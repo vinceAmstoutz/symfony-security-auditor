@@ -1,6 +1,9 @@
 # Contributing
 
-Thanks for considering a contribution. This guide walks through the dev setup, expected workflow, and PR checklist. New to the codebase? Start with the [Architecture overview](docs/architecture.md) — it explains the DDD layering and the dual-agent loop before you touch code.
+Thanks for considering a contribution. This guide walks through the dev setup,
+expected workflow, and PR checklist. New to the codebase? Start with the
+[Architecture overview](docs/architecture.md) — it explains the DDD layering and
+the dual-agent loop before you touch code.
 
 ## Table of Contents
 
@@ -43,7 +46,7 @@ Stop containers later with `bin/castor down`.
 
 ## Project Tour for New Contributors
 
-```
+```text
 src/
   Audit/
     Domain/          # Pure PHP — no framework, no I/O. Value objects, enums, ports.
@@ -57,13 +60,19 @@ tests/Phpunit/
   EndToEnd/          # Full pipeline with stubbed LLM responses.
 ```
 
-Strict dependency direction: `Command → Application → Domain ← Infrastructure`. Infrastructure never leaks into Domain or Application. The sole LLM seam is `LLMClientInterface` — Application agents never import `symfony/ai` types directly.
+Strict dependency direction: `Command → Application → Domain ← Infrastructure`.
+Infrastructure never leaks into Domain or Application. The sole LLM seam is
+`LLMClientInterface` — Application agents never import `symfony/ai` types
+directly.
 
 Read more:
 
-- [Architecture](docs/architecture.md) — layers, data flow, domain model, design decisions.
-- [Extending](docs/extending.md) — extension points (custom LLM client, agent, stage, report format).
-- [`.claude/rules/`](.claude/rules/) — path-scoped rules (DDD boundaries, immutability, LLM seam, testing).
+- [Architecture](docs/architecture.md) — layers, data flow, domain model, design
+  decisions.
+- [Extending](docs/extending.md) — extension points (custom LLM client, agent,
+  stage, report format).
+- [`.claude/rules/`](.claude/rules/) — path-scoped rules (DDD boundaries,
+  immutability, LLM seam, testing).
 
 ---
 
@@ -100,13 +109,13 @@ docker compose exec php vendor/bin/phpunit --testsuite EndToEnd
 ```
 
 | Suite       | Path                         | What it tests                            |
-|-------------|------------------------------|------------------------------------------|
+| ----------- | ---------------------------- | ---------------------------------------- |
 | Unit        | `tests/Phpunit/Unit/`        | Isolated logic, all I/O mocked           |
 | Integration | `tests/Phpunit/Integration/` | Real filesystem + stub LLM               |
 | EndToEnd    | `tests/Phpunit/EndToEnd/`    | Full workflow with fixture LLM responses |
 
-> End-to-end tests replace the LLM boundary with deterministic fixture responses.
-> No API credentials are required to run any test suite.
+> End-to-end tests replace the LLM boundary with deterministic fixture
+> responses. No API credentials are required to run any test suite.
 
 ---
 
@@ -116,7 +125,11 @@ docker compose exec php vendor/bin/phpunit --testsuite EndToEnd
 docker compose exec php bin/infection
 ```
 
-**100% MSI (Mutation Score Indicator) is required.** Every mutation must be killed. Suppression directives (`@infection-ignore-all`, `ignoreSourceCodeByRegex`, …) are not allowed — fix the underlying test gap instead. See [CLAUDE.md → Never Silence Quality Gates](CLAUDE.md#5-never-silence-quality-gates).
+**100% MSI (Mutation Score Indicator) is required.** Every mutation must be
+killed. Suppression directives (`@infection-ignore-all`,
+`ignoreSourceCodeByRegex`, …) are not allowed — fix the underlying test gap
+instead. See
+[CLAUDE.md → Never Silence Quality Gates](CLAUDE.md#5-never-silence-quality-gates).
 
 ---
 
@@ -130,32 +143,51 @@ bin/castor lint
 bin/castor lint:fix
 ```
 
-This runs: **Prettier** ([prettier](https://prettier.io/)) → **Markdown lint** ([markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2)) → `composer normalize` → PHP CS Fixer (@PER-CS3x0, @Symfony) → Rector → PHPStan max → PHPUnit → Infection.
+This runs: **Prettier** ([prettier](https://prettier.io/)) → **Markdown lint**
+([markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2)) →
+`composer normalize` → PHP CS Fixer (@PER-CS3x0, @Symfony) → Rector → PHPStan
+max → PHPUnit → Infection.
 
-Prettier and Markdown lint both run via Docker (`tmknom/prettier`, `davidanson/markdownlint-cli2`) so no local Node installation is required. Configs: [`.prettierrc.json`](.prettierrc.json), [`.markdownlint-cli2.jsonc`](.markdownlint-cli2.jsonc).
+Prettier and Markdown lint both run via Docker (`tmknom/prettier`,
+`davidanson/markdownlint-cli2`) so no local Node installation is required.
+Configs: [`.prettierrc.json`](.prettierrc.json),
+[`.markdownlint-cli2.jsonc`](.markdownlint-cli2.jsonc).
 
-- Prettier handles **formatting** (line wrap to 80, table alignment, list/fence style).
-- markdownlint handles **semantics** (heading hierarchy, broken anchors, missing image alt text).
+- Prettier handles **formatting** (line wrap to 80, table alignment, list/fence
+  style).
+- markdownlint handles **semantics** (heading hierarchy, broken anchors, missing
+  image alt text).
 
-**Commit messages are linted separately** in CI via [commitlint](https://commitlint.js.org/) (Conventional Commits). Config: [`commitlint.config.js`](commitlint.config.js). Run locally:
+**Commit messages are linted separately** in CI via
+[commitlint](https://commitlint.js.org/) (Conventional Commits). Config:
+[`commitlint.config.js`](commitlint.config.js). Run locally:
 
 ```bash
 npx --yes @commitlint/cli --from=origin/main --to=HEAD --config commitlint.config.js
 ```
 
-**No silent suppressions allowed.** PHPStan `@phpstan-ignore*`, baseline files, Rector skips, `@codeCoverageIgnore`, `markTestSkipped` used to dodge failures — all forbidden. If a tool flags something, fix the code. Genuine false positives require a PR-description justification and a linked tracking issue.
+**No silent suppressions allowed.** PHPStan `@phpstan-ignore*`, baseline files,
+Rector skips, `@codeCoverageIgnore`, `markTestSkipped` used to dodge failures —
+all forbidden. If a tool flags something, fix the code. Genuine false positives
+require a PR-description justification and a linked tracking issue.
 
 ---
 
 ## Writing Tests
 
 **Mock vs Stub rule:**
-- Use `createStub()` when the test only needs a return value (method-not-called → test still fails via assertions).
-- Use `createMock()` only when the test must fail if the method is not called (`expects(self::never())`, `expects(self::once())`, etc.).
 
-**TDD red/green/refactor.** Write the failing test first whenever practical. See [`.claude/rules/testing.md`](.claude/rules/testing.md) for the full convention.
+- Use `createStub()` when the test only needs a return value (method-not-called
+  → test still fails via assertions).
+- Use `createMock()` only when the test must fail if the method is not called
+  (`expects(self::never())`, `expects(self::once())`, etc.).
 
-**Domain models** (`src/Audit/Domain/Model/`) are immutable. State changes return new instances. See [`.claude/rules/domain-models.md`](.claude/rules/domain-models.md).
+**TDD red/green/refactor.** Write the failing test first whenever practical. See
+[`.claude/rules/testing.md`](.claude/rules/testing.md) for the full convention.
+
+**Domain models** (`src/Audit/Domain/Model/`) are immutable. State changes
+return new instances. See
+[`.claude/rules/domain-models.md`](.claude/rules/domain-models.md).
 
 ---
 
@@ -167,27 +199,35 @@ npx --yes @commitlint/cli --from=origin/main --to=HEAD --config commitlint.confi
 2. Extend `category()` and `owaspReference()` with the new case.
 3. Update `AttackerPromptBuilder` to mention the new type so the LLM emits it.
 4. Add a fixture in `tests/Phpunit/Fixtures/` that exercises the new case.
-5. Update the type list in [`docs/architecture.md`](docs/architecture.md#vulnerabilitytype--backed-enum-with-owasp-references).
+5. Update the type list in
+   [`docs/architecture.md`](docs/architecture.md#vulnerabilitytype--backed-enum-with-owasp-references).
 
 ### Add a new pipeline stage
 
-Implement `Audit/Domain/Pipeline/StageInterface`. Stages are auto-tagged via `symfony_security_auditor.pipeline_stage` in `config/services.php`. See [Extending → Custom Pipeline Stage](docs/extending.md#2-custom-pipeline-stage).
+Implement `Audit/Domain/Pipeline/StageInterface`. Stages are auto-tagged via
+`symfony_security_auditor.pipeline_stage` in `config/services.php`. See
+[Extending → Custom Pipeline Stage](docs/extending.md#2-custom-pipeline-stage).
 
 ### Add a new output format
 
 1. Add a case to `Command/OutputFormat`.
-2. Add a `render<Name>(AuditReport): string` method to `Audit/Infrastructure/Report/ReportRenderer`.
+2. Add a `render<Name>(AuditReport): string` method to
+   `Audit/Infrastructure/Report/ReportRenderer`.
 3. Add the matching arm in `Command/ReportWriter::write()`.
 
 ### Add a new advisory source (CVE feed)
 
-Implement `Audit/Infrastructure/Advisory/AdvisoryDatabaseInterface` and alias `AdvisoryDatabaseInterface` to your service in `config/services.yaml`. See [Configuration → Advisory Source](docs/configuration.md#advisory-source-lookup_advisory-tool).
+Implement `Audit/Infrastructure/Advisory/AdvisoryDatabaseInterface` and alias
+`AdvisoryDatabaseInterface` to your service in `config/services.yaml`. See
+[Configuration → Advisory Source](docs/configuration.md#advisory-source-lookup_advisory-tool).
 
 ### Swap the LLM provider
 
-`config/packages/ai.yaml` change only — no PHP edits. See [Configuration → Platform Configuration](docs/configuration.md#platform-configuration).
+`config/packages/ai.yaml` change only — no PHP edits. See
+[Configuration → Platform Configuration](docs/configuration.md#platform-configuration).
 
-For a custom client implementation (direct HTTP, retry logic, …) see [Extending → Custom LLM Client](docs/extending.md#1-custom-llm-client).
+For a custom client implementation (direct HTTP, retry logic, …) see
+[Extending → Custom LLM Client](docs/extending.md#1-custom-llm-client).
 
 ---
 
@@ -197,9 +237,13 @@ For a custom client implementation (direct HTTP, retry logic, …) see [Extendin
 2. Create a feature branch: `git checkout -b feat/my-feature`.
 3. Write tests for your change (unit + integration where applicable).
 4. Ensure all checks pass: `bin/castor lint`.
-5. Open a pull request — the [PR template](.github/PULL_REQUEST_TEMPLATE.md) will guide you.
+5. Open a pull request — the [PR template](.github/PULL_REQUEST_TEMPLATE.md)
+   will guide you.
 
-The CI pipeline runs six jobs: **Prettier Check** → **Markdown Lint** → **Commit Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max) → **Tests** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1) → **Mutation** (Infection 100% MSI). All six must pass before merging.
+The CI pipeline runs six jobs: **Prettier Check** → **Markdown Lint** → **Commit
+Lint** → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max) →
+**Tests** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1) →
+**Mutation** (Infection 100% MSI). All six must pass before merging.
 
 Details: [`docs/ci.md`](docs/ci.md).
 
@@ -209,7 +253,7 @@ Details: [`docs/ci.md`](docs/ci.md).
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
-```
+```text
 feat(agent): add IDOR detection to attacker agent
 fix(pipeline): handle empty LLM response in reviewer
 test(infrastructure): add integration test for ProjectFileScanner
@@ -217,31 +261,38 @@ docs(configuration): document dry-run CI usage
 chore(deps): bump symfony/ai to 0.10
 ```
 
-| Type       | When                              |
-|------------|-----------------------------------|
-| `feat`     | New user-facing feature           |
-| `fix`      | Bug fix                           |
-| `refactor` | Neither fix nor feature           |
-| `test`     | Adding/fixing tests               |
-| `docs`     | Documentation only                |
-| `chore`    | Maintenance/tooling               |
-| `build`    | Build system/deps                 |
-| `ci`       | CI configuration                  |
-| `perf`     | Performance improvement           |
+| Type       | When                    |
+| ---------- | ----------------------- |
+| `feat`     | New user-facing feature |
+| `fix`      | Bug fix                 |
+| `refactor` | Neither fix nor feature |
+| `test`     | Adding/fixing tests     |
+| `docs`     | Documentation only      |
+| `chore`    | Maintenance/tooling     |
+| `build`    | Build system/deps       |
+| `ci`       | CI configuration        |
+| `perf`     | Performance improvement |
 
-Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`, `deps`, `ci`.
-Breaking changes: `feat!:` with a `BREAKING CHANGE:` footer.
+Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`,
+`deps`, `ci`. Breaking changes: `feat!:` with a `BREAKING CHANGE:` footer.
 
 ---
 
 ## Code of Conduct
 
-Be respectful and constructive. Personal attacks, harassment, or dismissive behavior are not tolerated. Report problems privately to the maintainer (see [`composer.json`](composer.json) → `authors.email`).
+Be respectful and constructive. Personal attacks, harassment, or dismissive
+behavior are not tolerated. Report problems privately to the maintainer (see
+[`composer.json`](composer.json) → `authors.email`).
 
 ---
 
 ## Security
 
-Report vulnerabilities **in the auditor itself** privately via [GitHub Security Advisories](https://github.com/vinceamstoutz/symfony-security-auditor/security/advisories/new) — not in a public issue. See [SECURITY.md](.github/SECURITY.md) for the full policy.
+Report vulnerabilities **in the auditor itself** privately via
+[GitHub Security Advisories](https://github.com/vinceamstoutz/symfony-security-auditor/security/advisories/new)
+— not in a public issue. See [SECURITY.md](.github/SECURITY.md) for the full
+policy.
 
-Issues with audit output (false positives, missed vulnerabilities, weird LLM behavior) are not security issues — open them as normal GitHub issues with a reproducer, or check [Troubleshooting](docs/troubleshooting.md) first.
+Issues with audit output (false positives, missed vulnerabilities, weird LLM
+behavior) are not security issues — open them as normal GitHub issues with a
+reproducer, or check [Troubleshooting](docs/troubleshooting.md) first.
