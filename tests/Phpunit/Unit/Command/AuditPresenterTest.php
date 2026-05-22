@@ -106,6 +106,16 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString('CRITICAL risk level', $display);
     }
 
+    public function test_running_section_emits_section_header(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->runningSection($symfonyStyle);
+
+        self::assertStringContainsString('Running audit pipeline', $bufferedOutput->fetch());
+    }
+
     private function makeCriticalReport(): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);

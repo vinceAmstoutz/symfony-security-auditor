@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
 
+use Closure;
 use Symfony\Component\Process\Exception\ExceptionInterface;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
@@ -27,19 +28,32 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
 {
     public const int DEFAULT_TIMEOUT_SECONDS = 60;
 
+    /**
+     * @param ?Closure(string): Process $processBuilder defaults to the standard composer-audit command; tests inject a stub
+     */
     public function __construct(
         private int $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,
+        private ?Closure $processBuilder = null,
     ) {}
+
+    /**
+     * @return Closure(string): Process
+     */
+    public static function defaultProcessBuilder(): Closure
+    {
+        return static fn (string $path): Process => new Process(
+            ['composer', 'audit', '--format=json', '--locked', '--no-interaction'],
+            $path,
+        );
+    }
 
     public function run(string $projectPath): string
     {
-        $process = new Process(
-            ['composer', 'audit', '--format=json', '--locked', '--no-interaction'],
-            $projectPath,
-        );
-        $process->setTimeout((float) $this->timeoutSeconds);
+        $builder = $this->processBuilder ?? self::defaultProcessBuilder();
+        $process = $builder($projectPath);
 
         try {
+            $process->setTimeout((float) $this->timeoutSeconds);
             $process->run();
         } catch (ExceptionInterface $exception) {
             throw AdvisorySourceUnavailableException::forBinaryNotFound($exception);
@@ -47,7 +61,7 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
 
         $stdout = $process->getOutput();
         if ('' === trim($stdout)) {
-            throw AdvisorySourceUnavailableException::forFailedProcess($projectPath, $process->getErrorOutput() ?: 'empty stdout', new ProcessFailedException($process));
+            throw AdvisorySourceUnavailableException::forFailedProcess($projectPath, $process->getErrorOutput() ?: 'empty stdout', $process->isSuccessful() ? null : new ProcessFailedException($process));
         }
 
         return $stdout;

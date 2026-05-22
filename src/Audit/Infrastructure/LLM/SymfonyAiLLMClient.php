@@ -19,7 +19,11 @@ use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\AI\Platform\Result\MultiPartResult;
+use Symfony\AI\Platform\Result\ResultInterface;
+use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
+use Symfony\AI\Platform\Result\ToolCallResult;
 use Symfony\AI\Platform\Tool\ExecutionReference;
 use Symfony\AI\Platform\Tool\Tool;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
@@ -107,10 +111,11 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         $iteration = 0;
         while ($iteration < $maxToolIterations) {
             $deferred = $this->platform->invoke($this->model, $messageBag, $options);
-            $toolCalls = $deferred->asToolCalls();
+            $platformResult = $deferred->getResult();
+            $toolCalls = $this->extractToolCalls($platformResult);
 
             if ([] === $toolCalls) {
-                $content = $deferred->asText();
+                $content = $this->extractText($platformResult);
                 $this->logger->debug('Tool-using loop ended with text response', [
                     'iterations' => $iteration,
                     'content_length' => \strlen($content),
@@ -155,6 +160,39 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
     public function model(): string
     {
         return $this->model;
+    }
+
+    /**
+     * @return list<ToolCall>
+     */
+    private function extractToolCalls(ResultInterface $result): array
+    {
+        if ($result instanceof ToolCallResult) {
+            return array_values($result->getContent());
+        }
+
+        if ($result instanceof MultiPartResult) {
+            foreach ($result->getContent() as $part) {
+                if ($part instanceof ToolCallResult) {
+                    return array_values($part->getContent());
+                }
+            }
+        }
+
+        return [];
+    }
+
+    private function extractText(ResultInterface $result): string
+    {
+        if ($result instanceof TextResult) {
+            return $result->getContent();
+        }
+
+        if ($result instanceof MultiPartResult) {
+            return $result->asText();
+        }
+
+        return '';
     }
 
     /**

@@ -16,7 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Validator\ConstraintViolationListInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
@@ -35,13 +34,6 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     public function runningSection(SymfonyStyle $symfonyStyle): void
     {
         $symfonyStyle->section('Running audit pipeline...');
-    }
-
-    public function violations(SymfonyStyle $symfonyStyle, ConstraintViolationListInterface $constraintViolationList): void
-    {
-        foreach ($constraintViolationList as $violation) {
-            $symfonyStyle->error((string) $violation->getMessage());
-        }
     }
 
     public function error(SymfonyStyle $symfonyStyle, Throwable $throwable): void

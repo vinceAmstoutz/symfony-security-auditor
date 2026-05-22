@@ -13,12 +13,13 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Cache;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 
 final class FilesystemAttackerCacheTest extends TestCase
@@ -32,6 +33,19 @@ final class FilesystemAttackerCacheTest extends TestCase
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
 
         self::assertNull($this->filesystemAttackerCache->get($chunk));
+    }
+
+    public function test_get_returns_null_and_skips_read_when_no_entry_exists(): void
+    {
+        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+
+        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem->method('exists')->willReturn(false);
+        $filesystem->expects(self::never())->method('readFile');
+
+        $filesystemAttackerCache = new FilesystemAttackerCache($this->cacheDir, $filesystem, new NullLogger());
+
+        self::assertNull($filesystemAttackerCache->get($chunk));
     }
 
     public function test_round_trip_store_and_get_returns_same_payload(): void
@@ -108,8 +122,59 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     public function test_constructor_rejects_empty_cache_dir(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidCacheConfigurationException::class);
         new FilesystemAttackerCache('   ', new Filesystem(), new NullLogger());
+    }
+
+    public function test_get_returns_null_when_filesystem_read_throws_io_exception(): void
+    {
+        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem->method('exists')->willReturn(true);
+        $filesystem->method('readFile')->willThrowException(new IOException('permission denied'));
+
+        $filesystemAttackerCache = new FilesystemAttackerCache($this->cacheDir, $filesystem, new NullLogger());
+
+        self::assertNull($filesystemAttackerCache->get([ProjectFile::create('a.php', '/app/a.php', '<?php')]));
+    }
+
+    public function test_get_logs_warning_with_path_and_error_keys_when_filesystem_read_throws_io_exception(): void
+    {
+        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem->method('exists')->willReturn(true);
+        $filesystem->method('readFile')->willThrowException(new IOException('permission denied'));
+
+        /** @var list<array{string, array<string, string>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('debug');
+
+        $filesystemAttackerCache = new FilesystemAttackerCache($this->cacheDir, $filesystem, $logger);
+        $filesystemAttackerCache->get([ProjectFile::create('a.php', '/app/a.php', '<?php')]);
+
+        self::assertCount(1, $warnings);
+        self::assertSame('Attacker cache entry was unreadable, ignoring', $warnings[0][0]);
+        $context = $warnings[0][1];
+        self::assertArrayHasKey('path', $context);
+        self::assertArrayHasKey('error', $context);
+        self::assertSame('permission denied', $context['error']);
+    }
+
+    public function test_get_skips_non_array_entries_in_decoded_cache_payload(): void
+    {
+        $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
+        $this->filesystemAttackerCache->store($chunk, [['type' => 'sql_injection']]);
+
+        $files = glob($this->cacheDir.'/*/*.json') ?: [];
+        file_put_contents($files[0], '[123, {"type":"sql_injection","severity":"high"}, "scalar", null]');
+
+        $entries = $this->filesystemAttackerCache->get($chunk);
+
+        self::assertSame([['type' => 'sql_injection', 'severity' => 'high']], $entries);
     }
 
     public function test_get_logs_warning_when_cache_entry_is_unreadable_json(): void

@@ -16,6 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use RuntimeException;
+use Symfony\Component\Finder\SplFileInfo;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 
@@ -257,6 +259,47 @@ final class ProjectFileScannerTest extends TestCase
 
         self::assertCount(1, $files);
         self::assertSame('src/Small.php', $files[0]->relativePath());
+    }
+
+    public function test_it_logs_warning_and_skips_files_whose_contents_cannot_be_read(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Readable.php', '<?php');
+        file_put_contents($this->tmpDir.'/src/Unreadable.php', '<?php');
+
+        /** @var list<array{string, array<string, string>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('info');
+
+        $reader = static function (SplFileInfo $splFile): string {
+            if (str_ends_with($splFile->getPathname(), 'Unreadable.php')) {
+                throw new RuntimeException('disk read error');
+            }
+
+            return $splFile->getContents();
+        };
+
+        $projectFileScanner = new ProjectFileScanner($logger, fileReader: $reader);
+        $files = $projectFileScanner->scan($this->tmpDir);
+
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files);
+        self::assertSame(['src/Readable.php'], $paths);
+
+        self::assertCount(1, $warnings);
+        self::assertSame('Failed to read file', $warnings[0][0]);
+        $context = $warnings[0][1];
+        $path = $context['path'];
+        $error = $context['error'];
+        self::assertIsString($path);
+        self::assertIsString($error);
+        self::assertStringEndsWith('Unreadable.php', $path);
+        self::assertSame('disk read error', $error);
     }
 
     protected function setUp(): void

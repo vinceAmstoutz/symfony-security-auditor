@@ -13,13 +13,14 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache;
 
-use InvalidArgumentException;
 use JsonException;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 
 final readonly class FilesystemAttackerCache implements AttackerCacheInterface
 {
@@ -29,7 +30,7 @@ final readonly class FilesystemAttackerCache implements AttackerCacheInterface
         private LoggerInterface $logger,
     ) {
         if ('' === trim($cacheDir)) {
-            throw new InvalidArgumentException('Attacker cache dir cannot be empty');
+            throw InvalidCacheConfigurationException::forEmptyCacheDir();
         }
     }
 
@@ -42,10 +43,7 @@ final readonly class FilesystemAttackerCache implements AttackerCacheInterface
         }
 
         try {
-            $raw = file_get_contents($path);
-            if (false === $raw) {
-                return null;
-            }
+            $raw = $this->filesystem->readFile($path);
 
             // Raw json_decode (over symfony/serializer) is deliberate: cache stores opaque
             // vulnerability dicts that VulnerabilityFactory::fromList() tolerates partially,
@@ -58,6 +56,13 @@ final readonly class FilesystemAttackerCache implements AttackerCacheInterface
             $this->logger->debug('Attacker cache hit', ['path' => $path]);
 
             return $this->coerceToEntries($decoded);
+        } catch (IOException $ioException) {
+            $this->logger->warning('Attacker cache entry was unreadable, ignoring', [
+                'path' => $path,
+                'error' => $ioException->getMessage(),
+            ]);
+
+            return null;
         } catch (JsonException $jsonException) {
             $this->logger->warning('Attacker cache entry was unreadable, ignoring', [
                 'path' => $path,

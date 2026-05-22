@@ -13,9 +13,9 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
-use RuntimeException;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\Option;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
 // Symfony Console MapInput reflects class properties and requires public mutable fields
 // with property-level defaults; promoted readonly ctor params are invisible to its reflection.
@@ -31,15 +31,18 @@ final class AuditCommandInput
     #[Option(description: 'Output file path (for json or sarif format)', shortcut: 'o')]
     public ?string $output = null;
 
-    public function resolvedProjectPath(): string
+    /**
+     * @param ?callable(): (string|false) $cwdResolver defaults to PHP's getcwd; tests inject a stub
+     */
+    public function resolvedProjectPath(?callable $cwdResolver = null): string
     {
         if (null !== $this->projectPath && '' !== trim($this->projectPath)) {
             return $this->projectPath;
         }
 
-        $cwd = getcwd();
+        $cwd = ($cwdResolver ?? \getcwd(...))();
         if (false === $cwd) {
-            throw new RuntimeException('Failed to determine current working directory; pass an explicit project path.');
+            throw WorkingDirectoryUnavailableException::fromGetcwdFailure();
         }
 
         return $cwd;

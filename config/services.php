@@ -59,6 +59,8 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_it
 return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator = $containerConfigurator->services()
         ->defaults()
+            ->autowire()
+            ->autoconfigure()
             ->private();
 
     $defaultsConfigurator
@@ -180,7 +182,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->args([
             service(RunAuditUseCase::class),
             service(ReportWriterInterface::class),
-            service('validator'),
             service(AuditExitCodeResolverInterface::class),
             service(AuditPresenterInterface::class),
         ])

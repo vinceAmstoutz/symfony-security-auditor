@@ -18,6 +18,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
@@ -149,6 +150,13 @@ final class AuditOrchestratorTest extends TestCase
             ->willReturnCallback(static function () use (&$iterationCount): array {
                 ++$iterationCount;
 
+                // Safety bound: if the orchestrator runs the loop more than its declared
+                // max_iterations (e.g. a faulty counter mutation), fail loud instead of
+                // looping forever. The orchestrator must call analyze exactly 3 times.
+                if ($iterationCount > 10) {
+                    throw new RuntimeException('orchestrator exceeded safety bound: '.$iterationCount.' analyze calls');
+                }
+
                 return [Vulnerability::create(
                     VulnerabilityType::SQL_INJECTION,
                     VulnerabilitySeverity::HIGH,
@@ -176,6 +184,7 @@ final class AuditOrchestratorTest extends TestCase
         $this->auditOrchestrator->orchestrate($auditContext);
 
         self::assertSame(3, $auditContext->getMeta('audit.iterations'));
+        self::assertSame(3, $iterationCount);
     }
 
     public function test_it_accepts_vulnerability_at_exact_confidence_threshold(): void

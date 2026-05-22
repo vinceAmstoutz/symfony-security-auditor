@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Validator\ConstraintViolationListInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
@@ -23,8 +22,6 @@ interface AuditPresenterInterface
     public function header(SymfonyStyle $symfonyStyle, string $projectPath): void;
 
     public function runningSection(SymfonyStyle $symfonyStyle): void;
-
-    public function violations(SymfonyStyle $symfonyStyle, ConstraintViolationListInterface $constraintViolationList): void;
 
     public function error(SymfonyStyle $symfonyStyle, Throwable $throwable): void;
 

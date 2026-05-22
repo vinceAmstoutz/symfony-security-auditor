@@ -52,6 +52,10 @@
             <parameter name="maximum-count" value="3"/>
             <parameter name="maximum-duration" value="50"/>
         </bootstrap>
+        <bootstrap class="RobinIngelbrecht\PHPUnitCoverageTools\PhpUnitExtension">
+            <parameter name="exitOnLowCoverage" value="1"/>
+            <parameter name="cleanUpCloverXml" value="0"/>
+        </bootstrap>
     </extensions>
 
 </phpunit>

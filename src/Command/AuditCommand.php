@@ -17,7 +17,6 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\MapInput;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 
@@ -30,7 +29,6 @@ final readonly class AuditCommand
     public function __construct(
         private RunAuditUseCase $runAuditUseCase,
         private ReportWriterInterface $reportWriter,
-        private ValidatorInterface $validator,
         private AuditExitCodeResolverInterface $auditExitCodeResolver,
         private AuditPresenterInterface $auditPresenter,
     ) {}
@@ -39,20 +37,7 @@ final readonly class AuditCommand
         SymfonyStyle $symfonyStyle,
         #[MapInput] AuditCommandInput $auditCommandInput,
     ): int {
-        $constraintViolationList = $this->validator->validate($auditCommandInput);
-        if (\count($constraintViolationList) > 0) {
-            $this->auditPresenter->violations($symfonyStyle, $constraintViolationList);
-
-            return Command::FAILURE;
-        }
-
-        try {
-            $projectPath = $auditCommandInput->resolvedProjectPath();
-        } catch (Throwable $throwable) {
-            $this->auditPresenter->error($symfonyStyle, $throwable);
-
-            return Command::FAILURE;
-        }
+        $projectPath = $auditCommandInput->resolvedProjectPath();
 
         $this->auditPresenter->header($symfonyStyle, $projectPath);
 

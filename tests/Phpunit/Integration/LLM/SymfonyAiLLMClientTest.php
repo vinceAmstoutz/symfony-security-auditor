@@ -1,0 +1,593 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM;
+
+use Closure;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use Symfony\AI\Platform\Message\AssistantMessage;
+use Symfony\AI\Platform\Message\MessageBag;
+use Symfony\AI\Platform\Message\MessageInterface;
+use Symfony\AI\Platform\Message\ToolCallMessage;
+use Symfony\AI\Platform\ModelCatalog\FallbackModelCatalog;
+use Symfony\AI\Platform\ModelCatalog\ModelCatalogInterface;
+use Symfony\AI\Platform\PlainConverter;
+use Symfony\AI\Platform\PlatformInterface;
+use Symfony\AI\Platform\Result\BaseResult;
+use Symfony\AI\Platform\Result\DeferredResult;
+use Symfony\AI\Platform\Result\InMemoryRawResult;
+use Symfony\AI\Platform\Result\MultiPartResult;
+use Symfony\AI\Platform\Result\ResultInterface;
+use Symfony\AI\Platform\Result\TextResult;
+use Symfony\AI\Platform\Result\ToolCall;
+use Symfony\AI\Platform\Result\ToolCallResult;
+use Symfony\AI\Platform\Test\InMemoryPlatform;
+use Symfony\AI\Platform\Tool\Tool;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
+
+final class SymfonyAiLLMClientTest extends TestCase
+{
+    public function test_complete_returns_text_from_platform_invoke(): void
+    {
+        $inMemoryPlatform = new InMemoryPlatform('Hello from LLM');
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', new NullLogger());
+
+        $llmResponse = $symfonyAiLLMClient->complete('You are a helper.', 'Tell me a joke.');
+
+        self::assertSame('Hello from LLM', $llmResponse->content());
+        self::assertSame('test-model', $llmResponse->model());
+        self::assertSame('end_turn', $llmResponse->stopReason());
+        self::assertSame(0, $llmResponse->inputTokens());
+        self::assertSame(0, $llmResponse->outputTokens());
+    }
+
+    public function test_complete_logs_debug_with_prompt_lengths_and_temperature(): void
+    {
+        $inMemoryPlatform = new InMemoryPlatform('ok');
+        /** @var list<array{string, array<string, mixed>}> $logs */
+        $logs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$logs): void {
+                $logs[] = [$msg, $ctx];
+            },
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', $logger, temperature: 0.42);
+        $symfonyAiLLMClient->complete('sys', 'usr-message');
+
+        $startLog = $logs[0];
+        self::assertSame('Invoking symfony/ai platform', $startLog[0]);
+        self::assertSame(3, $startLog[1]['system_length']);
+        self::assertSame(11, $startLog[1]['user_length']);
+        self::assertSame(0.42, $startLog[1]['temperature']);
+        self::assertFalse($startLog[1]['prompt_caching']);
+    }
+
+    public function test_complete_logs_debug_response_with_content_length(): void
+    {
+        $inMemoryPlatform = new InMemoryPlatform('twelve-chars');
+        /** @var list<array{string, array<string, mixed>}> $logs */
+        $logs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$logs): void {
+                $logs[] = [$msg, $ctx];
+            },
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', $logger);
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        $respondedLogs = array_values(array_filter(
+            $logs,
+            static fn (array $entry): bool => 'symfony/ai platform responded' === $entry[0],
+        ));
+
+        self::assertCount(1, $respondedLogs);
+        self::assertSame(12, $respondedLogs[0][1]['content_length']);
+    }
+
+    public function test_complete_passes_temperature_via_options(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $inMemoryPlatform = new InMemoryPlatform(
+            /** @param array<string, mixed> $options */
+            static function (object $model, mixed $input, array $options) use ($invocationOptionsCapture): TextResult {
+                $invocationOptionsCapture->options ??= $options;
+
+                return new TextResult('out');
+            },
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', new NullLogger(), temperature: 0.7);
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertSame(0.7, $invocationOptionsCapture->options['temperature']);
+        self::assertArrayNotHasKey('cache_control', $invocationOptionsCapture->options);
+    }
+
+    public function test_complete_passes_prompt_caching_flag_when_enabled(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $inMemoryPlatform = new InMemoryPlatform(
+            /** @param array<string, mixed> $options */
+            static function (object $model, mixed $input, array $options) use ($invocationOptionsCapture): TextResult {
+                $invocationOptionsCapture->options ??= $options;
+
+                return new TextResult('out');
+            },
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', new NullLogger(), promptCaching: true);
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertSame(['type' => 'ephemeral'], $invocationOptionsCapture->options['cache_control']);
+    }
+
+    public function test_model_returns_configured_model_name(): void
+    {
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform(''), 'claude-test', new NullLogger());
+
+        self::assertSame('claude-test', $symfonyAiLLMClient->model());
+    }
+
+    public function test_complete_with_tools_returns_text_when_platform_emits_no_tool_calls(): void
+    {
+        $platform = $this->scriptedPlatform([
+            new MultiPartResult([new TextResult('done')]),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+
+        $toolRegistry = new ToolRegistry([$this->makeTool('lookup', 'description here')], new NullLogger());
+
+        $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 3);
+
+        self::assertSame('done', $llmResponse->content());
+        self::assertSame('end_turn', $llmResponse->stopReason());
+        self::assertSame(0, $llmResponse->inputTokens());
+        self::assertSame(0, $llmResponse->outputTokens());
+    }
+
+    public function test_complete_with_tools_executes_tool_calls_then_returns_final_text(): void
+    {
+        $tool = $this->makeTool('lookup', 'looks things up', static fn (array $args): string => 'tool-result');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        $platform = $this->scriptedPlatform([
+            new MultiPartResult([new ToolCallResult([new ToolCall('call-1', 'lookup', ['q' => 'test'])])]),
+            new MultiPartResult([new TextResult('final answer')]),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
+
+        self::assertSame('final answer', $llmResponse->content());
+        self::assertSame('end_turn', $llmResponse->stopReason());
+    }
+
+    public function test_complete_with_tools_stops_at_iteration_cap_and_warns(): void
+    {
+        $tool = $this->makeTool('lookup', 'lookup');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        /** @var list<array{string, array<string, mixed>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug');
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $platform = $this->scriptedPlatform([
+            new MultiPartResult([new ToolCallResult([new ToolCall('1', 'lookup')])]),
+            new MultiPartResult([new ToolCallResult([new ToolCall('2', 'lookup')])]),
+            new MultiPartResult([new ToolCallResult([new ToolCall('3', 'lookup')])]),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', $logger);
+        $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 2);
+
+        self::assertSame('', $llmResponse->content());
+        self::assertSame('max_tool_iterations', $llmResponse->stopReason());
+        self::assertSame(0, $llmResponse->inputTokens());
+        self::assertSame(0, $llmResponse->outputTokens());
+
+        $capLogs = array_values(array_filter(
+            $warnings,
+            static fn (array $entry): bool => 'Tool-using loop hit iteration cap' === $entry[0],
+        ));
+        self::assertCount(1, $capLogs);
+        self::assertSame(2, $capLogs[0][1]['max_iterations']);
+    }
+
+    public function test_complete_with_tools_invokes_platform_exact_max_iterations_times_when_all_iterations_return_tool_calls(): void
+    {
+        $tool = $this->makeTool('lookup', 'lookup');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        $platformInvocationLog = new PlatformInvocationLog();
+        $platform = $this->scriptedPlatform(
+            [
+                new MultiPartResult([new ToolCallResult([new ToolCall('1', 'lookup')])]),
+                new MultiPartResult([new ToolCallResult([new ToolCall('2', 'lookup')])]),
+                new MultiPartResult([new ToolCallResult([new ToolCall('3', 'lookup')])]),
+            ],
+            $platformInvocationLog,
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 2);
+
+        self::assertSame(2, $platformInvocationLog->invocations);
+    }
+
+    public function test_complete_with_tools_logs_loop_ended_debug_with_iterations_count_and_content_length(): void
+    {
+        $toolRegistry = new ToolRegistry([$this->makeTool('lookup', 'lookup')], new NullLogger());
+
+        /** @var list<array{string, array<string, mixed>}> $logs */
+        $logs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$logs): void {
+                $logs[] = [$msg, $ctx];
+            },
+        );
+
+        $platform = $this->scriptedPlatform([
+            new MultiPartResult([new ToolCallResult([new ToolCall('1', 'lookup')])]),
+            new MultiPartResult([new TextResult('finished-12c')]),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', $logger);
+        $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
+
+        $endedLogs = array_values(array_filter(
+            $logs,
+            static fn (array $entry): bool => 'Tool-using loop ended with text response' === $entry[0],
+        ));
+
+        self::assertCount(1, $endedLogs);
+        self::assertSame(1, $endedLogs[0][1]['iterations']);
+        self::assertSame(12, $endedLogs[0][1]['content_length']);
+    }
+
+    public function test_complete_with_tools_appends_assistant_message_then_tool_call_message_between_iterations(): void
+    {
+        $tool = $this->makeTool('lookup', 'lookup', static fn (array $args): string => 'tool-output');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        $platformInvocationLog = new PlatformInvocationLog();
+        $platform = $this->scriptedPlatform(
+            [
+                new MultiPartResult([new ToolCallResult([new ToolCall('call-1', 'lookup', ['q' => 'v'])])]),
+                new MultiPartResult([new TextResult('done')]),
+            ],
+            $platformInvocationLog,
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
+
+        self::assertSame(2, $platformInvocationLog->invocations);
+        $secondInvocationMessages = $platformInvocationLog->messageSnapshots[1];
+
+        $hasAssistant = false;
+        $hasToolCall = false;
+        foreach ($secondInvocationMessages as $secondInvocationMessage) {
+            if ($secondInvocationMessage instanceof AssistantMessage) {
+                $hasAssistant = true;
+            }
+
+            if ($secondInvocationMessage instanceof ToolCallMessage) {
+                $hasToolCall = true;
+            }
+        }
+
+        self::assertTrue($hasAssistant, 'Second invoke should receive an AssistantMessage carrying the prior tool calls');
+        self::assertTrue($hasToolCall, 'Second invoke should receive a ToolCallMessage carrying the tool execution result');
+    }
+
+    public function test_complete_with_tools_logs_tool_invocation_with_tool_name_and_iteration_number(): void
+    {
+        $tool = $this->makeTool('lookup', 'lookup', static fn (array $args): string => 'ok');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        /** @var list<array{string, array<string, mixed>}> $logs */
+        $logs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$logs): void {
+                $logs[] = [$msg, $ctx];
+            },
+        );
+
+        $platform = $this->scriptedPlatform([
+            new MultiPartResult([new ToolCallResult([new ToolCall('1', 'lookup')])]),
+            new MultiPartResult([new TextResult('done')]),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', $logger);
+        $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
+
+        $toolInvokedLogs = array_values(array_filter(
+            $logs,
+            static fn (array $entry): bool => 'Tool invoked' === $entry[0],
+        ));
+
+        self::assertCount(1, $toolInvokedLogs);
+        self::assertSame('lookup', $toolInvokedLogs[0][1]['tool']);
+        self::assertSame(1, $toolInvokedLogs[0][1]['iteration']);
+    }
+
+    public function test_complete_with_tools_passes_tool_definitions_in_options(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(
+            new MultiPartResult([new TextResult('done')]),
+            $invocationOptionsCapture,
+        );
+
+        $tool = $this->makeTool(
+            'fetch_file',
+            'reads a file from disk',
+            parametersSchema: [
+                'type' => 'object',
+                'properties' => [
+                    'path' => ['type' => 'string', 'description' => 'file path'],
+                    123 => ['type' => 'string', 'description' => 'ignored — non-string key'],
+                    'bogus_spec' => 'not-an-array',
+                    'malformed_type' => ['type' => 42, 'description' => null],
+                ],
+                'required' => ['path', 456],
+            ],
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient->completeWithTools('sys', 'usr', new ToolRegistry([$tool], new NullLogger()), 3);
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertArrayHasKey('tools', $invocationOptionsCapture->options);
+        $tools = $invocationOptionsCapture->options['tools'];
+        self::assertIsArray($tools);
+        self::assertCount(1, $tools);
+
+        $platformTool = $tools[0];
+        self::assertInstanceOf(Tool::class, $platformTool);
+        self::assertSame('fetch_file', $platformTool->getName());
+        self::assertSame('reads a file from disk', $platformTool->getDescription());
+
+        $parameters = $platformTool->getParameters();
+        self::assertNotNull($parameters);
+        self::assertSame('object', $parameters['type']);
+        self::assertSame(['path'], $parameters['required']);
+        $properties = $parameters['properties'];
+        self::assertArrayHasKey('path', $properties);
+        self::assertSame('string', $properties['path']['type']);
+        self::assertSame('file path', $properties['path']['description']);
+        self::assertSame('string', $properties['malformed_type']['type']);
+        self::assertSame('', $properties['malformed_type']['description']);
+    }
+
+    public function test_complete_with_tools_handles_bare_tool_call_result_not_wrapped_in_multipart(): void
+    {
+        $tool = $this->makeTool('lookup', 'lookup', static fn (array $args): string => 'ok');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        $platform = $this->scriptedPlatform([
+            new ToolCallResult([new ToolCall('1', 'lookup')]),
+            new MultiPartResult([new TextResult('final')]),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
+
+        self::assertSame('final', $llmResponse->content());
+    }
+
+    public function test_complete_with_tools_handles_bare_text_result_not_wrapped_in_multipart(): void
+    {
+        $tool = $this->makeTool('lookup', 'lookup');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        $platform = $this->scriptedPlatform([new TextResult('plain text')]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 3);
+
+        self::assertSame('plain text', $llmResponse->content());
+    }
+
+    public function test_complete_with_tools_falls_back_to_empty_text_when_platform_returns_unknown_result_type(): void
+    {
+        $tool = $this->makeTool('lookup', 'lookup');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        $unknownResult = new class extends BaseResult {
+            /** @return list<never> */
+            public function getContent(): array
+            {
+                return [];
+            }
+        };
+
+        $platform = $this->scriptedPlatform([$unknownResult]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 3);
+
+        self::assertSame('', $llmResponse->content());
+        self::assertSame('end_turn', $llmResponse->stopReason());
+    }
+
+    public function test_complete_with_tools_normalize_schema_tolerates_missing_properties_and_required(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(
+            new MultiPartResult([new TextResult('done')]),
+            $invocationOptionsCapture,
+        );
+
+        $tool = $this->makeTool(
+            'no_schema',
+            'no schema',
+            parametersSchema: [
+                'properties' => 'not-an-array',
+                'required' => 'not-a-list',
+            ],
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient->completeWithTools('sys', 'usr', new ToolRegistry([$tool], new NullLogger()), 1);
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        $tools = $invocationOptionsCapture->options['tools'];
+        self::assertIsArray($tools);
+        $platformTool = $tools[0];
+        self::assertInstanceOf(Tool::class, $platformTool);
+        $parameters = $platformTool->getParameters();
+        self::assertNotNull($parameters);
+        self::assertSame([], $parameters['properties']);
+        self::assertSame([], $parameters['required']);
+    }
+
+    /**
+     * @param list<ResultInterface> $scriptedResults
+     */
+    private function scriptedPlatform(array $scriptedResults, ?PlatformInvocationLog $platformInvocationLog = null): PlatformInterface
+    {
+        return new class($scriptedResults, $platformInvocationLog) implements PlatformInterface {
+            /** @var list<ResultInterface> */
+            private array $remaining;
+
+            /**
+             * @param list<ResultInterface> $scriptedResults
+             */
+            public function __construct(
+                array $scriptedResults,
+                private readonly ?PlatformInvocationLog $platformInvocationLog,
+            ) {
+                $this->remaining = $scriptedResults;
+            }
+
+            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                if ($this->platformInvocationLog instanceof PlatformInvocationLog) {
+                    ++$this->platformInvocationLog->invocations;
+                    if ($input instanceof MessageBag) {
+                        $this->platformInvocationLog->messageSnapshots[] = $input->getMessages();
+                    }
+                }
+
+                $result = array_shift($this->remaining) ?? new TextResult('exhausted');
+
+                return new DeferredResult(
+                    new PlainConverter($result),
+                    new InMemoryRawResult(['text' => ''], [], (object) []),
+                    $options,
+                );
+            }
+
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+    }
+
+    private function scriptedPlatformCapturingOptions(
+        ResultInterface $result,
+        InvocationOptionsCapture $invocationOptionsCapture,
+    ): PlatformInterface {
+        return new class($result, $invocationOptionsCapture) implements PlatformInterface {
+            public function __construct(
+                private readonly ResultInterface $result,
+                private readonly InvocationOptionsCapture $invocationOptionsCapture,
+            ) {}
+
+            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                $this->invocationOptionsCapture->options ??= $options;
+
+                return new DeferredResult(
+                    new PlainConverter($this->result),
+                    new InMemoryRawResult(['text' => ''], [], (object) []),
+                    $options,
+                );
+            }
+
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+    }
+
+    /**
+     * @param ?Closure(array<string, mixed>): string $executor
+     * @param array<string, mixed>                   $parametersSchema
+     */
+    private function makeTool(
+        string $name,
+        string $description,
+        ?Closure $executor = null,
+        array $parametersSchema = ['type' => 'object', 'properties' => [], 'required' => []],
+    ): ToolInterface {
+        return new class($name, $description, $executor, $parametersSchema) implements ToolInterface {
+            /**
+             * @param ?Closure(array<string, mixed>): string $executor
+             * @param array<string, mixed>                   $parametersSchema
+             */
+            public function __construct(
+                private readonly string $name,
+                private readonly string $description,
+                private readonly ?Closure $executor,
+                private readonly array $parametersSchema,
+            ) {}
+
+            public function definition(): ToolDefinition
+            {
+                return new ToolDefinition($this->name, $this->description, $this->parametersSchema);
+            }
+
+            public function execute(array $arguments): string
+            {
+                return $this->executor instanceof Closure ? ($this->executor)($arguments) : 'ok';
+            }
+        };
+    }
+}
+
+final class InvocationOptionsCapture
+{
+    /** @var ?array<int|string, mixed> */
+    public ?array $options = null;
+}
+
+final class PlatformInvocationLog
+{
+    public int $invocations = 0;
+
+    /** @var list<list<MessageInterface>> */
+    public array $messageSnapshots = [];
+}

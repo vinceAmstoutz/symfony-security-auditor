@@ -73,7 +73,7 @@ function runCodeQualityTools(bool $fixMode = false): void
     run('docker compose exec php vendor/bin/phpstan analyse --memory-limit=500M');
 
     io()->section('PHPUnit');
-    run('docker compose exec php vendor/bin/phpunit');
+    run('docker compose exec php vendor/bin/phpunit --coverage-clover=build/coverage/clover.xml -d --min-coverage=100');
 
     io()->section('Infection');
     run('docker compose exec php bin/infection');

@@ -108,6 +108,50 @@ final class ProjectFileTest extends TestCase
         self::assertFalse($withoutAnnotation->hasSecurityAnnotations());
     }
 
+    public function test_it_detects_legacy_at_isgranted_annotation_in_doc_comment(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/LegacyController.php',
+            '/app/src/Controller/LegacyController.php',
+            '<?php /** @IsGranted("ROLE_ADMIN") */ class LegacyController {}',
+        );
+
+        self::assertTrue($projectFile->hasSecurityAnnotations());
+    }
+
+    public function test_it_detects_deny_access_unless_granted_call(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/GuardedController.php',
+            '/app/src/Controller/GuardedController.php',
+            '<?php class GuardedController { public function action() { $this->denyAccessUnlessGranted("ROLE_USER"); } }',
+        );
+
+        self::assertTrue($projectFile->hasSecurityAnnotations());
+    }
+
+    public function test_it_detects_security_yaml_key(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/security.yaml',
+            '/app/config/packages/security.yaml',
+            "security:\n    providers: {}",
+        );
+
+        self::assertTrue($projectFile->hasSecurityAnnotations());
+    }
+
+    public function test_absolute_path_returns_the_absolute_path_passed_at_creation(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Foo.php',
+            '/srv/app/src/Foo.php',
+            '<?php',
+        );
+
+        self::assertSame('/srv/app/src/Foo.php', $projectFile->absolutePath());
+    }
+
     public function test_it_detects_keyword_in_content(): void
     {
         $projectFile = ProjectFile::create('src/Repo.php', '/app/src/Repo.php', '<?php $conn->query($input);');

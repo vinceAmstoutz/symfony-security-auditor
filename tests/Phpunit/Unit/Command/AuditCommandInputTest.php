@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 
 final class AuditCommandInputTest extends TestCase
@@ -119,5 +120,22 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput->projectPath = ' /tmp/project ';
 
         self::assertSame(' /tmp/project ', $auditCommandInput->resolvedProjectPath());
+    }
+
+    public function test_resolved_project_path_throws_when_cwd_lookup_returns_false(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+
+        $this->expectException(WorkingDirectoryUnavailableException::class);
+        $this->expectExceptionMessage('Failed to determine current working directory');
+
+        $auditCommandInput->resolvedProjectPath(static fn (): false => false);
+    }
+
+    public function test_resolved_project_path_uses_injected_resolver_when_property_is_null(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+
+        self::assertSame('/custom/cwd', $auditCommandInput->resolvedProjectPath(static fn (): string => '/custom/cwd'));
     }
 }

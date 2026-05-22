@@ -961,6 +961,37 @@ final class ReviewerAgentTest extends TestCase
         self::assertTrue($result[1]->isReviewerValidated());
     }
 
+    public function test_batch_mode_skips_non_array_entries_in_response(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+        $b = $this->makeVulnerabilityAt('src/B.php');
+
+        // Response mixes a scalar entry between valid array entries.
+        // The scalar must be skipped without aborting batch processing.
+        $batchResponse = (string) json_encode([
+            ['id' => $vulnerability->id(), 'accepted' => true],
+            'not an object',
+            ['id' => $b->id(), 'accepted' => true],
+        ]);
+
+        $this->llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::create($batchResponse, 0, 0, 'claude', 'end_turn'));
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $this->llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: new NullLogger(),
+            batchSize: 5,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability, $b], [], new NullCoverageRecorder());
+
+        self::assertCount(2, $result);
+        self::assertTrue($result[0]->isReviewerValidated());
+        self::assertTrue($result[1]->isReviewerValidated());
+    }
+
     public function test_batch_mode_logs_error_with_batch_size_and_error_context_on_json_exception(): void
     {
         $errorLogs = [];

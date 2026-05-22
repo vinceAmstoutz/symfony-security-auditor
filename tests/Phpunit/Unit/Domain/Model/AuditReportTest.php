@@ -211,6 +211,17 @@ final class AuditReportTest extends TestCase
         self::assertSame([], $auditReport->coverage());
     }
 
+    public function test_completed_at_is_at_or_after_started_at(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertGreaterThanOrEqual(
+            $auditReport->startedAt()->getTimestamp(),
+            $auditReport->completedAt()->getTimestamp(),
+        );
+    }
+
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/report_test_'.uniqid('', true);

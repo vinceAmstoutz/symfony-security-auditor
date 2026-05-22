@@ -17,7 +17,6 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
-use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
@@ -320,14 +319,9 @@ final class AuditCommandEndToEndTest extends TestCase
             new NullLogger(),
         );
 
-        $validator = Validation::createValidatorBuilder()
-            ->enableAttributeMapping()
-            ->getValidator();
-
         $auditCommand = new AuditCommand(
             new RunAuditUseCase($auditPipeline, new NullLogger()),
             new ReportWriter(new ReportRenderer()),
-            $validator,
             new AuditExitCodeResolver(),
             new AuditPresenter(),
         );

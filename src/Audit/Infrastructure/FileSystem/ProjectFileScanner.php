@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
+use Closure;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
@@ -45,13 +46,15 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
     public const int DEFAULT_MAX_FILE_SIZE_KB = 512;
 
     /**
-     * @param list<string> $additionalExcludedDirs appended to the hard defaults; never replaces them
+     * @param list<string>                  $additionalExcludedDirs appended to the hard defaults; never replaces them
+     * @param ?Closure(SplFileInfo): string $fileReader             defaults to SplFileInfo::getContents; tests inject a stub
      */
     public function __construct(
         private LoggerInterface $logger,
         private array $additionalExcludedDirs = [],
         private bool $respectGitignore = false,
         private int $maxFileSizeKb = self::DEFAULT_MAX_FILE_SIZE_KB,
+        private ?Closure $fileReader = null,
     ) {}
 
     /**
@@ -78,6 +81,7 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
             $finder->ignoreVCSIgnored(true);
         }
 
+        $reader = $this->fileReader ?? static fn (SplFileInfo $splFile): string => $splFile->getContents();
         $files = [];
 
         /** @var SplFileInfo $splFile */
@@ -86,7 +90,7 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
                 $files[] = ProjectFile::create(
                     relativePath: Path::makeRelative($splFile->getPathname(), $projectPath),
                     absolutePath: $splFile->getPathname(),
-                    content: $splFile->getContents(),
+                    content: $reader($splFile),
                 );
             } catch (Throwable $exception) {
                 $this->logger->warning('Failed to read file', [
