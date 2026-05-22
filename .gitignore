@@ -1,0 +1,38 @@
+/vendor/
+/var/
+composer.lock
+.phpunit.cache/
+infection/
+
+.castor.stub.php
+
+# Flex recipe is submitted to symfony/recipes-contrib separately, not shipped in the package repo.
+/recipe/
+
+/.claude/*
+!/.claude/skills/
+!/.claude/rules/
+
+###> phpunit/phpunit ###
+/phpunit.xml
+/.phpunit.cache/
+###< phpunit/phpunit ###
+
+###> friendsofphp/php-cs-fixer ###
+/.php-cs-fixer.php
+/.php-cs-fixer.cache
+###< friendsofphp/php-cs-fixer ###
+
+###> phpstan/phpstan ###
+phpstan.neon
+###< phpstan/phpstan ###
+
+###> symfony/framework-bundle ###
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/prod/prod.decrypt.private.php
+/public/bundles/
+/var/
+/vendor/
+###< symfony/framework-bundle ###

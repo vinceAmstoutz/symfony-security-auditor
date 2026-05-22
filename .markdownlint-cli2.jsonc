@@ -1,0 +1,26 @@
+{
+  "config": {
+    "default": true,
+    "MD013": {
+      "line_length": 80,
+      "code_blocks": false,
+      "tables": false,
+      "headings": false
+    },
+    "MD033": false,
+    "MD041": false,
+    "MD024": {
+      "siblings_only": true
+    },
+    "MD036": false
+  },
+  "globs": [
+    "**/*.md"
+  ],
+  "ignores": [
+    "vendor/**",
+    "node_modules/**",
+    "var/**",
+    ".phpunit.cache/**"
+  ]
+}

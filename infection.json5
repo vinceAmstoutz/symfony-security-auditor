@@ -1,0 +1,28 @@
+{
+    "$schema": "https://raw.githubusercontent.com/infection/infection/0.33.1/resources/schema.json",
+    "source": {
+        "directories": [
+            "src"
+        ]
+    },
+    "tmpDir": "var/infection",
+    "timeout": 10,
+    "threads": "max",
+    "logs": {
+        "text": "infection/infection.log",
+        "html": "infection/infection.html",
+        "summary": "infection/summary.log",
+        "json": "infection/infection-log.json",
+        "perMutator": "infection/per-mutator.md",
+        "github": true,
+        "summaryJson": "infection/summary.json"
+    },
+    "testFramework":"phpunit",
+    "staticAnalysisTool":"phpstan",
+    "staticAnalysisToolOptions": "--memory-limit=500M",
+    "minMsi": 100,
+    "minCoveredMsi": 100,
+    "mutators": {
+        "@default": true
+    }
+}

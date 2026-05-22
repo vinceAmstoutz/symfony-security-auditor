@@ -1,0 +1,102 @@
+{
+    "name": "vinceamstoutz/symfony-security-auditor",
+    "description": "AI-powered multi-agent security auditor for Symfony applications — provider-agnostic via symfony/ai",
+    "license": "MIT",
+    "type": "symfony-bundle",
+    "keywords": [
+        "ai",
+        "audit",
+        "bundle",
+        "llm",
+        "multi-agent",
+        "owasp",
+        "penetration-testing",
+        "php",
+        "sast",
+        "security",
+        "static-analysis",
+        "symfony",
+        "vulnerability"
+    ],
+    "authors": [
+        {
+            "name": "Vincent Amstoutz",
+            "email": "vincent.amstoutz.dev@gmail.com",
+            "homepage": "https://vince-amstoutz.tech/",
+            "role": "Creator"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/vinceamstoutz/symfony-security-auditor/issues",
+        "source": "https://github.com/vinceamstoutz/symfony-security-auditor",
+        "security": "https://github.com/vinceamstoutz/symfony-security-auditor/security/policy"
+    },
+    "require": {
+        "php": ">=8.3",
+        "psr/log": "^3.0",
+        "symfony/ai-bundle": "^0.9",
+        "symfony/config": "^7.4 || ^8.0",
+        "symfony/console": "^7.4 || ^8.0",
+        "symfony/dependency-injection": "^7.4 || ^8.0",
+        "symfony/filesystem": "^7.4 || ^8.0",
+        "symfony/finder": "^7.4 || ^8.0",
+        "symfony/process": "^7.4 || ^8.0",
+        "symfony/validator": "^7.4 || ^8.0"
+    },
+    "require-dev": {
+        "ergebnis/composer-normalize": "^2.52",
+        "ergebnis/phpunit-agent-reporter": "^0.3",
+        "ergebnis/phpunit-slow-test-detector": "^2.24",
+        "friendsofphp/php-cs-fixer": "^3.95",
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan-deprecation-rules": "^2.0",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "phpstan/phpstan-strict-rules": "^2.0",
+        "phpstan/phpstan-symfony": "^2.0",
+        "phpunit/phpunit": "^11.5",
+        "rector/rector": "^2.4",
+        "staabm/phpstan-todo-by": "^0.3",
+        "symfony/dotenv": "^7.4 || ^8.0",
+        "symfony/var-dumper": "^7.4 || ^8.0"
+    },
+    "suggest": {
+        "symfony/ai-anthropic-platform": "Anthropic (Claude) platform bridge — claude-opus-4-5, claude-sonnet-4-5",
+        "symfony/ai-azure-platform": "Azure OpenAI platform bridge — enterprise GPT-4o, o3",
+        "symfony/ai-bedrock-platform": "AWS Bedrock platform bridge — Claude, Nova, Llama on AWS",
+        "symfony/ai-deep-seek-platform": "DeepSeek platform bridge — deepseek-chat, deepseek-reasoner",
+        "symfony/ai-gemini-platform": "Google Gemini platform bridge — gemini-2.5-pro, gemini-2.0-flash",
+        "symfony/ai-meta-platform": "Meta (Llama) platform bridge — Llama-4-Scout, Llama-3.3",
+        "symfony/ai-mistral-platform": "Mistral platform bridge — mistral-large, codestral",
+        "symfony/ai-ollama-platform": "Ollama local inference bridge — llama3.3, deepseek-r1, qwen3, phi4 (no API key)",
+        "symfony/ai-open-ai-platform": "OpenAI platform bridge — gpt-4o, gpt-4.1, o3, o4-mini",
+        "symfony/ai-open-responses-platform": "OpenAI Responses API platform bridge",
+        "symfony/ai-vertex-ai-platform": "Google Vertex AI platform bridge — Gemini + Claude on GCP"
+    },
+    "autoload": {
+        "psr-4": {
+            "VinceAmstoutz\\SymfonySecurityAuditor\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "VinceAmstoutz\\SymfonySecurityAuditor\\Tests\\": "tests/Phpunit/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "ergebnis/composer-normalize": true
+        },
+        "sort-packages": true
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.0.x-dev"
+        }
+    },
+    "scripts": {
+        "auto-scripts": {
+            "cache:clear": "symfony-cmd",
+            "assets:install %PUBLIC_DIR%": "symfony-cmd"
+        }
+    }
+}
