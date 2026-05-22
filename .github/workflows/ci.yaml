@@ -130,7 +130,7 @@ jobs:
           coverage: none
 
       - name: Cache Composer dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: vendor
           key: composer-php${{ matrix.php }}-sf${{ matrix.symfony }}-${{ hashFiles('composer.json') }}
@@ -140,7 +140,7 @@ jobs:
         run: composer update --no-interaction --prefer-dist --no-progress
 
       - name: Cache PHPUnit result cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .phpunit.cache
           key: phpunit-php${{ matrix.php }}-sf${{ matrix.symfony }}-${{ hashFiles('src/**/*.php', 'tests/**/*.php', 'phpunit.xml', 'composer.json') }}
@@ -164,7 +164,7 @@ jobs:
           coverage: pcov
 
       - name: Cache Composer dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: vendor
           key: composer-mutation-${{ hashFiles('composer.lock') }}
