@@ -1,0 +1,93 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
+
+use PHPUnit\Framework\TestCase;
+use Symfony\Component\Console\Input\StringInput;
+use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Style\SymfonyStyle;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
+
+final class ReportWriterTest extends TestCase
+{
+    private ReportWriter $reportWriter;
+
+    private string $tmpDir;
+
+    protected function setUp(): void
+    {
+        $this->reportWriter = new ReportWriter(new ReportRenderer());
+        $this->tmpDir = sys_get_temp_dir().'/report_writer_test_'.uniqid('', true);
+        mkdir($this->tmpDir, 0o777, true);
+    }
+
+    protected function tearDown(): void
+    {
+        foreach (glob($this->tmpDir.'/*') ?: [] as $path) {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+
+        rmdir($this->tmpDir);
+    }
+
+    public function test_writing_to_file_announces_save_path_via_success_message(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $outputFile = $this->tmpDir.'/report.json';
+
+        $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $outputFile, $symfonyStyle);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('[OK]', $display);
+        self::assertStringContainsString('Report saved to', $display);
+        self::assertStringContainsString($outputFile, $display);
+    }
+
+    public function test_writing_to_file_persists_content_to_disk(): void
+    {
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), new BufferedOutput());
+        $outputFile = $this->tmpDir.'/report.json';
+
+        $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $outputFile, $symfonyStyle);
+
+        self::assertFileExists($outputFile);
+        $content = file_get_contents($outputFile);
+        self::assertIsString($content);
+        self::assertIsArray(json_decode($content, true));
+    }
+
+    public function test_writing_without_file_streams_content_to_console(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->reportWriter->write($this->makeReport(), OutputFormat::Console, null, $symfonyStyle);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('SYMFONY LLM AUDIT REPORT', $display);
+        self::assertStringNotContainsString('Report saved to', $display);
+    }
+
+    private function makeReport(): AuditReport
+    {
+        return AuditReport::fromContext(AuditContext::forProject($this->tmpDir));
+    }
+}
