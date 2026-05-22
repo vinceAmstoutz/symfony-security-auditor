@@ -16,14 +16,22 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Stage;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestratorInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 
 final class StagesTest extends TestCase
 {
@@ -144,30 +152,36 @@ final class StagesTest extends TestCase
 
     public function test_audit_stage_has_correct_name(): void
     {
-        $orchestrator = self::createStub(AuditOrchestratorInterface::class);
-        $auditStage = new AuditStage($orchestrator, new NullLogger());
+        $auditStage = new AuditStage($this->makeOrchestrator(), new NullLogger());
 
         self::assertSame('audit', $auditStage->name());
     }
 
     public function test_audit_stage_skips_when_no_files(): void
     {
-        $orchestrator = $this->createMock(AuditOrchestratorInterface::class);
-        $orchestrator->expects(self::never())->method('orchestrate');
+        $attackerLlm = $this->createMock(LLMClientInterface::class);
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm->expects(self::never())->method('complete');
+        $reviewerLlm->expects(self::never())->method('complete');
 
-        $auditStage = new AuditStage($orchestrator, new NullLogger());
+        $auditStage = new AuditStage($this->makeOrchestrator($attackerLlm, $reviewerLlm), new NullLogger());
         $auditContext = AuditContext::forProject($this->tmpDir);
         // No files, no mapping
 
         $auditStage->process($auditContext);
+
+        self::assertEmpty($auditContext->vulnerabilities());
+        self::assertNull($auditContext->getMeta('audit.iterations'));
     }
 
     public function test_audit_stage_skips_when_no_mapping(): void
     {
-        $orchestrator = $this->createMock(AuditOrchestratorInterface::class);
-        $orchestrator->expects(self::never())->method('orchestrate');
+        $attackerLlm = $this->createMock(LLMClientInterface::class);
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm->expects(self::never())->method('complete');
+        $reviewerLlm->expects(self::never())->method('complete');
 
-        $auditStage = new AuditStage($orchestrator, new NullLogger());
+        $auditStage = new AuditStage($this->makeOrchestrator($attackerLlm, $reviewerLlm), new NullLogger());
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
             ProjectFile::create('src/A.php', '/app/src/A.php', '<?php'),
@@ -175,14 +189,18 @@ final class StagesTest extends TestCase
         // Mapping NOT set
 
         $auditStage->process($auditContext);
+
+        self::assertEmpty($auditContext->vulnerabilities());
+        self::assertNull($auditContext->getMeta('audit.iterations'));
     }
 
     public function test_audit_stage_calls_orchestrator_when_ready(): void
     {
-        $orchestrator = $this->createMock(AuditOrchestratorInterface::class);
-        $orchestrator->expects(self::once())->method('orchestrate');
+        $attackerLlm = $this->createMock(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'stub', 'end_turn'));
 
-        $auditStage = new AuditStage($orchestrator, new NullLogger());
+        $auditStage = new AuditStage($this->makeOrchestrator($attackerLlm, $reviewerLlm), new NullLogger());
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
             ProjectFile::create('src/A.php', '/app/src/A.php', '<?php'),
@@ -190,6 +208,9 @@ final class StagesTest extends TestCase
         $auditContext->setMapping(SymfonyMapping::create());
 
         $auditStage->process($auditContext);
+
+        // Orchestrator ran (writes the audit.iterations meta) and finished cleanly.
+        self::assertNotNull($auditContext->getMeta('audit.iterations'));
     }
 
     public function test_ingestion_stage_sets_total_lines_meta(): void
@@ -488,11 +509,9 @@ final class StagesTest extends TestCase
         $logger->expects(self::once())
             ->method('warning')
             ->with('No files to audit, skipping');
+        $logger->expects(self::never())->method('info');
 
-        $orchestrator = $this->createMock(AuditOrchestratorInterface::class);
-        $orchestrator->expects(self::never())->method('orchestrate');
-
-        $auditStage = new AuditStage($orchestrator, $logger);
+        $auditStage = new AuditStage($this->makeOrchestrator(), $logger);
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $auditStage->process($auditContext);
@@ -504,11 +523,9 @@ final class StagesTest extends TestCase
         $logger->expects(self::once())
             ->method('warning')
             ->with('Mapping not available, skipping audit stage');
+        $logger->expects(self::never())->method('info');
 
-        $orchestrator = $this->createMock(AuditOrchestratorInterface::class);
-        $orchestrator->expects(self::never())->method('orchestrate');
-
-        $auditStage = new AuditStage($orchestrator, $logger);
+        $auditStage = new AuditStage($this->makeOrchestrator(), $logger);
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
             ProjectFile::create('src/A.php', '/app/src/A.php', '<?php'),
@@ -528,9 +545,11 @@ final class StagesTest extends TestCase
             },
         );
 
-        $orchestrator = self::createStub(AuditOrchestratorInterface::class);
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'stub', 'end_turn'));
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
 
-        $auditStage = new AuditStage($orchestrator, $logger);
+        $auditStage = new AuditStage($this->makeOrchestrator($attackerLlm, $reviewerLlm), $logger);
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
             ProjectFile::create('src/A.php', '/app/src/A.php', '<?php'),
@@ -539,13 +558,18 @@ final class StagesTest extends TestCase
 
         $auditStage->process($auditContext);
 
-        self::assertSame('Audit stage complete', $infoLogs[0][0]);
+        $stageCompleteLogs = array_values(array_filter(
+            $infoLogs,
+            static fn (array $entry): bool => 'Audit stage complete' === $entry[0],
+        ));
+
+        self::assertCount(1, $stageCompleteLogs);
         self::assertSame([
             'vulnerabilities' => 0,
             'validated' => 0,
             'critical' => 0,
             'risk_score' => 0,
-        ], $infoLogs[0][1]);
+        ], $stageCompleteLogs[0][1]);
     }
 
     public function test_mapping_stage_returns_immediately_and_sets_empty_mapping_when_no_files(): void
@@ -572,6 +596,27 @@ final class StagesTest extends TestCase
     protected function tearDown(): void
     {
         $this->rmdirRecursive($this->tmpDir);
+    }
+
+    private function makeOrchestrator(
+        ?LLMClientInterface $attackerLlm = null,
+        ?LLMClientInterface $reviewerLlm = null,
+    ): AuditOrchestrator {
+        return new AuditOrchestrator(
+            attackerAgent: new AttackerAgent(
+                llmClient: $attackerLlm ?? self::createStub(LLMClientInterface::class),
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger()),
+                attackerCache: new NullAttackerCache(),
+                logger: new NullLogger(),
+            ),
+            reviewerAgent: new ReviewerAgent(
+                llmClient: $reviewerLlm ?? self::createStub(LLMClientInterface::class),
+                reviewerPromptBuilder: new ReviewerPromptBuilder(),
+                logger: new NullLogger(),
+            ),
+            logger: new NullLogger(),
+        );
     }
 
     private function rmdirRecursive(string $dir): void
