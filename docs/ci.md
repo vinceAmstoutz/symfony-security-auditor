@@ -1,6 +1,7 @@
 # CI Integration
 
-Run the AI security audit on a nightly schedule and ship the SARIF report to GitHub Code Scanning or the GitLab Security Dashboard.
+Run the AI security audit on a nightly schedule and ship the SARIF report to
+GitHub Code Scanning or the GitLab Security Dashboard.
 
 ## Table of Contents
 
@@ -11,21 +12,29 @@ Run the AI security audit on a nightly schedule and ship the SARIF report to Git
 - [GitLab CI](#gitlab-ci)
 - [Output Formats Reference](#output-formats-reference)
 
-> See also: [Configuration](configuration.md) · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
+> See also: [Configuration](configuration.md) · [FAQ](faq.md) ·
+> [Troubleshooting](troubleshooting.md)
 
 ---
 
 ## Why Scheduled, Not Per-Push
 
-The auditor runs a multi-agent LLM loop (up to 3 attacker/reviewer iterations). A single audit can take **30 seconds to several minutes** depending on project size and provider latency. Running it on every push or pull request blocks developers and inflates CI costs with no proportional benefit — vulnerabilities are not introduced commit-by-commit.
+The auditor runs a multi-agent LLM loop (up to 3 attacker/reviewer iterations).
+A single audit can take **30 seconds to several minutes** depending on project
+size and provider latency. Running it on every push or pull request blocks
+developers and inflates CI costs with no proportional benefit — vulnerabilities
+are not introduced commit-by-commit.
 
-**Recommended pattern**: nightly scheduled pipeline. Results land in your security dashboard (GitHub Code Scanning, GitLab Security Dashboard) and can trigger alerts on new findings.
+**Recommended pattern**: nightly scheduled pipeline. Results land in your
+security dashboard (GitHub Code Scanning, GitLab Security Dashboard) and can
+trigger alerts on new findings.
 
 ---
 
 ## Managing LLM Costs
 
-Each audit run makes multiple LLM API calls: up to **3 iterations × N file chunks × 2 agents** (Attacker + Reviewer). Token usage grows with project size.
+Each audit run makes multiple LLM API calls: up to **3 iterations × N file
+chunks × 2 agents** (Attacker + Reviewer). Token usage grows with project size.
 
 ### Reduce cost with split-model
 
@@ -38,11 +47,13 @@ symfony_security_auditor:
     reviewer_model: 'claude-haiku-4-5'  # ~20× cheaper for false-positive filtering
 ```
 
-Any supported provider works — see [Configuration](configuration.md#split-model-setup) for all options.
+Any supported provider works — see
+[Configuration](configuration.md#split-model-setup) for all options.
 
 ### Run less often on large projects
 
-Nightly is a sensible default. For large monorepos or expensive models, weekly is fine — most vulnerability patterns are stable across commits:
+Nightly is a sensible default. For large monorepos or expensive models, weekly
+is fine — most vulnerability patterns are stable across commits:
 
 ```yaml
 # GitHub Actions
@@ -65,9 +76,11 @@ See [Configuration](configuration.md#supported-platforms) for Ollama setup.
 
 ### Set a spend cap
 
-All major providers offer budget alerts or hard caps — set one before enabling scheduled runs:
+All major providers offer budget alerts or hard caps — set one before enabling
+scheduled runs:
 
-- Anthropic: [console.anthropic.com](https://console.anthropic.com) → Billing → Usage limits
+- Anthropic: [console.anthropic.com](https://console.anthropic.com) → Billing →
+  Usage limits
 - OpenAI: [platform.openai.com](https://platform.openai.com) → Settings → Limits
 - Others: check your provider's billing dashboard
 
@@ -75,12 +88,12 @@ All major providers offer budget alerts or hard caps — set one before enabling
 
 ## Report Visibility on Public Repositories
 
-> [!WARNING]
-> Security audit reports list vulnerabilities in your application. Storing them where anyone can read them
-> **advertises your attack surface publicly**. Evaluate report storage carefully before enabling CI uploads.
+> [!WARNING] Security audit reports list vulnerabilities in your application.
+> Storing them where anyone can read them **advertises your attack surface
+> publicly**. Evaluate report storage carefully before enabling CI uploads.
 
 | Storage method                   | Public repo risk          | Notes                                                    |
-|----------------------------------|---------------------------|----------------------------------------------------------|
+| -------------------------------- | ------------------------- | -------------------------------------------------------- |
 | GitHub Actions artifact          | **Publicly downloadable** | Anyone with repo URL can fetch it                        |
 | GitLab CI artifact               | **Publicly downloadable** | Same — public project = public artifacts                 |
 | GitHub Code Scanning (SARIF)     | **Safe**                  | Security tab requires write access, even on public repos |
@@ -89,8 +102,9 @@ All major providers offer budget alerts or hard caps — set one before enabling
 
 ### Option 1 — GitHub Code Scanning (recommended for GitHub)
 
-SARIF upload to Code Scanning is restricted to collaborators even on public repositories. The workflow shown
-below already uses this approach — prefer it over raw artifact uploads.
+SARIF upload to Code Scanning is restricted to collaborators even on public
+repositories. The workflow shown below already uses this approach — prefer it
+over raw artifact uploads.
 
 ### Option 2 — External private storage
 
@@ -104,11 +118,13 @@ below already uses this approach — prefer it over raw artifact uploads.
           AWS_DEFAULT_REGION: eu-west-1
 ```
 
-Replace the `upload-artifact` step with this. Requires an S3 bucket with a bucket policy that blocks public access.
+Replace the `upload-artifact` step with this. Requires an S3 bucket with a
+bucket policy that blocks public access.
 
 ### Option 3 — Notification only (no stored report)
 
-Run the audit and send a summary notification — no file persisted, no public exposure:
+Run the audit and send a summary notification — no file persisted, no public
+exposure:
 
 ```yaml
       - name: Run security audit
@@ -123,14 +139,16 @@ Run the audit and send a summary notification — no file persisted, no public e
 
 ### Option 4 — Store artifact in a private repository
 
-Use a scoped Personal Access Token (PAT) with `contents: write` on a private repo to push reports there.
-Keeps your source repo public while centralising security findings privately.
+Use a scoped Personal Access Token (PAT) with `contents: write` on a private
+repo to push reports there. Keeps your source repo public while centralising
+security findings privately.
 
 ---
 
 ## GitHub Actions
 
-Add your LLM provider key as a repository secret (`Settings → Secrets → Actions`). Example for Anthropic: `ANTHROPIC_API_KEY`.
+Add your LLM provider key as a repository secret
+(`Settings → Secrets → Actions`). Example for Anthropic: `ANTHROPIC_API_KEY`.
 
 See [supported platforms](../README.md#supported-platforms) for other providers.
 
@@ -198,11 +216,15 @@ jobs:
 
 ## GitLab CI
 
-Add your LLM provider key as a CI/CD variable (`Settings → CI/CD → Variables`). Example: `ANTHROPIC_API_KEY` (masked, not protected unless you only audit protected branches).
+Add your LLM provider key as a CI/CD variable (`Settings → CI/CD → Variables`).
+Example: `ANTHROPIC_API_KEY` (masked, not protected unless you only audit
+protected branches).
 
 ### Scheduled pipeline with Security Dashboard upload
 
-GitLab natively parses SARIF and displays findings in the **Security Dashboard** and **Vulnerability Report** when you upload a `gl-sast-report.json` (GitLab SAST format) or use the `security` artifact report type.
+GitLab natively parses SARIF and displays findings in the **Security Dashboard**
+and **Vulnerability Report** when you upload a `gl-sast-report.json` (GitLab
+SAST format) or use the `security` artifact report type.
 
 ```yaml
 # .gitlab-ci.yml (add to existing file or create standalone)

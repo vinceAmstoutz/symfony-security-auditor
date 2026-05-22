@@ -42,16 +42,20 @@ function fix(): void
 
 function runCodeQualityTools(bool $fixMode = false): void
 {
+    $userFlag = sprintf('--user %d:%d', posix_getuid(), posix_getgid());
+
     io()->section('Prettier Markdown');
     run(sprintf(
-        'docker run --rm -v "%s:/work" -w /work tmknom/prettier:latest --%s "**/*.md"',
+        'docker run --rm %s -v "%s:/work" -w /work tmknom/prettier:latest --%s "**/*.md"',
+        $userFlag,
         getcwd(),
         $fixMode ? 'write' : 'check',
     ));
 
     io()->section('Markdown lint');
     run(sprintf(
-        'docker run --rm -v "%s:/workdir" davidanson/markdownlint-cli2:latest%s',
+        'docker run --rm %s -v "%s:/workdir" davidanson/markdownlint-cli2:latest%s',
+        $userFlag,
         getcwd(),
         $fixMode ? ' --fix' : '',
     ));

@@ -2,28 +2,34 @@
 
 ## Keeping This File Up to Date
 
-Update the relevant section in the same commit/PR whenever the project evolves. Rules scoped to specific paths live in `.claude/rules/` — update them too. Never leave this file describing a state that no longer exists.
+Update the relevant section in the same commit/PR whenever the project evolves.
+Rules scoped to specific paths live in `.claude/rules/` — update them too. Never
+leave this file describing a state that no longer exists.
 
 ---
 
 ## Project Overview
 
-**symfony-security-auditor** — AI-powered multi-agent security auditor for Symfony applications. Distributed as a **Symfony bundle** (`symfony-bundle` package type). Uses a dual-agent attacker/reviewer loop backed by `symfony/ai` to detect vulnerabilities and produce structured reports.
+**symfony-security-auditor** — AI-powered multi-agent security auditor for
+Symfony applications. Distributed as a **Symfony bundle** (`symfony-bundle`
+package type). Uses a dual-agent attacker/reviewer loop backed by `symfony/ai`
+to detect vulnerabilities and produce structured reports.
 
-> Always check `composer.json` for authoritative dependency versions — never rely on version numbers written here.
+> Always check `composer.json` for authoritative dependency versions — never
+> rely on version numbers written here.
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Language | PHP (see `composer.json` → `require.php`) |
-| Framework | Symfony (see `composer.json`) |
-| LLM | symfony/ai (provider-agnostic: Anthropic, OpenAI, Mistral, Ollama, …) |
-| Packaging | symfony-bundle + Flex recipe |
-| Tests | PHPUnit (Unit / Integration / EndToEnd) |
-| Mutation | Infection (100% MSI required) |
-| Static analysis | PHPStan max + Rector |
-| Style | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets) |
+| Layer           | Technology                                                            |
+| --------------- | --------------------------------------------------------------------- |
+| Language        | PHP (see `composer.json` → `require.php`)                             |
+| Framework       | Symfony (see `composer.json`)                                         |
+| LLM             | symfony/ai (provider-agnostic: Anthropic, OpenAI, Mistral, Ollama, …) |
+| Packaging       | symfony-bundle + Flex recipe                                          |
+| Tests           | PHPUnit (Unit / Integration / EndToEnd)                               |
+| Mutation        | Infection (100% MSI required)                                         |
+| Static analysis | PHPStan max + Rector                                                  |
+| Style           | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets)                          |
 
 ## Build, Test & Lint Commands
 
@@ -31,24 +37,28 @@ Update the relevant section in the same commit/PR whenever the project evolves. 
 bin/castor up
 ```
 
-| Task | Command |
-|---|---|
+| Task                 | Command                                           |
+| -------------------- | ------------------------------------------------- |
 | Install dependencies | `bin/castor up` (runs `docker compose up --wait`) |
-| Stop containers | `bin/castor down` |
-| Lint (check only) | `bin/castor lint` |
-| Lint + auto-fix | `bin/castor lint:fix` |
-| Run PHP tests | `docker compose exec php vendor/bin/phpunit` |
-| Run mutation tests | `docker compose exec php bin/infection` |
-| Symfony console | `docker compose exec php bin/console <command>` |
+| Stop containers      | `bin/castor down`                                 |
+| Lint (check only)    | `bin/castor lint`                                 |
+| Lint + auto-fix      | `bin/castor lint:fix`                             |
+| Run PHP tests        | `docker compose exec php vendor/bin/phpunit`      |
+| Run mutation tests   | `docker compose exec php bin/infection`           |
+| Symfony console      | `docker compose exec php bin/console <command>`   |
 
-`bin/castor lint` runs sequentially: Prettier (check) → Markdown lint (markdownlint-cli2) → Composer Normalize → PHP CS Fixer → Rector → PHPStan (max, 500M) → PHPUnit → Infection.
-`bin/castor lint:fix` auto-fixes Prettier + Markdown lint + steps 1–3; remaining steps are check-only.
+`bin/castor lint` runs sequentially: Prettier (check) → Markdown lint
+(markdownlint-cli2) → Composer Normalize → PHP CS Fixer → Rector → PHPStan (max,
+500M) → PHPUnit → Infection. `bin/castor lint:fix` auto-fixes Prettier +
+Markdown lint + steps 1–3; remaining steps are check-only.
 
-Commit messages are validated separately in CI via [commitlint](https://commitlint.js.org/) (`commitlint.config.js`) — see [Commit Messages](#commit-messages).
+Commit messages are validated separately in CI via
+[commitlint](https://commitlint.js.org/) (`commitlint.config.js`) — see
+[Commit Messages](#commit-messages).
 
 ## Project Structure
 
-```
+```text
 src/
   Audit/
     Domain/          # Pure PHP — no framework, no I/O
@@ -87,16 +97,20 @@ docs/
 
 ## Architecture: DDD Layers
 
-Strict DDD layering under `src/Audit/`. Infrastructure never leaks into Domain or Application.
+Strict DDD layering under `src/Audit/`. Infrastructure never leaks into Domain
+or Application.
 
-```
+```text
 Command → Application → Domain ← Infrastructure (implements ports)
 ```
 
-**`LLMClientInterface`** is the sole seam between Application and LLM I/O. `AttackerAgent` and `ReviewerAgent` never import any `symfony/ai` type directly.
+**`LLMClientInterface`** is the sole seam between Application and LLM I/O.
+`AttackerAgent` and `ReviewerAgent` never import any `symfony/ai` type directly.
 
 **Dual-agent loop** (up to 3 iterations, stops earlier when no new findings):
-1. `AttackerAgent` — chunks files by priority (controllers first), calls LLM, parses JSON vulnerabilities
+
+1. `AttackerAgent` — chunks files by priority (controllers first), calls LLM,
+   parses JSON vulnerabilities
 2. Filter — confidence ≥ 0.6
 3. `ReviewerAgent` — validates each finding one-by-one, may adjust severity
 4. Deduplicate → persist to `AuditContext`
@@ -106,44 +120,52 @@ Full details: [`docs/architecture.md`](docs/architecture.md)
 ## Bundle Configuration
 
 Minimal:
+
 ```yaml
 symfony_security_auditor:
     model: 'claude-opus-4-5'
 ```
 
 Split-model (larger attacker, faster reviewer):
+
 ```yaml
 symfony_security_auditor:
     attacker_model: 'claude-opus-4-5'
     reviewer_model: 'claude-haiku-4-5'
 ```
 
-Swapping LLM providers requires only `config/packages/ai.yaml` changes — no code changes.
+Swapping LLM providers requires only `config/packages/ai.yaml` changes — no code
+changes.
 
 Full reference: [`docs/configuration.md`](docs/configuration.md)
 
 ## Commit Messages
 
-Format: `<type>[optional scope]: <description>` — [Conventional Commits](https://www.conventionalcommits.org/)
+Format: `<type>[optional scope]: <description>` —
+[Conventional Commits](https://www.conventionalcommits.org/)
 
-| Type | When |
-|---|---|
-| `feat` | New user-facing feature |
-| `fix` | Bug fix |
+| Type       | When                    |
+| ---------- | ----------------------- |
+| `feat`     | New user-facing feature |
+| `fix`      | Bug fix                 |
 | `refactor` | Neither fix nor feature |
-| `test` | Adding/fixing tests |
-| `docs` | Documentation only |
-| `chore` | Maintenance/tooling |
-| `build` | Build system/deps |
-| `ci` | CI configuration |
-| `perf` | Performance improvement |
+| `test`     | Adding/fixing tests     |
+| `docs`     | Documentation only      |
+| `chore`    | Maintenance/tooling     |
+| `build`    | Build system/deps       |
+| `ci`       | CI configuration        |
+| `perf`     | Performance improvement |
 
-Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`, `deps`, `ci`.
-Breaking changes: `feat!:` with `BREAKING CHANGE:` footer.
+Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`,
+`deps`, `ci`. Breaking changes: `feat!:` with `BREAKING CHANGE:` footer.
 
 ## CI Pipeline
 
-Six jobs must all pass before merging: **Prettier Check** (markdown formatting) → **Markdown Lint** (markdownlint-cli2 semantics) → **Commit Lint** (commitlint, conventional commits) → **Lint** (Composer Normalize, PHP CS Fixer, Rector, PHPStan max) → **Tests** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1) → **Mutation** (Infection, 100% MSI).
+Six jobs must all pass before merging: **Prettier Check** (markdown formatting)
+→ **Markdown Lint** (markdownlint-cli2 semantics) → **Commit Lint** (commitlint,
+conventional commits) → **Lint** (Composer Normalize, PHP CS Fixer, Rector,
+PHPStan max) → **Tests** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony
+7.4/8.0/8.1) → **Mutation** (Infection, 100% MSI).
 
 Details: [`docs/ci.md`](docs/ci.md)
 
@@ -151,37 +173,55 @@ Details: [`docs/ci.md`](docs/ci.md)
 
 ### 1. Think Before Coding
 
-Before implementing: state assumptions explicitly, surface tradeoffs, present multiple interpretations rather than picking silently. If unclear, stop and ask.
+Before implementing: state assumptions explicitly, surface tradeoffs, present
+multiple interpretations rather than picking silently. If unclear, stop and ask.
 
 ### 2. Simplicity First
 
-Minimum code that solves the problem. No speculative features, no abstractions for single-use code, no error handling for impossible scenarios.
+Minimum code that solves the problem. No speculative features, no abstractions
+for single-use code, no error handling for impossible scenarios.
 
 ### 3. Surgical Changes
 
-Touch only what the request requires. Don't improve adjacent code. Match existing style. If you notice unrelated dead code, mention it — don't delete it. Remove only imports/variables that YOUR changes made unused.
+Touch only what the request requires. Don't improve adjacent code. Match
+existing style. If you notice unrelated dead code, mention it — don't delete it.
+Remove only imports/variables that YOUR changes made unused.
 
 ### 4. Goal-Driven Execution
 
-Transform tasks into verifiable goals. For multistep tasks, state a brief plan with a verify step for each.
+Transform tasks into verifiable goals. For multistep tasks, state a brief plan
+with a verify step for each.
 
 ### 5. Never Silence Quality Gates
 
-Never bypass static analysis or mutation testing via suppression annotations or config opt-outs. **Forbidden** (non-exhaustive):
+Never bypass static analysis or mutation testing via suppression annotations or
+config opt-outs. **Forbidden** (non-exhaustive):
 
-- PHPStan — `@phpstan-ignore`, `@phpstan-ignore-line`, `@phpstan-ignore-next-line`, `ignoreErrors` entries in `phpstan.dist.neon`, baseline files.
-- Infection — `@infection-ignore-all`, `@infection-ignore-all-for`, per-mutator `ignore` entries in `infection.json5`, `ignoreSourceCodeByRegex`.
-- PHPUnit / coverage — `@codeCoverageIgnore*`, `@requires`/`markTestSkipped` used to dodge a failing test, `@group` used to exclude from CI.
-- PHP CS Fixer / Rector — `@phpcs:ignore`, `// @phpstan-ignore`, `\Rector\Skip`, blanket `--no-check`.
+- PHPStan — `@phpstan-ignore`, `@phpstan-ignore-line`,
+  `@phpstan-ignore-next-line`, `ignoreErrors` entries in `phpstan.dist.neon`,
+  baseline files.
+- Infection — `@infection-ignore-all`, `@infection-ignore-all-for`, per-mutator
+  `ignore` entries in `infection.json5`, `ignoreSourceCodeByRegex`.
+- PHPUnit / coverage — `@codeCoverageIgnore*`, `@requires`/`markTestSkipped`
+  used to dodge a failing test, `@group` used to exclude from CI.
+- PHP CS Fixer / Rector — `@phpcs:ignore`, `// @phpstan-ignore`, `\Rector\Skip`,
+  blanket `--no-check`.
 
-If a tool flags something, **fix the underlying code**. Genuine exceptions (a real false positive, a library bug) require a PR-description justification and a linked issue tracking removal — never silent suppression.
+If a tool flags something, **fix the underlying code**. Genuine exceptions (a
+real false positive, a library bug) require a PR-description justification and a
+linked issue tracking removal — never silent suppression.
 
 ## Path-Scoped Rules
 
 Rules scoped to specific paths live in `.claude/rules/`:
 
-- [`ddd-layers.md`](.claude/rules/ddd-layers.md) — dependency direction across layers.
-- [`domain-models.md`](.claude/rules/domain-models.md) — immutability, copy-on-write, deterministic IDs in `src/Audit/Domain/**`.
-- [`llm-seam.md`](.claude/rules/llm-seam.md) — `LLMClientInterface` boundary between Application and `symfony/ai`.
-- [`php-classes.md`](.claude/rules/php-classes.md) — `final readonly`, interfaces/SOLID, single responsibility, Symfony components in `src/**`.
-- [`testing.md`](.claude/rules/testing.md) — TDD red/green/refactor, stub vs mock, suite layout, mutation score.
+- [`ddd-layers.md`](.claude/rules/ddd-layers.md) — dependency direction across
+  layers.
+- [`domain-models.md`](.claude/rules/domain-models.md) — immutability,
+  copy-on-write, deterministic IDs in `src/Audit/Domain/**`.
+- [`llm-seam.md`](.claude/rules/llm-seam.md) — `LLMClientInterface` boundary
+  between Application and `symfony/ai`.
+- [`php-classes.md`](.claude/rules/php-classes.md) — `final readonly`,
+  interfaces/SOLID, single responsibility, Symfony components in `src/**`.
+- [`testing.md`](.claude/rules/testing.md) — TDD red/green/refactor, stub vs
+  mock, suite layout, mutation score.

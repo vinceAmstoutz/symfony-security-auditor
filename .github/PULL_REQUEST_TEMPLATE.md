@@ -17,5 +17,7 @@
 - [ ] Tests added or updated (unit + integration where applicable)
 - [ ] All checks pass: `bin/castor lint`
 - [ ] 100% MSI maintained: `docker compose exec php bin/infection`
-- [ ] No `createMock` without a matching `expects()` (use `createStub` otherwise)
-- [ ] Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
+- [ ] No `createMock` without a matching `expects()` (use `createStub`
+      otherwise)
+- [ ] Commit messages follow
+      [Conventional Commits](https://www.conventionalcommits.org/)
