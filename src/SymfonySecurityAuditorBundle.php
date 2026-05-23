@@ -34,6 +34,12 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
 final class SymfonySecurityAuditorBundle extends AbstractBundle
 {
+    /**
+     * Environments where the bundle wires its services. Outside this list the
+     * extension is a no-op so the auditor cannot accidentally ship to prod.
+     */
+    public const SUPPORTED_ENVIRONMENTS = ['dev', 'test'];
+
     public function configure(DefinitionConfigurator $definition): void
     {
         $definition->rootNode()
@@ -132,6 +138,10 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      */
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
+        if (!\in_array($builder->getParameter('kernel.environment'), self::SUPPORTED_ENVIRONMENTS, true)) {
+            return;
+        }
+
         $container->import('../config/services.php');
 
         $attackerModel = $config['attacker_model'] ?? $config['model'];

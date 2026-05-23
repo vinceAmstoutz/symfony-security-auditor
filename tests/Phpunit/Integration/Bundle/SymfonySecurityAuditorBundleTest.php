@@ -250,6 +250,27 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame(1, $kernel->getContainer()->getParameter('symfony_security_auditor.audit.max_tool_iterations'));
     }
 
+    public function test_bundle_registers_services_in_dev_environment(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o'], 'dev');
+
+        self::assertSame('gpt-4o', $kernel->getContainer()->getParameter('symfony_security_auditor.attacker_model'));
+    }
+
+    public function test_bundle_skips_service_registration_in_prod_environment(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o'], 'prod');
+
+        self::assertFalse($kernel->getContainer()->hasParameter('symfony_security_auditor.attacker_model'));
+    }
+
+    public function test_bundle_skips_service_registration_in_unknown_environment(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o'], 'staging');
+
+        self::assertFalse($kernel->getContainer()->hasParameter('symfony_security_auditor.attacker_model'));
+    }
+
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/bundle_test_'.uniqid('', true);
@@ -271,10 +292,10 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     /**
      * @param array<string, mixed> $bundleConfig
      */
-    private function boot(array $bundleConfig): Kernel
+    private function boot(array $bundleConfig, string $environment = 'test'): Kernel
     {
         $tmpDir = $this->tmpDir;
-        $kernel = new class('test', true, $tmpDir, $bundleConfig) extends Kernel {
+        $kernel = new class($environment, true, $tmpDir, $bundleConfig) extends Kernel {
             /** @var array<string, mixed> */
             private array $bundleConfig;
 

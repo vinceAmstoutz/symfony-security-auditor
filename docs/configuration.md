@@ -41,6 +41,10 @@ return [
 ];
 ```
 
+The bundle enforces the same restriction internally: even if registered under
+`['all' => true]`, `loadExtension()` is a no-op outside `dev` and `test`, so the
+auditor cannot accidentally ship to prod.
+
 ---
 
 ## Bundle Configuration
