@@ -50,11 +50,11 @@ following keys:
 
 ### Top-level
 
-| Key              | Type   | Default    | Description                                          |
-| ---------------- | ------ | ---------- | ---------------------------------------------------- |
-| `model`          | string | `'gpt-4o'` | Model name used for both Attacker and Reviewer roles |
-| `attacker_model` | string | `null`     | Override: dedicated model for the Attacker role      |
-| `reviewer_model` | string | `null`     | Override: dedicated model for the Reviewer role      |
+| Key              | Type   | Default             | Description                                          |
+| ---------------- | ------ | ------------------- | ---------------------------------------------------- |
+| `model`          | string | `'claude-opus-4-5'` | Model name used for both Attacker and Reviewer roles |
+| `attacker_model` | string | `null`              | Override: dedicated model for the Attacker role      |
+| `reviewer_model` | string | `null`              | Override: dedicated model for the Reviewer role      |
 
 `attacker_model` and `reviewer_model` fall back to `model` when not set. Model
 names must be supported by the platform configured in `ai.yaml`.

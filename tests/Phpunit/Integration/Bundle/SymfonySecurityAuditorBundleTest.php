@@ -52,12 +52,12 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertInstanceOf(AuditCommand::class, $this->getPrivateService($kernel, AuditCommand::class));
     }
 
-    public function test_bundle_default_model_is_gpt_4o(): void
+    public function test_bundle_default_model_is_claude_opus_4_5(): void
     {
         $kernel = $this->boot([]);
 
-        self::assertSame('gpt-4o', $kernel->getContainer()->getParameter('symfony_security_auditor.attacker_model'));
-        self::assertSame('gpt-4o', $kernel->getContainer()->getParameter('symfony_security_auditor.reviewer_model'));
+        self::assertSame('claude-opus-4-5', $kernel->getContainer()->getParameter('symfony_security_auditor.attacker_model'));
+        self::assertSame('claude-opus-4-5', $kernel->getContainer()->getParameter('symfony_security_auditor.reviewer_model'));
     }
 
     public function test_bundle_uses_shared_model_for_both_agents_when_split_overrides_omitted(): void
