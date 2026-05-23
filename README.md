@@ -42,12 +42,20 @@ false positives over up to three iterations. Output is a validated vulnerability
 report in your console, as JSON, or as SARIF for GitHub Code Scanning / GitLab
 Security Dashboard.
 
-```mermaid
-flowchart TD
-    A[Project files] --> B["1. Ingestion — scans .php / .twig / .yaml / .xml recursively"]
-    B --> C["2. Mapping — classifies Controllers, Entities, Voters, Forms, Routes"]
-    C --> D["3. Audit — Attacker ⚔ Reviewer multi-agent loop (up to 3 iterations)"]
-    D --> E[Validated vulnerability report: console, JSON, or SARIF]
+```text
+  Project files
+       │
+       ▼
+  1. Ingestion — scans .php / .twig / .yaml / .xml recursively
+       │
+       ▼
+  2. Mapping — classifies Controllers, Entities, Voters, Forms, Routes
+       │
+       ▼
+  3. Audit — Attacker ⚔ Reviewer multi-agent loop (up to 3 iterations)
+       │
+       ▼
+  Validated vulnerability report: console, JSON, or SARIF
 ```
 
 ---
