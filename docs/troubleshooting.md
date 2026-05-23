@@ -57,17 +57,37 @@ corresponding `symfony/ai-*-platform` package is installed.
 ### `audit:run` not registered / unknown command
 
 `SymfonySecurityAuditorBundle` is registered for `dev` and `test` only by
-default. Run from those environments:
+design. Run from those environments:
 
 ```bash
 APP_ENV=dev bin/console audit:run /path/to/project
 ```
 
-To enable in `prod`, change `config/bundles.php`:
+The bundle's `loadExtension` is a hard no-op outside `dev` and `test`, so
+flipping `config/bundles.php` to `['all' => true]` will _not_ make the command
+available in prod — services are still skipped. This is intentional: the auditor
+calls remote LLMs with your source code and is not meant to run in production.
 
-```php
-VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['all' => true],
+### `There is no extension able to load the configuration for "symfony_security_auditor"` (prod / staging)
+
+Your `config/packages/symfony_security_auditor.yaml` is loaded in every env, but
+the bundle class only exists in `dev` and `test`. Wrap the block in `when@dev:`
+/ `when@test:`:
+
+```yaml
+# config/packages/symfony_security_auditor.yaml
+when@dev:
+    symfony_security_auditor:
+        model: 'claude-opus-4-5'
+
+when@test:
+    symfony_security_auditor:
+        model: 'claude-opus-4-5'
 ```
+
+See
+[configuration.md → Bundle Registration](configuration.md#bundle-registration)
+for the full pattern.
 
 ### `[ERROR] Path "/x" is not a valid directory`
 

@@ -119,19 +119,35 @@ Full details: [`docs/architecture.md`](docs/architecture.md)
 
 ## Bundle Configuration
 
+Register the bundle for `dev` and `test` only in `config/bundles.php`, and wrap
+every `symfony_security_auditor.yaml` block in `when@dev:` / `when@test:` so
+prod never tries to load the (absent) extension. `loadExtension` is also a no-op
+outside dev/test as a safety net.
+
 Minimal:
 
 ```yaml
-symfony_security_auditor:
-    model: 'claude-opus-4-5'
+when@dev:
+    symfony_security_auditor:
+        model: 'claude-opus-4-5'
+
+when@test:
+    symfony_security_auditor:
+        model: 'claude-opus-4-5'
 ```
 
 Split-model (larger attacker, faster reviewer):
 
 ```yaml
-symfony_security_auditor:
-    attacker_model: 'claude-opus-4-5'
-    reviewer_model: 'claude-haiku-4-5'
+when@dev:
+    symfony_security_auditor:
+        attacker_model: 'claude-opus-4-5'
+        reviewer_model: 'claude-haiku-4-5'
+
+when@test:
+    symfony_security_auditor:
+        attacker_model: 'claude-opus-4-5'
+        reviewer_model: 'claude-haiku-4-5'
 ```
 
 Swapping LLM providers requires only `config/packages/ai.yaml` changes — no code

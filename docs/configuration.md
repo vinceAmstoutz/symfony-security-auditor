@@ -41,9 +41,14 @@ return [
 ];
 ```
 
-The bundle enforces the same restriction internally: even if registered under
-`['all' => true]`, `loadExtension()` is a no-op outside `dev` and `test`, so the
-auditor cannot accidentally ship to prod.
+The bundle enforces the same restriction internally: `loadExtension()` is a
+no-op outside `dev` and `test`, so a misregistered `['all' => true]` cannot wire
+the auditor into prod. Even with that safety net, **always scope your config
+file with `when@dev:` / `when@test:` (see below)** — otherwise Symfony will
+reject `config/packages/symfony_security_auditor.yaml` at compile time in prod
+with _"There is no extension able to load the configuration for
+symfony_security_auditor"_, because the bundle class itself is not loaded in
+that env.
 
 ---
 
@@ -89,44 +94,65 @@ names must be supported by the platform configured in `ai.yaml`.
 | `cache.dir`            | `string` | `%kernel.cache_dir%/symfony_security_auditor/attacker` | Cache storage path. Created on first write.                                                                                                                                                                                                                                   |
 | `cache.prompt_caching` | `bool`   | `true`                                                 | Opt into provider-side prompt caching by setting `cache_control: ephemeral` on every LLM call. Default `true` — Anthropic honors it for ~90% input-token discount; other providers silently ignore the flag (zero cost to leave on).                                          |
 
+> All examples below wrap the `symfony_security_auditor:` block in `when@dev:`
+> and `when@test:`. The wrapping is **required** when the bundle is registered
+> for `dev` and `test` only (the recommendation above) — without it, Symfony
+> fails at compile time in prod. Duplicate the block across the two envs, or use
+> a YAML anchor to keep it DRY.
+
 ### Simple mode — one model for both roles
 
 ```yaml
 # config/packages/symfony_security_auditor.yaml
-symfony_security_auditor:
-    model: 'claude-opus-4-5'
+when@dev:
+    symfony_security_auditor:
+        model: 'claude-opus-4-5'
+
+when@test:
+    symfony_security_auditor:
+        model: 'claude-opus-4-5'
 ```
 
 ### Split mode — separate models per role
 
 ```yaml
 # config/packages/symfony_security_auditor.yaml
-symfony_security_auditor:
-    attacker_model: 'claude-opus-4-5'   # powerful model for discovery
-    reviewer_model: 'claude-haiku-4-5'  # faster model for validation
+when@dev:
+    symfony_security_auditor:
+        attacker_model: 'claude-opus-4-5'   # powerful model for discovery
+        reviewer_model: 'claude-haiku-4-5'  # faster model for validation
+
+when@test:
+    symfony_security_auditor:
+        attacker_model: 'claude-opus-4-5'
+        reviewer_model: 'claude-haiku-4-5'
 ```
 
 ### Full configuration example
 
 ```yaml
 # config/packages/symfony_security_auditor.yaml
-symfony_security_auditor:
-    attacker_model: 'claude-opus-4-5'
-    reviewer_model: 'claude-haiku-4-5'
-    scan:
-        excluded_dirs:
-            - 'legacy'
-            - 'tests/fixtures/generated'
-        respect_gitignore: true
-        max_file_size_kb: 256
-    audit:
-        max_iterations: 5
-        min_confidence: 0.7
-        reviewer_batch_size: 5
-        tools_enabled: true
-    cache:
-        enabled: true
-        prompt_caching: true
+_symfony_security_auditor: &symfony_security_auditor
+    symfony_security_auditor:
+        attacker_model: 'claude-opus-4-5'
+        reviewer_model: 'claude-haiku-4-5'
+        scan:
+            excluded_dirs:
+                - 'legacy'
+                - 'tests/fixtures/generated'
+            respect_gitignore: true
+            max_file_size_kb: 256
+        audit:
+            max_iterations: 5
+            min_confidence: 0.7
+            reviewer_batch_size: 5
+            tools_enabled: true
+        cache:
+            enabled: true
+            prompt_caching: true
+
+when@dev: *symfony_security_auditor
+when@test: *symfony_security_auditor
 ```
 
 ---
@@ -232,6 +258,9 @@ Provider-specific parameters such as `max_tokens` and `temperature` are passed
 via the model name. Two syntaxes are supported in
 `symfony_security_auditor.yaml`.
 
+> Same `when@dev:` / `when@test:` wrapping rule applies — omitted below for
+> readability.
+
 ### Query-string syntax
 
 ```yaml
@@ -275,9 +304,15 @@ ai:
 ### `config/packages/symfony_security_auditor.yaml`
 
 ```yaml
-symfony_security_auditor:
-    attacker_model: 'claude-opus-4-5'   # deep reasoning for vuln discovery
-    reviewer_model: 'claude-haiku-4-5'  # fast + cheap for false-positive filtering
+when@dev:
+    symfony_security_auditor:
+        attacker_model: 'claude-opus-4-5'   # deep reasoning for vuln discovery
+        reviewer_model: 'claude-haiku-4-5'  # fast + cheap for false-positive filtering
+
+when@test:
+    symfony_security_auditor:
+        attacker_model: 'claude-opus-4-5'
+        reviewer_model: 'claude-haiku-4-5'
 ```
 
 The attacker agent receives all source files grouped into chunks of 10, sorted
