@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exceptio
 
 use RuntimeException;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final class BudgetExceededException extends RuntimeException
 {
     public static function forTokens(int $used, int $cap): self

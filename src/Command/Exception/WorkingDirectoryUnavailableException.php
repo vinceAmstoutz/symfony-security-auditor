@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command\Exception;
 
 use RuntimeException;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final class WorkingDirectoryUnavailableException extends RuntimeException
 {
     public static function fromGetcwdFailure(): self

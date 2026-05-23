@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Except
 
 use InvalidArgumentException;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final class InvalidCacheConfigurationException extends InvalidArgumentException
 {
     public static function forEmptyCacheDir(): self

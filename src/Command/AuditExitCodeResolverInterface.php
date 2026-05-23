@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 interface AuditExitCodeResolverInterface
 {
     public function resolve(AuditReport $auditReport): int;

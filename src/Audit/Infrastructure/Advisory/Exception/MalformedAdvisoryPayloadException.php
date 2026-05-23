@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exc
 use RuntimeException;
 use Throwable;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final class MalformedAdvisoryPayloadException extends RuntimeException
 {
     public static function forInvalidJson(Throwable $throwable): self

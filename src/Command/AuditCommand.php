@@ -50,6 +50,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCa
           Versioning    : <info>docs/versioning.md</info>
         HELP,
 )]
+/** @internal not part of the BC promise — the command *name* (`audit:run`) and its CLI surface are public, but the PHP class itself is for internal use only. */
 final readonly class AuditCommand
 {
     public function __construct(

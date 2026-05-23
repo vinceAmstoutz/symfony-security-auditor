@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\E
 
 use InvalidArgumentException;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final class SecretScrubberConfigurationException extends InvalidArgumentException
 {
     public static function forInvalidPattern(string $pattern, string $error): self

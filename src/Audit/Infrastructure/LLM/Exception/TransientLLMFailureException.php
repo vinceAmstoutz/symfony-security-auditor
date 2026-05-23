@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exceptio
 use RuntimeException;
 use Throwable;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final class TransientLLMFailureException extends RuntimeException
 {
     public static function afterExhaustedAttempts(int $attempts, Throwable $throwable): self
