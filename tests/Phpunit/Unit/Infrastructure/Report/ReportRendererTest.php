@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
+use Composer\InstalledVersions;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
@@ -198,11 +199,19 @@ final class ReportRendererTest extends TestCase
         self::assertSame('Symfony Security Auditor', $decoded['runs'][0]['tool']['driver']['name']);
     }
 
-    public function test_render_sarif_driver_version_is_1_0_0(): void
+    public function test_render_sarif_driver_version_matches_installed_package_version(): void
+    {
+        $decoded = $this->decodeSarif($this->makeReport());
+        $expected = InstalledVersions::getPrettyVersion(ReportRenderer::PACKAGE_NAME) ?? ReportRenderer::UNKNOWN_VERSION;
+
+        self::assertSame($expected, $decoded['runs'][0]['tool']['driver']['version']);
+    }
+
+    public function test_render_sarif_driver_version_is_non_empty(): void
     {
         $decoded = $this->decodeSarif($this->makeReport());
 
-        self::assertSame('1.0.0', $decoded['runs'][0]['tool']['driver']['version']);
+        self::assertNotSame('', $decoded['runs'][0]['tool']['driver']['version']);
     }
 
     public function test_render_sarif_runs_contains_tool_and_results_keys(): void

@@ -13,14 +13,18 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
+use Composer\InstalledVersions;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ReportRenderer
 {
     public const string PACKAGE_NAME = 'vinceamstoutz/symfony-security-auditor';
+
+    public const string UNKNOWN_VERSION = 'unknown';
 
     private const string TEMPLATE_DIR = __DIR__.'/Template';
 
@@ -91,7 +95,7 @@ final readonly class ReportRenderer
                     'tool' => [
                         'driver' => [
                             'name' => 'Symfony Security Auditor',
-                            'version' => '1.0.0',
+                            'version' => $this->packageVersion(),
                             'informationUri' => 'https://github.com/vinceamstoutz/symfony-security-auditor',
                             'rules' => $rules,
                         ],
@@ -160,6 +164,11 @@ final readonly class ReportRenderer
     private function loadTemplate(string $name): string
     {
         return rtrim((string) file_get_contents(self::TEMPLATE_DIR.'/'.$name), "\n");
+    }
+
+    private function packageVersion(): string
+    {
+        return InstalledVersions::getPrettyVersion(self::PACKAGE_NAME) ?? self::UNKNOWN_VERSION;
     }
 
     private function sarifLevel(VulnerabilitySeverity $vulnerabilitySeverity): string
