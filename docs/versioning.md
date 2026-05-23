@@ -77,6 +77,7 @@ overriding the alias in `config/services.yaml` is a supported integration path:
 - `AttackerCacheInterface`
 - `SecretScrubberInterface`
 - `PricingProviderInterface`
+- `TokenEstimatorInterface`
 - Domain models: `AuditBudget`, `AuditCost`, `TokenUsageSnapshot`
 - `Tool\ToolInterface`, `Tool\ToolRegistryFactoryInterface`
 - `Pipeline\PipelineInterface`, `Pipeline\StageInterface`,

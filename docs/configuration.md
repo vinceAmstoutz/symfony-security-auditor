@@ -313,8 +313,9 @@ bin/console audit:run <project-path> [options]
 
 | Option     | Short | Default   | Description                                                   |
 | ---------- | ----- | --------- | ------------------------------------------------------------- |
-| `--format` | `-f`  | `console` | Output format: `console` (human-readable), `json`, or `sarif` |
-| `--output` | `-o`  | none      | Write the JSON or SARIF report to a file path                 |
+| `--format`  | `-f`  | `console` | Output format: `console` (human-readable), `json`, or `sarif`                       |
+| `--output`  | `-o`  | none      | Write the JSON or SARIF report to a file path                                       |
+| `--dry-run` |       | `false`   | Estimate token usage and cost without invoking the LLM. Exits `0` with zero findings and a populated `cost` block. |
 
 ### Examples
 
@@ -330,9 +331,14 @@ bin/console audit:run /path/to/project --format=json --output=report.json
 bin/console audit:run . --format=sarif --output=report.sarif
 ```
 
+```bash
+bin/console audit:run . --dry-run --format=json
+```
+
 ### Exit codes
 
-| Code | Meaning                                                   |
-| ---- | --------------------------------------------------------- |
-| `0`  | Audit completed; risk level is SAFE, LOW, MEDIUM, or HIGH |
-| `1`  | Risk level is CRITICAL, or the project path is invalid    |
+| Code | Meaning                                                                                              |
+| ---- | ---------------------------------------------------------------------------------------------------- |
+| `0`  | Audit completed; risk level is SAFE, LOW, MEDIUM, or HIGH                                            |
+| `1`  | Risk level is CRITICAL, or the project path is invalid                                               |
+| `2`  | Audit aborted because the configured token or cost budget was exceeded (partial report still emitted) |

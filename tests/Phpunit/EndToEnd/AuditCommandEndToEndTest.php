@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
@@ -22,15 +23,20 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CharacterBasedTokenEstimator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\StaticPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
@@ -320,14 +326,73 @@ final class AuditCommandEndToEndTest extends TestCase
             new NullLogger(),
         );
 
+        $projectFileScanner = new ProjectFileScanner(new NullLogger());
+        $estimateAuditCostUseCase = new EstimateAuditCostUseCase(
+            $projectFileScanner,
+            new CharacterBasedTokenEstimator(),
+            new CostCalculator(new StaticPricingProvider(new NullLogger())),
+            new NullLogger(),
+            'stub',
+            1,
+        );
         $auditCommand = new AuditCommand(
             new RunAuditUseCase($auditPipeline, new NullLogger()),
             new ReportWriter(new ReportRenderer(), new Filesystem()),
             new AuditExitCodeResolver(),
             new AuditPresenter(),
+            $estimateAuditCostUseCase,
         );
 
         return new CommandTester($auditCommand);
+    }
+
+    public function test_dry_run_emits_estimated_cost_without_invoking_llm(): void
+    {
+        $this->createProjectDir();
+        mkdir($this->fixtureDir.'/src/Controller', 0o777, true);
+        file_put_contents($this->fixtureDir.'/src/Controller/UserController.php', '<?php class UserController { public function indexAction() {} }');
+
+        $throwingLLM = new class implements LLMClientInterface {
+            public function complete(string $systemPrompt, string $userMessage): LLMResponse
+            {
+                throw new RuntimeException('platform must not be invoked during --dry-run');
+            }
+
+            public function completeWithTools(
+                string $systemPrompt,
+                string $userMessage,
+                ToolRegistry $toolRegistry,
+                int $maxToolIterations,
+            ): LLMResponse {
+                throw new RuntimeException('platform must not be invoked during --dry-run');
+            }
+
+            public function model(): string
+            {
+                return 'stub';
+            }
+        };
+
+        $commandTester = $this->makeCommandTesterWithLLM($throwingLLM, $throwingLLM);
+
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+            '--format' => 'json',
+            '--output' => $this->fixtureDir.'/report.json',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $reportPath = $this->fixtureDir.'/report.json';
+        self::assertFileExists($reportPath);
+        $decoded = json_decode((string) file_get_contents($reportPath), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertIsArray($decoded);
+        self::assertArrayHasKey('cost', $decoded);
+        $cost = $decoded['cost'];
+        self::assertIsArray($cost);
+        self::assertGreaterThan(0, $cost['input_tokens']);
+        self::assertGreaterThan(0, $cost['output_tokens']);
+        self::assertSame('stub', $cost['primary_model']);
     }
 
     private function rmdirRecursive(string $dir): void

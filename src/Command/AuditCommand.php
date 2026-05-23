@@ -19,6 +19,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 
 #[AsCommand(
@@ -58,6 +59,7 @@ final readonly class AuditCommand
         private ReportWriterInterface $reportWriter,
         private AuditExitCodeResolverInterface $auditExitCodeResolver,
         private AuditPresenterInterface $auditPresenter,
+        private EstimateAuditCostUseCase $estimateAuditCostUseCase,
     ) {}
 
     public function __invoke(
@@ -70,6 +72,17 @@ final readonly class AuditCommand
 
         try {
             $this->auditPresenter->runningSection($symfonyStyle);
+
+            if ($auditCommandInput->dryRun) {
+                $report = $this->estimateAuditCostUseCase->execute($projectPath);
+                $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+
+                if (!$auditCommandInput->isMachineReadableToStdout()) {
+                    $this->auditPresenter->result($symfonyStyle, $report, Command::SUCCESS);
+                }
+
+                return Command::SUCCESS;
+            }
 
             $report = $this->runAuditUseCase->execute($projectPath);
             $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
