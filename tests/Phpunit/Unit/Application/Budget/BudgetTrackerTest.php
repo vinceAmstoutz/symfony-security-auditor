@@ -90,6 +90,16 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->assertWithinBudget();
     }
 
+    public function test_cost_used_accumulates_from_recorded_calls(): void
+    {
+        $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0, outputPrice: 20.0);
+
+        // 1M input @ $10 = $10; 0 output @ $20 = $0; total $10
+        $budgetTracker->recordCall(LLMResponse::create('x', 1_000_000, 0, 'gpt-4o', 'end_turn'));
+
+        self::assertSame(10.0, $budgetTracker->costUsdUsed());
+    }
+
     public function test_at_cap_call_completes_next_call_aborts(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forTokens(100));

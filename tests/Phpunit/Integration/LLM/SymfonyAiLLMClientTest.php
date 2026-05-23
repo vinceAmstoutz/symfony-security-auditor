@@ -37,7 +37,12 @@ use Symfony\AI\Platform\Result\ToolCallResult;
 use Symfony\AI\Platform\Test\InMemoryPlatform;
 use Symfony\AI\Platform\TokenUsage\TokenUsage;
 use Symfony\AI\Platform\Tool\Tool;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
@@ -540,6 +545,90 @@ final class SymfonyAiLLMClientTest extends TestCase
         $snapshot = $tokenUsageRecorder->snapshot();
         self::assertSame(80, $snapshot->inputTokens());
         self::assertSame(15, $snapshot->outputTokens());
+    }
+
+    public function test_complete_with_tools_aborts_mid_loop_when_budget_exceeded(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $tool = $this->makeTool('echo', 'echo', static fn (): string => 'echoed');
+        $toolCall = new ToolCall('call-1', 'echo', []);
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            results: [new ToolCallResult([$toolCall]), new TextResult('should-not-reach')],
+            tokenUsages: [
+                new TokenUsage(promptTokens: 200, completionTokens: 0),
+                new TokenUsage(promptTokens: 200, completionTokens: 0),
+            ],
+        );
+        $budgetTracker = new BudgetTracker(
+            AuditBudget::forTokens(100),
+            new CostCalculator($this->stubPricing(0.0, 0.0)),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+            budgetTracker: $budgetTracker,
+        );
+
+        $this->expectException(BudgetExceededException::class);
+        $this->expectExceptionMessage('token budget exceeded (200 / 100 tokens)');
+
+        $symfonyAiLLMClient->completeWithTools(
+            'sys',
+            'usr',
+            new ToolRegistry([$tool], new NullLogger()),
+            5,
+        );
+    }
+
+    public function test_complete_records_budget_call_and_aborts_when_exceeded(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('done'),
+            new TokenUsage(promptTokens: 500, completionTokens: 0),
+        );
+        $budgetTracker = new BudgetTracker(
+            AuditBudget::forTokens(100),
+            new CostCalculator($this->stubPricing(0.0, 0.0)),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+            budgetTracker: $budgetTracker,
+        );
+
+        $this->expectException(BudgetExceededException::class);
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+    }
+
+    private function stubPricing(float $inputPrice, float $outputPrice): PricingProviderInterface
+    {
+        return new class($inputPrice, $outputPrice) implements PricingProviderInterface {
+            public function __construct(
+                private readonly float $inputPrice,
+                private readonly float $outputPrice,
+            ) {}
+
+            public function pricePerMillionInputTokens(string $model): float
+            {
+                return $this->inputPrice;
+            }
+
+            public function pricePerMillionOutputTokens(string $model): float
+            {
+                return $this->outputPrice;
+            }
+
+            public function hasModel(string $model): bool
+            {
+                return true;
+            }
+        };
     }
 
     public function test_complete_with_tools_accumulates_tokens_across_iterations(): void

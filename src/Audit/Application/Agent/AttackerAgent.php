@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 use JsonException;
 use Psr\Log\LoggerInterface;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -126,6 +127,12 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             $this->recordChunkCoverage($chunk, 'analyzed', $coverageRecorder);
 
             return $this->vulnerabilityFactory->fromList($rawData);
+        } catch (BudgetExceededException $budgetExceededException) {
+            // Budget exhaustion is a deliberate abort, not an LLM failure;
+            // let it bubble up so RunAuditUseCase can wrap it with a partial report.
+            $this->recordChunkCoverage($chunk, 'aborted', $coverageRecorder);
+
+            throw $budgetExceededException;
         } catch (JsonException $exception) {
             $this->logger->error('Failed to parse attacker agent JSON response', [
                 'error' => $exception->getMessage(),

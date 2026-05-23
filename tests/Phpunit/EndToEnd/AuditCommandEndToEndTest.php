@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
@@ -344,6 +345,35 @@ final class AuditCommandEndToEndTest extends TestCase
         );
 
         return new CommandTester($auditCommand);
+    }
+
+    public function test_command_exits_with_budget_exit_code_when_audit_is_aborted_by_budget(): void
+    {
+        $this->createProjectDir();
+
+        $abortingAttacker = self::createStub(LLMClientInterface::class);
+        $abortingAttacker->method('complete')->willThrowException(
+            BudgetExceededException::forCost(1.5, 1.0),
+        );
+        $abortingAttacker->method('completeWithTools')->willThrowException(
+            BudgetExceededException::forCost(1.5, 1.0),
+        );
+        $reviewerLLM = self::createStub(LLMClientInterface::class);
+        $reviewerLLM->method('complete')->willReturn(LLMResponse::create('{}', 0, 0, 'stub', 'end_turn'));
+
+        $commandTester = $this->makeCommandTesterWithLLM($abortingAttacker, $reviewerLLM);
+        $outputFile = $this->fixtureDir.'/partial.json';
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--format' => 'json',
+            '--output' => $outputFile,
+        ]);
+
+        self::assertSame(2, $exitCode);
+        self::assertFileExists($outputFile);
+        $decoded = json_decode((string) file_get_contents($outputFile), true);
+        self::assertIsArray($decoded);
+        self::assertArrayHasKey('audit_id', $decoded);
     }
 
     public function test_dry_run_emits_estimated_cost_without_invoking_llm(): void

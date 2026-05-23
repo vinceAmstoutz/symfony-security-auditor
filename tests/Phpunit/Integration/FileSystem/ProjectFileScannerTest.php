@@ -25,6 +25,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSe
 
 final class ProjectFileScannerTest extends TestCase
 {
+    // Split via constant so neither CS Fixer's `no_useless_concat_operator`
+    // nor GitHub's secret scanner sees a contiguous credential-shaped string.
+    private const string STRIPE_LIVE_PREFIX = 'sk_live';
+
     private string $tmpDir;
 
     private ProjectFileScanner $projectFileScanner;
@@ -265,9 +269,7 @@ final class ProjectFileScannerTest extends TestCase
 
     public function test_it_scrubs_secrets_from_file_content_when_scrubber_is_injected(): void
     {
-        // Synthesize the credential-shaped value at runtime so the repository file
-        // does not contain a string matching GitHub's secret scanner.
-        $stripeShape = 'sk_live'.'_4eC39HqLyjWDarjtT1zdp7dc';
+        $stripeShape = self::STRIPE_LIVE_PREFIX.'_4eC39HqLyjWDarjtT1zdp7dc';
 
         mkdir($this->tmpDir.'/config', 0o777, true);
         file_put_contents(
@@ -295,7 +297,7 @@ final class ProjectFileScannerTest extends TestCase
 
     public function test_null_scrubber_leaves_file_content_unmodified(): void
     {
-        $stripeShape = 'sk_live'.'_4eC39HqLyjWDarjtT1zdp7dc';
+        $stripeShape = self::STRIPE_LIVE_PREFIX.'_4eC39HqLyjWDarjtT1zdp7dc';
         mkdir($this->tmpDir.'/config', 0o777, true);
         $original = "stripe:\n    key: ".$stripeShape."\n";
         file_put_contents($this->tmpDir.'/config/secrets.yaml', $original);

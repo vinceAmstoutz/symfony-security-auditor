@@ -53,8 +53,8 @@ is a `MAJOR` change.
 - Exit codes (see [CLI Reference → Exit codes](configuration.md#exit-codes)):
   - `0` — audit completed; risk level is `SAFE`, `LOW`, `MEDIUM`, or `HIGH`.
   - `1` — risk level is `CRITICAL`, or the audit itself failed.
-  - `2` — audit aborted because the configured token or cost budget was
-    exceeded (partial report still emitted).
+  - `2` — audit aborted because the configured token or cost budget was exceeded
+    (partial report still emitted).
 
 ### Output schemas
 
@@ -78,7 +78,8 @@ overriding the alias in `config/services.yaml` is a supported integration path:
 - `SecretScrubberInterface`
 - `PricingProviderInterface`
 - `TokenEstimatorInterface`
-- Configuration value objects in `Audit\Domain\Configuration\*` (BundleConfiguration and per-layer VOs)
+- Configuration value objects in `Audit\Domain\Configuration\*`
+  (BundleConfiguration and per-layer VOs)
 - Domain models: `AuditBudget`, `AuditCost`, `TokenUsageSnapshot`
 - `Tool\ToolInterface`, `Tool\ToolRegistryFactoryInterface`
 - `Pipeline\PipelineInterface`, `Pipeline\StageInterface`,

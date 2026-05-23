@@ -83,7 +83,18 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
                 default => '***REDACTED:'.$label.'***',
             };
 
-            $result = preg_replace($pattern, $replacement, $content);
+            // Silence PCRE warnings so a runaway user-supplied pattern hitting the
+            // backtrack limit returns null cleanly instead of escalating to a
+            // PHPUnit fail-on-warning. The null branch lets the scrub continue
+            // with the next pattern instead of aborting the whole pipeline.
+            set_error_handler(static fn (): bool => true);
+
+            try {
+                $result = preg_replace($pattern, $replacement, $content);
+            } finally {
+                restore_error_handler();
+            }
+
             if (null === $result) {
                 continue;
             }

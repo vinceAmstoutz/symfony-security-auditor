@@ -29,6 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentIn
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
@@ -98,6 +99,54 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame(['legacy', 'tmp'], $container->getParameter('symfony_security_auditor.scan.excluded_dirs'));
         self::assertFalse($container->getParameter('symfony_security_auditor.scan.respect_gitignore'));
         self::assertSame(1024, $container->getParameter('symfony_security_auditor.scan.max_file_size_kb'));
+    }
+
+    public function test_bundle_wires_unlimited_audit_budget_when_both_caps_omitted(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        $auditBudget = $this->getPrivateService($kernel, AuditBudget::class);
+        self::assertInstanceOf(AuditBudget::class, $auditBudget);
+        self::assertTrue($auditBudget->isUnlimited());
+    }
+
+    public function test_bundle_wires_token_only_audit_budget(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'audit' => ['budget' => ['max_tokens' => 50_000]],
+        ]);
+
+        $auditBudget = $this->getPrivateService($kernel, AuditBudget::class);
+        self::assertInstanceOf(AuditBudget::class, $auditBudget);
+        self::assertSame(50_000, $auditBudget->maxTokens());
+        self::assertNull($auditBudget->maxCostUsd());
+    }
+
+    public function test_bundle_wires_cost_only_audit_budget(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'audit' => ['budget' => ['max_cost_usd' => 2.5]],
+        ]);
+
+        $auditBudget = $this->getPrivateService($kernel, AuditBudget::class);
+        self::assertInstanceOf(AuditBudget::class, $auditBudget);
+        self::assertNull($auditBudget->maxTokens());
+        self::assertSame(2.5, $auditBudget->maxCostUsd());
+    }
+
+    public function test_bundle_wires_both_caps_audit_budget(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'audit' => ['budget' => ['max_tokens' => 10_000, 'max_cost_usd' => 1.0]],
+        ]);
+
+        $auditBudget = $this->getPrivateService($kernel, AuditBudget::class);
+        self::assertInstanceOf(AuditBudget::class, $auditBudget);
+        self::assertSame(10_000, $auditBudget->maxTokens());
+        self::assertSame(1.0, $auditBudget->maxCostUsd());
     }
 
     public function test_bundle_propagates_audit_retry_config_to_parameters(): void
