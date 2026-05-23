@@ -19,13 +19,16 @@ use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\MultiPartResult;
 use Symfony\AI\Platform\Result\ResultInterface;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
+use Symfony\AI\Platform\TokenUsage\TokenUsageInterface;
 use Symfony\AI\Platform\Tool\ExecutionReference;
 use Symfony\AI\Platform\Tool\Tool;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
@@ -38,8 +41,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  * Developers choose their provider (Anthropic, OpenAI, Mistral, Ollama, Gemini, Azure …)
  * there; this class remains provider-agnostic.
  *
- * Token counts are set to zero here. For full token tracking, register a
- * Symfony\AI\Platform\Event\ResultEvent listener and read the token usage metadata.
+ * Token counts are read from the per-call `DeferredResult` metadata (populated by the
+ * platform's `TokenUsageExtractor` during result conversion) and forwarded to the
+ * shared `TokenUsageRecorder` so the orchestrator can attribute cumulative usage to
+ * the final `AuditReport` and enforce configured budgets.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -61,6 +66,7 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         private LoggerInterface $logger,
         private float $temperature = self::DEFAULT_TEMPERATURE,
         private bool $promptCaching = self::DEFAULT_PROMPT_CACHING,
+        private ?TokenUsageRecorder $tokenUsageRecorder = null,
     ) {}
 
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
@@ -79,16 +85,20 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
 
         \assert('' !== $this->model, 'Model must be a non-empty string');
 
-        $content = $this->platform->invoke($this->model, $messageBag, $this->baseOptions())->asText();
+        $deferredResult = $this->platform->invoke($this->model, $messageBag, $this->baseOptions());
+        $content = $deferredResult->asText();
+        [$inputTokens, $outputTokens] = $this->extractTokens($deferredResult);
 
         $this->logger->debug('symfony/ai platform responded', [
             'content_length' => \strlen($content),
+            'input_tokens' => $inputTokens,
+            'output_tokens' => $outputTokens,
         ]);
 
         return LLMResponse::create(
             content: $content,
-            inputTokens: 0,
-            outputTokens: 0,
+            inputTokens: $inputTokens,
+            outputTokens: $outputTokens,
             model: $this->model,
             stopReason: 'end_turn',
         );
@@ -111,9 +121,14 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         $options['tools'] = $this->buildPlatformTools($toolRegistry->definitions());
 
         $iteration = 0;
+        $totalInputTokens = 0;
+        $totalOutputTokens = 0;
         while ($iteration < $maxToolIterations) {
-            $deferred = $this->platform->invoke($this->model, $messageBag, $options);
-            $platformResult = $deferred->getResult();
+            $deferredResult = $this->platform->invoke($this->model, $messageBag, $options);
+            $platformResult = $deferredResult->getResult();
+            [$callInput, $callOutput] = $this->extractTokens($deferredResult);
+            $totalInputTokens += $callInput;
+            $totalOutputTokens += $callOutput;
             $toolCalls = $this->extractToolCalls($platformResult);
 
             if ([] === $toolCalls) {
@@ -121,12 +136,14 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
                 $this->logger->debug('Tool-using loop ended with text response', [
                     'iterations' => $iteration,
                     'content_length' => \strlen($content),
+                    'input_tokens' => $totalInputTokens,
+                    'output_tokens' => $totalOutputTokens,
                 ]);
 
                 return LLMResponse::create(
                     content: $content,
-                    inputTokens: 0,
-                    outputTokens: 0,
+                    inputTokens: $totalInputTokens,
+                    outputTokens: $totalOutputTokens,
                     model: $this->model,
                     stopReason: 'end_turn',
                 );
@@ -148,12 +165,14 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
 
         $this->logger->warning('Tool-using loop hit iteration cap', [
             'max_iterations' => $maxToolIterations,
+            'input_tokens' => $totalInputTokens,
+            'output_tokens' => $totalOutputTokens,
         ]);
 
         return LLMResponse::create(
             content: '',
-            inputTokens: 0,
-            outputTokens: 0,
+            inputTokens: $totalInputTokens,
+            outputTokens: $totalOutputTokens,
             model: $this->model,
             stopReason: 'max_tool_iterations',
         );
@@ -195,6 +214,28 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         }
 
         return '';
+    }
+
+    /**
+     * Reads token usage from the deferred result's metadata and forwards it to the
+     * shared recorder. Returns the per-call counts as [inputTokens, outputTokens] so
+     * callers can populate the returned LLMResponse.
+     *
+     * @return array{0: int, 1: int}
+     */
+    private function extractTokens(DeferredResult $deferredResult): array
+    {
+        $metadata = $deferredResult->getMetadata()->all();
+        $tokenUsage = $metadata['token_usage'] ?? null;
+        if (!$tokenUsage instanceof TokenUsageInterface) {
+            return [0, 0];
+        }
+
+        $inputTokens = max(0, $tokenUsage->getPromptTokens() ?? 0);
+        $outputTokens = max(0, $tokenUsage->getCompletionTokens() ?? 0);
+        $this->tokenUsageRecorder?->record($inputTokens, $outputTokens);
+
+        return [$inputTokens, $outputTokens];
     }
 
     /**

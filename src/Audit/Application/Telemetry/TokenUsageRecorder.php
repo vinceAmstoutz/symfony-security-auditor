@@ -1,0 +1,63 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry;
+
+use InvalidArgumentException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
+
+/**
+ * Accumulates LLM token usage across all calls within a single audit run.
+ *
+ * The recorder is the single source of truth for cumulative usage. Both the
+ * attacker and reviewer LLM clients share one instance so the audit budget
+ * can be enforced globally and the final report can attribute total cost.
+ *
+ * Mutable by design — `LLMClientInterface` callers report each call's deltas
+ * via {@see record()}; the orchestrator and budget tracker read totals via
+ * {@see snapshot()}. {@see reset()} clears state between independent audit
+ * runs sharing a recorder instance.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
+ */
+final class TokenUsageRecorder
+{
+    private int $inputTokens = 0;
+
+    private int $outputTokens = 0;
+
+    public function record(int $inputTokens, int $outputTokens): void
+    {
+        if ($inputTokens < 0) {
+            throw new InvalidArgumentException(\sprintf('Input tokens must be >= 0, got %d', $inputTokens));
+        }
+
+        if ($outputTokens < 0) {
+            throw new InvalidArgumentException(\sprintf('Output tokens must be >= 0, got %d', $outputTokens));
+        }
+
+        $this->inputTokens += $inputTokens;
+        $this->outputTokens += $outputTokens;
+    }
+
+    public function snapshot(): TokenUsageSnapshot
+    {
+        return TokenUsageSnapshot::of($this->inputTokens, $this->outputTokens);
+    }
+
+    public function reset(): void
+    {
+        $this->inputTokens = 0;
+        $this->outputTokens = 0;
+    }
+}

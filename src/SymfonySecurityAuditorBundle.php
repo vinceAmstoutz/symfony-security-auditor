@@ -21,6 +21,7 @@ use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
@@ -181,6 +182,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service('logger'),
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
                 $config['cache']['prompt_caching'],
+                service(TokenUsageRecorder::class),
             ]);
 
         $services->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
@@ -191,6 +193,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service('logger'),
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
                 $config['cache']['prompt_caching'],
+                service(TokenUsageRecorder::class),
             ]);
 
         $services->alias(LLMClientInterface::class, 'security_auditor.attacker_client');

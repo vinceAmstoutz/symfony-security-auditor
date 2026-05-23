@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipelin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
@@ -69,6 +70,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator
         ->instanceof(StageInterface::class)
         ->tag('symfony_security_auditor.pipeline_stage');
+
+    $defaultsConfigurator->set(TokenUsageRecorder::class);
 
     $defaultsConfigurator->set(NullSecretScrubber::class);
 

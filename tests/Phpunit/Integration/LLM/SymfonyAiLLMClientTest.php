@@ -34,7 +34,9 @@ use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
 use Symfony\AI\Platform\Test\InMemoryPlatform;
+use Symfony\AI\Platform\TokenUsage\TokenUsage;
 use Symfony\AI\Platform\Tool\Tool;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
@@ -469,6 +471,145 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertNotNull($parameters);
         self::assertSame([], $parameters['properties']);
         self::assertSame([], $parameters['required']);
+    }
+
+    public function test_complete_populates_input_and_output_tokens_from_platform_metadata(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('done'),
+            new TokenUsage(promptTokens: 120, completionTokens: 30),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+        );
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame(120, $llmResponse->inputTokens());
+        self::assertSame(30, $llmResponse->outputTokens());
+        self::assertSame(150, $llmResponse->totalTokens());
+        self::assertSame(120, $tokenUsageRecorder->snapshot()->inputTokens());
+        self::assertSame(30, $tokenUsageRecorder->snapshot()->outputTokens());
+    }
+
+    public function test_complete_returns_zero_tokens_when_platform_metadata_omits_token_usage(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $platform = $this->scriptedPlatform([new TextResult('done')]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+        );
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame(0, $llmResponse->inputTokens());
+        self::assertSame(0, $llmResponse->outputTokens());
+        self::assertSame(0, $tokenUsageRecorder->snapshot()->totalTokens());
+    }
+
+    public function test_consecutive_complete_calls_accumulate_in_shared_recorder(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $attackerPlatform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('one'),
+            new TokenUsage(promptTokens: 50, completionTokens: 10),
+        );
+        $reviewerPlatform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('two'),
+            new TokenUsage(promptTokens: 30, completionTokens: 5),
+        );
+        $clientOne = new SymfonyAiLLMClient($attackerPlatform, 'attacker', new NullLogger(), tokenUsageRecorder: $tokenUsageRecorder);
+        $clientTwo = new SymfonyAiLLMClient($reviewerPlatform, 'reviewer', new NullLogger(), tokenUsageRecorder: $tokenUsageRecorder);
+
+        $clientOne->complete('sys', 'usr');
+        $clientTwo->complete('sys', 'usr');
+
+        $snapshot = $tokenUsageRecorder->snapshot();
+        self::assertSame(80, $snapshot->inputTokens());
+        self::assertSame(15, $snapshot->outputTokens());
+    }
+
+    public function test_complete_with_tools_accumulates_tokens_across_iterations(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $toolCall = new ToolCall('call-1', 'echo', []);
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            results: [new ToolCallResult([$toolCall]), new TextResult('finished')],
+            tokenUsages: [
+                new TokenUsage(promptTokens: 40, completionTokens: 10),
+                new TokenUsage(promptTokens: 60, completionTokens: 5),
+            ],
+        );
+        $tool = $this->makeTool('echo', 'echo', static fn (): string => 'echoed');
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+        );
+
+        $llmResponse = $symfonyAiLLMClient->completeWithTools(
+            'sys',
+            'usr',
+            new ToolRegistry([$tool], new NullLogger()),
+            5,
+        );
+
+        self::assertSame(100, $llmResponse->inputTokens());
+        self::assertSame(15, $llmResponse->outputTokens());
+        self::assertSame(100, $tokenUsageRecorder->snapshot()->inputTokens());
+        self::assertSame(15, $tokenUsageRecorder->snapshot()->outputTokens());
+    }
+
+    /**
+     * @param ResultInterface|list<ResultInterface> $results
+     * @param TokenUsage|list<TokenUsage>           $tokenUsages
+     */
+    private function scriptedPlatformWithTokenUsage(
+        ResultInterface|array $results = new TextResult(''),
+        TokenUsage|array $tokenUsages = new TokenUsage(),
+    ): PlatformInterface {
+        $resultList = $results instanceof ResultInterface ? [$results] : $results;
+        $tokenUsageList = $tokenUsages instanceof TokenUsage ? [$tokenUsages] : $tokenUsages;
+
+        return new class($resultList, $tokenUsageList) implements PlatformInterface {
+            /**
+             * @param list<ResultInterface> $results
+             * @param list<TokenUsage>      $tokenUsages
+             */
+            public function __construct(
+                private array $results,
+                private array $tokenUsages,
+            ) {}
+
+            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                $result = array_shift($this->results) ?? new TextResult('exhausted');
+                $tokenUsage = array_shift($this->tokenUsages);
+                $deferredResult = new DeferredResult(
+                    new PlainConverter($result),
+                    new InMemoryRawResult(['text' => ''], [], (object) []),
+                    $options,
+                );
+                if ($tokenUsage instanceof TokenUsage) {
+                    $deferredResult->getMetadata()->add('token_usage', $tokenUsage);
+                }
+
+                return $deferredResult;
+            }
+
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
     }
 
     /**
