@@ -102,7 +102,7 @@ final class RegexSecretScrubberTest extends TestCase
 
     public function test_scrub_is_idempotent(): void
     {
-        $input = "STRIPE_SECRET_KEY=sk_super_secret_123\nAWS='.'AKIA'.'IOSFODNN7EXAMPLE'.'\n";
+        $input = "STRIPE_SECRET_KEY=sk_super_secret_123\nAWS=".'AKIA'."IOSFODNN7EXAMPLE\n";
 
         $once = $this->regexSecretScrubber->scrub($input);
         $twice = $this->regexSecretScrubber->scrub($once);
@@ -114,7 +114,7 @@ final class RegexSecretScrubberTest extends TestCase
     {
         // Mix free-floating tokens (caught by their specific regex) with env-style assignments
         // (caught by env_assignment). Asserts both code paths fire in a single call.
-        $input = "Token: '.'AKIA'.'IOSFODNN7EXAMPLE'.'\nGitHub: '.'ghp'.'_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij'.'\nAPI_TOKEN=should_be_redacted_too\n";
+        $input = 'Token: '.'AKIA'."IOSFODNN7EXAMPLE\nGitHub: ".'ghp'."_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij\nAPI_TOKEN=should_be_redacted_too\n";
 
         $output = $this->regexSecretScrubber->scrub($input);
 
