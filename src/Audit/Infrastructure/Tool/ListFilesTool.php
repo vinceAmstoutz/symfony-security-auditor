@@ -21,6 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
  * Lists project files, optionally filtered by ProjectFile::type(). Lets the
  * attacker survey the project topology without consuming context for the actual
  * file contents.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class ListFilesTool implements ToolInterface
 {

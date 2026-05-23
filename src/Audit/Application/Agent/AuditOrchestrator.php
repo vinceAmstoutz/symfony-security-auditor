@@ -18,6 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 {
     public const int DEFAULT_MAX_ITERATIONS = 3;

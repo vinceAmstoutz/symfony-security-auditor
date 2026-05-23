@@ -23,6 +23,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception
  * Runs `composer audit --format=json --locked` via symfony/process. Composer's
  * exit code is non-zero whenever advisories are found, so we only treat a failure
  * as fatal when stdout is empty (the JSON is the contract).
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditRunnerInterface
 {

@@ -20,6 +20,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 /**
  * Case-sensitive substring search across the project files scanned by the
  * ingestion stage. Returns up to MAX_MATCHES matches as path:line lines.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class GrepTool implements ToolInterface
 {

@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInterface
 {
     public function buildSystemPrompt(): string

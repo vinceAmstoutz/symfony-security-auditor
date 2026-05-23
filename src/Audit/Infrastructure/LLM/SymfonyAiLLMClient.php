@@ -40,6 +40,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  *
  * Token counts are set to zero here. For full token tracking, register a
  * Symfony\AI\Platform\Event\ResultEvent listener and read the token usage metadata.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class SymfonyAiLLMClient implements LLMClientInterface
 {

@@ -29,6 +29,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception
  * gracefully to an empty database — `lookup()` always returns a list, never
  * propagates an exception, so the orchestrator and the tool layer stay
  * resilient.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseInterface
 {

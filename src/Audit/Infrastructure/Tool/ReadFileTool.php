@@ -21,6 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
  * Returns the textual content of a project file by its relative path. The set
  * of readable files is fixed at construction time to the project files scanned
  * by IngestionStage — the LLM cannot escape outside the audited project tree.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class ReadFileTool implements ToolInterface
 {

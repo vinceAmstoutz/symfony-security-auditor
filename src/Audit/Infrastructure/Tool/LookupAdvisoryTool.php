@@ -21,6 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AdvisoryD
  * Bridges the security advisory database to the LLM's tool-calling protocol.
  * The LLM passes a Composer package name and an installed version; the database
  * adapter returns matching CVE entries (or an "no advisories found" message).
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class LookupAdvisoryTool implements ToolInterface
 {
