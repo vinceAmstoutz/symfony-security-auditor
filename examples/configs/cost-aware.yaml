@@ -1,0 +1,22 @@
+# Triage scan — single small model, single iteration, tools disabled.
+#
+# Target: smallest possible bill for an initial pass on a large monorepo.
+# Trade-off: lower recall, no cross-file investigation, no live CVE lookups.
+# Drop in as: config/packages/symfony_security_auditor.yaml
+symfony_security_auditor:
+    model: 'claude-haiku-4-5'
+
+    scan:
+        respect_gitignore: true
+        max_file_size_kb: 256   # skip large generated files
+
+    audit:
+        max_iterations: 1       # one pass only
+        min_confidence: 0.8     # cut everything below high-confidence
+        reviewer_batch_size: 5
+        tools_enabled: false    # disables read_file / grep / list_files / lookup_advisory
+        max_tool_iterations: 1
+
+    cache:
+        enabled: true
+        prompt_caching: true

@@ -1,0 +1,9 @@
+ai:
+    platform:
+        anthropic:
+            api_key: '%env(ANTHROPIC_API_KEY)%'
+        # Swap to any other platform without touching PHP.
+        # ollama:
+        #     host_url: 'http://localhost:11434'
+        # openai:
+        #     api_key: '%env(OPENAI_API_KEY)%'

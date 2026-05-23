@@ -1,0 +1,24 @@
+# Scheduled CI run — split-model, cache + prompt caching enabled.
+#
+# Target: accuracy on a medium-to-large Symfony codebase, run nightly.
+# Cost:   ~$0.50–$2.00 per run on a 150-file project (varies by provider).
+# Drop in as: config/packages/symfony_security_auditor.yaml
+symfony_security_auditor:
+    # Heavyweight model finds the bugs; lightweight model filters false positives.
+    attacker_model: 'claude-opus-4-5'
+    reviewer_model: 'claude-haiku-4-5'
+
+    scan:
+        respect_gitignore: true
+        max_file_size_kb: 512
+
+    audit:
+        max_iterations: 3
+        min_confidence: 0.6     # standard precision/recall balance
+        reviewer_batch_size: 5  # fewer LLM calls, watch for cross-talk
+        tools_enabled: true     # cross-file investigation + advisory lookups
+        max_tool_iterations: 8
+
+    cache:
+        enabled: true           # skip identical chunks on rerun
+        prompt_caching: true    # ~90% discount on Anthropic
