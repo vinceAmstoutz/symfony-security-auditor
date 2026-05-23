@@ -16,9 +16,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\RecordingStage;
 
 final class RunAuditUseCaseTest extends TestCase
 {
@@ -37,21 +39,22 @@ final class RunAuditUseCaseTest extends TestCase
 
     public function test_it_returns_audit_report(): void
     {
-        $pipeline = self::createStub(PipelineInterface::class);
-        $runAuditUseCase = new RunAuditUseCase($pipeline, new NullLogger());
+        $runAuditUseCase = new RunAuditUseCase($this->makePipeline(), new NullLogger());
 
         $auditReport = $runAuditUseCase->execute($this->tmpDir);
 
         self::assertInstanceOf(AuditReport::class, $auditReport);
     }
 
-    public function test_it_calls_pipeline_process(): void
+    public function test_it_runs_pipeline_against_the_audit_context(): void
     {
-        $pipeline = $this->createMock(PipelineInterface::class);
-        $pipeline->expects(self::once())->method('process');
+        $recordingStage = new RecordingStage();
+        $runAuditUseCase = new RunAuditUseCase($this->makePipeline($recordingStage), new NullLogger());
 
-        $runAuditUseCase = new RunAuditUseCase($pipeline, new NullLogger());
-        $runAuditUseCase->execute($this->tmpDir);
+        $auditReport = $runAuditUseCase->execute($this->tmpDir);
+
+        self::assertCount(1, $recordingStage->processedAuditIds);
+        self::assertSame($auditReport->auditId(), $recordingStage->processedAuditIds[0]);
     }
 
     public function test_it_logs_starting_audit_with_project_path(): void
@@ -64,8 +67,7 @@ final class RunAuditUseCaseTest extends TestCase
             },
         );
 
-        $pipeline = self::createStub(PipelineInterface::class);
-        $runAuditUseCase = new RunAuditUseCase($pipeline, $logger);
+        $runAuditUseCase = new RunAuditUseCase($this->makePipeline(), $logger);
         $runAuditUseCase->execute($this->tmpDir);
 
         self::assertSame(['Starting audit', ['project' => $this->tmpDir]], $infoLogs[0]);
@@ -81,8 +83,7 @@ final class RunAuditUseCaseTest extends TestCase
             },
         );
 
-        $pipeline = self::createStub(PipelineInterface::class);
-        $runAuditUseCase = new RunAuditUseCase($pipeline, $logger);
+        $runAuditUseCase = new RunAuditUseCase($this->makePipeline(), $logger);
         $auditReport = $runAuditUseCase->execute($this->tmpDir);
 
         $completeLog = array_values(array_filter($infoLogs, static fn (array $e): bool => 'Audit complete' === $e[0]))[0];
@@ -90,5 +91,10 @@ final class RunAuditUseCaseTest extends TestCase
         self::assertSame($auditReport->riskLevel(), $completeLog[1]['risk_level']);
         self::assertSame(0, $completeLog[1]['vulnerabilities']);
         self::assertIsFloat($completeLog[1]['duration']);
+    }
+
+    private function makePipeline(?StageInterface $stage = null): AuditPipeline
+    {
+        return new AuditPipeline($stage instanceof StageInterface ? [$stage] : [], new NullLogger());
     }
 }

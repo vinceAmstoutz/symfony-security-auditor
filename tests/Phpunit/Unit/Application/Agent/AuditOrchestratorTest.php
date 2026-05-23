@@ -13,27 +13,34 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
-use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 
+/**
+ * Drives the orchestrator end-to-end via real AttackerAgent + ReviewerAgent,
+ * stubbing only the LLMClientInterface boundary (per testing.md: mock at
+ * system boundaries only, never internal Application/Domain collaborators).
+ */
 final class AuditOrchestratorTest extends TestCase
 {
-    private AttackerAgentInterface&MockObject $attackerAgent;
+    private LLMClientInterface&MockObject $attackerLlm;
 
-    private ReviewerAgentInterface&MockObject $reviewerAgent;
+    private LLMClientInterface&MockObject $reviewerLlm;
 
     private AuditOrchestrator $auditOrchestrator;
 
@@ -41,10 +48,10 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_skips_audit_when_no_mapping(): void
     {
-        $auditContext = AuditContext::forProject($this->tmpDir);
+        $this->attackerLlm->expects(self::never())->method('complete');
+        $this->reviewerLlm->expects(self::never())->method('complete');
 
-        $this->attackerAgent->expects(self::never())->method('analyze');
-        $this->reviewerAgent->expects(self::never())->method('review');
+        $auditContext = AuditContext::forProject($this->tmpDir);
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -53,18 +60,13 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_runs_attacker_and_reviewer_loop(): void
     {
+        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'Vuln v1')]),
+            $this->emptyResponse(),
+        );
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
         $auditContext = $this->makeContextWithMapping();
-
-        $vulnerability = $this->makeVulnerability('v1');
-        $validatedVuln = $vulnerability->withReviewerValidation(true);
-
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturnOnConsecutiveCalls([$vulnerability], []);
-
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturn([$validatedVuln]);
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -74,34 +76,25 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_stops_when_attacker_finds_nothing(): void
     {
+        $this->attackerLlm->method('complete')->willReturn($this->emptyResponse());
+        $this->reviewerLlm->expects(self::never())->method('complete');
+
         $auditContext = $this->makeContextWithMapping();
-
-        $this->attackerAgent
-            ->expects(self::once())
-            ->method('analyze')
-            ->willReturn([]);
-
-        $this->reviewerAgent->expects(self::never())->method('review');
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
         self::assertEmpty($auditContext->vulnerabilities());
+        self::assertSame(1, $auditContext->getMeta('audit.iterations'));
     }
 
     public function test_it_deduplicates_vulnerabilities_across_iterations(): void
     {
+        $this->attackerLlm->method('complete')->willReturn(
+            $this->attackerResponse([$this->vulnPayload(title: 'Vuln v1')]),
+        );
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
         $auditContext = $this->makeContextWithMapping();
-
-        $vulnerability = $this->makeVulnerability('v1');
-        $validated = $vulnerability->withReviewerValidation(true);
-
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturn([$vulnerability]);
-
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturn([$validated]);
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -110,16 +103,12 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_filters_low_confidence_findings(): void
     {
+        $this->attackerLlm->method('complete')->willReturn(
+            $this->attackerResponse([$this->vulnPayload(title: 'low', confidence: 0.3)]),
+        );
+        $this->reviewerLlm->expects(self::never())->method('complete');
+
         $auditContext = $this->makeContextWithMapping();
-
-        $vulnerability = $this->makeVulnerability('low', confidence: 0.3);
-
-        $this->attackerAgent
-            ->expects(self::once())
-            ->method('analyze')
-            ->willReturn([$vulnerability]);
-
-        $this->reviewerAgent->expects(self::never())->method('review');
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -128,9 +117,9 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_stores_audit_metadata_in_context(): void
     {
-        $auditContext = $this->makeContextWithMapping();
+        $this->attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
-        $this->attackerAgent->method('analyze')->willReturn([]);
+        $auditContext = $this->makeContextWithMapping();
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -142,44 +131,28 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_runs_exactly_max_iterations_when_new_findings_each_time(): void
     {
-        $auditContext = $this->makeContextWithMapping();
         $iterationCount = 0;
 
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturnCallback(static function () use (&$iterationCount): array {
+        $this->attackerLlm
+            ->method('complete')
+            ->willReturnCallback(function () use (&$iterationCount): LLMResponse {
                 ++$iterationCount;
 
                 // Safety bound: if the orchestrator runs the loop more than its declared
                 // max_iterations (e.g. a faulty counter mutation), fail loud instead of
-                // looping forever. The orchestrator must call analyze exactly 3 times.
+                // looping forever. The orchestrator must call the LLM exactly 3 times.
                 if ($iterationCount > 10) {
-                    throw new RuntimeException('orchestrator exceeded safety bound: '.$iterationCount.' analyze calls');
+                    throw new RuntimeException('orchestrator exceeded safety bound: '.$iterationCount.' attacker calls');
                 }
 
-                return [Vulnerability::create(
-                    VulnerabilityType::SQL_INJECTION,
-                    VulnerabilitySeverity::HIGH,
-                    'Vuln iter'.$iterationCount,
-                    'desc',
-                    'src/File'.$iterationCount.'.php',
-                    10, 15,
-                    '$q', 'inject', "' OR 1", 'fix',
-                    0.9,
-                )];
+                return $this->attackerResponse([$this->vulnPayload(
+                    title: 'Vuln iter'.$iterationCount,
+                    filePath: 'src/File'.$iterationCount.'.php',
+                )]);
             });
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturnCallback(static function (array $vulns): array {
-                $result = [];
-                foreach ($vulns as $vuln) {
-                    Assert::assertInstanceOf(Vulnerability::class, $vuln);
-                    $result[] = $vuln->withReviewerValidation(true);
-                }
-
-                return $result;
-            });
+        $auditContext = $this->makeContextWithMapping();
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -189,17 +162,13 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_accepts_vulnerability_at_exact_confidence_threshold(): void
     {
+        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'threshold', confidence: 0.6)]),
+            $this->emptyResponse(),
+        );
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
         $auditContext = $this->makeContextWithMapping();
-
-        $vulnerability = $this->makeVulnerability('threshold', confidence: 0.6);
-
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturnOnConsecutiveCalls([$vulnerability], []);
-
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturn([$vulnerability->withReviewerValidation(true)]);
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -208,16 +177,12 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_rejects_vulnerability_just_below_confidence_threshold(): void
     {
+        $this->attackerLlm->method('complete')->willReturn(
+            $this->attackerResponse([$this->vulnPayload(title: 'below', confidence: 0.59)]),
+        );
+        $this->reviewerLlm->expects(self::never())->method('complete');
+
         $auditContext = $this->makeContextWithMapping();
-
-        $vulnerability = $this->makeVulnerability('below', confidence: 0.59);
-
-        $this->attackerAgent
-            ->expects(self::once())
-            ->method('analyze')
-            ->willReturn([$vulnerability]);
-
-        $this->reviewerAgent->expects(self::never())->method('review');
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -226,44 +191,13 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_deduplicates_by_overlapping_line_ranges(): void
     {
+        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'SQL A', lineStart: 10, lineEnd: 20)]),
+            $this->attackerResponse([$this->vulnPayload(title: 'SQL B', lineStart: 15, lineEnd: 25)]),
+        );
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
         $auditContext = $this->makeContextWithMapping();
-
-        $vulnerability = Vulnerability::create(
-            VulnerabilityType::SQL_INJECTION,
-            VulnerabilitySeverity::HIGH,
-            'SQL Injection A',
-            'desc',
-            'src/Controller/FooController.php',
-            10, 20,
-            '$q', 'inject', "' OR 1", 'fix',
-            0.9,
-        );
-        $vuln2 = Vulnerability::create(
-            VulnerabilityType::SQL_INJECTION,
-            VulnerabilitySeverity::HIGH,
-            'SQL Injection B',
-            'desc',
-            'src/Controller/FooController.php',
-            15, 25,
-            '$q', 'inject', "' OR 1", 'fix',
-            0.9,
-        );
-
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturnOnConsecutiveCalls([$vulnerability], [$vuln2]);
-
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturnCallback(static function (array $vulns): array {
-                $result = [];
-                foreach ($vulns as $vuln) {
-                    Assert::assertInstanceOf(Vulnerability::class, $vuln);
-                    $result[] = $vuln->withReviewerValidation(true);
-                }
-
-                return $result;
-            });
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -272,17 +206,13 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_stores_exact_metadata_values_after_orchestration(): void
     {
+        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'Vuln v1')]),
+            $this->emptyResponse(),
+        );
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
         $auditContext = $this->makeContextWithMapping();
-        $vulnerability = $this->makeVulnerability('v1');
-        $validated = $vulnerability->withReviewerValidation(true);
-
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturnOnConsecutiveCalls([$vulnerability], []);
-
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturn([$validated]);
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -296,30 +226,17 @@ final class AuditOrchestratorTest extends TestCase
     {
         // If continue→break mutation occurred, processing would stop after the duplicate.
         // This test ensures that when a dup is encountered, processing continues to the next item.
+        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'dup', lineStart: 10, lineEnd: 15)]),
+            $this->attackerResponse([
+                $this->vulnPayload(title: 'dup', lineStart: 10, lineEnd: 15),
+                $this->vulnPayload(title: 'new', lineStart: 20, lineEnd: 30),
+            ]),
+            $this->emptyResponse(),
+        );
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
         $auditContext = $this->makeContextWithMapping();
-
-        $vulnerability = $this->makeVulnerability('dup');
-        $new = $this->makeVulnerability('new', lineStart: 20, lineEnd: 30);
-
-        $validated_dup = $vulnerability->withReviewerValidation(true);
-        $validated_new = $new->withReviewerValidation(true);
-
-        // First iteration: attacker returns dup only → persisted
-        // Second iteration: attacker returns dup+new → dup is duplicate, new should still be added
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturnOnConsecutiveCalls(
-                [$vulnerability],
-                [$vulnerability, $new],
-                [],
-            );
-
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturnOnConsecutiveCalls(
-                [$validated_dup],
-                [$validated_dup, $validated_new],
-            );
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -332,37 +249,14 @@ final class AuditOrchestratorTest extends TestCase
         // linesOverlap: $start1 <= $end2 && $start2 <= $end1
         // With <= changed to <: touching ranges (end1==start2) would NOT be treated as overlapping.
         // This test ensures end1==start2 IS treated as overlapping (i.e. duplicate).
+        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'SQL A', lineStart: 10, lineEnd: 20)]),
+            // start2==20 == end1==20 → touching, should be treated as overlap (duplicate)
+            $this->attackerResponse([$this->vulnPayload(title: 'SQL B', lineStart: 20, lineEnd: 30)]),
+        );
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
         $auditContext = $this->makeContextWithMapping();
-
-        $vulnerability = Vulnerability::create(
-            VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH,
-            'SQL A', 'desc', 'src/Controller/FooController.php',
-            10, 20,
-            '$q', 'inject', "' OR 1", 'fix', 0.9,
-        );
-        // start2==20 == end1==20 → touching, should be treated as overlap (duplicate)
-        $vuln2 = Vulnerability::create(
-            VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH,
-            'SQL B', 'desc', 'src/Controller/FooController.php',
-            20, 30,
-            '$q', 'inject', "' OR 1", 'fix', 0.9,
-        );
-
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturnOnConsecutiveCalls([$vulnerability], [$vuln2]);
-
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturnCallback(static function (array $vulns): array {
-                $result = [];
-                foreach ($vulns as $vuln) {
-                    Assert::assertInstanceOf(Vulnerability::class, $vuln);
-                    $result[] = $vuln->withReviewerValidation(true);
-                }
-
-                return $result;
-            });
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -374,36 +268,14 @@ final class AuditOrchestratorTest extends TestCase
     {
         // linesOverlap with &&→|| mutation: would treat ALL pairs as overlapping.
         // This test verifies truly separate ranges (1-5 and 10-15) are NOT deduplicated.
+        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'SQL A', lineStart: 1, lineEnd: 5)]),
+            $this->attackerResponse([$this->vulnPayload(title: 'SQL B', lineStart: 10, lineEnd: 15)]),
+            $this->emptyResponse(),
+        );
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
         $auditContext = $this->makeContextWithMapping();
-
-        $vulnerability = Vulnerability::create(
-            VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH,
-            'SQL A', 'desc', 'src/Controller/FooController.php',
-            1, 5,
-            '$q', 'inject', "' OR 1", 'fix', 0.9,
-        );
-        $vuln2 = Vulnerability::create(
-            VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH,
-            'SQL B', 'desc', 'src/Controller/FooController.php',
-            10, 15,
-            '$q', 'inject', "' OR 1", 'fix', 0.9,
-        );
-
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturnOnConsecutiveCalls([$vulnerability], [$vuln2], []);
-
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturnCallback(static function (array $vulns): array {
-                $result = [];
-                foreach ($vulns as $vuln) {
-                    Assert::assertInstanceOf(Vulnerability::class, $vuln);
-                    $result[] = $vuln->withReviewerValidation(true);
-                }
-
-                return $result;
-            });
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -421,23 +293,14 @@ final class AuditOrchestratorTest extends TestCase
             },
         );
 
-        $auditOrchestrator = new AuditOrchestrator(
-            attackerAgent: $this->attackerAgent,
-            reviewerAgent: $this->reviewerAgent,
-            logger: $logger,
+        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'Vuln v1')]),
+            $this->emptyResponse(),
         );
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm, $logger);
         $auditContext = $this->makeContextWithMapping();
-        $vulnerability = $this->makeVulnerability('v1');
-        $validated = $vulnerability->withReviewerValidation(true);
-
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturnOnConsecutiveCalls([$vulnerability], []);
-
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturn([$validated]);
 
         $auditOrchestrator->orchestrate($auditContext);
 
@@ -462,14 +325,10 @@ final class AuditOrchestratorTest extends TestCase
             },
         );
 
-        $auditOrchestrator = new AuditOrchestrator(
-            attackerAgent: $this->attackerAgent,
-            reviewerAgent: $this->reviewerAgent,
-            logger: $logger,
-        );
+        $this->attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm, $logger);
         $auditContext = $this->makeContextWithMapping();
-        $this->attackerAgent->method('analyze')->willReturn([]);
 
         $auditOrchestrator->orchestrate($auditContext);
 
@@ -491,14 +350,10 @@ final class AuditOrchestratorTest extends TestCase
             },
         );
 
-        $auditOrchestrator = new AuditOrchestrator(
-            attackerAgent: $this->attackerAgent,
-            reviewerAgent: $this->reviewerAgent,
-            logger: $logger,
-        );
+        $this->attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm, $logger);
         $auditContext = $this->makeContextWithMapping();
-        $this->attackerAgent->method('analyze')->willReturn([]);
 
         $auditOrchestrator->orchestrate($auditContext);
 
@@ -520,24 +375,21 @@ final class AuditOrchestratorTest extends TestCase
             },
         );
 
-        $auditOrchestrator = new AuditOrchestrator(
-            attackerAgent: $this->attackerAgent,
-            reviewerAgent: $this->reviewerAgent,
-            logger: $logger,
+        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([
+                $this->vulnPayload(title: 'v1', lineStart: 10, lineEnd: 15),
+                $this->vulnPayload(title: 'v2', lineStart: 30, lineEnd: 40),
+            ]),
+            $this->emptyResponse(),
+        );
+        // Reviewer batchSize=1 → one LLM call per vuln. Accept the first, reject the second.
+        $this->reviewerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->reviewerAcceptResponse(),
+            $this->reviewerRejectResponse(),
         );
 
+        $auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm, $logger);
         $auditContext = $this->makeContextWithMapping();
-
-        $vulnerability = $this->makeVulnerability('v1')->withReviewerValidation(true);
-        $rejected = $this->makeVulnerability('v2', lineStart: 30, lineEnd: 40);
-
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturnOnConsecutiveCalls([$vulnerability, $rejected], []);
-
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturn([$vulnerability, $rejected]);
 
         $auditOrchestrator->orchestrate($auditContext);
 
@@ -560,14 +412,10 @@ final class AuditOrchestratorTest extends TestCase
             },
         );
 
-        $auditOrchestrator = new AuditOrchestrator(
-            attackerAgent: $this->attackerAgent,
-            reviewerAgent: $this->reviewerAgent,
-            logger: $logger,
-        );
+        $this->attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm, $logger);
         $auditContext = $this->makeContextWithMapping();
-        $this->attackerAgent->method('analyze')->willReturn([]);
 
         $auditOrchestrator->orchestrate($auditContext);
 
@@ -584,36 +432,13 @@ final class AuditOrchestratorTest extends TestCase
     {
         // Covers $start1 <= $end2 boundary (mutant: <= → <).
         // existing vuln1 (10-20) persisted first; then vuln2 (5-10) — touching at start1==end2==10.
+        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'SQL A', lineStart: 10, lineEnd: 20)]),
+            $this->attackerResponse([$this->vulnPayload(title: 'SQL B', lineStart: 5, lineEnd: 10)]),
+        );
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
         $auditContext = $this->makeContextWithMapping();
-
-        $vulnerability = Vulnerability::create(
-            VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH,
-            'SQL A', 'desc', 'src/Controller/FooController.php',
-            10, 20,
-            '$q', 'inject', "' OR 1", 'fix', 0.9,
-        );
-        $vuln2 = Vulnerability::create(
-            VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH,
-            'SQL B', 'desc', 'src/Controller/FooController.php',
-            5, 10,
-            '$q', 'inject', "' OR 1", 'fix', 0.9,
-        );
-
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturnOnConsecutiveCalls([$vulnerability], [$vuln2]);
-
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturnCallback(static function (array $vulns): array {
-                $result = [];
-                foreach ($vulns as $vuln) {
-                    Assert::assertInstanceOf(Vulnerability::class, $vuln);
-                    $result[] = $vuln->withReviewerValidation(true);
-                }
-
-                return $result;
-            });
 
         $this->auditOrchestrator->orchestrate($auditContext);
 
@@ -627,59 +452,41 @@ final class AuditOrchestratorTest extends TestCase
         $logger->expects(self::once())
             ->method('warning')
             ->with('No mapping available, skipping audit');
+        $logger->expects(self::never())->method('info');
 
-        $auditOrchestrator = new AuditOrchestrator(
-            attackerAgent: $this->attackerAgent,
-            reviewerAgent: $this->reviewerAgent,
-            logger: $logger,
-        );
-
+        $auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm, $logger);
         $auditContext = AuditContext::forProject($this->tmpDir);
-        // No mapping set
+
         $auditOrchestrator->orchestrate($auditContext);
     }
 
     public function test_it_respects_custom_max_iterations(): void
     {
-        $auditContext = $this->makeContextWithMapping();
         $iterationCount = 0;
 
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturnCallback(static function () use (&$iterationCount): array {
+        $this->attackerLlm
+            ->method('complete')
+            ->willReturnCallback(function () use (&$iterationCount): LLMResponse {
                 ++$iterationCount;
 
-                return [Vulnerability::create(
-                    VulnerabilityType::SQL_INJECTION,
-                    VulnerabilitySeverity::HIGH,
-                    'Vuln iter'.$iterationCount,
-                    'desc',
-                    'src/File'.$iterationCount.'.php',
-                    10, 15,
-                    '$q', 'inject', "' OR 1", 'fix',
-                    0.9,
-                )];
-            });
-
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturnCallback(static function (array $vulns): array {
-                $result = [];
-                foreach ($vulns as $vuln) {
-                    Assert::assertInstanceOf(Vulnerability::class, $vuln);
-                    $result[] = $vuln->withReviewerValidation(true);
+                if ($iterationCount > 20) {
+                    throw new RuntimeException('orchestrator exceeded safety bound: '.$iterationCount.' attacker calls');
                 }
 
-                return $result;
+                return $this->attackerResponse([$this->vulnPayload(
+                    title: 'Vuln iter'.$iterationCount,
+                    filePath: 'src/File'.$iterationCount.'.php',
+                )]);
             });
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
-        $auditOrchestrator = new AuditOrchestrator(
-            attackerAgent: $this->attackerAgent,
-            reviewerAgent: $this->reviewerAgent,
-            logger: new NullLogger(),
+        $auditOrchestrator = $this->makeOrchestrator(
+            $this->attackerLlm,
+            $this->reviewerLlm,
+            new NullLogger(),
             maxIterations: 5,
-            minConfidence: AuditOrchestrator::DEFAULT_MIN_CONFIDENCE,
         );
+        $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
 
@@ -688,24 +495,18 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_respects_custom_min_confidence(): void
     {
-        $auditContext = $this->makeContextWithMapping();
+        $this->attackerLlm->method('complete')->willReturn(
+            $this->attackerResponse([$this->vulnPayload(title: 'borderline', confidence: 0.65)]),
+        );
+        $this->reviewerLlm->expects(self::never())->method('complete');
 
-        $vulnerability = $this->makeVulnerability('borderline', confidence: 0.65);
-
-        $this->attackerAgent
-            ->expects(self::once())
-            ->method('analyze')
-            ->willReturn([$vulnerability]);
-
-        $this->reviewerAgent->expects(self::never())->method('review');
-
-        $auditOrchestrator = new AuditOrchestrator(
-            attackerAgent: $this->attackerAgent,
-            reviewerAgent: $this->reviewerAgent,
-            logger: new NullLogger(),
-            maxIterations: AuditOrchestrator::DEFAULT_MAX_ITERATIONS,
+        $auditOrchestrator = $this->makeOrchestrator(
+            $this->attackerLlm,
+            $this->reviewerLlm,
+            new NullLogger(),
             minConfidence: 0.7,
         );
+        $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
 
@@ -714,25 +515,19 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_accepts_vulnerability_at_exact_custom_confidence_threshold(): void
     {
-        $auditContext = $this->makeContextWithMapping();
+        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'exact', confidence: 0.7)]),
+            $this->emptyResponse(),
+        );
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
-        $vulnerability = $this->makeVulnerability('exact', confidence: 0.7);
-
-        $this->attackerAgent
-            ->method('analyze')
-            ->willReturnOnConsecutiveCalls([$vulnerability], []);
-
-        $this->reviewerAgent
-            ->method('review')
-            ->willReturn([$vulnerability->withReviewerValidation(true)]);
-
-        $auditOrchestrator = new AuditOrchestrator(
-            attackerAgent: $this->attackerAgent,
-            reviewerAgent: $this->reviewerAgent,
-            logger: new NullLogger(),
-            maxIterations: AuditOrchestrator::DEFAULT_MAX_ITERATIONS,
+        $auditOrchestrator = $this->makeOrchestrator(
+            $this->attackerLlm,
+            $this->reviewerLlm,
+            new NullLogger(),
             minConfidence: 0.7,
         );
+        $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
 
@@ -749,16 +544,15 @@ final class AuditOrchestratorTest extends TestCase
             },
         );
 
-        $auditOrchestrator = new AuditOrchestrator(
-            attackerAgent: $this->attackerAgent,
-            reviewerAgent: $this->reviewerAgent,
-            logger: $logger,
-            maxIterations: 7,
-            minConfidence: AuditOrchestrator::DEFAULT_MIN_CONFIDENCE,
-        );
+        $this->attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator(
+            $this->attackerLlm,
+            $this->reviewerLlm,
+            $logger,
+            maxIterations: 7,
+        );
         $auditContext = $this->makeContextWithMapping();
-        $this->attackerAgent->method('analyze')->willReturn([]);
 
         $auditOrchestrator->orchestrate($auditContext);
 
@@ -775,18 +569,40 @@ final class AuditOrchestratorTest extends TestCase
         $this->tmpDir = sys_get_temp_dir().'/orchestrator_test_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
 
-        $this->attackerAgent = $this->createMock(AttackerAgentInterface::class);
-        $this->reviewerAgent = $this->createMock(ReviewerAgentInterface::class);
-        $this->auditOrchestrator = new AuditOrchestrator(
-            attackerAgent: $this->attackerAgent,
-            reviewerAgent: $this->reviewerAgent,
-            logger: new NullLogger(),
-        );
+        $this->attackerLlm = $this->createMock(LLMClientInterface::class);
+        $this->reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $this->auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm);
     }
 
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
+    }
+
+    private function makeOrchestrator(
+        LLMClientInterface $attackerLlm,
+        LLMClientInterface $reviewerLlm,
+        ?LoggerInterface $logger = null,
+        int $maxIterations = AuditOrchestrator::DEFAULT_MAX_ITERATIONS,
+        float $minConfidence = AuditOrchestrator::DEFAULT_MIN_CONFIDENCE,
+    ): AuditOrchestrator {
+        return new AuditOrchestrator(
+            attackerAgent: new AttackerAgent(
+                llmClient: $attackerLlm,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger()),
+                attackerCache: new NullAttackerCache(),
+                logger: new NullLogger(),
+            ),
+            reviewerAgent: new ReviewerAgent(
+                llmClient: $reviewerLlm,
+                reviewerPromptBuilder: new ReviewerPromptBuilder(),
+                logger: new NullLogger(),
+            ),
+            logger: $logger ?? new NullLogger(),
+            maxIterations: $maxIterations,
+            minConfidence: $minConfidence,
+        );
     }
 
     private function makeContextWithMapping(): AuditContext
@@ -800,21 +616,50 @@ final class AuditOrchestratorTest extends TestCase
         return $auditContext;
     }
 
-    private function makeVulnerability(string $discriminator, float $confidence = 0.9, int $lineStart = 10, int $lineEnd = 15): Vulnerability
+    /**
+     * @return array<string, mixed>
+     */
+    private function vulnPayload(
+        string $title = 'Vuln',
+        float $confidence = 0.9,
+        int $lineStart = 10,
+        int $lineEnd = 15,
+        string $filePath = 'src/Controller/FooController.php',
+    ): array {
+        return [
+            'type' => 'sql_injection',
+            'severity' => 'high',
+            'title' => $title,
+            'description' => 'desc',
+            'file_path' => $filePath,
+            'line_start' => $lineStart,
+            'line_end' => $lineEnd,
+            'vulnerable_code' => '$db->query($input)',
+            'attack_vector' => 'SQL injection',
+            'proof' => "' OR 1=1",
+            'remediation' => 'Use prepared statements',
+            'confidence' => $confidence,
+        ];
+    }
+
+    /** @param list<array<string, mixed>> $vulns */
+    private function attackerResponse(array $vulns): LLMResponse
     {
-        return Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'Vuln '.$discriminator,
-            description: 'Test',
-            filePath: 'src/Controller/FooController.php',
-            lineStart: $lineStart,
-            lineEnd: $lineEnd,
-            vulnerableCode: '$db->query($input)',
-            attackVector: 'SQL injection',
-            proof: "' OR 1=1",
-            remediation: 'Use prepared statements',
-            confidence: $confidence,
-        );
+        return LLMResponse::create((string) json_encode($vulns), 0, 0, 'test', 'end_turn');
+    }
+
+    private function emptyResponse(): LLMResponse
+    {
+        return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+    }
+
+    private function reviewerAcceptResponse(): LLMResponse
+    {
+        return LLMResponse::create((string) json_encode(['accepted' => true]), 0, 0, 'test', 'end_turn');
+    }
+
+    private function reviewerRejectResponse(): LLMResponse
+    {
+        return LLMResponse::create((string) json_encode(['accepted' => false]), 0, 0, 'test', 'end_turn');
     }
 }
