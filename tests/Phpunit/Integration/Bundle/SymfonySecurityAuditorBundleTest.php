@@ -100,6 +100,39 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame(1024, $container->getParameter('symfony_security_auditor.scan.max_file_size_kb'));
     }
 
+    public function test_bundle_propagates_audit_retry_config_to_parameters(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'audit' => [
+                'retry' => [
+                    'max_attempts' => 5,
+                    'initial_delay_ms' => 250,
+                    'backoff_multiplier' => 1.5,
+                    'jitter_ratio' => 0.1,
+                ],
+            ],
+        ]);
+        $container = $kernel->getContainer();
+
+        self::assertSame(5, $container->getParameter('symfony_security_auditor.audit.retry.max_attempts'));
+        self::assertSame(250, $container->getParameter('symfony_security_auditor.audit.retry.initial_delay_ms'));
+        self::assertSame(1.5, $container->getParameter('symfony_security_auditor.audit.retry.backoff_multiplier'));
+        self::assertSame(0.1, $container->getParameter('symfony_security_auditor.audit.retry.jitter_ratio'));
+    }
+
+    public function test_bundle_rejects_audit_retry_max_attempts_below_one(): void
+    {
+        $this->expectException(Throwable::class);
+        $this->boot(['model' => 'gpt-4o', 'audit' => ['retry' => ['max_attempts' => 0]]]);
+    }
+
+    public function test_bundle_rejects_audit_retry_backoff_multiplier_below_one(): void
+    {
+        $this->expectException(Throwable::class);
+        $this->boot(['model' => 'gpt-4o', 'audit' => ['retry' => ['backoff_multiplier' => 0.5]]]);
+    }
+
     public function test_bundle_propagates_audit_config_to_parameters(): void
     {
         $kernel = $this->boot([

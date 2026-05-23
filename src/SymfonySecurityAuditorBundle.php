@@ -32,7 +32,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttacker
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
@@ -116,6 +119,33 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->min(1)
                             ->info('Maximum tool-call rounds per chunk before forcing the attacker to commit to a final answer. Bounds runaway tool use.')
                         ->end()
+                        ->arrayNode('retry')
+                            ->addDefaultsIfNotSet()
+                            ->info('Bounded exponential-backoff retry around every LLM call. Transient failures (provider 429/5xx, network blips) are retried with jittered delays; non-transient failures (auth, validation) fail fast.')
+                            ->children()
+                                ->integerNode('max_attempts')
+                                    ->defaultValue(RetryPolicy::DEFAULT_MAX_ATTEMPTS)
+                                    ->min(1)
+                                    ->info('Total attempts per LLM call, including the first try. `1` disables retries.')
+                                ->end()
+                                ->integerNode('initial_delay_ms')
+                                    ->defaultValue(RetryPolicy::DEFAULT_INITIAL_DELAY_MS)
+                                    ->min(0)
+                                    ->info('Base delay (milliseconds) before the first retry. Subsequent retries multiply by `backoff_multiplier`.')
+                                ->end()
+                                ->floatNode('backoff_multiplier')
+                                    ->defaultValue(RetryPolicy::DEFAULT_BACKOFF_MULTIPLIER)
+                                    ->min(1.0)
+                                    ->info('Exponential growth factor between retries. With initial 500ms and multiplier 2.0, retries wait ~500, ~1000, ~2000 ms.')
+                                ->end()
+                                ->floatNode('jitter_ratio')
+                                    ->defaultValue(RetryPolicy::DEFAULT_JITTER_RATIO)
+                                    ->min(0.0)
+                                    ->max(1.0)
+                                    ->info('Jitter applied to each computed delay, as a fraction in `[0.0, 1.0]`. `0.2` means each delay varies within ±20% of the base.')
+                                ->end()
+                            ->end()
+                        ->end()
                     ->end()
                 ->end()
                 ->arrayNode('cache')
@@ -145,7 +175,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *     attacker_model: string|null,
      *     reviewer_model: string|null,
      *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int},
+     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * } $config
      */
@@ -168,6 +198,10 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.reviewer_batch_size', $config['audit']['reviewer_batch_size']);
         $builder->setParameter('symfony_security_auditor.audit.tools_enabled', $config['audit']['tools_enabled']);
         $builder->setParameter('symfony_security_auditor.audit.max_tool_iterations', $config['audit']['max_tool_iterations']);
+        $builder->setParameter('symfony_security_auditor.audit.retry.max_attempts', $config['audit']['retry']['max_attempts']);
+        $builder->setParameter('symfony_security_auditor.audit.retry.initial_delay_ms', $config['audit']['retry']['initial_delay_ms']);
+        $builder->setParameter('symfony_security_auditor.audit.retry.backoff_multiplier', $config['audit']['retry']['backoff_multiplier']);
+        $builder->setParameter('symfony_security_auditor.audit.retry.jitter_ratio', $config['audit']['retry']['jitter_ratio']);
         $builder->setParameter('symfony_security_auditor.cache.enabled', $config['cache']['enabled']);
         $builder->setParameter('symfony_security_auditor.cache.dir', $config['cache']['dir']);
         $builder->setParameter('symfony_security_auditor.cache.prompt_caching', $config['cache']['prompt_caching']);
@@ -183,6 +217,9 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
                 $config['cache']['prompt_caching'],
                 service(TokenUsageRecorder::class),
+                service(RetryPolicy::class),
+                service(TransientFailureClassifier::class),
+                service(SleeperInterface::class),
             ]);
 
         $services->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
@@ -194,6 +231,9 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
                 $config['cache']['prompt_caching'],
                 service(TokenUsageRecorder::class),
+                service(RetryPolicy::class),
+                service(TransientFailureClassifier::class),
+                service(SleeperInterface::class),
             ]);
 
         $services->alias(LLMClientInterface::class, 'security_auditor.attacker_client');

@@ -44,6 +44,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttacker
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
@@ -72,6 +76,19 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->tag('symfony_security_auditor.pipeline_stage');
 
     $defaultsConfigurator->set(TokenUsageRecorder::class);
+
+    $defaultsConfigurator->set(RetryPolicy::class)
+        ->args([
+            param('symfony_security_auditor.audit.retry.max_attempts'),
+            param('symfony_security_auditor.audit.retry.initial_delay_ms'),
+            param('symfony_security_auditor.audit.retry.backoff_multiplier'),
+            param('symfony_security_auditor.audit.retry.jitter_ratio'),
+        ]);
+
+    $defaultsConfigurator->set(TransientFailureClassifier::class);
+
+    $defaultsConfigurator->set(UsleepSleeper::class);
+    $defaultsConfigurator->alias(SleeperInterface::class, UsleepSleeper::class);
 
     $defaultsConfigurator->set(NullSecretScrubber::class);
 

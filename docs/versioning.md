@@ -35,7 +35,9 @@ Every key under `symfony_security_auditor:` documented in
 - `scan.excluded_dirs`, `scan.respect_gitignore`, `scan.max_file_size_kb`,
   `scan.secret_scrubbing.enabled`, `scan.secret_scrubbing.additional_patterns`
 - `audit.max_iterations`, `audit.min_confidence`, `audit.reviewer_batch_size`,
-  `audit.tools_enabled`, `audit.max_tool_iterations`
+  `audit.tools_enabled`, `audit.max_tool_iterations`,
+  `audit.retry.max_attempts`, `audit.retry.initial_delay_ms`,
+  `audit.retry.backoff_multiplier`, `audit.retry.jitter_ratio`
 - `cache.enabled`, `cache.dir`, `cache.prompt_caching`
 
 Default values for these keys are also part of the contract. Changing a default

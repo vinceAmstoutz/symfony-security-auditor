@@ -17,6 +17,7 @@ use Closure;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use RuntimeException;
 use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\MessageInterface;
@@ -40,7 +41,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 
 final class SymfonyAiLLMClientTest extends TestCase
 {
@@ -612,6 +618,133 @@ final class SymfonyAiLLMClientTest extends TestCase
         };
     }
 
+    public function test_complete_retries_transient_failures_and_succeeds(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new TextResult('finally ok'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 10,
+                backoffMultiplier: 2.0,
+                jitterRatio: 0.0,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+        );
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame('finally ok', $llmResponse->content());
+        self::assertSame([10, 20], $fakeSleeper->durations);
+    }
+
+    public function test_complete_throws_transient_failure_after_exhausting_attempts(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 429 too many requests'),
+            new RuntimeException('HTTP 429 too many requests'),
+            new RuntimeException('HTTP 429 too many requests'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 10,
+                backoffMultiplier: 2.0,
+                jitterRatio: 0.0,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+        );
+
+        $this->expectException(TransientLLMFailureException::class);
+        $this->expectExceptionMessage('LLM call failed after 3 transient retries');
+
+        try {
+            $symfonyAiLLMClient->complete('sys', 'usr');
+        } finally {
+            // Final attempt does not sleep — only retries-before-attempts do.
+            self::assertSame([10, 20], $fakeSleeper->durations);
+        }
+    }
+
+    public function test_complete_does_not_retry_non_transient_failures(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 401 Unauthorized: invalid api key'),
+            new TextResult('should-not-reach'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(maxAttempts: 5, jitterSource: static fn (): float => 0.5),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+        );
+
+        $this->expectException(NonTransientLLMFailureException::class);
+        $this->expectExceptionMessage('LLM call failed with non-transient error');
+
+        try {
+            $symfonyAiLLMClient->complete('sys', 'usr');
+        } finally {
+            self::assertSame([], $fakeSleeper->durations);
+        }
+    }
+
+    /**
+     * @param list<ResultInterface|RuntimeException> $scriptedResultsOrErrors
+     */
+    private function flakyPlatform(array $scriptedResultsOrErrors): PlatformInterface
+    {
+        return new class($scriptedResultsOrErrors) implements PlatformInterface {
+            /** @var list<ResultInterface|RuntimeException> */
+            private array $remaining;
+
+            /** @param list<ResultInterface|RuntimeException> $scriptedResultsOrErrors */
+            public function __construct(array $scriptedResultsOrErrors)
+            {
+                $this->remaining = $scriptedResultsOrErrors;
+            }
+
+            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                $next = array_shift($this->remaining);
+                if ($next instanceof RuntimeException) {
+                    throw $next;
+                }
+
+                $result = $next ?? new TextResult('exhausted');
+
+                return new DeferredResult(
+                    new PlainConverter($result),
+                    new InMemoryRawResult(['text' => ''], [], (object) []),
+                    $options,
+                );
+            }
+
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+    }
+
     /**
      * @param list<ResultInterface> $scriptedResults
      */
@@ -731,4 +864,15 @@ final class PlatformInvocationLog
 
     /** @var list<list<MessageInterface>> */
     public array $messageSnapshots = [];
+}
+
+final class FakeSleeper implements SleeperInterface
+{
+    /** @var list<int> */
+    public array $durations = [];
+
+    public function sleep(int $milliseconds): void
+    {
+        $this->durations[] = $milliseconds;
+    }
 }

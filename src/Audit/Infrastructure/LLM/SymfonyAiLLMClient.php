@@ -28,11 +28,16 @@ use Symfony\AI\Platform\Result\ToolCallResult;
 use Symfony\AI\Platform\TokenUsage\TokenUsageInterface;
 use Symfony\AI\Platform\Tool\ExecutionReference;
 use Symfony\AI\Platform\Tool\Tool;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 
 /**
  * Adapter: bridges our domain LLMClientInterface to symfony/ai's PlatformInterface.
@@ -67,6 +72,9 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         private float $temperature = self::DEFAULT_TEMPERATURE,
         private bool $promptCaching = self::DEFAULT_PROMPT_CACHING,
         private ?TokenUsageRecorder $tokenUsageRecorder = null,
+        private ?RetryPolicy $retryPolicy = null,
+        private ?TransientFailureClassifier $transientFailureClassifier = null,
+        private ?SleeperInterface $sleeper = null,
     ) {}
 
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
@@ -85,7 +93,7 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
 
         \assert('' !== $this->model, 'Model must be a non-empty string');
 
-        $deferredResult = $this->platform->invoke($this->model, $messageBag, $this->baseOptions());
+        $deferredResult = $this->invokeWithRetry($messageBag, $this->baseOptions());
         $content = $deferredResult->asText();
         [$inputTokens, $outputTokens] = $this->extractTokens($deferredResult);
 
@@ -124,7 +132,7 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         $totalInputTokens = 0;
         $totalOutputTokens = 0;
         while ($iteration < $maxToolIterations) {
-            $deferredResult = $this->platform->invoke($this->model, $messageBag, $options);
+            $deferredResult = $this->invokeWithRetry($messageBag, $options);
             $platformResult = $deferredResult->getResult();
             [$callInput, $callOutput] = $this->extractTokens($deferredResult);
             $totalInputTokens += $callInput;
@@ -214,6 +222,53 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         }
 
         return '';
+    }
+
+    /**
+     * Invokes the platform with bounded exponential-backoff retry on transient failures
+     * (provider 429/5xx, network timeouts). Non-transient failures (auth, validation)
+     * fail fast — wrapped in `NonTransientLLMFailureException`. If every retry is
+     * exhausted, a `TransientLLMFailureException` carries the last error.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function invokeWithRetry(MessageBag $messageBag, array $options): DeferredResult
+    {
+        $retryPolicy = $this->retryPolicy ?? new RetryPolicy();
+        $classifier = $this->transientFailureClassifier ?? new TransientFailureClassifier();
+        $sleeper = $this->sleeper ?? new UsleepSleeper();
+
+        \assert('' !== $this->model, 'Model must be a non-empty string');
+
+        $maxAttempts = $retryPolicy->maxAttempts();
+        $lastException = null;
+        for ($attempt = 1; $attempt <= $maxAttempts; ++$attempt) {
+            try {
+                return $this->platform->invoke($this->model, $messageBag, $options);
+            } catch (Throwable $throwable) {
+                $lastException = $throwable;
+                if (!$classifier->isTransient($throwable)) {
+                    throw NonTransientLLMFailureException::from($throwable);
+                }
+
+                if ($attempt === $maxAttempts) {
+                    break;
+                }
+
+                $delay = $retryPolicy->delayMs($attempt);
+                $this->logger->warning('LLM call failed, retrying after backoff', [
+                    'attempt' => $attempt,
+                    'max_attempts' => $maxAttempts,
+                    'delay_ms' => $delay,
+                    'error' => $throwable->getMessage(),
+                ]);
+                $sleeper->sleep($delay);
+            }
+        }
+
+        \assert($lastException instanceof Throwable);
+
+        throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $lastException);
     }
 
     /**
