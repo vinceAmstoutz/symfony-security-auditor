@@ -29,6 +29,7 @@ use Symfony\AI\Platform\TokenUsage\TokenUsageInterface;
 use Symfony\AI\Platform\Tool\ExecutionReference;
 use Symfony\AI\Platform\Tool\Tool;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -75,6 +76,7 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         private ?RetryPolicy $retryPolicy = null,
         private ?TransientFailureClassifier $transientFailureClassifier = null,
         private ?SleeperInterface $sleeper = null,
+        private ?BudgetTracker $budgetTracker = null,
     ) {}
 
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
@@ -103,13 +105,17 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
             'output_tokens' => $outputTokens,
         ]);
 
-        return LLMResponse::create(
+        $llmResponse = LLMResponse::create(
             content: $content,
             inputTokens: $inputTokens,
             outputTokens: $outputTokens,
             model: $this->model,
             stopReason: 'end_turn',
         );
+        $this->budgetTracker?->recordCall($llmResponse);
+        $this->budgetTracker?->assertWithinBudget();
+
+        return $llmResponse;
     }
 
     public function completeWithTools(
@@ -137,6 +143,17 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
             [$callInput, $callOutput] = $this->extractTokens($deferredResult);
             $totalInputTokens += $callInput;
             $totalOutputTokens += $callOutput;
+            if ($this->budgetTracker instanceof BudgetTracker) {
+                $this->budgetTracker->recordCall(LLMResponse::create(
+                    content: '',
+                    inputTokens: $callInput,
+                    outputTokens: $callOutput,
+                    model: $this->model,
+                    stopReason: 'tool_iteration',
+                ));
+                $this->budgetTracker->assertWithinBudget();
+            }
+
             $toolCalls = $this->extractToolCalls($platformResult);
 
             if ([] === $toolCalls) {

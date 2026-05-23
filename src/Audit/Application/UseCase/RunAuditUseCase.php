@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase;
 
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
@@ -31,7 +33,17 @@ final readonly class RunAuditUseCase
 
         $auditContext = AuditContext::forProject($projectPath);
 
-        $this->pipeline->process($auditContext);
+        try {
+            $this->pipeline->process($auditContext);
+        } catch (BudgetExceededException $budgetExceededException) {
+            $partialReport = AuditReport::fromContext($auditContext);
+            $this->logger->warning('Audit aborted by budget cap', [
+                'audit_id' => $partialReport->auditId(),
+                'error' => $budgetExceededException->getMessage(),
+            ]);
+
+            throw AuditAbortedByBudgetException::from($budgetExceededException, $partialReport);
+        }
 
         $auditReport = AuditReport::fromContext($auditContext);
 

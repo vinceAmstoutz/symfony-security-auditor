@@ -21,7 +21,9 @@ use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
@@ -119,6 +121,21 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->min(1)
                             ->info('Maximum tool-call rounds per chunk before forcing the attacker to commit to a final answer. Bounds runaway tool use.')
                         ->end()
+                        ->arrayNode('budget')
+                            ->addDefaultsIfNotSet()
+                            ->info('Hard ceiling on cumulative LLM usage per audit run. Aborts the audit cleanly (exit code 2) with the partial report instead of running away on cost.')
+                            ->children()
+                                ->integerNode('max_tokens')
+                                    ->defaultNull()
+                                    ->min(1)
+                                    ->info('Maximum total tokens (input + output, across attacker + reviewer) before the audit aborts. `null` (default) = unlimited.')
+                                ->end()
+                                ->floatNode('max_cost_usd')
+                                    ->defaultNull()
+                                    ->info('Maximum estimated cost (USD) before the audit aborts. Computed via the configured `PricingProviderInterface`. `null` (default) = unlimited.')
+                                ->end()
+                            ->end()
+                        ->end()
                         ->arrayNode('retry')
                             ->addDefaultsIfNotSet()
                             ->info('Bounded exponential-backoff retry around every LLM call. Transient failures (provider 429/5xx, network blips) are retried with jittered delays; non-transient failures (auth, validation) fail fast.')
@@ -175,7 +192,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *     attacker_model: string|null,
      *     reviewer_model: string|null,
      *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}},
+     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * } $config
      */
@@ -198,6 +215,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.reviewer_batch_size', $config['audit']['reviewer_batch_size']);
         $builder->setParameter('symfony_security_auditor.audit.tools_enabled', $config['audit']['tools_enabled']);
         $builder->setParameter('symfony_security_auditor.audit.max_tool_iterations', $config['audit']['max_tool_iterations']);
+        $builder->setParameter('symfony_security_auditor.audit.budget.max_tokens', $config['audit']['budget']['max_tokens']);
+        $builder->setParameter('symfony_security_auditor.audit.budget.max_cost_usd', $config['audit']['budget']['max_cost_usd']);
         $builder->setParameter('symfony_security_auditor.audit.retry.max_attempts', $config['audit']['retry']['max_attempts']);
         $builder->setParameter('symfony_security_auditor.audit.retry.initial_delay_ms', $config['audit']['retry']['initial_delay_ms']);
         $builder->setParameter('symfony_security_auditor.audit.retry.backoff_multiplier', $config['audit']['retry']['backoff_multiplier']);
@@ -207,6 +226,27 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.cache.prompt_caching', $config['cache']['prompt_caching']);
 
         $services = $container->services();
+
+        $maxTokens = $config['audit']['budget']['max_tokens'];
+        $maxCostUsd = $config['audit']['budget']['max_cost_usd'];
+        if (null === $maxTokens && null === $maxCostUsd) {
+            $auditBudgetFactory = [AuditBudget::class, 'unlimited'];
+            $auditBudgetArgs = [];
+        } elseif (null !== $maxTokens && null !== $maxCostUsd) {
+            $auditBudgetFactory = [AuditBudget::class, 'forBoth'];
+            $auditBudgetArgs = [$maxTokens, $maxCostUsd];
+        } elseif (null !== $maxTokens) {
+            $auditBudgetFactory = [AuditBudget::class, 'forTokens'];
+            $auditBudgetArgs = [$maxTokens];
+        } else {
+            $auditBudgetFactory = [AuditBudget::class, 'forCost'];
+            $auditBudgetArgs = [$maxCostUsd];
+        }
+
+        $services->set(AuditBudget::class)
+            ->private()
+            ->factory($auditBudgetFactory)
+            ->args($auditBudgetArgs);
 
         $services->set('security_auditor.attacker_client', SymfonyAiLLMClient::class)
             ->private()
@@ -220,6 +260,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service(RetryPolicy::class),
                 service(TransientFailureClassifier::class),
                 service(SleeperInterface::class),
+                service(BudgetTracker::class),
             ]);
 
         $services->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
@@ -234,6 +275,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service(RetryPolicy::class),
                 service(TransientFailureClassifier::class),
                 service(SleeperInterface::class),
+                service(BudgetTracker::class),
             ]);
 
         $services->alias(LLMClientInterface::class, 'security_auditor.attacker_client');

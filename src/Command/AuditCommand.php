@@ -18,6 +18,7 @@ use Symfony\Component\Console\Attribute\MapInput;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 
 #[AsCommand(
@@ -37,6 +38,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCa
         Exit codes:
           <info>0</info>  audit completed; risk level is SAFE, LOW, MEDIUM, or HIGH
           <info>1</info>  audit completed with CRITICAL risk level, or the audit itself failed
+          <info>2</info>  audit aborted because the configured token or cost budget was exceeded (partial report still emitted)
 
         Cost & duration: a typical Symfony project (~150 files) takes minutes, not seconds,
         and costs a few cents to a few dollars depending on the selected model. Configure
@@ -78,10 +80,18 @@ final readonly class AuditCommand
             }
 
             return $exitCode;
+        } catch (AuditAbortedByBudgetException $auditAbortedByBudgetException) {
+            $partialReport = $auditAbortedByBudgetException->partialReport();
+            $this->reportWriter->write($partialReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+            $this->auditPresenter->error($symfonyStyle, $auditAbortedByBudgetException);
+
+            return self::EXIT_CODE_BUDGET_ABORTED;
         } catch (Throwable $throwable) {
             $this->auditPresenter->error($symfonyStyle, $throwable);
 
             return Command::FAILURE;
         }
     }
+
+    private const int EXIT_CODE_BUDGET_ABORTED = 2;
 }
