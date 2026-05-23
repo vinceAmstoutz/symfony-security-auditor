@@ -1,0 +1,27 @@
+# Local development scan — Ollama backend, no spend, exploratory recall.
+#
+# Pair with the following in config/packages/ai.yaml:
+#
+#   ai:
+#     platform:
+#       ollama:
+#         host_url: 'http://localhost:11434'
+#
+# Drop in as: config/packages/symfony_security_auditor.yaml
+symfony_security_auditor:
+    model: 'llama3.3'
+
+    scan:
+        respect_gitignore: true
+        max_file_size_kb: 512
+
+    audit:
+        max_iterations: 2
+        min_confidence: 0.3     # surface near-misses for human review
+        reviewer_batch_size: 1  # one finding at a time, highest precision
+        tools_enabled: true
+        max_tool_iterations: 8
+
+    cache:
+        enabled: true
+        prompt_caching: false   # Ollama ignores prompt caching anyway

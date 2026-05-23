@@ -14,12 +14,17 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ReportWriter implements ReportWriterInterface
 {
-    public function __construct(private ReportRenderer $reportRenderer) {}
+    public function __construct(
+        private ReportRenderer $reportRenderer,
+        private Filesystem $filesystem,
+    ) {}
 
     public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle): void
     {
@@ -30,7 +35,7 @@ final readonly class ReportWriter implements ReportWriterInterface
         };
 
         if (null !== $outputFile) {
-            file_put_contents($outputFile, $content);
+            $this->filesystem->dumpFile($outputFile, $content);
             $symfonyStyle->success(\sprintf('Report saved to %s', $outputFile));
         } else {
             $symfonyStyle->writeln($content);

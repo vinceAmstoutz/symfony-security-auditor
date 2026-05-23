@@ -19,6 +19,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditPresenter implements AuditPresenterInterface
 {
     public function header(SymfonyStyle $symfonyStyle, string $projectPath): void

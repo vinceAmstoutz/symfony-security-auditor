@@ -33,6 +33,7 @@
     },
     "require": {
         "php": ">=8.3",
+        "composer-runtime-api": "^2.0",
         "psr/log": "^3.0",
         "symfony/ai-bundle": "^0.9",
         "symfony/config": "^7.4 || ^8.0",

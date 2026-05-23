@@ -17,9 +17,13 @@ use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\Option;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
-// Symfony Console MapInput reflects class properties and requires public mutable fields
-// with property-level defaults; promoted readonly ctor params are invisible to its reflection.
-// Treated as a context carrier per .claude/rules/php-classes.md.
+/**
+ * Symfony Console MapInput reflects class properties and requires public mutable fields
+ * with property-level defaults; promoted readonly ctor params are invisible to its reflection.
+ * Treated as a context carrier per .claude/rules/php-classes.md.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
+ */
 final class AuditCommandInput
 {
     #[Argument(description: 'Path to the Symfony project to audit. Defaults to the current working directory.')]

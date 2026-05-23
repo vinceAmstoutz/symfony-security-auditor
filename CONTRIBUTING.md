@@ -236,8 +236,12 @@ For a custom client implementation (direct HTTP, retry logic, …) see
 1. Fork the repository.
 2. Create a feature branch: `git checkout -b feat/my-feature`.
 3. Write tests for your change (unit + integration where applicable).
-4. Ensure all checks pass: `bin/castor lint`.
-5. Open a pull request — the [PR template](.github/PULL_REQUEST_TEMPLATE.md)
+4. Mind backward compatibility — the project follows
+   [Semantic Versioning 2.0.0](https://semver.org); any change that affects the
+   public API surface listed in [`docs/versioning.md`](docs/versioning.md) needs
+   a deprecation cycle and a `feat!:` commit.
+5. Ensure all checks pass: `bin/castor lint`.
+6. Open a pull request — the [PR template](.github/PULL_REQUEST_TEMPLATE.md)
    will guide you.
 
 The CI pipeline runs six jobs: **Prettier Check** → **Markdown Lint** → **Commit

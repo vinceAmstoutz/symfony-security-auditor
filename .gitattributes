@@ -1,0 +1,25 @@
+# Keep release tarballs / Packagist downloads lean: exclude development
+# tooling, tests, examples, and CI metadata from `composer install`.
+/.castor.stub.php       export-ignore
+/.editorconfig          export-ignore
+/.github                export-ignore
+/.gitattributes         export-ignore
+/.gitignore             export-ignore
+/.markdownlint-cli2.jsonc export-ignore
+/.markdownlintignore    export-ignore
+/.php-cs-fixer.dist.php export-ignore
+/.prettierignore        export-ignore
+/.prettierrc.json       export-ignore
+/CLAUDE.md              export-ignore
+/CONTRIBUTING.md        export-ignore
+/bin                    export-ignore
+/castor.php             export-ignore
+/commitlint.config.mjs  export-ignore
+/docker                 export-ignore
+/docker-compose.yml     export-ignore
+/examples               export-ignore
+/infection.json5        export-ignore
+/phpstan.dist.neon      export-ignore
+/phpunit.dist.xml       export-ignore
+/rector.php             export-ignore
+/tests                  export-ignore

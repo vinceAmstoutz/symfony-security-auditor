@@ -22,6 +22,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
  * Returns every advisory registered for the package — version-constraint filtering
  * is delegated to the LLM, which already has the installed version and the
  * advisory's `affected_versions` text in front of it.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class InMemoryAdvisoryDatabase implements AdvisoryDatabaseInterface
 {

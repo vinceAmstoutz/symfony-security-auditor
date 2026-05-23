@@ -17,6 +17,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInterface
 {
     /**

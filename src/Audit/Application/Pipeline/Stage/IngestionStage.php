@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class IngestionStage implements StageInterface
 {
     public function __construct(

@@ -26,6 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AttackerAgent implements AttackerAgentInterface
 {
     private const int CHUNK_SIZE = 10;

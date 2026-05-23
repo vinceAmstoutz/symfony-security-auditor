@@ -22,6 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AdvisoryD
  * Builds a fresh ToolRegistry pre-loaded with the project's scanned files, so
  * tools like read_file / grep / list_files can answer the LLM's questions
  * without re-walking the filesystem.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class SymfonyToolRegistryFactory implements ToolRegistryFactoryInterface
 {

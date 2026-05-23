@@ -18,6 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditPipeline implements PipelineInterface
 {
     /** @var list<StageInterface> */

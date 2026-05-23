@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class NullAttackerCache implements AttackerCacheInterface
 {
     public function get(array $chunk): ?array
