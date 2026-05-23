@@ -229,7 +229,13 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->alias(ReviewerAgentInterface::class, ReviewerAgent::class);
 
     $defaultsConfigurator->set(RunAuditUseCase::class)
-        ->args([service(PipelineInterface::class), service('logger')]);
+        ->args([
+            service(PipelineInterface::class),
+            service('logger'),
+            service(TokenUsageRecorder::class),
+            service(CostCalculator::class),
+            param('symfony_security_auditor.attacker_model'),
+        ]);
 
     $defaultsConfigurator->set(AuditCommand::class)
         ->args([

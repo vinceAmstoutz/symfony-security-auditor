@@ -14,9 +14,12 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase;
 
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 
@@ -25,6 +28,9 @@ final readonly class RunAuditUseCase
     public function __construct(
         private PipelineInterface $pipeline,
         private LoggerInterface $logger,
+        private ?TokenUsageRecorder $tokenUsageRecorder = null,
+        private ?CostCalculator $costCalculator = null,
+        private string $primaryModel = '',
     ) {}
 
     public function execute(string $projectPath): AuditReport
@@ -36,7 +42,7 @@ final readonly class RunAuditUseCase
         try {
             $this->pipeline->process($auditContext);
         } catch (BudgetExceededException $budgetExceededException) {
-            $partialReport = AuditReport::fromContext($auditContext);
+            $partialReport = AuditReport::fromContext($auditContext, $this->buildCost());
             $this->logger->warning('Audit aborted by budget cap', [
                 'audit_id' => $partialReport->auditId(),
                 'error' => $budgetExceededException->getMessage(),
@@ -45,7 +51,7 @@ final readonly class RunAuditUseCase
             throw AuditAbortedByBudgetException::from($budgetExceededException, $partialReport);
         }
 
-        $auditReport = AuditReport::fromContext($auditContext);
+        $auditReport = AuditReport::fromContext($auditContext, $this->buildCost());
 
         $this->logger->info('Audit complete', [
             'audit_id' => $auditReport->auditId(),
@@ -55,5 +61,19 @@ final readonly class RunAuditUseCase
         ]);
 
         return $auditReport;
+    }
+
+    private function buildCost(): ?AuditCost
+    {
+        if (!$this->tokenUsageRecorder instanceof TokenUsageRecorder) {
+            return null;
+        }
+
+        $snapshot = $this->tokenUsageRecorder->snapshot();
+        $estimatedCost = $this->costCalculator instanceof CostCalculator
+            ? $this->costCalculator->costForCall($snapshot->inputTokens(), $snapshot->outputTokens(), $this->primaryModel)
+            : 0.0;
+
+        return AuditCost::of($snapshot->inputTokens(), $snapshot->outputTokens(), $estimatedCost, $this->primaryModel);
     }
 }
