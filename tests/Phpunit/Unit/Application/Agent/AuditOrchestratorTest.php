@@ -101,6 +101,25 @@ final class AuditOrchestratorTest extends TestCase
         self::assertCount(1, $auditContext->vulnerabilities());
     }
 
+    public function test_it_breaks_early_when_iteration_yields_no_new_unique_findings(): void
+    {
+        // Iter 1: attacker returns vuln v1 → reviewer accepts → persisted (newFindings=1, loop continues).
+        // Iter 2: attacker returns the same vuln → duplicate, not persisted (newFindings=0) → break.
+        // audit.iterations must be 2 (not maxIterations=3). Kills:
+        //   - Break_ on line 79 (break → continue would let the loop run to iteration 3).
+        //   - DecrementInteger on line 78 (0 === → -1 === would never trigger early exit).
+        $this->attackerLlm->method('complete')->willReturn(
+            $this->attackerResponse([$this->vulnPayload(title: 'Vuln v1')]),
+        );
+        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
+        $auditContext = $this->makeContextWithMapping();
+
+        $this->auditOrchestrator->orchestrate($auditContext);
+
+        self::assertSame(2, $auditContext->getMeta('audit.iterations'));
+    }
+
     public function test_it_filters_low_confidence_findings(): void
     {
         $this->attackerLlm->method('complete')->willReturn(
