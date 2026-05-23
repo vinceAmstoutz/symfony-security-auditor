@@ -31,10 +31,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentIn
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
@@ -147,6 +150,40 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => false]]);
 
         self::assertInstanceOf(NullAttackerCache::class, $this->getPrivateService($kernel, AttackerCacheInterface::class));
+    }
+
+    public function test_bundle_propagates_secret_scrubbing_config_to_parameters(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'scan' => [
+                'secret_scrubbing' => [
+                    'enabled' => false,
+                    'additional_patterns' => ['/CUSTOM-[A-Z]{6}/'],
+                ],
+            ],
+        ]);
+        $container = $kernel->getContainer();
+
+        self::assertFalse($container->getParameter('symfony_security_auditor.scan.secret_scrubbing.enabled'));
+        self::assertSame(['/CUSTOM-[A-Z]{6}/'], $container->getParameter('symfony_security_auditor.scan.secret_scrubbing.additional_patterns'));
+    }
+
+    public function test_bundle_wires_regex_secret_scrubber_by_default(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        self::assertInstanceOf(RegexSecretScrubber::class, $this->getPrivateService($kernel, SecretScrubberInterface::class));
+    }
+
+    public function test_bundle_wires_null_secret_scrubber_when_scrubbing_disabled(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'scan' => ['secret_scrubbing' => ['enabled' => false]],
+        ]);
+
+        self::assertInstanceOf(NullSecretScrubber::class, $this->getPrivateService($kernel, SecretScrubberInterface::class));
     }
 
     public function test_bundle_wires_composer_audit_advisory_database_as_default_implementation(): void

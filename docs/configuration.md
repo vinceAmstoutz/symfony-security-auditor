@@ -66,6 +66,8 @@ names must be supported by the platform configured in `ai.yaml`.
 | `scan.excluded_dirs`     | `string[]`  | `[]`    | Extra directories to skip. **Appended** to the hard defaults (`vendor`, `node_modules`, `.git`, `var/cache`, `var/log`, `public/bundles`); never replaces them. |
 | `scan.respect_gitignore` | `bool`      | `true`  | When `true` (default), files matched by the project `.gitignore` are skipped. Set `false` for full-tree scans that include generated/cached artefacts (rare).   |
 | `scan.max_file_size_kb`  | `int` (≥ 1) | `512`   | Skip files larger than this size, in kilobytes.                                                                                                                 |
+| `scan.secret_scrubbing.enabled` | `bool` | `true` | Redact credential-shaped strings (AWS/GitHub/Stripe/Slack/Google API keys, JWTs, PEM private keys, env-style credential assignments) from file content before it reaches the LLM. Default `true` — credentials in committed sample configs or `.env.dist` files would otherwise be sent verbatim to the LLM provider. |
+| `scan.secret_scrubbing.additional_patterns` | `string[]` | `[]` | Extra PCRE patterns merged with the defaults. Use to redact project-specific tokens (e.g. internal API key shapes). |
 
 ### `audit.*` — orchestrator knobs
 
@@ -115,6 +117,10 @@ symfony_security_auditor:
             - 'tests/fixtures/generated'
         respect_gitignore: true
         max_file_size_kb: 256
+        secret_scrubbing:
+            enabled: true
+            additional_patterns:
+                - '/MY_INTERNAL_TOKEN-[A-Z0-9]{16}/'
     audit:
         max_iterations: 5
         min_confidence: 0.7

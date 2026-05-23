@@ -31,6 +31,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
@@ -39,7 +40,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryA
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
@@ -67,12 +70,21 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->instanceof(StageInterface::class)
         ->tag('symfony_security_auditor.pipeline_stage');
 
+    $defaultsConfigurator->set(NullSecretScrubber::class);
+
+    $defaultsConfigurator->set(RegexSecretScrubber::class)
+        ->args([param('symfony_security_auditor.scan.secret_scrubbing.additional_patterns')]);
+    // `SecretScrubberInterface` alias is set in SymfonySecurityAuditorBundle::loadExtension()
+    // based on `scan.secret_scrubbing.enabled`.
+
     $defaultsConfigurator->set(ProjectFileScanner::class)
         ->args([
             service('logger'),
             param('symfony_security_auditor.scan.excluded_dirs'),
             param('symfony_security_auditor.scan.respect_gitignore'),
             param('symfony_security_auditor.scan.max_file_size_kb'),
+            null,
+            service(SecretScrubberInterface::class),
         ]);
     $defaultsConfigurator->alias(ProjectFileScannerInterface::class, ProjectFileScanner::class);
 

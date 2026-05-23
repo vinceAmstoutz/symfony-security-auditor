@@ -23,11 +23,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
@@ -66,6 +69,21 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->defaultValue(ProjectFileScanner::DEFAULT_MAX_FILE_SIZE_KB)
                             ->min(1)
                             ->info('Skip files larger than this size, in kilobytes.')
+                        ->end()
+                        ->arrayNode('secret_scrubbing')
+                            ->addDefaultsIfNotSet()
+                            ->info('Redact credential-shaped strings from file content before it reaches the LLM. Covers AWS/GitHub/Stripe/Slack/Google API keys, JWTs, PEM private keys, and env-style credential assignments.')
+                            ->children()
+                                ->booleanNode('enabled')
+                                    ->defaultTrue()
+                                    ->info('When true, file content is run through the configured scrubber before chunking. Default true — credentials in committed sample configs or .env.dist files would otherwise be sent verbatim to the LLM provider.')
+                                ->end()
+                                ->arrayNode('additional_patterns')
+                                    ->info('Extra PCRE patterns merged with the defaults. Use to redact project-specific tokens (e.g. internal API keys).')
+                                    ->scalarPrototype()->end()
+                                    ->defaultValue([])
+                                ->end()
+                            ->end()
                         ->end()
                     ->end()
                 ->end()
@@ -125,7 +143,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *     model: string,
      *     attacker_model: string|null,
      *     reviewer_model: string|null,
-     *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int},
+     *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
      *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * } $config
@@ -142,6 +160,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.scan.excluded_dirs', $config['scan']['excluded_dirs']);
         $builder->setParameter('symfony_security_auditor.scan.respect_gitignore', $config['scan']['respect_gitignore']);
         $builder->setParameter('symfony_security_auditor.scan.max_file_size_kb', $config['scan']['max_file_size_kb']);
+        $builder->setParameter('symfony_security_auditor.scan.secret_scrubbing.enabled', $config['scan']['secret_scrubbing']['enabled']);
+        $builder->setParameter('symfony_security_auditor.scan.secret_scrubbing.additional_patterns', $config['scan']['secret_scrubbing']['additional_patterns']);
         $builder->setParameter('symfony_security_auditor.audit.max_iterations', $config['audit']['max_iterations']);
         $builder->setParameter('symfony_security_auditor.audit.min_confidence', $config['audit']['min_confidence']);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_batch_size', $config['audit']['reviewer_batch_size']);
@@ -179,6 +199,11 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ? FilesystemAttackerCache::class
             : NullAttackerCache::class;
         $services->alias(AttackerCacheInterface::class, $cacheServiceId);
+
+        $scrubberServiceId = $config['scan']['secret_scrubbing']['enabled']
+            ? RegexSecretScrubber::class
+            : NullSecretScrubber::class;
+        $services->alias(SecretScrubberInterface::class, $scrubberServiceId);
 
         $services->alias(AdvisoryDatabaseInterface::class, ComposerAuditAdvisoryDatabase::class);
     }

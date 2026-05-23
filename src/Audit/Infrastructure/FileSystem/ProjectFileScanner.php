@@ -21,6 +21,7 @@ use Symfony\Component\Finder\SplFileInfo;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ProjectFileScanner implements ProjectFileScannerInterface
@@ -56,6 +57,7 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
         private bool $respectGitignore = false,
         private int $maxFileSizeKb = self::DEFAULT_MAX_FILE_SIZE_KB,
         private ?Closure $fileReader = null,
+        private ?SecretScrubberInterface $secretScrubber = null,
     ) {}
 
     /**
@@ -88,10 +90,15 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
         /** @var SplFileInfo $splFile */
         foreach ($finder as $splFile) {
             try {
+                $content = $reader($splFile);
+                if ($this->secretScrubber instanceof SecretScrubberInterface) {
+                    $content = $this->secretScrubber->scrub($content);
+                }
+
                 $files[] = ProjectFile::create(
                     relativePath: Path::makeRelative($splFile->getPathname(), $projectPath),
                     absolutePath: $splFile->getPathname(),
-                    content: $reader($splFile),
+                    content: $content,
                 );
             } catch (Throwable $exception) {
                 $this->logger->warning('Failed to read file', [
