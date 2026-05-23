@@ -211,6 +211,23 @@ If a tool flags something, **fix the underlying code**. Genuine exceptions (a
 real false positive, a library bug) require a PR-description justification and a
 linked issue tracking removal — never silent suppression.
 
+### 6. Backward Compatibility
+
+The project follows [Semantic Versioning 2.0.0](https://semver.org). Treat every
+public-API element as load-bearing: configuration keys (and their defaults),
+`audit:run` arguments/options/exit codes, JSON and SARIF output schemas, Domain
+ports under `src/Audit/Domain/Port/`, `AdvisoryDatabaseInterface`, Domain
+models/enums/exceptions, `RunAuditUseCase`, and the Bundle class. A change that
+removes or alters any of these is a `MAJOR` and requires a deprecation cycle.
+
+Internal classes (`@internal` PHPDoc tag) — concrete agents, pipeline stages,
+infrastructure adapters, Command collaborators — may be refactored freely in a
+`MINOR`. When you add a class that is **not** an extension point, add the
+`@internal` tag. When you add a public configuration key, list it in
+`docs/versioning.md`.
+
+Canonical policy: [`docs/versioning.md`](docs/versioning.md).
+
 ## Path-Scoped Rules
 
 Rules scoped to specific paths live in `.claude/rules/`:
