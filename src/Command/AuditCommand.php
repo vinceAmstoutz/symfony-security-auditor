@@ -23,6 +23,30 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCa
 #[AsCommand(
     name: 'audit:run',
     description: 'Run AI-powered multi-agent security audit on a Symfony project',
+    help: <<<'HELP'
+        The <info>%command.name%</info> command runs a multi-agent LLM security audit against a Symfony project.
+
+        Output formats (<info>--format</info>, <info>-f</info>):
+          <info>console</info>  human-readable summary (default)
+          <info>json</info>     machine-readable report
+          <info>sarif</info>    SARIF 2.1.0 for GitHub Code Scanning / GitLab Security Dashboard
+
+        Use <info>--output</info> (<info>-o</info>) to write the report to a file:
+          <info>%command.full_name% . --format=sarif --output=report.sarif</info>
+
+        Exit codes:
+          <info>0</info>  audit completed; risk level is SAFE, LOW, MEDIUM, or HIGH
+          <info>1</info>  audit completed with CRITICAL risk level, or the audit itself failed
+
+        Cost & duration: a typical Symfony project (~150 files) takes minutes, not seconds,
+        and costs a few cents to a few dollars depending on the selected model. Configure
+        via <info>config/packages/symfony_security_auditor.yaml</info>.
+
+        Documentation:
+          Configuration : <info>docs/configuration.md</info>
+          CI integration: <info>docs/ci.md</info>
+          Versioning    : <info>docs/versioning.md</info>
+        HELP,
 )]
 final readonly class AuditCommand
 {

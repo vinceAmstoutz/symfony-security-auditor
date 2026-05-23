@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
@@ -27,24 +28,21 @@ final class ReportWriterTest extends TestCase
 {
     private ReportWriter $reportWriter;
 
+    private Filesystem $filesystem;
+
     private string $tmpDir;
 
     protected function setUp(): void
     {
-        $this->reportWriter = new ReportWriter(new ReportRenderer());
+        $this->filesystem = new Filesystem();
+        $this->reportWriter = new ReportWriter(new ReportRenderer(), $this->filesystem);
         $this->tmpDir = sys_get_temp_dir().'/report_writer_test_'.uniqid('', true);
-        mkdir($this->tmpDir, 0o777, true);
+        $this->filesystem->mkdir($this->tmpDir);
     }
 
     protected function tearDown(): void
     {
-        foreach (glob($this->tmpDir.'/*') ?: [] as $path) {
-            if (is_file($path)) {
-                unlink($path);
-            }
-        }
-
-        rmdir($this->tmpDir);
+        $this->filesystem->remove($this->tmpDir);
     }
 
     public function test_writing_to_file_announces_save_path_via_success_message(): void
@@ -84,6 +82,16 @@ final class ReportWriterTest extends TestCase
         $display = $bufferedOutput->fetch();
         self::assertStringContainsString('SYMFONY LLM AUDIT REPORT', $display);
         self::assertStringNotContainsString('Report saved to', $display);
+    }
+
+    public function test_writing_to_file_creates_missing_parent_directories(): void
+    {
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), new BufferedOutput());
+        $outputFile = $this->tmpDir.'/nested/sub/dir/report.json';
+
+        $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $outputFile, $symfonyStyle);
+
+        self::assertFileExists($outputFile);
     }
 
     private function makeReport(): AuditReport
