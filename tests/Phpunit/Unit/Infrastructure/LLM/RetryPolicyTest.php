@@ -115,6 +115,16 @@ final class RetryPolicyTest extends TestCase
         $retryPolicy->delayMs(0);
     }
 
+    public function test_invalid_attempt_is_rejected_for_rate_limit_delay(): void
+    {
+        $retryPolicy = new RetryPolicy();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('attempt must be >= 1, got 0');
+
+        $retryPolicy->rateLimitDelayMs(0);
+    }
+
     public function test_invalid_max_attempts_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
