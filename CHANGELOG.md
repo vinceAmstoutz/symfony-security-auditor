@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   finding; `ReviewerAgent` parses it, validates against `VulnerabilityType`,
   and applies it via `withCorrectedType()`. Invalid values are logged and
   ignored — original type is preserved.
+- New configuration key `symfony_security_auditor.provider_json_mode`
+  (boolean, default `false`). When `true`, every LLM call carries
+  `response_format: {type: json_object}` to the underlying provider —
+  honored by OpenAI / Mistral / Ollama (provider-enforced JSON output),
+  silently ignored by Anthropic and any provider without an equivalent
+  knob. The prompt contract (_"Return ONLY the JSON array"_) remains
+  authoritative; this is a belt-and-braces opt-in for providers that
+  support it.
 
 ### Changed
 

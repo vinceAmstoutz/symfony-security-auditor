@@ -50,11 +50,12 @@ following keys:
 
 ### Top-level
 
-| Key              | Type   | Default             | Description                                          |
-| ---------------- | ------ | ------------------- | ---------------------------------------------------- |
-| `model`          | string | `'claude-opus-4-7'` | Model name used for both Attacker and Reviewer roles |
-| `attacker_model` | string | `null`              | Override: dedicated model for the Attacker role      |
-| `reviewer_model` | string | `null`              | Override: dedicated model for the Reviewer role      |
+| Key                  | Type   | Default             | Description                                                                                                                                                                                                                                                                                                                                                                                |
+| -------------------- | ------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `model`              | string | `'claude-opus-4-7'` | Model name used for both Attacker and Reviewer roles                                                                                                                                                                                                                                                                                                                                       |
+| `attacker_model`     | string | `null`              | Override: dedicated model for the Attacker role                                                                                                                                                                                                                                                                                                                                            |
+| `reviewer_model`     | string | `null`              | Override: dedicated model for the Reviewer role                                                                                                                                                                                                                                                                                                                                            |
+| `provider_json_mode` | bool   | `false`             | Send `response_format: {type: json_object}` on every LLM call so the provider enforces JSON output natively. Honored by OpenAI / Mistral / Ollama; silently ignored by Anthropic (no equivalent knob). Default `false` because behaviour is provider-dependent — only enable when your provider supports it. The prompt contract (_"Return ONLY the JSON array"_) remains authoritative.   |
 
 `attacker_model` and `reviewer_model` fall back to `model` when not set. Model
 names must be supported by the platform configured in `ai.yaml`.

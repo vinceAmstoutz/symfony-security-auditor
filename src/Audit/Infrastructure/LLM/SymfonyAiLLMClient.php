@@ -47,6 +47,8 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
 
     public const bool DEFAULT_PROMPT_CACHING = false;
 
+    public const bool DEFAULT_PROVIDER_JSON_MODE = false;
+
     public function __construct(
         private PlatformInterface $platform,
         private string $model,
@@ -58,6 +60,7 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         private ?TransientFailureClassifier $transientFailureClassifier = null,
         private ?SleeperInterface $sleeper = null,
         private ?BudgetTracker $budgetTracker = null,
+        private bool $providerJsonMode = self::DEFAULT_PROVIDER_JSON_MODE,
     ) {}
 
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
@@ -284,6 +287,14 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         $options = ['temperature' => $this->temperature];
         if ($this->promptCaching) {
             $options['cache_control'] = ['type' => 'ephemeral'];
+        }
+
+        if ($this->providerJsonMode) {
+            // OpenAI-compatible JSON mode. Honored by OpenAI / Mistral / Ollama;
+            // Anthropic does not expose this knob and the option is silently
+            // dropped by providers that do not recognize it. The prompt
+            // contract ("Return ONLY the JSON array") remains authoritative.
+            $options['response_format'] = ['type' => 'json_object'];
         }
 
         return $options;

@@ -39,6 +39,7 @@ final readonly class BundleConfiguration
      *     model: string,
      *     attacker_model: string|null,
      *     reviewer_model: string|null,
+     *     provider_json_mode: bool,
      *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
      *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
@@ -51,6 +52,7 @@ final readonly class BundleConfiguration
                 model: $config['model'],
                 attackerModelOverride: $config['attacker_model'],
                 reviewerModelOverride: $config['reviewer_model'],
+                providerJsonMode: $config['provider_json_mode'],
             ),
             scan: new ScanConfiguration(
                 excludedDirs: $config['scan']['excluded_dirs'],

@@ -60,6 +60,10 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                     ->defaultNull()
                     ->info('Override: dedicated model for the Reviewer role. Falls back to `model` when null.')
                 ->end()
+                ->booleanNode('provider_json_mode')
+                    ->defaultFalse()
+                    ->info('Opt into the provider-native JSON mode by sending `response_format: {type: json_object}` on every LLM call. Honored by OpenAI/Mistral/Ollama; silently ignored by Anthropic (which has no equivalent knob). Default false because behaviour is provider-dependent — only enable if your provider supports it. The prompt contract ("Return ONLY the JSON array") remains authoritative.')
+                ->end()
                 ->arrayNode('scan')
                     ->addDefaultsIfNotSet()
                     ->children()
@@ -192,6 +196,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *     model: string,
      *     attacker_model: string|null,
      *     reviewer_model: string|null,
+     *     provider_json_mode: bool,
      *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
      *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
@@ -261,6 +266,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service(TransientFailureClassifier::class),
                 service(SleeperInterface::class),
                 service(BudgetTracker::class),
+                $bundleConfiguration->llm->providerJsonMode,
             ]);
 
         $services->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
@@ -276,6 +282,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service(TransientFailureClassifier::class),
                 service(SleeperInterface::class),
                 service(BudgetTracker::class),
+                $bundleConfiguration->llm->providerJsonMode,
             ]);
 
         $services->alias(LLMClientInterface::class, 'security_auditor.attacker_client');
