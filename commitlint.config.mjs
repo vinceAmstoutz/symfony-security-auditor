@@ -44,6 +44,7 @@ export default {
                 'tool',
                 'cache',
                 'report',
+                'scan',
             ],
         ],
         'scope-empty': [0],
