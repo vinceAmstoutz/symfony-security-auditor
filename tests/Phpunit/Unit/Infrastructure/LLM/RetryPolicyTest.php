@@ -120,4 +120,88 @@ final class RetryPolicyTest extends TestCase
 
         new RetryPolicy(jitterRatio: 1.5);
     }
+
+    public function test_negative_jitter_ratio_is_rejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('jitterRatio must be in [0.0, 1.0]');
+
+        new RetryPolicy(jitterRatio: -0.01);
+    }
+
+    public function test_jitter_ratio_zero_is_accepted(): void
+    {
+        // Pins `< 0.0` boundary — mutation to `<= 0.0` would reject 0.0.
+        $retryPolicy = new RetryPolicy(jitterRatio: 0.0);
+
+        self::assertSame(3, $retryPolicy->maxAttempts());
+    }
+
+    public function test_jitter_ratio_one_is_accepted(): void
+    {
+        // Pins `> 1.0` boundary — mutation to `>= 1.0` would reject 1.0.
+        $retryPolicy = new RetryPolicy(jitterRatio: 1.0);
+
+        self::assertSame(3, $retryPolicy->maxAttempts());
+    }
+
+    public function test_max_attempts_one_is_accepted(): void
+    {
+        // Pins `< 1` boundary — mutation to `<= 1` would reject 1.
+        $retryPolicy = new RetryPolicy(maxAttempts: 1);
+
+        self::assertSame(1, $retryPolicy->maxAttempts());
+    }
+
+    public function test_initial_delay_zero_is_accepted(): void
+    {
+        // Pins `< 0` boundary — mutation to `<= 0` would reject 0.
+        $retryPolicy = new RetryPolicy(initialDelayMs: 0, jitterSource: static fn (): float => 0.5);
+
+        self::assertSame(0, $retryPolicy->delayMs(1));
+    }
+
+    public function test_backoff_multiplier_one_is_accepted(): void
+    {
+        // Pins `< 1.0` boundary — mutation to `<= 1.0` would reject 1.0.
+        $retryPolicy = new RetryPolicy(
+            initialDelayMs: 100,
+            backoffMultiplier: 1.0,
+            jitterRatio: 0.0,
+            jitterSource: static fn (): float => 0.5,
+        );
+
+        // With multiplier 1.0, delays do not grow.
+        self::assertSame(100, $retryPolicy->delayMs(1));
+        self::assertSame(100, $retryPolicy->delayMs(5));
+    }
+
+    public function test_constructor_defaults_match_documented_values(): void
+    {
+        // Pins the default values in the constructor signature — DecrementInteger
+        // and IncrementInteger mutations would shift them.
+        $retryPolicy = new RetryPolicy(jitterSource: static fn (): float => 0.5);
+
+        self::assertSame(RetryPolicy::DEFAULT_MAX_ATTEMPTS, $retryPolicy->maxAttempts());
+        self::assertSame(3, $retryPolicy->maxAttempts());
+        // Initial delay 500 × multiplier 2.0 ^ (attempt-1) with jitter midpoint
+        self::assertSame(500, $retryPolicy->delayMs(1));
+        self::assertSame(1000, $retryPolicy->delayMs(2));
+        self::assertSame(2000, $retryPolicy->delayMs(3));
+    }
+
+    public function test_default_jitter_source_produces_value_in_range(): void
+    {
+        // Pins the `mt_rand() / mt_getrandmax()` default jitter source — a
+        // mutation to `mt_rand() * mt_getrandmax()` would produce huge values.
+        // Without injecting jitter, delay should land within ±20% of the base.
+        $retryPolicy = new RetryPolicy(initialDelayMs: 1_000, backoffMultiplier: 1.0, jitterRatio: 0.2);
+
+        // Sample multiple times: every value must be in [800, 1200].
+        for ($attempt = 1; $attempt <= 20; ++$attempt) {
+            $delay = $retryPolicy->delayMs(1);
+            self::assertGreaterThanOrEqual(800, $delay);
+            self::assertLessThanOrEqual(1200, $delay);
+        }
+    }
 }

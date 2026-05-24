@@ -131,12 +131,13 @@ final class BudgetTrackerTest extends TestCase
 
     public function test_cost_used_is_rounded_to_six_decimal_places(): void
     {
-        // Pins: `round($this->costUsdUsed, 6)` — 7e-7 cents (0.0000007 USD).
+        // Pins `round($this->costUsdUsed, 6)` — feeds 7e-7 USD (0.0000007) into the
+        // tracker via CostCalculator (which returns raw, unrounded values now).
         //   round(7e-7, 6) = 0.000001  ← expected
-        //   round(7e-7, 5) = 0.0
-        //   round(7e-7, 7) = 0.0000007 (unchanged)
-        //   floor(7e-7)    = 0.0
-        //   ceil(7e-7)     = 1.0
+        //   round(7e-7, 5) = 0.0       (DecrementInteger kills here)
+        //   round(7e-7, 7) = 0.0000007 (IncrementInteger kills here)
+        //   floor(7e-7)    = 0.0       (RoundingFamily kills here)
+        //   ceil(7e-7)     = 1.0       (RoundingFamily kills here)
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 0.7);
 
         $budgetTracker->recordCall(LLMResponse::create('x', 1, 0, 'gpt-4o', 'end_turn'));

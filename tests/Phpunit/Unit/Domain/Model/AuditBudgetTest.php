@@ -85,4 +85,67 @@ final class AuditBudgetTest extends TestCase
 
         AuditBudget::forBoth(100, 0.0);
     }
+
+    public function test_for_tokens_accepts_one_at_boundary(): void
+    {
+        // Pins `<= 0` boundary — mutation to `< 0` would still accept 1, but
+        // mutation to `> 0` would reject 1.
+        $auditBudget = AuditBudget::forTokens(1);
+
+        self::assertSame(1, $auditBudget->maxTokens());
+    }
+
+    public function test_for_cost_accepts_tiny_positive_at_boundary(): void
+    {
+        // Pins `<= 0.0` boundary — mutation to `> 0.0` would reject this.
+        $auditBudget = AuditBudget::forCost(0.000001);
+
+        self::assertSame(0.000001, $auditBudget->maxCostUsd());
+    }
+
+    public function test_for_both_accepts_tiny_positives_at_boundary(): void
+    {
+        $auditBudget = AuditBudget::forBoth(1, 0.000001);
+
+        self::assertSame(1, $auditBudget->maxTokens());
+        self::assertSame(0.000001, $auditBudget->maxCostUsd());
+    }
+
+    public function test_for_tokens_rejects_negative(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('maxTokens must be > 0, got -1');
+
+        AuditBudget::forTokens(-1);
+    }
+
+    public function test_for_cost_rejects_negative(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('maxCostUsd must be > 0.0');
+
+        AuditBudget::forCost(-0.5);
+    }
+
+    public function test_is_unlimited_returns_false_when_token_cap_set(): void
+    {
+        // Pins the logical-and on `null === $maxTokens && null === $maxCostUsd`.
+        $auditBudget = AuditBudget::forTokens(100);
+
+        self::assertFalse($auditBudget->isUnlimited());
+    }
+
+    public function test_is_unlimited_returns_false_when_cost_cap_set(): void
+    {
+        $auditBudget = AuditBudget::forCost(1.0);
+
+        self::assertFalse($auditBudget->isUnlimited());
+    }
+
+    public function test_is_unlimited_returns_false_when_both_caps_set(): void
+    {
+        $auditBudget = AuditBudget::forBoth(100, 1.0);
+
+        self::assertFalse($auditBudget->isUnlimited());
+    }
 }

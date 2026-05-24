@@ -54,12 +54,18 @@ final class CostCalculatorTest extends TestCase
         self::assertSame(0.0, $costCalculator->costForCall(1_000_000, 1_000_000, 'unknown'));
     }
 
-    public function test_cost_is_rounded_to_six_decimal_places(): void
+    public function test_cost_returns_raw_unrounded_value(): void
     {
+        // Rounding belongs to surfaces that present the cost to users
+        // (`AuditCost::of` and `BudgetTracker::costUsdUsed`); the calculator
+        // returns the raw float so the accumulator can preserve precision
+        // across multiple calls. Float arithmetic introduces a tiny binary
+        // imprecision (~1e-22 here), hence assertEqualsWithDelta.
         $costCalculator = new CostCalculator($this->fixedPricing(0.1, 0.4));
 
-        // 7 input tokens @ 0.1/1M = 0.0000007 → rounds to 0.000001
-        self::assertSame(0.000001, $costCalculator->costForCall(7, 0, 'model'));
+        // 7 input tokens @ 0.1/1M = 7e-7 = 0.0000007 (unrounded mathematically;
+        // ~7.000000000000001e-7 due to float representation).
+        self::assertEqualsWithDelta(7.0e-7, $costCalculator->costForCall(7, 0, 'model'), 1e-15);
     }
 
     private function fixedPricing(float $inputPrice, float $outputPrice): PricingProviderInterface
