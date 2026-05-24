@@ -41,9 +41,15 @@ final class AuditCostTest extends TestCase
 
     public function test_cost_is_rounded_to_six_decimal_places(): void
     {
-        $auditCost = AuditCost::of(0, 0, 0.0000001234, 'm');
+        // Pins `round(X, 6)` precision exactly. With X = 5e-7:
+        //   round(5e-7, 6) = 0.000001 (rounds up at position 7)
+        //   round(5e-7, 5) = 0.0       (DecrementInteger mutation)
+        //   round(5e-7, 7) = 0.0000005 (IncrementInteger mutation)
+        //   floor(5e-7)    = 0.0       (RoundingFamily mutation)
+        //   ceil(5e-7)     = 1.0       (RoundingFamily mutation)
+        $auditCost = AuditCost::of(0, 0, 0.0000005, 'm');
 
-        self::assertSame(0.0, $auditCost->estimatedCostUsd());
+        self::assertSame(0.000001, $auditCost->estimatedCostUsd());
     }
 
     public function test_to_array_emits_canonical_keys(): void

@@ -72,10 +72,6 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
 
     public function scrub(string $content): string
     {
-        if ('' === $content) {
-            return '';
-        }
-
         foreach ($this->patterns as $label => $pattern) {
             $replacement = match ($label) {
                 'env_assignment' => '$1=***REDACTED:'.$label.'***',
@@ -83,18 +79,12 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
                 default => '***REDACTED:'.$label.'***',
             };
 
-            // Silence PCRE warnings so a runaway user-supplied pattern hitting the
-            // backtrack limit returns null cleanly instead of escalating to a
-            // PHPUnit fail-on-warning. The null branch lets the scrub continue
-            // with the next pattern instead of aborting the whole pipeline.
-            set_error_handler(static fn (): bool => true);
-
-            try {
-                $result = preg_replace($pattern, $replacement, $content);
-            } finally {
-                restore_error_handler();
-            }
-
+            // `@` silences the PCRE warning so a runaway user-supplied pattern
+            // hitting the backtrack limit returns null cleanly instead of
+            // escalating to a PHPUnit fail-on-warning. The null branch lets
+            // the scrub `continue` with the next pattern instead of aborting
+            // the whole pipeline.
+            $result = @preg_replace($pattern, $replacement, $content);
             if (null === $result) {
                 continue;
             }
@@ -111,14 +101,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             return 'empty pattern';
         }
 
-        set_error_handler(static fn (): bool => true);
-
-        try {
-            $result = preg_match($pattern, '');
-        } finally {
-            restore_error_handler();
-        }
-
+        $result = @preg_match($pattern, '');
         if (false === $result) {
             return preg_last_error_msg();
         }

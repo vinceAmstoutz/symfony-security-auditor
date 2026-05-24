@@ -26,6 +26,17 @@ final class CharacterBasedTokenEstimatorTest extends TestCase
         self::assertSame(0, $characterBasedTokenEstimator->estimateTokens('', 'claude-opus-4-5'));
     }
 
+    public function test_multibyte_characters_are_counted_as_one_each_via_mb_strlen(): void
+    {
+        // Pins `mb_strlen` (vs `strlen`). The euro sign U+20AC is 3 bytes in UTF-8.
+        // 10 multibyte characters → mb_strlen = 10, strlen = 30. With Claude divisor 3.5:
+        //   ceil(10 / 3.5) = 3   (correct, mb_strlen)
+        //   ceil(30 / 3.5) = 9   (wrong, strlen mutation)
+        $characterBasedTokenEstimator = new CharacterBasedTokenEstimator();
+
+        self::assertSame(3, $characterBasedTokenEstimator->estimateTokens(str_repeat('€', 10), 'claude-opus-4-5'));
+    }
+
     #[DataProvider('modelDivisorCases')]
     public function test_estimate_uses_per_model_divisor(string $model, int $expected): void
     {

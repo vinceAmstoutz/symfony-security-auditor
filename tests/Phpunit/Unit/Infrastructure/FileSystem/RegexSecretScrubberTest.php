@@ -153,28 +153,51 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertStringContainsString('***REDACTED:custom_0***', $output);
     }
 
-    public function test_runtime_pcre_failure_skips_pattern_and_keeps_other_redactions(): void
+    public function test_inline_assignment_redaction_preserves_key_and_quotes(): void
     {
-        // A catastrophic-backtracking pattern that passes validation against an empty
-        // string but blows past `pcre.backtrack_limit` on real input. The scrubber
-        // must skip that pattern (returning null from preg_replace) and continue
-        // applying remaining patterns without aborting the whole call.
-        $regexSecretScrubber = new RegexSecretScrubber(additionalPatterns: ['/^(a+)+$/']);
+        // Pins the `'inline_assignment' => '$1***REDACTED:...***$3'` match arm.
+        // If the arm is removed, the default replacement `***REDACTED:inline_assignment***`
+        // is used and the entire match (including the `password: "` prefix and closing
+        // `"`) is replaced — the key and surrounding quotes disappear.
+        $output = $this->regexSecretScrubber->scrub('password: "supersecretvalue"');
+
+        self::assertSame('password: "***REDACTED:inline_assignment***"', $output);
+    }
+
+    public function test_env_assignment_redaction_preserves_key_prefix(): void
+    {
+        // Pins the `'env_assignment' => '$1=***REDACTED:...***'` match arm.
+        // Removing the arm would fall back to the default replacement and erase
+        // the leading `KEY_NAME=` text.
+        $output = $this->regexSecretScrubber->scrub('STRIPE_SECRET_KEY=sk_super_secret_value');
+
+        self::assertSame('STRIPE_SECRET_KEY=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_runtime_pcre_failure_continues_to_remaining_patterns(): void
+    {
+        // Two custom patterns — the FIRST hits the backtrack limit, the SECOND
+        // is well-behaved and would redact `SECONDARY-123` if reached.
+        //   `continue` → second pattern runs → SECONDARY-123 is redacted.
+        //   `break`    → second pattern skipped → SECONDARY-123 stays raw.
+        // Pins both the `continue` keyword AND the runtime null-result branch.
+        $regexSecretScrubber = new RegexSecretScrubber(additionalPatterns: [
+            '/^(a+)+$/',
+            '/SECONDARY-\d+/',
+        ]);
 
         $previousLimit = \ini_get('pcre.backtrack_limit');
         ini_set('pcre.backtrack_limit', '50');
 
         try {
-            $payload = str_repeat('a', 30).'b '.self::AWS.'IOSFODNN7EXAMPLE';
+            $payload = str_repeat('a', 30).'b found: SECONDARY-123';
             $output = $regexSecretScrubber->scrub($payload);
         } finally {
             ini_set('pcre.backtrack_limit', false === $previousLimit ? '1000000' : $previousLimit);
         }
 
-        // The runaway pattern was skipped (its label would never appear),
-        // but the AWS pattern still ran and redacted the access key.
-        self::assertStringNotContainsString(self::AWS.'IOSFODNN7EXAMPLE', $output);
-        self::assertStringContainsString('***REDACTED:aws_access_key***', $output);
+        self::assertStringNotContainsString('SECONDARY-123', $output);
+        self::assertStringContainsString('***REDACTED:custom_1***', $output);
     }
 
     public function test_invalid_additional_pattern_throws_configuration_exception(): void
