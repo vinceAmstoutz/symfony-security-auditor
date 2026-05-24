@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-05-24
+
+### Fixed
+
+- Mutation gate now kills the `MethodCallRemoval` mutant on the
+  `logReviewDecision()` call inside the rejected-finding early-return branch of
+  `ReviewerAgent::applyReview()`. Existing tests covered the accepted /
+  severity-elevated paths but left the rejection-path debug log unasserted, so
+  removing the call escaped Infection — added a targeted unit test that
+  exercises a rejected review and asserts the `'Vulnerability reviewed'` debug
+  entry is emitted with `accepted => false`. No production code change.
+
 ## [1.1.0] — 2026-05-24
 
 ### Added
@@ -240,6 +252,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.1.1]:
+  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.1.1
 [1.1.0]:
   https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.1.0
 [1.0.0]:
