@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- `AdvisoryDatabaseInterface` moved from `Audit\Infrastructure\Advisory\` to
+  `Audit\Domain\Port\`. The interface is a public extension point, so its
+  canonical home is the Domain port namespace alongside `LLMClientInterface`,
+  `AttackerCacheInterface`, etc. Host applications aliasing the interface in
+  `config/services.yaml` must update the FQCN; concrete implementations
+  (`ComposerAuditAdvisoryDatabase`, `InMemoryAdvisoryDatabase`) keep their
+  existing FQCNs in `Infrastructure\`.
 - Default model updated from `claude-opus-4-5` (retired) to `claude-opus-4-7`.
 - Default reviewer model updated from `claude-haiku-4-5` (retired) to
   `claude-haiku-4-5-20251001`.

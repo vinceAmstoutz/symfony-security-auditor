@@ -562,9 +562,8 @@ serialization require no changes.
 method to `ReportRenderer`, and add the matching `match` arm in `ReportWriter`.
 
 **Replace advisory source** — implement
-`Audit\Infrastructure\Advisory\AdvisoryDatabaseInterface` and override the alias
-in `config/services.yaml` to wire a custom CVE feed (Snyk, internal database,
-…).
+`Audit\Domain\Port\AdvisoryDatabaseInterface` and override the alias in
+`config/services.yaml` to wire a custom CVE feed (Snyk, internal database, …).
 
 **Add cross-file investigation tools** — implement
 `Audit\Domain\Port\Tool\ToolInterface`, register it as a service, and inject it

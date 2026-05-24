@@ -217,7 +217,7 @@ Implement `Audit/Domain/Pipeline/StageInterface`. Stages are auto-tagged via
 
 ### Add a new advisory source (CVE feed)
 
-Implement `Audit/Infrastructure/Advisory/AdvisoryDatabaseInterface` and alias
+Implement `Audit/Domain/Port/AdvisoryDatabaseInterface` and alias
 `AdvisoryDatabaseInterface` to your service in `config/services.yaml`. See
 [Configuration → Advisory Source](docs/configuration.md#advisory-source-lookup_advisory-tool).
 

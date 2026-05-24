@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 interface AdvisoryDatabaseInterface
 {

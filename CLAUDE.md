@@ -64,7 +64,7 @@ src/
     Domain/          # Pure PHP — no framework, no I/O
       Model/         # Value objects and enums (Vulnerability, AuditReport, …)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)
-      Port/          # Cross-layer ports (LLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface)
+      Port/          # Cross-layer ports (LLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface)
         Tool/        # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
     Application/     # Orchestration — no I/O, depends only on Domain
       UseCase/       # RunAuditUseCase, EstimateAuditCostUseCase (entry points)
@@ -75,7 +75,7 @@ src/
       FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
       Prompt/        # AttackerPromptBuilder, ReviewerPromptBuilder
       Cache/         # FilesystemAttackerCache, NullAttackerCache
-      Advisory/      # AdvisoryDatabaseInterface + ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase (fallback), SymfonyProcessComposerAuditRunner
+      Advisory/      # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase (fallback), SymfonyProcessComposerAuditRunner
       Pricing/       # StaticPricingProvider
       Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory
       Report/        # ReportRenderer (+ Template/*.txt stubs)
@@ -217,9 +217,10 @@ linked issue tracking removal — never silent suppression.
 The project follows [Semantic Versioning 2.0.0](https://semver.org). Treat every
 public-API element as load-bearing: configuration keys (and their defaults),
 `audit:run` arguments/options/exit codes, JSON and SARIF output schemas, Domain
-ports under `src/Audit/Domain/Port/`, `AdvisoryDatabaseInterface`, Domain
-models/enums/exceptions, `RunAuditUseCase`, and the Bundle class. A change that
-removes or alters any of these is a `MAJOR` and requires a deprecation cycle.
+ports under `src/Audit/Domain/Port/` (including `AdvisoryDatabaseInterface`),
+Domain models/enums/exceptions, `RunAuditUseCase`, and the Bundle class. A
+change that removes or alters any of these is a `MAJOR` and requires a
+deprecation cycle.
 
 Internal classes (`@internal` PHPDoc tag) — concrete agents, pipeline stages,
 infrastructure adapters, Command collaborators — may be refactored freely in a
