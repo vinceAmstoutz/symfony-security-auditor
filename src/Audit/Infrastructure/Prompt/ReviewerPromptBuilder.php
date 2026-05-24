@@ -172,20 +172,20 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
                     </file>
                     MSG,
                 $index + 1,
-                (string) $data['id'],
-                (string) $data['type'],
-                (string) $data['severity'],
-                (string) $data['title'],
-                (string) $data['file'],
-                (int) $data['line_start'],
-                (int) $data['line_end'],
-                (string) $data['description'],
-                (string) $data['vulnerable_code'],
-                (string) $data['attack_vector'],
-                (string) $data['proof'],
-                (string) $data['remediation'],
-                (float) $data['confidence'],
-                (string) $data['file'],
+                $data['id'],
+                $data['type'],
+                $data['severity'],
+                $data['title'],
+                $data['file'],
+                $data['line_start'],
+                $data['line_end'],
+                $data['description'],
+                $data['vulnerable_code'],
+                $data['attack_vector'],
+                $data['proof'],
+                $data['remediation'],
+                $data['confidence'],
+                $data['file'],
                 $this->numberLines($codeContext),
             );
         }
@@ -197,7 +197,6 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
     public function buildUserMessage(Vulnerability $vulnerability, string $codeContext): string
     {
         $data = $vulnerability->toArray();
-        $file = (string) $data['file'];
 
         return \sprintf(
             <<<'MSG'
@@ -236,20 +235,20 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
 
                 Validate this finding and return your review JSON.
                 MSG,
-            (string) $data['id'],
-            (string) $data['type'],
-            (string) $data['severity'],
-            (string) $data['title'],
-            $file,
-            (int) $data['line_start'],
-            (int) $data['line_end'],
-            (string) $data['description'],
-            (string) $data['vulnerable_code'],
-            (string) $data['attack_vector'],
-            (string) $data['proof'],
-            (string) $data['remediation'],
-            (float) $data['confidence'],
-            $file,
+            $data['id'],
+            $data['type'],
+            $data['severity'],
+            $data['title'],
+            $data['file'],
+            $data['line_start'],
+            $data['line_end'],
+            $data['description'],
+            $data['vulnerable_code'],
+            $data['attack_vector'],
+            $data['proof'],
+            $data['remediation'],
+            $data['confidence'],
+            $data['file'],
             $this->numberLines($codeContext),
         );
     }
