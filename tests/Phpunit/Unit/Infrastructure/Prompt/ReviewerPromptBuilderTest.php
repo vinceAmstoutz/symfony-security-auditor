@@ -87,13 +87,16 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertGreaterThan($finding2Pos, $bPos);
     }
 
-    public function test_batch_user_message_ends_with_trailing_array_instruction(): void
+    public function test_batch_user_message_ends_with_id_based_array_instruction(): void
     {
         $vulnerabilities = [$this->makeVulnerability('src/A.php')];
 
         $message = $this->reviewerPromptBuilder->buildBatchUserMessage($vulnerabilities, []);
 
-        self::assertStringEndsWith('Return a JSON array of reviews, one per finding above, in the same order.', $message);
+        self::assertStringEndsWith(
+            'Each entry\'s "id" must match the input; we re-key by id on parse, so a misordered array with correct ids will still be accepted.',
+            $message,
+        );
     }
 
     public function test_batch_user_message_includes_code_context_for_finding_id(): void
@@ -117,6 +120,105 @@ final class ReviewerPromptBuilderTest extends TestCase
 
         // Should still produce output without throwing; the code section will be empty
         self::assertStringContainsString('### Finding 1', $message);
+    }
+
+    public function test_system_prompt_includes_severity_rubric_with_all_five_tiers(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('Severity rubric', $prompt);
+        self::assertStringContainsString('- critical:', $prompt);
+        self::assertStringContainsString('- info:', $prompt);
+    }
+
+    public function test_batch_system_prompt_includes_severity_rubric(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildBatchSystemPrompt();
+
+        self::assertStringContainsString('Severity rubric', $prompt);
+    }
+
+    public function test_system_prompt_includes_symfony_false_positive_playbook(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('false-positive playbook', $prompt);
+        self::assertStringContainsString('setParameter()', $prompt);
+        self::assertStringContainsString('mapped: false', $prompt);
+    }
+
+    public function test_batch_system_prompt_includes_symfony_false_positive_playbook(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildBatchSystemPrompt();
+
+        self::assertStringContainsString('false-positive playbook', $prompt);
+    }
+
+    public function test_system_prompt_documents_corrected_type_field(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('corrected_type', $prompt);
+        self::assertStringContainsString("null if the attacker's type is correct", $prompt);
+    }
+
+    public function test_system_prompt_lists_valid_corrected_type_enum_values(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+
+        // A handful of canonical values must appear — the LLM should not invent new types.
+        self::assertStringContainsString('sql_injection', $prompt);
+        self::assertStringContainsString('ssrf', $prompt);
+        self::assertStringContainsString('hardcoded_secret', $prompt);
+    }
+
+    public function test_system_and_batch_system_prompts_share_core_instructions(): void
+    {
+        // The two prompts MUST be derived from a shared base — drift between single and batch is a known FP risk.
+        $singlePrompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+        $batchPrompt = $this->reviewerPromptBuilder->buildBatchSystemPrompt();
+
+        $sharedAnchor = 'You are a senior AppSec engineer and security code reviewer.';
+        self::assertStringContainsString($sharedAnchor, $singlePrompt);
+        self::assertStringContainsString($sharedAnchor, $batchPrompt);
+
+        // Both must reference the FP playbook and the severity rubric verbatim.
+        self::assertStringContainsString('false-positive playbook', $singlePrompt);
+        self::assertStringContainsString('false-positive playbook', $batchPrompt);
+    }
+
+    public function test_batch_user_message_line_numbers_full_file_context(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $context = "<?php\nclass Foo {}";
+
+        $message = $this->reviewerPromptBuilder->buildBatchUserMessage(
+            [$vulnerability],
+            [$vulnerability->id() => $context],
+        );
+
+        // Lock both numbering AND the "\n" separator — see analogous AttackerPromptBuilder test.
+        self::assertStringContainsString("  1 | <?php\n  2 | class Foo {}", $message);
+    }
+
+    public function test_single_user_message_line_numbers_full_file_context(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $context = "<?php\nclass Foo {}";
+
+        $message = $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $context);
+
+        self::assertStringContainsString("  1 | <?php\n  2 | class Foo {}", $message);
+    }
+
+    public function test_empty_code_context_yields_empty_full_file_block(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+
+        $message = $this->reviewerPromptBuilder->buildUserMessage($vulnerability, '');
+
+        // No line-numbered output for empty context — keeps the prompt clean.
+        self::assertStringNotContainsString('  1 | ', $message);
     }
 
     private function makeVulnerability(string $filePath): Vulnerability

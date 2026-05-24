@@ -19,84 +19,106 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilder
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInterface
 {
+    private const string SEVERITY_RUBRIC = <<<'RUBRIC'
+        Severity rubric (apply this scale when accepting OR when setting adjusted_severity — do not inflate):
+        - critical: unauthenticated RCE, full authentication bypass, mass data exfiltration without auth, hardcoded production secret in a committed file.
+        - high: authenticated RCE, privilege escalation across tenants, IDOR exposing PII, SQL/DQL injection with a reachable sink, voter bypass on sensitive resources.
+        - medium: stored XSS in authenticated views, CSRF on state-changing actions, SSRF reaching internal services, weak crypto guarding non-public secrets.
+        - low: reflected XSS in low-impact contexts, information disclosure of non-sensitive metadata, weak crypto on already-public data, missing security headers.
+        - info: defense-in-depth opportunities, hardening suggestions, deprecated patterns with no current exploit path.
+        RUBRIC;
+
+    private const string FALSE_POSITIVE_PLAYBOOK = <<<'PLAYBOOK'
+        Symfony false-positive playbook (REJECT findings that match these patterns — they are NOT vulnerabilities):
+        - Doctrine `QueryBuilder` / DQL that uses `setParameter()` for every user-controlled value. Doctrine binds those safely; no SQL injection.
+        - Forms using the default CSRF token (Symfony enables it by default). Only an explicit `'csrf_protection' => false` is the smell.
+        - Controllers protected by a parent-class `denyAccessUnlessGranted()` call, a class-level `#[IsGranted]`, or an `access_control` rule in `security.yaml` matching the route path.
+        - `md5`/`sha1` on non-security data (cache keys, ETags, file fingerprints).
+        - `Process` instantiated with a hardcoded argv array — no shell interpolation occurs.
+        - Twig `{{ value }}` interpolation in HTML context — auto-escape covers this. Only `|raw`, broken `autoescape`, or wrong-context output (URL, JS) qualify.
+        - `_profiler` / `_wdt` routes gated by `when@dev` / `when@test`.
+        - Form fields with `mapped: false` whose constraints validate the input — they never reach the entity setter.
+        - Reflected user input echoed back as plain text inside a `Response` of `Content-Type: text/plain` (no HTML execution surface).
+        Reject these with a one-line note pointing at the specific mitigation.
+        PLAYBOOK;
+
+    private const string CORE_INSTRUCTIONS = <<<'CORE'
+        You are a senior AppSec engineer and security code reviewer.
+        Your role is to CRITICALLY VALIDATE vulnerability reports from an automated scanner.
+
+        You must be SKEPTICAL and RIGOROUS. Your job is to eliminate false positives.
+
+        For each vulnerability:
+        1. Verify the vulnerable code actually exists at the stated location (the `Full File Context` is line-numbered; match `line_start`/`line_end` against those numbers).
+        2. Confirm the attack vector is technically feasible
+        3. Check if there are mitigating controls not seen by the attacker agent
+        4. Validate that the severity rating is appropriate
+        5. Validate that the `type` accurately describes the finding — set `corrected_type` if mislabeled
+        6. Assess if the proof-of-concept is realistic
+
+        You must consider:
+        - Symfony's built-in protections (CSRF tokens, firewall, parameter validation)
+        - Framework-level mitigations (Doctrine parameterized queries by default)
+        - Existing Voters that might protect the resource
+        - HTTP method restrictions and route constraints
+        - Whether the code is actually reachable in production
+        CORE;
+
+    private const string JSON_SCHEMA_DESCRIPTION = <<<'SCHEMA'
+        Each entry of the JSON array MUST be shaped:
+        {
+          "id": "<vulnerability id, must match the input>",
+          "accepted": <true|false>,
+          "adjusted_severity": "<critical|high|medium|low|info or null if unchanged>",
+          "corrected_type": "<valid vulnerability type string or null if the attacker's type is correct>",
+          "reviewer_notes": "<concise technical justification>",
+          "additional_attack_paths": "<any additional exploitation paths found, or null>"
+        }
+
+        Valid `corrected_type` values (same enum the attacker uses):
+        sql_injection, command_injection, ldap_injection, xpath_injection, twig_injection, header_injection,
+        broken_access_control, missing_voter, voter_bypass, role_escalation, insecure_direct_object_reference,
+        missing_csrf_protection, business_logic_flaw, race_condition, insecure_workflow, price_manipulation,
+        state_machine_bypass, mass_assignment, insecure_deserialization, unsafe_parameter_binding,
+        exposed_internal_service, misconfigured_firewall, insecure_redirect, sensitive_data_exposure,
+        log_injection, path_traversal, ssrf, xxe, open_redirect, weak_cryptography, insecure_random,
+        hardcoded_secret
+        SCHEMA;
+
+    private const string DECISION_RULES = <<<'RULES'
+        Rules:
+        - Be strict: reject any finding where exploitation is not clearly demonstrated
+        - Accept a finding if it represents a REAL risk, even if exploitation is complex
+        - You MAY upgrade severity if context reveals a worse impact
+        - You MAY downgrade if the scanner overstated impact
+        - You MAY set `corrected_type` if the attacker labelled the finding with the wrong vulnerability type but the underlying issue is real
+        - Return ONLY the JSON array, no prose
+        RULES;
+
     public function buildSystemPrompt(): string
     {
-        return <<<'PROMPT'
-            You are a senior AppSec engineer and security code reviewer.
-            Your role is to CRITICALLY VALIDATE vulnerability reports from an automated scanner.
-
-            You must be SKEPTICAL and RIGOROUS. Your job is to eliminate false positives.
-
-            For each vulnerability:
-            1. Verify the vulnerable code actually exists at the stated location
-            2. Confirm the attack vector is technically feasible
-            3. Check if there are mitigating controls not seen by the attacker agent
-            4. Validate that the severity rating is appropriate
-            5. Assess if the proof-of-concept is realistic
-
-            You must consider:
-            - Symfony's built-in protections (CSRF tokens, firewall, parameter validation)
-            - Framework-level mitigations (Doctrine parameterized queries by default)
-            - Existing Voters that might protect the resource
-            - HTTP method restrictions and route constraints
-            - Whether the code is actually reachable in production
-
-            Your output must be a JSON array, one entry per vulnerability reviewed:
-            {
-              "id": "<vulnerability id>",
-              "accepted": <true|false>,
-              "adjusted_severity": "<critical|high|medium|low|info or null if unchanged>",
-              "reviewer_notes": "<concise technical justification>",
-              "additional_attack_paths": "<any additional exploitation paths found, or null>"
-            }
-
-            Rules:
-            - Be strict: reject any finding where exploitation is not clearly demonstrated
-            - Accept a finding if it represents a REAL risk, even if exploitation is complex
-            - You MAY upgrade severity if context reveals a worse impact
-            - You MAY downgrade if the scanner overstated impact
-            - Return ONLY the JSON array, no prose
-            PROMPT;
+        return self::CORE_INSTRUCTIONS
+            ."\n\n".self::SEVERITY_RUBRIC
+            ."\n\n".self::FALSE_POSITIVE_PLAYBOOK
+            ."\n\nYour output must be a JSON array, one entry per vulnerability reviewed.\n"
+            ."\n".self::JSON_SCHEMA_DESCRIPTION
+            ."\n\n".self::DECISION_RULES;
     }
 
     public function buildBatchSystemPrompt(): string
     {
-        return <<<'PROMPT'
-            You are a senior AppSec engineer and security code reviewer.
-            You will receive SEVERAL vulnerability reports in a single batch and must validate each one.
+        $batchPreamble = 'You will receive SEVERAL vulnerability reports in a single batch and must validate each one.';
 
-            Be SKEPTICAL and RIGOROUS. Your job is to eliminate false positives.
+        $orderingInstruction = 'Findings are re-keyed by "id" when we parse your response, so the id field is the source of truth — keep the natural order shown above for your scratch reasoning, but a misordered array with correct ids will still be accepted.';
 
-            For each input vulnerability:
-            1. Verify the vulnerable code actually exists at the stated location
-            2. Confirm the attack vector is technically feasible
-            3. Check if there are mitigating controls not seen by the attacker agent
-            4. Validate that the severity rating is appropriate
-            5. Assess if the proof-of-concept is realistic
-
-            Consider:
-            - Symfony's built-in protections (CSRF tokens, firewall, parameter validation)
-            - Framework-level mitigations (Doctrine parameterized queries by default)
-            - Existing Voters that might protect the resource
-            - HTTP method restrictions and route constraints
-            - Whether the code is actually reachable in production
-
-            Your output MUST be a JSON array with EXACTLY one entry per input vulnerability, IN THE SAME ORDER, each shaped:
-            {
-              "id": "<vulnerability id, must match the input>",
-              "accepted": <true|false>,
-              "adjusted_severity": "<critical|high|medium|low|info or null if unchanged>",
-              "reviewer_notes": "<concise technical justification>",
-              "additional_attack_paths": "<any additional exploitation paths found, or null>"
-            }
-
-            Rules:
-            - Be strict: reject any finding where exploitation is not clearly demonstrated
-            - Accept a finding if it represents a REAL risk, even if exploitation is complex
-            - You MAY upgrade severity if context reveals a worse impact
-            - You MAY downgrade if the scanner overstated impact
-            - Return ONLY the JSON array, no prose
-            PROMPT;
+        return self::CORE_INSTRUCTIONS
+            ."\n\n".$batchPreamble
+            ."\n\n".self::SEVERITY_RUBRIC
+            ."\n\n".self::FALSE_POSITIVE_PLAYBOOK
+            ."\n\nYour output MUST be a JSON array with EXACTLY one entry per input vulnerability.\n"
+            ."\n".self::JSON_SCHEMA_DESCRIPTION
+            ."\n\n".$orderingInstruction
+            ."\n\n".self::DECISION_RULES;
     }
 
     public function buildBatchUserMessage(array $vulnerabilities, array $codeContexts): string
@@ -135,9 +157,9 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
                     %.2f
 
                     #### Full File Context
-                    ```php
+                    <file path="%s">
                     %s
-                    ```
+                    </file>
                     MSG,
                 $index + 1,
                 (string) $data['id'],
@@ -153,17 +175,19 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
                 (string) $data['proof'],
                 (string) $data['remediation'],
                 (float) $data['confidence'],
-                $codeContext,
+                (string) $data['file'],
+                $this->numberLines($codeContext),
             );
         }
 
         return "## Vulnerability Reports to Review\n\n".implode("\n\n", $sections)
-            ."\n\nReturn a JSON array of reviews, one per finding above, in the same order.";
+            ."\n\nReturn a JSON array of reviews — one entry per finding above. Each entry's \"id\" must match the input; we re-key by id on parse, so a misordered array with correct ids will still be accepted.";
     }
 
     public function buildUserMessage(Vulnerability $vulnerability, string $codeContext): string
     {
         $data = $vulnerability->toArray();
+        $file = (string) $data['file'];
 
         return \sprintf(
             <<<'MSG'
@@ -196,9 +220,9 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
                 %.2f
 
                 ## Full File Context
-                ```php
+                <file path="%s">
                 %s
-                ```
+                </file>
 
                 Validate this finding and return your review JSON.
                 MSG,
@@ -206,7 +230,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
             (string) $data['type'],
             (string) $data['severity'],
             (string) $data['title'],
-            (string) $data['file'],
+            $file,
             (int) $data['line_start'],
             (int) $data['line_end'],
             (string) $data['description'],
@@ -215,7 +239,23 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
             (string) $data['proof'],
             (string) $data['remediation'],
             (float) $data['confidence'],
-            $codeContext,
+            $file,
+            $this->numberLines($codeContext),
         );
+    }
+
+    private function numberLines(string $content): string
+    {
+        if ('' === $content) {
+            return '';
+        }
+
+        $lines = explode("\n", $content);
+        $numbered = [];
+        foreach ($lines as $index => $line) {
+            $numbered[] = \sprintf('%3d | %s', $index + 1, $line);
+        }
+
+        return implode("\n", $numbered);
     }
 }

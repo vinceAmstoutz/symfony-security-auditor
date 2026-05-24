@@ -10,8 +10,40 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- `Vulnerability::withCorrectedType()` — copy-on-write reclassification when
+  the reviewer determines the attacker mislabelled the finding's type. The
+  original `id` is preserved so downstream consumers can still correlate the
+  corrected record with its pre-correction source.
+- Reviewer prompt accepts a `corrected_type` field (nullable string) per
+  finding; `ReviewerAgent` parses it, validates against `VulnerabilityType`,
+  and applies it via `withCorrectedType()`. Invalid values are logged and
+  ignored — original type is preserved.
+
 ### Changed
 
+- Prompt builders restructured for accuracy: source files are now wrapped as
+  `<file path="…" type="…">…</file>` with each line prefixed by its line
+  number (`NNN | `). The attacker prompt instructs the model to use those
+  exact line numbers for `line_start` / `line_end` instead of counting
+  manually. Skill blocks switched from `### Heading` to
+  `<skills role="…">…</skills>` form and are emitted in attack-surface
+  priority order rather than alphabetically.
+- Attacker base prompt now includes a severity rubric, a confidence rubric
+  (with a hard `< 0.6` filter threshold), a single canonical few-shot example
+  with concrete line numbers, and an explicit scope exclusion for `vendor/`,
+  `var/cache/`, `var/log/`, `.generated.*`, and `.cache.*` paths.
+- Each per-artifact skill block now lists both attack patterns to hunt and
+  patterns explicitly NOT to flag — reduces false positives from the attacker
+  agent before the reviewer ever sees them.
+- Reviewer prompts (single and batch) now share a common core-instructions
+  block to prevent drift, include the same severity rubric as the attacker,
+  and embed a Symfony-specific false-positive playbook (Doctrine
+  `setParameter()`, default CSRF, `mapped: false` form fields, hardcoded-argv
+  `Process` invocations, `_profiler` gated by `when@dev`, etc.). Batch mode
+  no longer requires findings to be returned in input order — entries are
+  re-keyed by `id` on parse.
 - `AdvisoryDatabaseInterface` moved from `Audit\Infrastructure\Advisory\` to
   `Audit\Domain\Port\`. The interface is a public extension point, so its
   canonical home is the Domain port namespace alongside `LLMClientInterface`,
