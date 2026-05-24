@@ -263,13 +263,13 @@ prompt receives the resulting CVE summaries, not your dependency list itself.
 
 ### Which LLM model should I use?
 
-| Goal              | Recommended setup                                                                 |
-| ----------------- | --------------------------------------------------------------------------------- |
-| Highest accuracy  | `attacker_model: claude-opus-4-7` + `reviewer_model: claude-opus-4-7`             |
-| Best cost/quality | `attacker_model: claude-opus-4-7` + `reviewer_model: claude-haiku-4-5-20251001`   |
-| Cheapest paid     | `model: deepseek-chat` or `mistral-large`                                         |
-| Offline / free    | `model: llama3.3` via Ollama                                                      |
-| Enterprise        | Azure OpenAI / AWS Bedrock with split-model                                       |
+| Goal              | Recommended setup                                                               |
+| ----------------- | ------------------------------------------------------------------------------- |
+| Highest accuracy  | `attacker_model: claude-opus-4-7` + `reviewer_model: claude-opus-4-7`           |
+| Best cost/quality | `attacker_model: claude-opus-4-7` + `reviewer_model: claude-haiku-4-5-20251001` |
+| Cheapest paid     | `model: deepseek-chat` or `mistral-large`                                       |
+| Offline / free    | `model: llama3.3` via Ollama                                                    |
+| Enterprise        | Azure OpenAI / AWS Bedrock with split-model                                     |
 
 See [Configuration → Split-Model Setup](configuration.md#split-model-setup).
 

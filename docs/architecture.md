@@ -521,12 +521,12 @@ Parameters exposed for debugging: `symfony_security_auditor.attacker_model`,
 
 Console command `audit:run`. Arguments and options:
 
-| Name            | Type     | Default    | Purpose                                            |
-| --------------- | -------- | ---------- | -------------------------------------------------- |
-| `project-path`  | argument | `getcwd()` | Path to target project; defaults to CWD            |
-| `--format / -f` | option   | `console`  | `console`, `json`, or `sarif`                      |
-| `--output / -o` | option   | `null`     | Write JSON/SARIF report to file                    |
-| `--dry-run`     | option   | `false`    | Estimate cost without invoking the LLM; exits `0`  |
+| Name            | Type     | Default    | Purpose                                           |
+| --------------- | -------- | ---------- | ------------------------------------------------- |
+| `project-path`  | argument | `getcwd()` | Path to target project; defaults to CWD           |
+| `--format / -f` | option   | `console`  | `console`, `json`, or `sarif`                     |
+| `--output / -o` | option   | `null`     | Write JSON/SARIF report to file                   |
+| `--dry-run`     | option   | `false`    | Estimate cost without invoking the LLM; exits `0` |
 
 Input mapping and resolution live in `AuditCommandInput`; output writing in
 `ReportWriter`; user-facing messaging in `AuditPresenter`; exit code policy in
@@ -571,14 +571,16 @@ in `config/services.yaml` to wire a custom CVE feed (Snyk, internal database,
 into `SymfonyToolRegistryFactory` so the attacker can call it when
 `audit.tools_enabled: true`.
 
-**Replace credential scrubber** — implement `Audit\Domain\Port\SecretScrubberInterface`
-and alias it in `config/services.yaml`. Default: `RegexSecretScrubber`;
-disabled: `NullSecretScrubber`.
+**Replace credential scrubber** — implement
+`Audit\Domain\Port\SecretScrubberInterface` and alias it in
+`config/services.yaml`. Default: `RegexSecretScrubber`; disabled:
+`NullSecretScrubber`.
 
-**Replace token estimator** — implement `Audit\Domain\Port\TokenEstimatorInterface`
-to plug in a provider-specific token counter. Default:
-`CharacterBasedTokenEstimator` (character ÷ 4 heuristic via `mb_strlen`).
+**Replace token estimator** — implement
+`Audit\Domain\Port\TokenEstimatorInterface` to plug in a provider-specific token
+counter. Default: `CharacterBasedTokenEstimator` (character ÷ 4 heuristic via
+`mb_strlen`).
 
-**Replace pricing provider** — implement `Audit\Domain\Port\PricingProviderInterface`
-to supply custom per-token prices. Default: `StaticPricingProvider` (hardcoded
-table).
+**Replace pricing provider** — implement
+`Audit\Domain\Port\PricingProviderInterface` to supply custom per-token prices.
+Default: `StaticPricingProvider` (hardcoded table).

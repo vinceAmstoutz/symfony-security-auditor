@@ -264,8 +264,8 @@ third-party packages.
 
 ### `--dry-run` mode
 
-Scans files and estimates token usage and cost without calling the LLM.
-Use this to gauge cost before committing to a full audit.
+Scans files and estimates token usage and cost without calling the LLM. Use this
+to gauge cost before committing to a full audit.
 
 ```bash
 bin/console audit:run --dry-run

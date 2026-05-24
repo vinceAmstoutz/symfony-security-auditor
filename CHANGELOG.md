@@ -83,8 +83,8 @@ First stable release.
 #### Budget cap
 
 - Hard token and cost budget enforced via `audit.budget.max_tokens` and
-  `audit.budget.max_cost_usd`. Audit aborts cleanly with exit code `2` and
-  emits a partial report when either limit is exceeded. Both default to `null`
+  `audit.budget.max_cost_usd`. Audit aborts cleanly with exit code `2` and emits
+  a partial report when either limit is exceeded. Both default to `null`
   (unlimited).
 
 #### Resilience — retry with exponential backoff
@@ -99,8 +99,9 @@ First stable release.
 
 - Credential-shaped strings (AWS/GitHub/Stripe/Slack/Google API keys, JWTs, PEM
   private keys, env-style assignments) are redacted from file content before
-  reaching any LLM provider. Enabled by default (`scan.secret_scrubbing.enabled:
-  true`); extensible via `scan.secret_scrubbing.additional_patterns`.
+  reaching any LLM provider. Enabled by default
+  (`scan.secret_scrubbing.enabled: true`); extensible via
+  `scan.secret_scrubbing.additional_patterns`.
 
 #### Attacker tools
 
@@ -144,7 +145,8 @@ First stable release.
 `LLMClientInterface`, `AdvisoryDatabaseInterface`,
 `AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`,
 `ProjectFileScannerInterface`, `AttackerCacheInterface`, `ToolInterface`,
-`PipelineInterface`, `StageInterface`. See [`docs/extending.md`](docs/extending.md).
+`PipelineInterface`, `StageInterface`. See
+[`docs/extending.md`](docs/extending.md).
 
 #### Documentation
 
@@ -154,8 +156,8 @@ First stable release.
   reference.
 - [`docs/extending.md`](docs/extending.md) — how to plug in custom advisory
   sources, tools, prompt builders, and pipeline stages.
-- [`docs/ci.md`](docs/ci.md) — CI pipeline documentation (PHP matrix,
-  Infection, PHPStan max).
+- [`docs/ci.md`](docs/ci.md) — CI pipeline documentation (PHP matrix, Infection,
+  PHPStan max).
 - [`docs/diagrams.md`](docs/diagrams.md) — architecture and data-flow diagrams.
 - [`docs/faq.md`](docs/faq.md) — cost, accuracy, model selection, privacy,
   comparisons.
@@ -166,8 +168,8 @@ First stable release.
 
 ### Fixed
 
-- Budget exceptions now rethrown from `AttackerAgent` so abort propagates to
-  the pipeline and triggers exit code `2`.
+- Budget exceptions now rethrown from `AttackerAgent` so abort propagates to the
+  pipeline and triggers exit code `2`.
 - SARIF `tool.driver.version` previously hardcoded; now resolved from installed
   Composer metadata at runtime.
 - `RegexSecretScrubber` replaced `set_error_handler`/`try-finally` around PCRE
@@ -177,7 +179,7 @@ First stable release.
 ### Compatibility
 
 | Axis                | Requirement      |
-|---------------------|------------------|
+| ------------------- | ---------------- |
 | PHP                 | `^8.3`           |
 | Symfony             | `^7.4 \|\| ^8.0` |
 | `symfony/ai-bundle` | `^0.9`           |
@@ -186,9 +188,10 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 
 ### Notes
 
-- Default model is `claude-opus-4-7`. Change via `model:`, `attacker_model:`,
-  or `reviewer_model:`.
-- Register bundle in `dev` and `test` environments only (per `config/bundles.php`
-  guidance in the README).
+- Default model is `claude-opus-4-7`. Change via `model:`, `attacker_model:`, or
+  `reviewer_model:`.
+- Register bundle in `dev` and `test` environments only (per
+  `config/bundles.php` guidance in the README).
 
-[1.0.0]: https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.0.0
+[1.0.0]:
+  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.0.0

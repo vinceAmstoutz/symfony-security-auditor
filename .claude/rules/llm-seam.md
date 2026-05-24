@@ -20,13 +20,15 @@ Application and LLM I/O.
 - `LLMResponse::parseJson()` strips markdown fences before decoding — always use
   it; never call `json_decode` directly on LLM output.
 - **Transient/parsing errors** (JSON decode failure, generic `Throwable`) in
-  agents must be caught and logged; return empty array / `reviewerValidated =
-  false` rather than propagating — a single bad chunk must not abort the audit.
+  agents must be caught and logged; return empty array /
+  `reviewerValidated = false` rather than propagating — a single bad chunk must
+  not abort the audit.
 - **Non-transient provider failures** (`LLMProviderException` from
   `Audit\Domain\Exception\`) must be **rethrown** by agents. These represent
   misconfigured platforms, auth errors, or retired model names that will repeat
   on every call — swallowing them produces a false-negative SAFE result.
-  `NonTransientLLMFailureException` (Infrastructure) extends `LLMProviderException`
-  (Domain) so agents can catch the Domain type without importing Infrastructure.
+  `NonTransientLLMFailureException` (Infrastructure) extends
+  `LLMProviderException` (Domain) so agents can catch the Domain type without
+  importing Infrastructure.
 - `VulnerabilityFactory::fromArray()` returns `null` on invalid data —
   `fromList()` silently drops nulls. Do not throw from the factory.
