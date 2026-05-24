@@ -300,10 +300,13 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      */
     private function skillsForFiles(array $files): string
     {
-        $presentTypes = array_unique(array_map(
+        // No need to deduplicate the type list — SKILL_PRIORITY drives the
+        // outer loop and only emits each priority type once, regardless of
+        // how many times it appears in $presentTypes.
+        $presentTypes = array_map(
             static fn (ProjectFile $projectFile): string => $projectFile->type(),
             $files,
-        ));
+        );
 
         $blocks = [];
         foreach (self::SKILL_PRIORITY as $type) {

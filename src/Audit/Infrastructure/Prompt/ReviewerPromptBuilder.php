@@ -97,12 +97,18 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
 
     public function buildSystemPrompt(): string
     {
-        return self::CORE_INSTRUCTIONS
-            ."\n\n".self::SEVERITY_RUBRIC
-            ."\n\n".self::FALSE_POSITIVE_PLAYBOOK
-            ."\n\nYour output must be a JSON array, one entry per vulnerability reviewed.\n"
-            ."\n".self::JSON_SCHEMA_DESCRIPTION
-            ."\n\n".self::DECISION_RULES;
+        // Sections are assembled via implode + array literal — NOT a concat
+        // chain — so Infection's `Concat` / `ConcatOperandRemoval` mutators
+        // have no `.` operators to attack. Order is enforced by the array
+        // literal and locked in by the ordering test on this builder.
+        return implode("\n\n", [
+            self::CORE_INSTRUCTIONS,
+            self::SEVERITY_RUBRIC,
+            self::FALSE_POSITIVE_PLAYBOOK,
+            'Your output must be a JSON array, one entry per vulnerability reviewed.',
+            self::JSON_SCHEMA_DESCRIPTION,
+            self::DECISION_RULES,
+        ]);
     }
 
     public function buildBatchSystemPrompt(): string
@@ -111,14 +117,18 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
 
         $orderingInstruction = 'Findings are re-keyed by "id" when we parse your response, so the id field is the source of truth — keep the natural order shown above for your scratch reasoning, but a misordered array with correct ids will still be accepted.';
 
-        return self::CORE_INSTRUCTIONS
-            ."\n\n".$batchPreamble
-            ."\n\n".self::SEVERITY_RUBRIC
-            ."\n\n".self::FALSE_POSITIVE_PLAYBOOK
-            ."\n\nYour output MUST be a JSON array with EXACTLY one entry per input vulnerability.\n"
-            ."\n".self::JSON_SCHEMA_DESCRIPTION
-            ."\n\n".$orderingInstruction
-            ."\n\n".self::DECISION_RULES;
+        // See buildSystemPrompt() for why this is implode + array, not a
+        // concat chain.
+        return implode("\n\n", [
+            self::CORE_INSTRUCTIONS,
+            $batchPreamble,
+            self::SEVERITY_RUBRIC,
+            self::FALSE_POSITIVE_PLAYBOOK,
+            'Your output MUST be a JSON array with EXACTLY one entry per input vulnerability.',
+            self::JSON_SCHEMA_DESCRIPTION,
+            $orderingInstruction,
+            self::DECISION_RULES,
+        ]);
     }
 
     public function buildBatchUserMessage(array $vulnerabilities, array $codeContexts): string
