@@ -294,8 +294,7 @@ behavior are not tolerated. Report problems privately to the maintainer (see
 
 Report vulnerabilities **in the auditor itself** privately via
 [GitHub Security Advisories](https://github.com/vinceamstoutz/symfony-security-auditor/security/advisories/new)
-— not in a public issue. See [SECURITY.md](.github/SECURITY.md) for the full
-policy.
+— not in a public issue. See [SECURITY.md](SECURITY.md) for the full policy.
 
 Issues with audit output (false positives, missed vulnerabilities, weird LLM
 behavior) are not security issues — open them as normal GitHub issues with a
