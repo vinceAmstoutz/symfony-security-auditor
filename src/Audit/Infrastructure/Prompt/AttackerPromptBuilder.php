@@ -300,14 +300,14 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      */
     private function skillsForFiles(array $files): string
     {
-        $present = [];
-        foreach ($files as $file) {
-            $present[$file->type()] = true;
-        }
+        $presentTypes = array_unique(array_map(
+            static fn (ProjectFile $projectFile): string => $projectFile->type(),
+            $files,
+        ));
 
         $blocks = [];
         foreach (self::SKILL_PRIORITY as $type) {
-            if (isset($present[$type])) {
+            if (\in_array($type, $presentTypes, true)) {
                 $blocks[] = self::SKILLS[$type];
             }
         }

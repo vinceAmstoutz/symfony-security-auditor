@@ -172,6 +172,70 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringContainsString('hardcoded_secret', $prompt);
     }
 
+    public function test_system_prompt_emits_sections_in_documented_order(): void
+    {
+        // Locks the concat chain in buildSystemPrompt(): persona → severity rubric
+        // → FP playbook → output statement → JSON schema → decision rules. Any
+        // ConcatOperandRemoval makes one section disappear (strpos returns false,
+        // assertNotFalse fails); any Concat swap puts sections out of order (the
+        // assertLessThan fails).
+        $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+
+        $personaPos = strpos($prompt, 'You are a senior AppSec engineer');
+        $rubricPos = strpos($prompt, 'Severity rubric');
+        $playbookPos = strpos($prompt, 'false-positive playbook');
+        $outputDirectivePos = strpos($prompt, 'one entry per vulnerability reviewed');
+        $schemaPos = strpos($prompt, 'Each entry of the JSON array MUST be shaped');
+        $rulesPos = strpos($prompt, 'Be strict: reject any finding');
+
+        self::assertNotFalse($personaPos);
+        self::assertNotFalse($rubricPos);
+        self::assertNotFalse($playbookPos);
+        self::assertNotFalse($outputDirectivePos);
+        self::assertNotFalse($schemaPos);
+        self::assertNotFalse($rulesPos);
+
+        self::assertLessThan($rubricPos, $personaPos);
+        self::assertLessThan($playbookPos, $rubricPos);
+        self::assertLessThan($outputDirectivePos, $playbookPos);
+        self::assertLessThan($schemaPos, $outputDirectivePos);
+        self::assertLessThan($rulesPos, $schemaPos);
+    }
+
+    public function test_batch_system_prompt_emits_sections_in_documented_order(): void
+    {
+        // Same ordering guarantee for the batch variant — it has an extra
+        // "batch preamble" right after the core persona and an ordering
+        // instruction right before the decision rules.
+        $prompt = $this->reviewerPromptBuilder->buildBatchSystemPrompt();
+
+        $personaPos = strpos($prompt, 'You are a senior AppSec engineer');
+        $batchPreamblePos = strpos($prompt, 'SEVERAL vulnerability reports in a single batch');
+        $rubricPos = strpos($prompt, 'Severity rubric');
+        $playbookPos = strpos($prompt, 'false-positive playbook');
+        $outputDirectivePos = strpos($prompt, 'EXACTLY one entry per input vulnerability');
+        $schemaPos = strpos($prompt, 'Each entry of the JSON array MUST be shaped');
+        $orderingHintPos = strpos($prompt, 're-keyed by "id" when we parse your response');
+        $rulesPos = strpos($prompt, 'Be strict: reject any finding');
+
+        self::assertNotFalse($personaPos);
+        self::assertNotFalse($batchPreamblePos);
+        self::assertNotFalse($rubricPos);
+        self::assertNotFalse($playbookPos);
+        self::assertNotFalse($outputDirectivePos);
+        self::assertNotFalse($schemaPos);
+        self::assertNotFalse($orderingHintPos);
+        self::assertNotFalse($rulesPos);
+
+        self::assertLessThan($batchPreamblePos, $personaPos);
+        self::assertLessThan($rubricPos, $batchPreamblePos);
+        self::assertLessThan($playbookPos, $rubricPos);
+        self::assertLessThan($outputDirectivePos, $playbookPos);
+        self::assertLessThan($schemaPos, $outputDirectivePos);
+        self::assertLessThan($orderingHintPos, $schemaPos);
+        self::assertLessThan($rulesPos, $orderingHintPos);
+    }
+
     public function test_system_and_batch_system_prompts_share_core_instructions(): void
     {
         // The two prompts MUST be derived from a shared base — drift between single and batch is a known FP risk.
