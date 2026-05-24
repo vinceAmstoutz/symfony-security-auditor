@@ -525,6 +525,27 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(0, $tokenUsageRecorder->snapshot()->totalTokens());
     }
 
+    public function test_complete_returns_zero_tokens_when_token_usage_prompt_and_completion_are_null(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('done'),
+            new TokenUsage(),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+        );
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame(0, $llmResponse->inputTokens());
+        self::assertSame(0, $llmResponse->outputTokens());
+        self::assertSame(0, $tokenUsageRecorder->snapshot()->totalTokens());
+    }
+
     public function test_consecutive_complete_calls_accumulate_in_shared_recorder(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -740,9 +761,9 @@ final class SymfonyAiLLMClientTest extends TestCase
     {
         $fakeSleeper = new FakeSleeper();
         $platform = $this->flakyPlatform([
-            new RuntimeException('HTTP 429 too many requests'),
-            new RuntimeException('HTTP 429 too many requests'),
-            new RuntimeException('HTTP 429 too many requests'),
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new RuntimeException('HTTP 503 Service Unavailable'),
         ]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
             $platform,
@@ -770,6 +791,88 @@ final class SymfonyAiLLMClientTest extends TestCase
         }
     }
 
+    public function test_complete_logs_warning_with_full_context_when_retrying_transient_failure(): void
+    {
+        /** @var list<array{string, array<string, mixed>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 first failure message'),
+            new TextResult('recovered'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            $logger,
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 50,
+                backoffMultiplier: 2.0,
+                jitterRatio: 0.0,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: new FakeSleeper(),
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertCount(1, $warnings);
+        self::assertSame('LLM call failed, retrying after backoff', $warnings[0][0]);
+        $context = $warnings[0][1];
+        self::assertSame(1, $context['attempt']);
+        self::assertSame(3, $context['max_attempts']);
+        self::assertSame(50, $context['delay_ms']);
+        self::assertSame('HTTP 503 first failure message', $context['error']);
+    }
+
+    public function test_complete_logs_one_warning_per_intermediate_attempt_no_warning_on_last(): void
+    {
+        /** @var list<array{string, array<string, mixed>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503'),
+            new RuntimeException('HTTP 503'),
+            new RuntimeException('HTTP 503'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            $logger,
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 10,
+                backoffMultiplier: 2.0,
+                jitterRatio: 0.0,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: new FakeSleeper(),
+        );
+
+        try {
+            $symfonyAiLLMClient->complete('sys', 'usr');
+            self::fail('Expected TransientLLMFailureException');
+        } catch (TransientLLMFailureException) {
+            self::assertCount(2, $warnings);
+            self::assertSame(1, $warnings[0][1]['attempt']);
+            self::assertSame(2, $warnings[1][1]['attempt']);
+        }
+    }
+
     public function test_complete_does_not_retry_non_transient_failures(): void
     {
         $fakeSleeper = new FakeSleeper();
@@ -794,6 +897,60 @@ final class SymfonyAiLLMClientTest extends TestCase
         } finally {
             self::assertSame([], $fakeSleeper->durations);
         }
+    }
+
+    public function test_complete_uses_rate_limit_delay_for_429_errors(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 429 Rate limit exceeded'),
+            new TextResult('recovered after rate limit'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 500,
+                jitterRatio: 0.0,
+                rateLimitInitialDelayMs: 60_000,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame([60_000], $fakeSleeper->durations);
+    }
+
+    public function test_complete_uses_regular_delay_for_non_rate_limit_transient_errors(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new TextResult('recovered'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 500,
+                jitterRatio: 0.0,
+                rateLimitInitialDelayMs: 60_000,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame([500], $fakeSleeper->durations);
     }
 
     /**

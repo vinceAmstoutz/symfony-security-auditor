@@ -13,17 +13,28 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay;
 
-/**
- * @internal not part of the BC promise — see docs/versioning.md
- */
+use Closure;
+
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class UsleepSleeper implements SleeperInterface
 {
+    public const int MICROSECONDS_PER_MILLISECOND = 1000;
+
+    /** @var Closure(int): void */
+    private Closure $usleep;
+
+    /** @param ?Closure(int): void $usleep test seam: defaults to PHP's usleep */
+    public function __construct(?Closure $usleep = null)
+    {
+        $this->usleep = $usleep ?? usleep(...);
+    }
+
     public function sleep(int $milliseconds): void
     {
         if ($milliseconds <= 0) {
             return;
         }
 
-        usleep($milliseconds * 1000);
+        ($this->usleep)($milliseconds * self::MICROSECONDS_PER_MILLISECOND);
     }
 }

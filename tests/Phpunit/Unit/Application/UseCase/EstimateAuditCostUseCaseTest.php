@@ -235,12 +235,12 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         $estimateAuditCostUseCase = $this->makeUseCase(
             files: [$this->makeProjectFile('a.php', 'aaa')],
             tokenEstimator: $this->fixedEstimator(perRoundTokens: 1),
-            primaryModel: 'claude-opus-4-5',
+            primaryModel: 'claude-opus-4-7',
         );
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        self::assertSame('claude-opus-4-5', $auditReport->cost()->primaryModel());
+        self::assertSame('claude-opus-4-7', $auditReport->cost()->primaryModel());
     }
 
     /**

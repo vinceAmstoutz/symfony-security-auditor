@@ -52,7 +52,7 @@ following keys:
 
 | Key              | Type   | Default             | Description                                          |
 | ---------------- | ------ | ------------------- | ---------------------------------------------------- |
-| `model`          | string | `'claude-opus-4-5'` | Model name used for both Attacker and Reviewer roles |
+| `model`          | string | `'claude-opus-4-7'` | Model name used for both Attacker and Reviewer roles |
 | `attacker_model` | string | `null`              | Override: dedicated model for the Attacker role      |
 | `reviewer_model` | string | `null`              | Override: dedicated model for the Reviewer role      |
 
@@ -98,7 +98,7 @@ names must be supported by the platform configured in `ai.yaml`.
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-5'
+    model: 'claude-opus-4-7'
 ```
 
 ### Split mode — separate models per role
@@ -106,8 +106,8 @@ symfony_security_auditor:
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-5'   # powerful model for discovery
-    reviewer_model: 'claude-haiku-4-5'  # faster model for validation
+    attacker_model: 'claude-opus-4-7'   # powerful model for discovery
+    reviewer_model: 'claude-haiku-4-5-20251001'  # faster model for validation
 ```
 
 ### Full configuration example
@@ -115,8 +115,8 @@ symfony_security_auditor:
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-5'
-    reviewer_model: 'claude-haiku-4-5'
+    attacker_model: 'claude-opus-4-7'
+    reviewer_model: 'claude-haiku-4-5-20251001'
     scan:
         excluded_dirs:
             - 'legacy'
@@ -244,7 +244,7 @@ via the model name. Two syntaxes are supported in
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-5?max_tokens=4096&temperature=0.2'
+    model: 'claude-opus-4-7?max_tokens=4096&temperature=0.2'
 ```
 
 ### Expanded syntax
@@ -252,7 +252,7 @@ symfony_security_auditor:
 ```yaml
 symfony_security_auditor:
     model:
-        name: 'claude-opus-4-5'
+        name: 'claude-opus-4-7'
         options:
             max_tokens: 4096
             temperature: 0.2
@@ -284,8 +284,8 @@ ai:
 
 ```yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-5'   # deep reasoning for vuln discovery
-    reviewer_model: 'claude-haiku-4-5'  # fast + cheap for false-positive filtering
+    attacker_model: 'claude-opus-4-7'   # deep reasoning for vuln discovery
+    reviewer_model: 'claude-haiku-4-5-20251001'  # fast + cheap for false-positive filtering
 ```
 
 The attacker agent receives all source files grouped into chunks of 10, sorted

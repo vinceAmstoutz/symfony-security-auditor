@@ -60,8 +60,8 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     {
         $kernel = $this->boot([]);
 
-        self::assertSame('claude-opus-4-5', $kernel->getContainer()->getParameter('symfony_security_auditor.attacker_model'));
-        self::assertSame('claude-opus-4-5', $kernel->getContainer()->getParameter('symfony_security_auditor.reviewer_model'));
+        self::assertSame('claude-opus-4-7', $kernel->getContainer()->getParameter('symfony_security_auditor.attacker_model'));
+        self::assertSame('claude-opus-4-7', $kernel->getContainer()->getParameter('symfony_security_auditor.reviewer_model'));
     }
 
     public function test_bundle_uses_shared_model_for_both_agents_when_split_overrides_omitted(): void

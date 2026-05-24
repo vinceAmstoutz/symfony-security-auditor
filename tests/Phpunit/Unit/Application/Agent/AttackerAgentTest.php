@@ -22,6 +22,7 @@ use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
@@ -32,6 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 
 final class AttackerAgentTest extends TestCase
@@ -979,6 +981,89 @@ final class AttackerAgentTest extends TestCase
         );
 
         $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder());
+    }
+
+    public function test_it_propagates_llm_provider_exception_and_records_errored_coverage(): void
+    {
+        // Non-transient failures (missing platform, auth errors, retired model) must
+        // NOT be swallowed. Silently returning [] would produce a false-negative SAFE
+        // report. Both propagation and coverage recording are pinned here.
+        $files = [
+            $this->makeFile('src/Controller/A.php'),
+            $this->makeFile('src/Controller/B.php'),
+        ];
+
+        $this->llmClient
+            ->method('complete')
+            ->willThrowException(new LLMProviderException('No provider found for model "claude-opus-4-7".'));
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $attackerAgent = new AttackerAgent(
+            llmClient: $this->llmClient,
+            attackerPromptBuilder: new AttackerPromptBuilder(),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger()),
+            attackerCache: new NullAttackerCache(),
+            logger: new NullLogger(),
+        );
+
+        try {
+            $attackerAgent->analyze($files, SymfonyMapping::create(), $auditContext);
+            self::fail('Expected LLMProviderException to propagate');
+        } catch (LLMProviderException) {
+            // expected — the agent rethrows; coverage must still be recorded.
+        }
+
+        self::assertSame(
+            [
+                ['stage' => 'attacker', 'file' => 'src/Controller/A.php', 'status' => 'errored'],
+                ['stage' => 'attacker', 'file' => 'src/Controller/B.php', 'status' => 'errored'],
+            ],
+            $auditContext->coverage(),
+        );
+    }
+
+    public function test_it_propagates_exhausted_transient_failure_and_records_errored_coverage(): void
+    {
+        // Rate-limit and other transient errors that exhaust all retries are wrapped in
+        // TransientLLMFailureException. Like non-transient failures, they must NOT be
+        // swallowed — every subsequent chunk will fail identically, and silently returning
+        // [] produces a false-negative SAFE result.
+        $files = [
+            $this->makeFile('src/Controller/A.php'),
+            $this->makeFile('src/Controller/B.php'),
+        ];
+
+        $this->llmClient
+            ->method('complete')
+            ->willThrowException(
+                TransientLLMFailureException::afterExhaustedAttempts(3, new RuntimeException('Rate limit exceeded')),
+            );
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $attackerAgent = new AttackerAgent(
+            llmClient: $this->llmClient,
+            attackerPromptBuilder: new AttackerPromptBuilder(),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger()),
+            attackerCache: new NullAttackerCache(),
+            logger: new NullLogger(),
+        );
+
+        try {
+            $attackerAgent->analyze($files, SymfonyMapping::create(), $auditContext);
+            self::fail('Expected LLMProviderException to propagate');
+        } catch (LLMProviderException) {
+            // TransientLLMFailureException extends LLMProviderException — expected.
+        }
+
+        self::assertSame(
+            [
+                ['stage' => 'attacker', 'file' => 'src/Controller/A.php', 'status' => 'errored'],
+                ['stage' => 'attacker', 'file' => 'src/Controller/B.php', 'status' => 'errored'],
+            ],
+            $auditContext->coverage(),
+        );
     }
 
     protected function setUp(): void

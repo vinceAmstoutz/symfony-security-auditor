@@ -182,7 +182,7 @@ on the model:
 ```yaml
 symfony_security_auditor:
     model:
-        name: 'claude-opus-4-5'
+        name: 'claude-opus-4-7'
         options:
             temperature: 0.0
 ```
@@ -212,7 +212,7 @@ Expected behavior on large projects. Mitigations:
   input-token discount on cached prompts.
 - Confirm `cache.enabled: true` (default) — repeated chunks skip the LLM
   entirely.
-- Switch to a cheaper Reviewer (`reviewer_model: claude-haiku-4-5` or
+- Switch to a cheaper Reviewer (`reviewer_model: claude-haiku-4-5-20251001` or
   `deepseek-chat`).
 - Set a provider-side hard cap. See
   [CI → Set a spend cap](ci.md#set-a-spend-cap).

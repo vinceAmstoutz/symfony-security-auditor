@@ -32,11 +32,11 @@ final class AuditCostTest extends TestCase
 
     public function test_zero_factory_constructs_empty_cost_for_model(): void
     {
-        $auditCost = AuditCost::zero('claude-haiku-4-5');
+        $auditCost = AuditCost::zero('claude-haiku-4-5-20251001');
 
         self::assertSame(0, $auditCost->totalTokens());
         self::assertSame(0.0, $auditCost->estimatedCostUsd());
-        self::assertSame('claude-haiku-4-5', $auditCost->primaryModel());
+        self::assertSame('claude-haiku-4-5-20251001', $auditCost->primaryModel());
     }
 
     public function test_cost_is_rounded_to_six_decimal_places(): void

@@ -422,13 +422,15 @@ $report->startedAt(): \DateTimeImmutable
 $report->completedAt(): \DateTimeImmutable
 $report->durationSeconds(): float
 $report->filesScanned(): int
+$report->cost(): AuditCost                           // tokens + estimated USD
+$report->coverage(): array<string, mixed>            // per-file coverage metadata
 $report->vulnerabilities(): list<Vulnerability>      // validated only
 $report->totalVulnerabilities(): int
 $report->vulnerabilitiesBySeverity(VulnerabilitySeverity $s): list<Vulnerability>
 $report->vulnerabilitiesByType(VulnerabilityType $t): list<Vulnerability>
 $report->riskScore(): int                            // sum of severity scores
 $report->riskLevel(): string                         // SAFE|LOW|MEDIUM|HIGH|CRITICAL
-$report->toArray(): array<string, mixed>             // fully serializable
+$report->toArray(): array<string, mixed>             // fully serializable; includes 'cost' key
 ```
 
 `Vulnerability::toArray()` keys: `id`, `type`, `category`, `owasp`, `severity`,

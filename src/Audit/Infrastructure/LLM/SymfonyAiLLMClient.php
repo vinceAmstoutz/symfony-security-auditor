@@ -40,32 +40,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 
-/**
- * Adapter: bridges our domain LLMClientInterface to symfony/ai's PlatformInterface.
- *
- * The platform is configured entirely via symfony/ai-bundle (config/packages/ai.yaml).
- * Developers choose their provider (Anthropic, OpenAI, Mistral, Ollama, Gemini, Azure …)
- * there; this class remains provider-agnostic.
- *
- * Token counts are read from the per-call `DeferredResult` metadata (populated by the
- * platform's `TokenUsageExtractor` during result conversion) and forwarded to the
- * shared `TokenUsageRecorder` so the orchestrator can attribute cumulative usage to
- * the final `AuditReport` and enforce configured budgets.
- *
- * @internal not part of the BC promise — see docs/versioning.md
- */
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class SymfonyAiLLMClient implements LLMClientInterface
 {
     public const float DEFAULT_TEMPERATURE = 0.0;
 
     public const bool DEFAULT_PROMPT_CACHING = false;
 
-    /**
-     * @param bool $promptCaching When true, opts into provider-side prompt caching by passing a
-     *                            `cache_control: ephemeral` flag through the symfony/ai options bag.
-     *                            Honored by Anthropic platform; silently ignored by providers that
-     *                            do not understand the key.
-     */
     public function __construct(
         private PlatformInterface $platform,
         private string $model,
@@ -241,14 +222,7 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         return '';
     }
 
-    /**
-     * Invokes the platform with bounded exponential-backoff retry on transient failures
-     * (provider 429/5xx, network timeouts). Non-transient failures (auth, validation)
-     * fail fast — wrapped in `NonTransientLLMFailureException`. If every retry is
-     * exhausted, a `TransientLLMFailureException` carries the last error.
-     *
-     * @param array<string, mixed> $options
-     */
+    /** @param array<string, mixed> $options */
     private function invokeWithRetry(MessageBag $messageBag, array $options): DeferredResult
     {
         $retryPolicy = $this->retryPolicy ?? new RetryPolicy();
@@ -258,21 +232,22 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         \assert('' !== $this->model, 'Model must be a non-empty string');
 
         $maxAttempts = $retryPolicy->maxAttempts();
-        $lastException = null;
-        for ($attempt = 1; $attempt <= $maxAttempts; ++$attempt) {
+        $attempt = 1;
+        while (true) {
             try {
                 return $this->platform->invoke($this->model, $messageBag, $options);
             } catch (Throwable $throwable) {
-                $lastException = $throwable;
                 if (!$classifier->isTransient($throwable)) {
                     throw NonTransientLLMFailureException::from($throwable);
                 }
 
-                if ($attempt === $maxAttempts) {
-                    break;
+                if ($attempt >= $maxAttempts) {
+                    throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $throwable);
                 }
 
-                $delay = $retryPolicy->delayMs($attempt);
+                $delay = $classifier->isRateLimit($throwable)
+                    ? $retryPolicy->rateLimitDelayMs($attempt)
+                    : $retryPolicy->delayMs($attempt);
                 $this->logger->warning('LLM call failed, retrying after backoff', [
                     'attempt' => $attempt,
                     'max_attempts' => $maxAttempts,
@@ -280,21 +255,12 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
                     'error' => $throwable->getMessage(),
                 ]);
                 $sleeper->sleep($delay);
+                ++$attempt;
             }
         }
-
-        \assert($lastException instanceof Throwable);
-
-        throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $lastException);
     }
 
-    /**
-     * Reads token usage from the deferred result's metadata and forwards it to the
-     * shared recorder. Returns the per-call counts as [inputTokens, outputTokens] so
-     * callers can populate the returned LLMResponse.
-     *
-     * @return array{0: int, 1: int}
-     */
+    /** @return array{0: int, 1: int} */
     private function extractTokens(DeferredResult $deferredResult): array
     {
         $metadata = $deferredResult->getMetadata()->all();
@@ -303,8 +269,8 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
             return [0, 0];
         }
 
-        $inputTokens = max(0, $tokenUsage->getPromptTokens() ?? 0);
-        $outputTokens = max(0, $tokenUsage->getCompletionTokens() ?? 0);
+        $inputTokens = $tokenUsage->getPromptTokens() ?? 0;
+        $outputTokens = $tokenUsage->getCompletionTokens() ?? 0;
         $this->tokenUsageRecorder?->record($inputTokens, $outputTokens);
 
         return [$inputTokens, $outputTokens];
@@ -342,9 +308,6 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
     }
 
     /**
-     * Coerces our open-shaped JSON Schema (array<string, mixed>) to the
-     * symfony/ai Tool parameters shape. Missing fields are filled with safe defaults.
-     *
      * @param array<string, mixed> $schema
      *
      * @return array{type: 'object', properties: array<string, array{type: string, description: string}>, required: list<string>, additionalProperties: false}

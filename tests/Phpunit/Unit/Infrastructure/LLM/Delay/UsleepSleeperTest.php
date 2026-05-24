@@ -13,35 +13,51 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Delay;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
 
 final class UsleepSleeperTest extends TestCase
 {
-    public function test_zero_milliseconds_returns_immediately(): void
+    #[DataProvider('nonPositiveDurationCases')]
+    public function test_non_positive_milliseconds_skip_the_usleep_call(int $milliseconds): void
     {
-        $usleepSleeper = new UsleepSleeper();
+        $invocations = [];
+        $usleepSleeper = new UsleepSleeper(static function (int $microseconds) use (&$invocations): void {
+            $invocations[] = $microseconds;
+        });
 
-        $startedAt = hrtime(true);
-        $usleepSleeper->sleep(0);
-        $elapsedNanoseconds = hrtime(true) - $startedAt;
+        $usleepSleeper->sleep($milliseconds);
 
-        // Should be effectively instant; allow generous slack for CI noise.
-        self::assertLessThan(5_000_000, $elapsedNanoseconds);
+        self::assertSame([], $invocations);
     }
 
-    public function test_negative_milliseconds_returns_immediately(): void
+    /** @return iterable<string, array{int}> */
+    public static function nonPositiveDurationCases(): iterable
     {
-        $usleepSleeper = new UsleepSleeper();
-
-        $startedAt = hrtime(true);
-        $usleepSleeper->sleep(-10);
-        $elapsedNanoseconds = hrtime(true) - $startedAt;
-
-        self::assertLessThan(5_000_000, $elapsedNanoseconds);
+        yield 'zero' => [0];
+        yield 'negative_one' => [-1];
+        yield 'large_negative' => [-1_000];
     }
 
-    public function test_positive_milliseconds_sleeps_at_least_that_long(): void
+    public function test_positive_milliseconds_invoke_usleep_with_milliseconds_times_one_thousand(): void
+    {
+        $invocations = [];
+        $usleepSleeper = new UsleepSleeper(static function (int $microseconds) use (&$invocations): void {
+            $invocations[] = $microseconds;
+        });
+
+        $usleepSleeper->sleep(10);
+
+        self::assertSame([10_000], $invocations);
+    }
+
+    public function test_microseconds_per_millisecond_constant_is_exactly_one_thousand(): void
+    {
+        self::assertSame(1_000, UsleepSleeper::MICROSECONDS_PER_MILLISECOND);
+    }
+
+    public function test_default_constructor_uses_real_usleep_for_actual_blocking(): void
     {
         $usleepSleeper = new UsleepSleeper();
 
@@ -49,7 +65,18 @@ final class UsleepSleeperTest extends TestCase
         $usleepSleeper->sleep(10);
         $elapsedNanoseconds = hrtime(true) - $startedAt;
 
-        // 10 ms == 10_000_000 ns. usleep may be slightly imprecise; assert ≥ 8 ms.
         self::assertGreaterThanOrEqual(8_000_000, $elapsedNanoseconds);
+    }
+
+    public function test_one_millisecond_boundary_value_triggers_usleep(): void
+    {
+        $invocations = [];
+        $usleepSleeper = new UsleepSleeper(static function (int $microseconds) use (&$invocations): void {
+            $invocations[] = $microseconds;
+        });
+
+        $usleepSleeper->sleep(1);
+
+        self::assertSame([1_000], $invocations);
     }
 }

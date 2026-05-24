@@ -48,19 +48,23 @@ src/
 │   │   ├── Pipeline/    # PipelineInterface, StageInterface, CoverageRecorderInterface, NullCoverageRecorder
 │   │   └── Port/        # Cross-layer ports — LLMClientInterface, LLMResponse,
 │   │       │              AttackerCacheInterface, ProjectFileScannerInterface,
+│   │       │              SecretScrubberInterface, TokenEstimatorInterface,
+│   │       │              PricingProviderInterface,
 │   │       │              Attacker/ReviewerPromptBuilderInterface
 │   │       └── Tool/    # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
 │   ├── Application/     # Orchestration — no I/O, depends only on Domain
-│   │   ├── UseCase/     # Entry point: RunAuditUseCase
+│   │   ├── UseCase/     # Entry points: RunAuditUseCase, EstimateAuditCostUseCase
 │   │   ├── Pipeline/    # AuditPipeline + three Stage implementations
 │   │   └── Agent/       # Attacker/Reviewer agents (+ interfaces), AuditOrchestrator (+ interface), VulnerabilityFactory
 │   └── Infrastructure/  # I/O adapters
-│       ├── LLM/         # SymfonyAiLLMClient (implements Domain/Port/LLMClientInterface)
-│       ├── FileSystem/  # ProjectFileScanner
+│       ├── LLM/         # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier,
+│       │                  CharacterBasedTokenEstimator, Delay/SleeperInterface + UsleepSleeper
+│       ├── FileSystem/  # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
 │       ├── Prompt/      # AttackerPromptBuilder, ReviewerPromptBuilder
 │       ├── Cache/       # FilesystemAttackerCache, NullAttackerCache
 │       ├── Advisory/    # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase,
 │       │                  SymfonyProcessComposerAuditRunner + Exception/*
+│       ├── Pricing/     # StaticPricingProvider
 │       ├── Tool/        # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool,
 │       │                  SymfonyToolRegistryFactory
 │       └── Report/      # ReportRenderer (console / JSON / SARIF + Template/*.txt)
@@ -80,7 +84,7 @@ graph LR
 
     subgraph DOM["Domain"]
         MODELS["AuditContext · AuditReport\nVulnerability · ProjectFile\nSymfonyMapping"]
-        PORTS["PipelineInterface · StageInterface\nLLMClientInterface · LLMResponse\nAttackerCacheInterface\nProjectFileScannerInterface\n*PromptBuilderInterface\nTool/* (ports)"]
+        PORTS["PipelineInterface · StageInterface\nLLMClientInterface · LLMResponse\nAttackerCacheInterface · ProjectFileScannerInterface\nSecretScrubberInterface · TokenEstimatorInterface\nPricingProviderInterface\n*PromptBuilderInterface · Tool/* (ports)"]
     end
 
     subgraph INFRA["Infrastructure"]
@@ -388,9 +392,17 @@ with a system message and a user message per call, invokes
 `$agent->call($messages, ['stream' => false])`, and wraps the string result in
 `LLMResponse`.
 
-Token counts are not tracked here (set to `0`). To capture real token usage,
-register a `Symfony\AI\Platform\Event\PostInvoke` listener and read from
-`$event->response->getMetaInformation()`.
+Token usage (input, output tokens) is read from the platform response via
+`symfony/ai`'s `TokenUsageInterface` and forwarded to the shared
+`TokenUsageRecorder` so `RunAuditUseCase` can attribute cumulative usage to the
+final `AuditReport`. `BudgetTracker` receives the same counts to enforce
+`audit.budget.*` limits; it throws `BudgetExceededException` when a limit is
+breached, triggering a clean abort with exit code `2`.
+
+Jittered exponential backoff is applied by the surrounding `RetryPolicy`;
+transient failures (HTTP 429, 5xx) are retried up to `audit.retry.max_attempts`
+times. Non-transient failures (auth, validation errors) are classified by
+`TransientFailureClassifier` and propagate immediately.
 
 Swapping LLM providers (Anthropic → OpenAI → Mistral → Ollama → …) requires no
 code changes — only `ai.yaml` configuration.
@@ -418,11 +430,13 @@ instructs the model to output a JSON array of vulnerability objects matching
 
 ### `ReportRenderer`
 
-Two render methods:
+Three render methods:
 
 - `renderConsole(AuditReport): string` — human-readable terminal output
 - `renderJson(AuditReport): string` — delegates to `AuditReport::toArray()` then
   `json_encode`
+- `renderSarif(AuditReport): string` — SARIF 2.1.0; `tool.driver.version`
+  sourced dynamically from installed Composer metadata
 
 ---
 
@@ -438,16 +452,20 @@ root key `symfony_security_auditor`. Top-level scalars:
 
 | Key              | Default             | Purpose                                         |
 | ---------------- | ------------------- | ----------------------------------------------- |
-| `model`          | `'claude-opus-4-5'` | Model name for both Attacker and Reviewer roles |
+| `model`          | `'claude-opus-4-7'` | Model name for both Attacker and Reviewer roles |
 | `attacker_model` | `null`              | Override: dedicated model for the Attacker role |
 | `reviewer_model` | `null`              | Override: dedicated model for the Reviewer role |
 
 Nested sections:
 
-- `scan.*` — `excluded_dirs`, `respect_gitignore`, `max_file_size_kb` (file
-  discovery)
+- `scan.*` — `excluded_dirs`, `respect_gitignore`, `max_file_size_kb`,
+  `secret_scrubbing.enabled`, `secret_scrubbing.additional_patterns` (file
+  discovery + credential redaction)
 - `audit.*` — `max_iterations`, `min_confidence`, `reviewer_batch_size`,
-  `tools_enabled`, `max_tool_iterations` (orchestrator knobs)
+  `tools_enabled`, `max_tool_iterations` (orchestrator knobs);
+  `budget.max_tokens`, `budget.max_cost_usd` (abort limits);
+  `retry.max_attempts`, `retry.initial_delay_ms`, `retry.backoff_multiplier`,
+  `retry.jitter_ratio` (LLM resilience)
 - `cache.*` — `enabled`, `dir`, `prompt_caching` (chunk cache + provider-side
   prompt cache)
 
@@ -459,15 +477,15 @@ Minimal configuration:
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-5'
+    model: 'claude-opus-4-7'
 ```
 
 Split-model configuration (larger model for attacking, faster for reviewing):
 
 ```yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-5'
-    reviewer_model: 'claude-haiku-4-5'
+    attacker_model: 'claude-opus-4-7'
+    reviewer_model: 'claude-haiku-4-5-20251001'
 ```
 
 Corresponding `ai.yaml` (platform only — no agent config needed):
@@ -503,18 +521,19 @@ Parameters exposed for debugging: `symfony_security_auditor.attacker_model`,
 
 Console command `audit:run`. Arguments and options:
 
-| Name            | Type     | Default    | Purpose                                 |
-| --------------- | -------- | ---------- | --------------------------------------- |
-| `project-path`  | argument | `getcwd()` | Path to target project; defaults to CWD |
-| `--format / -f` | option   | `console`  | `console`, `json`, or `sarif`           |
-| `--output / -o` | option   | `null`     | Write JSON/SARIF report to file         |
+| Name            | Type     | Default    | Purpose                                            |
+| --------------- | -------- | ---------- | -------------------------------------------------- |
+| `project-path`  | argument | `getcwd()` | Path to target project; defaults to CWD            |
+| `--format / -f` | option   | `console`  | `console`, `json`, or `sarif`                      |
+| `--output / -o` | option   | `null`     | Write JSON/SARIF report to file                    |
+| `--dry-run`     | option   | `false`    | Estimate cost without invoking the LLM; exits `0`  |
 
 Input mapping and resolution live in `AuditCommandInput`; output writing in
 `ReportWriter`; user-facing messaging in `AuditPresenter`; exit code policy in
 `AuditExitCodeResolver`. `AuditCommand` itself only orchestrates.
 
-Exit code: `Command::FAILURE` when risk level is `CRITICAL`, `Command::SUCCESS`
-otherwise. Invalid path or unexpected exceptions also return `FAILURE`.
+Exit codes: `0` (SAFE/LOW/MEDIUM/HIGH), `1` (CRITICAL risk or invalid path or
+unexpected failure), `2` (budget exceeded — partial report still emitted).
 
 ---
 
@@ -551,3 +570,15 @@ in `config/services.yaml` to wire a custom CVE feed (Snyk, internal database,
 `Audit\Domain\Port\Tool\ToolInterface`, register it as a service, and inject it
 into `SymfonyToolRegistryFactory` so the attacker can call it when
 `audit.tools_enabled: true`.
+
+**Replace credential scrubber** — implement `Audit\Domain\Port\SecretScrubberInterface`
+and alias it in `config/services.yaml`. Default: `RegexSecretScrubber`;
+disabled: `NullSecretScrubber`.
+
+**Replace token estimator** — implement `Audit\Domain\Port\TokenEstimatorInterface`
+to plug in a provider-specific token counter. Default:
+`CharacterBasedTokenEstimator` (character ÷ 4 heuristic via `mb_strlen`).
+
+**Replace pricing provider** — implement `Audit\Domain\Port\PricingProviderInterface`
+to supply custom per-token prices. Default: `StaticPricingProvider` (hardcoded
+table).

@@ -62,7 +62,7 @@
         "symfony/var-dumper": "^7.4 || ^8.0"
     },
     "suggest": {
-        "symfony/ai-anthropic-platform": "Anthropic (Claude) platform bridge — claude-opus-4-5, claude-sonnet-4-5",
+        "symfony/ai-anthropic-platform": "Anthropic (Claude) platform bridge — claude-opus-4-7, claude-sonnet-4-5",
         "symfony/ai-azure-platform": "Azure OpenAI platform bridge — enterprise GPT-4o, o3",
         "symfony/ai-bedrock-platform": "AWS Bedrock platform bridge — Claude, Nova, Llama on AWS",
         "symfony/ai-deep-seek-platform": "DeepSeek platform bridge — deepseek-chat, deepseek-reasoner",

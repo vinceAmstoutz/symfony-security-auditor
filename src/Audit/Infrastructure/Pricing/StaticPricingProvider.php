@@ -16,26 +16,29 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 
-/**
- * Hardcoded pricing table for well-known LLM models, expressed in USD per
- * million tokens. Unknown models return `0.0` and log a one-shot warning so
- * the operator notices missing pricing without aborting the audit.
- *
- * Prices reflect public list pricing at the time of the last manual update;
- * downstream users overriding `PricingProviderInterface` can plug their own
- * provider for negotiated rates or self-hosted/free models.
- *
- * @internal not part of the BC promise — see docs/versioning.md
- */
+/** @internal not part of the BC promise — see docs/versioning.md */
 final class StaticPricingProvider implements PricingProviderInterface
 {
-    /** @var array<string, array{0: float, 1: float}> input/output USD per million tokens */
+    /**
+     * @var array<string, array{0: float, 1: float}> input/output USD per million tokens
+     *
+     * Prices sourced from https://platform.claude.com/docs/en/about-claude/models/overview
+     * Last updated: 2026-05-24
+     */
     private const array PRICES = [
-        'claude-opus-4-5' => [15.00, 75.00],
+        // Current models — https://platform.claude.com/docs/en/about-claude/models/overview
+        'claude-opus-4-7' => [5.00, 25.00],
+        'claude-sonnet-4-6' => [3.00, 15.00],
+        'claude-haiku-4-5-20251001' => [1.00, 5.00],
+        // Legacy models still available — kept for cost reporting on existing configs
+        'claude-opus-4-6' => [5.00, 25.00],
+        'claude-opus-4-5' => [5.00, 25.00],
+        'claude-haiku-4-5' => [1.00, 5.00],   // alias for claude-haiku-4-5-20251001
         'claude-sonnet-4-5' => [3.00, 15.00],
-        'claude-haiku-4-5' => [0.80, 4.00],
-        'claude-opus-4' => [15.00, 75.00],
-        'claude-sonnet-4' => [3.00, 15.00],
+        'claude-opus-4-1' => [15.00, 75.00],
+        'claude-opus-4' => [15.00, 75.00],     // deprecated alias
+        'claude-sonnet-4' => [3.00, 15.00],    // deprecated alias
+        // Other providers
         'gpt-4o' => [2.50, 10.00],
         'gpt-4o-mini' => [0.15, 0.60],
         'gpt-4.1' => [2.00, 8.00],

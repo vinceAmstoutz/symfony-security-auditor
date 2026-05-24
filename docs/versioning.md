@@ -81,6 +81,8 @@ overriding the alias in `config/services.yaml` is a supported integration path:
 - Configuration value objects in `Audit\Domain\Configuration\*`
   (BundleConfiguration and per-layer VOs)
 - Domain models: `AuditBudget`, `AuditCost`, `TokenUsageSnapshot`
+- Domain exceptions: `LLMProviderException` (signals non-transient platform
+  failure; callers may catch this to detect misconfigured or retired models)
 - `Tool\ToolInterface`, `Tool\ToolRegistryFactoryInterface`
 - `Pipeline\PipelineInterface`, `Pipeline\StageInterface`,
   `Pipeline\CoverageRecorderInterface`

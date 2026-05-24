@@ -13,11 +13,11 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception;
 
-use RuntimeException;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final class NonTransientLLMFailureException extends RuntimeException
+final class NonTransientLLMFailureException extends LLMProviderException
 {
     public static function from(Throwable $throwable): self
     {

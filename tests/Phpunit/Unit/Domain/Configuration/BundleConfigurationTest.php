@@ -22,8 +22,8 @@ final class BundleConfigurationTest extends TestCase
     {
         $bundleConfiguration = BundleConfiguration::fromArray($this->treeBuilderOutput());
 
-        self::assertSame('claude-opus-4-5', $bundleConfiguration->llm->attackerModel());
-        self::assertSame('claude-haiku-4-5', $bundleConfiguration->llm->reviewerModel());
+        self::assertSame('claude-opus-4-7', $bundleConfiguration->llm->attackerModel());
+        self::assertSame('claude-haiku-4-5-20251001', $bundleConfiguration->llm->reviewerModel());
 
         self::assertSame(['legacy'], $bundleConfiguration->scan->excludedDirs);
         self::assertTrue($bundleConfiguration->scan->respectGitignore);
@@ -58,7 +58,7 @@ final class BundleConfigurationTest extends TestCase
 
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
-        self::assertSame('claude-opus-4-5', $bundleConfiguration->llm->attackerModel());
+        self::assertSame('claude-opus-4-7', $bundleConfiguration->llm->attackerModel());
     }
 
     public function test_reviewer_model_falls_back_to_top_level_model_when_override_omitted(): void
@@ -68,7 +68,7 @@ final class BundleConfigurationTest extends TestCase
 
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
-        self::assertSame('claude-opus-4-5', $bundleConfiguration->llm->reviewerModel());
+        self::assertSame('claude-opus-4-7', $bundleConfiguration->llm->reviewerModel());
     }
 
     public function test_budget_is_not_unlimited_when_token_cap_set(): void
@@ -95,9 +95,9 @@ final class BundleConfigurationTest extends TestCase
     private function treeBuilderOutput(): array
     {
         return [
-            'model' => 'claude-opus-4-5',
+            'model' => 'claude-opus-4-7',
             'attacker_model' => null,
-            'reviewer_model' => 'claude-haiku-4-5',
+            'reviewer_model' => 'claude-haiku-4-5-20251001',
             'scan' => [
                 'excluded_dirs' => ['legacy'],
                 'respect_gitignore' => true,

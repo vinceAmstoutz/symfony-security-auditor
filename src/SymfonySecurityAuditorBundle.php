@@ -49,7 +49,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $definition->rootNode()
             ->children()
                 ->scalarNode('model')
-                    ->defaultValue('claude-opus-4-5')
+                    ->defaultValue('claude-opus-4-7')
                     ->info('Model name for both Attacker and Reviewer. Must be supported by the configured platform.')
                 ->end()
                 ->scalarNode('attacker_model')

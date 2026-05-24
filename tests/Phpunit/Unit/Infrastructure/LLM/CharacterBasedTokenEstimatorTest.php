@@ -23,18 +23,23 @@ final class CharacterBasedTokenEstimatorTest extends TestCase
     {
         $characterBasedTokenEstimator = new CharacterBasedTokenEstimator();
 
-        self::assertSame(0, $characterBasedTokenEstimator->estimateTokens('', 'claude-opus-4-5'));
+        self::assertSame(0, $characterBasedTokenEstimator->estimateTokens('', 'claude-opus-4-7'));
     }
 
     public function test_multibyte_characters_are_counted_as_one_each_via_mb_strlen(): void
     {
-        // Pins `mb_strlen` (vs `strlen`). The euro sign U+20AC is 3 bytes in UTF-8.
-        // 10 multibyte characters → mb_strlen = 10, strlen = 30. With Claude divisor 3.5:
-        //   ceil(10 / 3.5) = 3   (correct, mb_strlen)
-        //   ceil(30 / 3.5) = 9   (wrong, strlen mutation)
         $characterBasedTokenEstimator = new CharacterBasedTokenEstimator();
 
-        self::assertSame(3, $characterBasedTokenEstimator->estimateTokens(str_repeat('€', 10), 'claude-opus-4-5'));
+        // U+20AC = 3 bytes in UTF-8: mb_strlen('€'×10) = 10, strlen = 30. Pins mb_strlen vs strlen.
+        self::assertSame(3, $characterBasedTokenEstimator->estimateTokens(str_repeat('€', 10), 'claude-opus-4-7'));
+    }
+
+    public function test_estimate_uses_ceiling_so_fractional_tokens_round_up(): void
+    {
+        $characterBasedTokenEstimator = new CharacterBasedTokenEstimator();
+
+        // 8 / 3.5 = 2.285 → ceil=3, round=2, floor=2. Pins ceil against round/floor.
+        self::assertSame(3, $characterBasedTokenEstimator->estimateTokens(str_repeat('x', 8), 'claude-opus-4-7'));
     }
 
     #[DataProvider('modelDivisorCases')]
@@ -42,30 +47,27 @@ final class CharacterBasedTokenEstimatorTest extends TestCase
     {
         $characterBasedTokenEstimator = new CharacterBasedTokenEstimator();
 
-        // 100 characters → tokens count depends on the model's chars-per-token constant.
         self::assertSame($expected, $characterBasedTokenEstimator->estimateTokens(str_repeat('x', 100), $model));
     }
 
     /** @return iterable<string, array{string, int}> */
     public static function modelDivisorCases(): iterable
     {
-        // 100 / 3.5 = 28.57 → ceil → 29
-        yield 'claude_uses_3.5_chars_per_token' => ['claude-opus-4-5', 29];
-        yield 'gpt_uses_4.0_chars_per_token' => ['gpt-4o', 25];
+        yield 'claude_uses_claude_divisor' => ['claude-opus-4-7', 29];
+        yield 'gpt_uses_gpt_divisor' => ['gpt-4o', 25];
         yield 'o3_uses_gpt_divisor' => ['o3', 25];
-        yield 'gemini_uses_4.0_chars_per_token' => ['gemini-2.5-pro', 25];
-        // Unknown model falls back to default (3.5)
-        yield 'unknown_model_uses_default_divisor' => ['mystery-7', 29];
+        yield 'o4_uses_gpt_divisor' => ['o4-mini', 25];
+        yield 'gemini_uses_gemini_divisor' => ['gemini-2.5-pro', 27];
+        yield 'unknown_model_uses_default_divisor' => ['mystery-7', 32];
     }
 
     public function test_longer_text_yields_strictly_more_tokens(): void
     {
         $characterBasedTokenEstimator = new CharacterBasedTokenEstimator();
 
-        $short = $characterBasedTokenEstimator->estimateTokens(str_repeat('a', 1_000), 'claude-opus-4-5');
-        $long = $characterBasedTokenEstimator->estimateTokens(str_repeat('a', 10_000), 'claude-opus-4-5');
+        $short = $characterBasedTokenEstimator->estimateTokens(str_repeat('a', 1_000), 'claude-opus-4-7');
+        $long = $characterBasedTokenEstimator->estimateTokens(str_repeat('a', 10_000), 'claude-opus-4-7');
 
-        // Ceiling makes the multiplier inexact; assert the order-of-magnitude relationship instead.
         self::assertGreaterThan($short, $long);
         self::assertEqualsWithDelta(10 * $short, $long, 5);
     }

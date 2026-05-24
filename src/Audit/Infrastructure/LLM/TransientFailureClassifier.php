@@ -15,17 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Throwable;
 
-/**
- * Decides whether an exception thrown by the LLM platform represents a
- * *transient* failure worth retrying (network blip, provider 429/5xx) versus
- * a *non-transient* one (auth error, validation error, account suspended).
- *
- * The classifier walks the entire `previous` chain so wrapper exceptions like
- * `ClientExceptionInterface` carrying an HTTP 429 underneath are still
- * recognized.
- *
- * @internal not part of the BC promise — see docs/versioning.md
- */
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class TransientFailureClassifier
 {
     /** @var list<string> */
@@ -66,16 +56,17 @@ final readonly class TransientFailureClassifier
         'invalid request',
     ];
 
+    /** @var list<string> */
+    private const array RATE_LIMIT_HINTS = [
+        '429',
+        'too many requests',
+        'rate limit',
+        'rate_limit',
+    ];
+
     public function isTransient(Throwable $throwable): bool
     {
-        $messages = [];
-        $current = $throwable;
-        while ($current instanceof Throwable) {
-            $messages[] = mb_strtolower($current->getMessage());
-            $current = $current->getPrevious();
-        }
-
-        $joined = implode("\n", $messages);
+        $joined = $this->joinMessages($throwable);
 
         foreach (self::NON_TRANSIENT_HINTS as $hint) {
             if (str_contains($joined, $hint)) {
@@ -90,5 +81,35 @@ final readonly class TransientFailureClassifier
         }
 
         return false;
+    }
+
+    /**
+     * Returns true when the exception indicates a rate-limit response (HTTP 429).
+     * Used by `SymfonyAiLLMClient` to select the rate-limit-specific retry delay
+     * rather than the regular exponential backoff.
+     */
+    public function isRateLimit(Throwable $throwable): bool
+    {
+        $joined = $this->joinMessages($throwable);
+
+        foreach (self::RATE_LIMIT_HINTS as $hint) {
+            if (str_contains($joined, $hint)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function joinMessages(Throwable $throwable): string
+    {
+        $messages = [];
+        $current = $throwable;
+        while ($current instanceof Throwable) {
+            $messages[] = strtolower($current->getMessage());
+            $current = $current->getPrevious();
+        }
+
+        return implode("\n", $messages);
     }
 }

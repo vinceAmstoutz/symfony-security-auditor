@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 use Composer\InstalledVersions;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
@@ -511,6 +512,37 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('{{riskScore}}', $output);
     }
 
+    public function test_render_console_substitutes_unknown_model_label_when_primary_model_is_empty(): void
+    {
+        $auditReport = $this->makeReportWithCost(AuditCost::zero(''));
+        $output = $this->reportRenderer->renderConsole($auditReport);
+
+        self::assertStringContainsString('unknown model', $output);
+        self::assertStringNotContainsString('{{primaryModel}}', $output);
+    }
+
+    public function test_render_console_substitutes_actual_model_name_when_primary_model_is_set(): void
+    {
+        $auditReport = $this->makeReportWithCost(AuditCost::of(100, 50, 0.05, 'claude-opus-4-7'));
+        $output = $this->reportRenderer->renderConsole($auditReport);
+
+        self::assertStringContainsString('claude-opus-4-7', $output);
+        self::assertStringNotContainsString('unknown model', $output);
+        self::assertStringNotContainsString('{{primaryModel}}', $output);
+    }
+
+    public function test_render_sarif_properties_block_includes_all_cost_keys_with_exact_values(): void
+    {
+        $auditReport = $this->makeReportWithCost(AuditCost::of(1234, 567, 1.2345, 'gpt-4o'));
+        $decoded = $this->decodeSarifProperties($auditReport);
+
+        self::assertSame(1234, $decoded['input_tokens']);
+        self::assertSame(567, $decoded['output_tokens']);
+        self::assertSame(1801, $decoded['total_tokens']);
+        self::assertSame(1.2345, $decoded['estimated_cost_usd']);
+        self::assertSame('gpt-4o', $decoded['primary_model']);
+    }
+
     public function test_render_console_vulnerability_substitutes_id(): void
     {
         $vulnerability = $this->makeValidatedVuln();
@@ -619,13 +651,37 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('Confidence: 0%', $output);
     }
 
+    /** @return array{input_tokens: int, output_tokens: int, total_tokens: int, estimated_cost_usd: float, primary_model: string} */
+    private function decodeSarifProperties(AuditReport $auditReport): array
+    {
+        $decoded = $this->decodeSarif($auditReport);
+        $properties = $decoded['runs'][0]['properties'] ?? null;
+        $this->assertSarifPropertiesShape($properties);
+
+        return $properties;
+    }
+
+    /**
+     * @phpstan-assert array{input_tokens: int, output_tokens: int, total_tokens: int, estimated_cost_usd: float, primary_model: string} $value
+     */
+    private function assertSarifPropertiesShape(mixed $value): void
+    {
+        self::assertIsArray($value);
+        self::assertArrayHasKey('input_tokens', $value);
+        self::assertArrayHasKey('output_tokens', $value);
+        self::assertArrayHasKey('total_tokens', $value);
+        self::assertArrayHasKey('estimated_cost_usd', $value);
+        self::assertArrayHasKey('primary_model', $value);
+    }
+
     /**
      * @return array{
      *     "$schema": string,
      *     version: string,
      *     runs: list<array{
      *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array<string, mixed>>}},
-     *         results: list<array{ruleId: string, level: string, message: array{text: string}, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>}>
+     *         results: list<array{ruleId: string, level: string, message: array{text: string}, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>}>,
+     *         properties?: array<string, mixed>
      *     }>
      * }
      */
@@ -660,6 +716,16 @@ final class ReportRendererTest extends TestCase
         }
 
         return AuditReport::fromContext($auditContext);
+    }
+
+    private function makeReportWithCost(AuditCost $auditCost, Vulnerability ...$vulnerabilities): AuditReport
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        foreach ($vulnerabilities as $vulnerability) {
+            $auditContext->addVulnerability($vulnerability);
+        }
+
+        return AuditReport::fromContext($auditContext, $auditCost);
     }
 
     private function makeValidatedVuln(

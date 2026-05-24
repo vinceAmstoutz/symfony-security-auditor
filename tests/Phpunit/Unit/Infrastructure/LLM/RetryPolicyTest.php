@@ -68,6 +68,32 @@ final class RetryPolicyTest extends TestCase
         self::assertSame(1200, $retryPolicyHigh->delayMs(1));
     }
 
+    public function test_delay_rounds_low_fraction_down_distinguishing_ceil(): void
+    {
+        // 100 × (1 + 0.5 × (2×0.744 − 1)) = 124.4 → round 124, ceil 125, floor 124.
+        $retryPolicy = new RetryPolicy(
+            initialDelayMs: 100,
+            backoffMultiplier: 1.0,
+            jitterRatio: 0.5,
+            jitterSource: static fn (): float => 0.744,
+        );
+
+        self::assertSame(124, $retryPolicy->delayMs(1));
+    }
+
+    public function test_delay_rounds_high_fraction_up_distinguishing_floor(): void
+    {
+        // 100 × (1 + 0.5 × (2×0.747 − 1)) = 124.7 → round 125, ceil 125, floor 124.
+        $retryPolicy = new RetryPolicy(
+            initialDelayMs: 100,
+            backoffMultiplier: 1.0,
+            jitterRatio: 0.5,
+            jitterSource: static fn (): float => 0.747,
+        );
+
+        self::assertSame(125, $retryPolicy->delayMs(1));
+    }
+
     public function test_zero_initial_delay_always_returns_zero(): void
     {
         $retryPolicy = new RetryPolicy(
@@ -131,7 +157,6 @@ final class RetryPolicyTest extends TestCase
 
     public function test_jitter_ratio_zero_is_accepted(): void
     {
-        // Pins `< 0.0` boundary — mutation to `<= 0.0` would reject 0.0.
         $retryPolicy = new RetryPolicy(jitterRatio: 0.0);
 
         self::assertSame(3, $retryPolicy->maxAttempts());
@@ -139,7 +164,6 @@ final class RetryPolicyTest extends TestCase
 
     public function test_jitter_ratio_one_is_accepted(): void
     {
-        // Pins `> 1.0` boundary — mutation to `>= 1.0` would reject 1.0.
         $retryPolicy = new RetryPolicy(jitterRatio: 1.0);
 
         self::assertSame(3, $retryPolicy->maxAttempts());
@@ -147,7 +171,6 @@ final class RetryPolicyTest extends TestCase
 
     public function test_max_attempts_one_is_accepted(): void
     {
-        // Pins `< 1` boundary — mutation to `<= 1` would reject 1.
         $retryPolicy = new RetryPolicy(maxAttempts: 1);
 
         self::assertSame(1, $retryPolicy->maxAttempts());
@@ -155,7 +178,6 @@ final class RetryPolicyTest extends TestCase
 
     public function test_initial_delay_zero_is_accepted(): void
     {
-        // Pins `< 0` boundary — mutation to `<= 0` would reject 0.
         $retryPolicy = new RetryPolicy(initialDelayMs: 0, jitterSource: static fn (): float => 0.5);
 
         self::assertSame(0, $retryPolicy->delayMs(1));
@@ -163,7 +185,6 @@ final class RetryPolicyTest extends TestCase
 
     public function test_backoff_multiplier_one_is_accepted(): void
     {
-        // Pins `< 1.0` boundary — mutation to `<= 1.0` would reject 1.0.
         $retryPolicy = new RetryPolicy(
             initialDelayMs: 100,
             backoffMultiplier: 1.0,
@@ -171,33 +192,70 @@ final class RetryPolicyTest extends TestCase
             jitterSource: static fn (): float => 0.5,
         );
 
-        // With multiplier 1.0, delays do not grow.
         self::assertSame(100, $retryPolicy->delayMs(1));
         self::assertSame(100, $retryPolicy->delayMs(5));
     }
 
     public function test_constructor_defaults_match_documented_values(): void
     {
-        // Pins the default values in the constructor signature — DecrementInteger
-        // and IncrementInteger mutations would shift them.
         $retryPolicy = new RetryPolicy(jitterSource: static fn (): float => 0.5);
 
         self::assertSame(RetryPolicy::DEFAULT_MAX_ATTEMPTS, $retryPolicy->maxAttempts());
         self::assertSame(3, $retryPolicy->maxAttempts());
-        // Initial delay 500 × multiplier 2.0 ^ (attempt-1) with jitter midpoint
         self::assertSame(500, $retryPolicy->delayMs(1));
         self::assertSame(1000, $retryPolicy->delayMs(2));
         self::assertSame(2000, $retryPolicy->delayMs(3));
     }
 
+    public function test_rate_limit_delay_uses_its_own_initial_delay(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            initialDelayMs: 500,
+            backoffMultiplier: 2.0,
+            jitterRatio: 0.0,
+            rateLimitInitialDelayMs: 60_000,
+            jitterSource: static fn (): float => 0.5,
+        );
+
+        self::assertSame(60_000, $retryPolicy->rateLimitDelayMs(1));
+        self::assertSame(120_000, $retryPolicy->rateLimitDelayMs(2));
+        self::assertSame(240_000, $retryPolicy->rateLimitDelayMs(3));
+    }
+
+    public function test_rate_limit_delay_is_independent_of_regular_delay(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            initialDelayMs: 100,
+            backoffMultiplier: 1.0,
+            jitterRatio: 0.0,
+            rateLimitInitialDelayMs: 60_000,
+            jitterSource: static fn (): float => 0.5,
+        );
+
+        self::assertSame(100, $retryPolicy->delayMs(1));
+        self::assertSame(60_000, $retryPolicy->rateLimitDelayMs(1));
+    }
+
+    public function test_rate_limit_delay_default_is_sixty_seconds(): void
+    {
+        $retryPolicy = new RetryPolicy(jitterSource: static fn (): float => 0.5);
+
+        self::assertSame(RetryPolicy::DEFAULT_RATE_LIMIT_DELAY_MS, 60_000);
+        self::assertSame(60_000, $retryPolicy->rateLimitDelayMs(1));
+    }
+
+    public function test_negative_rate_limit_initial_delay_is_rejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('rateLimitInitialDelayMs must be >= 0, got -1');
+
+        new RetryPolicy(rateLimitInitialDelayMs: -1);
+    }
+
     public function test_default_jitter_source_produces_value_in_range(): void
     {
-        // Pins the `mt_rand() / mt_getrandmax()` default jitter source — a
-        // mutation to `mt_rand() * mt_getrandmax()` would produce huge values.
-        // Without injecting jitter, delay should land within ±20% of the base.
         $retryPolicy = new RetryPolicy(initialDelayMs: 1_000, backoffMultiplier: 1.0, jitterRatio: 0.2);
 
-        // Sample multiple times: every value must be in [800, 1200].
         for ($attempt = 1; $attempt <= 20; ++$attempt) {
             $delay = $retryPolicy->delayMs(1);
             self::assertGreaterThanOrEqual(800, $delay);

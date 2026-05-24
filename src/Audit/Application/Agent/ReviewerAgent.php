@@ -18,6 +18,7 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 use ValueError;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
@@ -107,6 +108,8 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             return $this->applyBatchReview($batch, $rawData, $coverageRecorder);
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
+        } catch (LLMProviderException $llmProviderException) {
+            throw $llmProviderException;
         } catch (JsonException $exception) {
             $this->logger->error('Failed to parse reviewer batch response', [
                 'batch_size' => \count($batch),
@@ -235,6 +238,8 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             return $reviewed;
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
+        } catch (LLMProviderException $llmProviderException) {
+            throw $llmProviderException;
         } catch (JsonException $exception) {
             $this->logger->error('Failed to parse reviewer response', [
                 'vulnerability_id' => $vulnerability->id(),

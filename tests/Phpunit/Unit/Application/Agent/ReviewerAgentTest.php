@@ -19,6 +19,8 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -1184,6 +1186,68 @@ final class ReviewerAgentTest extends TestCase
             [['stage' => 'reviewer', 'file' => 'src/Controller/UserController.php', 'status' => 'errored']],
             $auditContext->coverage(),
         );
+    }
+
+    public function test_single_review_propagates_llm_provider_exception_instead_of_swallowing_it(): void
+    {
+        $vulnerability = $this->makeVulnerability();
+        $this->llmClient
+            ->method('complete')
+            ->willThrowException(new LLMProviderException('platform unreachable'));
+
+        $this->expectException(LLMProviderException::class);
+        $this->expectExceptionMessage('platform unreachable');
+
+        $this->reviewerAgent->review([$vulnerability], [], AuditContext::forProject($this->tmpDir));
+    }
+
+    public function test_single_review_propagates_budget_exceeded_exception_instead_of_swallowing_it(): void
+    {
+        $vulnerability = $this->makeVulnerability();
+        $this->llmClient
+            ->method('complete')
+            ->willThrowException(BudgetExceededException::forTokens(500, 100));
+
+        $this->expectException(BudgetExceededException::class);
+
+        $this->reviewerAgent->review([$vulnerability], [], AuditContext::forProject($this->tmpDir));
+    }
+
+    public function test_batch_review_propagates_llm_provider_exception_instead_of_swallowing_it(): void
+    {
+        $batch = [$this->makeVulnerabilityAt('src/A.php'), $this->makeVulnerabilityAt('src/B.php')];
+        $this->llmClient
+            ->method('complete')
+            ->willThrowException(new LLMProviderException('platform unreachable'));
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $this->llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: new NullLogger(),
+            batchSize: 5,
+        );
+
+        $this->expectException(LLMProviderException::class);
+        $this->expectExceptionMessage('platform unreachable');
+
+        $reviewerAgent->review($batch, [], AuditContext::forProject($this->tmpDir));
+    }
+
+    public function test_batch_review_propagates_budget_exceeded_exception_instead_of_swallowing_it(): void
+    {
+        $batch = [$this->makeVulnerabilityAt('src/A.php'), $this->makeVulnerabilityAt('src/B.php')];
+        $this->llmClient
+            ->method('complete')
+            ->willThrowException(BudgetExceededException::forTokens(500, 100));
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $this->llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: new NullLogger(),
+            batchSize: 5,
+        );
+
+        $this->expectException(BudgetExceededException::class);
+
+        $reviewerAgent->review($batch, [], AuditContext::forProject($this->tmpDir));
     }
 
     protected function setUp(): void

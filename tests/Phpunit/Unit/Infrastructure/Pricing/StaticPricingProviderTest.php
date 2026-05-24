@@ -34,12 +34,16 @@ final class StaticPricingProviderTest extends TestCase
     /** @return iterable<string, array{string, float, float}> */
     public static function knownModelCases(): iterable
     {
-        yield 'claude-opus-4-5' => ['claude-opus-4-5', 15.00, 75.00];
+        yield 'claude-opus-4-7' => ['claude-opus-4-7', 5.00, 25.00];
+        yield 'claude-sonnet-4-6' => ['claude-sonnet-4-6', 3.00, 15.00];
+        yield 'claude-haiku-4-5-20251001' => ['claude-haiku-4-5-20251001', 1.00, 5.00];
         yield 'claude-sonnet-4-5' => ['claude-sonnet-4-5', 3.00, 15.00];
-        yield 'claude-haiku-4-5' => ['claude-haiku-4-5', 0.80, 4.00];
         yield 'gpt-4o' => ['gpt-4o', 2.50, 10.00];
         yield 'gpt-4o-mini' => ['gpt-4o-mini', 0.15, 0.60];
         yield 'gemini-2.5-pro' => ['gemini-2.5-pro', 1.25, 10.00];
+        // Legacy aliases still in table for cost reporting on existing configs
+        yield 'claude-opus-4-5 (legacy)' => ['claude-opus-4-5', 5.00, 25.00];
+        yield 'claude-haiku-4-5 (legacy)' => ['claude-haiku-4-5', 1.00, 5.00];
     }
 
     public function test_unknown_model_returns_zero_input_price(): void
@@ -51,7 +55,7 @@ final class StaticPricingProviderTest extends TestCase
         self::assertSame(0.0, $staticPricingProvider->pricePerMillionOutputTokens('unknown-model'));
     }
 
-    public function test_unknown_model_is_warned_once(): void
+    public function test_unknown_model_is_warned_once_when_queried_multiple_times(): void
     {
         $warnings = [];
         $logger = self::createStub(LoggerInterface::class);
@@ -69,5 +73,39 @@ final class StaticPricingProviderTest extends TestCase
         self::assertCount(1, $warnings);
         self::assertSame('No pricing entry for LLM model — cost reporting will show zero', $warnings[0][0]);
         self::assertSame(['model' => 'mystery-3'], $warnings[0][1]);
+    }
+
+    public function test_input_price_query_warns_when_model_is_unknown(): void
+    {
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $staticPricingProvider = new StaticPricingProvider($logger);
+        $staticPricingProvider->pricePerMillionInputTokens('mystery-input');
+
+        self::assertCount(1, $warnings);
+        self::assertSame(['model' => 'mystery-input'], $warnings[0][1]);
+    }
+
+    public function test_output_price_query_warns_when_model_is_unknown(): void
+    {
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $staticPricingProvider = new StaticPricingProvider($logger);
+        $staticPricingProvider->pricePerMillionOutputTokens('mystery-output');
+
+        self::assertCount(1, $warnings);
+        self::assertSame(['model' => 'mystery-output'], $warnings[0][1]);
     }
 }

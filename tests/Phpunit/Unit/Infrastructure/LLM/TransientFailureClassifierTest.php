@@ -54,6 +54,42 @@ final class TransientFailureClassifierTest extends TestCase
         self::assertFalse((new TransientFailureClassifier())->isTransient($throwable));
     }
 
+    #[DataProvider('rateLimitCases')]
+    public function test_it_recognizes_rate_limit_failures(Throwable $throwable): void
+    {
+        self::assertTrue((new TransientFailureClassifier())->isRateLimit($throwable));
+    }
+
+    /** @return iterable<string, array{Throwable}> */
+    public static function rateLimitCases(): iterable
+    {
+        yield 'http_429' => [new RuntimeException('HTTP 429 Too Many Requests')];
+        yield 'too_many_requests_phrasing' => [new RuntimeException('too many requests')];
+        yield 'rate_limit_phrasing' => [new RuntimeException('Rate limit exceeded')];
+        yield 'rate_limit_underscore' => [new RuntimeException('rate_limit error')];
+        yield 'wrapped_rate_limit' => [
+            new RuntimeException(
+                'API call failed',
+                previous: new RuntimeException('underlying: 429 rate limit hit'),
+            ),
+        ];
+    }
+
+    #[DataProvider('nonRateLimitCases')]
+    public function test_it_does_not_classify_non_rate_limit_errors_as_rate_limit(Throwable $throwable): void
+    {
+        self::assertFalse((new TransientFailureClassifier())->isRateLimit($throwable));
+    }
+
+    /** @return iterable<string, array{Throwable}> */
+    public static function nonRateLimitCases(): iterable
+    {
+        yield 'http_503_transient_but_not_rate_limit' => [new RuntimeException('HTTP 503 Service Unavailable')];
+        yield 'connection_reset' => [new RuntimeException('Connection reset by peer')];
+        yield 'http_401_non_transient' => [new RuntimeException('HTTP 401 Unauthorized')];
+        yield 'unknown_error' => [new RuntimeException('Something went wrong')];
+    }
+
     /** @return iterable<string, array{Throwable}> */
     public static function nonTransientCases(): iterable
     {

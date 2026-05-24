@@ -376,6 +376,56 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertArrayHasKey('audit_id', $decoded);
     }
 
+    public function test_dry_run_with_console_format_shows_success_message(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertStringContainsString('Audit complete', $commandTester->getDisplay());
+    }
+
+    public function test_dry_run_with_machine_readable_json_format_suppresses_success_message(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+            '--format' => 'json',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertStringNotContainsString('Audit complete', $commandTester->getDisplay());
+        self::assertStringNotContainsString('Risk:', $commandTester->getDisplay());
+    }
+
+    public function test_budget_aborted_command_renders_error_message_to_display(): void
+    {
+        $this->createProjectDir();
+
+        $abortingAttacker = self::createStub(LLMClientInterface::class);
+        $abortingAttacker->method('complete')->willThrowException(
+            BudgetExceededException::forCost(1.5, 1.0),
+        );
+        $abortingAttacker->method('completeWithTools')->willThrowException(
+            BudgetExceededException::forCost(1.5, 1.0),
+        );
+        $reviewerLLM = self::createStub(LLMClientInterface::class);
+        $reviewerLLM->method('complete')->willReturn(LLMResponse::create('{}', 0, 0, 'stub', 'end_turn'));
+
+        $commandTester = $this->makeCommandTesterWithLLM($abortingAttacker, $reviewerLLM);
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertStringContainsString('[ERROR]', $commandTester->getDisplay());
+    }
+
     public function test_dry_run_emits_estimated_cost_without_invoking_llm(): void
     {
         $this->createProjectDir();
