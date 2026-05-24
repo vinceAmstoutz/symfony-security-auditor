@@ -381,7 +381,7 @@ Contributions welcome, please refer to [CONTRIBUTING.md](CONTRIBUTING.md).
 Found a vulnerability **in the auditor itself**? Do **not** open a public issue.
 Report privately via
 [GitHub Security Advisories](https://github.com/vinceamstoutz/symfony-security-auditor/security/advisories/new).
-See [SECURITY.md](.github/SECURITY.md).
+See [SECURITY.md](SECURITY.md).
 
 ---
 

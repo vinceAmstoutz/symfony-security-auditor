@@ -396,8 +396,8 @@ Yes. Implement `Audit/Domain/Port/LLMClientInterface` and alias it. See
 
 ### Can I use a custom CVE database instead of `composer audit`?
 
-Yes. Implement `Audit/Infrastructure/Advisory/AdvisoryDatabaseInterface` and
-override the alias in `config/services.yaml`. See
+Yes. Implement `Audit/Domain/Port/AdvisoryDatabaseInterface` and override the
+alias in `config/services.yaml`. See
 [Configuration → Advisory Source](configuration.md#advisory-source-lookup_advisory-tool).
 
 ### Can I add a new output format?

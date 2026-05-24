@@ -161,13 +161,13 @@ first call and caches the result for the lifetime of the request.
   recommended setup for any real audit is `tools_enabled: true` combined with
   `cache.prompt_caching: true` to amortize the additional round-trips.
 - **Overriding the source.** Need a custom feed (Snyk, internal CVE list, …)?
-  Implement `Audit\Infrastructure\Advisory\AdvisoryDatabaseInterface` in your
-  project and override the alias in `config/services.yaml`:
+  Implement `Audit\Domain\Port\AdvisoryDatabaseInterface` in your project and
+  override the alias in `config/services.yaml`:
 
 ```yaml
 # config/services.yaml
 services:
-    VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AdvisoryDatabaseInterface:
+    VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface:
         alias: App\Security\MyCustomAdvisoryDatabase
 ```
 

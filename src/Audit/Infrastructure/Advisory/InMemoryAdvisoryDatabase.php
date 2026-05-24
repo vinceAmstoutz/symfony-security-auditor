@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
+
 /**
  * Static, test-friendly advisory database. Bundle's default is
  * `ComposerAuditAdvisoryDatabase`, which queries Packagist's live advisory feed via

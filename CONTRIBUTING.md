@@ -217,7 +217,7 @@ Implement `Audit/Domain/Pipeline/StageInterface`. Stages are auto-tagged via
 
 ### Add a new advisory source (CVE feed)
 
-Implement `Audit/Infrastructure/Advisory/AdvisoryDatabaseInterface` and alias
+Implement `Audit/Domain/Port/AdvisoryDatabaseInterface` and alias
 `AdvisoryDatabaseInterface` to your service in `config/services.yaml`. See
 [Configuration → Advisory Source](docs/configuration.md#advisory-source-lookup_advisory-tool).
 
@@ -294,8 +294,7 @@ behavior are not tolerated. Report problems privately to the maintainer (see
 
 Report vulnerabilities **in the auditor itself** privately via
 [GitHub Security Advisories](https://github.com/vinceamstoutz/symfony-security-auditor/security/advisories/new)
-— not in a public issue. See [SECURITY.md](.github/SECURITY.md) for the full
-policy.
+— not in a public issue. See [SECURITY.md](SECURITY.md) for the full policy.
 
 Issues with audit output (false positives, missed vulnerabilities, weird LLM
 behavior) are not security issues — open them as normal GitHub issues with a

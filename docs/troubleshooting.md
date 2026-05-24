@@ -288,12 +288,12 @@ a baked snapshot.
 
 ### Override the advisory source
 
-Implement `Audit/Infrastructure/Advisory/AdvisoryDatabaseInterface`:
+Implement `Audit/Domain/Port/AdvisoryDatabaseInterface`:
 
 ```yaml
 # config/services.yaml
 services:
-    VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AdvisoryDatabaseInterface:
+    VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface:
         alias: App\Security\MyCustomAdvisoryDatabase
 ```
 

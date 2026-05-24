@@ -75,6 +75,9 @@ overriding the alias in `config/services.yaml` is a supported integration path:
 - `AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`
 - `ProjectFileScannerInterface`
 - `AttackerCacheInterface`
+- `AdvisoryDatabaseInterface` — host applications may implement this and alias
+  it to swap the CVE feed (Snyk, internal database, …). See
+  [`docs/extending.md`](extending.md).
 - `SecretScrubberInterface`
 - `PricingProviderInterface`
 - `TokenEstimatorInterface`
@@ -86,10 +89,6 @@ overriding the alias in `config/services.yaml` is a supported integration path:
 - `Tool\ToolInterface`, `Tool\ToolRegistryFactoryInterface`
 - `Pipeline\PipelineInterface`, `Pipeline\StageInterface`,
   `Pipeline\CoverageRecorderInterface`
-
-`Audit\Infrastructure\Advisory\AdvisoryDatabaseInterface` is also part of the
-public API even though it lives under `Infrastructure/` — it is documented as an
-extension point in [`docs/extending.md`](extending.md).
 
 ### Domain models and exceptions
 
