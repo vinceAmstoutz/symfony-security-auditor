@@ -344,11 +344,13 @@ Identical chunks (same content hash) are short-circuited by
 
 ### `ReviewerAgent`
 
-Reviews vulnerabilities one at a time (not batched). For each: builds context
-from the source file content, calls `LLMClientInterface::complete()`, parses
-`accepted` (bool) and `adjusted_severity` (optional string) from the JSON
-response, returns a new `Vulnerability` instance via copy-on-write. On any
-error: returns the vulnerability with `reviewerValidated = false`.
+Reviews vulnerabilities one at a time (or in batches when `batchSize > 1`). For
+each: builds context from the source file content, calls
+`LLMClientInterface::complete()`, parses `accepted` (bool), `adjusted_severity`
+(optional string) and `corrected_type` (optional string) from the JSON response,
+returns a new `Vulnerability` instance via copy-on-write
+(`withReviewerValidation` / `withElevatedSeverity` / `withCorrectedType`). On
+any error: returns the vulnerability with `reviewerValidated = false`.
 
 ### `VulnerabilityFactory`
 
@@ -423,10 +425,40 @@ root).
 ### `AttackerPromptBuilder` / `ReviewerPromptBuilder`
 
 Build system and user prompts fed to `LLMClientInterface::complete()`. Both are
-pure string builders with no network or I/O dependencies. The attacker prompt
-instructs the model to output a JSON array of vulnerability objects matching
-`VulnerabilityFactory::fromArray()`'s expected keys. The reviewer prompt expects
-`{"accepted": bool, "adjusted_severity": string|null, "reviewer_notes": string}`.
+pure string builders with no network or I/O dependencies.
+
+The attacker prompt instructs the model to output a JSON array of vulnerability
+objects matching `VulnerabilityFactory::fromArray()`'s expected keys. It injects
+a short severity and confidence rubric, scope-exclusion guidance, a single
+few-shot example, and — when files of the corresponding `ProjectFile` type
+appear in the chunk — per-artifact skill blocks (controller, voter, form,
+repository, entity, template, config, php). Skill blocks emit both attack
+patterns to hunt and patterns explicitly NOT to flag, reducing reviewer noise.
+Blocks are emitted in attack-surface priority order, not alphabetically.
+
+Source files are wrapped as `<file path="…" type="…">…</file>` and every line is
+prefixed with a line-number marker of the form `` `NNN | ` `` (line number,
+space, pipe, space). The model is instructed to populate `line_start` /
+`line_end` using those exact numbers rather than counting manually.
+
+The reviewer prompt expects each entry of the JSON array to be shaped:
+
+```json
+{
+  "id": "string",
+  "accepted": true,
+  "adjusted_severity": "critical|high|medium|low|info|null",
+  "corrected_type": "<vulnerability_type>|null",
+  "reviewer_notes": "string",
+  "additional_attack_paths": "string|null"
+}
+```
+
+It includes a Symfony-specific false-positive playbook (Doctrine
+`setParameter()`, default CSRF, `mapped: false`, hardcoded-argv `Process`, etc.)
+so the reviewer rejects known non-issues with a one-line note. The single- and
+batch-mode system prompts share a single core-instructions block to prevent
+drift.
 
 ### `ReportRenderer`
 

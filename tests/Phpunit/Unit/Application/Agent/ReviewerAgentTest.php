@@ -1098,6 +1098,136 @@ final class ReviewerAgentTest extends TestCase
         self::assertSame(VulnerabilitySeverity::CRITICAL, $result[0]->severity());
     }
 
+    public function test_it_corrects_type_when_reviewer_reclassifies_accepted_finding(): void
+    {
+        // Attacker labelled it SQLi but reviewer determines it's actually an SSRF.
+        $vulnerability = Vulnerability::create(
+            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
+            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
+            title: 'Mislabelled finding',
+            description: 'desc',
+            filePath: 'src/Service/Webhook.php',
+            lineStart: 10,
+            lineEnd: 12,
+            vulnerableCode: 'code',
+            attackVector: 'vec',
+            proof: 'proof',
+            remediation: 'fix',
+            confidence: 0.9,
+        );
+
+        $reviewResponse = (string) json_encode([
+            'id' => $vulnerability->id(),
+            'accepted' => true,
+            'corrected_type' => 'ssrf',
+            'reviewer_notes' => 'attacker mislabelled — this is SSRF, not SQLi',
+        ]);
+
+        $this->llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+
+        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertSame(VulnerabilityType::SSRF, $result[0]->type());
+    }
+
+    public function test_it_keeps_original_type_when_corrected_type_is_invalid_string(): void
+    {
+        $vulnerability = $this->makeVulnerability();
+
+        $reviewResponse = (string) json_encode([
+            'id' => $vulnerability->id(),
+            'accepted' => true,
+            'corrected_type' => 'NOT_A_REAL_TYPE',
+        ]);
+
+        $this->llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+
+        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        // Original type survives a bad correction; accepted state is still honored.
+        self::assertSame($vulnerability->type(), $result[0]->type());
+        self::assertTrue($result[0]->isReviewerValidated());
+    }
+
+    public function test_it_ignores_corrected_type_when_finding_is_rejected(): void
+    {
+        $vulnerability = $this->makeVulnerability();
+
+        $reviewResponse = (string) json_encode([
+            'id' => $vulnerability->id(),
+            'accepted' => false,
+            'corrected_type' => 'ssrf',
+        ]);
+
+        $this->llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+
+        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertFalse($result[0]->isReviewerValidated());
+        self::assertSame($vulnerability->type(), $result[0]->type());
+    }
+
+    public function test_it_logs_debug_invalid_corrected_type_with_exact_context(): void
+    {
+        $vulnerability = $this->makeVulnerability();
+        $debugLogs = [];
+
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info');
+        $logger->method('debug')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$debugLogs): void {
+                $debugLogs[] = [$msg, $ctx];
+            },
+        );
+
+        $this->llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::create(
+                (string) json_encode(['accepted' => true, 'corrected_type' => 'NOT_A_TYPE_999']),
+                10, 10, 'claude', 'end_turn',
+            ));
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $this->llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: $logger,
+        );
+
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        $invalidLogs = array_values(array_filter(
+            $debugLogs,
+            static fn (array $entry): bool => str_contains($entry[0], 'invalid corrected_type'),
+        ));
+        self::assertNotEmpty($invalidLogs);
+        self::assertSame(['corrected_type' => 'NOT_A_TYPE_999'], $invalidLogs[0][1]);
+    }
+
+    public function test_it_ignores_corrected_type_when_value_is_not_a_string(): void
+    {
+        // Non-string corrected_type (e.g. integer) must be ignored — would TypeError on enum::from()
+        // if the is_string guard were removed.
+        $vulnerability = $this->makeVulnerability();
+
+        $this->llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::create(
+                (string) json_encode(['accepted' => true, 'corrected_type' => 12345]),
+                10, 10, 'claude', 'end_turn',
+            ));
+
+        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertSame($vulnerability->type(), $result[0]->type());
+        self::assertTrue($result[0]->isReviewerValidated());
+    }
+
     public function test_it_records_coverage_validated_when_reviewer_accepts_finding(): void
     {
         $vulnerability = $this->makeVulnerability();

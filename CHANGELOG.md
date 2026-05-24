@@ -10,38 +10,48 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-05-24
+
+### Added
+
+- `Vulnerability::withCorrectedType()` — copy-on-write reclassification when the
+  reviewer determines the attacker mislabelled the finding's type. The original
+  `id` is preserved so downstream consumers can still correlate the corrected
+  record with its pre-correction source.
+- Reviewer prompt accepts a `corrected_type` field (nullable string) per
+  finding; `ReviewerAgent` parses it, validates against `VulnerabilityType`, and
+  applies it via `withCorrectedType()`. Invalid values are logged and ignored —
+  original type is preserved.
+- New configuration key `symfony_security_auditor.provider_json_mode` (boolean,
+  default `false`). When `true`, every LLM call carries
+  `response_format: {type: json_object}` to the underlying provider — honored by
+  OpenAI / Mistral / Ollama (provider-enforced JSON output), silently ignored by
+  Anthropic and any provider without an equivalent knob. The prompt contract
+  (_"Return ONLY the JSON array"_) remains authoritative; this is a
+  belt-and-braces opt-in for providers that support it.
+
 ### Changed
 
-- `AdvisoryDatabaseInterface` moved from `Audit\Infrastructure\Advisory\` to
-  `Audit\Domain\Port\`. The interface is a public extension point, so its
-  canonical home is the Domain port namespace alongside `LLMClientInterface`,
-  `AttackerCacheInterface`, etc. Host applications aliasing the interface in
-  `config/services.yaml` must update the FQCN; concrete implementations
-  (`ComposerAuditAdvisoryDatabase`, `InMemoryAdvisoryDatabase`) keep their
-  existing FQCNs in `Infrastructure\`.
-- Default model updated from `claude-opus-4-5` (retired) to `claude-opus-4-7`.
-- Default reviewer model updated from `claude-haiku-4-5` (retired) to
-  `claude-haiku-4-5-20251001`.
-- **Pricing table corrected**: Anthropic Claude 4 Opus prices were set to the
-  Claude 3 Opus rate (`$15.00 / $75.00` per MTok) — corrected to the actual
-  Claude 4 Opus rate (`$5.00 / $25.00` per MTok input/output). Haiku and Sonnet
-  entries unchanged. Existing cost estimates in CI reports will recalculate at
-  the correct rate once updated.
-- Pricing table extended with additional current and legacy model entries:
-  `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`,
-  `claude-opus-4-6`, `claude-opus-4-1`, `claude-opus-4` (deprecated alias),
-  `claude-sonnet-4` (deprecated alias), `gpt-4.1`, `o3`, `o4-mini`,
-  `gemini-2.0-flash`, `mistral-large`. Legacy `claude-opus-4-5` /
-  `claude-haiku-4-5` entries retained for cost reporting on existing
-  configurations.
-
-### Fixed
-
-- Non-transient LLM failures (missing platform configuration, auth errors,
-  retired model names) now abort the audit with exit code `1` and a clear error
-  message instead of silently producing a false-negative SAFE result. Introduced
-  `Audit\Domain\Exception\LLMProviderException` as the catchable Domain type;
-  `AttackerAgent` and `ReviewerAgent` rethrow it rather than swallowing it.
+- Prompt builders restructured for accuracy: source files are now wrapped as
+  `<file path="…" type="…">…</file>` with each line prefixed by its line number
+  in the form `` `NNN | ` ``. The attacker prompt instructs the model to use
+  those exact line numbers for `line_start` / `line_end` instead of counting
+  manually. Skill blocks switched from `### Heading` to
+  `<skills role="…">…</skills>` form and are emitted in attack-surface priority
+  order rather than alphabetically.
+- Attacker base prompt now includes a severity rubric, a confidence rubric (with
+  a hard `< 0.6` filter threshold), a single canonical few-shot example with
+  concrete line numbers, and an explicit scope exclusion for `vendor/`,
+  `var/cache/`, `var/log/`, `.generated.*`, and `.cache.*` paths.
+- Each per-artifact skill block now lists both attack patterns to hunt and
+  patterns explicitly NOT to flag — reduces false positives from the attacker
+  agent before the reviewer ever sees them.
+- Reviewer prompts (single and batch) now share a common core-instructions block
+  to prevent drift, include the same severity rubric as the attacker, and embed
+  a Symfony-specific false-positive playbook (Doctrine `setParameter()`, default
+  CSRF, `mapped: false` form fields, hardcoded-argv `Process` invocations,
+  `_profiler` gated by `when@dev`, etc.). Batch mode no longer requires findings
+  to be returned in input order — entries are re-keyed by `id` on parse.
 
 ---
 
@@ -173,6 +183,31 @@ First stable release.
 - [`docs/versioning.md`](docs/versioning.md) — semantic versioning policy and
   public API surface.
 
+### Changed
+
+- `AdvisoryDatabaseInterface` moved from `Audit\Infrastructure\Advisory\` to
+  `Audit\Domain\Port\`. The interface is a public extension point, so its
+  canonical home is the Domain port namespace alongside `LLMClientInterface`,
+  `AttackerCacheInterface`, etc. Host applications aliasing the interface in
+  `config/services.yaml` must update the FQCN; concrete implementations
+  (`ComposerAuditAdvisoryDatabase`, `InMemoryAdvisoryDatabase`) keep their
+  existing FQCNs in `Infrastructure\`.
+- Default model updated from `claude-opus-4-5` (retired) to `claude-opus-4-7`.
+- Default reviewer model updated from `claude-haiku-4-5` (retired) to
+  `claude-haiku-4-5-20251001`.
+- **Pricing table corrected**: Anthropic Claude 4 Opus prices were set to the
+  Claude 3 Opus rate (`$15.00 / $75.00` per MTok) — corrected to the actual
+  Claude 4 Opus rate (`$5.00 / $25.00` per MTok input/output). Haiku and Sonnet
+  entries unchanged. Existing cost estimates in CI reports will recalculate at
+  the correct rate once updated.
+- Pricing table extended with additional current and legacy model entries:
+  `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`,
+  `claude-opus-4-6`, `claude-opus-4-1`, `claude-opus-4` (deprecated alias),
+  `claude-sonnet-4` (deprecated alias), `gpt-4.1`, `o3`, `o4-mini`,
+  `gemini-2.0-flash`, `mistral-large`. Legacy `claude-opus-4-5` /
+  `claude-haiku-4-5` entries retained for cost reporting on existing
+  configurations.
+
 ### Fixed
 
 - Budget exceptions now rethrown from `AttackerAgent` so abort propagates to the
@@ -182,6 +217,11 @@ First stable release.
 - `RegexSecretScrubber` replaced `set_error_handler`/`try-finally` around PCRE
   calls with a leading `@` suppressor — eliminates `UnwrapFinally`/`TrueValue`
   mutation escapes and removes dead early-return path.
+- Non-transient LLM failures (missing platform configuration, auth errors,
+  retired model names) now abort the audit with exit code `1` and a clear error
+  message instead of silently producing a false-negative SAFE result. Introduced
+  `Audit\Domain\Exception\LLMProviderException` as the catchable Domain type;
+  `AttackerAgent` and `ReviewerAgent` rethrow it rather than swallowing it.
 
 ### Compatibility
 
@@ -200,5 +240,7 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.1.0]:
+  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.1.0
 [1.0.0]:
   https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.0.0

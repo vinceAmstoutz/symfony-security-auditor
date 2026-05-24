@@ -19,6 +19,7 @@ final readonly class LLMConfiguration
         private string $model,
         private ?string $attackerModelOverride,
         private ?string $reviewerModelOverride,
+        public bool $providerJsonMode = false,
     ) {}
 
     public function attackerModel(): string

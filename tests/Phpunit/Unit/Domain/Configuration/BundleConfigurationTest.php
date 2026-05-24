@@ -82,11 +82,42 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(50_000, $bundleConfiguration->budget->maxTokens);
     }
 
+    public function test_provider_json_mode_defaults_false_in_tree_output(): void
+    {
+        $bundleConfiguration = BundleConfiguration::fromArray($this->treeBuilderOutput());
+
+        self::assertFalse($bundleConfiguration->llm->providerJsonMode);
+    }
+
+    public function test_provider_json_mode_flows_through_when_enabled(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['provider_json_mode'] = true;
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertTrue($bundleConfiguration->llm->providerJsonMode);
+    }
+
+    public function test_from_array_tolerates_omitted_provider_json_mode_key_for_bc(): void
+    {
+        // BC guard: callers that built their array against the 1.0 shape (no
+        // provider_json_mode key) must keep working. fromArray must default
+        // the missing key to false rather than warning about an undefined index.
+        $config = $this->treeBuilderOutput();
+        unset($config['provider_json_mode']);
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertFalse($bundleConfiguration->llm->providerJsonMode);
+    }
+
     /**
      * @return array{
      *     model: string,
      *     attacker_model: string|null,
      *     reviewer_model: string|null,
+     *     provider_json_mode: bool,
      *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
      *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
@@ -98,6 +129,7 @@ final class BundleConfigurationTest extends TestCase
             'model' => 'claude-opus-4-7',
             'attacker_model' => null,
             'reviewer_model' => 'claude-haiku-4-5-20251001',
+            'provider_json_mode' => false,
             'scan' => [
                 'excluded_dirs' => ['legacy'],
                 'respect_gitignore' => true,

@@ -21,80 +21,135 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilder
 final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInterface
 {
     /**
+     * Skill-block emission order — by attack-surface priority, NOT alphabetical.
+     * The LLM weights earlier-in-context instructions more heavily (primacy), so
+     * higher-risk surfaces are listed first.
+     */
+    private const array SKILL_PRIORITY = [
+        'controller',
+        'voter',
+        'form',
+        'repository',
+        'entity',
+        'template',
+        'config',
+        'php',
+    ];
+
+    /**
      * Expert skill blocks injected into the system prompt when files of the matching
-     * ProjectFile::type() appear in the chunk. Each block is a focused, technical
-     * checklist of attack patterns specific to that artifact type. Keep them tight —
-     * the LLM rewards precision over volume.
+     * ProjectFile::type() appear in the chunk. Each block lists both attack patterns
+     * to hunt AND patterns explicitly NOT to flag, reducing false positives.
      *
      * @var array<string, string>
      */
     private const array SKILLS = [
         'controller' => <<<'SKILL'
-            ### Controller Specialist Skills
-            - Hunt for missing `denyAccessUnlessGranted()` / `#[IsGranted]` on state-changing or sensitive read actions.
-            - Inspect `ParamConverter` / `MapEntity` flows for IDOR: path id → entity fetch with no ownership check.
-            - Flag mass-assignment risks: form `->submit($request->request->all())` without `allow_extra_fields: false` controls or restricted setters.
-            - Check redirect targets and `RedirectResponse` arguments against open-redirect via user-controlled URLs.
-            - Inspect file-upload handlers: missing MIME validation, predictable upload paths, no content-type enforcement.
-            - Look for `Request::get()` / `getContent()` flowing into Doctrine raw queries, `exec`, `passthru`, `eval`, `unserialize`, `simplexml_load_string`.
+            <skills role="controller">
+            Hunt:
+            - Missing `denyAccessUnlessGranted()` / `#[IsGranted]` on state-changing or sensitive read actions.
+            - `ParamConverter` / `MapEntity` flows for IDOR: path id → entity fetch with no ownership check.
+            - Mass-assignment: form `->submit($request->request->all())` without `allow_extra_fields: false` or restricted setters.
+            - Redirect targets and `RedirectResponse` arguments against open-redirect via user-controlled URLs.
+            - File-upload handlers: missing MIME validation, predictable upload paths, no content-type enforcement.
+            - `Request::get()` / `getContent()` flowing into Doctrine raw queries, `exec`, `passthru`, `eval`, `unserialize`, `simplexml_load_string`.
+            Do NOT flag:
+            - Controllers inheriting `denyAccessUnlessGranted()` from a parent class or a `#[IsGranted]` attribute on the class itself.
+            - Routes restricted by `methods: ['POST']` plus a CSRF-protected form — the form covers the CSRF concern.
+            </skills>
             SKILL,
         'voter' => <<<'SKILL'
-            ### Voter Specialist Skills
-            - Verify `supports($attribute, $subject)` matches the attributes consumers actually pass (typo → silent allow).
-            - Check `voteOnAttribute()` default branch: returning `true` or implicit fallthrough is a critical bypass.
-            - Hunt for over-broad role shortcuts (`ROLE_SUPER_ADMIN` always allowed) without auditable trail.
-            - Inspect ownership checks for nullable / weak-typed comparisons (e.g. `==` on UUID strings, missing user object check).
-            - Flag voters that consult only `getRoles()` while the request requires per-resource attribute checks.
+            <skills role="voter">
+            Hunt:
+            - `supports($attribute, $subject)` mismatched with attributes consumers actually pass (typo → silent allow).
+            - `voteOnAttribute()` default branch returning `true` or implicit fallthrough — critical bypass.
+            - Over-broad role shortcuts (`ROLE_SUPER_ADMIN` always allowed) without auditable trail.
+            - Ownership checks with nullable / weak-typed comparisons (`==` on UUID strings, missing user object check).
+            - Voters consulting only `getRoles()` while the request requires per-resource attribute checks.
+            Do NOT flag:
+            - Voters that explicitly `return false` as the default — that is the secure-by-default pattern.
+            - Voters using `Security::isGranted('ROLE_USER')` after a positive ownership check.
+            </skills>
             SKILL,
         'entity' => <<<'SKILL'
-            ### Entity / Doctrine Specialist Skills
+            <skills role="entity">
+            Hunt:
             - Lifecycle callbacks (`#[PrePersist]`, `#[PreUpdate]`) calling unsanitized methods, command execution, or external HTTP.
             - Public setters on sensitive fields (`isAdmin`, `roles`, `passwordHash`) exposed via form normalization.
             - Custom Doctrine types using `convertToPHPValue` with `unserialize` or `eval`-equivalent.
             - DQL/QueryBuilder usage with string concatenation of request input — even inside the entity class.
-            - Boolean / enum coercion via Doctrine type juggling that lets attacker promote role string.
+            - Boolean / enum coercion via Doctrine type juggling that lets attacker promote a role string.
+            Do NOT flag:
+            - Public setters on non-sensitive fields (titles, descriptions) where the form `mapped: false` or constraints validate input.
+            - `#[ORM\Column]` with `nullable: true` — nullability is a schema concern, not a security one.
+            </skills>
             SKILL,
         'repository' => <<<'SKILL'
-            ### Repository Specialist Skills
+            <skills role="repository">
+            Hunt:
             - DQL/SQL injection via string concatenation in custom finder methods; absence of `setParameter()`.
             - Dynamic `ORDER BY` / `LIMIT` fed from request input — Doctrine does NOT parameterize these.
             - `NativeQuery` / `getConnection()->executeQuery()` with interpolated user input.
             - Methods exposing arbitrary criteria (`findBy(['role' => $userInput])`) where caller forgot to constrain values.
             - Subquery building that bypasses voters/filters applied at the controller layer.
+            Do NOT flag:
+            - QueryBuilder calls that use `setParameter()` for every user-controlled value — Doctrine binds those safely.
+            - `findOneBy([...])` / `findAll()` on non-sensitive entities; access control belongs to the voter, not the repository.
+            </skills>
             SKILL,
         'form' => <<<'SKILL'
-            ### Form Specialist Skills
-            - `'csrf_protection' => false` on forms processing state changes (only acceptable for stateless APIs with their own auth).
+            <skills role="form">
+            Hunt:
+            - `'csrf_protection' => false` on forms processing state changes (acceptable only for stateless APIs with their own auth).
             - `'allow_extra_fields' => true` enabling mass assignment of unmapped properties via setters.
             - `EntityType` choice queries unscoped by ownership — attacker can select any other tenant's row.
             - Data transformers that `unserialize` / `json_decode` raw input without strict mode.
             - Missing `'constraints'` on free-form fields that flow into the database or shell.
+            Do NOT flag:
+            - Forms with the default CSRF token (Symfony enables it by default — only explicit `false` is the smell).
+            - Fields declared `mapped: false` and re-validated by a constraint — those don't reach the entity setter.
+            </skills>
             SKILL,
         'template' => <<<'SKILL'
-            ### Twig Template Specialist Skills
+            <skills role="template">
+            Hunt:
             - `|raw` filter applied to variables originating from user input or untrusted DB content.
             - `autoescape` overridden to `false` or to a context that does not match the surrounding HTML/JS/URL context.
-            - `{{ include(user_input) }}` or `{% include %}` with dynamic template names — Server-Side Template Injection (SSTI) vector.
+            - `{{ include(user_input) }}` or `{% include %}` with dynamic template names — SSTI vector.
             - Inline JavaScript context (`<script>var x = {{ value }};`) without `|json_encode` — XSS via Twig.
             - URL attributes (`href`, `src`) built from user input without `|url_encode` and protocol whitelist (javascript:, data:).
+            Do NOT flag:
+            - Default `{{ value }}` interpolation — Twig auto-escapes for the active context.
+            - `|raw` on values originating from a `Markdown` / `Sanitize` transformation upstream — trust the sanitizer unless evidence shows otherwise.
+            </skills>
             SKILL,
         'config' => <<<'SKILL'
-            ### Configuration Specialist Skills
+            <skills role="config">
+            Hunt:
             - Hardcoded secrets, API keys, DSNs (look for `_KEY`, `_SECRET`, `_TOKEN`, `password:`, full DSN strings).
             - `security.firewalls` with `security: false` on protected paths, or `access_control` rules with overly broad path patterns.
             - `framework.session.cookie_secure: false` / `cookie_samesite: none` / missing `cookie_httponly` in non-test envs.
             - Dev-only routes (`_profiler`, `_wdt`) not gated by environment or IP allowlist.
             - `cors.allow_origin: '*'` combined with `allow_credentials: true` — credential leak.
             - Exposed services with public `true` that wrap dangerous primitives (filesystem, process, raw SQL).
+            Do NOT flag:
+            - Environment-variable references like `%env(DATABASE_URL)%` — those are externalized, not hardcoded.
+            - `_profiler` / `_wdt` declarations gated by `when@dev` / `when@test`.
+            </skills>
             SKILL,
         'php' => <<<'SKILL'
-            ### Generic PHP Service Specialist Skills
+            <skills role="php">
+            Hunt:
             - Symfony ExpressionLanguage / Security Expression evaluating strings derived from user input.
             - `HttpClientInterface` calls with user-controlled URL or host — SSRF; check for protocol & host allowlist.
             - `unserialize()` / `igbinary_unserialize()` on untrusted payloads (cache values, queue messages, request body).
             - `Process` / `proc_open` / `shell_exec` constructed with user input concatenation; no `escapeshellarg`.
             - PSR-3 logger sinks receiving raw request payloads without redaction (log injection, log forging).
             - Cryptography: `md5`/`sha1` for security purposes, `random_int` vs `rand`/`mt_rand`, hardcoded IVs/keys.
+            Do NOT flag:
+            - `md5`/`sha1` on non-security data (cache keys, ETags, file fingerprints) — those are integrity, not authentication.
+            - `Process` invocations with hardcoded argument arrays (`new Process(['ls', '-la'])`) — no shell interpolation occurs.
+            </skills>
             SKILL,
     ];
 
@@ -135,7 +190,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             {$noVoterList}
 
             ## Source Code
-            Analyze these files for exploitable vulnerabilities:
+            Analyze these files for exploitable vulnerabilities. Each line is prefixed with its line number (`NNN | code`) — use those exact numbers when populating `line_start` and `line_end`; do NOT count manually or guess.
 
             {$context}
 
@@ -187,6 +242,49 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             log_injection, path_traversal, ssrf, xxe, open_redirect, weak_cryptography, insecure_random,
             hardcoded_secret
 
+            Severity rubric (calibrate every finding against this scale — do NOT inflate severity for emphasis):
+            - critical: unauthenticated RCE, full authentication bypass, mass data exfiltration without auth, hardcoded production secret in a committed file.
+            - high: authenticated RCE, privilege escalation across tenants, IDOR exposing PII, SQL/DQL injection with a reachable sink, voter bypass on sensitive resources.
+            - medium: stored XSS in authenticated views, CSRF on state-changing actions, SSRF reaching internal services, weak crypto guarding non-public secrets.
+            - low: reflected XSS in low-impact contexts, information disclosure of non-sensitive metadata, weak crypto on already-public data, missing security headers.
+            - info: defense-in-depth opportunities, hardening suggestions, deprecated patterns with no current exploit path.
+
+            Confidence rubric (filtered downstream — entries below 0.6 are dropped before reviewer):
+            - 0.9-1.0: tainted source traced to dangerous sink with concrete payload.
+            - 0.7-0.89: clear vulnerable pattern matched, exploitation plausible without a full PoC.
+            - 0.6-0.69: pattern smell that needs reviewer adjudication.
+            - Below 0.6: do NOT report — it will be filtered and waste reviewer budget.
+
+            File-numbering protocol:
+            Each line of every source file is prefixed with `NNN | ` (line number, space, pipe, space). Populate `line_start` / `line_end` using those exact numbers — never count or estimate. If a finding spans a single line, set `line_end == line_start`.
+
+            Scope:
+            - Only report findings in the source files provided below. Ignore code under `vendor/`, `var/cache/`, `var/log/`, any path containing `.generated.` or `.cache.`, and obvious build artifacts.
+            - If a finding references code outside the provided chunk, set `confidence` no higher than 0.7 and explain the cross-file dependency in `attack_vector`.
+
+            Example finding (illustrative — do NOT echo this in your output):
+            Input file `src/Controller/InvoiceController.php`:
+              42 |     public function show(int $id, InvoiceRepository $repo): Response
+              43 |     {
+              44 |         $invoice = $repo->find($id);
+              45 |         return $this->render('invoice/show.html.twig', ['invoice' => $invoice]);
+              46 |     }
+            Expected JSON entry:
+            {
+              "type": "insecure_direct_object_reference",
+              "severity": "high",
+              "title": "IDOR on invoice show action",
+              "description": "The show() action fetches an Invoice by id without verifying that the current user owns it. Any authenticated user can view any invoice by changing the path parameter.",
+              "file_path": "src/Controller/InvoiceController.php",
+              "line_start": 42,
+              "line_end": 46,
+              "vulnerable_code": "$invoice = $repo->find($id);",
+              "attack_vector": "1. Authenticate as user A. 2. Browse to /invoice/{B's invoice id}. 3. Server returns the invoice without ownership check.",
+              "proof": "GET /invoice/9999 → 200 with another tenant's invoice payload.",
+              "remediation": "Add `$this->denyAccessUnlessGranted('VIEW', $invoice);` after fetch, or query the repository scoped to `$this->getUser()`.",
+              "confidence": 0.9
+            }
+
             Rules:
             - ONLY report REAL vulnerabilities with clear exploitation paths
             - Do NOT report theoretical issues without concrete evidence in the code
@@ -202,17 +300,17 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      */
     private function skillsForFiles(array $files): string
     {
-        $types = [];
-        foreach ($files as $file) {
-            $types[] = $file->type();
-        }
-
-        $types = array_unique($types);
-        sort($types);
+        // No need to deduplicate the type list — SKILL_PRIORITY drives the
+        // outer loop and only emits each priority type once, regardless of
+        // how many times it appears in $presentTypes.
+        $presentTypes = array_map(
+            static fn (ProjectFile $projectFile): string => $projectFile->type(),
+            $files,
+        );
 
         $blocks = [];
-        foreach ($types as $type) {
-            if (isset(self::SKILLS[$type])) {
+        foreach (self::SKILL_PRIORITY as $type) {
+            if (\in_array($type, $presentTypes, true)) {
                 $blocks[] = self::SKILLS[$type];
             }
         }
@@ -226,13 +324,24 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
         $parts = [];
         foreach ($files as $file) {
             $parts[] = \sprintf(
-                "### %s [%s]\n```php\n%s\n```",
+                "<file path=\"%s\" type=\"%s\">\n%s\n</file>",
                 $file->relativePath(),
                 $file->type(),
-                $file->content(),
+                $this->numberLines($file->content()),
             );
         }
 
         return implode("\n\n", $parts);
+    }
+
+    private function numberLines(string $content): string
+    {
+        $lines = explode("\n", $content);
+        $numbered = [];
+        foreach ($lines as $index => $line) {
+            $numbered[] = \sprintf('%3d | %s', $index + 1, $line);
+        }
+
+        return implode("\n", $numbered);
     }
 }

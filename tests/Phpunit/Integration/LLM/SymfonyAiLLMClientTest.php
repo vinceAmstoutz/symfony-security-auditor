@@ -155,6 +155,46 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(['type' => 'ephemeral'], $invocationOptionsCapture->options['cache_control']);
     }
 
+    public function test_complete_passes_provider_json_mode_response_format_when_enabled(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $inMemoryPlatform = new InMemoryPlatform(
+            /** @param array<string, mixed> $options */
+            static function (object $model, mixed $input, array $options) use ($invocationOptionsCapture): TextResult {
+                $invocationOptionsCapture->options ??= $options;
+
+                return new TextResult('out');
+            },
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', new NullLogger(), providerJsonMode: true);
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertSame(['type' => 'json_object'], $invocationOptionsCapture->options['response_format']);
+    }
+
+    public function test_complete_omits_response_format_when_provider_json_mode_disabled(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $inMemoryPlatform = new InMemoryPlatform(
+            /** @param array<string, mixed> $options */
+            static function (object $model, mixed $input, array $options) use ($invocationOptionsCapture): TextResult {
+                $invocationOptionsCapture->options ??= $options;
+
+                return new TextResult('out');
+            },
+        );
+
+        // Default constructor (no providerJsonMode) — option must be absent so providers
+        // that reject unknown keys keep working.
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', new NullLogger());
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertArrayNotHasKey('response_format', $invocationOptionsCapture->options);
+    }
+
     public function test_model_returns_configured_model_name(): void
     {
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform(''), 'claude-test', new NullLogger());

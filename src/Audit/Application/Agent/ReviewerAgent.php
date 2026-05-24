@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderExcep
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
@@ -270,22 +271,37 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         $accepted = (bool) ($review['accepted'] ?? false);
         $rawSeverity = $review['adjusted_severity'] ?? null;
         $adjustedSeverity = \is_string($rawSeverity) ? $rawSeverity : null;
+        $rawCorrectedType = $review['corrected_type'] ?? null;
+        $correctedType = \is_string($rawCorrectedType) ? $rawCorrectedType : null;
 
         $reviewed = $vulnerability->withReviewerValidation($accepted);
 
-        if (!$accepted || null === $adjustedSeverity) {
+        if (!$accepted) {
             $this->logReviewDecision($vulnerability, $accepted, $review);
 
             return $reviewed;
         }
 
-        try {
-            $severity = VulnerabilitySeverity::from($adjustedSeverity);
-            $reviewed = $reviewed->withElevatedSeverity($severity);
-        } catch (ValueError) {
-            $this->logger->debug('Reviewer returned invalid severity, keeping original', [
-                'adjusted_severity' => $adjustedSeverity,
-            ]);
+        if (null !== $adjustedSeverity) {
+            try {
+                $severity = VulnerabilitySeverity::from($adjustedSeverity);
+                $reviewed = $reviewed->withElevatedSeverity($severity);
+            } catch (ValueError) {
+                $this->logger->debug('Reviewer returned invalid severity, keeping original', [
+                    'adjusted_severity' => $adjustedSeverity,
+                ]);
+            }
+        }
+
+        if (null !== $correctedType) {
+            try {
+                $type = VulnerabilityType::from($correctedType);
+                $reviewed = $reviewed->withCorrectedType($type);
+            } catch (ValueError) {
+                $this->logger->debug('Reviewer returned invalid corrected_type, keeping original', [
+                    'corrected_type' => $correctedType,
+                ]);
+            }
         }
 
         $this->logReviewDecision($vulnerability, $accepted, $review);
