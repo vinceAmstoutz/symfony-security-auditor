@@ -20,17 +20,25 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
@@ -39,7 +47,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryA
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CharacterBasedTokenEstimator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\StaticPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
@@ -67,12 +83,55 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->instanceof(StageInterface::class)
         ->tag('symfony_security_auditor.pipeline_stage');
 
+    $defaultsConfigurator->set(TokenUsageRecorder::class);
+
+    $defaultsConfigurator->set(StaticPricingProvider::class)
+        ->args([service('logger')]);
+    $defaultsConfigurator->alias(PricingProviderInterface::class, StaticPricingProvider::class);
+
+    $defaultsConfigurator->set(CostCalculator::class)
+        ->args([service(PricingProviderInterface::class)]);
+
+    // `AuditBudget` is built in SymfonySecurityAuditorBundle::loadExtension() so the
+    // factory selection (unlimited/forTokens/forCost/forBoth) is explicit per config.
+
+    $defaultsConfigurator->set(BudgetTracker::class)
+        ->args([
+            service(AuditBudget::class),
+            service(CostCalculator::class),
+        ]);
+
+    $defaultsConfigurator->set(RetryPolicy::class)
+        ->args([
+            param('symfony_security_auditor.audit.retry.max_attempts'),
+            param('symfony_security_auditor.audit.retry.initial_delay_ms'),
+            param('symfony_security_auditor.audit.retry.backoff_multiplier'),
+            param('symfony_security_auditor.audit.retry.jitter_ratio'),
+        ]);
+
+    $defaultsConfigurator->set(TransientFailureClassifier::class);
+
+    $defaultsConfigurator->set(CharacterBasedTokenEstimator::class);
+    $defaultsConfigurator->alias(TokenEstimatorInterface::class, CharacterBasedTokenEstimator::class);
+
+    $defaultsConfigurator->set(UsleepSleeper::class);
+    $defaultsConfigurator->alias(SleeperInterface::class, UsleepSleeper::class);
+
+    $defaultsConfigurator->set(NullSecretScrubber::class);
+
+    $defaultsConfigurator->set(RegexSecretScrubber::class)
+        ->args([param('symfony_security_auditor.scan.secret_scrubbing.additional_patterns')]);
+    // `SecretScrubberInterface` alias is set in SymfonySecurityAuditorBundle::loadExtension()
+    // based on `scan.secret_scrubbing.enabled`.
+
     $defaultsConfigurator->set(ProjectFileScanner::class)
         ->args([
             service('logger'),
             param('symfony_security_auditor.scan.excluded_dirs'),
             param('symfony_security_auditor.scan.respect_gitignore'),
             param('symfony_security_auditor.scan.max_file_size_kb'),
+            null,
+            service(SecretScrubberInterface::class),
         ]);
     $defaultsConfigurator->alias(ProjectFileScannerInterface::class, ProjectFileScanner::class);
 
@@ -175,8 +234,24 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->alias(ReviewerAgentInterface::class, ReviewerAgent::class);
 
+    $defaultsConfigurator->set(EstimateAuditCostUseCase::class)
+        ->args([
+            service(ProjectFileScannerInterface::class),
+            service(TokenEstimatorInterface::class),
+            service(CostCalculator::class),
+            service('logger'),
+            param('symfony_security_auditor.attacker_model'),
+            param('symfony_security_auditor.audit.max_iterations'),
+        ]);
+
     $defaultsConfigurator->set(RunAuditUseCase::class)
-        ->args([service(PipelineInterface::class), service('logger')]);
+        ->args([
+            service(PipelineInterface::class),
+            service('logger'),
+            service(TokenUsageRecorder::class),
+            service(CostCalculator::class),
+            param('symfony_security_auditor.attacker_model'),
+        ]);
 
     $defaultsConfigurator->set(AuditCommand::class)
         ->args([
@@ -184,6 +259,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(ReportWriterInterface::class),
             service(AuditExitCodeResolverInterface::class),
             service(AuditPresenterInterface::class),
+            service(EstimateAuditCostUseCase::class),
         ])
         ->tag('console.command');
 };

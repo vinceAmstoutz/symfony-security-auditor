@@ -1,0 +1,358 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase;
+
+use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
+
+final class EstimateAuditCostUseCaseTest extends TestCase
+{
+    private string $tmpDir;
+
+    public function test_emits_zero_tokens_when_no_files_are_scanned(): void
+    {
+        // Pins: `$totalInputChars = 0` (vs -1), `mb_strlen` invocation,
+        // `str_repeat('x', 0)` returning empty string → estimator gets ''.
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 99),
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        // 0 chars → str_repeat('x', 0) === '' → estimator yields its base; here we use
+        // a fixed-output estimator that returns 99 regardless. So with 0 chars the
+        // estimator IS still called, but the input it receives is empty.
+        // Asserting on the output_tokens shape kills the -1 mutation: ceil(99 * 3 * 0.15) = 45.
+        self::assertSame(99 * 3, $auditReport->cost()->inputTokens());
+        self::assertSame(45, $auditReport->cost()->outputTokens());
+    }
+
+    public function test_multi_file_content_accumulates_via_addition(): void
+    {
+        // Pins: `+=` (vs `=`) — last file's length would otherwise override prior files.
+        $measuringTokenEstimator = $this->measuringEstimator();
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [
+                $this->makeProjectFile('a.php', '<?php // ten ch'),     // 15 chars
+                $this->makeProjectFile('b.php', '<?php /* 1 */'),       // 13 chars
+            ],
+            tokenEstimator: $measuringTokenEstimator,
+        );
+
+        $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(28, $measuringTokenEstimator->lastInputLength, 'estimator should see sum (15+13), not last file (13)');
+    }
+
+    public function test_multibyte_content_is_counted_via_mb_strlen_not_strlen(): void
+    {
+        // Pins: `mb_strlen` (vs `strlen`). One 3-byte UTF-8 character has
+        // mb_strlen=1 but strlen=3 — different scrub-down token counts.
+        $measuringTokenEstimator = $this->measuringEstimator();
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [
+                $this->makeProjectFile('m.php', '€€€'), // mb_strlen=3, strlen=9
+            ],
+            tokenEstimator: $measuringTokenEstimator,
+        );
+
+        $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(3, $measuringTokenEstimator->lastInputLength, 'mb_strlen of "€€€" is 3; strlen would be 9');
+    }
+
+    public function test_input_token_estimate_scales_with_max_iterations(): void
+    {
+        // Pins: `* maxIterations` (vs `/`). With perRoundTokens=10 and maxIterations=5,
+        // expected = 50; with division mutation, would be 2.
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 10),
+            maxIterations: 5,
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(50, $auditReport->cost()->inputTokens());
+    }
+
+    public function test_output_token_estimate_uses_ceil_of_output_ratio(): void
+    {
+        // Pins: `(int) ceil($input * $outputRatio)`. With input=100, ratio=0.155:
+        //   ceil(100 * 0.155) = ceil(15.5) = 16
+        //   floor(100 * 0.155) = 15
+        //   round(100 * 0.155) = 16  (banker's rounding gives 16 here)
+        //   ceil(100 / 0.155) ≈ 646
+        // Also pins `*` vs `/` for outputRatio.
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
+            maxIterations: 1,
+            outputRatio: 0.155,
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(100, $auditReport->cost()->inputTokens());
+        self::assertSame(16, $auditReport->cost()->outputTokens());
+    }
+
+    public function test_output_token_estimate_uses_ceil_not_floor(): void
+    {
+        // 100 * 0.21 = 21.0 exactly — floor=21, ceil=21, round=21. Useless to distinguish.
+        // Try 100 * 0.234 = 23.4 → ceil=24, floor=23, round=23. Picks ceil distinctly.
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
+            maxIterations: 1,
+            outputRatio: 0.234,
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(24, $auditReport->cost()->outputTokens());
+    }
+
+    public function test_estimate_input_is_str_repeat_x_of_total_chars(): void
+    {
+        // Pins: `str_repeat('x', $totalInputChars)` — if mutator unwraps to just 'x',
+        // the estimator receives a single character and produces a much smaller estimate.
+        $measuringTokenEstimator = $this->measuringEstimator();
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', str_repeat('a', 1000))],
+            tokenEstimator: $measuringTokenEstimator,
+        );
+
+        $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(1000, $measuringTokenEstimator->lastInputLength);
+    }
+
+    public function test_logs_starting_message_with_project_path_context(): void
+    {
+        // Pins: logger.info('Estimating ...', ['project' => $projectPath]) — both
+        // MethodCallRemoval (entire call gone) and ArrayItemRemoval (empty context).
+        $logCalls = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$logCalls): void {
+                $logCalls[] = [$msg, $ctx];
+            },
+        );
+
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 1),
+            logger: $logger,
+        );
+
+        $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        $startLogs = array_values(array_filter(
+            $logCalls,
+            static fn (array $entry): bool => 'Estimating audit cost (dry-run)' === $entry[0],
+        ));
+        self::assertCount(1, $startLogs);
+        self::assertSame($this->tmpDir, $startLogs[0][1]['project']);
+    }
+
+    public function test_logs_ready_message_with_estimate_breakdown(): void
+    {
+        // Pins: logger.info('Dry-run estimate ready', [...]) — both MethodCallRemoval
+        // and the ArrayItemRemoval for each context field.
+        $logCalls = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$logCalls): void {
+                $logCalls[] = [$msg, $ctx];
+            },
+        );
+
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [
+                $this->makeProjectFile('a.php', 'aaa'),
+                $this->makeProjectFile('b.php', 'bbb'),
+            ],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
+            logger: $logger,
+            maxIterations: 2,
+            outputRatio: 0.5,
+        );
+
+        $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        $readyLogs = array_values(array_filter(
+            $logCalls,
+            static fn (array $entry): bool => 'Dry-run estimate ready' === $entry[0],
+        ));
+        self::assertCount(1, $readyLogs);
+        $context = $readyLogs[0][1];
+        self::assertSame(2, $context['files']);
+        self::assertSame(200, $context['input_tokens']);
+        self::assertSame(100, $context['output_tokens']);
+        self::assertSame(0.0, $context['estimated_cost_usd']);
+    }
+
+    public function test_scanned_files_are_set_on_the_audit_context(): void
+    {
+        // Pins: `$auditContext->setProjectFiles($files)` — if removed, the resulting
+        // AuditReport's `filesScanned` would be 0 instead of the actual count.
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [
+                $this->makeProjectFile('a.php', 'a'),
+                $this->makeProjectFile('b.php', 'b'),
+                $this->makeProjectFile('c.php', 'c'),
+            ],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 1),
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(3, $auditReport->filesScanned());
+    }
+
+    public function test_primary_model_flows_through_to_audit_cost(): void
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 1),
+            primaryModel: 'claude-opus-4-7',
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame('claude-opus-4-7', $auditReport->cost()->primaryModel());
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     */
+    private function makeUseCase(
+        array $files,
+        TokenEstimatorInterface $tokenEstimator,
+        ?LoggerInterface $logger = null,
+        string $primaryModel = 'gpt-4o',
+        int $maxIterations = 3,
+        float $outputRatio = EstimateAuditCostUseCase::DEFAULT_OUTPUT_RATIO,
+    ): EstimateAuditCostUseCase {
+        $projectFileScanner = $this->fixedScanner($files);
+
+        return new EstimateAuditCostUseCase(
+            $projectFileScanner,
+            $tokenEstimator,
+            new CostCalculator($this->zeroPricing()),
+            $logger ?? new NullLogger(),
+            $primaryModel,
+            $maxIterations,
+            $outputRatio,
+        );
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     */
+    private function fixedScanner(array $files): ProjectFileScannerInterface
+    {
+        return new class($files) implements ProjectFileScannerInterface {
+            /** @param list<ProjectFile> $files */
+            public function __construct(private readonly array $files) {}
+
+            public function scan(string $projectPath): array
+            {
+                return $this->files;
+            }
+        };
+    }
+
+    private function fixedEstimator(int $perRoundTokens): TokenEstimatorInterface
+    {
+        return new class($perRoundTokens) implements TokenEstimatorInterface {
+            public function __construct(private readonly int $perRoundTokens) {}
+
+            public function estimateTokens(string $text, string $model): int
+            {
+                return $this->perRoundTokens;
+            }
+        };
+    }
+
+    /** Recording estimator — returns 0 but captures the length of the last input seen. */
+    private function measuringEstimator(): MeasuringTokenEstimator
+    {
+        return new MeasuringTokenEstimator();
+    }
+
+    private function zeroPricing(): PricingProviderInterface
+    {
+        return new class implements PricingProviderInterface {
+            public function pricePerMillionInputTokens(string $model): float
+            {
+                return 0.0;
+            }
+
+            public function pricePerMillionOutputTokens(string $model): float
+            {
+                return 0.0;
+            }
+
+            public function hasModel(string $model): bool
+            {
+                return true;
+            }
+        };
+    }
+
+    private function makeProjectFile(string $relative, string $content): ProjectFile
+    {
+        return ProjectFile::create($relative, $this->tmpDir.'/'.$relative, $content);
+    }
+
+    protected function setUp(): void
+    {
+        $this->tmpDir = sys_get_temp_dir().'/estimate_'.uniqid('', true);
+        mkdir($this->tmpDir, 0o777, true);
+    }
+
+    protected function tearDown(): void
+    {
+        if (is_dir($this->tmpDir)) {
+            rmdir($this->tmpDir);
+        }
+    }
+}
+
+/**
+ * Recording estimator — returns 0 but captures the length of the last input seen.
+ *
+ * @internal scoped to EstimateAuditCostUseCaseTest
+ */
+final class MeasuringTokenEstimator implements TokenEstimatorInterface
+{
+    public int $lastInputLength = -1;
+
+    public function estimateTokens(string $text, string $model): int
+    {
+        $this->lastInputLength = mb_strlen($text);
+
+        return 0;
+    }
+}

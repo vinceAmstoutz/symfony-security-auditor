@@ -112,18 +112,28 @@ ai:
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-5'
+    model: 'claude-opus-4-7'
 ```
 
 ### 6. Run
 
 ```bash
+# audit the current directory
+bin/console audit:run
+
+# or point at another project
 bin/console audit:run /path/to/your/symfony/project
 ```
 
 Want JSON or SARIF instead? Add `--format json --output report.json` or
 `--format sarif --output report.sarif`. See
 [CLI reference](docs/configuration.md#cli-reference).
+
+Estimate cost before running:
+
+```bash
+bin/console audit:run --dry-run
+```
 
 > [!WARNING]
 >
@@ -218,7 +228,7 @@ third-party packages.
 
 ## Example Output
 
-Console mode (truncated):
+### Console mode (truncated)
 
 ```text
 ══════════════════════════════════════════════════════════════════════
@@ -230,6 +240,8 @@ Console mode (truncated):
   Started : 2026-05-22 09:14:02
   Duration: 2m 31s
   Files   : 142 scanned
+  Tokens  : 48,210 in / 3,820 out (claude-opus-4-7)
+  Cost    : $0.3366 (estimated)
 
 ──────────────────────────────────────────────────────────────────────
   RISK LEVEL: HIGH  (Score: 34)
@@ -249,6 +261,40 @@ Console mode (truncated):
 
   ... (3 more findings)
 ```
+
+### `--dry-run` mode
+
+Scans files and estimates token usage and cost without calling the LLM. Use this
+to gauge cost before committing to a full audit.
+
+```bash
+bin/console audit:run --dry-run
+```
+
+```text
+══════════════════════════════════════════════════════════════════════
+  🔍 SYMFONY LLM AUDIT REPORT — AUDIT-b7e2f901
+  vinceamstoutz/symfony-security-auditor
+══════════════════════════════════════════════════════════════════════
+
+  Project : /var/www/my-app
+  Started : 2026-05-22 09:10:44
+  Duration: 0.0s
+  Files   : 142 scanned
+  Tokens  : ~52,400 in / ~4,200 out (claude-opus-4-7)  [estimate]
+  Cost    : $0.3670 (estimated)
+
+──────────────────────────────────────────────────────────────────────
+  RISK LEVEL: SAFE  (Score: 0)
+──────────────────────────────────────────────────────────────────────
+
+  ✅  No validated vulnerabilities found.
+
+
+ [OK] Estimate complete. No LLM calls were made.
+```
+
+No LLM calls are made; exit code is always `0`.
 
 JSON / SARIF formats are documented in
 [CLI Reference](docs/configuration.md#cli-reference) and

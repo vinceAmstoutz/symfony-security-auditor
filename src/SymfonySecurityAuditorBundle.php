@@ -21,14 +21,24 @@ use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
@@ -39,7 +49,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $definition->rootNode()
             ->children()
                 ->scalarNode('model')
-                    ->defaultValue('claude-opus-4-5')
+                    ->defaultValue('claude-opus-4-7')
                     ->info('Model name for both Attacker and Reviewer. Must be supported by the configured platform.')
                 ->end()
                 ->scalarNode('attacker_model')
@@ -66,6 +76,21 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->defaultValue(ProjectFileScanner::DEFAULT_MAX_FILE_SIZE_KB)
                             ->min(1)
                             ->info('Skip files larger than this size, in kilobytes.')
+                        ->end()
+                        ->arrayNode('secret_scrubbing')
+                            ->addDefaultsIfNotSet()
+                            ->info('Redact credential-shaped strings from file content before it reaches the LLM. Covers AWS/GitHub/Stripe/Slack/Google API keys, JWTs, PEM private keys, and env-style credential assignments.')
+                            ->children()
+                                ->booleanNode('enabled')
+                                    ->defaultTrue()
+                                    ->info('When true, file content is run through the configured scrubber before chunking. Default true — credentials in committed sample configs or .env.dist files would otherwise be sent verbatim to the LLM provider.')
+                                ->end()
+                                ->arrayNode('additional_patterns')
+                                    ->info('Extra PCRE patterns merged with the defaults. Use to redact project-specific tokens (e.g. internal API keys).')
+                                    ->scalarPrototype()->end()
+                                    ->defaultValue([])
+                                ->end()
+                            ->end()
                         ->end()
                     ->end()
                 ->end()
@@ -97,6 +122,48 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->min(1)
                             ->info('Maximum tool-call rounds per chunk before forcing the attacker to commit to a final answer. Bounds runaway tool use.')
                         ->end()
+                        ->arrayNode('budget')
+                            ->addDefaultsIfNotSet()
+                            ->info('Hard ceiling on cumulative LLM usage per audit run. Aborts the audit cleanly (exit code 2) with the partial report instead of running away on cost.')
+                            ->children()
+                                ->integerNode('max_tokens')
+                                    ->defaultNull()
+                                    ->min(1)
+                                    ->info('Maximum total tokens (input + output, across attacker + reviewer) before the audit aborts. `null` (default) = unlimited.')
+                                ->end()
+                                ->floatNode('max_cost_usd')
+                                    ->defaultNull()
+                                    ->info('Maximum estimated cost (USD) before the audit aborts. Computed via the configured `PricingProviderInterface`. `null` (default) = unlimited.')
+                                ->end()
+                            ->end()
+                        ->end()
+                        ->arrayNode('retry')
+                            ->addDefaultsIfNotSet()
+                            ->info('Bounded exponential-backoff retry around every LLM call. Transient failures (provider 429/5xx, network blips) are retried with jittered delays; non-transient failures (auth, validation) fail fast.')
+                            ->children()
+                                ->integerNode('max_attempts')
+                                    ->defaultValue(RetryPolicy::DEFAULT_MAX_ATTEMPTS)
+                                    ->min(1)
+                                    ->info('Total attempts per LLM call, including the first try. `1` disables retries.')
+                                ->end()
+                                ->integerNode('initial_delay_ms')
+                                    ->defaultValue(RetryPolicy::DEFAULT_INITIAL_DELAY_MS)
+                                    ->min(0)
+                                    ->info('Base delay (milliseconds) before the first retry. Subsequent retries multiply by `backoff_multiplier`.')
+                                ->end()
+                                ->floatNode('backoff_multiplier')
+                                    ->defaultValue(RetryPolicy::DEFAULT_BACKOFF_MULTIPLIER)
+                                    ->min(1.0)
+                                    ->info('Exponential growth factor between retries. With initial 500ms and multiplier 2.0, retries wait ~500, ~1000, ~2000 ms.')
+                                ->end()
+                                ->floatNode('jitter_ratio')
+                                    ->defaultValue(RetryPolicy::DEFAULT_JITTER_RATIO)
+                                    ->min(0.0)
+                                    ->max(1.0)
+                                    ->info('Jitter applied to each computed delay, as a fraction in `[0.0, 1.0]`. `0.2` means each delay varies within ±20% of the base.')
+                                ->end()
+                            ->end()
+                        ->end()
                     ->end()
                 ->end()
                 ->arrayNode('cache')
@@ -125,8 +192,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *     model: string,
      *     attacker_model: string|null,
      *     reviewer_model: string|null,
-     *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int},
-     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int},
+     *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
+     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * } $config
      */
@@ -134,51 +201,94 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     {
         $container->import('../config/services.php');
 
-        $attackerModel = $config['attacker_model'] ?? $config['model'];
-        $reviewerModel = $config['reviewer_model'] ?? $config['model'];
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
 
-        $builder->setParameter('symfony_security_auditor.attacker_model', (string) $attackerModel);
-        $builder->setParameter('symfony_security_auditor.reviewer_model', (string) $reviewerModel);
-        $builder->setParameter('symfony_security_auditor.scan.excluded_dirs', $config['scan']['excluded_dirs']);
-        $builder->setParameter('symfony_security_auditor.scan.respect_gitignore', $config['scan']['respect_gitignore']);
-        $builder->setParameter('symfony_security_auditor.scan.max_file_size_kb', $config['scan']['max_file_size_kb']);
-        $builder->setParameter('symfony_security_auditor.audit.max_iterations', $config['audit']['max_iterations']);
-        $builder->setParameter('symfony_security_auditor.audit.min_confidence', $config['audit']['min_confidence']);
-        $builder->setParameter('symfony_security_auditor.audit.reviewer_batch_size', $config['audit']['reviewer_batch_size']);
-        $builder->setParameter('symfony_security_auditor.audit.tools_enabled', $config['audit']['tools_enabled']);
-        $builder->setParameter('symfony_security_auditor.audit.max_tool_iterations', $config['audit']['max_tool_iterations']);
-        $builder->setParameter('symfony_security_auditor.cache.enabled', $config['cache']['enabled']);
-        $builder->setParameter('symfony_security_auditor.cache.dir', $config['cache']['dir']);
-        $builder->setParameter('symfony_security_auditor.cache.prompt_caching', $config['cache']['prompt_caching']);
+        $builder->setParameter('symfony_security_auditor.attacker_model', $bundleConfiguration->llm->attackerModel());
+        $builder->setParameter('symfony_security_auditor.reviewer_model', $bundleConfiguration->llm->reviewerModel());
+        $builder->setParameter('symfony_security_auditor.scan.excluded_dirs', $bundleConfiguration->scan->excludedDirs);
+        $builder->setParameter('symfony_security_auditor.scan.respect_gitignore', $bundleConfiguration->scan->respectGitignore);
+        $builder->setParameter('symfony_security_auditor.scan.max_file_size_kb', $bundleConfiguration->scan->maxFileSizeKb);
+        $builder->setParameter('symfony_security_auditor.scan.secret_scrubbing.enabled', $bundleConfiguration->scan->secretScrubbingEnabled);
+        $builder->setParameter('symfony_security_auditor.scan.secret_scrubbing.additional_patterns', $bundleConfiguration->scan->additionalScrubberPatterns);
+        $builder->setParameter('symfony_security_auditor.audit.max_iterations', $bundleConfiguration->audit->maxIterations);
+        $builder->setParameter('symfony_security_auditor.audit.min_confidence', $bundleConfiguration->audit->minConfidence);
+        $builder->setParameter('symfony_security_auditor.audit.reviewer_batch_size', $bundleConfiguration->audit->reviewerBatchSize);
+        $builder->setParameter('symfony_security_auditor.audit.tools_enabled', $bundleConfiguration->audit->toolsEnabled);
+        $builder->setParameter('symfony_security_auditor.audit.max_tool_iterations', $bundleConfiguration->audit->maxToolIterations);
+        $builder->setParameter('symfony_security_auditor.audit.budget.max_tokens', $bundleConfiguration->budget->maxTokens);
+        $builder->setParameter('symfony_security_auditor.audit.budget.max_cost_usd', $bundleConfiguration->budget->maxCostUsd);
+        $builder->setParameter('symfony_security_auditor.audit.retry.max_attempts', $bundleConfiguration->retry->maxAttempts);
+        $builder->setParameter('symfony_security_auditor.audit.retry.initial_delay_ms', $bundleConfiguration->retry->initialDelayMs);
+        $builder->setParameter('symfony_security_auditor.audit.retry.backoff_multiplier', $bundleConfiguration->retry->backoffMultiplier);
+        $builder->setParameter('symfony_security_auditor.audit.retry.jitter_ratio', $bundleConfiguration->retry->jitterRatio);
+        $builder->setParameter('symfony_security_auditor.cache.enabled', $bundleConfiguration->cache->enabled);
+        $builder->setParameter('symfony_security_auditor.cache.dir', $bundleConfiguration->cache->dir);
+        $builder->setParameter('symfony_security_auditor.cache.prompt_caching', $bundleConfiguration->cache->promptCaching);
 
         $services = $container->services();
+
+        $maxTokens = $bundleConfiguration->budget->maxTokens;
+        $maxCostUsd = $bundleConfiguration->budget->maxCostUsd;
+        if (null === $maxTokens && null === $maxCostUsd) {
+            $auditBudgetFactory = [AuditBudget::class, 'unlimited'];
+            $auditBudgetArgs = [];
+        } elseif (null !== $maxTokens && null !== $maxCostUsd) {
+            $auditBudgetFactory = [AuditBudget::class, 'forBoth'];
+            $auditBudgetArgs = [$maxTokens, $maxCostUsd];
+        } elseif (null !== $maxTokens) {
+            $auditBudgetFactory = [AuditBudget::class, 'forTokens'];
+            $auditBudgetArgs = [$maxTokens];
+        } else {
+            $auditBudgetFactory = [AuditBudget::class, 'forCost'];
+            $auditBudgetArgs = [$maxCostUsd];
+        }
+
+        $services->set(AuditBudget::class)
+            ->private()
+            ->factory($auditBudgetFactory)
+            ->args($auditBudgetArgs);
 
         $services->set('security_auditor.attacker_client', SymfonyAiLLMClient::class)
             ->private()
             ->args([
                 service(PlatformInterface::class),
-                $attackerModel,
+                $bundleConfiguration->llm->attackerModel(),
                 service('logger'),
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
-                $config['cache']['prompt_caching'],
+                $bundleConfiguration->cache->promptCaching,
+                service(TokenUsageRecorder::class),
+                service(RetryPolicy::class),
+                service(TransientFailureClassifier::class),
+                service(SleeperInterface::class),
+                service(BudgetTracker::class),
             ]);
 
         $services->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
             ->private()
             ->args([
                 service(PlatformInterface::class),
-                $reviewerModel,
+                $bundleConfiguration->llm->reviewerModel(),
                 service('logger'),
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
-                $config['cache']['prompt_caching'],
+                $bundleConfiguration->cache->promptCaching,
+                service(TokenUsageRecorder::class),
+                service(RetryPolicy::class),
+                service(TransientFailureClassifier::class),
+                service(SleeperInterface::class),
+                service(BudgetTracker::class),
             ]);
 
         $services->alias(LLMClientInterface::class, 'security_auditor.attacker_client');
 
-        $cacheServiceId = $config['cache']['enabled']
+        $cacheServiceId = $bundleConfiguration->cache->enabled
             ? FilesystemAttackerCache::class
             : NullAttackerCache::class;
         $services->alias(AttackerCacheInterface::class, $cacheServiceId);
+
+        $scrubberServiceId = $bundleConfiguration->scan->secretScrubbingEnabled
+            ? RegexSecretScrubber::class
+            : NullSecretScrubber::class;
+        $services->alias(SecretScrubberInterface::class, $scrubberServiceId);
 
         $services->alias(AdvisoryDatabaseInterface::class, ComposerAuditAdvisoryDatabase::class);
     }

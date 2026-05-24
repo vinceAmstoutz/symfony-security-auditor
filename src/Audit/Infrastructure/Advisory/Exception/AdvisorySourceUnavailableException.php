@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exc
 use RuntimeException;
 use Throwable;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final class AdvisorySourceUnavailableException extends RuntimeException
 {
     public static function forFailedProcess(string $projectPath, string $reason, ?Throwable $throwable = null): self

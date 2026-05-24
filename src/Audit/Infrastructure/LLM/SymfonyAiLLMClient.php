@@ -19,48 +19,45 @@ use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\MultiPartResult;
 use Symfony\AI\Platform\Result\ResultInterface;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
+use Symfony\AI\Platform\TokenUsage\TokenUsageInterface;
 use Symfony\AI\Platform\Tool\ExecutionReference;
 use Symfony\AI\Platform\Tool\Tool;
+use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 
-/**
- * Adapter: bridges our domain LLMClientInterface to symfony/ai's PlatformInterface.
- *
- * The platform is configured entirely via symfony/ai-bundle (config/packages/ai.yaml).
- * Developers choose their provider (Anthropic, OpenAI, Mistral, Ollama, Gemini, Azure …)
- * there; this class remains provider-agnostic.
- *
- * Token counts are set to zero here. For full token tracking, register a
- * Symfony\AI\Platform\Event\ResultEvent listener and read the token usage metadata.
- *
- * @internal not part of the BC promise — see docs/versioning.md
- */
+/** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class SymfonyAiLLMClient implements LLMClientInterface
 {
     public const float DEFAULT_TEMPERATURE = 0.0;
 
     public const bool DEFAULT_PROMPT_CACHING = false;
 
-    /**
-     * @param bool $promptCaching When true, opts into provider-side prompt caching by passing a
-     *                            `cache_control: ephemeral` flag through the symfony/ai options bag.
-     *                            Honored by Anthropic platform; silently ignored by providers that
-     *                            do not understand the key.
-     */
     public function __construct(
         private PlatformInterface $platform,
         private string $model,
         private LoggerInterface $logger,
         private float $temperature = self::DEFAULT_TEMPERATURE,
         private bool $promptCaching = self::DEFAULT_PROMPT_CACHING,
+        private ?TokenUsageRecorder $tokenUsageRecorder = null,
+        private ?RetryPolicy $retryPolicy = null,
+        private ?TransientFailureClassifier $transientFailureClassifier = null,
+        private ?SleeperInterface $sleeper = null,
+        private ?BudgetTracker $budgetTracker = null,
     ) {}
 
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
@@ -79,19 +76,27 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
 
         \assert('' !== $this->model, 'Model must be a non-empty string');
 
-        $content = $this->platform->invoke($this->model, $messageBag, $this->baseOptions())->asText();
+        $deferredResult = $this->invokeWithRetry($messageBag, $this->baseOptions());
+        $content = $deferredResult->asText();
+        [$inputTokens, $outputTokens] = $this->extractTokens($deferredResult);
 
         $this->logger->debug('symfony/ai platform responded', [
             'content_length' => \strlen($content),
+            'input_tokens' => $inputTokens,
+            'output_tokens' => $outputTokens,
         ]);
 
-        return LLMResponse::create(
+        $llmResponse = LLMResponse::create(
             content: $content,
-            inputTokens: 0,
-            outputTokens: 0,
+            inputTokens: $inputTokens,
+            outputTokens: $outputTokens,
             model: $this->model,
             stopReason: 'end_turn',
         );
+        $this->budgetTracker?->recordCall($llmResponse);
+        $this->budgetTracker?->assertWithinBudget();
+
+        return $llmResponse;
     }
 
     public function completeWithTools(
@@ -111,9 +116,25 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         $options['tools'] = $this->buildPlatformTools($toolRegistry->definitions());
 
         $iteration = 0;
+        $totalInputTokens = 0;
+        $totalOutputTokens = 0;
         while ($iteration < $maxToolIterations) {
-            $deferred = $this->platform->invoke($this->model, $messageBag, $options);
-            $platformResult = $deferred->getResult();
+            $deferredResult = $this->invokeWithRetry($messageBag, $options);
+            $platformResult = $deferredResult->getResult();
+            [$callInput, $callOutput] = $this->extractTokens($deferredResult);
+            $totalInputTokens += $callInput;
+            $totalOutputTokens += $callOutput;
+            if ($this->budgetTracker instanceof BudgetTracker) {
+                $this->budgetTracker->recordCall(LLMResponse::create(
+                    content: '',
+                    inputTokens: $callInput,
+                    outputTokens: $callOutput,
+                    model: $this->model,
+                    stopReason: 'tool_iteration',
+                ));
+                $this->budgetTracker->assertWithinBudget();
+            }
+
             $toolCalls = $this->extractToolCalls($platformResult);
 
             if ([] === $toolCalls) {
@@ -121,12 +142,14 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
                 $this->logger->debug('Tool-using loop ended with text response', [
                     'iterations' => $iteration,
                     'content_length' => \strlen($content),
+                    'input_tokens' => $totalInputTokens,
+                    'output_tokens' => $totalOutputTokens,
                 ]);
 
                 return LLMResponse::create(
                     content: $content,
-                    inputTokens: 0,
-                    outputTokens: 0,
+                    inputTokens: $totalInputTokens,
+                    outputTokens: $totalOutputTokens,
                     model: $this->model,
                     stopReason: 'end_turn',
                 );
@@ -148,12 +171,14 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
 
         $this->logger->warning('Tool-using loop hit iteration cap', [
             'max_iterations' => $maxToolIterations,
+            'input_tokens' => $totalInputTokens,
+            'output_tokens' => $totalOutputTokens,
         ]);
 
         return LLMResponse::create(
             content: '',
-            inputTokens: 0,
-            outputTokens: 0,
+            inputTokens: $totalInputTokens,
+            outputTokens: $totalOutputTokens,
             model: $this->model,
             stopReason: 'max_tool_iterations',
         );
@@ -197,6 +222,60 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         return '';
     }
 
+    /** @param array<string, mixed> $options */
+    private function invokeWithRetry(MessageBag $messageBag, array $options): DeferredResult
+    {
+        $retryPolicy = $this->retryPolicy ?? new RetryPolicy();
+        $classifier = $this->transientFailureClassifier ?? new TransientFailureClassifier();
+        $sleeper = $this->sleeper ?? new UsleepSleeper();
+
+        \assert('' !== $this->model, 'Model must be a non-empty string');
+
+        $maxAttempts = $retryPolicy->maxAttempts();
+        $attempt = 1;
+        while (true) {
+            try {
+                return $this->platform->invoke($this->model, $messageBag, $options);
+            } catch (Throwable $throwable) {
+                if (!$classifier->isTransient($throwable)) {
+                    throw NonTransientLLMFailureException::from($throwable);
+                }
+
+                if ($attempt >= $maxAttempts) {
+                    throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $throwable);
+                }
+
+                $delay = $classifier->isRateLimit($throwable)
+                    ? $retryPolicy->rateLimitDelayMs($attempt)
+                    : $retryPolicy->delayMs($attempt);
+                $this->logger->warning('LLM call failed, retrying after backoff', [
+                    'attempt' => $attempt,
+                    'max_attempts' => $maxAttempts,
+                    'delay_ms' => $delay,
+                    'error' => $throwable->getMessage(),
+                ]);
+                $sleeper->sleep($delay);
+                ++$attempt;
+            }
+        }
+    }
+
+    /** @return array{0: int, 1: int} */
+    private function extractTokens(DeferredResult $deferredResult): array
+    {
+        $metadata = $deferredResult->getMetadata()->all();
+        $tokenUsage = $metadata['token_usage'] ?? null;
+        if (!$tokenUsage instanceof TokenUsageInterface) {
+            return [0, 0];
+        }
+
+        $inputTokens = $tokenUsage->getPromptTokens() ?? 0;
+        $outputTokens = $tokenUsage->getCompletionTokens() ?? 0;
+        $this->tokenUsageRecorder?->record($inputTokens, $outputTokens);
+
+        return [$inputTokens, $outputTokens];
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -229,9 +308,6 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
     }
 
     /**
-     * Coerces our open-shaped JSON Schema (array<string, mixed>) to the
-     * symfony/ai Tool parameters shape. Missing fields are filled with safe defaults.
-     *
      * @param array<string, mixed> $schema
      *
      * @return array{type: 'object', properties: array<string, array{type: string, description: string}>, required: list<string>, additionalProperties: false}

@@ -4,7 +4,7 @@
 # Trade-off: lower recall, no cross-file investigation, no live CVE lookups.
 # Drop in as: config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    model: 'claude-haiku-4-5'
+    model: 'claude-haiku-4-5-20251001'
 
     scan:
         respect_gitignore: true

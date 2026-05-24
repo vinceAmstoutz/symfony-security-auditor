@@ -64,18 +64,19 @@ src/
     Domain/          # Pure PHP — no framework, no I/O
       Model/         # Value objects and enums (Vulnerability, AuditReport, …)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)
-      Port/          # Cross-layer ports (LLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface)
+      Port/          # Cross-layer ports (LLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface)
         Tool/        # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
     Application/     # Orchestration — no I/O, depends only on Domain
-      UseCase/       # RunAuditUseCase (entry point)
+      UseCase/       # RunAuditUseCase, EstimateAuditCostUseCase (entry points)
       Pipeline/      # AuditPipeline + IngestionStage, MappingStage, AuditStage
       Agent/         # AttackerAgent, ReviewerAgent, AuditOrchestrator, VulnerabilityFactory
     Infrastructure/  # I/O adapters
-      LLM/           # SymfonyAiLLMClient adapter (implements Domain/Port/LLMClientInterface)
-      FileSystem/    # ProjectFileScanner
+      LLM/           # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier, CharacterBasedTokenEstimator, Delay/
+      FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
       Prompt/        # AttackerPromptBuilder, ReviewerPromptBuilder
       Cache/         # FilesystemAttackerCache, NullAttackerCache
       Advisory/      # AdvisoryDatabaseInterface + ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase (fallback), SymfonyProcessComposerAuditRunner
+      Pricing/       # StaticPricingProvider
       Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory
       Report/        # ReportRenderer (+ Template/*.txt stubs)
   Command/           # AuditCommand (Symfony Console: audit:run) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, OutputFormat enum
@@ -123,15 +124,15 @@ Minimal:
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-5'
+    model: 'claude-opus-4-7'
 ```
 
 Split-model (larger attacker, faster reviewer):
 
 ```yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-5'
-    reviewer_model: 'claude-haiku-4-5'
+    attacker_model: 'claude-opus-4-7'
+    reviewer_model: 'claude-haiku-4-5-20251001'
 ```
 
 Swapping LLM providers requires only `config/packages/ai.yaml` changes — no code

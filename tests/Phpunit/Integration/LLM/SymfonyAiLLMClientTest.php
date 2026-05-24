@@ -17,6 +17,7 @@ use Closure;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use RuntimeException;
 use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\MessageInterface;
@@ -34,11 +35,23 @@ use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
 use Symfony\AI\Platform\Test\InMemoryPlatform;
+use Symfony\AI\Platform\TokenUsage\TokenUsage;
 use Symfony\AI\Platform\Tool\Tool;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 
 final class SymfonyAiLLMClientTest extends TestCase
 {
@@ -471,6 +484,513 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([], $parameters['required']);
     }
 
+    public function test_complete_populates_input_and_output_tokens_from_platform_metadata(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('done'),
+            new TokenUsage(promptTokens: 120, completionTokens: 30),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+        );
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame(120, $llmResponse->inputTokens());
+        self::assertSame(30, $llmResponse->outputTokens());
+        self::assertSame(150, $llmResponse->totalTokens());
+        self::assertSame(120, $tokenUsageRecorder->snapshot()->inputTokens());
+        self::assertSame(30, $tokenUsageRecorder->snapshot()->outputTokens());
+    }
+
+    public function test_complete_returns_zero_tokens_when_platform_metadata_omits_token_usage(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $platform = $this->scriptedPlatform([new TextResult('done')]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+        );
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame(0, $llmResponse->inputTokens());
+        self::assertSame(0, $llmResponse->outputTokens());
+        self::assertSame(0, $tokenUsageRecorder->snapshot()->totalTokens());
+    }
+
+    public function test_complete_returns_zero_tokens_when_token_usage_prompt_and_completion_are_null(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('done'),
+            new TokenUsage(),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+        );
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame(0, $llmResponse->inputTokens());
+        self::assertSame(0, $llmResponse->outputTokens());
+        self::assertSame(0, $tokenUsageRecorder->snapshot()->totalTokens());
+    }
+
+    public function test_consecutive_complete_calls_accumulate_in_shared_recorder(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $attackerPlatform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('one'),
+            new TokenUsage(promptTokens: 50, completionTokens: 10),
+        );
+        $reviewerPlatform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('two'),
+            new TokenUsage(promptTokens: 30, completionTokens: 5),
+        );
+        $clientOne = new SymfonyAiLLMClient($attackerPlatform, 'attacker', new NullLogger(), tokenUsageRecorder: $tokenUsageRecorder);
+        $clientTwo = new SymfonyAiLLMClient($reviewerPlatform, 'reviewer', new NullLogger(), tokenUsageRecorder: $tokenUsageRecorder);
+
+        $clientOne->complete('sys', 'usr');
+        $clientTwo->complete('sys', 'usr');
+
+        $snapshot = $tokenUsageRecorder->snapshot();
+        self::assertSame(80, $snapshot->inputTokens());
+        self::assertSame(15, $snapshot->outputTokens());
+    }
+
+    public function test_complete_with_tools_aborts_mid_loop_when_budget_exceeded(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $tool = $this->makeTool('echo', 'echo', static fn (): string => 'echoed');
+        $toolCall = new ToolCall('call-1', 'echo', []);
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            results: [new ToolCallResult([$toolCall]), new TextResult('should-not-reach')],
+            tokenUsages: [
+                new TokenUsage(promptTokens: 200, completionTokens: 0),
+                new TokenUsage(promptTokens: 200, completionTokens: 0),
+            ],
+        );
+        $budgetTracker = new BudgetTracker(
+            AuditBudget::forTokens(100),
+            new CostCalculator($this->stubPricing(0.0, 0.0)),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+            budgetTracker: $budgetTracker,
+        );
+
+        $this->expectException(BudgetExceededException::class);
+        $this->expectExceptionMessage('token budget exceeded (200 / 100 tokens)');
+
+        $symfonyAiLLMClient->completeWithTools(
+            'sys',
+            'usr',
+            new ToolRegistry([$tool], new NullLogger()),
+            5,
+        );
+    }
+
+    public function test_complete_records_budget_call_and_aborts_when_exceeded(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('done'),
+            new TokenUsage(promptTokens: 500, completionTokens: 0),
+        );
+        $budgetTracker = new BudgetTracker(
+            AuditBudget::forTokens(100),
+            new CostCalculator($this->stubPricing(0.0, 0.0)),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+            budgetTracker: $budgetTracker,
+        );
+
+        $this->expectException(BudgetExceededException::class);
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+    }
+
+    private function stubPricing(float $inputPrice, float $outputPrice): PricingProviderInterface
+    {
+        return new class($inputPrice, $outputPrice) implements PricingProviderInterface {
+            public function __construct(
+                private readonly float $inputPrice,
+                private readonly float $outputPrice,
+            ) {}
+
+            public function pricePerMillionInputTokens(string $model): float
+            {
+                return $this->inputPrice;
+            }
+
+            public function pricePerMillionOutputTokens(string $model): float
+            {
+                return $this->outputPrice;
+            }
+
+            public function hasModel(string $model): bool
+            {
+                return true;
+            }
+        };
+    }
+
+    public function test_complete_with_tools_accumulates_tokens_across_iterations(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $toolCall = new ToolCall('call-1', 'echo', []);
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            results: [new ToolCallResult([$toolCall]), new TextResult('finished')],
+            tokenUsages: [
+                new TokenUsage(promptTokens: 40, completionTokens: 10),
+                new TokenUsage(promptTokens: 60, completionTokens: 5),
+            ],
+        );
+        $tool = $this->makeTool('echo', 'echo', static fn (): string => 'echoed');
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+        );
+
+        $llmResponse = $symfonyAiLLMClient->completeWithTools(
+            'sys',
+            'usr',
+            new ToolRegistry([$tool], new NullLogger()),
+            5,
+        );
+
+        self::assertSame(100, $llmResponse->inputTokens());
+        self::assertSame(15, $llmResponse->outputTokens());
+        self::assertSame(100, $tokenUsageRecorder->snapshot()->inputTokens());
+        self::assertSame(15, $tokenUsageRecorder->snapshot()->outputTokens());
+    }
+
+    /**
+     * @param ResultInterface|list<ResultInterface> $results
+     * @param TokenUsage|list<TokenUsage>           $tokenUsages
+     */
+    private function scriptedPlatformWithTokenUsage(
+        ResultInterface|array $results = new TextResult(''),
+        TokenUsage|array $tokenUsages = new TokenUsage(),
+    ): PlatformInterface {
+        $resultList = $results instanceof ResultInterface ? [$results] : $results;
+        $tokenUsageList = $tokenUsages instanceof TokenUsage ? [$tokenUsages] : $tokenUsages;
+
+        return new class($resultList, $tokenUsageList) implements PlatformInterface {
+            /**
+             * @param list<ResultInterface> $results
+             * @param list<TokenUsage>      $tokenUsages
+             */
+            public function __construct(
+                private array $results,
+                private array $tokenUsages,
+            ) {}
+
+            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                $result = array_shift($this->results) ?? new TextResult('exhausted');
+                $tokenUsage = array_shift($this->tokenUsages);
+                $deferredResult = new DeferredResult(
+                    new PlainConverter($result),
+                    new InMemoryRawResult(['text' => ''], [], (object) []),
+                    $options,
+                );
+                if ($tokenUsage instanceof TokenUsage) {
+                    $deferredResult->getMetadata()->add('token_usage', $tokenUsage);
+                }
+
+                return $deferredResult;
+            }
+
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+    }
+
+    public function test_complete_retries_transient_failures_and_succeeds(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new TextResult('finally ok'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 10,
+                backoffMultiplier: 2.0,
+                jitterRatio: 0.0,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+        );
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame('finally ok', $llmResponse->content());
+        self::assertSame([10, 20], $fakeSleeper->durations);
+    }
+
+    public function test_complete_throws_transient_failure_after_exhausting_attempts(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new RuntimeException('HTTP 503 Service Unavailable'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 10,
+                backoffMultiplier: 2.0,
+                jitterRatio: 0.0,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+        );
+
+        $this->expectException(TransientLLMFailureException::class);
+        $this->expectExceptionMessage('LLM call failed after 3 transient retries');
+
+        try {
+            $symfonyAiLLMClient->complete('sys', 'usr');
+        } finally {
+            // Final attempt does not sleep — only retries-before-attempts do.
+            self::assertSame([10, 20], $fakeSleeper->durations);
+        }
+    }
+
+    public function test_complete_logs_warning_with_full_context_when_retrying_transient_failure(): void
+    {
+        /** @var list<array{string, array<string, mixed>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 first failure message'),
+            new TextResult('recovered'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            $logger,
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 50,
+                backoffMultiplier: 2.0,
+                jitterRatio: 0.0,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: new FakeSleeper(),
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertCount(1, $warnings);
+        self::assertSame('LLM call failed, retrying after backoff', $warnings[0][0]);
+        $context = $warnings[0][1];
+        self::assertSame(1, $context['attempt']);
+        self::assertSame(3, $context['max_attempts']);
+        self::assertSame(50, $context['delay_ms']);
+        self::assertSame('HTTP 503 first failure message', $context['error']);
+    }
+
+    public function test_complete_logs_one_warning_per_intermediate_attempt_no_warning_on_last(): void
+    {
+        /** @var list<array{string, array<string, mixed>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503'),
+            new RuntimeException('HTTP 503'),
+            new RuntimeException('HTTP 503'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            $logger,
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 10,
+                backoffMultiplier: 2.0,
+                jitterRatio: 0.0,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: new FakeSleeper(),
+        );
+
+        try {
+            $symfonyAiLLMClient->complete('sys', 'usr');
+            self::fail('Expected TransientLLMFailureException');
+        } catch (TransientLLMFailureException) {
+            self::assertCount(2, $warnings);
+            self::assertSame(1, $warnings[0][1]['attempt']);
+            self::assertSame(2, $warnings[1][1]['attempt']);
+        }
+    }
+
+    public function test_complete_does_not_retry_non_transient_failures(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 401 Unauthorized: invalid api key'),
+            new TextResult('should-not-reach'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(maxAttempts: 5, jitterSource: static fn (): float => 0.5),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+        );
+
+        $this->expectException(NonTransientLLMFailureException::class);
+        $this->expectExceptionMessage('LLM call failed with non-transient error');
+
+        try {
+            $symfonyAiLLMClient->complete('sys', 'usr');
+        } finally {
+            self::assertSame([], $fakeSleeper->durations);
+        }
+    }
+
+    public function test_complete_uses_rate_limit_delay_for_429_errors(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 429 Rate limit exceeded'),
+            new TextResult('recovered after rate limit'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 500,
+                jitterRatio: 0.0,
+                rateLimitInitialDelayMs: 60_000,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame([60_000], $fakeSleeper->durations);
+    }
+
+    public function test_complete_uses_regular_delay_for_non_rate_limit_transient_errors(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new TextResult('recovered'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 500,
+                jitterRatio: 0.0,
+                rateLimitInitialDelayMs: 60_000,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame([500], $fakeSleeper->durations);
+    }
+
+    /**
+     * @param list<ResultInterface|RuntimeException> $scriptedResultsOrErrors
+     */
+    private function flakyPlatform(array $scriptedResultsOrErrors): PlatformInterface
+    {
+        return new class($scriptedResultsOrErrors) implements PlatformInterface {
+            /** @var list<ResultInterface|RuntimeException> */
+            private array $remaining;
+
+            /** @param list<ResultInterface|RuntimeException> $scriptedResultsOrErrors */
+            public function __construct(array $scriptedResultsOrErrors)
+            {
+                $this->remaining = $scriptedResultsOrErrors;
+            }
+
+            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                $next = array_shift($this->remaining);
+                if ($next instanceof RuntimeException) {
+                    throw $next;
+                }
+
+                $result = $next ?? new TextResult('exhausted');
+
+                return new DeferredResult(
+                    new PlainConverter($result),
+                    new InMemoryRawResult(['text' => ''], [], (object) []),
+                    $options,
+                );
+            }
+
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+    }
+
     /**
      * @param list<ResultInterface> $scriptedResults
      */
@@ -590,4 +1110,15 @@ final class PlatformInvocationLog
 
     /** @var list<list<MessageInterface>> */
     public array $messageSnapshots = [];
+}
+
+final class FakeSleeper implements SleeperInterface
+{
+    /** @var list<int> */
+    public array $durations = [];
+
+    public function sleep(int $milliseconds): void
+    {
+        $this->durations[] = $milliseconds;
+    }
 }

@@ -35,6 +35,9 @@ final class AuditCommandInput
     #[Option(description: 'Output file path (for json or sarif format)', shortcut: 'o')]
     public ?string $output = null;
 
+    #[Option(description: 'Estimate token usage and cost without invoking the LLM; emits a report with zero vulnerabilities and an estimated cost block.')]
+    public bool $dryRun = false;
+
     /**
      * @param ?callable(): (string|false) $cwdResolver defaults to PHP's getcwd; tests inject a stub
      */

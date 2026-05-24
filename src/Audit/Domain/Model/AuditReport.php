@@ -21,6 +21,8 @@ final readonly class AuditReport
     /** @var list<Vulnerability> */
     private array $vulnerabilities;
 
+    private AuditCost $auditCost;
+
     /**
      * @param list<array{stage: string, file: string, status: string}> $coverage
      */
@@ -31,12 +33,14 @@ final readonly class AuditReport
         private DateTimeImmutable $completedAt,
         private int $filesScanned,
         private array $coverage,
+        ?AuditCost $auditCost,
         Vulnerability ...$vulnerabilities,
     ) {
         $this->vulnerabilities = array_values($vulnerabilities);
+        $this->auditCost = $auditCost ?? AuditCost::zero('');
     }
 
-    public static function fromContext(AuditContext $auditContext): self
+    public static function fromContext(AuditContext $auditContext, ?AuditCost $auditCost = null): self
     {
         return new self(
             $auditContext->auditId(),
@@ -45,6 +49,7 @@ final readonly class AuditReport
             new DateTimeImmutable(),
             \count($auditContext->projectFiles()),
             $auditContext->coverage(),
+            $auditCost,
             ...$auditContext->validatedVulnerabilities(),
         );
     }
@@ -72,6 +77,11 @@ final readonly class AuditReport
     public function filesScanned(): int
     {
         return $this->filesScanned;
+    }
+
+    public function cost(): AuditCost
+    {
+        return $this->auditCost;
     }
 
     /**
@@ -164,6 +174,7 @@ final readonly class AuditReport
                 static fn (Vulnerability $vulnerability): array => $vulnerability->toArray(),
                 $this->vulnerabilities,
             ),
+            'cost' => $this->auditCost->toArray(),
             'coverage' => $this->coverage,
         ];
     }

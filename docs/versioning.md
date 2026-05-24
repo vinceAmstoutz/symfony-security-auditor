@@ -32,9 +32,13 @@ Every key under `symfony_security_auditor:` documented in
 [`docs/configuration.md`](configuration.md):
 
 - `model`, `attacker_model`, `reviewer_model`
-- `scan.excluded_dirs`, `scan.respect_gitignore`, `scan.max_file_size_kb`
+- `scan.excluded_dirs`, `scan.respect_gitignore`, `scan.max_file_size_kb`,
+  `scan.secret_scrubbing.enabled`, `scan.secret_scrubbing.additional_patterns`
 - `audit.max_iterations`, `audit.min_confidence`, `audit.reviewer_batch_size`,
-  `audit.tools_enabled`, `audit.max_tool_iterations`
+  `audit.tools_enabled`, `audit.max_tool_iterations`,
+  `audit.retry.max_attempts`, `audit.retry.initial_delay_ms`,
+  `audit.retry.backoff_multiplier`, `audit.retry.jitter_ratio`,
+  `audit.budget.max_tokens`, `audit.budget.max_cost_usd`
 - `cache.enabled`, `cache.dir`, `cache.prompt_caching`
 
 Default values for these keys are also part of the contract. Changing a default
@@ -49,6 +53,8 @@ is a `MAJOR` change.
 - Exit codes (see [CLI Reference → Exit codes](configuration.md#exit-codes)):
   - `0` — audit completed; risk level is `SAFE`, `LOW`, `MEDIUM`, or `HIGH`.
   - `1` — risk level is `CRITICAL`, or the audit itself failed.
+  - `2` — audit aborted because the configured token or cost budget was exceeded
+    (partial report still emitted).
 
 ### Output schemas
 
@@ -69,6 +75,14 @@ overriding the alias in `config/services.yaml` is a supported integration path:
 - `AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`
 - `ProjectFileScannerInterface`
 - `AttackerCacheInterface`
+- `SecretScrubberInterface`
+- `PricingProviderInterface`
+- `TokenEstimatorInterface`
+- Configuration value objects in `Audit\Domain\Configuration\*`
+  (BundleConfiguration and per-layer VOs)
+- Domain models: `AuditBudget`, `AuditCost`, `TokenUsageSnapshot`
+- Domain exceptions: `LLMProviderException` (signals non-transient platform
+  failure; callers may catch this to detect misconfigured or retired models)
 - `Tool\ToolInterface`, `Tool\ToolRegistryFactoryInterface`
 - `Pipeline\PipelineInterface`, `Pipeline\StageInterface`,
   `Pipeline\CoverageRecorderInterface`

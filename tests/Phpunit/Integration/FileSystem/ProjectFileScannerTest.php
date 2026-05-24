@@ -19,10 +19,16 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 
 final class ProjectFileScannerTest extends TestCase
 {
+    // Split via constant so neither CS Fixer's `no_useless_concat_operator`
+    // nor GitHub's secret scanner sees a contiguous credential-shaped string.
+    private const string STRIPE_LIVE_PREFIX = 'sk_live';
+
     private string $tmpDir;
 
     private ProjectFileScanner $projectFileScanner;
@@ -259,6 +265,52 @@ final class ProjectFileScannerTest extends TestCase
 
         self::assertCount(1, $files);
         self::assertSame('src/Small.php', $files[0]->relativePath());
+    }
+
+    public function test_it_scrubs_secrets_from_file_content_when_scrubber_is_injected(): void
+    {
+        $stripeShape = self::STRIPE_LIVE_PREFIX.'_4eC39HqLyjWDarjtT1zdp7dc';
+
+        mkdir($this->tmpDir.'/config', 0o777, true);
+        file_put_contents(
+            $this->tmpDir.'/config/.env.dist',
+            "APP_ENV=dev\nSTRIPE_SECRET_KEY=".$stripeShape."\n",
+        );
+        file_put_contents(
+            $this->tmpDir.'/config/secrets.yaml',
+            "stripe:\n    key: ".$stripeShape."\n",
+        );
+
+        // .env.dist is not in the scanner's tracked extensions, but secrets.yaml is.
+        $projectFileScanner = new ProjectFileScanner(
+            new NullLogger(),
+            secretScrubber: new RegexSecretScrubber(),
+        );
+
+        $files = $projectFileScanner->scan($this->tmpDir);
+
+        self::assertNotEmpty($files);
+        foreach ($files as $file) {
+            self::assertStringNotContainsString($stripeShape, $file->content());
+        }
+    }
+
+    public function test_null_scrubber_leaves_file_content_unmodified(): void
+    {
+        $stripeShape = self::STRIPE_LIVE_PREFIX.'_4eC39HqLyjWDarjtT1zdp7dc';
+        mkdir($this->tmpDir.'/config', 0o777, true);
+        $original = "stripe:\n    key: ".$stripeShape."\n";
+        file_put_contents($this->tmpDir.'/config/secrets.yaml', $original);
+
+        $projectFileScanner = new ProjectFileScanner(
+            new NullLogger(),
+            secretScrubber: new NullSecretScrubber(),
+        );
+
+        $files = $projectFileScanner->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertSame($original, $files[0]->content());
     }
 
     public function test_it_logs_warning_and_skips_files_whose_contents_cannot_be_read(): void

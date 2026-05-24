@@ -18,6 +18,8 @@ use Symfony\Component\Console\Attribute\MapInput;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 
 #[AsCommand(
@@ -37,6 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCa
         Exit codes:
           <info>0</info>  audit completed; risk level is SAFE, LOW, MEDIUM, or HIGH
           <info>1</info>  audit completed with CRITICAL risk level, or the audit itself failed
+          <info>2</info>  audit aborted because the configured token or cost budget was exceeded (partial report still emitted)
 
         Cost & duration: a typical Symfony project (~150 files) takes minutes, not seconds,
         and costs a few cents to a few dollars depending on the selected model. Configure
@@ -48,6 +51,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCa
           Versioning    : <info>docs/versioning.md</info>
         HELP,
 )]
+/** @internal not part of the BC promise — the command *name* (`audit:run`) and its CLI surface are public, but the PHP class itself is for internal use only. */
 final readonly class AuditCommand
 {
     public function __construct(
@@ -55,6 +59,7 @@ final readonly class AuditCommand
         private ReportWriterInterface $reportWriter,
         private AuditExitCodeResolverInterface $auditExitCodeResolver,
         private AuditPresenterInterface $auditPresenter,
+        private EstimateAuditCostUseCase $estimateAuditCostUseCase,
     ) {}
 
     public function __invoke(
@@ -68,6 +73,17 @@ final readonly class AuditCommand
         try {
             $this->auditPresenter->runningSection($symfonyStyle);
 
+            if ($auditCommandInput->dryRun) {
+                $report = $this->estimateAuditCostUseCase->execute($projectPath);
+                $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+
+                if (!$auditCommandInput->isMachineReadableToStdout()) {
+                    $this->auditPresenter->result($symfonyStyle, $report, Command::SUCCESS);
+                }
+
+                return Command::SUCCESS;
+            }
+
             $report = $this->runAuditUseCase->execute($projectPath);
             $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
 
@@ -78,10 +94,18 @@ final readonly class AuditCommand
             }
 
             return $exitCode;
+        } catch (AuditAbortedByBudgetException $auditAbortedByBudgetException) {
+            $partialReport = $auditAbortedByBudgetException->partialReport();
+            $this->reportWriter->write($partialReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+            $this->auditPresenter->error($symfonyStyle, $auditAbortedByBudgetException);
+
+            return self::EXIT_CODE_BUDGET_ABORTED;
         } catch (Throwable $throwable) {
             $this->auditPresenter->error($symfonyStyle, $throwable);
 
             return Command::FAILURE;
         }
     }
+
+    private const int EXIT_CODE_BUDGET_ABORTED = 2;
 }

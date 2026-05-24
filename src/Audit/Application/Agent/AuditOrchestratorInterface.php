@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 interface AuditOrchestratorInterface
 {
     public function orchestrate(AuditContext $auditContext): void;

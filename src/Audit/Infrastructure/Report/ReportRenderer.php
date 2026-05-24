@@ -30,6 +30,8 @@ final readonly class ReportRenderer
 
     public function renderConsole(AuditReport $auditReport): string
     {
+        $cost = $auditReport->cost();
+
         return strtr($this->loadTemplate('console.txt'), [
             '{{auditId}}' => $auditReport->auditId(),
             '{{packageName}}' => self::PACKAGE_NAME,
@@ -37,6 +39,9 @@ final readonly class ReportRenderer
             '{{startedAt}}' => $auditReport->startedAt()->format('Y-m-d H:i:s'),
             '{{duration}}' => \sprintf('%.1fs', $auditReport->durationSeconds()),
             '{{filesScanned}}' => $auditReport->filesScanned(),
+            '{{tokens}}' => \sprintf('%s in / %s out', number_format($cost->inputTokens()), number_format($cost->outputTokens())),
+            '{{primaryModel}}' => '' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel(),
+            '{{cost}}' => \sprintf('$%.4f (estimated)', $cost->estimatedCostUsd()),
             '{{riskLevel}}' => $auditReport->riskLevel(),
             '{{riskScore}}' => $auditReport->riskScore(),
             '{{body}}' => $this->renderBody($auditReport),
@@ -87,6 +92,7 @@ final readonly class ReportRenderer
             $types,
         ));
 
+        $cost = $auditReport->cost();
         $sarif = [
             '$schema' => 'https://json.schemastore.org/sarif-2.1.0.json',
             'version' => '2.1.0',
@@ -101,6 +107,13 @@ final readonly class ReportRenderer
                         ],
                     ],
                     'results' => $results,
+                    'properties' => [
+                        'input_tokens' => $cost->inputTokens(),
+                        'output_tokens' => $cost->outputTokens(),
+                        'total_tokens' => $cost->totalTokens(),
+                        'estimated_cost_usd' => $cost->estimatedCostUsd(),
+                        'primary_model' => $cost->primaryModel(),
+                    ],
                 ],
             ],
         ];

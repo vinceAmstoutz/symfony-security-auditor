@@ -52,7 +52,7 @@ following keys:
 
 | Key              | Type   | Default             | Description                                          |
 | ---------------- | ------ | ------------------- | ---------------------------------------------------- |
-| `model`          | string | `'claude-opus-4-5'` | Model name used for both Attacker and Reviewer roles |
+| `model`          | string | `'claude-opus-4-7'` | Model name used for both Attacker and Reviewer roles |
 | `attacker_model` | string | `null`              | Override: dedicated model for the Attacker role      |
 | `reviewer_model` | string | `null`              | Override: dedicated model for the Reviewer role      |
 
@@ -61,21 +61,29 @@ names must be supported by the platform configured in `ai.yaml`.
 
 ### `scan.*` — file discovery
 
-| Key                      | Type        | Default | Description                                                                                                                                                     |
-| ------------------------ | ----------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scan.excluded_dirs`     | `string[]`  | `[]`    | Extra directories to skip. **Appended** to the hard defaults (`vendor`, `node_modules`, `.git`, `var/cache`, `var/log`, `public/bundles`); never replaces them. |
-| `scan.respect_gitignore` | `bool`      | `true`  | When `true` (default), files matched by the project `.gitignore` are skipped. Set `false` for full-tree scans that include generated/cached artefacts (rare).   |
-| `scan.max_file_size_kb`  | `int` (≥ 1) | `512`   | Skip files larger than this size, in kilobytes.                                                                                                                 |
+| Key                                         | Type        | Default | Description                                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------- | ----------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scan.excluded_dirs`                        | `string[]`  | `[]`    | Extra directories to skip. **Appended** to the hard defaults (`vendor`, `node_modules`, `.git`, `var/cache`, `var/log`, `public/bundles`); never replaces them.                                                                                                                                                       |
+| `scan.respect_gitignore`                    | `bool`      | `true`  | When `true` (default), files matched by the project `.gitignore` are skipped. Set `false` for full-tree scans that include generated/cached artefacts (rare).                                                                                                                                                         |
+| `scan.max_file_size_kb`                     | `int` (≥ 1) | `512`   | Skip files larger than this size, in kilobytes.                                                                                                                                                                                                                                                                       |
+| `scan.secret_scrubbing.enabled`             | `bool`      | `true`  | Redact credential-shaped strings (AWS/GitHub/Stripe/Slack/Google API keys, JWTs, PEM private keys, env-style credential assignments) from file content before it reaches the LLM. Default `true` — credentials in committed sample configs or `.env.dist` files would otherwise be sent verbatim to the LLM provider. |
+| `scan.secret_scrubbing.additional_patterns` | `string[]`  | `[]`    | Extra PCRE patterns merged with the defaults. Use to redact project-specific tokens (e.g. internal API key shapes).                                                                                                                                                                                                   |
 
 ### `audit.*` — orchestrator knobs
 
-| Key                         | Type        | Default | Description                                                                                                                                                                                                                                                                                                                                                                                      |
-| --------------------------- | ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `audit.max_iterations`      | `int` (≥ 1) | `3`     | Maximum number of attacker/reviewer iterations per audit. Loop stops earlier when no new findings emerge.                                                                                                                                                                                                                                                                                        |
-| `audit.min_confidence`      | `float` 0–1 | `0.6`   | Minimum attacker self-reported confidence required to forward a finding to the reviewer. Tune for precision vs. recall: CI gate `0.8`, discovery scan `0.3`, default audit `0.6`.                                                                                                                                                                                                                |
-| `audit.reviewer_batch_size` | `int` (≥ 1) | `1`     | Number of findings reviewed per LLM call. `1` = one-by-one (highest precision, highest latency). Larger values reduce cost/latency at risk of cross-talk between findings in the prompt. Try `5` for cost-sensitive runs.                                                                                                                                                                        |
-| `audit.tools_enabled`       | `bool`      | `true`  | Give the attacker access to tools (`read_file`, `grep`, `list_files`, `lookup_advisory`) for cross-file investigation. Default `true` — without tools, `lookup_advisory` is dead weight and the attacker is blind across files. Costs more LLM round-trips per chunk; mostly offset by `cache.prompt_caching` on Anthropic. Set `false` only if you need the cheapest possible single-file scan. |
-| `audit.max_tool_iterations` | `int` (≥ 1) | `8`     | Maximum tool-call rounds per chunk before the attacker is forced to commit to a final answer. Bounds runaway tool use.                                                                                                                                                                                                                                                                           |
+| Key                              | Type                    | Default | Description                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------------- | ----------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `audit.max_iterations`           | `int` (≥ 1)             | `3`     | Maximum number of attacker/reviewer iterations per audit. Loop stops earlier when no new findings emerge.                                                                                                                                                                                                                                                                                        |
+| `audit.min_confidence`           | `float` 0–1             | `0.6`   | Minimum attacker self-reported confidence required to forward a finding to the reviewer. Tune for precision vs. recall: CI gate `0.8`, discovery scan `0.3`, default audit `0.6`.                                                                                                                                                                                                                |
+| `audit.reviewer_batch_size`      | `int` (≥ 1)             | `1`     | Number of findings reviewed per LLM call. `1` = one-by-one (highest precision, highest latency). Larger values reduce cost/latency at risk of cross-talk between findings in the prompt. Try `5` for cost-sensitive runs.                                                                                                                                                                        |
+| `audit.tools_enabled`            | `bool`                  | `true`  | Give the attacker access to tools (`read_file`, `grep`, `list_files`, `lookup_advisory`) for cross-file investigation. Default `true` — without tools, `lookup_advisory` is dead weight and the attacker is blind across files. Costs more LLM round-trips per chunk; mostly offset by `cache.prompt_caching` on Anthropic. Set `false` only if you need the cheapest possible single-file scan. |
+| `audit.max_tool_iterations`      | `int` (≥ 1)             | `8`     | Maximum tool-call rounds per chunk before the attacker is forced to commit to a final answer. Bounds runaway tool use.                                                                                                                                                                                                                                                                           |
+| `audit.budget.max_tokens`        | `int` (≥ 1) or `null`   | `null`  | Maximum total tokens (input + output, across attacker + reviewer) before the audit aborts cleanly with exit code `2`. `null` = unlimited.                                                                                                                                                                                                                                                        |
+| `audit.budget.max_cost_usd`      | `float` (> 0) or `null` | `null`  | Maximum estimated cost (USD) before the audit aborts cleanly with exit code `2`. Cost is computed via the configured `PricingProviderInterface`. `null` = unlimited.                                                                                                                                                                                                                             |
+| `audit.retry.max_attempts`       | `int` (≥ 1)             | `3`     | Total attempts per LLM call, including the first try. `1` disables retries. Transient failures (provider 429/5xx, network blips) are retried with jittered exponential backoff; non-transient failures (auth, validation) fail fast.                                                                                                                                                             |
+| `audit.retry.initial_delay_ms`   | `int` (≥ 0)             | `500`   | Base delay (milliseconds) before the first retry. Subsequent retries multiply by `backoff_multiplier`.                                                                                                                                                                                                                                                                                           |
+| `audit.retry.backoff_multiplier` | `float` (≥ 1.0)         | `2.0`   | Exponential growth factor between retries. With initial 500ms and multiplier 2.0, retries wait ~500, ~1000, ~2000 ms.                                                                                                                                                                                                                                                                            |
+| `audit.retry.jitter_ratio`       | `float` 0–1             | `0.2`   | Jitter applied to each computed delay, as a fraction in `[0.0, 1.0]`. `0.2` means each delay varies within ±20% of the base.                                                                                                                                                                                                                                                                     |
 
 ### `cache.*` — caching layers
 
@@ -90,7 +98,7 @@ names must be supported by the platform configured in `ai.yaml`.
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-5'
+    model: 'claude-opus-4-7'
 ```
 
 ### Split mode — separate models per role
@@ -98,8 +106,8 @@ symfony_security_auditor:
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-5'   # powerful model for discovery
-    reviewer_model: 'claude-haiku-4-5'  # faster model for validation
+    attacker_model: 'claude-opus-4-7'   # powerful model for discovery
+    reviewer_model: 'claude-haiku-4-5-20251001'  # faster model for validation
 ```
 
 ### Full configuration example
@@ -107,14 +115,18 @@ symfony_security_auditor:
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-5'
-    reviewer_model: 'claude-haiku-4-5'
+    attacker_model: 'claude-opus-4-7'
+    reviewer_model: 'claude-haiku-4-5-20251001'
     scan:
         excluded_dirs:
             - 'legacy'
             - 'tests/fixtures/generated'
         respect_gitignore: true
         max_file_size_kb: 256
+        secret_scrubbing:
+            enabled: true
+            additional_patterns:
+                - '/MY_INTERNAL_TOKEN-[A-Z0-9]{16}/'
     audit:
         max_iterations: 5
         min_confidence: 0.7
@@ -232,7 +244,7 @@ via the model name. Two syntaxes are supported in
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-5?max_tokens=4096&temperature=0.2'
+    model: 'claude-opus-4-7?max_tokens=4096&temperature=0.2'
 ```
 
 ### Expanded syntax
@@ -240,7 +252,7 @@ symfony_security_auditor:
 ```yaml
 symfony_security_auditor:
     model:
-        name: 'claude-opus-4-5'
+        name: 'claude-opus-4-7'
         options:
             max_tokens: 4096
             temperature: 0.2
@@ -272,8 +284,8 @@ ai:
 
 ```yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-5'   # deep reasoning for vuln discovery
-    reviewer_model: 'claude-haiku-4-5'  # fast + cheap for false-positive filtering
+    attacker_model: 'claude-opus-4-7'   # deep reasoning for vuln discovery
+    reviewer_model: 'claude-haiku-4-5-20251001'  # fast + cheap for false-positive filtering
 ```
 
 The attacker agent receives all source files grouped into chunks of 10, sorted
@@ -299,10 +311,11 @@ bin/console audit:run <project-path> [options]
 
 ### Options
 
-| Option     | Short | Default   | Description                                                   |
-| ---------- | ----- | --------- | ------------------------------------------------------------- |
-| `--format` | `-f`  | `console` | Output format: `console` (human-readable), `json`, or `sarif` |
-| `--output` | `-o`  | none      | Write the JSON or SARIF report to a file path                 |
+| Option      | Short | Default   | Description                                                                                                        |
+| ----------- | ----- | --------- | ------------------------------------------------------------------------------------------------------------------ |
+| `--format`  | `-f`  | `console` | Output format: `console` (human-readable), `json`, or `sarif`                                                      |
+| `--output`  | `-o`  | none      | Write the JSON or SARIF report to a file path                                                                      |
+| `--dry-run` |       | `false`   | Estimate token usage and cost without invoking the LLM. Exits `0` with zero findings and a populated `cost` block. |
 
 ### Examples
 
@@ -318,9 +331,14 @@ bin/console audit:run /path/to/project --format=json --output=report.json
 bin/console audit:run . --format=sarif --output=report.sarif
 ```
 
+```bash
+bin/console audit:run . --dry-run --format=json
+```
+
 ### Exit codes
 
-| Code | Meaning                                                   |
-| ---- | --------------------------------------------------------- |
-| `0`  | Audit completed; risk level is SAFE, LOW, MEDIUM, or HIGH |
-| `1`  | Risk level is CRITICAL, or the project path is invalid    |
+| Code | Meaning                                                                                               |
+| ---- | ----------------------------------------------------------------------------------------------------- |
+| `0`  | Audit completed; risk level is SAFE, LOW, MEDIUM, or HIGH                                             |
+| `1`  | Risk level is CRITICAL, or the project path is invalid                                                |
+| `2`  | Audit aborted because the configured token or cost budget was exceeded (partial report still emitted) |
