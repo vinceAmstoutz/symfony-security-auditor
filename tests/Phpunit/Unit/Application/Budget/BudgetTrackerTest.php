@@ -100,6 +100,50 @@ final class BudgetTrackerTest extends TestCase
         self::assertSame(10.0, $budgetTracker->costUsdUsed());
     }
 
+    public function test_cost_used_accumulates_across_multiple_calls(): void
+    {
+        // Pins: `$this->costUsdUsed += ...` — if mutated to `=`, the second call
+        // would overwrite the first, and the total would be $5 (not $15).
+        $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0);
+
+        $budgetTracker->recordCall(LLMResponse::create('a', 1_000_000, 0, 'gpt-4o', 'end_turn'));
+        $budgetTracker->recordCall(LLMResponse::create('b', 500_000, 0, 'gpt-4o', 'end_turn'));
+
+        self::assertSame(15.0, $budgetTracker->costUsdUsed());
+    }
+
+    public function test_cost_budget_passes_at_exact_cap_and_aborts_above(): void
+    {
+        // Pins: `$this->costUsdUsed > $maxCostUsd` (vs `>=`). With cap = $5
+        // and usage = $5 exactly, the call completes; the next call (totaling
+        // $5.01) trips the cap.
+        $budgetTracker = $this->budgetTracker(AuditBudget::forCost(5.0), inputPrice: 10.0);
+
+        $budgetTracker->recordCall(LLMResponse::create('a', 500_000, 0, 'gpt-4o', 'end_turn')); // $5.00
+        $budgetTracker->assertWithinBudget();
+        self::assertSame(5.0, $budgetTracker->costUsdUsed());
+
+        $budgetTracker->recordCall(LLMResponse::create('b', 1_000, 0, 'gpt-4o', 'end_turn')); // +$0.01 → $5.01
+
+        $this->expectException(BudgetExceededException::class);
+        $budgetTracker->assertWithinBudget();
+    }
+
+    public function test_cost_used_is_rounded_to_six_decimal_places(): void
+    {
+        // Pins: `round($this->costUsdUsed, 6)` — 7e-7 cents (0.0000007 USD).
+        //   round(7e-7, 6) = 0.000001  ← expected
+        //   round(7e-7, 5) = 0.0
+        //   round(7e-7, 7) = 0.0000007 (unchanged)
+        //   floor(7e-7)    = 0.0
+        //   ceil(7e-7)     = 1.0
+        $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 0.7);
+
+        $budgetTracker->recordCall(LLMResponse::create('x', 1, 0, 'gpt-4o', 'end_turn'));
+
+        self::assertSame(0.000001, $budgetTracker->costUsdUsed());
+    }
+
     public function test_at_cap_call_completes_next_call_aborts(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forTokens(100));

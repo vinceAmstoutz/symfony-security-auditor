@@ -21,6 +21,7 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
@@ -669,6 +670,46 @@ final class AttackerAgentTest extends TestCase
             [
                 ['stage' => 'attacker', 'file' => 'src/Controller/A.php', 'status' => 'errored'],
                 ['stage' => 'attacker', 'file' => 'src/Controller/B.php', 'status' => 'errored'],
+            ],
+            $auditContext->coverage(),
+        );
+    }
+
+    public function test_it_records_coverage_aborted_when_llm_throws_budget_exceeded(): void
+    {
+        // Pins `recordChunkCoverage($chunk, 'aborted', ...)` in the BudgetExceededException
+        // catch branch — without this assertion, removing the recordCoverage call
+        // would be undetectable.
+        $files = [
+            $this->makeFile('src/Controller/A.php'),
+            $this->makeFile('src/Controller/B.php'),
+        ];
+
+        $this->llmClient
+            ->method('complete')
+            ->willThrowException(BudgetExceededException::forCost(2.0, 1.0));
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $attackerAgent = new AttackerAgent(
+            llmClient: $this->llmClient,
+            attackerPromptBuilder: new AttackerPromptBuilder(),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger()),
+            attackerCache: new NullAttackerCache(),
+            logger: new NullLogger(),
+        );
+
+        try {
+            $attackerAgent->analyze($files, SymfonyMapping::create(), $auditContext);
+            self::fail('Expected BudgetExceededException to propagate');
+        } catch (BudgetExceededException) {
+            // expected — the agent rethrows; coverage should still be recorded.
+        }
+
+        self::assertSame(
+            [
+                ['stage' => 'attacker', 'file' => 'src/Controller/A.php', 'status' => 'aborted'],
+                ['stage' => 'attacker', 'file' => 'src/Controller/B.php', 'status' => 'aborted'],
             ],
             $auditContext->coverage(),
         );
