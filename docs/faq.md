@@ -327,17 +327,16 @@ security-relevant code lives. Other extensions are skipped.
 
 ### Does it scan `vendor/`, `tests/`, or `migrations/`?
 
-No. The scan is an **allow-list** by default: only the paths listed in
+No. The scan is a strict **allow-list**: only the paths listed in
 `scan.included_paths` are inspected, defaulting to `src`, `config`, `templates`,
-and `public/index.php` (the Symfony Flex skeleton). Anything outside that list —
-including `vendor/`, `bin/`, `app/`, root-level scripts, or any other top-level
-tree — is silently skipped. On top of that allow-list, the hard-default
-exclusion list (`vendor`, `node_modules`, `.git`, `.github`, `.idea`, `.vscode`,
-`var/cache`, `var/log`, `public/bundles`, `public/build`, `tests`, `Tests`,
-`migrations`, `Migrations`, `translations`, `build`, `coverage`) prunes those
-directories should they appear inside an included path. Append to
-`scan.excluded_dirs` for project-specific pruning. `composer audit` covers
-vendor CVEs via the `lookup_advisory` tool.
+and `public/index.php` (the Symfony Flex skeleton). Anything outside —
+`vendor/`, `node_modules/`, `var/`, `tests/`, `migrations/`, `translations/`,
+`bin/`, `app/`, root-level scripts, IDE folders, build artefacts — is silently
+skipped. To prune a sub-tree inside an included path (e.g. drop `src/Migrations`
+from the audit), tighten `included_paths` to the specific sub-directories you
+want instead:
+`included_paths: ['src/Controller', 'src/Form', 'src/Voter', 'config', 'templates', 'public/index.php']`.
+`composer audit` covers vendor CVEs via the `lookup_advisory` tool.
 
 ---
 

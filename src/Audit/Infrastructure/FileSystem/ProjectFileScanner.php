@@ -35,35 +35,6 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
     /** @var list<string> */
     private const array CONFIG_EXTENSIONS = ['yaml', 'yml', 'xml'];
 
-    /**
-     * Directories never scanned regardless of `scan.excluded_dirs`. Cuts the
-     * audit surface to deployable application source — test code, generated
-     * Doctrine migrations, translations, build artefacts, and IDE / CI
-     * metadata are excluded by default to keep token spend bounded. Append
-     * additional project-specific paths via `scan.excluded_dirs`.
-     *
-     * @var list<string>
-     */
-    private const array HARD_EXCLUDED_DIRS = [
-        'vendor',
-        'node_modules',
-        '.git',
-        '.github',
-        '.idea',
-        '.vscode',
-        'var/cache',
-        'var/log',
-        'public/bundles',
-        'public/build',
-        'tests',
-        'Tests',
-        'migrations',
-        'Migrations',
-        'translations',
-        'build',
-        'coverage',
-    ];
-
     public const int DEFAULT_MAX_FILE_SIZE_KB = 512;
 
     /**
@@ -73,22 +44,19 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
      * front controller). Anything outside this list is silently skipped —
      * including ad-hoc root-level scripts, `bin/`, custom `app/` or `lib/`
      * trees, and the build artefacts in `var/`, `public/build`, `vendor/`.
-     * Override via `scan.included_paths` for non-standard layouts; the
-     * `scan.excluded_dirs` list still prunes inside each scanned directory.
+     * Override via `scan.included_paths` for non-standard layouts.
      *
      * @var list<string>
      */
     public const array DEFAULT_INCLUDED_PATHS = ['src', 'config', 'templates', 'public/index.php'];
 
     /**
-     * @param list<string>                  $includedPaths          project-relative directories and files to scan; defaults to the Symfony skeleton layout
-     * @param list<string>                  $additionalExcludedDirs appended to the hard defaults; never replaces them
-     * @param ?Closure(SplFileInfo): string $fileReader             defaults to SplFileInfo::getContents; tests inject a stub
+     * @param list<string>                  $includedPaths project-relative directories and files to scan; defaults to the Symfony skeleton layout
+     * @param ?Closure(SplFileInfo): string $fileReader    defaults to SplFileInfo::getContents; tests inject a stub
      */
     public function __construct(
         private LoggerInterface $logger,
         private array $includedPaths = self::DEFAULT_INCLUDED_PATHS,
-        private array $additionalExcludedDirs = [],
         private bool $respectGitignore = false,
         private int $maxFileSizeKb = self::DEFAULT_MAX_FILE_SIZE_KB,
         private ?Closure $fileReader = null,
@@ -102,7 +70,9 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
     {
         $this->logger->info('Scanning project', ['path' => $projectPath]);
 
-        if (!$this->anyIncludedPathExists($projectPath)) {
+        [$directories, $explicitFiles] = $this->resolveIncludedPaths($projectPath);
+
+        if ([] === $directories && [] === $explicitFiles) {
             $this->logger->warning('No included paths exist in project', [
                 'included_paths' => $this->includedPaths,
                 'project_path' => $projectPath,
@@ -111,40 +81,42 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
             return [];
         }
 
-        $extensions = array_merge(
-            array_map(static fn (string $ext): string => '*.'.$ext, self::PHP_EXTENSIONS),
-            array_map(static fn (string $ext): string => '*.'.$ext, self::TEMPLATE_EXTENSIONS),
-            array_map(static fn (string $ext): string => '*.'.$ext, self::CONFIG_EXTENSIONS),
-        );
-
-        // Walk from the project root so the project-level `.gitignore` is
-        // honoured by `ignoreVCSIgnored()` (Symfony Finder only consults a
-        // `.gitignore` that lives at — or above — the directory passed to
-        // `in()`, so scanning each included path individually would silently
-        // bypass it on unstaged projects). HARD_EXCLUDED_DIRS prunes the
-        // common heavy trees during traversal; the allow-list filter below
-        // keeps only files whose relative path is inside an included entry.
-        $finder = (new Finder())
-            ->files()
-            ->in($projectPath)
-            ->name($extensions)
-            ->exclude(array_merge(self::HARD_EXCLUDED_DIRS, $this->additionalExcludedDirs))
-            ->size(\sprintf('<= %dK', $this->maxFileSizeKb));
-
-        if ($this->respectGitignore) {
-            $finder->ignoreVCSIgnored(true);
-        }
-
         $reader = $this->fileReader ?? static fn (SplFileInfo $splFile): string => $splFile->getContents();
         $files = [];
 
-        /** @var SplFileInfo $splFile */
-        foreach ($finder as $splFile) {
-            $relativePath = Path::makeRelative($splFile->getPathname(), $projectPath);
-            if (!$this->relativePathIsIncluded($relativePath)) {
+        if ([] !== $directories) {
+            $extensions = array_merge(
+                array_map(static fn (string $ext): string => '*.'.$ext, self::PHP_EXTENSIONS),
+                array_map(static fn (string $ext): string => '*.'.$ext, self::TEMPLATE_EXTENSIONS),
+                array_map(static fn (string $ext): string => '*.'.$ext, self::CONFIG_EXTENSIONS),
+            );
+
+            $finder = (new Finder())
+                ->files()
+                ->in($directories)
+                ->name($extensions)
+                ->size(\sprintf('<= %dK', $this->maxFileSizeKb));
+
+            if ($this->respectGitignore) {
+                $finder->ignoreVCSIgnored(true);
+            }
+
+            /** @var SplFileInfo $splFile */
+            foreach ($finder as $splFile) {
+                $file = $this->buildProjectFile($splFile, $projectPath, $reader);
+                if ($file instanceof ProjectFile) {
+                    $files[] = $file;
+                }
+            }
+        }
+
+        $maxBytes = $this->maxFileSizeKb * 1024;
+        foreach ($explicitFiles as $explicitFile) {
+            if (filesize($explicitFile) > $maxBytes) {
                 continue;
             }
 
+            $splFile = new SplFileInfo($explicitFile, '', basename($explicitFile));
             $file = $this->buildProjectFile($splFile, $projectPath, $reader);
             if ($file instanceof ProjectFile) {
                 $files[] = $file;
@@ -156,34 +128,23 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
         return $files;
     }
 
-    private function anyIncludedPathExists(string $projectPath): bool
+    /**
+     * @return array{0: list<string>, 1: list<string>}
+     */
+    private function resolveIncludedPaths(string $projectPath): array
     {
+        $directories = [];
+        $explicitFiles = [];
         foreach ($this->includedPaths as $includedPath) {
-            if (file_exists($projectPath.\DIRECTORY_SEPARATOR.$includedPath)) {
-                return true;
+            $resolved = $projectPath.\DIRECTORY_SEPARATOR.$includedPath;
+            if (is_dir($resolved)) {
+                $directories[] = $resolved;
+            } elseif (is_file($resolved)) {
+                $explicitFiles[] = $resolved;
             }
         }
 
-        return false;
-    }
-
-    private function relativePathIsIncluded(string $relativePath): bool
-    {
-        // `Path::makeRelative` normalizes directory separators to forward
-        // slashes on every platform, and user-supplied `included_paths`
-        // values follow the same convention in YAML — so a plain string
-        // comparison is sufficient here.
-        foreach ($this->includedPaths as $includedPath) {
-            if ($relativePath === $includedPath) {
-                return true;
-            }
-
-            if (str_starts_with($relativePath, $includedPath.'/')) {
-                return true;
-            }
-        }
-
-        return false;
+        return [$directories, $explicitFiles];
     }
 
     /**

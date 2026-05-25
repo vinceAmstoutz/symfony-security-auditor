@@ -13,12 +13,12 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem;
 
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
+use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
@@ -237,61 +237,6 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame('src/App.php', $files[0]->relativePath());
     }
 
-    public function test_excluded_dirs_still_prune_within_an_included_path(): void
-    {
-        // Pins that HARD_EXCLUDED_DIRS still applies INSIDE a scanned
-        // directory: a misnamed `src/tests/` subtree must not leak into
-        // the report just because its parent is allow-listed.
-        mkdir($this->tmpDir.'/src/Controller', 0o777, true);
-        mkdir($this->tmpDir.'/src/tests', 0o777, true);
-
-        file_put_contents($this->tmpDir.'/src/Controller/User.php', '<?php');
-        file_put_contents($this->tmpDir.'/src/tests/Fixture.php', '<?php');
-
-        $files = $this->projectFileScanner->scan($this->tmpDir);
-
-        self::assertCount(1, $files);
-        self::assertSame('src/Controller/User.php', $files[0]->relativePath());
-    }
-
-    #[DataProvider('hardExcludedDirectoryCases')]
-    public function test_it_excludes_hard_default_directory(string $relativeDir): void
-    {
-        // Cost-control default: each directory listed here is excluded
-        // regardless of `scan.excluded_dirs`. The single `src/App.php`
-        // anchor verifies the scanner still finds application code while
-        // the per-case directory is skipped.
-        mkdir($this->tmpDir.'/src', 0o777, true);
-        mkdir($this->tmpDir.'/'.$relativeDir, 0o777, true);
-
-        file_put_contents($this->tmpDir.'/src/App.php', '<?php class App {}');
-        file_put_contents($this->tmpDir.'/'.$relativeDir.'/Skipped.php', '<?php // excluded');
-
-        $files = $this->projectFileScanner->scan($this->tmpDir);
-
-        self::assertCount(1, $files);
-        self::assertSame('src/App.php', $files[0]->relativePath());
-    }
-
-    /** @return iterable<string, array{string}> */
-    public static function hardExcludedDirectoryCases(): iterable
-    {
-        yield 'tests' => ['tests'];
-        yield 'Tests' => ['Tests'];
-        yield 'migrations' => ['migrations'];
-        yield 'Migrations' => ['Migrations'];
-        yield 'translations' => ['translations'];
-        yield 'public/build' => ['public/build'];
-        yield 'public/bundles' => ['public/bundles'];
-        yield 'build' => ['build'];
-        yield 'coverage' => ['coverage'];
-        yield 'var/cache' => ['var/cache'];
-        yield 'var/log' => ['var/log'];
-        yield '.github' => ['.github'];
-        yield '.idea' => ['.idea'];
-        yield '.vscode' => ['.vscode'];
-    }
-
     public function test_it_returns_empty_for_directory_with_no_matching_files(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
@@ -364,50 +309,19 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame(['Scan complete', ['files' => 1]], $infoLogs[1]);
     }
 
-    public function test_it_excludes_additional_dirs_from_config(): void
-    {
-        mkdir($this->tmpDir.'/src', 0o777, true);
-        mkdir($this->tmpDir.'/legacy', 0o777, true);
-
-        file_put_contents($this->tmpDir.'/src/App.php', '<?php class App {}');
-        file_put_contents($this->tmpDir.'/legacy/Old.php', '<?php class Old {}');
-
-        $projectFileScanner = new ProjectFileScanner(new NullLogger(), additionalExcludedDirs: ['legacy']);
-
-        $files = $projectFileScanner->scan($this->tmpDir);
-
-        self::assertCount(1, $files);
-        self::assertSame('src/App.php', $files[0]->relativePath());
-    }
-
-    public function test_additional_excluded_dirs_do_not_replace_hard_defaults(): void
-    {
-        mkdir($this->tmpDir.'/src', 0o777, true);
-        mkdir($this->tmpDir.'/vendor', 0o777, true);
-        mkdir($this->tmpDir.'/legacy', 0o777, true);
-
-        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
-        file_put_contents($this->tmpDir.'/vendor/autoload.php', '<?php');
-        file_put_contents($this->tmpDir.'/legacy/Old.php', '<?php');
-
-        $projectFileScanner = new ProjectFileScanner(new NullLogger(), additionalExcludedDirs: ['legacy']);
-
-        $files = $projectFileScanner->scan($this->tmpDir);
-
-        self::assertCount(1, $files);
-        self::assertSame('src/App.php', $files[0]->relativePath());
-    }
-
     public function test_it_respects_gitignore_when_enabled(): void
     {
-        // `derived` is intentionally NOT in HARD_EXCLUDED_DIRS and is added to
-        // `includedPaths` so the test measures gitignore behavior in isolation,
-        // not the allow-list or hard-exclusion paths.
+        // `derived` is added to `includedPaths` so the test measures
+        // gitignore filtering in isolation. Finder's `ignoreVCSIgnored()`
+        // calls `git check-ignore`, which requires a real `.git/` directory
+        // — initialize an empty git repo so the fixture mirrors a real
+        // cloned project layout.
         mkdir($this->tmpDir.'/src', 0o777, true);
         mkdir($this->tmpDir.'/derived', 0o777, true);
         file_put_contents($this->tmpDir.'/.gitignore', "derived/\n");
         file_put_contents($this->tmpDir.'/src/App.php', '<?php');
         file_put_contents($this->tmpDir.'/derived/Generated.php', '<?php');
+        (new Process(['git', 'init', '--quiet', $this->tmpDir]))->mustRun();
 
         $projectFileScanner = new ProjectFileScanner(
             new NullLogger(),
@@ -475,6 +389,44 @@ final class ProjectFileScannerTest extends TestCase
 
         self::assertCount(1, $files);
         self::assertSame('src/Small.php', $files[0]->relativePath());
+    }
+
+    public function test_it_skips_explicit_file_path_when_larger_than_configured_max_size(): void
+    {
+        // Explicit file entries in `included_paths` (e.g. `public/index.php`)
+        // bypass Symfony Finder, so the size cap is enforced manually. A
+        // bloated front controller must be skipped just like an oversized
+        // file inside a scanned directory.
+        mkdir($this->tmpDir.'/public', 0o777, true);
+        file_put_contents(
+            $this->tmpDir.'/public/index.php',
+            '<?php /* '.str_repeat('x', 3 * 1024).' */',
+        );
+
+        $projectFileScanner = new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2);
+
+        $files = $projectFileScanner->scan($this->tmpDir);
+
+        self::assertSame([], $files);
+    }
+
+    public function test_it_keeps_explicit_file_at_exact_max_size_boundary(): void
+    {
+        // Boundary pin for the `kb * 1024` byte conversion AND the `>` comparator
+        // on the explicit-file size cap. A file of exactly `maxFileSizeKb * 1024`
+        // bytes must be kept (size is not strictly greater than the cap), so a
+        // `* 1023`/`* 1025` mutation on the multiplier or a `>=` mutation on the
+        // comparator would push it past the threshold and drop it.
+        mkdir($this->tmpDir.'/public', 0o777, true);
+        // 2 KB exactly — `str_repeat('a', 2 * 1024)` is 2048 bytes on disk.
+        file_put_contents($this->tmpDir.'/public/index.php', str_repeat('a', 2 * 1024));
+
+        $projectFileScanner = new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2);
+
+        $files = $projectFileScanner->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertSame('public/index.php', $files[0]->relativePath());
     }
 
     public function test_it_scrubs_secrets_from_file_content_when_scrubber_is_injected(): void

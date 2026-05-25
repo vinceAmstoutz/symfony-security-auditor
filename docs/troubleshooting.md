@@ -76,13 +76,12 @@ absolute path, or omit the argument to default to the current working directory.
 
 ### `[ERROR] Project does not look like a Symfony app`
 
-The auditor walks the project for `.php`, `.twig`, `.yaml`, `.yml`, `.xml`
-files. If nothing is found, the path is wrong, the project layout is
-non-standard (the default allow-list only scans `src/`, `config/`, `templates/`,
-and `public/index.php`), or the project is empty after exclusions. Check
-`scan.included_paths`, `scan.excluded_dirs`, and `scan.respect_gitignore`. A log
-line `No included paths exist in project` at `warning` level confirms the
-allow-list resolved to nothing.
+The auditor walks the project for `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files
+inside `scan.included_paths` (default: `src/`, `config/`, `templates/`,
+`public/index.php` — the Symfony Flex skeleton). If nothing is found, the path
+is wrong, the layout is non-standard, or `scan.respect_gitignore` is filtering
+everything out. A log line `No included paths exist in project` at `warning`
+level confirms the allow-list resolved to nothing.
 
 ### Audit exits with code `1` even though risk is LOW
 
@@ -212,8 +211,9 @@ Expected behavior on large projects. Mitigations:
 - Use **split-model** — Opus Attacker + Haiku Reviewer cuts ~50% wall time.
 - Raise `reviewer_batch_size` from `1` to `5` — fewer Reviewer round-trips.
 - Lower `audit.max_iterations` from `3` to `1` or `2`.
-- Trim scan scope via `scan.excluded_dirs` — e.g. exclude `tests/Fixtures` if it
-  has no real code.
+- Tighten `scan.included_paths` to specific sub-directories — e.g. point it at
+  `src/Controller`, `src/Form`, `src/Voter`, `config`, `templates` so high-value
+  surfaces are audited and infrastructure code is dropped.
 - Enable both caches: `cache.enabled: true` and `cache.prompt_caching: true`
   (defaults).
 
@@ -221,16 +221,13 @@ Expected behavior on large projects. Mitigations:
 
 - Confirm `scan.included_paths` matches the deployable code surface. The default
   `['src', 'config', 'templates', 'public/index.php']` already skips every file
-  outside the Symfony skeleton (no `bin/`, no root scripts, no custom `app/` or
-  `lib/` trees) without you having to enumerate them.
-- Confirm the default scan exclusions are in effect — `tests`, `migrations`,
-  `translations`, `build`, `coverage`, `public/build`, and IDE folders are
-  hard-excluded out of the box. If a previous override extended
-  `scan.excluded_dirs`, the defaults still apply (the list is additive).
-- Trim further by tightening `scan.included_paths` (drop `templates/` or
-  `config/` if you only want to audit PHP) or appending to `scan.excluded_dirs`
-  — e.g. add `assets`, `docs`, or any project-specific generated trees inside an
-  included path.
+  outside the Symfony skeleton — `vendor/`, `node_modules/`, `var/`, `tests/`,
+  `migrations/`, `translations/`, `bin/`, root scripts, IDE folders, build
+  artefacts — without you having to enumerate them.
+- Trim further by tightening `scan.included_paths`: drop `templates/` or
+  `config/` if you only want to audit PHP, or replace `src` with a list of
+  specific sub-directories (e.g. `src/Controller`, `src/Form`, `src/Voter`) to
+  focus the audit on high-value security surfaces.
 - Confirm `cache.prompt_caching: true` (default) — Anthropic provides ~90%
   input-token discount on cached prompts.
 - Confirm `cache.enabled: true` (default) — repeated chunks skip the LLM

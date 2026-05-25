@@ -17,12 +17,10 @@ final readonly class ScanConfiguration
 {
     /**
      * @param list<string> $includedPaths
-     * @param list<string> $excludedDirs
      * @param list<string> $additionalScrubberPatterns
      */
     public function __construct(
         public array $includedPaths,
-        public array $excludedDirs,
         public bool $respectGitignore,
         public int $maxFileSizeKb,
         public bool $secretScrubbingEnabled,

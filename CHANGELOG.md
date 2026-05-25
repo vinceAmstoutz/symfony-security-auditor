@@ -13,27 +13,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 ### Added
 
 - New `scan.included_paths` configuration key (`string[]`, default
-  `['src', 'config', 'templates', 'public/index.php']`) turns scanning into an
-  explicit allow-list. Only the listed project-relative directories and files
-  are inspected; everything else — `bin/`, root scripts, custom `app/` or `lib/`
-  trees, monorepo siblings — is silently skipped. Override the list for
-  non-standard layouts. If none of the entries resolve in the project root the
+  `['src', 'config', 'templates', 'public/index.php']`) is the **sole scoping
+  knob** for the audit. Only the listed project-relative directories and files
+  are inspected; everything else — `vendor/`, `node_modules/`, `var/`, `tests/`,
+  `migrations/`, `translations/`, `bin/`, root scripts, IDE folders, build
+  artefacts, monorepo siblings — is silently skipped. Symfony Finder is invoked
+  with the resolved directories as its `in()` roots so it never traverses
+  outside the allow-list. If none of the entries resolve in the project root the
   scanner logs `No included paths exist in project` at `warning` level and
-  returns an empty result rather than silently scanning the wrong tree.
+  returns an empty result.
 
-### Changed
+### Removed
 
-- Expanded the hard-default scan exclusion list with `tests`, `Tests`,
-  `migrations`, `Migrations`, `translations`, `public/build`, `build`,
-  `coverage`, `.github`, `.idea`, and `.vscode`. Audits now focus on deployable
-  application source by default and bypass test code, generated migrations,
-  translations, and build artefacts — typically cutting the file count (and
-  token spend) by 30–50 % on a standard Symfony layout. Override by appending to
-  `scan.excluded_dirs` as before; the list cannot be shortened.
-- `scan.excluded_dirs` now prunes _inside_ each `scan.included_paths` entry
-  rather than across the full project tree. The semantics are unchanged for the
-  Symfony skeleton, but if you point `included_paths` at a custom directory the
-  exclusion list still applies relative to that root.
+- **Breaking:** `scan.excluded_dirs` configuration key. The previous deny-list
+  mechanism (hard defaults plus user-supplied exclusions) has been replaced by
+  `scan.included_paths`. To prune a sub-tree inside an included path (e.g. drop
+  `src/Migrations`), tighten `included_paths` to specific sub-directories
+  instead — for example:
+  `included_paths: ['src/Controller', 'src/Form', 'src/Voter', 'config', 'templates', 'public/index.php']`.
+- **Breaking:** the internal `HARD_EXCLUDED_DIRS` list on `ProjectFileScanner`
+  is gone. With Finder scanning only included paths, walking into `vendor/` or
+  `node_modules/` no longer happens, so the prune list is unnecessary.
 
 ### Fixed
 
