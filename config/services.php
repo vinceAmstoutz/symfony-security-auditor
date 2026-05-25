@@ -44,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFact
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
@@ -195,7 +196,15 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(InMemoryAdvisoryDatabase::class);
 
     $defaultsConfigurator->set(SymfonyProcessComposerAuditRunner::class);
-    $defaultsConfigurator->alias(ComposerAuditRunnerInterface::class, SymfonyProcessComposerAuditRunner::class);
+
+    $defaultsConfigurator->set(LockfileHashedAdvisoryCache::class)
+        ->args([
+            service(SymfonyProcessComposerAuditRunner::class),
+            param('symfony_security_auditor.cache.advisory_dir'),
+            service(Filesystem::class),
+            service('logger'),
+        ]);
+    $defaultsConfigurator->alias(ComposerAuditRunnerInterface::class, LockfileHashedAdvisoryCache::class);
 
     $defaultsConfigurator->set(ComposerAuditAdvisoryDatabase::class)
         ->args([

@@ -229,6 +229,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.retry.jitter_ratio', $bundleConfiguration->retry->jitterRatio);
         $builder->setParameter('symfony_security_auditor.cache.enabled', $bundleConfiguration->cache->enabled);
         $builder->setParameter('symfony_security_auditor.cache.dir', $bundleConfiguration->cache->dir);
+        $builder->setParameter('symfony_security_auditor.cache.advisory_dir', $bundleConfiguration->cache->dir.'/advisory');
         $builder->setParameter('symfony_security_auditor.cache.prompt_caching', $bundleConfiguration->cache->promptCaching);
         $builder->setParameter(
             'symfony_security_auditor.cache.key_salt',
