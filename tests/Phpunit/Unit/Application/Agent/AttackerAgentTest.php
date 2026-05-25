@@ -375,7 +375,7 @@ final class AttackerAgentTest extends TestCase
 
         $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder());
 
-        self::assertSame(['Attacker agent starting analysis', ['files' => 2, 'tools_enabled' => false]], $infoLogs[0]);
+        self::assertSame(['Attacker agent starting analysis', ['files' => 2, 'tools_enabled' => false, 'cache_bypassed' => false]], $infoLogs[0]);
         self::assertSame(['Attacker agent complete', ['total_vulnerabilities' => 0]], $infoLogs[1]);
     }
 
@@ -578,6 +578,70 @@ final class AttackerAgentTest extends TestCase
         );
 
         $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder());
+    }
+
+    public function test_bypass_cache_skips_cache_get_and_calls_llm(): void
+    {
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+
+        $cache = $this->createMock(AttackerCacheInterface::class);
+        $cache->expects(self::never())->method('get');
+        $cache->expects(self::never())->method('store');
+
+        $this->llmClient
+            ->expects(self::once())
+            ->method('complete')
+            ->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+
+        $attackerAgent = new AttackerAgent(
+            llmClient: $this->llmClient,
+            attackerPromptBuilder: new AttackerPromptBuilder(),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger()),
+            attackerCache: $cache,
+            logger: new NullLogger(),
+        );
+
+        $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder(), true);
+    }
+
+    public function test_bypass_cache_skips_cache_store_after_successful_llm_call(): void
+    {
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+
+        $rawPayload = [[
+            'type' => 'broken_access_control',
+            'severity' => 'high',
+            'title' => 'Fresh finding',
+            'description' => 'fresh',
+            'file_path' => 'src/Controller/UserController.php',
+            'line_start' => 1,
+            'line_end' => 2,
+            'vulnerable_code' => 'x',
+            'attack_vector' => 'x',
+            'proof' => 'x',
+            'remediation' => 'x',
+            'confidence' => 0.85,
+        ]];
+
+        $cache = $this->createMock(AttackerCacheInterface::class);
+        $cache->expects(self::never())->method('get');
+        $cache->expects(self::never())->method('store');
+
+        $this->llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::create((string) json_encode($rawPayload), 10, 10, 'claude', 'end_turn'));
+
+        $attackerAgent = new AttackerAgent(
+            llmClient: $this->llmClient,
+            attackerPromptBuilder: new AttackerPromptBuilder(),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger()),
+            attackerCache: $cache,
+            logger: new NullLogger(),
+        );
+
+        $result = $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder(), true);
+
+        self::assertCount(1, $result);
     }
 
     public function test_it_records_coverage_analyzed_for_each_file_in_chunk_after_llm_call(): void

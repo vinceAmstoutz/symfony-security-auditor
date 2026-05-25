@@ -86,7 +86,7 @@ final readonly class AuditCommand
                 return Command::SUCCESS;
             }
 
-            $report = $this->runAuditUseCase->execute($projectPath, $scanPaths);
+            $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache);
             $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
 
             $exitCode = $this->auditExitCodeResolver->resolve($report);

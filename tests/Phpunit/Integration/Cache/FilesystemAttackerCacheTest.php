@@ -237,6 +237,45 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertSame([['type' => 'sql_injection', 'title' => 'b-finding']], $this->filesystemAttackerCache->get([$b]));
     }
 
+    public function test_distinct_key_salts_produce_distinct_cache_entries(): void
+    {
+        $chunk = [ProjectFile::create('src/A.php', '/app/src/A.php', 'X')];
+        $payload = [['type' => 'sql_injection', 'title' => 'on-claude']];
+
+        $claudeCache = new FilesystemAttackerCache($this->cacheDir, new Filesystem(), new NullLogger(), 'claude-opus-4-7');
+        $gptCache = new FilesystemAttackerCache($this->cacheDir, new Filesystem(), new NullLogger(), 'gpt-4o');
+
+        $claudeCache->store($chunk, $payload);
+
+        self::assertSame($payload, $claudeCache->get($chunk));
+        self::assertNull($gptCache->get($chunk), 'switching the salt must invalidate the cache for the same chunk');
+    }
+
+    public function test_same_key_salt_yields_same_cache_entry_across_instances(): void
+    {
+        $chunk = [ProjectFile::create('src/A.php', '/app/src/A.php', 'X')];
+        $payload = [['type' => 'sql_injection']];
+
+        $writer = new FilesystemAttackerCache($this->cacheDir, new Filesystem(), new NullLogger(), 'claude-opus-4-7');
+        $reader = new FilesystemAttackerCache($this->cacheDir, new Filesystem(), new NullLogger(), 'claude-opus-4-7');
+
+        $writer->store($chunk, $payload);
+
+        self::assertSame($payload, $reader->get($chunk));
+    }
+
+    public function test_empty_salt_keeps_legacy_unprefixed_key(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+
+        $expectedKey = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
+
+        $this->filesystemAttackerCache->store([$projectFile], [['type' => 'sql_injection']]);
+
+        self::assertFileExists($expectedPath);
+    }
+
     public function test_dump_path_has_trailing_slash_stripped_from_cache_dir(): void
     {
         $capturedPath = '';

@@ -189,6 +189,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.cache.dir'),
             service(Filesystem::class),
             service('logger'),
+            param('symfony_security_auditor.cache.key_salt'),
         ]);
 
     $defaultsConfigurator->set(InMemoryAdvisoryDatabase::class);

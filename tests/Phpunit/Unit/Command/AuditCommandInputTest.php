@@ -169,4 +169,11 @@ final class AuditCommandInputTest extends TestCase
 
         self::assertSame(['apps/api/src', 'libs/shared'], $auditCommandInput->scanPaths());
     }
+
+    public function test_default_no_cache_is_false(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+
+        self::assertFalse($auditCommandInput->noCache);
+    }
 }

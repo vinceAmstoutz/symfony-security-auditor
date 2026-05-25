@@ -34,15 +34,21 @@ final readonly class RunAuditUseCase
     ) {}
 
     /**
-     * @param list<string> $scanPaths optional project-relative subdirectories
-     *                                to restrict the scan to; empty list (the
-     *                                default) audits the whole project
+     * @param list<string> $scanPaths   optional project-relative subdirectories
+     *                                  to restrict the scan to; empty list (the
+     *                                  default) audits the whole project
+     * @param bool         $bypassCache when true, agents skip the attacker
+     *                                  cache entirely (no reads, no writes)
      */
-    public function execute(string $projectPath, array $scanPaths = []): AuditReport
+    public function execute(string $projectPath, array $scanPaths = [], bool $bypassCache = false): AuditReport
     {
-        $this->logger->info('Starting audit', ['project' => $projectPath, 'scan_paths' => $scanPaths]);
+        $this->logger->info('Starting audit', [
+            'project' => $projectPath,
+            'scan_paths' => $scanPaths,
+            'cache_bypassed' => $bypassCache,
+        ]);
 
-        $auditContext = AuditContext::forProject($projectPath, $scanPaths);
+        $auditContext = AuditContext::forProject($projectPath, $scanPaths, $bypassCache);
 
         try {
             $this->pipeline->process($auditContext);

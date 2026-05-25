@@ -21,6 +21,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilder
 final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInterface
 {
     /**
+     * Wire-format version of the prompt this builder emits. Folded into the
+     * attacker cache key so that a wording change automatically invalidates
+     * previously-cached LLM responses. Bump whenever the prompt structure or
+     * skill blocks change in a way the LLM is expected to react to.
+     */
+    public const int PROMPT_VERSION = 1;
+
+    /**
      * Skill-block emission order — by attack-surface priority, NOT alphabetical.
      * The LLM weights earlier-in-context instructions more heavily (primacy), so
      * higher-risk surfaces are listed first.

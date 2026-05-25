@@ -54,7 +54,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             ++$iteration;
             $this->logger->info(\sprintf('Audit iteration %d/%d', $iteration, $this->maxIterations));
 
-            $rawFindings = $this->attackerAgent->analyze($files, $mapping, $auditContext);
+            $rawFindings = $this->attackerAgent->analyze($files, $mapping, $auditContext, $auditContext->isCacheBypassed());
             $filtered = $this->filterByConfidence(array_values($rawFindings));
 
             if ([] === $filtered) {

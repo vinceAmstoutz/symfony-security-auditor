@@ -70,7 +70,20 @@ final class RunAuditUseCaseTest extends TestCase
         $runAuditUseCase = new RunAuditUseCase($this->makePipeline(), $logger);
         $runAuditUseCase->execute($this->tmpDir);
 
-        self::assertSame(['Starting audit', ['project' => $this->tmpDir, 'scan_paths' => []]], $infoLogs[0]);
+        self::assertSame(
+            ['Starting audit', ['project' => $this->tmpDir, 'scan_paths' => [], 'cache_bypassed' => false]],
+            $infoLogs[0],
+        );
+    }
+
+    public function test_it_marks_the_audit_context_as_cache_bypassed_when_requested(): void
+    {
+        $recordingStage = new RecordingStage();
+        $runAuditUseCase = new RunAuditUseCase($this->makePipeline($recordingStage), new NullLogger());
+
+        $runAuditUseCase->execute($this->tmpDir, [], true);
+
+        self::assertSame([true], $recordingStage->observedCacheBypassed);
     }
 
     public function test_it_passes_scan_paths_to_the_pipeline_via_audit_context(): void

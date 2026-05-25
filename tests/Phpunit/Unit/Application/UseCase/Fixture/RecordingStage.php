@@ -30,6 +30,9 @@ final class RecordingStage implements StageInterface
     /** @var list<list<string>> */
     public array $observedScanPaths = [];
 
+    /** @var list<bool> */
+    public array $observedCacheBypassed = [];
+
     public function name(): string
     {
         return 'recording';
@@ -39,5 +42,6 @@ final class RecordingStage implements StageInterface
     {
         $this->processedAuditIds[] = $auditContext->auditId();
         $this->observedScanPaths[] = $auditContext->scanPaths();
+        $this->observedCacheBypassed[] = $auditContext->isCacheBypassed();
     }
 }
