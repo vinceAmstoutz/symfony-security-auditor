@@ -576,6 +576,50 @@ final class ReviewerAgentTest extends TestCase
         self::assertFalse($result[0]->isReviewerValidated());
     }
 
+    public function test_it_logs_debug_review_decision_when_finding_is_rejected(): void
+    {
+        // Covers MethodCallRemoval on the logReviewDecision call inside the
+        // `if (!$accepted)` early-return branch in applyReview(). Without an
+        // assertion on the rejected-path debug log, removing that call escapes.
+        $vulnerability = $this->makeVulnerability();
+        $debugLogs = [];
+
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info');
+        $logger->method('debug')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$debugLogs): void {
+                $debugLogs[] = [$msg, $ctx];
+            },
+        );
+
+        $this->llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::create(
+                (string) json_encode(['accepted' => false, 'reviewer_notes' => 'false positive']),
+                10, 10, 'claude', 'end_turn',
+            ));
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $this->llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: $logger,
+        );
+
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        $reviewedLogs = array_values(array_filter(
+            $debugLogs,
+            static fn (array $entry): bool => 'Vulnerability reviewed' === $entry[0],
+        ));
+
+        self::assertCount(1, $reviewedLogs);
+        self::assertSame([
+            'id' => $vulnerability->id(),
+            'accepted' => false,
+            'notes' => 'false positive',
+        ], $reviewedLogs[0][1]);
+    }
+
     public function test_it_logs_debug_review_decision_when_severity_is_elevated(): void
     {
         // Covers MethodCallRemoval on the logReviewDecision call after severity elevation
