@@ -24,7 +24,49 @@ final readonly class CharacterBasedTokenEstimator implements TokenEstimatorInter
 
     public const float CHARS_PER_TOKEN_GEMINI = 3.8;
 
+    public const float CHARS_PER_TOKEN_MISTRAL = 3.7;
+
+    public const float CHARS_PER_TOKEN_LLAMA = 3.6;
+
+    public const float CHARS_PER_TOKEN_DEEPSEEK = 3.4;
+
     public const float CHARS_PER_TOKEN_DEFAULT = 3.2;
+
+    /**
+     * Per-model-prefix character-to-token ratios. Calibrated against
+     * each vendor's published tokenizer behavior on English source code.
+     * The first prefix that the model name starts with wins, so longer /
+     * more specific prefixes should appear first.
+     *
+     * @var list<array{prefix: string, charsPerToken: float}>
+     */
+    private const array DEFAULT_RATIOS = [
+        ['prefix' => 'claude-', 'charsPerToken' => self::CHARS_PER_TOKEN_CLAUDE],
+        ['prefix' => 'gpt-', 'charsPerToken' => self::CHARS_PER_TOKEN_GPT],
+        ['prefix' => 'o3', 'charsPerToken' => self::CHARS_PER_TOKEN_GPT],
+        ['prefix' => 'o4', 'charsPerToken' => self::CHARS_PER_TOKEN_GPT],
+        ['prefix' => 'gemini-', 'charsPerToken' => self::CHARS_PER_TOKEN_GEMINI],
+        ['prefix' => 'mistral-', 'charsPerToken' => self::CHARS_PER_TOKEN_MISTRAL],
+        ['prefix' => 'codestral-', 'charsPerToken' => self::CHARS_PER_TOKEN_MISTRAL],
+        ['prefix' => 'llama-', 'charsPerToken' => self::CHARS_PER_TOKEN_LLAMA],
+        ['prefix' => 'llama3', 'charsPerToken' => self::CHARS_PER_TOKEN_LLAMA],
+        ['prefix' => 'llama4', 'charsPerToken' => self::CHARS_PER_TOKEN_LLAMA],
+        ['prefix' => 'meta-llama', 'charsPerToken' => self::CHARS_PER_TOKEN_LLAMA],
+        ['prefix' => 'deepseek-', 'charsPerToken' => self::CHARS_PER_TOKEN_DEEPSEEK],
+    ];
+
+    /**
+     * @param array<string, float> $charsPerTokenByPrefix optional overrides
+     *                                                    keyed by model-name
+     *                                                    prefix, e.g.
+     *                                                    `['my-tuned-' => 3.8]`.
+     *                                                    Custom prefixes are
+     *                                                    matched in declaration
+     *                                                    order and take
+     *                                                    precedence over the
+     *                                                    built-in defaults.
+     */
+    public function __construct(private array $charsPerTokenByPrefix = []) {}
 
     public function estimateTokens(string $text, string $model): int
     {
@@ -33,11 +75,18 @@ final readonly class CharacterBasedTokenEstimator implements TokenEstimatorInter
 
     private function charsPerToken(string $model): float
     {
-        return match (true) {
-            str_starts_with($model, 'claude-') => self::CHARS_PER_TOKEN_CLAUDE,
-            str_starts_with($model, 'gpt-'), str_starts_with($model, 'o3'), str_starts_with($model, 'o4') => self::CHARS_PER_TOKEN_GPT,
-            str_starts_with($model, 'gemini-') => self::CHARS_PER_TOKEN_GEMINI,
-            default => self::CHARS_PER_TOKEN_DEFAULT,
-        };
+        foreach ($this->charsPerTokenByPrefix as $prefix => $ratio) {
+            if (str_starts_with($model, $prefix)) {
+                return $ratio;
+            }
+        }
+
+        foreach (self::DEFAULT_RATIOS as $entry) {
+            if (str_starts_with($model, $entry['prefix'])) {
+                return $entry['charsPerToken'];
+            }
+        }
+
+        return self::CHARS_PER_TOKEN_DEFAULT;
     }
 }
