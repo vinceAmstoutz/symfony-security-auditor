@@ -73,8 +73,10 @@ final readonly class AuditCommand
         try {
             $this->auditPresenter->runningSection($symfonyStyle);
 
+            $scanPaths = $auditCommandInput->scanPaths();
+
             if ($auditCommandInput->dryRun) {
-                $report = $this->estimateAuditCostUseCase->execute($projectPath);
+                $report = $this->estimateAuditCostUseCase->execute($projectPath, $scanPaths);
                 $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
 
                 if (!$auditCommandInput->isMachineReadableToStdout()) {
@@ -84,7 +86,7 @@ final readonly class AuditCommand
                 return Command::SUCCESS;
             }
 
-            $report = $this->runAuditUseCase->execute($projectPath);
+            $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache);
             $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
 
             $exitCode = $this->auditExitCodeResolver->resolve($report);

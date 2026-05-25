@@ -45,6 +45,7 @@ export default {
                 'cache',
                 'report',
                 'scan',
+                'rate-limit',
             ],
         ],
         'scope-empty': [0],

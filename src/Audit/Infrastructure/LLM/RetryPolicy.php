@@ -34,6 +34,13 @@ final readonly class RetryPolicy
      */
     public const int DEFAULT_RATE_LIMIT_DELAY_MS = 60_000;
 
+    /**
+     * Upper bound applied to any rate-limit delay — exponential backoff or
+     * server-provided `Retry-After` — so a misbehaving provider cannot wedge
+     * the audit for hours.
+     */
+    public const int DEFAULT_RATE_LIMIT_MAX_DELAY_MS = 300_000;
+
     /** @var Closure(): float */
     private Closure $jitterSource;
 
@@ -44,6 +51,7 @@ final readonly class RetryPolicy
         private float $backoffMultiplier = self::DEFAULT_BACKOFF_MULTIPLIER,
         private float $jitterRatio = self::DEFAULT_JITTER_RATIO,
         private int $rateLimitInitialDelayMs = self::DEFAULT_RATE_LIMIT_DELAY_MS,
+        private int $rateLimitMaxDelayMs = self::DEFAULT_RATE_LIMIT_MAX_DELAY_MS,
         ?Closure $jitterSource = null,
     ) {
         if ($maxAttempts < 1) {
@@ -66,6 +74,10 @@ final readonly class RetryPolicy
             throw new InvalidArgumentException(\sprintf('rateLimitInitialDelayMs must be >= 0, got %d', $rateLimitInitialDelayMs));
         }
 
+        if ($rateLimitMaxDelayMs < 0) {
+            throw new InvalidArgumentException(\sprintf('rateLimitMaxDelayMs must be >= 0, got %d', $rateLimitMaxDelayMs));
+        }
+
         $this->jitterSource = $jitterSource ?? static fn (): float => mt_rand() / mt_getrandmax();
     }
 
@@ -85,16 +97,26 @@ final readonly class RetryPolicy
 
     /**
      * Returns the delay before retrying a rate-limited (429) request.
-     * Uses `rateLimitInitialDelayMs` as the base, applying the same
-     * backoff multiplier and jitter as `delayMs()`.
+     *
+     * When `$serverHintSeconds` is a positive integer (typically parsed from a
+     * `Retry-After` response header via `RetryAfterHeaderParser`), the hint
+     * wins over the local exponential schedule. Otherwise the delay is
+     * `rateLimitInitialDelayMs` grown by `backoffMultiplier ** (attempt − 1)`
+     * with the same jitter as `delayMs()`. The result is always clamped to
+     * `rateLimitMaxDelayMs` so a hostile provider cannot push the wait past
+     * a sane ceiling.
      */
-    public function rateLimitDelayMs(int $attempt): int
+    public function rateLimitDelayMs(int $attempt, ?int $serverHintSeconds = null): int
     {
         if ($attempt < 1) {
             throw new InvalidArgumentException(\sprintf('attempt must be >= 1, got %d', $attempt));
         }
 
-        return $this->computeDelay($this->rateLimitInitialDelayMs, $attempt);
+        if (null !== $serverHintSeconds && $serverHintSeconds > 0) {
+            return min($serverHintSeconds * 1_000, $this->rateLimitMaxDelayMs);
+        }
+
+        return min($this->computeDelay($this->rateLimitInitialDelayMs, $attempt), $this->rateLimitMaxDelayMs);
     }
 
     private function computeDelay(int $baseInitialDelayMs, int $attempt): int

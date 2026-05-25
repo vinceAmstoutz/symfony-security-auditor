@@ -78,6 +78,23 @@ final class StagesTest extends TestCase
         self::assertSame(0, $auditContext->getMeta('ingestion.file_count'));
     }
 
+    public function test_ingestion_stage_restricts_files_to_context_scan_paths(): void
+    {
+        $scanner = self::createStub(ProjectFileScannerInterface::class);
+        $scanner->method('scan')->willReturn([
+            ProjectFile::create('apps/api/src/A.php', '/app/apps/api/src/A.php', '<?php'),
+            ProjectFile::create('apps/web/src/B.php', '/app/apps/web/src/B.php', '<?php'),
+        ]);
+
+        $ingestionStage = new IngestionStage($scanner, new NullLogger());
+        $auditContext = AuditContext::forProject($this->tmpDir, ['apps/api']);
+
+        $ingestionStage->process($auditContext);
+
+        self::assertCount(1, $auditContext->projectFiles());
+        self::assertSame('apps/api/src/A.php', $auditContext->projectFiles()[0]->relativePath());
+    }
+
     public function test_mapping_stage_has_correct_name(): void
     {
         $mappingStage = new MappingStage(new NullLogger());
@@ -196,7 +213,7 @@ final class StagesTest extends TestCase
 
     public function test_audit_stage_calls_orchestrator_when_ready(): void
     {
-        $attackerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm = self::createStub(LLMClientInterface::class);
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'stub', 'end_turn'));
 

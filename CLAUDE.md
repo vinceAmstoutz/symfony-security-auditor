@@ -64,14 +64,14 @@ src/
     Domain/          # Pure PHP — no framework, no I/O
       Model/         # Value objects and enums (Vulnerability, AuditReport, …)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)
-      Port/          # Cross-layer ports (LLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface)
+      Port/          # Cross-layer ports (LLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface)
         Tool/        # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
     Application/     # Orchestration — no I/O, depends only on Domain
       UseCase/       # RunAuditUseCase, EstimateAuditCostUseCase (entry points)
       Pipeline/      # AuditPipeline + IngestionStage, MappingStage, AuditStage
       Agent/         # AttackerAgent, ReviewerAgent, AuditOrchestrator, VulnerabilityFactory
     Infrastructure/  # I/O adapters
-      LLM/           # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier, CharacterBasedTokenEstimator, Delay/
+      LLM/           # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier, CharacterBasedTokenEstimator, Delay/, RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
       FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
       Prompt/        # AttackerPromptBuilder, ReviewerPromptBuilder
       Cache/         # FilesystemAttackerCache, NullAttackerCache
@@ -158,7 +158,8 @@ Format: `<type>[optional scope]: <description>` —
 | `perf`     | Performance improvement |
 
 Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`,
-`scan`, `deps`, `ci`. Breaking changes: `feat!:` with `BREAKING CHANGE:` footer.
+`scan`, `deps`, `ci`, `rate-limit`. Breaking changes: `feat!:` with
+`BREAKING CHANGE:` footer.
 
 ## CI Pipeline
 

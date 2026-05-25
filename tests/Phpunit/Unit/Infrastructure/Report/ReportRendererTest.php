@@ -718,6 +718,39 @@ final class ReportRendererTest extends TestCase
         return AuditReport::fromContext($auditContext);
     }
 
+    public function test_render_console_includes_per_role_cost_breakdown_when_present(): void
+    {
+        $auditCost = AuditCost::of(
+            inputTokens: 150,
+            outputTokens: 30,
+            estimatedCostUsd: 0.04,
+            primaryModel: 'claude-opus-4-7',
+            byRole: [
+                'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 100, 'output_tokens' => 20, 'estimated_cost_usd' => 0.035],
+                'reviewer' => ['model' => 'claude-haiku-4-5', 'input_tokens' => 50, 'output_tokens' => 10, 'estimated_cost_usd' => 0.005],
+            ],
+        );
+
+        $output = $this->reportRenderer->renderConsole($this->makeReportWithCost($auditCost));
+
+        self::assertStringContainsString('attacker', $output);
+        self::assertStringContainsString('claude-opus-4-7', $output);
+        self::assertStringContainsString('reviewer', $output);
+        self::assertStringContainsString('claude-haiku-4-5', $output);
+        self::assertStringContainsString('$0.0350', $output);
+        self::assertStringContainsString('$0.0050', $output);
+    }
+
+    public function test_render_console_omits_breakdown_section_when_no_by_role_data(): void
+    {
+        $auditCost = AuditCost::of(150, 30, 0.04, 'claude-opus-4-7');
+
+        $output = $this->reportRenderer->renderConsole($this->makeReportWithCost($auditCost));
+
+        self::assertStringNotContainsString('attacker', $output);
+        self::assertStringNotContainsString('reviewer', $output);
+    }
+
     private function makeReportWithCost(AuditCost $auditCost, Vulnerability ...$vulnerabilities): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);

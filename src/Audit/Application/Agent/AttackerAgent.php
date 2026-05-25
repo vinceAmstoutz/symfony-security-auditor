@@ -53,7 +53,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
      *
      * @return list<Vulnerability>
      */
-    public function analyze(array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder): array
+    public function analyze(array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false): array
     {
         if ([] === $files) {
             return [];
@@ -64,6 +64,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         $this->logger->info('Attacker agent starting analysis', [
             'files' => \count($files),
             'tools_enabled' => $useTools,
+            'cache_bypassed' => $bypassCache,
         ]);
 
         $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($files) : null;
@@ -74,7 +75,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         foreach ($chunks as $index => $chunk) {
             $this->logger->debug(\sprintf('Analyzing chunk %d/%d', $index + 1, \count($chunks)));
 
-            $vulnerabilities = $this->analyzeChunk($chunk, $symfonyMapping, $coverageRecorder, $toolRegistry);
+            $vulnerabilities = $this->analyzeChunk($chunk, $symfonyMapping, $coverageRecorder, $toolRegistry, $bypassCache);
             $allVulnerabilities = [...$allVulnerabilities, ...$vulnerabilities];
 
             $this->logger->debug('Chunk analysis complete', [
@@ -96,15 +97,17 @@ final readonly class AttackerAgent implements AttackerAgentInterface
      *
      * @return list<Vulnerability>
      */
-    private function analyzeChunk(array $chunk, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry): array
+    private function analyzeChunk(array $chunk, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, bool $bypassCache): array
     {
-        $cached = $this->attackerCache->get($chunk);
+        if (!$bypassCache) {
+            $cached = $this->attackerCache->get($chunk);
 
-        if (null !== $cached) {
-            $this->logger->info('Attacker chunk served from cache', ['files' => \count($chunk)]);
-            $this->recordChunkCoverage($chunk, 'cached', $coverageRecorder);
+            if (null !== $cached) {
+                $this->logger->info('Attacker chunk served from cache', ['files' => \count($chunk)]);
+                $this->recordChunkCoverage($chunk, 'cached', $coverageRecorder);
 
-            return $this->vulnerabilityFactory->fromList(array_values($cached));
+                return $this->vulnerabilityFactory->fromList(array_values($cached));
+            }
         }
 
         $systemPrompt = $this->attackerPromptBuilder->buildSystemPrompt($chunk);
@@ -124,7 +127,10 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             /** @var list<array<string, mixed>> $rawData */
             $rawData = $response->parseJson();
 
-            $this->attackerCache->store($chunk, $rawData);
+            if (!$bypassCache) {
+                $this->attackerCache->store($chunk, $rawData);
+            }
+
             $this->recordChunkCoverage($chunk, 'analyzed', $coverageRecorder);
 
             return $this->vulnerabilityFactory->fromList($rawData);

@@ -38,6 +38,15 @@ final class AuditCommandInput
     #[Option(description: 'Estimate token usage and cost without invoking the LLM; emits a report with zero vulnerabilities and an estimated cost block.')]
     public bool $dryRun = false;
 
+    #[Option(description: 'Bypass the attacker cache for this run: skip cache reads so every chunk hits the LLM, and skip cache writes so existing entries stay untouched. Useful after upgrading the auditor or when you need to force a fresh analysis.', name: 'no-cache')]
+    public bool $noCache = false;
+
+    /**
+     * @var list<string>
+     */
+    #[Option(description: 'Restrict the scan to a subdirectory of the project (relative to the project root). Repeat the option to include several subdirectories. Useful for monorepos where only one app should be audited. By default the whole project is scanned.', name: 'path', shortcut: 'p')]
+    public array $paths = [];
+
     /**
      * @param ?callable(): (string|false) $cwdResolver defaults to PHP's getcwd; tests inject a stub
      */
@@ -53,6 +62,25 @@ final class AuditCommandInput
         }
 
         return $cwd;
+    }
+
+    /**
+     * @return list<string> normalized scan-path filters: trimmed, trailing
+     *                      separators removed, blanks dropped, in input order
+     */
+    public function scanPaths(): array
+    {
+        $normalized = [];
+        foreach ($this->paths as $path) {
+            $trimmed = trim($path);
+            if ('' === $trimmed) {
+                continue;
+            }
+
+            $normalized[] = rtrim($trimmed, '/');
+        }
+
+        return $normalized;
     }
 
     public function isMachineReadableToStdout(): bool

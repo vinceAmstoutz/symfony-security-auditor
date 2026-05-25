@@ -62,7 +62,41 @@ final class AuditCostTest extends TestCase
             'total_tokens' => 150,
             'estimated_cost_usd' => 0.04,
             'primary_model' => 'claude-sonnet-4-5',
+            'by_role' => [],
         ], $auditCost->toArray());
+    }
+
+    public function test_to_array_carries_per_role_breakdown_when_provided(): void
+    {
+        $auditCost = AuditCost::of(
+            inputTokens: 150,
+            outputTokens: 30,
+            estimatedCostUsd: 0.04,
+            primaryModel: 'claude-opus-4-7',
+            byRole: [
+                'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 100, 'output_tokens' => 20, 'estimated_cost_usd' => 0.035],
+                'reviewer' => ['model' => 'claude-haiku-4-5', 'input_tokens' => 50, 'output_tokens' => 10, 'estimated_cost_usd' => 0.005],
+            ],
+        );
+
+        $arr = $auditCost->toArray();
+        self::assertArrayHasKey('by_role', $arr);
+
+        $byRole = $auditCost->byRole();
+        self::assertSame('claude-opus-4-7', $byRole['attacker']['model']);
+        self::assertSame('claude-haiku-4-5', $byRole['reviewer']['model']);
+        self::assertSame(100, $byRole['attacker']['input_tokens']);
+        self::assertSame(50, $byRole['reviewer']['input_tokens']);
+    }
+
+    public function test_by_role_getter_returns_constructor_payload(): void
+    {
+        $byRole = [
+            'attacker' => ['model' => 'm1', 'input_tokens' => 10, 'output_tokens' => 2, 'estimated_cost_usd' => 0.01],
+        ];
+        $auditCost = AuditCost::of(10, 2, 0.01, 'm1', $byRole);
+
+        self::assertSame($byRole, $auditCost->byRole());
     }
 
     public function test_negative_input_tokens_rejected(): void

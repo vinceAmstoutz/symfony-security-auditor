@@ -223,6 +223,34 @@ final class AuditContextTest extends TestCase
         self::assertCount(2, $auditContext->coverage());
     }
 
+    public function test_scan_paths_default_is_empty_list(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        self::assertSame([], $auditContext->scanPaths());
+    }
+
+    public function test_for_project_stores_scan_paths(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, ['apps/api/src', 'libs/shared']);
+
+        self::assertSame(['apps/api/src', 'libs/shared'], $auditContext->scanPaths());
+    }
+
+    public function test_cache_bypassed_default_is_false(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        self::assertFalse($auditContext->isCacheBypassed());
+    }
+
+    public function test_for_project_stores_cache_bypassed_flag(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, [], true);
+
+        self::assertTrue($auditContext->isCacheBypassed());
+    }
+
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);

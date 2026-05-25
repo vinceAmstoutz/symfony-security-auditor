@@ -38,12 +38,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        // 0 chars → str_repeat('x', 0) === '' → estimator yields its base; here we use
-        // a fixed-output estimator that returns 99 regardless. So with 0 chars the
-        // estimator IS still called, but the input it receives is empty.
-        // Asserting on the output_tokens shape kills the -1 mutation: ceil(99 * 3 * 0.15) = 45.
-        self::assertSame(99 * 3, $auditReport->cost()->inputTokens());
-        self::assertSame(45, $auditReport->cost()->outputTokens());
+        // Attacker share alone: 99 * 3 = 297 input; output = ceil(297 * 0.15) = 45.
+        // Asserting on the attacker breakdown kills the -1 mutation in $perRoundInputTokens.
+        $byRole = $auditReport->cost()->byRole();
+        self::assertSame(99 * 3, $byRole['attacker']['input_tokens']);
+        self::assertSame(45, $byRole['attacker']['output_tokens']);
     }
 
     public function test_multi_file_content_accumulates_via_addition(): void
@@ -83,7 +82,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     public function test_input_token_estimate_scales_with_max_iterations(): void
     {
         // Pins: `* maxIterations` (vs `/`). With perRoundTokens=10 and maxIterations=5,
-        // expected = 50; with division mutation, would be 2.
+        // expected attacker = 50; with division mutation, would be 2.
         $estimateAuditCostUseCase = $this->makeUseCase(
             files: [$this->makeProjectFile('a.php', 'aaa')],
             tokenEstimator: $this->fixedEstimator(perRoundTokens: 10),
@@ -92,7 +91,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        self::assertSame(50, $auditReport->cost()->inputTokens());
+        self::assertSame(50, $auditReport->cost()->byRole()['attacker']['input_tokens']);
     }
 
     public function test_output_token_estimate_uses_ceil_of_output_ratio(): void
@@ -112,8 +111,9 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        self::assertSame(100, $auditReport->cost()->inputTokens());
-        self::assertSame(16, $auditReport->cost()->outputTokens());
+        $byRole = $auditReport->cost()->byRole();
+        self::assertSame(100, $byRole['attacker']['input_tokens']);
+        self::assertSame(16, $byRole['attacker']['output_tokens']);
     }
 
     public function test_output_token_estimate_uses_ceil_not_floor(): void
@@ -129,7 +129,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        self::assertSame(24, $auditReport->cost()->outputTokens());
+        self::assertSame(24, $auditReport->cost()->byRole()['attacker']['output_tokens']);
     }
 
     public function test_estimate_input_is_str_repeat_x_of_total_chars(): void
@@ -207,9 +207,168 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertCount(1, $readyLogs);
         $context = $readyLogs[0][1];
         self::assertSame(2, $context['files']);
-        self::assertSame(200, $context['input_tokens']);
-        self::assertSame(100, $context['output_tokens']);
+        // attacker = 100 * 2 = 200, reviewer = ceil(200 * 0.20) = 40, total = 240
+        self::assertSame(240, $context['input_tokens']);
+        // attacker_out = ceil(200 * 0.5) = 100, reviewer_out = ceil(40 * 0.5) = 20, total = 120
+        self::assertSame(120, $context['output_tokens']);
         self::assertSame(0.0, $context['estimated_cost_usd']);
+        self::assertSame(0.0, $context['attacker_cost_usd']);
+        self::assertSame(0.0, $context['reviewer_cost_usd']);
+    }
+
+    public function test_dry_run_emits_attacker_and_reviewer_breakdown(): void
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
+            primaryModel: 'claude-opus-4-7',
+            maxIterations: 1,
+            outputRatio: 0.5,
+            reviewerModel: 'claude-haiku-4-5',
+            reviewerInputRatio: 0.25,
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        $byRole = $auditReport->cost()->byRole();
+        self::assertSame('claude-opus-4-7', $byRole['attacker']['model']);
+        self::assertSame('claude-haiku-4-5', $byRole['reviewer']['model']);
+        // attacker input = 100, reviewer input = ceil(100 * 0.25) = 25
+        self::assertSame(100, $byRole['attacker']['input_tokens']);
+        self::assertSame(25, $byRole['reviewer']['input_tokens']);
+    }
+
+    public function test_attacker_cost_in_breakdown_is_rounded_to_six_decimals(): void
+    {
+        // Pins `round($attackerCostUsd, 6)` against the RoundingFamily mutants
+        // (ceil/floor) and the IncrementInteger/DecrementInteger mutants on the
+        // precision argument (6 → 5 or 6 → 7).
+        //   inputPricePerMillion = 1.234567, 100 input tokens, 0 output, 1 iter
+        //   attackerCost = (100 / 1_000_000) * 1.234567 = 0.0001234567
+        //   round(_, 6) → 0.000123  (correct)
+        //   round(_, 5) → 0.00012   (DecrementInteger)
+        //   round(_, 7) → 0.0001235 (IncrementInteger)
+        //   floor       → 0.0
+        //   ceil        → 1.0
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
+            maxIterations: 1,
+            outputRatio: 0.0,
+            reviewerInputRatio: 0.0,
+            pricingProvider: $this->nonZeroPricing(1.234567, 0.0),
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(0.000123, $auditReport->cost()->byRole()['attacker']['estimated_cost_usd']);
+    }
+
+    public function test_reviewer_cost_in_breakdown_is_rounded_to_six_decimals(): void
+    {
+        // Same family of mutants as the attacker test, applied to the
+        // `round($reviewerCostUsd, 6)` line.
+        //   inputPricePerMillion = 1.234567, attacker input = 100, reviewerInputRatio = 0.5
+        //   reviewerInput = ceil(100 * 0.5) = 50; reviewer output = 0
+        //   reviewerCost = (50 / 1_000_000) * 1.234567 = 0.0000617283(5)
+        //   round(_, 6) → 0.000062  (correct, 7th decimal is 8 → round up)
+        //   round(_, 5) → 0.00006   (DecrementInteger)
+        //   round(_, 7) → 0.0000617 (IncrementInteger)
+        //   floor       → 0.0
+        //   ceil        → 1.0
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
+            maxIterations: 1,
+            outputRatio: 0.0,
+            reviewerInputRatio: 0.5,
+            pricingProvider: $this->nonZeroPricing(1.234567, 0.0),
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(0.000062, $auditReport->cost()->byRole()['reviewer']['estimated_cost_usd']);
+    }
+
+    public function test_estimated_cost_sums_attacker_and_reviewer_contributions(): void
+    {
+        // Pins `$attackerCostUsd + $reviewerCostUsd` against the Plus → Minus mutant.
+        //   attackerCost = 0.0001234567, reviewerCost = 0.00006172835
+        //   sum      = 0.00018518505 → AuditCost::of rounds to 6 decimals → 0.000185
+        //   minus    = 0.00006172835 → rounds to 0.000062 (clearly different)
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
+            maxIterations: 1,
+            outputRatio: 0.0,
+            reviewerInputRatio: 0.5,
+            pricingProvider: $this->nonZeroPricing(1.234567, 0.0),
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(0.000185, $auditReport->cost()->estimatedCostUsd());
+    }
+
+    public function test_reviewer_input_token_estimate_uses_ceil_not_floor_or_round(): void
+    {
+        // Pins `(int) ceil($attackerInputTokens * $this->reviewerInputRatio)` against
+        // floor / round mutants on the reviewer estimation.
+        //   attackerInput = 100, reviewerInputRatio = 0.234 → 23.4
+        //   ceil  → 24  (correct)
+        //   floor → 23
+        //   round → 23  (banker's rounding)
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
+            maxIterations: 1,
+            outputRatio: 0.5,
+            reviewerInputRatio: 0.234,
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(24, $auditReport->cost()->byRole()['reviewer']['input_tokens']);
+    }
+
+    public function test_reviewer_output_token_estimate_uses_ceil_not_floor_or_round(): void
+    {
+        // Pins `(int) ceil($reviewerInputTokens * $this->outputRatio)` for the
+        // reviewer output line against both floor AND round mutants.
+        //   reviewerInput = ceil(100 * 0.5) = 50, outputRatio = 0.146
+        //   50 * 0.146 = 7.3
+        //   ceil  → 8  (correct)
+        //   floor → 7
+        //   round → 7  (banker's rounding rounds half-down here, but 7.3 < 7.5 anyway)
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
+            maxIterations: 1,
+            outputRatio: 0.146,
+            reviewerInputRatio: 0.5,
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(8, $auditReport->cost()->byRole()['reviewer']['output_tokens']);
+    }
+
+    public function test_dry_run_falls_back_to_attacker_model_when_reviewer_model_blank(): void
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 10),
+            primaryModel: 'gpt-4o',
+            maxIterations: 1,
+            outputRatio: 0.5,
+            reviewerModel: '',
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        $byRole = $auditReport->cost()->byRole();
+        self::assertSame('gpt-4o', $byRole['attacker']['model']);
+        self::assertSame('gpt-4o', $byRole['reviewer']['model']);
     }
 
     public function test_scanned_files_are_set_on_the_audit_context(): void
@@ -228,6 +387,25 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
         self::assertSame(3, $auditReport->filesScanned());
+    }
+
+    public function test_scan_paths_filter_files_before_estimation(): void
+    {
+        // Pins ScanPathFilter integration: without filter, all three files are
+        // estimated; with `apps/api`, only the matching one contributes.
+        $measuringTokenEstimator = $this->measuringEstimator();
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [
+                $this->makeProjectFile('apps/api/src/A.php', 'aa'),     // 2 chars
+                $this->makeProjectFile('apps/web/src/B.php', 'bbbbbb'), // 6 chars
+                $this->makeProjectFile('libs/shared/C.php', 'cccc'),    // 4 chars
+            ],
+            tokenEstimator: $measuringTokenEstimator,
+        );
+
+        $estimateAuditCostUseCase->execute($this->tmpDir, ['apps/api']);
+
+        self::assertSame(2, $measuringTokenEstimator->lastInputLength);
     }
 
     public function test_primary_model_flows_through_to_audit_cost(): void
@@ -253,17 +431,22 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         string $primaryModel = 'gpt-4o',
         int $maxIterations = 3,
         float $outputRatio = EstimateAuditCostUseCase::DEFAULT_OUTPUT_RATIO,
+        string $reviewerModel = '',
+        float $reviewerInputRatio = EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO,
+        ?PricingProviderInterface $pricingProvider = null,
     ): EstimateAuditCostUseCase {
         $projectFileScanner = $this->fixedScanner($files);
 
         return new EstimateAuditCostUseCase(
             $projectFileScanner,
             $tokenEstimator,
-            new CostCalculator($this->zeroPricing()),
+            new CostCalculator($pricingProvider ?? $this->zeroPricing()),
             $logger ?? new NullLogger(),
             $primaryModel,
             $maxIterations,
             $outputRatio,
+            $reviewerModel,
+            $reviewerInputRatio,
         );
     }
 
@@ -312,6 +495,36 @@ final class EstimateAuditCostUseCaseTest extends TestCase
             public function pricePerMillionOutputTokens(string $model): float
             {
                 return 0.0;
+            }
+
+            public function hasModel(string $model): bool
+            {
+                return true;
+            }
+        };
+    }
+
+    /**
+     * Non-zero pricing fixture that produces costs with at least six significant
+     * decimals — used to pin the rounding mutators on the per-role cost rows
+     * (`round(_, 6)`) which all collapse to 0.0 under `zeroPricing()`.
+     */
+    private function nonZeroPricing(float $inputPricePerMillion, float $outputPricePerMillion): PricingProviderInterface
+    {
+        return new class($inputPricePerMillion, $outputPricePerMillion) implements PricingProviderInterface {
+            public function __construct(
+                private readonly float $inputPricePerMillion,
+                private readonly float $outputPricePerMillion,
+            ) {}
+
+            public function pricePerMillionInputTokens(string $model): float
+            {
+                return $this->inputPricePerMillion;
+            }
+
+            public function pricePerMillionOutputTokens(string $model): float
+            {
+                return $this->outputPricePerMillion;
             }
 
             public function hasModel(string $model): bool

@@ -42,10 +42,31 @@ final readonly class ReportRenderer
             '{{tokens}}' => \sprintf('%s in / %s out', number_format($cost->inputTokens()), number_format($cost->outputTokens())),
             '{{primaryModel}}' => '' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel(),
             '{{cost}}' => \sprintf('$%.4f (estimated)', $cost->estimatedCostUsd()),
+            '{{costBreakdown}}' => $this->renderCostBreakdown($auditReport),
             '{{riskLevel}}' => $auditReport->riskLevel(),
             '{{riskScore}}' => $auditReport->riskScore(),
             '{{body}}' => $this->renderBody($auditReport),
         ]);
+    }
+
+    private function renderCostBreakdown(AuditReport $auditReport): string
+    {
+        // An empty byRole produces an empty $lines, which implode joins to ''.
+        // Keeping a single fall-through path avoids an equivalent ReturnRemoval
+        // mutant on a redundant `if ([] === $byRole) return '';` early return.
+        $lines = [];
+        foreach ($auditReport->cost()->byRole() as $role => $entry) {
+            $lines[] = \sprintf(
+                '  - %-8s (%s): $%.4f — %s in / %s out',
+                $role,
+                '' === $entry['model'] ? 'unknown model' : $entry['model'],
+                $entry['estimated_cost_usd'],
+                number_format($entry['input_tokens']),
+                number_format($entry['output_tokens']),
+            );
+        }
+
+        return implode("\n", $lines);
     }
 
     public function renderJson(AuditReport $auditReport): string

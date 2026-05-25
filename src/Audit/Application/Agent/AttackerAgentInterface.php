@@ -23,8 +23,11 @@ interface AttackerAgentInterface
 {
     /**
      * @param ProjectFile[] $files
+     * @param bool          $bypassCache when true, the agent must skip both
+     *                                   reads from and writes to the
+     *                                   `AttackerCacheInterface` for this call
      *
      * @return Vulnerability[]
      */
-    public function analyze(array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder): array;
+    public function analyze(array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false): array;
 }

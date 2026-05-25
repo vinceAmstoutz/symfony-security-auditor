@@ -58,7 +58,29 @@ final class CharacterBasedTokenEstimatorTest extends TestCase
         yield 'o3_uses_gpt_divisor' => ['o3', 25];
         yield 'o4_uses_gpt_divisor' => ['o4-mini', 25];
         yield 'gemini_uses_gemini_divisor' => ['gemini-2.5-pro', 27];
+        yield 'mistral_uses_mistral_divisor' => ['mistral-large-2', 28];
+        yield 'codestral_uses_mistral_divisor' => ['codestral-25.01', 28];
+        yield 'llama_dashed_uses_llama_divisor' => ['llama-3.3-70b', 28];
+        yield 'llama3_concat_uses_llama_divisor' => ['llama3', 28];
+        yield 'meta_llama_uses_llama_divisor' => ['meta-llama/Llama-3.3-70B-Instruct', 28];
+        yield 'deepseek_uses_deepseek_divisor' => ['deepseek-chat', 30];
         yield 'unknown_model_uses_default_divisor' => ['mystery-7', 32];
+    }
+
+    public function test_user_provided_prefix_overrides_built_in_ratio(): void
+    {
+        $characterBasedTokenEstimator = new CharacterBasedTokenEstimator(['claude-' => 2.0]);
+
+        // 100 chars / 2.0 = 50 tokens; default Claude ratio (3.5) would yield 29.
+        self::assertSame(50, $characterBasedTokenEstimator->estimateTokens(str_repeat('x', 100), 'claude-opus-4-7'));
+    }
+
+    public function test_user_provided_prefix_falls_through_to_defaults_when_model_does_not_match(): void
+    {
+        $characterBasedTokenEstimator = new CharacterBasedTokenEstimator(['my-custom-' => 2.0]);
+
+        // GPT default 4.0 still applies for 'gpt-4o'.
+        self::assertSame(25, $characterBasedTokenEstimator->estimateTokens(str_repeat('x', 100), 'gpt-4o'));
     }
 
     public function test_longer_text_yields_strictly_more_tokens(): void

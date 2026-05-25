@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -33,17 +32,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPro
 
 final class ReviewerAgentTest extends TestCase
 {
-    private LLMClientInterface&MockObject $llmClient;
-
-    private ReviewerAgent $reviewerAgent;
-
     private string $tmpDir;
 
     public function test_it_returns_empty_array_when_no_vulnerabilities(): void
     {
-        $this->llmClient->expects(self::never())->method('complete');
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('complete');
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([], [], new NullCoverageRecorder());
 
         self::assertEmpty($result);
     }
@@ -61,12 +58,14 @@ final class ReviewerAgentTest extends TestCase
             'additional_attack_paths' => null,
         ]);
 
-        $this->llmClient
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
             ->expects(self::once())
             ->method('complete')
             ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability], $files, new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability], $files, new NullCoverageRecorder());
 
         self::assertCount(1, $result);
         self::assertTrue($result[0]->isReviewerValidated());
@@ -84,12 +83,14 @@ final class ReviewerAgentTest extends TestCase
             'additional_attack_paths' => null,
         ]);
 
-        $this->llmClient
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
             ->expects(self::once())
             ->method('complete')
             ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
         self::assertCount(1, $result);
         self::assertFalse($result[0]->isReviewerValidated());
@@ -107,12 +108,14 @@ final class ReviewerAgentTest extends TestCase
             'additional_attack_paths' => null,
         ]);
 
-        $this->llmClient
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
             ->expects(self::once())
             ->method('complete')
             ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
         self::assertCount(1, $result);
         self::assertSame(VulnerabilitySeverity::CRITICAL, $result[0]->severity());
@@ -129,12 +132,14 @@ final class ReviewerAgentTest extends TestCase
             'reviewer_notes' => 'Bad severity',
         ]);
 
-        $this->llmClient
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
             ->expects(self::once())
             ->method('complete')
             ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
         // Should still accept, just keep original severity
         self::assertCount(1, $result);
@@ -146,12 +151,14 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerability();
 
-        $this->llmClient
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
             ->expects(self::once())
             ->method('complete')
             ->willReturn(LLMResponse::create('not json!!!', 100, 10, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
         self::assertCount(1, $result);
         self::assertFalse($result[0]->isReviewerValidated());
@@ -161,12 +168,14 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerability();
 
-        $this->llmClient
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
             ->expects(self::once())
             ->method('complete')
             ->willThrowException(new RuntimeException('Network error'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
         self::assertCount(1, $result);
         self::assertFalse($result[0]->isReviewerValidated());
@@ -176,12 +185,14 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerability();
 
-        $this->llmClient
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
             ->expects(self::once())
             ->method('complete')
             ->willReturn(LLMResponse::create('', 100, 0, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
         self::assertCount(1, $result);
         self::assertFalse($result[0]->isReviewerValidated());
@@ -192,7 +203,8 @@ final class ReviewerAgentTest extends TestCase
         $vulnerability = $this->makeVulnerability();
         $vuln2 = $this->makeVulnerability(VulnerabilitySeverity::MEDIUM);
 
-        $this->llmClient
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
             ->expects(self::exactly(2))
             ->method('complete')
             ->willReturnOnConsecutiveCalls(
@@ -205,8 +217,9 @@ final class ReviewerAgentTest extends TestCase
                     100, 100, 'claude', 'end_turn',
                 ),
             );
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability, $vuln2], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability, $vuln2], [], new NullCoverageRecorder());
 
         self::assertCount(2, $result);
         self::assertTrue($result[0]->isReviewerValidated());
@@ -224,12 +237,14 @@ final class ReviewerAgentTest extends TestCase
             'reviewer_notes' => 'Confirmed and upgraded',
         ]]);
 
-        $this->llmClient
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
             ->expects(self::once())
             ->method('complete')
             ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
         self::assertCount(1, $result);
         self::assertTrue($result[0]->isReviewerValidated());
@@ -244,7 +259,8 @@ final class ReviewerAgentTest extends TestCase
         ];
 
         $capturedUserMessage = null;
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturnCallback(static function (string $sys, string $user) use (&$capturedUserMessage): LLMResponse {
                 $capturedUserMessage = $user;
@@ -254,8 +270,9 @@ final class ReviewerAgentTest extends TestCase
                     100, 10, 'claude', 'end_turn',
                 );
             });
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $this->reviewerAgent->review([$vulnerability], $files, new NullCoverageRecorder());
+        $reviewerAgent->review([$vulnerability], $files, new NullCoverageRecorder());
 
         // vulnerability filePath is UserController.php — not in $files (OtherController.php)
         // Full File Context section should be empty
@@ -277,7 +294,8 @@ final class ReviewerAgentTest extends TestCase
 
         $capturedUserMessage = null;
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturnCallback(static function (string $sys, string $user) use (&$capturedUserMessage): LLMResponse {
                 $capturedUserMessage = $user;
@@ -290,8 +308,9 @@ final class ReviewerAgentTest extends TestCase
                     'end_turn',
                 );
             });
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $this->reviewerAgent->review([$vulnerability], $files, new NullCoverageRecorder());
+        $reviewerAgent->review([$vulnerability], $files, new NullCoverageRecorder());
 
         self::assertStringContainsString('UserController', (string) $capturedUserMessage);
     }
@@ -308,7 +327,8 @@ final class ReviewerAgentTest extends TestCase
 
         $vulnerability = $this->makeVulnerability();
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create(
                 (string) json_encode(['accepted' => true]),
@@ -316,7 +336,7 @@ final class ReviewerAgentTest extends TestCase
             ));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
         );
@@ -331,13 +351,15 @@ final class ReviewerAgentTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::never())->method('info');
 
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('complete');
+
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
         );
 
-        $this->llmClient->expects(self::never())->method('complete');
         $result = $reviewerAgent->review([], [], new NullCoverageRecorder());
 
         self::assertSame([], $result);
@@ -355,12 +377,13 @@ final class ReviewerAgentTest extends TestCase
                 'error' => 'Syntax error',
             ]);
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create('invalid json {{{', 10, 10, 'claude', 'end_turn'));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
         );
@@ -383,12 +406,13 @@ final class ReviewerAgentTest extends TestCase
                 'error' => 'Timeout',
             ]);
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willThrowException(new RuntimeException('Timeout'));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
         );
@@ -412,7 +436,8 @@ final class ReviewerAgentTest extends TestCase
         );
         $logger->method('debug');
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create(
                 (string) json_encode(['accepted' => true, 'reviewer_notes' => 'confirmed']),
@@ -420,7 +445,7 @@ final class ReviewerAgentTest extends TestCase
             ));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
         );
@@ -444,7 +469,8 @@ final class ReviewerAgentTest extends TestCase
         );
         $logger->method('debug');
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create(
                 (string) json_encode(['accepted' => false, 'reviewer_notes' => 'rejected']),
@@ -452,7 +478,7 @@ final class ReviewerAgentTest extends TestCase
             ));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
         );
@@ -475,7 +501,8 @@ final class ReviewerAgentTest extends TestCase
             },
         );
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create(
                 (string) json_encode(['accepted' => true, 'reviewer_notes' => 'looks good']),
@@ -483,7 +510,7 @@ final class ReviewerAgentTest extends TestCase
             ));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
         );
@@ -508,12 +535,13 @@ final class ReviewerAgentTest extends TestCase
 
         $vulnerability = $this->makeVulnerability();
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create('', 10, 0, 'claude', 'end_turn'));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
         );
@@ -536,7 +564,8 @@ final class ReviewerAgentTest extends TestCase
             },
         );
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create(
                 (string) json_encode(['accepted' => true, 'adjusted_severity' => 'SUPER_CRITICAL_9000']),
@@ -544,7 +573,7 @@ final class ReviewerAgentTest extends TestCase
             ));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
         );
@@ -563,14 +592,16 @@ final class ReviewerAgentTest extends TestCase
         // A FalseValue mutation would remove the `?? false`, making missing key produce null (truthy cast).
         $vulnerability = $this->makeVulnerability();
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create(
                 (string) json_encode(['reviewer_notes' => 'no accepted key']),
                 10, 10, 'claude', 'end_turn',
             ));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
         self::assertCount(1, $result);
         self::assertFalse($result[0]->isReviewerValidated());
@@ -592,7 +623,8 @@ final class ReviewerAgentTest extends TestCase
             },
         );
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create(
                 (string) json_encode(['accepted' => false, 'reviewer_notes' => 'false positive']),
@@ -600,7 +632,7 @@ final class ReviewerAgentTest extends TestCase
             ));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
         );
@@ -635,7 +667,8 @@ final class ReviewerAgentTest extends TestCase
             },
         );
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create(
                 (string) json_encode([
@@ -647,7 +680,7 @@ final class ReviewerAgentTest extends TestCase
             ));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
         );
@@ -683,7 +716,8 @@ final class ReviewerAgentTest extends TestCase
         $vulnerability = $this->makeVulnerability();
 
         $capturedUserMessage = null;
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturnCallback(
                 static function (string $sys, string $user) use (&$capturedUserMessage): LLMResponse {
@@ -695,8 +729,9 @@ final class ReviewerAgentTest extends TestCase
                     );
                 },
             );
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $this->reviewerAgent->review([$vulnerability], $files, new NullCoverageRecorder());
+        $reviewerAgent->review([$vulnerability], $files, new NullCoverageRecorder());
 
         self::assertStringContainsString('sensitiveAction', (string) $capturedUserMessage);
     }
@@ -713,13 +748,14 @@ final class ReviewerAgentTest extends TestCase
             ['id' => $c->id(), 'accepted' => true],
         ]);
 
-        $this->llmClient
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
             ->expects(self::once())
             ->method('complete')
             ->willReturn(LLMResponse::create($batchResponse, 10, 10, 'claude', 'end_turn'));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 5,
@@ -741,7 +777,8 @@ final class ReviewerAgentTest extends TestCase
         }
 
         $callIndex = 0;
-        $this->llmClient
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
             ->expects(self::exactly(3))
             ->method('complete')
             ->willReturnCallback(static function () use (&$callIndex): LLMResponse {
@@ -751,7 +788,7 @@ final class ReviewerAgentTest extends TestCase
             });
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 3,
@@ -771,12 +808,13 @@ final class ReviewerAgentTest extends TestCase
             ['id' => $vulnerability->id(), 'accepted' => true],
         ]);
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create($batchResponse, 10, 10, 'claude', 'end_turn'));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 5,
@@ -798,14 +836,15 @@ final class ReviewerAgentTest extends TestCase
             ['id' => $b->id(), 'accepted' => false],
         ]);
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create($batchResponse, 10, 10, 'claude', 'end_turn'));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 5,
@@ -827,14 +866,15 @@ final class ReviewerAgentTest extends TestCase
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
         $b = $this->makeVulnerabilityAt('src/B.php');
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willThrowException(new RuntimeException('API down'));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 5,
@@ -858,14 +898,15 @@ final class ReviewerAgentTest extends TestCase
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
         $b = $this->makeVulnerabilityAt('src/B.php');
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create('not json{{{', 10, 10, 'claude', 'end_turn'));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 5,
@@ -887,14 +928,15 @@ final class ReviewerAgentTest extends TestCase
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
         $b = $this->makeVulnerabilityAt('src/B.php');
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create('', 10, 0, 'claude', 'end_turn'));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 5,
@@ -927,7 +969,8 @@ final class ReviewerAgentTest extends TestCase
             ['id' => $c->id(), 'accepted' => true],
         ]);
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturnOnConsecutiveCalls(
                 LLMResponse::create($batch1Response, 0, 0, 'claude', 'end_turn'),
@@ -935,7 +978,7 @@ final class ReviewerAgentTest extends TestCase
             );
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 2,
@@ -955,14 +998,15 @@ final class ReviewerAgentTest extends TestCase
             ['id' => $vulnerability->id(), 'accepted' => true],
         ]);
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create($batchResponse, 0, 0, 'claude', 'end_turn'));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 5,
@@ -989,12 +1033,13 @@ final class ReviewerAgentTest extends TestCase
             ['id' => $b->id(), 'accepted' => true],
         ]);
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create($batchResponse, 0, 0, 'claude', 'end_turn'));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 5,
@@ -1020,12 +1065,13 @@ final class ReviewerAgentTest extends TestCase
             ['id' => $b->id(), 'accepted' => true],
         ]);
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create($batchResponse, 0, 0, 'claude', 'end_turn'));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 5,
@@ -1050,12 +1096,13 @@ final class ReviewerAgentTest extends TestCase
         $logger->method('info');
         $logger->method('debug');
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create('not json{{{', 0, 0, 'claude', 'end_turn'));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
             batchSize: 5,
@@ -1090,12 +1137,13 @@ final class ReviewerAgentTest extends TestCase
         $logger->method('info');
         $logger->method('debug');
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willThrowException(new RuntimeException('API down'));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
             batchSize: 5,
@@ -1126,12 +1174,13 @@ final class ReviewerAgentTest extends TestCase
             ['id' => $vulnerability->id(), 'accepted' => true, 'adjusted_severity' => 'critical'],
         ]);
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create($batchResponse, 10, 10, 'claude', 'end_turn'));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 5,
@@ -1167,11 +1216,13 @@ final class ReviewerAgentTest extends TestCase
             'reviewer_notes' => 'attacker mislabelled — this is SSRF, not SQLi',
         ]);
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
         self::assertSame(VulnerabilityType::SSRF, $result[0]->type());
     }
@@ -1186,11 +1237,13 @@ final class ReviewerAgentTest extends TestCase
             'corrected_type' => 'NOT_A_REAL_TYPE',
         ]);
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
         // Original type survives a bad correction; accepted state is still honored.
         self::assertSame($vulnerability->type(), $result[0]->type());
@@ -1207,11 +1260,13 @@ final class ReviewerAgentTest extends TestCase
             'corrected_type' => 'ssrf',
         ]);
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
         self::assertFalse($result[0]->isReviewerValidated());
         self::assertSame($vulnerability->type(), $result[0]->type());
@@ -1230,7 +1285,8 @@ final class ReviewerAgentTest extends TestCase
             },
         );
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create(
                 (string) json_encode(['accepted' => true, 'corrected_type' => 'NOT_A_TYPE_999']),
@@ -1238,7 +1294,7 @@ final class ReviewerAgentTest extends TestCase
             ));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: $logger,
         );
@@ -1259,14 +1315,16 @@ final class ReviewerAgentTest extends TestCase
         // if the is_string guard were removed.
         $vulnerability = $this->makeVulnerability();
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create(
                 (string) json_encode(['accepted' => true, 'corrected_type' => 12345]),
                 10, 10, 'claude', 'end_turn',
             ));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
-        $result = $this->reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
         self::assertSame($vulnerability->type(), $result[0]->type());
         self::assertTrue($result[0]->isReviewerValidated());
@@ -1276,13 +1334,15 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerability();
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create((string) json_encode(['accepted' => true]), 10, 10, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
-        $this->reviewerAgent->review([$vulnerability], [], $auditContext);
+        $reviewerAgent->review([$vulnerability], [], $auditContext);
 
         self::assertSame(
             [['stage' => 'reviewer', 'file' => 'src/Controller/UserController.php', 'status' => 'validated']],
@@ -1294,13 +1354,15 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerability();
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create((string) json_encode(['accepted' => false]), 10, 10, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
-        $this->reviewerAgent->review([$vulnerability], [], $auditContext);
+        $reviewerAgent->review([$vulnerability], [], $auditContext);
 
         self::assertSame(
             [['stage' => 'reviewer', 'file' => 'src/Controller/UserController.php', 'status' => 'rejected']],
@@ -1312,13 +1374,15 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerability();
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create('', 10, 0, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
-        $this->reviewerAgent->review([$vulnerability], [], $auditContext);
+        $reviewerAgent->review([$vulnerability], [], $auditContext);
 
         self::assertSame(
             [['stage' => 'reviewer', 'file' => 'src/Controller/UserController.php', 'status' => 'rejected']],
@@ -1330,13 +1394,15 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerability();
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::create('garbage{{{', 10, 10, 'claude', 'end_turn'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
-        $this->reviewerAgent->review([$vulnerability], [], $auditContext);
+        $reviewerAgent->review([$vulnerability], [], $auditContext);
 
         self::assertSame(
             [['stage' => 'reviewer', 'file' => 'src/Controller/UserController.php', 'status' => 'errored']],
@@ -1348,13 +1414,15 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerability();
 
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willThrowException(new RuntimeException('API down'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
-        $this->reviewerAgent->review([$vulnerability], [], $auditContext);
+        $reviewerAgent->review([$vulnerability], [], $auditContext);
 
         self::assertSame(
             [['stage' => 'reviewer', 'file' => 'src/Controller/UserController.php', 'status' => 'errored']],
@@ -1365,36 +1433,41 @@ final class ReviewerAgentTest extends TestCase
     public function test_single_review_propagates_llm_provider_exception_instead_of_swallowing_it(): void
     {
         $vulnerability = $this->makeVulnerability();
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willThrowException(new LLMProviderException('platform unreachable'));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $this->expectException(LLMProviderException::class);
         $this->expectExceptionMessage('platform unreachable');
 
-        $this->reviewerAgent->review([$vulnerability], [], AuditContext::forProject($this->tmpDir));
+        $reviewerAgent->review([$vulnerability], [], AuditContext::forProject($this->tmpDir));
     }
 
     public function test_single_review_propagates_budget_exceeded_exception_instead_of_swallowing_it(): void
     {
         $vulnerability = $this->makeVulnerability();
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willThrowException(BudgetExceededException::forTokens(500, 100));
+        $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $this->expectException(BudgetExceededException::class);
 
-        $this->reviewerAgent->review([$vulnerability], [], AuditContext::forProject($this->tmpDir));
+        $reviewerAgent->review([$vulnerability], [], AuditContext::forProject($this->tmpDir));
     }
 
     public function test_batch_review_propagates_llm_provider_exception_instead_of_swallowing_it(): void
     {
         $batch = [$this->makeVulnerabilityAt('src/A.php'), $this->makeVulnerabilityAt('src/B.php')];
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willThrowException(new LLMProviderException('platform unreachable'));
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 5,
@@ -1409,11 +1482,12 @@ final class ReviewerAgentTest extends TestCase
     public function test_batch_review_propagates_budget_exceeded_exception_instead_of_swallowing_it(): void
     {
         $batch = [$this->makeVulnerabilityAt('src/A.php'), $this->makeVulnerabilityAt('src/B.php')];
-        $this->llmClient
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
             ->method('complete')
             ->willThrowException(BudgetExceededException::forTokens(500, 100));
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
+            llmClient: $llmClient,
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
             batchSize: 5,
@@ -1428,18 +1502,20 @@ final class ReviewerAgentTest extends TestCase
     {
         $this->tmpDir = sys_get_temp_dir().'/reviewer_agent_test_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
-
-        $this->llmClient = $this->createMock(LLMClientInterface::class);
-        $this->reviewerAgent = new ReviewerAgent(
-            llmClient: $this->llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-        );
     }
 
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
+    }
+
+    private function makeReviewerAgent(LLMClientInterface $llmClient): ReviewerAgent
+    {
+        return new ReviewerAgent(
+            llmClient: $llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: new NullLogger(),
+        );
     }
 
     private function makeVulnerabilityAt(
