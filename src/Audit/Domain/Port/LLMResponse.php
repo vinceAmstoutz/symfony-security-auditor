@@ -18,6 +18,8 @@ use RuntimeException;
 
 final readonly class LLMResponse
 {
+    private const int JSON_MAX_DEPTH = 512;
+
     private function __construct(
         private string $content,
         private int $inputTokens,
@@ -89,7 +91,7 @@ final readonly class LLMResponse
         // payloads whose shape we cannot pre-declare as a class. We only need array hydration
         // here; downstream factories (e.g. VulnerabilityFactory) handle structural validation.
         try {
-            $decoded = json_decode($content, true, 512, \JSON_THROW_ON_ERROR);
+            $decoded = json_decode($content, true, self::JSON_MAX_DEPTH, \JSON_THROW_ON_ERROR);
         } catch (JsonException $jsonException) {
             // When tools are enabled the LLM sometimes returns prose around the JSON
             // despite the "Return ONLY the JSON array" prompt instruction. Try to
@@ -99,7 +101,7 @@ final readonly class LLMResponse
                 throw $jsonException;
             }
 
-            $decoded = json_decode($extracted, true, 512, \JSON_THROW_ON_ERROR);
+            $decoded = json_decode($extracted, true, self::JSON_MAX_DEPTH, \JSON_THROW_ON_ERROR);
         }
 
         if (!\is_array($decoded)) {
@@ -117,25 +119,37 @@ final readonly class LLMResponse
      */
     private function extractBalancedJsonBlock(string $content): ?string
     {
-        $length = \strlen($content);
-        $start = -1;
-        $open = '';
-        $close = '';
-
-        for ($i = 0; $i < $length; ++$i) {
-            $char = $content[$i];
-            if ('[' === $char || '{' === $char) {
-                $start = $i;
-                $open = $char;
-                $close = '[' === $char ? ']' : '}';
-                break;
-            }
-        }
-
-        if (-1 === $start) {
+        $opener = $this->findFirstJsonOpener($content);
+        if (null === $opener) {
             return null;
         }
 
+        return $this->scanBalancedBlockFrom($content, $opener['start'], $opener['open'], $opener['close']);
+    }
+
+    /**
+     * @return array{start: int, open: string, close: string}|null
+     */
+    private function findFirstJsonOpener(string $content): ?array
+    {
+        $length = \strlen($content);
+        for ($i = 0; $i < $length; ++$i) {
+            $char = $content[$i];
+            if ('[' === $char) {
+                return ['start' => $i, 'open' => '[', 'close' => ']'];
+            }
+
+            if ('{' === $char) {
+                return ['start' => $i, 'open' => '{', 'close' => '}'];
+            }
+        }
+
+        return null;
+    }
+
+    private function scanBalancedBlockFrom(string $content, int $start, string $open, string $close): ?string
+    {
+        $length = \strlen($content);
         $depth = 0;
         $inString = false;
         $escape = false;

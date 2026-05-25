@@ -116,6 +116,37 @@ final class LLMResponseTest extends TestCase
         self::assertSame([['title' => 'x " ] y', 'other' => 'z']], $data);
     }
 
+    public function test_it_locks_extraction_length_to_closing_bracket_position(): void
+    {
+        // A `+1` → `+2` mutation on the substring length would include one byte
+        // past the closing bracket. With a `{` immediately after the `]`, that
+        // extra byte makes the substring invalid JSON, so the second decode
+        // throws and the mutant is killed.
+        $content = '[1,2]{garbage}';
+        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+
+        $data = $llmResponse->parseJson();
+
+        self::assertSame([1, 2], $data);
+    }
+
+    public function test_it_scans_for_opener_from_the_start_not_the_end_of_content(): void
+    {
+        // PHP returns the last character for `$content[-1]`. A mutation that flips
+        // the opener-scan loop's initial index from `0` to `-1` would pick that
+        // last character as the opener when it happens to be `[` or `{`, yielding
+        // a different extracted substring than scanning forward from the start.
+        // Content has a valid `[1,2]` early AND ends with `{`, so the original
+        // recovers `[1,2]` while the mutant tries to extract from the trailing
+        // `{` and fails to find a matching close → null → JsonException rethrow.
+        $content = '[1,2] {';
+        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+
+        $data = $llmResponse->parseJson();
+
+        self::assertSame([1, 2], $data);
+    }
+
     public function test_it_throws_on_invalid_json(): void
     {
         $llmResponse = LLMResponse::create('not json at all', 10, 5, 'claude', 'end_turn');
