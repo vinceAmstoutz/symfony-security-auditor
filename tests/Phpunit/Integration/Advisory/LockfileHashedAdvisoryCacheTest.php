@@ -234,12 +234,14 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $warnings,
             static fn (array $entry): bool => 'Advisory cache entry unreadable, falling back to live audit' === $entry[0],
         ));
-        // Pins the 'path' entry on the warning context against ArrayItemRemoval.
+        // Pins both 'path' and 'error' entries on the warning context against
+        // ArrayItemRemoval / ArrayItem mutants.
         self::assertCount(1, $unreadableLogs);
         $path = $unreadableLogs[0][1]['path'] ?? null;
         self::assertIsString($path);
         self::assertStringEndsWith('.json', $path);
         self::assertStringContainsString($this->cacheDir, $path);
+        self::assertSame('cache entry unreadable', $unreadableLogs[0][1]['error'] ?? null);
     }
 
     public function test_cache_file_is_written_at_two_char_shard_directory_under_full_hash_filename(): void
@@ -273,22 +275,33 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
 
     public function test_cache_dir_with_trailing_slash_is_normalized_before_assembling_path(): void
     {
-        // Pins UnwrapRtrim on rtrim($this->cacheDir, '/'): without it, a cacheDir
-        // ending in '/' produces a path containing a double slash (`.../cache//ab/...`).
-        $cacheDirWithSlash = $this->projectDir.'/trailing/';
+        // Pins UnwrapRtrim on rtrim($this->cacheDir, '/'). The Linux kernel
+        // collapses '//' in path lookups, so asserting on glob() output is not
+        // enough; intercept the raw path the code hands to dumpFile() instead.
         $this->writeLockfile('{"lock": "v1"}');
+
+        $capturedDumpPaths = [];
+        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem->method('exists')->willReturnCallback(
+            static fn (string $path): bool => str_ends_with($path, 'composer.lock'),
+        );
+        $filesystem->method('readFile')->willReturn('{"lock": "v1"}');
+        $filesystem->method('dumpFile')->willReturnCallback(
+            static function (string $path) use (&$capturedDumpPaths): void {
+                $capturedDumpPaths[] = $path;
+            },
+        );
 
         $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache(
             $this->recordingRunner('{"advisories": {}}'),
-            $cacheDirWithSlash,
-            new Filesystem(),
+            $this->cacheDir.'/',
+            $filesystem,
             new NullLogger(),
         );
         $lockfileHashedAdvisoryCache->run($this->projectDir);
 
-        $files = glob(rtrim($cacheDirWithSlash, '/').'/*/*.json') ?: [];
-        self::assertCount(1, $files);
-        self::assertStringNotContainsString('//', $files[0]);
+        self::assertCount(1, $capturedDumpPaths);
+        self::assertStringNotContainsString('//', $capturedDumpPaths[0]);
     }
 
     public function test_write_failure_is_logged_and_does_not_propagate(): void
@@ -324,8 +337,51 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
 
         self::assertSame('{"advisories": {"foo/bar": []}}', $json);
-        $messages = array_column($warnings, 0);
-        self::assertContains('Failed to write advisory cache entry', $messages);
+
+        $failureLogs = array_values(array_filter(
+            $warnings,
+            static fn (array $entry): bool => 'Failed to write advisory cache entry' === $entry[0],
+        ));
+        // Pins both 'path' and 'error' entries on the warning context against
+        // ArrayItemRemoval / ArrayItem mutants in the writeCache() catch.
+        self::assertCount(1, $failureLogs);
+        $path = $failureLogs[0][1]['path'] ?? null;
+        self::assertIsString($path);
+        self::assertStringEndsWith('.json', $path);
+        self::assertSame('cache dir unwritable', $failureLogs[0][1]['error'] ?? null);
+    }
+
+    public function test_successful_cache_write_emits_advisory_cache_stored_debug_log_with_lockfile_hash(): void
+    {
+        // Pins both the `$this->logger->debug('Advisory cache stored', …)` call
+        // against MethodCallRemoval and the `['lockfile_hash' => $hash]` entry
+        // against ArrayItemRemoval on the writeCache() success path.
+        $lockfileContent = '{"lock": "v1"}';
+        $this->writeLockfile($lockfileContent);
+        $expectedHash = hash('sha256', $lockfileContent);
+
+        $debugLogs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$debugLogs): void {
+                $debugLogs[] = [$message, $context];
+            },
+        );
+
+        $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache(
+            $this->recordingRunner('{"advisories": {"foo/bar": []}}'),
+            $this->cacheDir,
+            new Filesystem(),
+            $logger,
+        );
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $storedLogs = array_values(array_filter(
+            $debugLogs,
+            static fn (array $entry): bool => 'Advisory cache stored' === $entry[0],
+        ));
+        self::assertCount(1, $storedLogs);
+        self::assertSame($expectedHash, $storedLogs[0][1]['lockfile_hash'] ?? null);
     }
 
     protected function setUp(): void
