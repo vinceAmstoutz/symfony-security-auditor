@@ -35,14 +35,23 @@ final class AuditContext implements CoverageRecorderInterface
 
     private DateTimeImmutable $startedAt;
 
+    /**
+     * @param list<string> $scanPaths
+     */
     private function __construct(
         private readonly string $projectPath,
         private readonly string $auditId,
+        private readonly array $scanPaths,
     ) {
         $this->startedAt = new DateTimeImmutable();
     }
 
-    public static function forProject(string $projectPath): self
+    /**
+     * @param list<string> $scanPaths optional project-relative subdirectories
+     *                                that the scan should be restricted to;
+     *                                empty list scans the whole project
+     */
+    public static function forProject(string $projectPath, array $scanPaths = []): self
     {
         if (!is_dir($projectPath)) {
             throw new InvalidArgumentException(\sprintf('Project path "%s" is not a valid directory', $projectPath));
@@ -51,6 +60,7 @@ final class AuditContext implements CoverageRecorderInterface
         return new self(
             projectPath: rtrim($projectPath, '/'),
             auditId: \sprintf('AUDIT-%s', strtoupper(bin2hex(random_bytes(4)))),
+            scanPaths: $scanPaths,
         );
     }
 
@@ -67,6 +77,12 @@ final class AuditContext implements CoverageRecorderInterface
     public function startedAt(): DateTimeImmutable
     {
         return $this->startedAt;
+    }
+
+    /** @return list<string> */
+    public function scanPaths(): array
+    {
+        return $this->scanPaths;
     }
 
     /** @return list<ProjectFile> */

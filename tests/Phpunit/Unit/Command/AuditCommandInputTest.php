@@ -138,4 +138,35 @@ final class AuditCommandInputTest extends TestCase
 
         self::assertSame('/custom/cwd', $auditCommandInput->resolvedProjectPath(static fn (): string => '/custom/cwd'));
     }
+
+    public function test_default_paths_is_empty_list(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+
+        self::assertSame([], $auditCommandInput->paths);
+    }
+
+    public function test_scan_paths_returns_input_paths_unchanged(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->paths = ['apps/api/src', 'libs/shared/src'];
+
+        self::assertSame(['apps/api/src', 'libs/shared/src'], $auditCommandInput->scanPaths());
+    }
+
+    public function test_scan_paths_drops_blank_entries(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->paths = ['apps/api/src', '', '   ', 'libs'];
+
+        self::assertSame(['apps/api/src', 'libs'], $auditCommandInput->scanPaths());
+    }
+
+    public function test_scan_paths_normalizes_trailing_separators(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->paths = ['apps/api/src/', 'libs/shared/'];
+
+        self::assertSame(['apps/api/src', 'libs/shared'], $auditCommandInput->scanPaths());
+    }
 }

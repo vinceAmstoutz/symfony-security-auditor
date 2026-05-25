@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
@@ -38,7 +39,10 @@ final readonly class IngestionStage implements StageInterface
             'path' => $auditContext->projectPath(),
         ]);
 
-        $files = $this->projectFileScanner->scan($auditContext->projectPath());
+        $files = ScanPathFilter::apply(
+            $this->projectFileScanner->scan($auditContext->projectPath()),
+            $auditContext->scanPaths(),
+        );
 
         if ([] === $files) {
             $this->logger->warning('No files found in project', [

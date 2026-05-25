@@ -230,6 +230,25 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(3, $auditReport->filesScanned());
     }
 
+    public function test_scan_paths_filter_files_before_estimation(): void
+    {
+        // Pins ScanPathFilter integration: without filter, all three files are
+        // estimated; with `apps/api`, only the matching one contributes.
+        $measuringTokenEstimator = $this->measuringEstimator();
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [
+                $this->makeProjectFile('apps/api/src/A.php', 'aa'),     // 2 chars
+                $this->makeProjectFile('apps/web/src/B.php', 'bbbbbb'), // 6 chars
+                $this->makeProjectFile('libs/shared/C.php', 'cccc'),    // 4 chars
+            ],
+            tokenEstimator: $measuringTokenEstimator,
+        );
+
+        $estimateAuditCostUseCase->execute($this->tmpDir, ['apps/api']);
+
+        self::assertSame(2, $measuringTokenEstimator->lastInputLength);
+    }
+
     public function test_primary_model_flows_through_to_audit_cost(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase(

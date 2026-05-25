@@ -27,6 +27,9 @@ final class RecordingStage implements StageInterface
     /** @var list<string> */
     public array $processedAuditIds = [];
 
+    /** @var list<list<string>> */
+    public array $observedScanPaths = [];
+
     public function name(): string
     {
         return 'recording';
@@ -35,5 +38,6 @@ final class RecordingStage implements StageInterface
     public function process(AuditContext $auditContext): void
     {
         $this->processedAuditIds[] = $auditContext->auditId();
+        $this->observedScanPaths[] = $auditContext->scanPaths();
     }
 }

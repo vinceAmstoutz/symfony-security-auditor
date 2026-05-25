@@ -70,7 +70,17 @@ final class RunAuditUseCaseTest extends TestCase
         $runAuditUseCase = new RunAuditUseCase($this->makePipeline(), $logger);
         $runAuditUseCase->execute($this->tmpDir);
 
-        self::assertSame(['Starting audit', ['project' => $this->tmpDir]], $infoLogs[0]);
+        self::assertSame(['Starting audit', ['project' => $this->tmpDir, 'scan_paths' => []]], $infoLogs[0]);
+    }
+
+    public function test_it_passes_scan_paths_to_the_pipeline_via_audit_context(): void
+    {
+        $recordingStage = new RecordingStage();
+        $runAuditUseCase = new RunAuditUseCase($this->makePipeline($recordingStage), new NullLogger());
+
+        $runAuditUseCase->execute($this->tmpDir, ['apps/api/src']);
+
+        self::assertSame([['apps/api/src']], $recordingStage->observedScanPaths);
     }
 
     public function test_it_logs_audit_complete_with_exact_context(): void

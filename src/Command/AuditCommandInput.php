@@ -39,6 +39,12 @@ final class AuditCommandInput
     public bool $dryRun = false;
 
     /**
+     * @var list<string>
+     */
+    #[Option(description: 'Restrict the scan to a subdirectory of the project (relative to the project root). Repeat the option to include several subdirectories. Useful for monorepos where only one app should be audited. By default the whole project is scanned.', name: 'path', shortcut: 'p')]
+    public array $paths = [];
+
+    /**
      * @param ?callable(): (string|false) $cwdResolver defaults to PHP's getcwd; tests inject a stub
      */
     public function resolvedProjectPath(?callable $cwdResolver = null): string
@@ -53,6 +59,25 @@ final class AuditCommandInput
         }
 
         return $cwd;
+    }
+
+    /**
+     * @return list<string> normalized scan-path filters: trimmed, trailing
+     *                      separators removed, blanks dropped, in input order
+     */
+    public function scanPaths(): array
+    {
+        $normalized = [];
+        foreach ($this->paths as $path) {
+            $trimmed = trim($path);
+            if ('' === $trimmed) {
+                continue;
+            }
+
+            $normalized[] = rtrim($trimmed, '/');
+        }
+
+        return $normalized;
     }
 
     public function isMachineReadableToStdout(): bool

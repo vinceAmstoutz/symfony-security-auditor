@@ -33,11 +33,16 @@ final readonly class RunAuditUseCase
         private string $primaryModel = '',
     ) {}
 
-    public function execute(string $projectPath): AuditReport
+    /**
+     * @param list<string> $scanPaths optional project-relative subdirectories
+     *                                to restrict the scan to; empty list (the
+     *                                default) audits the whole project
+     */
+    public function execute(string $projectPath, array $scanPaths = []): AuditReport
     {
-        $this->logger->info('Starting audit', ['project' => $projectPath]);
+        $this->logger->info('Starting audit', ['project' => $projectPath, 'scan_paths' => $scanPaths]);
 
-        $auditContext = AuditContext::forProject($projectPath);
+        $auditContext = AuditContext::forProject($projectPath, $scanPaths);
 
         try {
             $this->pipeline->process($auditContext);

@@ -15,9 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase;
 
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 
@@ -47,12 +49,18 @@ final readonly class EstimateAuditCostUseCase
         private float $outputRatio = self::DEFAULT_OUTPUT_RATIO,
     ) {}
 
-    public function execute(string $projectPath): AuditReport
+    /**
+     * @param list<string> $scanPaths optional project-relative subdirectories
+     *                                to restrict the estimate to; empty list
+     *                                (the default) estimates over the whole
+     *                                project
+     */
+    public function execute(string $projectPath, array $scanPaths = []): AuditReport
     {
-        $this->logger->info('Estimating audit cost (dry-run)', ['project' => $projectPath]);
+        $this->logger->info('Estimating audit cost (dry-run)', ['project' => $projectPath, 'scan_paths' => $scanPaths]);
 
-        $auditContext = AuditContext::forProject($projectPath);
-        $files = $this->projectFileScanner->scan($projectPath);
+        $auditContext = AuditContext::forProject($projectPath, $scanPaths);
+        $files = $this->filterByScanPaths($this->projectFileScanner->scan($projectPath), $scanPaths);
         $auditContext->setProjectFiles($files);
 
         $totalInputChars = 0;
@@ -75,5 +83,16 @@ final readonly class EstimateAuditCostUseCase
         ]);
 
         return AuditReport::fromContext($auditContext, $auditCost);
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     * @param list<string>      $scanPaths
+     *
+     * @return list<ProjectFile>
+     */
+    private function filterByScanPaths(array $files, array $scanPaths): array
+    {
+        return ScanPathFilter::apply($files, $scanPaths);
     }
 }
