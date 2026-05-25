@@ -42,6 +42,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- `scan.max_file_size_kb` now interprets the unit as kibibytes (`1024`-byte
+  blocks) for both directory-scanned and explicitly-listed paths. The previous
+  implementation routed the directory scan through Symfony Finder's `K` suffix
+  (`1000`-byte kilobytes) while the explicit-file path used `*1024`, so files
+  between `1000 * N` and `1024 * N` bytes were treated differently depending on
+  which leg of the scanner saw them. Both paths now share the `Ki` suffix.
 - `LLMResponse::parseJson()` now recovers from conversational prose around a
   balanced JSON block. With `audit.tools_enabled: true` (the default), the
   attacker model sometimes ignores the "Return ONLY the JSON array" prompt

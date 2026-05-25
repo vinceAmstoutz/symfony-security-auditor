@@ -95,7 +95,7 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
                 ->files()
                 ->in($directories)
                 ->name($extensions)
-                ->size(\sprintf('<= %dK', $this->maxFileSizeKb));
+                ->size(\sprintf('<= %dKi', $this->maxFileSizeKb));
 
             if ($this->respectGitignore) {
                 $finder->ignoreVCSIgnored(true);
@@ -110,16 +110,30 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
             }
         }
 
-        $maxBytes = $this->maxFileSizeKb * 1024;
         foreach ($explicitFiles as $explicitFile) {
-            if (filesize($explicitFile) > $maxBytes) {
-                continue;
+            // Run Symfony Finder against the parent directory restricted to
+            // the exact basename and depth 0. This piggy-backs on the same
+            // `->size('<= NK')` filter Finder uses for the directory scan,
+            // so we avoid hand-rolling a `kb * 1024` byte conversion or a
+            // `filesize()` check (and the mutation-test debt that comes with
+            // either) — Symfony Components First (`.claude/rules/php-classes.md`).
+            $explicitFinder = (new Finder())
+                ->files()
+                ->in(\dirname($explicitFile))
+                ->depth('== 0')
+                ->name(basename($explicitFile))
+                ->size(\sprintf('<= %dKi', $this->maxFileSizeKb));
+
+            if ($this->respectGitignore) {
+                $explicitFinder->ignoreVCSIgnored(true);
             }
 
-            $splFile = new SplFileInfo($explicitFile, '', basename($explicitFile));
-            $file = $this->buildProjectFile($splFile, $projectPath, $reader);
-            if ($file instanceof ProjectFile) {
-                $files[] = $file;
+            /** @var SplFileInfo $splFile */
+            foreach ($explicitFinder as $splFile) {
+                $file = $this->buildProjectFile($splFile, $projectPath, $reader);
+                if ($file instanceof ProjectFile) {
+                    $files[] = $file;
+                }
             }
         }
 
