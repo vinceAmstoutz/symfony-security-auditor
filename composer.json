@@ -54,7 +54,7 @@
         "phpstan/phpstan-phpunit": "^2.0",
         "phpstan/phpstan-strict-rules": "^2.0",
         "phpstan/phpstan-symfony": "^2.0",
-        "phpunit/phpunit": "^11.5",
+        "phpunit/phpunit": "^13.0",
         "rector/rector": "^2.4",
         "robiningelbrecht/phpunit-coverage-tools": "^1.10",
         "staabm/phpstan-todo-by": "^0.3",
