@@ -28,6 +28,7 @@
 
 ## Table of Contents
 
+- [Quick start](#quick-start)
 - [What it does](#what-it-does)
 - [Getting Started](#getting-started)
 - [Features](#features)
@@ -39,6 +40,23 @@
 - [Contributing](#contributing)
 - [Security](#security)
 - [License](#license)
+
+---
+
+## Quick start
+
+Already have Symfony 7+, PHP 8.3+, and an Anthropic API key? In 30 seconds:
+
+```bash
+composer require --dev vinceamstoutz/symfony-security-auditor symfony/ai-anthropic-platform
+export ANTHROPIC_API_KEY=sk-ant-...
+bin/console audit:run --dry-run    # estimate cost first
+bin/console audit:run              # run the audit
+```
+
+`audit:run` accepts a project path (defaults to the current working directory)
+and a `--format` (`console` / `json` / `sarif`). Other providers and full setup:
+[Getting Started](#getting-started).
 
 ---
 
