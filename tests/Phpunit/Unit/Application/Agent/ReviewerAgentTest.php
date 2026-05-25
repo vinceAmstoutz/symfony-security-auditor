@@ -32,6 +32,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPro
 
 final class ReviewerAgentTest extends TestCase
 {
+    private const int PARSE_FAILURE_PREVIEW_BYTES = 512;
+
     private string $tmpDir;
 
     public function test_it_returns_empty_array_when_no_vulnerabilities(): void
@@ -375,6 +377,7 @@ final class ReviewerAgentTest extends TestCase
             ->with('Failed to parse reviewer response', [
                 'vulnerability_id' => $vulnerability->id(),
                 'error' => 'Syntax error',
+                'content_preview' => 'invalid json {{{',
             ]);
 
         $llmClient = self::createStub(LLMClientInterface::class);
@@ -392,6 +395,93 @@ final class ReviewerAgentTest extends TestCase
 
         self::assertCount(1, $result);
         self::assertFalse($result[0]->isReviewerValidated());
+    }
+
+    public function test_it_truncates_long_content_in_single_mode_parse_failure_log(): void
+    {
+        // Pin the truncation boundary so IncrementInteger / DecrementInteger
+        // mutations on the byte-cap constant are killed.
+        $errorLogs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info');
+        $logger->method('debug');
+        $logger->method('error')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$errorLogs): void {
+                $errorLogs[] = [$msg, $ctx];
+            },
+        );
+
+        $longInvalidContent = str_repeat('y', self::PARSE_FAILURE_PREVIEW_BYTES * 2).' {{{';
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::create($longInvalidContent, 0, 0, 'claude', 'end_turn'));
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: $logger,
+        );
+
+        $reviewerAgent->review([$this->makeVulnerability()], [], new NullCoverageRecorder());
+
+        $singleParseLogs = array_values(array_filter(
+            $errorLogs,
+            static fn (array $entry): bool => 'Failed to parse reviewer response' === $entry[0],
+        ));
+
+        self::assertCount(1, $singleParseLogs);
+        $preview = $singleParseLogs[0][1]['content_preview'];
+        self::assertIsString($preview);
+        self::assertSame(self::PARSE_FAILURE_PREVIEW_BYTES, \strlen($preview));
+        self::assertSame(str_repeat('y', self::PARSE_FAILURE_PREVIEW_BYTES), $preview);
+    }
+
+    public function test_it_truncates_long_content_in_batch_mode_parse_failure_log(): void
+    {
+        // Same boundary pin for the batch path (separate constant on the
+        // class even though both currently equal 512).
+        $errorLogs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info');
+        $logger->method('debug');
+        $logger->method('error')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$errorLogs): void {
+                $errorLogs[] = [$msg, $ctx];
+            },
+        );
+
+        $longInvalidContent = str_repeat('z', self::PARSE_FAILURE_PREVIEW_BYTES * 2).' {{{';
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::create($longInvalidContent, 0, 0, 'claude', 'end_turn'));
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: $logger,
+            batchSize: 5,
+        );
+
+        $reviewerAgent->review(
+            [$this->makeVulnerabilityAt('src/A.php'), $this->makeVulnerabilityAt('src/B.php')],
+            [],
+            new NullCoverageRecorder(),
+        );
+
+        $batchParseLogs = array_values(array_filter(
+            $errorLogs,
+            static fn (array $entry): bool => 'Failed to parse reviewer batch response' === $entry[0],
+        ));
+
+        self::assertCount(1, $batchParseLogs);
+        $preview = $batchParseLogs[0][1]['content_preview'];
+        self::assertIsString($preview);
+        self::assertSame(self::PARSE_FAILURE_PREVIEW_BYTES, \strlen($preview));
+        self::assertSame(str_repeat('z', self::PARSE_FAILURE_PREVIEW_BYTES), $preview);
     }
 
     public function test_it_logs_error_with_specific_message_on_llm_throwable(): void
@@ -1123,6 +1213,7 @@ final class ReviewerAgentTest extends TestCase
         self::assertSame(2, $batchParseLogs[0][1]['batch_size']);
         self::assertArrayHasKey('error', $batchParseLogs[0][1]);
         self::assertNotSame('', $batchParseLogs[0][1]['error']);
+        self::assertSame('not json{{{', $batchParseLogs[0][1]['content_preview']);
     }
 
     public function test_batch_mode_logs_error_with_batch_size_and_error_context_on_llm_exception(): void

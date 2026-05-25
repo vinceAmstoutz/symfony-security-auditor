@@ -119,16 +119,23 @@ Reduce concurrent load:
   have higher rate limits.
 - Run nightly, not on every PR.
 
-### `LLM response was empty` / `JsonException: Syntax error`
+### `LLM response was empty` / `Failed to parse … JSON response`
 
 The model returned blank or non-JSON output. The chunk is skipped automatically
-and logged at `warning` level via `LoggerInterface`. Causes:
+and logged at `error` level via `LoggerInterface`. The log entry includes a
+`content_preview` field with the first 512 bytes of the response — inspect it to
+see what the model actually emitted. Causes:
 
 - Model context limit exceeded — lower `audit.max_tool_iterations` or
   split-model to a model with a larger context.
 - Model refused the prompt — try a different model (some smaller open-weight
   models refuse "hacking" prompts).
 - Network timeout — retry; check the provider's status page.
+
+The parser tolerates prose wrapped around a balanced JSON block (the model
+sometimes ignores the "Return ONLY the JSON array" instruction when tools are
+enabled); a residual `JsonException: Syntax error` therefore means the response
+contains no recoverable JSON at all, not just chatty prose.
 
 If it happens for **every** chunk, the model is unsuitable. Switch model.
 

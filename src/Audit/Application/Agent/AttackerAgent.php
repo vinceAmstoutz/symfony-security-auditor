@@ -33,6 +33,8 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 {
     private const int CHUNK_SIZE = 10;
 
+    private const int PARSE_FAILURE_PREVIEW_BYTES = 512;
+
     public const int DEFAULT_MAX_TOOL_ITERATIONS = 8;
 
     public const bool DEFAULT_TOOLS_ENABLED = false;
@@ -150,6 +152,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         } catch (JsonException $exception) {
             $this->logger->error('Failed to parse attacker agent JSON response', [
                 'error' => $exception->getMessage(),
+                'content_preview' => substr($response->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
             ]);
             $this->recordChunkCoverage($chunk, 'errored', $coverageRecorder);
 

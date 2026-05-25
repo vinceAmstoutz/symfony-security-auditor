@@ -39,6 +39,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPro
 #[AllowMockObjectsWithoutExpectations]
 final class AttackerAgentTest extends TestCase
 {
+    private const int PARSE_FAILURE_PREVIEW_BYTES = 512;
+
     private string $tmpDir;
 
     public function test_it_returns_empty_array_when_no_files(): void
@@ -312,7 +314,10 @@ final class AttackerAgentTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::once())
             ->method('error')
-            ->with('Failed to parse attacker agent JSON response', ['error' => 'Syntax error']);
+            ->with('Failed to parse attacker agent JSON response', [
+                'error' => 'Syntax error',
+                'content_preview' => 'invalid json {{{',
+            ]);
 
         $files = [$this->makeFile('src/Controller/UserController.php')];
 
@@ -326,6 +331,45 @@ final class AttackerAgentTest extends TestCase
         $result = $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder());
 
         self::assertSame([], $result);
+    }
+
+    public function test_it_truncates_long_content_in_parse_failure_log(): void
+    {
+        // Preview must clip oversized LLM responses so logs stay readable
+        // and storage does not blow up on noisy provider output. Pinning the
+        // exact boundary kills IncrementInteger / DecrementInteger mutations
+        // on the byte-cap constant.
+        $errorLogs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info');
+        $logger->method('debug');
+        $logger->method('error')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$errorLogs): void {
+                $errorLogs[] = [$msg, $ctx];
+            },
+        );
+
+        $longInvalidContent = str_repeat('x', self::PARSE_FAILURE_PREVIEW_BYTES * 2).' {{{';
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::create($longInvalidContent, 10, 10, 'claude', 'end_turn'));
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $logger);
+
+        $attackerAgent->analyze(
+            [$this->makeFile('src/Controller/UserController.php')],
+            SymfonyMapping::create(),
+            new NullCoverageRecorder(),
+        );
+
+        self::assertCount(1, $errorLogs);
+        self::assertSame('Failed to parse attacker agent JSON response', $errorLogs[0][0]);
+        $preview = $errorLogs[0][1]['content_preview'];
+        self::assertIsString($preview);
+        self::assertSame(self::PARSE_FAILURE_PREVIEW_BYTES, \strlen($preview));
+        self::assertSame(str_repeat('x', self::PARSE_FAILURE_PREVIEW_BYTES), $preview);
     }
 
     public function test_it_logs_error_with_llm_call_failed_message_on_throwable(): void
