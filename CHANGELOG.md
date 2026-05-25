@@ -28,9 +28,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 - **Breaking:** `scan.excluded_dirs` configuration key. The previous deny-list
   mechanism (hard defaults plus user-supplied exclusions) has been replaced by
   `scan.included_paths`. To prune a sub-tree inside an included path (e.g. drop
-  `src/Migrations`), tighten `included_paths` to specific sub-directories
-  instead — for example:
-  `included_paths: ['src/Controller', 'src/Form', 'src/Voter', 'config', 'templates', 'public/index.php']`.
+  `src/Migrations`), tighten `included_paths` to specific sub-directories:
+
+  ```yaml
+  symfony_security_auditor:
+      scan:
+          included_paths: ['src/Controller', 'src/Form', 'src/Voter']
+  ```
+
 - **Breaking:** the internal `HARD_EXCLUDED_DIRS` list on `ProjectFileScanner`
   is gone. With Finder scanning only included paths, walking into `vendor/` or
   `node_modules/` no longer happens, so the prune list is unnecessary.

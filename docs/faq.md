@@ -334,8 +334,20 @@ and `public/index.php` (the Symfony Flex skeleton). Anything outside —
 `bin/`, `app/`, root-level scripts, IDE folders, build artefacts — is silently
 skipped. To prune a sub-tree inside an included path (e.g. drop `src/Migrations`
 from the audit), tighten `included_paths` to the specific sub-directories you
-want instead:
-`included_paths: ['src/Controller', 'src/Form', 'src/Voter', 'config', 'templates', 'public/index.php']`.
+want instead — e.g.:
+
+```yaml
+symfony_security_auditor:
+    scan:
+        included_paths:
+            - 'src/Controller'
+            - 'src/Form'
+            - 'src/Voter'
+            - 'config'
+            - 'templates'
+            - 'public/index.php'
+```
+
 `composer audit` covers vendor CVEs via the `lookup_advisory` tool.
 
 ---
