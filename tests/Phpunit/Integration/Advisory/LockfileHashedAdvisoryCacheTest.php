@@ -14,8 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Advisory;
 
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
@@ -102,6 +104,124 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         } finally {
             self::assertSame([], glob($this->cacheDir.'/*/*.json') ?: []);
         }
+    }
+
+    public function test_falls_back_to_live_audit_when_lockfile_read_throws_io_exception(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+
+        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem->method('exists')->willReturn(true);
+        $filesystem->method('readFile')->willThrowException(new IOException('permission denied'));
+
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$warnings): void {
+                $warnings[] = [$message, $context];
+            },
+        );
+        $logger->method('debug');
+
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {}}');
+
+        $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache(
+            $recordingComposerAuditRunner,
+            $this->cacheDir,
+            $filesystem,
+            $logger,
+        );
+
+        $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame('{"advisories": {}}', $json);
+        self::assertSame(1, $recordingComposerAuditRunner->callCount, 'inner runner must still be called when the lockfile is unreadable');
+        $messages = array_column($warnings, 0);
+        self::assertContains('composer.lock present but unreadable; skipping advisory cache', $messages);
+    }
+
+    public function test_cache_miss_when_existing_entry_is_unreadable_and_falls_back_to_inner(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+
+        // First run: real filesystem populates the cache.
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {}}');
+        $this->makeCache($recordingComposerAuditRunner)->run($this->projectDir);
+
+        // Second run: replace the filesystem with one that throws on readFile of any
+        // path other than composer.lock, forcing the readCache() catch branch.
+        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem->method('exists')->willReturn(true);
+        $lockfilePath = $this->projectDir.'/composer.lock';
+        $filesystem->method('readFile')->willReturnCallback(
+            static function (string $path) use ($lockfilePath): string {
+                if ($path === $lockfilePath) {
+                    return '{"lock": "v1"}';
+                }
+
+                throw new IOException('cache entry unreadable');
+            },
+        );
+
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$warnings): void {
+                $warnings[] = [$message, $context];
+            },
+        );
+        $logger->method('debug');
+
+        $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache(
+            $recordingComposerAuditRunner,
+            $this->cacheDir,
+            $filesystem,
+            $logger,
+        );
+
+        $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame('{"advisories": {}}', $json);
+        self::assertSame(2, $recordingComposerAuditRunner->callCount, 'inner runner must be called again after an unreadable cache entry');
+        $messages = array_column($warnings, 0);
+        self::assertContains('Advisory cache entry unreadable, falling back to live audit', $messages);
+    }
+
+    public function test_write_failure_is_logged_and_does_not_propagate(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+
+        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem->method('exists')->willReturnCallback(
+            static fn (string $path): bool => str_ends_with($path, 'composer.lock'),
+        );
+        $filesystem->method('readFile')->willReturn('{"lock": "v1"}');
+        $filesystem->method('mkdir')->willThrowException(new IOException('cache dir unwritable'));
+
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$warnings): void {
+                $warnings[] = [$message, $context];
+            },
+        );
+        $logger->method('debug');
+
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {"foo/bar": []}}');
+
+        $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache(
+            $recordingComposerAuditRunner,
+            $this->cacheDir,
+            $filesystem,
+            $logger,
+        );
+
+        // Must not throw despite the cache write failing.
+        $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame('{"advisories": {"foo/bar": []}}', $json);
+        $messages = array_column($warnings, 0);
+        self::assertContains('Failed to write advisory cache entry', $messages);
     }
 
     protected function setUp(): void

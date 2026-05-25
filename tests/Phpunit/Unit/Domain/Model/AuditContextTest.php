@@ -237,6 +237,20 @@ final class AuditContextTest extends TestCase
         self::assertSame(['apps/api/src', 'libs/shared'], $auditContext->scanPaths());
     }
 
+    public function test_cache_bypassed_default_is_false(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        self::assertFalse($auditContext->isCacheBypassed());
+    }
+
+    public function test_for_project_stores_cache_bypassed_flag(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, [], true);
+
+        self::assertTrue($auditContext->isCacheBypassed());
+    }
+
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
