@@ -161,4 +161,4 @@ jobs:
             git fetch --depth=1 origin "$BASE_REF"
             ARGS="$ARGS --git-diff-lines --git-diff-base=origin/$BASE_REF --ignore-msi-with-no-mutations"
           fi
-          bin/infection $ARGS
+          php -d memory_limit=1G bin/infection $ARGS
