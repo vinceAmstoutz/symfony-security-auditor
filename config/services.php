@@ -36,6 +36,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInter
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
@@ -57,6 +58,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\StaticPricingProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
@@ -173,10 +176,16 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(AuditStage::class)
         ->args([service(AuditOrchestratorInterface::class), service('logger')]);
 
+    $defaultsConfigurator->set(NullProgressReporter::class);
+    $defaultsConfigurator->set(LoggerProgressReporter::class)
+        ->args([service('logger')]);
+    $defaultsConfigurator->alias(ProgressReporterInterface::class, NullProgressReporter::class);
+
     $defaultsConfigurator->set(AuditPipeline::class)
         ->args([
             tagged_iterator('symfony_security_auditor.pipeline_stage'),
             service('logger'),
+            service(ProgressReporterInterface::class),
         ]);
 
     $defaultsConfigurator->alias(PipelineInterface::class, AuditPipeline::class);

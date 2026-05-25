@@ -21,6 +21,7 @@ use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 final class AuditPipelineTest extends TestCase
 {
@@ -176,6 +177,47 @@ final class AuditPipelineTest extends TestCase
         self::assertIsFloat($completedLog[1]['elapsed_seconds']);
         self::assertGreaterThanOrEqual(0.0, $completedLog[1]['elapsed_seconds']);
         self::assertLessThan(60.0, $completedLog[1]['elapsed_seconds']);
+    }
+
+    public function test_it_reports_pipeline_start_and_completion_events_to_the_progress_reporter(): void
+    {
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $stage = $this->createNamedStage('s', static function (): void {});
+        $auditPipeline = new AuditPipeline([$stage], new NullLogger(), $recordingProgressReporter);
+        $auditPipeline->process(AuditContext::forProject($this->tmpDir));
+
+        $eventNames = array_column($recordingProgressReporter->events, 0);
+        self::assertContains('pipeline.started', $eventNames);
+        self::assertContains('pipeline.completed', $eventNames);
+    }
+
+    public function test_it_reports_stage_started_and_completed_events_for_each_stage(): void
+    {
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $stage = $this->createNamedStage('mapping', static function (): void {});
+        $auditPipeline = new AuditPipeline([$stage], new NullLogger(), $recordingProgressReporter);
+        $auditPipeline->process(AuditContext::forProject($this->tmpDir));
+
+        $stageStarts = array_values(array_filter($recordingProgressReporter->events, static fn (array $e): bool => 'stage.started' === $e[0]));
+        $stageCompletes = array_values(array_filter($recordingProgressReporter->events, static fn (array $e): bool => 'stage.completed' === $e[0]));
+
+        self::assertCount(1, $stageStarts);
+        self::assertSame('mapping', $stageStarts[0][1]['stage']);
+        self::assertCount(1, $stageCompletes);
+        self::assertSame('mapping', $stageCompletes[0][1]['stage']);
+    }
+
+    public function test_it_defaults_to_a_silent_progress_reporter_when_none_is_injected(): void
+    {
+        // No reporter argument — should not throw and not require external wiring.
+        $stage = $this->createNamedStage('s', static function (): void {});
+        $auditPipeline = new AuditPipeline([$stage], new NullLogger());
+
+        $auditPipeline->process(AuditContext::forProject($this->tmpDir));
+
+        self::assertCount(1, $auditPipeline->stages());
     }
 
     public function test_it_accepts_iterable_stages_from_iterator(): void
