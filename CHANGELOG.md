@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Changed
+
+- Expanded the hard-default scan exclusion list with `tests`, `Tests`,
+  `migrations`, `Migrations`, `translations`, `public/build`, `build`,
+  `coverage`, `.github`, `.idea`, and `.vscode`. Audits now focus on deployable
+  application source by default and bypass test code, generated migrations,
+  translations, and build artefacts — typically cutting the file count (and
+  token spend) by 30–50 % on a standard Symfony layout. Override by appending to
+  `scan.excluded_dirs` as before; the list cannot be shortened.
+
+### Fixed
+
+- `LLMResponse::parseJson()` now recovers from conversational prose around a
+  balanced JSON block. With `audit.tools_enabled: true` (the default), the
+  attacker model sometimes ignores the "Return ONLY the JSON array" prompt
+  instruction and wraps its answer in commentary, which previously caused a
+  whole chunk's findings to be dropped with `JsonException: Syntax error`.
+- `AttackerAgent` / `ReviewerAgent` parse-failure error logs now include a
+  512-byte `content_preview` of the LLM response so the actual shape of an
+  unrecoverable payload is diagnosable without re-running the audit.
+
 ## [1.2.0] — 2026-05-25
 
 ### Added

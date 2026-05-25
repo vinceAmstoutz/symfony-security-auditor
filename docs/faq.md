@@ -325,12 +325,16 @@ context wouldn't apply, so accuracy drops. **Not recommended.**
 `.php`, `.twig`, `.yaml`, `.yml`, `.xml` — the file types where Symfony
 security-relevant code lives. Other extensions are skipped.
 
-### Does it scan `vendor/`?
+### Does it scan `vendor/`, `tests/`, or `migrations/`?
 
-No. `vendor`, `node_modules`, `.git`, `var/cache`, `var/log`, `public/bundles`
-are excluded by default (hard defaults — cannot be removed, only appended to via
-`scan.excluded_dirs`). `composer audit` covers vendor CVEs via the
-`lookup_advisory` tool.
+No. The full hard-default exclusion list is `vendor`, `node_modules`, `.git`,
+`.github`, `.idea`, `.vscode`, `var/cache`, `var/log`, `public/bundles`,
+`public/build`, `tests`, `Tests`, `migrations`, `Migrations`, `translations`,
+`build`, `coverage`. These cannot be removed, only appended to via
+`scan.excluded_dirs`. The defaults intentionally exclude test code, generated
+migrations, translations, and build artefacts so audits stay focused on
+deployable application source and keep token spend bounded. `composer audit`
+covers vendor CVEs via the `lookup_advisory` tool.
 
 ---
 

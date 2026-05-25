@@ -77,7 +77,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                     ->addDefaultsIfNotSet()
                     ->children()
                         ->arrayNode('excluded_dirs')
-                            ->info('Additional directories to exclude. Appended to hard defaults (vendor, node_modules, .git, var/cache, var/log, public/bundles); never replaces them.')
+                            ->info('Additional directories to exclude. Appended to hard defaults (vendor, node_modules, .git, .github, .idea, .vscode, var/cache, var/log, public/bundles, public/build, tests, Tests, migrations, Migrations, translations, build, coverage); never replaces them. The default list excludes test code, generated migrations, translations, and build artefacts so audits focus on deployable application source and stay within sensible token budgets.')
                             ->scalarPrototype()->end()
                             ->defaultValue([])
                         ->end()

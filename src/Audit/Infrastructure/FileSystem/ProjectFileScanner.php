@@ -35,14 +35,33 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
     /** @var list<string> */
     private const array CONFIG_EXTENSIONS = ['yaml', 'yml', 'xml'];
 
-    /** @var list<string> */
+    /**
+     * Directories never scanned regardless of `scan.excluded_dirs`. Cuts the
+     * audit surface to deployable application source — test code, generated
+     * Doctrine migrations, translations, build artefacts, and IDE / CI
+     * metadata are excluded by default to keep token spend bounded. Append
+     * additional project-specific paths via `scan.excluded_dirs`.
+     *
+     * @var list<string>
+     */
     private const array HARD_EXCLUDED_DIRS = [
         'vendor',
         'node_modules',
         '.git',
+        '.github',
+        '.idea',
+        '.vscode',
         'var/cache',
         'var/log',
         'public/bundles',
+        'public/build',
+        'tests',
+        'Tests',
+        'migrations',
+        'Migrations',
+        'translations',
+        'build',
+        'coverage',
     ];
 
     public const int DEFAULT_MAX_FILE_SIZE_KB = 512;

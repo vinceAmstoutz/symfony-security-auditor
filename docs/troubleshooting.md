@@ -215,10 +215,18 @@ Expected behavior on large projects. Mitigations:
 
 ### Cost blew past my budget
 
+- Confirm the default scan exclusions are in effect — `tests`, `migrations`,
+  `translations`, `build`, `coverage`, `public/build`, and IDE folders are
+  hard-excluded out of the box. If a previous override extended
+  `scan.excluded_dirs`, the defaults still apply (the list is additive).
+- Trim further by appending to `scan.excluded_dirs` — e.g. add `assets`, `docs`,
+  or any project-specific generated trees.
 - Confirm `cache.prompt_caching: true` (default) — Anthropic provides ~90%
   input-token discount on cached prompts.
 - Confirm `cache.enabled: true` (default) — repeated chunks skip the LLM
   entirely.
+- Lower `audit.max_tool_iterations` from `8` to `4` or `5` — caps chatty
+  tool-use loops on each chunk at the cost of less cross-file investigation.
 - Switch to a cheaper Reviewer (`reviewer_model: claude-haiku-4-5-20251001` or
   `deepseek-chat`).
 - Set a provider-side hard cap. See

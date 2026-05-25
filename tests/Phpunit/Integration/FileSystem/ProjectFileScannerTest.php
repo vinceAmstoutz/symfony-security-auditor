@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -91,6 +92,44 @@ final class ProjectFileScannerTest extends TestCase
 
         self::assertCount(1, $files);
         self::assertSame('src/App.php', $files[0]->relativePath());
+    }
+
+    #[DataProvider('hardExcludedDirectoryCases')]
+    public function test_it_excludes_hard_default_directory(string $relativeDir): void
+    {
+        // Cost-control default: each directory listed here is excluded
+        // regardless of `scan.excluded_dirs`. The single `src/App.php`
+        // anchor verifies the scanner still finds application code while
+        // the per-case directory is skipped.
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        mkdir($this->tmpDir.'/'.$relativeDir, 0o777, true);
+
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php class App {}');
+        file_put_contents($this->tmpDir.'/'.$relativeDir.'/Skipped.php', '<?php // excluded');
+
+        $files = $this->projectFileScanner->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertSame('src/App.php', $files[0]->relativePath());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function hardExcludedDirectoryCases(): iterable
+    {
+        yield 'tests' => ['tests'];
+        yield 'Tests' => ['Tests'];
+        yield 'migrations' => ['migrations'];
+        yield 'Migrations' => ['Migrations'];
+        yield 'translations' => ['translations'];
+        yield 'public/build' => ['public/build'];
+        yield 'public/bundles' => ['public/bundles'];
+        yield 'build' => ['build'];
+        yield 'coverage' => ['coverage'];
+        yield 'var/cache' => ['var/cache'];
+        yield 'var/log' => ['var/log'];
+        yield '.github' => ['.github'];
+        yield '.idea' => ['.idea'];
+        yield '.vscode' => ['.vscode'];
     }
 
     public function test_it_returns_empty_for_directory_with_no_matching_files(): void
@@ -201,11 +240,13 @@ final class ProjectFileScannerTest extends TestCase
 
     public function test_it_respects_gitignore_when_enabled(): void
     {
+        // `derived` is intentionally NOT in HARD_EXCLUDED_DIRS so the test
+        // measures gitignore behavior in isolation, not the hard-exclusion path.
         mkdir($this->tmpDir.'/src', 0o777, true);
-        mkdir($this->tmpDir.'/build', 0o777, true);
-        file_put_contents($this->tmpDir.'/.gitignore', "build/\n");
+        mkdir($this->tmpDir.'/derived', 0o777, true);
+        file_put_contents($this->tmpDir.'/.gitignore', "derived/\n");
         file_put_contents($this->tmpDir.'/src/App.php', '<?php');
-        file_put_contents($this->tmpDir.'/build/Generated.php', '<?php');
+        file_put_contents($this->tmpDir.'/derived/Generated.php', '<?php');
 
         $projectFileScanner = new ProjectFileScanner(new NullLogger(), respectGitignore: true);
 
@@ -218,10 +259,10 @@ final class ProjectFileScannerTest extends TestCase
     public function test_it_does_not_respect_gitignore_when_disabled(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
-        mkdir($this->tmpDir.'/build', 0o777, true);
-        file_put_contents($this->tmpDir.'/.gitignore', "build/\n");
+        mkdir($this->tmpDir.'/derived', 0o777, true);
+        file_put_contents($this->tmpDir.'/.gitignore', "derived/\n");
         file_put_contents($this->tmpDir.'/src/App.php', '<?php');
-        file_put_contents($this->tmpDir.'/build/Generated.php', '<?php');
+        file_put_contents($this->tmpDir.'/derived/Generated.php', '<?php');
 
         $projectFileScanner = new ProjectFileScanner(new NullLogger(), respectGitignore: false);
 
@@ -231,16 +272,16 @@ final class ProjectFileScannerTest extends TestCase
         );
         sort($paths);
 
-        self::assertSame(['build/Generated.php', 'src/App.php'], $paths);
+        self::assertSame(['derived/Generated.php', 'src/App.php'], $paths);
     }
 
     public function test_default_constructor_does_not_respect_gitignore(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
-        mkdir($this->tmpDir.'/build', 0o777, true);
-        file_put_contents($this->tmpDir.'/.gitignore', "build/\n");
+        mkdir($this->tmpDir.'/derived', 0o777, true);
+        file_put_contents($this->tmpDir.'/.gitignore', "derived/\n");
         file_put_contents($this->tmpDir.'/src/App.php', '<?php');
-        file_put_contents($this->tmpDir.'/build/Generated.php', '<?php');
+        file_put_contents($this->tmpDir.'/derived/Generated.php', '<?php');
 
         $projectFileScanner = new ProjectFileScanner(new NullLogger());
 
@@ -250,7 +291,7 @@ final class ProjectFileScannerTest extends TestCase
         );
         sort($paths);
 
-        self::assertSame(['build/Generated.php', 'src/App.php'], $paths);
+        self::assertSame(['derived/Generated.php', 'src/App.php'], $paths);
     }
 
     public function test_it_skips_files_larger_than_configured_max_size(): void
