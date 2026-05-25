@@ -38,12 +38,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        // 0 chars → str_repeat('x', 0) === '' → estimator yields its base; here we use
-        // a fixed-output estimator that returns 99 regardless. So with 0 chars the
-        // estimator IS still called, but the input it receives is empty.
-        // Asserting on the output_tokens shape kills the -1 mutation: ceil(99 * 3 * 0.15) = 45.
-        self::assertSame(99 * 3, $auditReport->cost()->inputTokens());
-        self::assertSame(45, $auditReport->cost()->outputTokens());
+        // Attacker share alone: 99 * 3 = 297 input; output = ceil(297 * 0.15) = 45.
+        // Asserting on the attacker breakdown kills the -1 mutation in $perRoundInputTokens.
+        $byRole = $auditReport->cost()->byRole();
+        self::assertSame(99 * 3, $byRole['attacker']['input_tokens']);
+        self::assertSame(45, $byRole['attacker']['output_tokens']);
     }
 
     public function test_multi_file_content_accumulates_via_addition(): void
@@ -83,7 +82,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     public function test_input_token_estimate_scales_with_max_iterations(): void
     {
         // Pins: `* maxIterations` (vs `/`). With perRoundTokens=10 and maxIterations=5,
-        // expected = 50; with division mutation, would be 2.
+        // expected attacker = 50; with division mutation, would be 2.
         $estimateAuditCostUseCase = $this->makeUseCase(
             files: [$this->makeProjectFile('a.php', 'aaa')],
             tokenEstimator: $this->fixedEstimator(perRoundTokens: 10),
@@ -92,7 +91,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        self::assertSame(50, $auditReport->cost()->inputTokens());
+        self::assertSame(50, $auditReport->cost()->byRole()['attacker']['input_tokens']);
     }
 
     public function test_output_token_estimate_uses_ceil_of_output_ratio(): void
@@ -112,8 +111,9 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        self::assertSame(100, $auditReport->cost()->inputTokens());
-        self::assertSame(16, $auditReport->cost()->outputTokens());
+        $byRole = $auditReport->cost()->byRole();
+        self::assertSame(100, $byRole['attacker']['input_tokens']);
+        self::assertSame(16, $byRole['attacker']['output_tokens']);
     }
 
     public function test_output_token_estimate_uses_ceil_not_floor(): void
@@ -129,7 +129,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        self::assertSame(24, $auditReport->cost()->outputTokens());
+        self::assertSame(24, $auditReport->cost()->byRole()['attacker']['output_tokens']);
     }
 
     public function test_estimate_input_is_str_repeat_x_of_total_chars(): void
@@ -207,9 +207,53 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertCount(1, $readyLogs);
         $context = $readyLogs[0][1];
         self::assertSame(2, $context['files']);
-        self::assertSame(200, $context['input_tokens']);
-        self::assertSame(100, $context['output_tokens']);
+        // attacker = 100 * 2 = 200, reviewer = ceil(200 * 0.20) = 40, total = 240
+        self::assertSame(240, $context['input_tokens']);
+        // attacker_out = ceil(200 * 0.5) = 100, reviewer_out = ceil(40 * 0.5) = 20, total = 120
+        self::assertSame(120, $context['output_tokens']);
         self::assertSame(0.0, $context['estimated_cost_usd']);
+        self::assertSame(0.0, $context['attacker_cost_usd']);
+        self::assertSame(0.0, $context['reviewer_cost_usd']);
+    }
+
+    public function test_dry_run_emits_attacker_and_reviewer_breakdown(): void
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
+            primaryModel: 'claude-opus-4-7',
+            maxIterations: 1,
+            outputRatio: 0.5,
+            reviewerModel: 'claude-haiku-4-5',
+            reviewerInputRatio: 0.25,
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        $byRole = $auditReport->cost()->byRole();
+        self::assertSame('claude-opus-4-7', $byRole['attacker']['model']);
+        self::assertSame('claude-haiku-4-5', $byRole['reviewer']['model']);
+        // attacker input = 100, reviewer input = ceil(100 * 0.25) = 25
+        self::assertSame(100, $byRole['attacker']['input_tokens']);
+        self::assertSame(25, $byRole['reviewer']['input_tokens']);
+    }
+
+    public function test_dry_run_falls_back_to_attacker_model_when_reviewer_model_blank(): void
+    {
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 10),
+            primaryModel: 'gpt-4o',
+            maxIterations: 1,
+            outputRatio: 0.5,
+            reviewerModel: '',
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        $byRole = $auditReport->cost()->byRole();
+        self::assertSame('gpt-4o', $byRole['attacker']['model']);
+        self::assertSame('gpt-4o', $byRole['reviewer']['model']);
     }
 
     public function test_scanned_files_are_set_on_the_audit_context(): void
@@ -272,6 +316,8 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         string $primaryModel = 'gpt-4o',
         int $maxIterations = 3,
         float $outputRatio = EstimateAuditCostUseCase::DEFAULT_OUTPUT_RATIO,
+        string $reviewerModel = '',
+        float $reviewerInputRatio = EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO,
     ): EstimateAuditCostUseCase {
         $projectFileScanner = $this->fixedScanner($files);
 
@@ -283,6 +329,8 @@ final class EstimateAuditCostUseCaseTest extends TestCase
             $primaryModel,
             $maxIterations,
             $outputRatio,
+            $reviewerModel,
+            $reviewerInputRatio,
         );
     }
 

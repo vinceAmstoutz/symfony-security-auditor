@@ -39,6 +39,14 @@ final readonly class EstimateAuditCostUseCase
     /** Conservative output:input ratio observed across reference audits. */
     public const float DEFAULT_OUTPUT_RATIO = 0.15;
 
+    /**
+     * Fraction of the attacker's per-iteration input that the reviewer
+     * receives. The reviewer only sees filtered findings (not the full
+     * file chunks), so its prompt is much smaller than the attacker's.
+     * Calibrated against reference audits at ~20% of attacker input.
+     */
+    public const float DEFAULT_REVIEWER_INPUT_RATIO = 0.20;
+
     public function __construct(
         private ProjectFileScannerInterface $projectFileScanner,
         private TokenEstimatorInterface $tokenEstimator,
@@ -47,6 +55,8 @@ final readonly class EstimateAuditCostUseCase
         private string $primaryModel = '',
         private int $maxIterations = 3,
         private float $outputRatio = self::DEFAULT_OUTPUT_RATIO,
+        private string $reviewerModel = '',
+        private float $reviewerInputRatio = self::DEFAULT_REVIEWER_INPUT_RATIO,
     ) {}
 
     /**
@@ -68,18 +78,44 @@ final readonly class EstimateAuditCostUseCase
             $totalInputChars += mb_strlen($file->content());
         }
 
-        $perRoundInputTokens = $this->tokenEstimator->estimateTokens(str_repeat('x', $totalInputChars), $this->primaryModel);
-        $estimatedInputTokens = $perRoundInputTokens * $this->maxIterations;
-        $estimatedOutputTokens = (int) ceil($estimatedInputTokens * $this->outputRatio);
-        $estimatedCostUsd = $this->costCalculator->costForCall($estimatedInputTokens, $estimatedOutputTokens, $this->primaryModel);
+        $attackerPerRoundInput = $this->tokenEstimator->estimateTokens(str_repeat('x', $totalInputChars), $this->primaryModel);
+        $attackerInputTokens = $attackerPerRoundInput * $this->maxIterations;
+        $attackerOutputTokens = (int) ceil($attackerInputTokens * $this->outputRatio);
+        $attackerCostUsd = $this->costCalculator->costForCall($attackerInputTokens, $attackerOutputTokens, $this->primaryModel);
 
-        $auditCost = AuditCost::of($estimatedInputTokens, $estimatedOutputTokens, $estimatedCostUsd, $this->primaryModel);
+        $reviewerModel = '' === $this->reviewerModel ? $this->primaryModel : $this->reviewerModel;
+        $reviewerInputTokens = (int) ceil($attackerInputTokens * $this->reviewerInputRatio);
+        $reviewerOutputTokens = (int) ceil($reviewerInputTokens * $this->outputRatio);
+        $reviewerCostUsd = $this->costCalculator->costForCall($reviewerInputTokens, $reviewerOutputTokens, $reviewerModel);
+
+        $estimatedInputTokens = $attackerInputTokens + $reviewerInputTokens;
+        $estimatedOutputTokens = $attackerOutputTokens + $reviewerOutputTokens;
+        $estimatedCostUsd = $attackerCostUsd + $reviewerCostUsd;
+
+        $byRole = [
+            'attacker' => [
+                'model' => $this->primaryModel,
+                'input_tokens' => $attackerInputTokens,
+                'output_tokens' => $attackerOutputTokens,
+                'estimated_cost_usd' => round($attackerCostUsd, 6),
+            ],
+            'reviewer' => [
+                'model' => $reviewerModel,
+                'input_tokens' => $reviewerInputTokens,
+                'output_tokens' => $reviewerOutputTokens,
+                'estimated_cost_usd' => round($reviewerCostUsd, 6),
+            ],
+        ];
+
+        $auditCost = AuditCost::of($estimatedInputTokens, $estimatedOutputTokens, $estimatedCostUsd, $this->primaryModel, $byRole);
 
         $this->logger->info('Dry-run estimate ready', [
             'files' => \count($files),
             'input_tokens' => $estimatedInputTokens,
             'output_tokens' => $estimatedOutputTokens,
             'estimated_cost_usd' => $estimatedCostUsd,
+            'attacker_cost_usd' => $attackerCostUsd,
+            'reviewer_cost_usd' => $reviewerCostUsd,
         ]);
 
         return AuditReport::fromContext($auditContext, $auditCost);

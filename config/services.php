@@ -252,6 +252,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger'),
             param('symfony_security_auditor.attacker_model'),
             param('symfony_security_auditor.audit.max_iterations'),
+            EstimateAuditCostUseCase::DEFAULT_OUTPUT_RATIO,
+            param('symfony_security_auditor.reviewer_model'),
         ]);
 
     $defaultsConfigurator->set(RunAuditUseCase::class)

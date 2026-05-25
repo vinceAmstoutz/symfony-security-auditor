@@ -19,20 +19,34 @@ use InvalidArgumentException;
  * Token + USD cost attribution for an audit run.
  *
  * `primaryModel` is the model used by the attacker (the dominant cost
- * contributor). The reviewer may run a smaller model in split-model
- * configurations; the per-model breakdown lives in `AuditContext` if
- * downstream consumers need it.
+ * contributor). When the audit ran with a split attacker/reviewer
+ * configuration, the optional per-role breakdown lives in `byRole()` and is
+ * also surfaced in `toArray()` under `by_role` — useful for dry-run reports
+ * that want to show "$X for the attacker, $Y for the reviewer" instead of
+ * a single bundled total.
  */
 final readonly class AuditCost
 {
+    /**
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}> $byRole
+     */
     private function __construct(
         private int $inputTokens,
         private int $outputTokens,
         private float $estimatedCostUsd,
         private string $primaryModel,
+        private array $byRole = [],
     ) {}
 
-    public static function of(int $inputTokens, int $outputTokens, float $estimatedCostUsd, string $primaryModel): self
+    /**
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}> $byRole keyed by role name
+     *                                                                                                                      (e.g. `attacker`,
+     *                                                                                                                      `reviewer`); each
+     *                                                                                                                      entry's totals must
+     *                                                                                                                      not exceed the
+     *                                                                                                                      aggregate
+     */
+    public static function of(int $inputTokens, int $outputTokens, float $estimatedCostUsd, string $primaryModel, array $byRole = []): self
     {
         if ($inputTokens < 0) {
             throw new InvalidArgumentException(\sprintf('inputTokens must be >= 0, got %d', $inputTokens));
@@ -46,12 +60,12 @@ final readonly class AuditCost
             throw new InvalidArgumentException(\sprintf('estimatedCostUsd must be >= 0.0, got %f', $estimatedCostUsd));
         }
 
-        return new self($inputTokens, $outputTokens, round($estimatedCostUsd, 6), $primaryModel);
+        return new self($inputTokens, $outputTokens, round($estimatedCostUsd, 6), $primaryModel, $byRole);
     }
 
     public static function zero(string $primaryModel): self
     {
-        return new self(0, 0, 0.0, $primaryModel);
+        return new self(0, 0, 0.0, $primaryModel, []);
     }
 
     public function inputTokens(): int
@@ -79,7 +93,15 @@ final readonly class AuditCost
         return $this->primaryModel;
     }
 
-    /** @return array<string, int|float|string> */
+    /**
+     * @return array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}>
+     */
+    public function byRole(): array
+    {
+        return $this->byRole;
+    }
+
+    /** @return array<string, int|float|string|array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}>> */
     public function toArray(): array
     {
         return [
@@ -88,6 +110,7 @@ final readonly class AuditCost
             'total_tokens' => $this->totalTokens(),
             'estimated_cost_usd' => $this->estimatedCostUsd,
             'primary_model' => $this->primaryModel,
+            'by_role' => $this->byRole,
         ];
     }
 }
