@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- New `scan.included_paths` configuration key (`string[]`, default
+  `['src', 'config', 'templates', 'public/index.php']`) turns scanning into an
+  explicit allow-list. Only the listed project-relative directories and files
+  are inspected; everything else — `bin/`, root scripts, custom `app/` or `lib/`
+  trees, monorepo siblings — is silently skipped. Override the list for
+  non-standard layouts. If none of the entries resolve in the project root the
+  scanner logs `No included paths exist in project` at `warning` level and
+  returns an empty result rather than silently scanning the wrong tree.
+
 ### Changed
 
 - Expanded the hard-default scan exclusion list with `tests`, `Tests`,
@@ -19,6 +30,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   translations, and build artefacts — typically cutting the file count (and
   token spend) by 30–50 % on a standard Symfony layout. Override by appending to
   `scan.excluded_dirs` as before; the list cannot be shortened.
+- `scan.excluded_dirs` now prunes _inside_ each `scan.included_paths` entry
+  rather than across the full project tree. The semantics are unchanged for the
+  Symfony skeleton, but if you point `included_paths` at a custom directory the
+  exclusion list still applies relative to that root.
 
 ### Fixed
 

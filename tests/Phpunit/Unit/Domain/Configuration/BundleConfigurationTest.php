@@ -25,6 +25,7 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame('claude-opus-4-7', $bundleConfiguration->llm->attackerModel());
         self::assertSame('claude-haiku-4-5-20251001', $bundleConfiguration->llm->reviewerModel());
 
+        self::assertSame(['src', 'config', 'templates', 'public/index.php'], $bundleConfiguration->scan->includedPaths);
         self::assertSame(['legacy'], $bundleConfiguration->scan->excludedDirs);
         self::assertTrue($bundleConfiguration->scan->respectGitignore);
         self::assertSame(256, $bundleConfiguration->scan->maxFileSizeKb);
@@ -140,7 +141,7 @@ final class BundleConfigurationTest extends TestCase
      *     attacker_model: string|null,
      *     reviewer_model: string|null,
      *     provider_json_mode: bool,
-     *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
+     *     scan: array{included_paths: list<string>, excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
      *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * }
@@ -153,6 +154,7 @@ final class BundleConfigurationTest extends TestCase
             'reviewer_model' => 'claude-haiku-4-5-20251001',
             'provider_json_mode' => false,
             'scan' => [
+                'included_paths' => ['src', 'config', 'templates', 'public/index.php'],
                 'excluded_dirs' => ['legacy'],
                 'respect_gitignore' => true,
                 'max_file_size_kb' => 256,

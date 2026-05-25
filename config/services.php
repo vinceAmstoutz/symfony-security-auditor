@@ -131,6 +131,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(ProjectFileScanner::class)
         ->args([
             service('logger'),
+            param('symfony_security_auditor.scan.included_paths'),
             param('symfony_security_auditor.scan.excluded_dirs'),
             param('symfony_security_auditor.scan.respect_gitignore'),
             param('symfony_security_auditor.scan.max_file_size_kb'),

@@ -76,8 +76,13 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 ->arrayNode('scan')
                     ->addDefaultsIfNotSet()
                     ->children()
+                        ->arrayNode('included_paths')
+                            ->info('Project-relative directories and files that define the scan surface. Defaults to the Symfony Flex skeleton (src/, config/, templates/, public/index.php). Anything outside this list is silently skipped — including ad-hoc root-level scripts, bin/, custom app/ or lib/ trees, and the build artefacts under var/, public/build, vendor/. Override for non-standard layouts; the audit only inspects what is listed here.')
+                            ->scalarPrototype()->end()
+                            ->defaultValue(ProjectFileScanner::DEFAULT_INCLUDED_PATHS)
+                        ->end()
                         ->arrayNode('excluded_dirs')
-                            ->info('Additional directories to exclude. Appended to hard defaults (vendor, node_modules, .git, .github, .idea, .vscode, var/cache, var/log, public/bundles, public/build, tests, Tests, migrations, Migrations, translations, build, coverage); never replaces them. The default list excludes test code, generated migrations, translations, and build artefacts so audits focus on deployable application source and stay within sensible token budgets.')
+                            ->info('Additional directories to exclude. Appended to hard defaults (vendor, node_modules, .git, .github, .idea, .vscode, var/cache, var/log, public/bundles, public/build, tests, Tests, migrations, Migrations, translations, build, coverage); never replaces them. Applied inside each included path — use this to prune sub-trees (e.g. src/Migrations) without rewriting the allow-list.')
                             ->scalarPrototype()->end()
                             ->defaultValue([])
                         ->end()
@@ -227,7 +232,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *     attacker_model: string|null,
      *     reviewer_model: string|null,
      *     provider_json_mode: bool,
-     *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
+     *     scan: array{included_paths: list<string>, excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
      *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * } $config
@@ -240,6 +245,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
 
         $builder->setParameter('symfony_security_auditor.attacker_model', $bundleConfiguration->llm->attackerModel());
         $builder->setParameter('symfony_security_auditor.reviewer_model', $bundleConfiguration->llm->reviewerModel());
+        $builder->setParameter('symfony_security_auditor.scan.included_paths', $bundleConfiguration->scan->includedPaths);
         $builder->setParameter('symfony_security_auditor.scan.excluded_dirs', $bundleConfiguration->scan->excludedDirs);
         $builder->setParameter('symfony_security_auditor.scan.respect_gitignore', $bundleConfiguration->scan->respectGitignore);
         $builder->setParameter('symfony_security_auditor.scan.max_file_size_kb', $bundleConfiguration->scan->maxFileSizeKb);

@@ -77,8 +77,12 @@ absolute path, or omit the argument to default to the current working directory.
 ### `[ERROR] Project does not look like a Symfony app`
 
 The auditor walks the project for `.php`, `.twig`, `.yaml`, `.yml`, `.xml`
-files. If nothing is found, the path is wrong or the project is empty after
-exclusions. Check `scan.excluded_dirs` and `scan.respect_gitignore`.
+files. If nothing is found, the path is wrong, the project layout is
+non-standard (the default allow-list only scans `src/`, `config/`, `templates/`,
+and `public/index.php`), or the project is empty after exclusions. Check
+`scan.included_paths`, `scan.excluded_dirs`, and `scan.respect_gitignore`. A log
+line `No included paths exist in project` at `warning` level confirms the
+allow-list resolved to nothing.
 
 ### Audit exits with code `1` even though risk is LOW
 
@@ -215,12 +219,18 @@ Expected behavior on large projects. Mitigations:
 
 ### Cost blew past my budget
 
+- Confirm `scan.included_paths` matches the deployable code surface. The default
+  `['src', 'config', 'templates', 'public/index.php']` already skips every file
+  outside the Symfony skeleton (no `bin/`, no root scripts, no custom `app/` or
+  `lib/` trees) without you having to enumerate them.
 - Confirm the default scan exclusions are in effect — `tests`, `migrations`,
   `translations`, `build`, `coverage`, `public/build`, and IDE folders are
   hard-excluded out of the box. If a previous override extended
   `scan.excluded_dirs`, the defaults still apply (the list is additive).
-- Trim further by appending to `scan.excluded_dirs` — e.g. add `assets`, `docs`,
-  or any project-specific generated trees.
+- Trim further by tightening `scan.included_paths` (drop `templates/` or
+  `config/` if you only want to audit PHP) or appending to `scan.excluded_dirs`
+  — e.g. add `assets`, `docs`, or any project-specific generated trees inside an
+  included path.
 - Confirm `cache.prompt_caching: true` (default) — Anthropic provides ~90%
   input-token discount on cached prompts.
 - Confirm `cache.enabled: true` (default) — repeated chunks skip the LLM

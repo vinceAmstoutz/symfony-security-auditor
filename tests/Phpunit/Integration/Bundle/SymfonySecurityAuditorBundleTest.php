@@ -92,6 +92,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $kernel = $this->boot([
             'model' => 'gpt-4o',
             'scan' => [
+                'included_paths' => ['src', 'app'],
                 'excluded_dirs' => ['legacy', 'tmp'],
                 'respect_gitignore' => false,
                 'max_file_size_kb' => 1024,
@@ -99,9 +100,20 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         ]);
         $container = $kernel->getContainer();
 
+        self::assertSame(['src', 'app'], $container->getParameter('symfony_security_auditor.scan.included_paths'));
         self::assertSame(['legacy', 'tmp'], $container->getParameter('symfony_security_auditor.scan.excluded_dirs'));
         self::assertFalse($container->getParameter('symfony_security_auditor.scan.respect_gitignore'));
         self::assertSame(1024, $container->getParameter('symfony_security_auditor.scan.max_file_size_kb'));
+    }
+
+    public function test_bundle_defaults_scan_included_paths_to_symfony_skeleton(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        self::assertSame(
+            ['src', 'config', 'templates', 'public/index.php'],
+            $kernel->getContainer()->getParameter('symfony_security_auditor.scan.included_paths'),
+        );
     }
 
     public function test_bundle_wires_unlimited_audit_budget_when_both_caps_omitted(): void
