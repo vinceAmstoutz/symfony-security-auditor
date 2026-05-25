@@ -178,14 +178,30 @@ final class ProjectFileScannerTest extends TestCase
         // Operator pointed `included_paths` at a layout that doesn't exist:
         // no scan happens, an explicit warning fires so the configuration
         // mismatch shows up in logs rather than a silent zero-finding report.
+        // We also pin the early return by asserting the "Scan complete" info
+        // log is absent — without the `return [];`, the Finder would still
+        // walk the project and reach that log even when no files survive
+        // the allow-list filter.
         $warningLogs = [];
+        $infoLogs = [];
         $logger = self::createStub(LoggerInterface::class);
-        $logger->method('info');
+        $logger->method('info')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$infoLogs): void {
+                $infoLogs[] = [$msg, $ctx];
+            },
+        );
         $logger->method('warning')->willReturnCallback(
             static function (string $msg, array $ctx = []) use (&$warningLogs): void {
                 $warningLogs[] = [$msg, $ctx];
             },
         );
+
+        // Anchoring file that WOULD be scanned without the early return —
+        // src/App.php matches no `nonexistent` allow-list entry, but the
+        // Finder would still reach "Scan complete" if the warning branch
+        // fell through.
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
 
         $projectFileScanner = new ProjectFileScanner($logger, includedPaths: ['nonexistent']);
 
@@ -195,6 +211,30 @@ final class ProjectFileScannerTest extends TestCase
         self::assertCount(1, $warningLogs);
         self::assertSame('No included paths exist in project', $warningLogs[0][0]);
         self::assertSame(['nonexistent'], $warningLogs[0][1]['included_paths']);
+
+        $completeLogs = array_values(array_filter(
+            $infoLogs,
+            static fn (array $entry): bool => 'Scan complete' === $entry[0],
+        ));
+        self::assertEmpty($completeLogs);
+    }
+
+    public function test_it_does_not_match_sibling_directory_that_shares_a_prefix_with_included_path(): void
+    {
+        // Pins the `/` separator in the prefix check: `srcfoo/` shares the
+        // `src` prefix but is a sibling, not a child, of the allow-listed
+        // `src/` entry. Without the trailing slash in `str_starts_with`, the
+        // sibling would leak into the scan.
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        mkdir($this->tmpDir.'/srcfoo', 0o777, true);
+
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
+        file_put_contents($this->tmpDir.'/srcfoo/Sibling.php', '<?php');
+
+        $files = $this->projectFileScanner->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertSame('src/App.php', $files[0]->relativePath());
     }
 
     public function test_excluded_dirs_still_prune_within_an_included_path(): void

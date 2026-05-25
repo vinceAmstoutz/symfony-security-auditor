@@ -169,14 +169,16 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
 
     private function relativePathIsIncluded(string $relativePath): bool
     {
-        $normalised = str_replace('\\', '/', $relativePath);
+        // `Path::makeRelative` normalizes directory separators to forward
+        // slashes on every platform, and user-supplied `included_paths`
+        // values follow the same convention in YAML — so a plain string
+        // comparison is sufficient here.
         foreach ($this->includedPaths as $includedPath) {
-            $candidate = str_replace('\\', '/', $includedPath);
-            if ($normalised === $candidate) {
+            if ($relativePath === $includedPath) {
                 return true;
             }
 
-            if (str_starts_with($normalised, $candidate.'/')) {
+            if (str_starts_with($relativePath, $includedPath.'/')) {
                 return true;
             }
         }
