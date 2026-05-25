@@ -33,12 +33,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
@@ -280,6 +283,27 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $kernel = $this->boot(['model' => 'gpt-4o']);
 
         self::assertInstanceOf(LLMClientInterface::class, $this->getPrivateService($kernel, LLMClientInterface::class));
+    }
+
+    public function test_bundle_wires_null_rate_limiter_when_no_rate_limit_dimension_configured(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        self::assertInstanceOf(NullRateLimiter::class, $this->getPrivateService($kernel, RateLimiterInterface::class));
+    }
+
+    public function test_bundle_wires_token_bucket_rate_limiter_when_any_dimension_configured(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'audit' => [
+                'rate_limit' => [
+                    'requests_per_minute' => 50,
+                ],
+            ],
+        ]);
+
+        self::assertInstanceOf(TokenBucketRateLimiter::class, $this->getPrivateService($kernel, RateLimiterInterface::class));
     }
 
     public function test_bundle_wires_attacker_agent(): void

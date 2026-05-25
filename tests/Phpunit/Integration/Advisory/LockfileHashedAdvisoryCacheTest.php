@@ -148,7 +148,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
     {
         $this->writeLockfile('{"lock": "v1"}');
 
-        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem = self::createStub(Filesystem::class);
         $filesystem->method('exists')->willReturn(true);
         $filesystem->method('readFile')->willThrowException(new IOException('permission denied'));
 
@@ -196,7 +196,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
 
         // Second run: replace the filesystem with one that throws on readFile of any
         // path other than composer.lock, forcing the readCache() catch branch.
-        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem = self::createStub(Filesystem::class);
         $filesystem->method('exists')->willReturn(true);
         $lockfilePath = $this->projectDir.'/composer.lock';
         $filesystem->method('readFile')->willReturnCallback(
@@ -281,7 +281,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         $this->writeLockfile('{"lock": "v1"}');
 
         $capturedDumpPaths = [];
-        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem = self::createStub(Filesystem::class);
         $filesystem->method('exists')->willReturnCallback(
             static fn (string $path): bool => str_ends_with($path, 'composer.lock'),
         );
@@ -308,7 +308,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
     {
         $this->writeLockfile('{"lock": "v1"}');
 
-        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem = self::createStub(Filesystem::class);
         $filesystem->method('exists')->willReturnCallback(
             static fn (string $path): bool => str_ends_with($path, 'composer.lock'),
         );

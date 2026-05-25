@@ -49,6 +49,28 @@ final class BundleConfigurationTest extends TestCase
         self::assertTrue($bundleConfiguration->cache->enabled);
         self::assertSame('/cache', $bundleConfiguration->cache->dir);
         self::assertTrue($bundleConfiguration->cache->promptCaching);
+
+        self::assertNull($bundleConfiguration->rateLimit->requestsPerMinute);
+        self::assertNull($bundleConfiguration->rateLimit->inputTokensPerMinute);
+        self::assertNull($bundleConfiguration->rateLimit->outputTokensPerMinute);
+        self::assertFalse($bundleConfiguration->rateLimit->isEnabled());
+    }
+
+    public function test_rate_limit_dimensions_flow_through_when_set(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['audit']['rate_limit'] = [
+            'requests_per_minute' => 50,
+            'input_tokens_per_minute' => 50_000,
+            'output_tokens_per_minute' => 10_000,
+        ];
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertSame(50, $bundleConfiguration->rateLimit->requestsPerMinute);
+        self::assertSame(50_000, $bundleConfiguration->rateLimit->inputTokensPerMinute);
+        self::assertSame(10_000, $bundleConfiguration->rateLimit->outputTokensPerMinute);
+        self::assertTrue($bundleConfiguration->rateLimit->isEnabled());
     }
 
     public function test_attacker_model_falls_back_to_top_level_model_when_override_omitted(): void
@@ -119,7 +141,7 @@ final class BundleConfigurationTest extends TestCase
      *     reviewer_model: string|null,
      *     provider_json_mode: bool,
      *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}},
+     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * }
      */
@@ -154,6 +176,11 @@ final class BundleConfigurationTest extends TestCase
                     'initial_delay_ms' => 500,
                     'backoff_multiplier' => 2.0,
                     'jitter_ratio' => 0.2,
+                ],
+                'rate_limit' => [
+                    'requests_per_minute' => null,
+                    'input_tokens_per_minute' => null,
+                    'output_tokens_per_minute' => null,
                 ],
             ],
             'cache' => [

@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor;
 
+use Psr\Clock\ClockInterface;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -24,11 +26,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
@@ -36,6 +41,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSec
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
@@ -169,6 +177,27 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                                 ->end()
                             ->end()
                         ->end()
+                        ->arrayNode('rate_limit')
+                            ->addDefaultsIfNotSet()
+                            ->info('Proactive token-bucket throttle around every LLM call. Each dimension is independently nullable; when all three are `null` (the default) the bundle wires `NullRateLimiter` and behavior matches the pre-existing retry-only path. Configure the limits enforced by your provider tier (e.g. Anthropic RPM/ITPM/OTPM) to avoid hitting 429 in the first place — exhausted retries will still surface, but the steady-state path stays inside quota.')
+                            ->children()
+                                ->integerNode('requests_per_minute')
+                                    ->defaultNull()
+                                    ->min(1)
+                                    ->info('Maximum LLM requests per minute. `null` (default) disables this dimension.')
+                                ->end()
+                                ->integerNode('input_tokens_per_minute')
+                                    ->defaultNull()
+                                    ->min(1)
+                                    ->info('Maximum input tokens per minute. `null` (default) disables this dimension. A single request whose estimated input exceeds this cap throws `RateLimitRequestTooLargeException`.')
+                                ->end()
+                                ->integerNode('output_tokens_per_minute')
+                                    ->defaultNull()
+                                    ->min(1)
+                                    ->info('Maximum output tokens per minute. `null` (default) disables this dimension. Counted post-hoc from `record()` so the next `acquire()` defers until the window resets when the bucket is full.')
+                                ->end()
+                            ->end()
+                        ->end()
                     ->end()
                 ->end()
                 ->arrayNode('cache')
@@ -199,7 +228,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *     reviewer_model: string|null,
      *     provider_json_mode: bool,
      *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}},
+     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * } $config
      */
@@ -259,6 +288,31 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ->factory($auditBudgetFactory)
             ->args($auditBudgetArgs);
 
+        $services->set(NullRateLimiter::class)->private();
+
+        if ($bundleConfiguration->rateLimit->isEnabled()) {
+            $services->set(RateLimitConfiguration::class)
+                ->private()
+                ->args([
+                    $bundleConfiguration->rateLimit->requestsPerMinute,
+                    $bundleConfiguration->rateLimit->inputTokensPerMinute,
+                    $bundleConfiguration->rateLimit->outputTokensPerMinute,
+                ]);
+            $services->set(ClockInterface::class, NativeClock::class)->private();
+            $services->set(TokenBucketRateLimiter::class)
+                ->private()
+                ->args([
+                    service(RateLimitConfiguration::class),
+                    service(ClockInterface::class),
+                    service(SleeperInterface::class),
+                ]);
+            $services->alias(RateLimiterInterface::class, TokenBucketRateLimiter::class);
+        } else {
+            $services->alias(RateLimiterInterface::class, NullRateLimiter::class);
+        }
+
+        $services->set(RetryAfterHeaderParser::class)->private();
+
         $services->set('security_auditor.attacker_client', SymfonyAiLLMClient::class)
             ->private()
             ->args([
@@ -273,6 +327,9 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service(SleeperInterface::class),
                 service(BudgetTracker::class),
                 $bundleConfiguration->llm->providerJsonMode,
+                service(RateLimiterInterface::class),
+                service(TokenEstimatorInterface::class),
+                service(RetryAfterHeaderParser::class),
             ]);
 
         $services->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
@@ -289,6 +346,9 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service(SleeperInterface::class),
                 service(BudgetTracker::class),
                 $bundleConfiguration->llm->providerJsonMode,
+                service(RateLimiterInterface::class),
+                service(TokenEstimatorInterface::class),
+                service(RetryAfterHeaderParser::class),
             ]);
 
         $services->alias(LLMClientInterface::class, 'security_auditor.attacker_client');

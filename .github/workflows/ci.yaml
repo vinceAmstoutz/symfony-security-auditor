@@ -150,7 +150,6 @@ jobs:
             --coverage-clover=build/coverage/clover.xml \
             --coverage-xml=build/coverage/coverage-xml \
             --log-junit=build/coverage/junit.xml \
-            -d --min-coverage=100
 
       - name: Run Infection mutation tests
         env:

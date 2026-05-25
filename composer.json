@@ -34,6 +34,7 @@
     "require": {
         "php": ">=8.3",
         "composer-runtime-api": "^2.0",
+        "psr/clock": "^1.0",
         "psr/log": "^3.0",
         "symfony/ai-bundle": "^0.9",
         "symfony/config": "^7.4 || ^8.0",
@@ -54,10 +55,11 @@
         "phpstan/phpstan-phpunit": "^2.0",
         "phpstan/phpstan-strict-rules": "^2.0",
         "phpstan/phpstan-symfony": "^2.0",
-        "phpunit/phpunit": "^11.5",
+        "phpunit/phpunit": "^12.5",
         "rector/rector": "^2.4",
         "robiningelbrecht/phpunit-coverage-tools": "^1.10",
         "staabm/phpstan-todo-by": "^0.3",
+        "symfony/clock": "^7.4 || ^8.0",
         "symfony/dotenv": "^7.4 || ^8.0",
         "symfony/var-dumper": "^7.4 || ^8.0"
     },

@@ -32,6 +32,7 @@ final readonly class BundleConfiguration
         public RetryConfiguration $retry,
         public BudgetConfiguration $budget,
         public CacheConfiguration $cache,
+        public RateLimitConfiguration $rateLimit,
     ) {}
 
     /**
@@ -41,7 +42,7 @@ final readonly class BundleConfiguration
      *     reviewer_model: string|null,
      *     provider_json_mode?: bool,
      *     scan: array{excluded_dirs: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}},
+     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * } $config
      */
@@ -82,6 +83,11 @@ final readonly class BundleConfiguration
                 enabled: $config['cache']['enabled'],
                 dir: $config['cache']['dir'],
                 promptCaching: $config['cache']['prompt_caching'],
+            ),
+            rateLimit: new RateLimitConfiguration(
+                requestsPerMinute: $config['audit']['rate_limit']['requests_per_minute'],
+                inputTokensPerMinute: $config['audit']['rate_limit']['input_tokens_per_minute'],
+                outputTokensPerMinute: $config['audit']['rate_limit']['output_tokens_per_minute'],
             ),
         );
     }

@@ -128,7 +128,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     public function test_get_returns_null_when_filesystem_read_throws_io_exception(): void
     {
-        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem = self::createStub(Filesystem::class);
         $filesystem->method('exists')->willReturn(true);
         $filesystem->method('readFile')->willThrowException(new IOException('permission denied'));
 
@@ -139,7 +139,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     public function test_get_logs_warning_with_path_and_error_keys_when_filesystem_read_throws_io_exception(): void
     {
-        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem = self::createStub(Filesystem::class);
         $filesystem->method('exists')->willReturn(true);
         $filesystem->method('readFile')->willThrowException(new IOException('permission denied'));
 
@@ -295,7 +295,7 @@ final class FilesystemAttackerCacheTest extends TestCase
     public function test_dump_path_has_trailing_slash_stripped_from_cache_dir(): void
     {
         $capturedPath = '';
-        $filesystem = $this->createMock(Filesystem::class);
+        $filesystem = self::createStub(Filesystem::class);
         $filesystem->method('dumpFile')->willReturnCallback(
             static function (string $path) use (&$capturedPath): void {
                 $capturedPath = $path;

@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -38,37 +37,37 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPro
  */
 final class AuditOrchestratorTest extends TestCase
 {
-    private LLMClientInterface&MockObject $attackerLlm;
-
-    private LLMClientInterface&MockObject $reviewerLlm;
-
-    private AuditOrchestrator $auditOrchestrator;
-
     private string $tmpDir;
 
     public function test_it_skips_audit_when_no_mapping(): void
     {
-        $this->attackerLlm->expects(self::never())->method('complete');
-        $this->reviewerLlm->expects(self::never())->method('complete');
+        $attackerLlm = $this->createMock(LLMClientInterface::class);
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm->expects(self::never())->method('complete');
+        $reviewerLlm->expects(self::never())->method('complete');
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         self::assertEmpty($auditContext->vulnerabilities());
     }
 
     public function test_it_runs_attacker_and_reviewer_loop(): void
     {
-        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->attackerResponse([$this->vulnPayload(title: 'Vuln v1')]),
             $this->emptyResponse(),
         );
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         self::assertCount(1, $auditContext->vulnerabilities());
         self::assertCount(1, $auditContext->validatedVulnerabilities());
@@ -76,12 +75,15 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_stops_when_attacker_finds_nothing(): void
     {
-        $this->attackerLlm->method('complete')->willReturn($this->emptyResponse());
-        $this->reviewerLlm->expects(self::never())->method('complete');
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn($this->emptyResponse());
+        $reviewerLlm->expects(self::never())->method('complete');
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         self::assertEmpty($auditContext->vulnerabilities());
         self::assertSame(1, $auditContext->getMeta('audit.iterations'));
@@ -89,14 +91,17 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_deduplicates_vulnerabilities_across_iterations(): void
     {
-        $this->attackerLlm->method('complete')->willReturn(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(
             $this->attackerResponse([$this->vulnPayload(title: 'Vuln v1')]),
         );
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         self::assertCount(1, $auditContext->vulnerabilities());
     }
@@ -108,39 +113,48 @@ final class AuditOrchestratorTest extends TestCase
         // audit.iterations must be 2 (not maxIterations=3). Kills:
         //   - Break_ on line 79 (break → continue would let the loop run to iteration 3).
         //   - DecrementInteger on line 78 (0 === → -1 === would never trigger early exit).
-        $this->attackerLlm->method('complete')->willReturn(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(
             $this->attackerResponse([$this->vulnPayload(title: 'Vuln v1')]),
         );
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         self::assertSame(2, $auditContext->getMeta('audit.iterations'));
     }
 
     public function test_it_filters_low_confidence_findings(): void
     {
-        $this->attackerLlm->method('complete')->willReturn(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(
             $this->attackerResponse([$this->vulnPayload(title: 'low', confidence: 0.3)]),
         );
-        $this->reviewerLlm->expects(self::never())->method('complete');
+        $reviewerLlm->expects(self::never())->method('complete');
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         self::assertEmpty($auditContext->vulnerabilities());
     }
 
     public function test_it_stores_audit_metadata_in_context(): void
     {
-        $this->attackerLlm->method('complete')->willReturn($this->emptyResponse());
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         self::assertNotNull($auditContext->getMeta('audit.iterations'));
         self::assertNotNull($auditContext->getMeta('audit.total_findings'));
@@ -152,7 +166,9 @@ final class AuditOrchestratorTest extends TestCase
     {
         $iterationCount = 0;
 
-        $this->attackerLlm
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm
             ->method('complete')
             ->willReturnCallback(function () use (&$iterationCount): LLMResponse {
                 ++$iterationCount;
@@ -169,11 +185,12 @@ final class AuditOrchestratorTest extends TestCase
                     filePath: 'src/File'.$iterationCount.'.php',
                 )]);
             });
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         self::assertSame(3, $auditContext->getMeta('audit.iterations'));
         self::assertSame(3, $iterationCount);
@@ -181,59 +198,71 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_accepts_vulnerability_at_exact_confidence_threshold(): void
     {
-        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->attackerResponse([$this->vulnPayload(title: 'threshold', confidence: 0.6)]),
             $this->emptyResponse(),
         );
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         self::assertCount(1, $auditContext->vulnerabilities());
     }
 
     public function test_it_rejects_vulnerability_just_below_confidence_threshold(): void
     {
-        $this->attackerLlm->method('complete')->willReturn(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(
             $this->attackerResponse([$this->vulnPayload(title: 'below', confidence: 0.59)]),
         );
-        $this->reviewerLlm->expects(self::never())->method('complete');
+        $reviewerLlm->expects(self::never())->method('complete');
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         self::assertEmpty($auditContext->vulnerabilities());
     }
 
     public function test_it_deduplicates_by_overlapping_line_ranges(): void
     {
-        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->attackerResponse([$this->vulnPayload(title: 'SQL A', lineStart: 10, lineEnd: 20)]),
             $this->attackerResponse([$this->vulnPayload(title: 'SQL B', lineStart: 15, lineEnd: 25)]),
         );
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         self::assertCount(1, $auditContext->vulnerabilities());
     }
 
     public function test_it_stores_exact_metadata_values_after_orchestration(): void
     {
-        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->attackerResponse([$this->vulnPayload(title: 'Vuln v1')]),
             $this->emptyResponse(),
         );
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         self::assertSame(2, $auditContext->getMeta('audit.iterations'));
         self::assertSame(1, $auditContext->getMeta('audit.total_findings'));
@@ -245,7 +274,9 @@ final class AuditOrchestratorTest extends TestCase
     {
         // If continue→break mutation occurred, processing would stop after the duplicate.
         // This test ensures that when a dup is encountered, processing continues to the next item.
-        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->attackerResponse([$this->vulnPayload(title: 'dup', lineStart: 10, lineEnd: 15)]),
             $this->attackerResponse([
                 $this->vulnPayload(title: 'dup', lineStart: 10, lineEnd: 15),
@@ -253,11 +284,12 @@ final class AuditOrchestratorTest extends TestCase
             ]),
             $this->emptyResponse(),
         );
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         // Both unique vulnerabilities should be persisted (not just the first after encountering dup)
         self::assertCount(2, $auditContext->vulnerabilities());
@@ -268,16 +300,19 @@ final class AuditOrchestratorTest extends TestCase
         // linesOverlap: $start1 <= $end2 && $start2 <= $end1
         // With <= changed to <: touching ranges (end1==start2) would NOT be treated as overlapping.
         // This test ensures end1==start2 IS treated as overlapping (i.e. duplicate).
-        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->attackerResponse([$this->vulnPayload(title: 'SQL A', lineStart: 10, lineEnd: 20)]),
             // start2==20 == end1==20 → touching, should be treated as overlap (duplicate)
             $this->attackerResponse([$this->vulnPayload(title: 'SQL B', lineStart: 20, lineEnd: 30)]),
         );
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         // vuln2 overlaps with vuln1 (touching at line 20) → deduplicated → only 1 stored
         self::assertCount(1, $auditContext->vulnerabilities());
@@ -287,16 +322,19 @@ final class AuditOrchestratorTest extends TestCase
     {
         // linesOverlap with &&→|| mutation: would treat ALL pairs as overlapping.
         // This test verifies truly separate ranges (1-5 and 10-15) are NOT deduplicated.
-        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->attackerResponse([$this->vulnPayload(title: 'SQL A', lineStart: 1, lineEnd: 5)]),
             $this->attackerResponse([$this->vulnPayload(title: 'SQL B', lineStart: 10, lineEnd: 15)]),
             $this->emptyResponse(),
         );
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         // Non-overlapping ranges → both should be stored
         self::assertCount(2, $auditContext->vulnerabilities());
@@ -312,13 +350,15 @@ final class AuditOrchestratorTest extends TestCase
             },
         );
 
-        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->attackerResponse([$this->vulnPayload(title: 'Vuln v1')]),
             $this->emptyResponse(),
         );
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
-        $auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm, $logger);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, $logger);
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -344,9 +384,11 @@ final class AuditOrchestratorTest extends TestCase
             },
         );
 
-        $this->attackerLlm->method('complete')->willReturn($this->emptyResponse());
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
-        $auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm, $logger);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, $logger);
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -369,9 +411,11 @@ final class AuditOrchestratorTest extends TestCase
             },
         );
 
-        $this->attackerLlm->method('complete')->willReturn($this->emptyResponse());
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
-        $auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm, $logger);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, $logger);
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -394,7 +438,9 @@ final class AuditOrchestratorTest extends TestCase
             },
         );
 
-        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->attackerResponse([
                 $this->vulnPayload(title: 'v1', lineStart: 10, lineEnd: 15),
                 $this->vulnPayload(title: 'v2', lineStart: 30, lineEnd: 40),
@@ -402,12 +448,12 @@ final class AuditOrchestratorTest extends TestCase
             $this->emptyResponse(),
         );
         // Reviewer batchSize=1 → one LLM call per vuln. Accept the first, reject the second.
-        $this->reviewerLlm->method('complete')->willReturnOnConsecutiveCalls(
+        $reviewerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->reviewerAcceptResponse(),
             $this->reviewerRejectResponse(),
         );
 
-        $auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm, $logger);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, $logger);
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -431,9 +477,11 @@ final class AuditOrchestratorTest extends TestCase
             },
         );
 
-        $this->attackerLlm->method('complete')->willReturn($this->emptyResponse());
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
-        $auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm, $logger);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, $logger);
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -451,15 +499,18 @@ final class AuditOrchestratorTest extends TestCase
     {
         // Covers $start1 <= $end2 boundary (mutant: <= → <).
         // existing vuln1 (10-20) persisted first; then vuln2 (5-10) — touching at start1==end2==10.
-        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->attackerResponse([$this->vulnPayload(title: 'SQL A', lineStart: 10, lineEnd: 20)]),
             $this->attackerResponse([$this->vulnPayload(title: 'SQL B', lineStart: 5, lineEnd: 10)]),
         );
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
         $auditContext = $this->makeContextWithMapping();
 
-        $this->auditOrchestrator->orchestrate($auditContext);
+        $auditOrchestrator->orchestrate($auditContext);
 
         // start1==end2==10 → touching → overlap → dup → only 1 stored
         self::assertCount(1, $auditContext->vulnerabilities());
@@ -467,13 +518,15 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_logs_warning_when_no_mapping_available(): void
     {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::once())
             ->method('warning')
             ->with('No mapping available, skipping audit');
         $logger->expects(self::never())->method('info');
 
-        $auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm, $logger);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, $logger);
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -483,7 +536,9 @@ final class AuditOrchestratorTest extends TestCase
     {
         $iterationCount = 0;
 
-        $this->attackerLlm
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm
             ->method('complete')
             ->willReturnCallback(function () use (&$iterationCount): LLMResponse {
                 ++$iterationCount;
@@ -497,11 +552,11 @@ final class AuditOrchestratorTest extends TestCase
                     filePath: 'src/File'.$iterationCount.'.php',
                 )]);
             });
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
         $auditOrchestrator = $this->makeOrchestrator(
-            $this->attackerLlm,
-            $this->reviewerLlm,
+            $attackerLlm,
+            $reviewerLlm,
             new NullLogger(),
             maxIterations: 5,
         );
@@ -514,14 +569,16 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_respects_custom_min_confidence(): void
     {
-        $this->attackerLlm->method('complete')->willReturn(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(
             $this->attackerResponse([$this->vulnPayload(title: 'borderline', confidence: 0.65)]),
         );
-        $this->reviewerLlm->expects(self::never())->method('complete');
+        $reviewerLlm->expects(self::never())->method('complete');
 
         $auditOrchestrator = $this->makeOrchestrator(
-            $this->attackerLlm,
-            $this->reviewerLlm,
+            $attackerLlm,
+            $reviewerLlm,
             new NullLogger(),
             minConfidence: 0.7,
         );
@@ -534,15 +591,17 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_accepts_vulnerability_at_exact_custom_confidence_threshold(): void
     {
-        $this->attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->attackerResponse([$this->vulnPayload(title: 'exact', confidence: 0.7)]),
             $this->emptyResponse(),
         );
-        $this->reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
         $auditOrchestrator = $this->makeOrchestrator(
-            $this->attackerLlm,
-            $this->reviewerLlm,
+            $attackerLlm,
+            $reviewerLlm,
             new NullLogger(),
             minConfidence: 0.7,
         );
@@ -563,11 +622,13 @@ final class AuditOrchestratorTest extends TestCase
             },
         );
 
-        $this->attackerLlm->method('complete')->willReturn($this->emptyResponse());
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
         $auditOrchestrator = $this->makeOrchestrator(
-            $this->attackerLlm,
-            $this->reviewerLlm,
+            $attackerLlm,
+            $reviewerLlm,
             $logger,
             maxIterations: 7,
         );
@@ -587,10 +648,6 @@ final class AuditOrchestratorTest extends TestCase
     {
         $this->tmpDir = sys_get_temp_dir().'/orchestrator_test_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
-
-        $this->attackerLlm = $this->createMock(LLMClientInterface::class);
-        $this->reviewerLlm = $this->createMock(LLMClientInterface::class);
-        $this->auditOrchestrator = $this->makeOrchestrator($this->attackerLlm, $this->reviewerLlm);
     }
 
     protected function tearDown(): void

@@ -81,6 +81,9 @@ overriding the alias in `config/services.yaml` is a supported integration path:
 - `SecretScrubberInterface`
 - `PricingProviderInterface`
 - `TokenEstimatorInterface`
+- `RateLimiterInterface` — host applications may implement this and alias it to
+  swap the throttling strategy (e.g. cross-process Redis-backed bucket). See
+  [`docs/extending.md`](extending.md).
 - Configuration value objects in `Audit\Domain\Configuration\*`
   (BundleConfiguration and per-layer VOs)
 - Domain models: `AuditBudget`, `AuditCost`, `TokenUsageSnapshot`

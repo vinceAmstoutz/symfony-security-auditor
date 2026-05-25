@@ -213,7 +213,7 @@ final class StagesTest extends TestCase
 
     public function test_audit_stage_calls_orchestrator_when_ready(): void
     {
-        $attackerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm = self::createStub(LLMClientInterface::class);
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'stub', 'end_turn'));
 

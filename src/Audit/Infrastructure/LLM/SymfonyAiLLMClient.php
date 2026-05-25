@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
+use DateTimeImmutable;
 use Psr\Log\LoggerInterface;
 use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\Message;
@@ -33,12 +34,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class SymfonyAiLLMClient implements LLMClientInterface
@@ -61,6 +66,9 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         private ?SleeperInterface $sleeper = null,
         private ?BudgetTracker $budgetTracker = null,
         private bool $providerJsonMode = self::DEFAULT_PROVIDER_JSON_MODE,
+        private ?RateLimiterInterface $rateLimiter = null,
+        private ?TokenEstimatorInterface $tokenEstimator = null,
+        private ?RetryAfterHeaderParser $retryAfterHeaderParser = null,
     ) {}
 
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
@@ -79,9 +87,12 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
 
         \assert('' !== $this->model, 'Model must be a non-empty string');
 
-        $deferredResult = $this->invokeWithRetry($messageBag, $this->baseOptions());
+        $estimatedInputTokens = $this->estimateInputTokens($systemPrompt, $userMessage);
+        $deferredResult = $this->invokeWithRetry($messageBag, $this->baseOptions(), $estimatedInputTokens);
         $content = $deferredResult->asText();
         [$inputTokens, $outputTokens] = $this->extractTokens($deferredResult);
+
+        $this->rateLimiter()->record($inputTokens, $outputTokens);
 
         $this->logger->debug('symfony/ai platform responded', [
             'content_length' => \strlen($content),
@@ -118,15 +129,18 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         $options = $this->baseOptions();
         $options['tools'] = $this->buildPlatformTools($toolRegistry->definitions());
 
+        $estimatedInputTokens = $this->estimateInputTokens($systemPrompt, $userMessage);
+
         $iteration = 0;
         $totalInputTokens = 0;
         $totalOutputTokens = 0;
         while ($iteration < $maxToolIterations) {
-            $deferredResult = $this->invokeWithRetry($messageBag, $options);
+            $deferredResult = $this->invokeWithRetry($messageBag, $options, $estimatedInputTokens);
             $platformResult = $deferredResult->getResult();
             [$callInput, $callOutput] = $this->extractTokens($deferredResult);
             $totalInputTokens += $callInput;
             $totalOutputTokens += $callOutput;
+            $this->rateLimiter()->record($callInput, $callOutput);
             if ($this->budgetTracker instanceof BudgetTracker) {
                 $this->budgetTracker->recordCall(LLMResponse::create(
                     content: '',
@@ -226,19 +240,32 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
     }
 
     /** @param array<string, mixed> $options */
-    private function invokeWithRetry(MessageBag $messageBag, array $options): DeferredResult
+    private function invokeWithRetry(MessageBag $messageBag, array $options, int $estimatedInputTokens): DeferredResult
     {
+        $rateLimiter = $this->rateLimiter();
         $retryPolicy = $this->retryPolicy ?? new RetryPolicy();
         $classifier = $this->transientFailureClassifier ?? new TransientFailureClassifier();
         $sleeper = $this->sleeper ?? new UsleepSleeper();
+        $retryAfterParser = $this->retryAfterHeaderParser ?? new RetryAfterHeaderParser();
 
         \assert('' !== $this->model, 'Model must be a non-empty string');
 
         $maxAttempts = $retryPolicy->maxAttempts();
         $attempt = 1;
         while (true) {
+            $rateLimiter->acquire($estimatedInputTokens);
+
             try {
-                return $this->platform->invoke($this->model, $messageBag, $options);
+                $deferredResult = $this->platform->invoke($this->model, $messageBag, $options);
+                // Eager resolution: force the HTTP body read here so 4xx/5xx
+                // errors surface inside this retry wrapper instead of escaping
+                // later from `asText()`/`getResult()` in `complete()` /
+                // `completeWithTools()`. `DeferredResult::getResult()` caches
+                // its converted output, so the subsequent caller-side calls
+                // see the same instance with no extra cost.
+                $deferredResult->getResult();
+
+                return $deferredResult;
             } catch (Throwable $throwable) {
                 if (!$classifier->isTransient($throwable)) {
                     throw NonTransientLLMFailureException::from($throwable);
@@ -248,8 +275,18 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
                     throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $throwable);
                 }
 
+                $serverHintSeconds = null;
+                if ($classifier->isRateLimit($throwable)) {
+                    $serverHintSeconds = $retryAfterParser->parse($throwable);
+                    if (null !== $serverHintSeconds) {
+                        $rateLimiter->pauseUntil(
+                            (new DateTimeImmutable())->modify(\sprintf('+%d seconds', $serverHintSeconds)),
+                        );
+                    }
+                }
+
                 $delay = $classifier->isRateLimit($throwable)
-                    ? $retryPolicy->rateLimitDelayMs($attempt)
+                    ? $retryPolicy->rateLimitDelayMs($attempt, $serverHintSeconds)
                     : $retryPolicy->delayMs($attempt);
                 $this->logger->warning('LLM call failed, retrying after backoff', [
                     'attempt' => $attempt,
@@ -261,6 +298,22 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
                 ++$attempt;
             }
         }
+    }
+
+    private function rateLimiter(): RateLimiterInterface
+    {
+        return $this->rateLimiter ?? new NullRateLimiter();
+    }
+
+    private function estimateInputTokens(string ...$prompts): int
+    {
+        $tokenEstimator = $this->tokenEstimator ?? new CharacterBasedTokenEstimator();
+        $total = 0;
+        foreach ($prompts as $prompt) {
+            $total += $tokenEstimator->estimateTokens($prompt, $this->model);
+        }
+
+        return $total;
     }
 
     /** @return array{0: int, 1: int} */

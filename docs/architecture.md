@@ -49,6 +49,7 @@ src/
 │   │   └── Port/        # Cross-layer ports — LLMClientInterface, LLMResponse,
 │   │       │              AttackerCacheInterface, ProjectFileScannerInterface,
 │   │       │              SecretScrubberInterface, TokenEstimatorInterface,
+│   │       │              RateLimiterInterface,
 │   │       │              PricingProviderInterface,
 │   │       │              Attacker/ReviewerPromptBuilderInterface
 │   │       └── Tool/    # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
@@ -58,7 +59,8 @@ src/
 │   │   └── Agent/       # Attacker/Reviewer agents (+ interfaces), AuditOrchestrator (+ interface), VulnerabilityFactory
 │   └── Infrastructure/  # I/O adapters
 │       ├── LLM/         # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier,
-│       │                  CharacterBasedTokenEstimator, Delay/SleeperInterface + UsleepSleeper
+│       │                  CharacterBasedTokenEstimator, Delay/SleeperInterface + UsleepSleeper,
+│       │                  RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
 │       ├── FileSystem/  # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
 │       ├── Prompt/      # AttackerPromptBuilder, ReviewerPromptBuilder
 │       ├── Cache/       # FilesystemAttackerCache, NullAttackerCache
@@ -404,7 +406,19 @@ breached, triggering a clean abort with exit code `2`.
 Jittered exponential backoff is applied by the surrounding `RetryPolicy`;
 transient failures (HTTP 429, 5xx) are retried up to `audit.retry.max_attempts`
 times. Non-transient failures (auth, validation errors) are classified by
-`TransientFailureClassifier` and propagate immediately.
+`TransientFailureClassifier` and propagate immediately. Eager resolution of the
+`DeferredResult` (forcing `getResult()` before the retry wrapper exits) ensures
+errors emitted by `symfony/http-client`'s lazy body read surface inside the
+retry loop instead of escaping later in `complete()` / `completeWithTools()`.
+
+Around each invocation, `RateLimiterInterface` (default `NullRateLimiter`,
+opt-in `TokenBucketRateLimiter`) gates outbound calls proactively:
+`acquire($estimatedInputTokens)` blocks until the next request fits inside the
+configured per-minute windows, `record($in, $out)` reconciles the estimate with
+actuals once the call completes, and `pauseUntil($at)` propagates a
+server-issued `Retry-After` (parsed by `RetryAfterHeaderParser` from
+`Symfony\AI\Platform\Exception\RateLimitExceededException::getRetryAfter()`) so
+concurrent chunks share the freeze instead of stampeding the provider.
 
 Swapping LLM providers (Anthropic → OpenAI → Mistral → Ollama → …) requires no
 code changes — only `ai.yaml` configuration.

@@ -86,6 +86,25 @@ names must be supported by the platform configured in `ai.yaml`.
 | `audit.retry.backoff_multiplier` | `float` (≥ 1.0)         | `2.0`   | Exponential growth factor between retries. With initial 500ms and multiplier 2.0, retries wait ~500, ~1000, ~2000 ms.                                                                                                                                                                                                                                                                            |
 | `audit.retry.jitter_ratio`       | `float` 0–1             | `0.2`   | Jitter applied to each computed delay, as a fraction in `[0.0, 1.0]`. `0.2` means each delay varies within ±20% of the base.                                                                                                                                                                                                                                                                     |
 
+### `audit.rate_limit.*` — proactive throttling
+
+Token-bucket limiter wrapped around every LLM call. Each dimension is
+independently nullable; when **all three are `null` (default)** the bundle wires
+`NullRateLimiter` and the reactive retry path applies unchanged. Set the limits
+enforced by your provider tier (e.g. Anthropic RPM/ITPM/OTPM) so the
+steady-state path stays inside quota — `Retry-After` parsing still surfaces
+server-driven backoff when an estimate misses.
+
+| Key                                         | Type                | Default | Description                                                                                                                                                                                          |
+| ------------------------------------------- | ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `audit.rate_limit.requests_per_minute`      | `int` (≥ 1) or null | `null`  | Maximum LLM requests per minute. `null` disables this dimension.                                                                                                                                     |
+| `audit.rate_limit.input_tokens_per_minute`  | `int` (≥ 1) or null | `null`  | Maximum input tokens per minute. `null` disables this dimension. A single request whose estimated input exceeds the cap throws `RateLimitRequestTooLargeException` (extends `LLMProviderException`). |
+| `audit.rate_limit.output_tokens_per_minute` | `int` (≥ 1) or null | `null`  | Maximum output tokens per minute. `null` disables this dimension. Counted post-hoc from each call's actual usage so the next `acquire()` defers until the window resets once the bucket is full.     |
+
+State is per-process. Parallel runs sharing one API key (e.g. CI matrix) still
+race on the provider window — out-of-process coordination (Redis/file lock) is
+not provided by v1.
+
 ### `cache.*` — caching layers
 
 | Key                    | Type     | Default                                                | Description                                                                                                                                                                                                                                                                   |

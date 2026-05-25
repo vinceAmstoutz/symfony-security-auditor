@@ -262,6 +262,70 @@ final class RetryPolicyTest extends TestCase
         new RetryPolicy(rateLimitInitialDelayMs: -1);
     }
 
+    public function test_server_hint_overrides_exponential_backoff(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            rateLimitInitialDelayMs: 60_000,
+            jitterSource: static fn (): float => 0.5,
+        );
+
+        self::assertSame(7_000, $retryPolicy->rateLimitDelayMs(1, serverHintSeconds: 7));
+    }
+
+    public function test_server_hint_is_clamped_to_maximum(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            rateLimitMaxDelayMs: 300_000,
+            jitterSource: static fn (): float => 0.5,
+        );
+
+        self::assertSame(300_000, $retryPolicy->rateLimitDelayMs(1, serverHintSeconds: 3_600));
+    }
+
+    public function test_server_hint_zero_falls_back_to_exponential(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            backoffMultiplier: 2.0,
+            jitterRatio: 0.0,
+            rateLimitInitialDelayMs: 60_000,
+            jitterSource: static fn (): float => 0.5,
+        );
+
+        self::assertSame(60_000, $retryPolicy->rateLimitDelayMs(1, serverHintSeconds: 0));
+    }
+
+    public function test_negative_server_hint_falls_back_to_exponential(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            jitterRatio: 0.0,
+            rateLimitInitialDelayMs: 60_000,
+            jitterSource: static fn (): float => 0.5,
+        );
+
+        self::assertSame(60_000, $retryPolicy->rateLimitDelayMs(1, serverHintSeconds: -5));
+    }
+
+    public function test_negative_rate_limit_max_delay_is_rejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('rateLimitMaxDelayMs must be >= 0, got -1');
+
+        new RetryPolicy(rateLimitMaxDelayMs: -1);
+    }
+
+    public function test_exponential_delay_is_also_clamped_to_max(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            backoffMultiplier: 10.0,
+            jitterRatio: 0.0,
+            rateLimitInitialDelayMs: 60_000,
+            rateLimitMaxDelayMs: 120_000,
+            jitterSource: static fn (): float => 0.5,
+        );
+
+        self::assertSame(120_000, $retryPolicy->rateLimitDelayMs(3));
+    }
+
     public function test_default_jitter_source_produces_value_in_range(): void
     {
         $retryPolicy = new RetryPolicy(initialDelayMs: 1_000, backoffMultiplier: 1.0, jitterRatio: 0.2);

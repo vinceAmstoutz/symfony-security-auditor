@@ -14,14 +14,17 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM;
 
 use Closure;
+use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\MessageInterface;
 use Symfony\AI\Platform\Message\ToolCallMessage;
+use Symfony\AI\Platform\Model;
 use Symfony\AI\Platform\ModelCatalog\FallbackModelCatalog;
 use Symfony\AI\Platform\ModelCatalog\ModelCatalogInterface;
 use Symfony\AI\Platform\PlainConverter;
@@ -30,12 +33,15 @@ use Symfony\AI\Platform\Result\BaseResult;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
 use Symfony\AI\Platform\Result\MultiPartResult;
+use Symfony\AI\Platform\Result\RawResultInterface;
 use Symfony\AI\Platform\Result\ResultInterface;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
+use Symfony\AI\Platform\ResultConverterInterface;
 use Symfony\AI\Platform\Test\InMemoryPlatform;
 use Symfony\AI\Platform\TokenUsage\TokenUsage;
+use Symfony\AI\Platform\TokenUsage\TokenUsageExtractorInterface;
 use Symfony\AI\Platform\Tool\Tool;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
@@ -43,6 +49,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\Budg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
@@ -993,6 +1001,198 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([500], $fakeSleeper->durations);
     }
 
+    public function test_eager_resolution_catches_transient_failure_thrown_from_deferred_result(): void
+    {
+        // The original bug: Symfony HttpClient defers HTTP body read to
+        // `DeferredResult::getResult()`, so a 503 thrown from there escaped the
+        // retry wrapper. After the fix, `invokeWithRetry()` forces eager
+        // resolution and the retry loop catches the failure normally.
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->lazilyFailingPlatform([
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new TextResult('recovered after lazy 503'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 10,
+                jitterRatio: 0.0,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+        );
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame('recovered after lazy 503', $llmResponse->content());
+        self::assertSame([10], $fakeSleeper->durations);
+    }
+
+    public function test_acquire_runs_before_invoke_with_estimated_input_tokens(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $inMemoryPlatform = new InMemoryPlatform('ok');
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $inMemoryPlatform,
+            'm',
+            new NullLogger(),
+            rateLimiter: $fakeRateLimiter,
+            tokenEstimator: new FixedTokenEstimator(123),
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame([246], $fakeRateLimiter->acquired, 'system + user prompts → 2 × 123 = 246');
+    }
+
+    public function test_record_runs_after_success_with_actual_tokens(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('ok'),
+            new TokenUsage(promptTokens: 250, completionTokens: 75),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            rateLimiter: $fakeRateLimiter,
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame([[250, 75]], $fakeRateLimiter->recorded);
+    }
+
+    public function test_complete_with_tools_records_actual_tokens_after_each_iteration(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $tool = $this->makeTool('echo', 'echo', static fn (): string => 'echoed');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            results: [
+                new MultiPartResult([new ToolCallResult([new ToolCall('call-1', 'echo', [])])]),
+                new MultiPartResult([new TextResult('finished')]),
+            ],
+            tokenUsages: [
+                new TokenUsage(promptTokens: 40, completionTokens: 10),
+                new TokenUsage(promptTokens: 60, completionTokens: 5),
+            ],
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            rateLimiter: $fakeRateLimiter,
+        );
+
+        $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
+
+        // Each tool-loop iteration must call rateLimiter->record() with the
+        // tokens consumed by that specific iteration — not the cumulative
+        // total, not skipped on the tool-call iteration.
+        self::assertSame([[40, 10], [60, 5]], $fakeRateLimiter->recorded);
+    }
+
+    public function test_429_with_retry_after_uses_server_hint_and_pauses_rate_limiter(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $fakeRateLimiter = new FakeRateLimiter();
+        $platform = $this->flakyPlatform([
+            new RateLimitExceededException(retryAfter: 7),
+            new TextResult('recovered'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                jitterRatio: 0.0,
+                rateLimitInitialDelayMs: 60_000,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+            rateLimiter: $fakeRateLimiter,
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame([7_000], $fakeSleeper->durations, 'must honor server-provided 7s, not the default 60s');
+        self::assertCount(1, $fakeRateLimiter->paused);
+    }
+
+    public function test_429_without_retry_after_falls_back_to_exponential_delay(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $fakeRateLimiter = new FakeRateLimiter();
+        $platform = $this->flakyPlatform([
+            new RateLimitExceededException(),
+            new TextResult('recovered'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                jitterRatio: 0.0,
+                rateLimitInitialDelayMs: 60_000,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+            rateLimiter: $fakeRateLimiter,
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame([60_000], $fakeSleeper->durations);
+        self::assertSame([], $fakeRateLimiter->paused, 'no server hint means no pauseUntil call');
+    }
+
+    /**
+     * @param list<ResultInterface|RuntimeException> $scriptedResultsOrErrors
+     */
+    private function lazilyFailingPlatform(array $scriptedResultsOrErrors): PlatformInterface
+    {
+        return new class($scriptedResultsOrErrors) implements PlatformInterface {
+            /** @var list<ResultInterface|RuntimeException> */
+            private array $remaining;
+
+            /** @param list<ResultInterface|RuntimeException> $scriptedResultsOrErrors */
+            public function __construct(array $scriptedResultsOrErrors)
+            {
+                $this->remaining = $scriptedResultsOrErrors;
+            }
+
+            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                $next = array_shift($this->remaining);
+                $converter = $next instanceof RuntimeException
+                    ? new ThrowingConverter($next)
+                    : new PlainConverter($next ?? new TextResult('exhausted'));
+
+                return new DeferredResult(
+                    $converter,
+                    new InMemoryRawResult(['text' => ''], [], (object) []),
+                    $options,
+                );
+            }
+
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+    }
+
     /**
      * @param list<ResultInterface|RuntimeException> $scriptedResultsOrErrors
      */
@@ -1160,5 +1360,62 @@ final class FakeSleeper implements SleeperInterface
     public function sleep(int $milliseconds): void
     {
         $this->durations[] = $milliseconds;
+    }
+}
+
+final class FakeRateLimiter implements RateLimiterInterface
+{
+    /** @var list<int> */
+    public array $acquired = [];
+
+    /** @var list<array{int, int}> */
+    public array $recorded = [];
+
+    /** @var list<DateTimeImmutable> */
+    public array $paused = [];
+
+    public function acquire(int $estimatedInputTokens): void
+    {
+        $this->acquired[] = $estimatedInputTokens;
+    }
+
+    public function record(int $inputTokens, int $outputTokens): void
+    {
+        $this->recorded[] = [$inputTokens, $outputTokens];
+    }
+
+    public function pauseUntil(DateTimeImmutable $until): void
+    {
+        $this->paused[] = $until;
+    }
+}
+
+final class FixedTokenEstimator implements TokenEstimatorInterface
+{
+    public function __construct(private readonly int $tokensPerCall) {}
+
+    public function estimateTokens(string $text, string $model): int
+    {
+        return $this->tokensPerCall;
+    }
+}
+
+final class ThrowingConverter implements ResultConverterInterface
+{
+    public function __construct(private readonly RuntimeException $runtimeException) {}
+
+    public function supports(Model $model): bool
+    {
+        return true;
+    }
+
+    public function convert(RawResultInterface $result, array $options = []): ResultInterface
+    {
+        throw $this->runtimeException;
+    }
+
+    public function getTokenUsageExtractor(): ?TokenUsageExtractorInterface
+    {
+        return null;
     }
 }
