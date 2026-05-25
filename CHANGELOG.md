@@ -10,6 +10,63 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-05-25
+
+### Added
+
+- `audit:run --path=<subdir>` (repeatable, shortcut `-p`) restricts the scan to
+  one or several project-relative subdirectories. The project root remains the
+  argument (or working directory), so advisory lookups still see
+  `composer.lock`. Useful for monorepos where only a single app needs to be
+  audited.
+- `audit:run --no-cache` bypasses the attacker cache for the run: every chunk
+  hits the LLM and no cache entries are written or read. Existing cache stays on
+  disk untouched.
+- New `Audit\Domain\Port\ProgressReporterInterface` plus two ready-to-use
+  implementations (`NullProgressReporter`, `LoggerProgressReporter`). The audit
+  pipeline now emits `pipeline.started`, `stage.started`, `stage.completed`, and
+  `pipeline.completed` events so hosts can render progress without polling.
+  Default is `NullProgressReporter` — silent unless the host wires another
+  implementation.
+- `CharacterBasedTokenEstimator` now covers Mistral / Codestral, Llama
+  (`llama-*`, `llama3*`, `llama4*`, `meta-llama/*`), and DeepSeek model families
+  in addition to Claude / GPT (incl. `o3` / `o4`) / Gemini. The constructor
+  accepts an optional `$charsPerTokenByPrefix` map so hosts can add or override
+  ratios for fine-tuned or self-hosted models without subclassing.
+- `AuditCost` carries an optional per-role breakdown (`byRole()`, also surfaced
+  under `by_role` in `toArray()`). `EstimateAuditCostUseCase` now computes
+  attacker and reviewer cost separately and populates the breakdown, so
+  `audit:run --dry-run` reports show `$X for the attacker model` and
+  `$Y for the reviewer model` instead of a single bundled total. The console
+  template renders the breakdown automatically when present.
+- README now opens with a 30-second quick-start section above the full Getting
+  Started guide.
+
+### Changed
+
+- The attacker cache key now folds in the configured attacker model name and a
+  prompt-builder version constant (`AttackerPromptBuilder::PROMPT_VERSION`).
+  Switching models or bumping the prompt automatically invalidates
+  previously-cached LLM responses; identical configuration across instances
+  still hits the cache as before.
+- `composer audit` results are now persisted to disk across runs, keyed by a
+  SHA-256 of the project's `composer.lock`. Re-running the audit (CI, repeated
+  `--dry-run`) reuses the cached advisory data instead of spawning composer
+  again. Projects without a lockfile transparently fall back to running the
+  underlying audit on every call; cache I/O failures are logged and swallowed.
+
+### Notes
+
+- All changes in this release are additive — existing public APIs (configuration
+  keys, `audit:run` arguments / options / exit codes, JSON and SARIF schemas,
+  Domain ports) keep their previous signatures. New optional constructor
+  parameters on `AuditCost`, `AuditContext::forProject()`,
+  `EstimateAuditCostUseCase`, `RunAuditUseCase::execute()`, and
+  `FilesystemAttackerCache` all default to their previous behavior.
+- `ProgressReporterInterface` is a Domain port covered by the BC promise: host
+  implementations should expect new event names to be added in `MINOR` releases
+  (additive) but never have their payload schemas changed without a `MAJOR`.
+
 ## [1.1.0] — 2026-05-24
 
 ### Added
@@ -240,6 +297,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.2.0]:
+  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.2.0
 [1.1.0]:
   https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.1.0
 [1.0.0]:
