@@ -39,6 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
@@ -228,7 +229,12 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.retry.jitter_ratio', $bundleConfiguration->retry->jitterRatio);
         $builder->setParameter('symfony_security_auditor.cache.enabled', $bundleConfiguration->cache->enabled);
         $builder->setParameter('symfony_security_auditor.cache.dir', $bundleConfiguration->cache->dir);
+        $builder->setParameter('symfony_security_auditor.cache.advisory_dir', $bundleConfiguration->cache->dir.'/advisory');
         $builder->setParameter('symfony_security_auditor.cache.prompt_caching', $bundleConfiguration->cache->promptCaching);
+        $builder->setParameter(
+            'symfony_security_auditor.cache.key_salt',
+            \sprintf('%s|prompt-v%d', $bundleConfiguration->llm->attackerModel(), AttackerPromptBuilder::PROMPT_VERSION),
+        );
 
         $services = $container->services();
 

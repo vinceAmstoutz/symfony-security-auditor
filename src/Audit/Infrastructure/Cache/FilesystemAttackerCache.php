@@ -29,6 +29,7 @@ final readonly class FilesystemAttackerCache implements AttackerCacheInterface
         private string $cacheDir,
         private Filesystem $filesystem,
         private LoggerInterface $logger,
+        private string $keySalt = '',
     ) {
         if ('' === trim($cacheDir)) {
             throw InvalidCacheConfigurationException::forEmptyCacheDir();
@@ -137,6 +138,11 @@ final readonly class FilesystemAttackerCache implements AttackerCacheInterface
 
         sort($signatures);
 
-        return hash('sha256', implode("\n", $signatures));
+        $payload = implode("\n", $signatures);
+        if ('' !== $this->keySalt) {
+            $payload = $this->keySalt."\0".$payload;
+        }
+
+        return hash('sha256', $payload);
     }
 }

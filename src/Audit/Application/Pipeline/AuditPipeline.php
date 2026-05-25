@@ -17,6 +17,8 @@ use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\NullProgressReporter;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditPipeline implements PipelineInterface
@@ -24,12 +26,15 @@ final readonly class AuditPipeline implements PipelineInterface
     /** @var list<StageInterface> */
     private array $stages;
 
+    private ProgressReporterInterface $progressReporter;
+
     /**
      * @param iterable<StageInterface> $stages
      */
     public function __construct(
         iterable $stages,
         private LoggerInterface $logger,
+        ?ProgressReporterInterface $progressReporter = null,
     ) {
         $collected = [];
         foreach ($stages as $stage) {
@@ -37,18 +42,31 @@ final readonly class AuditPipeline implements PipelineInterface
         }
 
         $this->stages = $collected;
+        $this->progressReporter = $progressReporter ?? new NullProgressReporter();
     }
 
     public function process(AuditContext $auditContext): void
     {
+        $stageNames = array_map(static fn (StageInterface $stage): string => $stage->name(), $this->stages);
+
         $this->logger->info('Starting audit pipeline', [
             'audit_id' => $auditContext->auditId(),
-            'stages' => array_map(static fn (StageInterface $stage): string => $stage->name(), $this->stages),
+            'stages' => $stageNames,
+        ]);
+
+        $this->progressReporter->report('pipeline.started', [
+            'audit_id' => $auditContext->auditId(),
+            'stages' => $stageNames,
         ]);
 
         foreach ($this->stages as $stage) {
             $this->logger->info(\sprintf('Running stage: %s', $stage->name()), [
                 'audit_id' => $auditContext->auditId(),
+            ]);
+
+            $this->progressReporter->report('stage.started', [
+                'audit_id' => $auditContext->auditId(),
+                'stage' => $stage->name(),
             ]);
 
             $start = microtime(true);
@@ -59,9 +77,21 @@ final readonly class AuditPipeline implements PipelineInterface
                 'audit_id' => $auditContext->auditId(),
                 'elapsed_seconds' => $elapsed,
             ]);
+
+            $this->progressReporter->report('stage.completed', [
+                'audit_id' => $auditContext->auditId(),
+                'stage' => $stage->name(),
+                'elapsed_seconds' => $elapsed,
+            ]);
         }
 
         $this->logger->info('Pipeline complete', [
+            'audit_id' => $auditContext->auditId(),
+            'vulnerabilities_found' => \count($auditContext->vulnerabilities()),
+            'validated' => \count($auditContext->validatedVulnerabilities()),
+        ]);
+
+        $this->progressReporter->report('pipeline.completed', [
             'audit_id' => $auditContext->auditId(),
             'vulnerabilities_found' => \count($auditContext->vulnerabilities()),
             'validated' => \count($auditContext->validatedVulnerabilities()),
