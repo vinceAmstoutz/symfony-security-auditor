@@ -204,6 +204,39 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(['type' => 'json_object'], $invocationOptionsCapture->options['response_format']);
     }
 
+    public function test_complete_passes_all_base_options_together_when_multiple_flags_enabled(): void
+    {
+        // With each option exercised individually the base-options array carries
+        // at most one entry, so an ArrayOneItem mutator on the return is silently
+        // absorbed (single-item slices equal the original). Enabling temperature
+        // + prompt caching + provider JSON mode together makes the full array
+        // observable: the mutant would drop two of the three keys.
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $inMemoryPlatform = new InMemoryPlatform(
+            /** @param array<string, mixed> $options */
+            static function (object $model, mixed $input, array $options) use ($invocationOptionsCapture): TextResult {
+                $invocationOptionsCapture->options ??= $options;
+
+                return new TextResult('out');
+            },
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $inMemoryPlatform,
+            'test-model',
+            new NullLogger(),
+            temperature: 0.5,
+            promptCaching: true,
+            providerJsonMode: true,
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertSame(0.5, $invocationOptionsCapture->options['temperature']);
+        self::assertSame(['type' => 'ephemeral'], $invocationOptionsCapture->options['cache_control']);
+        self::assertSame(['type' => 'json_object'], $invocationOptionsCapture->options['response_format']);
+    }
+
     public function test_complete_omits_response_format_when_provider_json_mode_disabled(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();

@@ -225,4 +225,19 @@ final class LLMResponseTest extends TestCase
 
         self::assertSame([1, 2, 3], $llmResponse->parseJson());
     }
+
+    public function test_parse_json_trims_non_json_whitespace_around_scalar_to_reach_array_guard(): void
+    {
+        // Vertical tab (\x0b) is removed by `trim()` but rejected by `json_decode`
+        // as a control character — and unlike an array payload, a scalar offers
+        // no `[`/`{` opener for the balanced-block extractor to recover from.
+        // With `trim()`: the inner `"scalar"` decodes and fails the `!is_array`
+        // guard → RuntimeException. Without `trim()` (UnwrapTrim mutant): the
+        // first decode throws on `\x0b`, the extractor finds no opener, and the
+        // original JsonException is rethrown — pins the `trim()` call.
+        $llmResponse = LLMResponse::create("\x0b\"scalar\"\x0b", 10, 5, 'claude', 'end_turn');
+
+        $this->expectException(RuntimeException::class);
+        $llmResponse->parseJson();
+    }
 }
