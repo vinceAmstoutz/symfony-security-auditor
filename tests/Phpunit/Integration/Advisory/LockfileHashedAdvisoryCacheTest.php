@@ -58,12 +58,14 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame(1, $recordingComposerAuditRunner->callCount, 'second call must be served from cache');
     }
 
-    public function test_cache_hit_emits_advisory_cache_hit_debug_log(): void
+    public function test_cache_hit_emits_advisory_cache_hit_debug_log_with_lockfile_hash_context(): void
     {
-        // Pins the `$this->logger->debug('Advisory cache hit', ...)` call against
-        // MethodCallRemoval. Without an explicit assertion, the debug call can be
-        // removed without any observable effect, leaving the mutant alive.
-        $this->writeLockfile('{"lock": "v1"}');
+        // Pins the `$this->logger->debug('Advisory cache hit', ['lockfile_hash' => …])`
+        // call against both MethodCallRemoval and ArrayItemRemoval on the context's
+        // `lockfile_hash` entry.
+        $lockfileContent = '{"lock": "v1"}';
+        $this->writeLockfile($lockfileContent);
+        $expectedHash = hash('sha256', $lockfileContent);
 
         $debugMessages = [];
         $logger = self::createStub(LoggerInterface::class);
@@ -86,8 +88,12 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         );
         $lockfileHashedAdvisoryCache->run($this->projectDir);
 
-        $messages = array_column($debugMessages, 0);
-        self::assertContains('Advisory cache hit', $messages);
+        $hitLogs = array_values(array_filter(
+            $debugMessages,
+            static fn (array $entry): bool => 'Advisory cache hit' === $entry[0],
+        ));
+        self::assertCount(1, $hitLogs);
+        self::assertSame($expectedHash, $hitLogs[0][1]['lockfile_hash']);
     }
 
     public function test_different_lockfile_contents_produce_distinct_cache_entries(): void
@@ -168,8 +174,16 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
 
         self::assertSame('{"advisories": {}}', $json);
         self::assertSame(1, $recordingComposerAuditRunner->callCount, 'inner runner must still be called when the lockfile is unreadable');
-        $messages = array_column($warnings, 0);
-        self::assertContains('composer.lock present but unreadable; skipping advisory cache', $messages);
+
+        $unreadableLogs = array_values(array_filter(
+            $warnings,
+            static fn (array $entry): bool => 'composer.lock present but unreadable; skipping advisory cache' === $entry[0],
+        ));
+        // Pins both 'path' and 'error' entries against ArrayItemRemoval on the
+        // warning context.
+        self::assertCount(1, $unreadableLogs);
+        self::assertSame($this->projectDir.'/composer.lock', $unreadableLogs[0][1]['path']);
+        self::assertSame('permission denied', $unreadableLogs[0][1]['error']);
     }
 
     public function test_cache_miss_when_existing_entry_is_unreadable_and_falls_back_to_inner(): void
@@ -215,8 +229,66 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
 
         self::assertSame('{"advisories": {}}', $json);
         self::assertSame(2, $recordingComposerAuditRunner->callCount, 'inner runner must be called again after an unreadable cache entry');
-        $messages = array_column($warnings, 0);
-        self::assertContains('Advisory cache entry unreadable, falling back to live audit', $messages);
+
+        $unreadableLogs = array_values(array_filter(
+            $warnings,
+            static fn (array $entry): bool => 'Advisory cache entry unreadable, falling back to live audit' === $entry[0],
+        ));
+        // Pins the 'path' entry on the warning context against ArrayItemRemoval.
+        self::assertCount(1, $unreadableLogs);
+        $path = $unreadableLogs[0][1]['path'] ?? null;
+        self::assertIsString($path);
+        self::assertStringEndsWith('.json', $path);
+        self::assertStringContainsString($this->cacheDir, $path);
+    }
+
+    public function test_cache_file_is_written_at_two_char_shard_directory_under_full_hash_filename(): void
+    {
+        // Pins every substr / rtrim mutant on pathForHash() against the exact
+        // on-disk layout: {cacheDir}/{first 2 chars of hash}/{full hash}.json.
+        //
+        //   - UnwrapSubstr            → shard would be the full 64-char hash
+        //   - IncrementInteger 2 → 3  → shard becomes 3 chars
+        //   - DecrementInteger 2 → 1  → shard becomes 1 char
+        //   - IncrementInteger 0 → 1  → shard takes chars 1-2 instead of 0-1
+        //   - DecrementInteger 0 → -1 → shard takes the last char instead of first
+        $lockfileContent = '{"lock": "v1"}';
+        $this->writeLockfile($lockfileContent);
+        $expectedHash = hash('sha256', $lockfileContent);
+
+        $lockfileHashedAdvisoryCache = $this->makeCache($this->recordingRunner('{"advisories": {}}'));
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $files = glob($this->cacheDir.'/*/*.json') ?: [];
+        self::assertCount(1, $files);
+
+        $expectedPath = \sprintf(
+            '%s/%s/%s.json',
+            $this->cacheDir,
+            substr($expectedHash, 0, 2),
+            $expectedHash,
+        );
+        self::assertSame($expectedPath, $files[0]);
+    }
+
+    public function test_cache_dir_with_trailing_slash_is_normalized_before_assembling_path(): void
+    {
+        // Pins UnwrapRtrim on rtrim($this->cacheDir, '/'): without it, a cacheDir
+        // ending in '/' produces a path containing a double slash (`.../cache//ab/...`).
+        $cacheDirWithSlash = $this->projectDir.'/trailing/';
+        $this->writeLockfile('{"lock": "v1"}');
+
+        $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache(
+            $this->recordingRunner('{"advisories": {}}'),
+            $cacheDirWithSlash,
+            new Filesystem(),
+            new NullLogger(),
+        );
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $files = glob(rtrim($cacheDirWithSlash, '/').'/*/*.json') ?: [];
+        self::assertCount(1, $files);
+        self::assertStringNotContainsString('//', $files[0]);
     }
 
     public function test_write_failure_is_logged_and_does_not_propagate(): void
