@@ -325,12 +325,30 @@ context wouldn't apply, so accuracy drops. **Not recommended.**
 `.php`, `.twig`, `.yaml`, `.yml`, `.xml` — the file types where Symfony
 security-relevant code lives. Other extensions are skipped.
 
-### Does it scan `vendor/`?
+### Does it scan `vendor/`, `tests/`, or `migrations/`?
 
-No. `vendor`, `node_modules`, `.git`, `var/cache`, `var/log`, `public/bundles`
-are excluded by default (hard defaults — cannot be removed, only appended to via
-`scan.excluded_dirs`). `composer audit` covers vendor CVEs via the
-`lookup_advisory` tool.
+No. The scan is a strict **allow-list**: only the paths listed in
+`scan.included_paths` are inspected, defaulting to `src`, `config`, `templates`,
+and `public/index.php` (the Symfony Flex skeleton). Anything outside —
+`vendor/`, `node_modules/`, `var/`, `tests/`, `migrations/`, `translations/`,
+`bin/`, `app/`, root-level scripts, IDE folders, build artefacts — is silently
+skipped. To prune a sub-tree inside an included path (e.g. drop `src/Migrations`
+from the audit), tighten `included_paths` to the specific sub-directories you
+want instead — e.g.:
+
+```yaml
+symfony_security_auditor:
+    scan:
+        included_paths:
+            - 'src/Controller'
+            - 'src/Form'
+            - 'src/Voter'
+            - 'config'
+            - 'templates'
+            - 'public/index.php'
+```
+
+`composer audit` covers vendor CVEs via the `lookup_advisory` tool.
 
 ---
 

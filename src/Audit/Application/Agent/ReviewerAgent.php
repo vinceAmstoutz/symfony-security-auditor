@@ -32,6 +32,8 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 {
     public const int DEFAULT_BATCH_SIZE = 1;
 
+    private const int PARSE_FAILURE_PREVIEW_BYTES = 512;
+
     public function __construct(
         private LLMClientInterface $llmClient,
         private ReviewerPromptBuilderInterface $reviewerPromptBuilder,
@@ -115,6 +117,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             $this->logger->error('Failed to parse reviewer batch response', [
                 'batch_size' => \count($batch),
                 'error' => $exception->getMessage(),
+                'content_preview' => substr($response->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
             ]);
 
             return $this->markBatchErrored($batch, $coverageRecorder);
@@ -245,6 +248,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             $this->logger->error('Failed to parse reviewer response', [
                 'vulnerability_id' => $vulnerability->id(),
                 'error' => $exception->getMessage(),
+                'content_preview' => substr($response->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
             ]);
             $coverageRecorder->recordCoverage('reviewer', $vulnerability->filePath(), 'errored');
 

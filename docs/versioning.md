@@ -32,7 +32,7 @@ Every key under `symfony_security_auditor:` documented in
 [`docs/configuration.md`](configuration.md):
 
 - `model`, `attacker_model`, `reviewer_model`, `provider_json_mode`
-- `scan.excluded_dirs`, `scan.respect_gitignore`, `scan.max_file_size_kb`,
+- `scan.included_paths`, `scan.respect_gitignore`, `scan.max_file_size_kb`,
   `scan.secret_scrubbing.enabled`, `scan.secret_scrubbing.additional_patterns`
 - `audit.max_iterations`, `audit.min_confidence`, `audit.reviewer_batch_size`,
   `audit.tools_enabled`, `audit.max_tool_iterations`,

@@ -504,7 +504,7 @@ root key `symfony_security_auditor`. Top-level scalars:
 
 Nested sections:
 
-- `scan.*` — `excluded_dirs`, `respect_gitignore`, `max_file_size_kb`,
+- `scan.*` — `included_paths`, `respect_gitignore`, `max_file_size_kb`,
   `secret_scrubbing.enabled`, `secret_scrubbing.additional_patterns` (file
   discovery + credential redaction)
 - `audit.*` — `max_iterations`, `min_confidence`, `reviewer_batch_size`,

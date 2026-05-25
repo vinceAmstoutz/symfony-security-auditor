@@ -16,11 +16,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 final readonly class ScanConfiguration
 {
     /**
-     * @param list<string> $excludedDirs
+     * @param list<string> $includedPaths
      * @param list<string> $additionalScrubberPatterns
      */
     public function __construct(
-        public array $excludedDirs,
+        public array $includedPaths,
         public bool $respectGitignore,
         public int $maxFileSizeKb,
         public bool $secretScrubbingEnabled,

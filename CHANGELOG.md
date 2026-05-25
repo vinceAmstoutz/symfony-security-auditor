@@ -10,6 +10,53 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- New `scan.included_paths` configuration key (`string[]`, default
+  `['src', 'config', 'templates', 'public/index.php']`) is the **sole scoping
+  knob** for the audit. Only the listed project-relative directories and files
+  are inspected; everything else — `vendor/`, `node_modules/`, `var/`, `tests/`,
+  `migrations/`, `translations/`, `bin/`, root scripts, IDE folders, build
+  artefacts, monorepo siblings — is silently skipped. Symfony Finder is invoked
+  with the resolved directories as its `in()` roots so it never traverses
+  outside the allow-list. If none of the entries resolve in the project root the
+  scanner logs `No included paths exist in project` at `warning` level and
+  returns an empty result.
+
+### Removed
+
+- **Breaking:** `scan.excluded_dirs` configuration key. The previous deny-list
+  mechanism (hard defaults plus user-supplied exclusions) has been replaced by
+  `scan.included_paths`. To prune a sub-tree inside an included path (e.g. drop
+  `src/Migrations`), tighten `included_paths` to specific sub-directories:
+
+  ```yaml
+  symfony_security_auditor:
+      scan:
+          included_paths: ['src/Controller', 'src/Form', 'src/Voter']
+  ```
+
+- **Breaking:** the internal `HARD_EXCLUDED_DIRS` list on `ProjectFileScanner`
+  is gone. With Finder scanning only included paths, walking into `vendor/` or
+  `node_modules/` no longer happens, so the prune list is unnecessary.
+
+### Fixed
+
+- `scan.max_file_size_kb` now interprets the unit as kibibytes (`1024`-byte
+  blocks) for both directory-scanned and explicitly-listed paths. The previous
+  implementation routed the directory scan through Symfony Finder's `K` suffix
+  (`1000`-byte kilobytes) while the explicit-file path used `*1024`, so files
+  between `1000 * N` and `1024 * N` bytes were treated differently depending on
+  which leg of the scanner saw them. Both paths now share the `Ki` suffix.
+- `LLMResponse::parseJson()` now recovers from conversational prose around a
+  balanced JSON block. With `audit.tools_enabled: true` (the default), the
+  attacker model sometimes ignores the "Return ONLY the JSON array" prompt
+  instruction and wraps its answer in commentary, which previously caused a
+  whole chunk's findings to be dropped with `JsonException: Syntax error`.
+- `AttackerAgent` / `ReviewerAgent` parse-failure error logs now include a
+  512-byte `content_preview` of the LLM response so the actual shape of an
+  unrecoverable payload is diagnosable without re-running the audit.
+
 ## [1.2.0] — 2026-05-25
 
 ### Added

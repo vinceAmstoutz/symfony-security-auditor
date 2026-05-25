@@ -18,6 +18,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
+use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
@@ -86,6 +87,149 @@ final class ProjectFileScannerTest extends TestCase
 
         file_put_contents($this->tmpDir.'/src/App.php', '<?php class App {}');
         file_put_contents($this->tmpDir.'/node_modules/pkg/index.php', '<?php // npm');
+
+        $files = $this->projectFileScanner->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertSame('src/App.php', $files[0]->relativePath());
+    }
+
+    public function test_default_included_paths_scan_src_config_templates_and_public_index(): void
+    {
+        // The Symfony skeleton allow-list: PHP under src/, YAML under config/,
+        // Twig under templates/, and the single HTTP front controller.
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        mkdir($this->tmpDir.'/config', 0o777, true);
+        mkdir($this->tmpDir.'/templates', 0o777, true);
+        mkdir($this->tmpDir.'/public', 0o777, true);
+
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
+        file_put_contents($this->tmpDir.'/config/security.yaml', 'security: {}');
+        file_put_contents($this->tmpDir.'/templates/base.html.twig', '{{ user.name }}');
+        file_put_contents($this->tmpDir.'/public/index.php', '<?php // front controller');
+
+        $paths = array_map(
+            static fn (ProjectFile $projectFile): string => $projectFile->relativePath(),
+            $this->projectFileScanner->scan($this->tmpDir),
+        );
+        sort($paths);
+
+        self::assertSame(
+            ['config/security.yaml', 'public/index.php', 'src/App.php', 'templates/base.html.twig'],
+            $paths,
+        );
+    }
+
+    public function test_it_skips_files_outside_default_included_paths(): void
+    {
+        // `app/` and root-level scripts are NOT in HARD_EXCLUDED_DIRS but ARE
+        // outside the default allow-list. Both must be skipped so the audit
+        // surface stays bounded for non-Symfony-skeleton layouts that the
+        // operator has not explicitly opted into.
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        mkdir($this->tmpDir.'/app', 0o777, true);
+
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
+        file_put_contents($this->tmpDir.'/app/Legacy.php', '<?php');
+        file_put_contents($this->tmpDir.'/root-script.php', '<?php');
+
+        $files = $this->projectFileScanner->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertSame('src/App.php', $files[0]->relativePath());
+    }
+
+    public function test_it_only_includes_public_index_when_other_public_files_present(): void
+    {
+        // `public/index.php` is included as an explicit file path. Sibling
+        // public/*.php files (assets, dev helpers) must NOT be picked up by
+        // the same entry — otherwise the allow-list silently fans out to the
+        // whole `public/` directory.
+        mkdir($this->tmpDir.'/public', 0o777, true);
+        file_put_contents($this->tmpDir.'/public/index.php', '<?php // front controller');
+        file_put_contents($this->tmpDir.'/public/dev.php', '<?php // dev script');
+
+        $files = $this->projectFileScanner->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertSame('public/index.php', $files[0]->relativePath());
+    }
+
+    public function test_it_uses_custom_included_paths_when_provided(): void
+    {
+        // Non-skeleton layout: operator points `included_paths` at `app/`.
+        // Files under `src/` are no longer scanned because the allow-list
+        // is replaced (not appended to).
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        mkdir($this->tmpDir.'/app', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Should.php', '<?php // ignored');
+        file_put_contents($this->tmpDir.'/app/MyClass.php', '<?php');
+
+        $projectFileScanner = new ProjectFileScanner(new NullLogger(), includedPaths: ['app']);
+
+        $files = $projectFileScanner->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertSame('app/MyClass.php', $files[0]->relativePath());
+    }
+
+    public function test_it_logs_warning_and_returns_empty_when_no_included_paths_exist(): void
+    {
+        // Operator pointed `included_paths` at a layout that doesn't exist:
+        // no scan happens, an explicit warning fires so the configuration
+        // mismatch shows up in logs rather than a silent zero-finding report.
+        // We also pin the early return by asserting the "Scan complete" info
+        // log is absent — without the `return [];`, the Finder would still
+        // walk the project and reach that log even when no files survive
+        // the allow-list filter.
+        $warningLogs = [];
+        $infoLogs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$infoLogs): void {
+                $infoLogs[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warningLogs): void {
+                $warningLogs[] = [$msg, $ctx];
+            },
+        );
+
+        // Anchoring file that WOULD be scanned without the early return —
+        // src/App.php matches no `nonexistent` allow-list entry, but the
+        // Finder would still reach "Scan complete" if the warning branch
+        // fell through.
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
+
+        $projectFileScanner = new ProjectFileScanner($logger, includedPaths: ['nonexistent']);
+
+        $files = $projectFileScanner->scan($this->tmpDir);
+
+        self::assertSame([], $files);
+        self::assertCount(1, $warningLogs);
+        self::assertSame('No included paths exist in project', $warningLogs[0][0]);
+        self::assertSame(['nonexistent'], $warningLogs[0][1]['included_paths']);
+
+        $completeLogs = array_values(array_filter(
+            $infoLogs,
+            static fn (array $entry): bool => 'Scan complete' === $entry[0],
+        ));
+        self::assertEmpty($completeLogs);
+    }
+
+    public function test_it_does_not_match_sibling_directory_that_shares_a_prefix_with_included_path(): void
+    {
+        // Pins the `/` separator in the prefix check: `srcfoo/` shares the
+        // `src` prefix but is a sibling, not a child, of the allow-listed
+        // `src/` entry. Without the trailing slash in `str_starts_with`, the
+        // sibling would leak into the scan.
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        mkdir($this->tmpDir.'/srcfoo', 0o777, true);
+
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
+        file_put_contents($this->tmpDir.'/srcfoo/Sibling.php', '<?php');
 
         $files = $this->projectFileScanner->scan($this->tmpDir);
 
@@ -165,49 +309,25 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame(['Scan complete', ['files' => 1]], $infoLogs[1]);
     }
 
-    public function test_it_excludes_additional_dirs_from_config(): void
-    {
-        mkdir($this->tmpDir.'/src', 0o777, true);
-        mkdir($this->tmpDir.'/legacy', 0o777, true);
-
-        file_put_contents($this->tmpDir.'/src/App.php', '<?php class App {}');
-        file_put_contents($this->tmpDir.'/legacy/Old.php', '<?php class Old {}');
-
-        $projectFileScanner = new ProjectFileScanner(new NullLogger(), additionalExcludedDirs: ['legacy']);
-
-        $files = $projectFileScanner->scan($this->tmpDir);
-
-        self::assertCount(1, $files);
-        self::assertSame('src/App.php', $files[0]->relativePath());
-    }
-
-    public function test_additional_excluded_dirs_do_not_replace_hard_defaults(): void
-    {
-        mkdir($this->tmpDir.'/src', 0o777, true);
-        mkdir($this->tmpDir.'/vendor', 0o777, true);
-        mkdir($this->tmpDir.'/legacy', 0o777, true);
-
-        file_put_contents($this->tmpDir.'/src/App.php', '<?php');
-        file_put_contents($this->tmpDir.'/vendor/autoload.php', '<?php');
-        file_put_contents($this->tmpDir.'/legacy/Old.php', '<?php');
-
-        $projectFileScanner = new ProjectFileScanner(new NullLogger(), additionalExcludedDirs: ['legacy']);
-
-        $files = $projectFileScanner->scan($this->tmpDir);
-
-        self::assertCount(1, $files);
-        self::assertSame('src/App.php', $files[0]->relativePath());
-    }
-
     public function test_it_respects_gitignore_when_enabled(): void
     {
+        // `derived` is added to `includedPaths` so the test measures
+        // gitignore filtering in isolation. Finder's `ignoreVCSIgnored()`
+        // calls `git check-ignore`, which requires a real `.git/` directory
+        // — initialize an empty git repo so the fixture mirrors a real
+        // cloned project layout.
         mkdir($this->tmpDir.'/src', 0o777, true);
-        mkdir($this->tmpDir.'/build', 0o777, true);
-        file_put_contents($this->tmpDir.'/.gitignore', "build/\n");
+        mkdir($this->tmpDir.'/derived', 0o777, true);
+        file_put_contents($this->tmpDir.'/.gitignore', "derived/\n");
         file_put_contents($this->tmpDir.'/src/App.php', '<?php');
-        file_put_contents($this->tmpDir.'/build/Generated.php', '<?php');
+        file_put_contents($this->tmpDir.'/derived/Generated.php', '<?php');
+        (new Process(['git', 'init', '--quiet', $this->tmpDir]))->mustRun();
 
-        $projectFileScanner = new ProjectFileScanner(new NullLogger(), respectGitignore: true);
+        $projectFileScanner = new ProjectFileScanner(
+            new NullLogger(),
+            includedPaths: ['src', 'derived'],
+            respectGitignore: true,
+        );
 
         $files = $projectFileScanner->scan($this->tmpDir);
 
@@ -218,12 +338,16 @@ final class ProjectFileScannerTest extends TestCase
     public function test_it_does_not_respect_gitignore_when_disabled(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
-        mkdir($this->tmpDir.'/build', 0o777, true);
-        file_put_contents($this->tmpDir.'/.gitignore', "build/\n");
+        mkdir($this->tmpDir.'/derived', 0o777, true);
+        file_put_contents($this->tmpDir.'/.gitignore', "derived/\n");
         file_put_contents($this->tmpDir.'/src/App.php', '<?php');
-        file_put_contents($this->tmpDir.'/build/Generated.php', '<?php');
+        file_put_contents($this->tmpDir.'/derived/Generated.php', '<?php');
 
-        $projectFileScanner = new ProjectFileScanner(new NullLogger(), respectGitignore: false);
+        $projectFileScanner = new ProjectFileScanner(
+            new NullLogger(),
+            includedPaths: ['src', 'derived'],
+            respectGitignore: false,
+        );
 
         $paths = array_map(
             static fn (ProjectFile $projectFile): string => $projectFile->relativePath(),
@@ -231,18 +355,18 @@ final class ProjectFileScannerTest extends TestCase
         );
         sort($paths);
 
-        self::assertSame(['build/Generated.php', 'src/App.php'], $paths);
+        self::assertSame(['derived/Generated.php', 'src/App.php'], $paths);
     }
 
     public function test_default_constructor_does_not_respect_gitignore(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
-        mkdir($this->tmpDir.'/build', 0o777, true);
-        file_put_contents($this->tmpDir.'/.gitignore', "build/\n");
+        mkdir($this->tmpDir.'/derived', 0o777, true);
+        file_put_contents($this->tmpDir.'/.gitignore', "derived/\n");
         file_put_contents($this->tmpDir.'/src/App.php', '<?php');
-        file_put_contents($this->tmpDir.'/build/Generated.php', '<?php');
+        file_put_contents($this->tmpDir.'/derived/Generated.php', '<?php');
 
-        $projectFileScanner = new ProjectFileScanner(new NullLogger());
+        $projectFileScanner = new ProjectFileScanner(new NullLogger(), includedPaths: ['src', 'derived']);
 
         $paths = array_map(
             static fn (ProjectFile $projectFile): string => $projectFile->relativePath(),
@@ -250,7 +374,7 @@ final class ProjectFileScannerTest extends TestCase
         );
         sort($paths);
 
-        self::assertSame(['build/Generated.php', 'src/App.php'], $paths);
+        self::assertSame(['derived/Generated.php', 'src/App.php'], $paths);
     }
 
     public function test_it_skips_files_larger_than_configured_max_size(): void
@@ -265,6 +389,44 @@ final class ProjectFileScannerTest extends TestCase
 
         self::assertCount(1, $files);
         self::assertSame('src/Small.php', $files[0]->relativePath());
+    }
+
+    public function test_it_skips_explicit_file_path_when_larger_than_configured_max_size(): void
+    {
+        // Explicit file entries in `included_paths` (e.g. `public/index.php`)
+        // bypass Symfony Finder, so the size cap is enforced manually. A
+        // bloated front controller must be skipped just like an oversized
+        // file inside a scanned directory.
+        mkdir($this->tmpDir.'/public', 0o777, true);
+        file_put_contents(
+            $this->tmpDir.'/public/index.php',
+            '<?php /* '.str_repeat('x', 3 * 1024).' */',
+        );
+
+        $projectFileScanner = new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2);
+
+        $files = $projectFileScanner->scan($this->tmpDir);
+
+        self::assertSame([], $files);
+    }
+
+    public function test_it_keeps_explicit_file_at_exact_max_size_boundary(): void
+    {
+        // Boundary pin for the `kb * 1024` byte conversion AND the `>` comparator
+        // on the explicit-file size cap. A file of exactly `maxFileSizeKb * 1024`
+        // bytes must be kept (size is not strictly greater than the cap), so a
+        // `* 1023`/`* 1025` mutation on the multiplier or a `>=` mutation on the
+        // comparator would push it past the threshold and drop it.
+        mkdir($this->tmpDir.'/public', 0o777, true);
+        // 2 KB exactly — `str_repeat('a', 2 * 1024)` is 2048 bytes on disk.
+        file_put_contents($this->tmpDir.'/public/index.php', str_repeat('a', 2 * 1024));
+
+        $projectFileScanner = new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2);
+
+        $files = $projectFileScanner->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertSame('public/index.php', $files[0]->relativePath());
     }
 
     public function test_it_scrubs_secrets_from_file_content_when_scrubber_is_injected(): void

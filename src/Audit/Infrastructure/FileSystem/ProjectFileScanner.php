@@ -35,25 +35,28 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
     /** @var list<string> */
     private const array CONFIG_EXTENSIONS = ['yaml', 'yml', 'xml'];
 
-    /** @var list<string> */
-    private const array HARD_EXCLUDED_DIRS = [
-        'vendor',
-        'node_modules',
-        '.git',
-        'var/cache',
-        'var/log',
-        'public/bundles',
-    ];
-
     public const int DEFAULT_MAX_FILE_SIZE_KB = 512;
 
     /**
-     * @param list<string>                  $additionalExcludedDirs appended to the hard defaults; never replaces them
-     * @param ?Closure(SplFileInfo): string $fileReader             defaults to SplFileInfo::getContents; tests inject a stub
+     * Default allow-list of project-relative paths scanned for security
+     * findings. Matches the Symfony Flex skeleton (`src/` for PHP, `config/`
+     * for YAML/XML, `templates/` for Twig, `public/index.php` for the HTTP
+     * front controller). Anything outside this list is silently skipped —
+     * including ad-hoc root-level scripts, `bin/`, custom `app/` or `lib/`
+     * trees, and the build artefacts in `var/`, `public/build`, `vendor/`.
+     * Override via `scan.included_paths` for non-standard layouts.
+     *
+     * @var list<string>
+     */
+    public const array DEFAULT_INCLUDED_PATHS = ['src', 'config', 'templates', 'public/index.php'];
+
+    /**
+     * @param list<string>                  $includedPaths project-relative directories and files to scan; defaults to the Symfony skeleton layout
+     * @param ?Closure(SplFileInfo): string $fileReader    defaults to SplFileInfo::getContents; tests inject a stub
      */
     public function __construct(
         private LoggerInterface $logger,
-        private array $additionalExcludedDirs = [],
+        private array $includedPaths = self::DEFAULT_INCLUDED_PATHS,
         private bool $respectGitignore = false,
         private int $maxFileSizeKb = self::DEFAULT_MAX_FILE_SIZE_KB,
         private ?Closure $fileReader = null,
@@ -67,50 +70,121 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
     {
         $this->logger->info('Scanning project', ['path' => $projectPath]);
 
-        $extensions = array_merge(
-            array_map(static fn (string $ext): string => '*.'.$ext, self::PHP_EXTENSIONS),
-            array_map(static fn (string $ext): string => '*.'.$ext, self::TEMPLATE_EXTENSIONS),
-            array_map(static fn (string $ext): string => '*.'.$ext, self::CONFIG_EXTENSIONS),
-        );
+        [$directories, $explicitFiles] = $this->resolveIncludedPaths($projectPath);
 
-        $finder = (new Finder())
-            ->files()
-            ->in($projectPath)
-            ->name($extensions)
-            ->exclude(array_merge(self::HARD_EXCLUDED_DIRS, $this->additionalExcludedDirs))
-            ->size(\sprintf('<= %dK', $this->maxFileSizeKb));
+        if ([] === $directories && [] === $explicitFiles) {
+            $this->logger->warning('No included paths exist in project', [
+                'included_paths' => $this->includedPaths,
+                'project_path' => $projectPath,
+            ]);
 
-        if ($this->respectGitignore) {
-            $finder->ignoreVCSIgnored(true);
+            return [];
         }
 
         $reader = $this->fileReader ?? static fn (SplFileInfo $splFile): string => $splFile->getContents();
         $files = [];
 
-        /** @var SplFileInfo $splFile */
-        foreach ($finder as $splFile) {
-            try {
-                $content = $reader($splFile);
-                if ($this->secretScrubber instanceof SecretScrubberInterface) {
-                    $content = $this->secretScrubber->scrub($content);
-                }
+        if ([] !== $directories) {
+            $extensions = array_merge(
+                array_map(static fn (string $ext): string => '*.'.$ext, self::PHP_EXTENSIONS),
+                array_map(static fn (string $ext): string => '*.'.$ext, self::TEMPLATE_EXTENSIONS),
+                array_map(static fn (string $ext): string => '*.'.$ext, self::CONFIG_EXTENSIONS),
+            );
 
-                $files[] = ProjectFile::create(
-                    relativePath: Path::makeRelative($splFile->getPathname(), $projectPath),
-                    absolutePath: $splFile->getPathname(),
-                    content: $content,
-                );
-            } catch (Throwable $exception) {
-                $this->logger->warning('Failed to read file', [
-                    'path' => $splFile->getPathname(),
-                    'error' => $exception->getMessage(),
-                ]);
+            $finder = (new Finder())
+                ->files()
+                ->in($directories)
+                ->name($extensions)
+                ->size(\sprintf('<= %dKi', $this->maxFileSizeKb));
+
+            if ($this->respectGitignore) {
+                $finder->ignoreVCSIgnored(true);
+            }
+
+            /** @var SplFileInfo $splFile */
+            foreach ($finder as $splFile) {
+                $file = $this->buildProjectFile($splFile, $projectPath, $reader);
+                if ($file instanceof ProjectFile) {
+                    $files[] = $file;
+                }
+            }
+        }
+
+        foreach ($explicitFiles as $explicitFile) {
+            // Run Symfony Finder against the parent directory restricted to
+            // the exact basename and depth 0. This piggy-backs on the same
+            // `->size('<= NK')` filter Finder uses for the directory scan,
+            // so we avoid hand-rolling a `kb * 1024` byte conversion or a
+            // `filesize()` check (and the mutation-test debt that comes with
+            // either) — Symfony Components First (`.claude/rules/php-classes.md`).
+            $explicitFinder = (new Finder())
+                ->files()
+                ->in(\dirname($explicitFile))
+                ->depth('== 0')
+                ->name(basename($explicitFile))
+                ->size(\sprintf('<= %dKi', $this->maxFileSizeKb));
+
+            if ($this->respectGitignore) {
+                $explicitFinder->ignoreVCSIgnored(true);
+            }
+
+            /** @var SplFileInfo $splFile */
+            foreach ($explicitFinder as $splFile) {
+                $file = $this->buildProjectFile($splFile, $projectPath, $reader);
+                if ($file instanceof ProjectFile) {
+                    $files[] = $file;
+                }
             }
         }
 
         $this->logger->info('Scan complete', ['files' => \count($files)]);
 
         return $files;
+    }
+
+    /**
+     * @return array{0: list<string>, 1: list<string>}
+     */
+    private function resolveIncludedPaths(string $projectPath): array
+    {
+        $directories = [];
+        $explicitFiles = [];
+        foreach ($this->includedPaths as $includedPath) {
+            $resolved = $projectPath.\DIRECTORY_SEPARATOR.$includedPath;
+            if (is_dir($resolved)) {
+                $directories[] = $resolved;
+            } elseif (is_file($resolved)) {
+                $explicitFiles[] = $resolved;
+            }
+        }
+
+        return [$directories, $explicitFiles];
+    }
+
+    /**
+     * @param Closure(SplFileInfo): string $reader
+     */
+    private function buildProjectFile(SplFileInfo $splFile, string $projectPath, Closure $reader): ?ProjectFile
+    {
+        try {
+            $content = $reader($splFile);
+            if ($this->secretScrubber instanceof SecretScrubberInterface) {
+                $content = $this->secretScrubber->scrub($content);
+            }
+
+            return ProjectFile::create(
+                relativePath: Path::makeRelative($splFile->getPathname(), $projectPath),
+                absolutePath: $splFile->getPathname(),
+                content: $content,
+            );
+        } catch (Throwable $throwable) {
+            $this->logger->warning('Failed to read file', [
+                'path' => $splFile->getPathname(),
+                'error' => $throwable->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**
