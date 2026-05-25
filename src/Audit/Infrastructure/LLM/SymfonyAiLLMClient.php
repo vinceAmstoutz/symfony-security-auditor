@@ -48,7 +48,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Retr
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class SymfonyAiLLMClient implements LLMClientInterface
 {
-    public const float DEFAULT_TEMPERATURE = 0.0;
+    public const ?float DEFAULT_TEMPERATURE = null;
 
     public const bool DEFAULT_PROMPT_CACHING = false;
 
@@ -58,7 +58,7 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         private PlatformInterface $platform,
         private string $model,
         private LoggerInterface $logger,
-        private float $temperature = self::DEFAULT_TEMPERATURE,
+        private ?float $temperature = self::DEFAULT_TEMPERATURE,
         private bool $promptCaching = self::DEFAULT_PROMPT_CACHING,
         private ?TokenUsageRecorder $tokenUsageRecorder = null,
         private ?RetryPolicy $retryPolicy = null,
@@ -337,7 +337,15 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
      */
     private function baseOptions(): array
     {
-        $options = ['temperature' => $this->temperature];
+        // `temperature` is rejected by some newer Claude models (e.g.
+        // extended-thinking variants of Sonnet 4.6). Send only when the
+        // operator explicitly opted in; otherwise let the provider apply
+        // its own default.
+        $options = [];
+        if (null !== $this->temperature) {
+            $options['temperature'] = $this->temperature;
+        }
+
         if ($this->promptCaching) {
             $options['cache_control'] = ['type' => 'ephemeral'];
         }

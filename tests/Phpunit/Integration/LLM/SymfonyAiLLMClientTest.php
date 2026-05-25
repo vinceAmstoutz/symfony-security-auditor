@@ -144,6 +144,28 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertArrayNotHasKey('cache_control', $invocationOptionsCapture->options);
     }
 
+    public function test_complete_omits_temperature_when_left_at_default(): void
+    {
+        // Some newer Claude models (e.g. extended-thinking variants of Sonnet 4.6)
+        // reject the `temperature` option. With no explicit opt-in, it must not
+        // appear in the options bag so the provider applies its own default.
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $inMemoryPlatform = new InMemoryPlatform(
+            /** @param array<string, mixed> $options */
+            static function (object $model, mixed $input, array $options) use ($invocationOptionsCapture): TextResult {
+                $invocationOptionsCapture->options ??= $options;
+
+                return new TextResult('out');
+            },
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', new NullLogger());
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertArrayNotHasKey('temperature', $invocationOptionsCapture->options);
+    }
+
     public function test_complete_passes_prompt_caching_flag_when_enabled(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
