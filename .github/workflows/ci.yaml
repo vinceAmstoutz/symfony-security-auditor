@@ -105,7 +105,11 @@ jobs:
         run: vendor/bin/phpstan analyse --memory-limit=500M
 
       - name: Composer audit
-        run: composer audit
+        # `--abandoned=report` keeps abandoned-dependency warnings visible
+        # in the log without turning every upstream package abandonment into
+        # a CI failure (Composer's default in CI is to exit non-zero in that
+        # case). Actual security advisories still fail the build.
+        run: composer audit --abandoned=report
 
   tests:
     name: Tests + Mutation (PHP ${{ matrix.php }}, Symfony ${{ matrix.symfony }})
