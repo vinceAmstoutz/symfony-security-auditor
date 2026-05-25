@@ -238,6 +238,49 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(25, $byRole['reviewer']['input_tokens']);
     }
 
+    public function test_reviewer_input_token_estimate_uses_ceil_not_floor_or_round(): void
+    {
+        // Pins `(int) ceil($attackerInputTokens * $this->reviewerInputRatio)` against
+        // floor / round mutants on the reviewer estimation.
+        //   attackerInput = 100, reviewerInputRatio = 0.234 → 23.4
+        //   ceil  → 24  (correct)
+        //   floor → 23
+        //   round → 23  (banker's rounding)
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
+            maxIterations: 1,
+            outputRatio: 0.5,
+            reviewerInputRatio: 0.234,
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(24, $auditReport->cost()->byRole()['reviewer']['input_tokens']);
+    }
+
+    public function test_reviewer_output_token_estimate_uses_ceil_not_floor_or_round(): void
+    {
+        // Pins `(int) ceil($reviewerInputTokens * $this->outputRatio)` for the
+        // reviewer output line against both floor AND round mutants.
+        //   reviewerInput = ceil(100 * 0.5) = 50, outputRatio = 0.146
+        //   50 * 0.146 = 7.3
+        //   ceil  → 8  (correct)
+        //   floor → 7
+        //   round → 7  (banker's rounding rounds half-down here, but 7.3 < 7.5 anyway)
+        $estimateAuditCostUseCase = $this->makeUseCase(
+            files: [$this->makeProjectFile('a.php', 'aaa')],
+            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
+            maxIterations: 1,
+            outputRatio: 0.146,
+            reviewerInputRatio: 0.5,
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(8, $auditReport->cost()->byRole()['reviewer']['output_tokens']);
+    }
+
     public function test_dry_run_falls_back_to_attacker_model_when_reviewer_model_blank(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase(

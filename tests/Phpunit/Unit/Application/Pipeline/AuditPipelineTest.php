@@ -185,11 +185,25 @@ final class AuditPipelineTest extends TestCase
 
         $stage = $this->createNamedStage('s', static function (): void {});
         $auditPipeline = new AuditPipeline([$stage], new NullLogger(), $recordingProgressReporter);
-        $auditPipeline->process(AuditContext::forProject($this->tmpDir));
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditPipeline->process($auditContext);
 
         $eventNames = array_column($recordingProgressReporter->events, 0);
         self::assertContains('pipeline.started', $eventNames);
         self::assertContains('pipeline.completed', $eventNames);
+
+        // Pins the `'audit_id' => $auditContext->auditId()` array entry against
+        // ArrayItemRemoval on both pipeline.started and pipeline.completed.
+        $startedContext = array_values(array_filter(
+            $recordingProgressReporter->events,
+            static fn (array $e): bool => 'pipeline.started' === $e[0],
+        ))[0][1];
+        $completedContext = array_values(array_filter(
+            $recordingProgressReporter->events,
+            static fn (array $e): bool => 'pipeline.completed' === $e[0],
+        ))[0][1];
+        self::assertSame($auditContext->auditId(), $startedContext['audit_id']);
+        self::assertSame($auditContext->auditId(), $completedContext['audit_id']);
     }
 
     public function test_it_reports_stage_started_and_completed_events_for_each_stage(): void
@@ -198,15 +212,22 @@ final class AuditPipelineTest extends TestCase
 
         $stage = $this->createNamedStage('mapping', static function (): void {});
         $auditPipeline = new AuditPipeline([$stage], new NullLogger(), $recordingProgressReporter);
-        $auditPipeline->process(AuditContext::forProject($this->tmpDir));
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditPipeline->process($auditContext);
 
         $stageStarts = array_values(array_filter($recordingProgressReporter->events, static fn (array $e): bool => 'stage.started' === $e[0]));
         $stageCompletes = array_values(array_filter($recordingProgressReporter->events, static fn (array $e): bool => 'stage.completed' === $e[0]));
 
         self::assertCount(1, $stageStarts);
         self::assertSame('mapping', $stageStarts[0][1]['stage']);
+        // Pins `'audit_id' => $auditContext->auditId()` against ArrayItemRemoval
+        // on stage.started.
+        self::assertSame($auditContext->auditId(), $stageStarts[0][1]['audit_id']);
+
         self::assertCount(1, $stageCompletes);
         self::assertSame('mapping', $stageCompletes[0][1]['stage']);
+        // Pins `'audit_id'` against ArrayItemRemoval on stage.completed.
+        self::assertSame($auditContext->auditId(), $stageCompletes[0][1]['audit_id']);
     }
 
     public function test_it_defaults_to_a_silent_progress_reporter_when_none_is_injected(): void
