@@ -58,6 +58,38 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame(1, $recordingComposerAuditRunner->callCount, 'second call must be served from cache');
     }
 
+    public function test_cache_hit_emits_advisory_cache_hit_debug_log(): void
+    {
+        // Pins the `$this->logger->debug('Advisory cache hit', ...)` call against
+        // MethodCallRemoval. Without an explicit assertion, the debug call can be
+        // removed without any observable effect, leaving the mutant alive.
+        $this->writeLockfile('{"lock": "v1"}');
+
+        $debugMessages = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$debugMessages): void {
+                $debugMessages[] = [$message, $context];
+            },
+        );
+
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {"foo/bar": []}}');
+
+        // Prime the cache with the default logger so the first run does not pollute the recording one.
+        $this->makeCache($recordingComposerAuditRunner)->run($this->projectDir);
+
+        $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache(
+            $recordingComposerAuditRunner,
+            $this->cacheDir,
+            new Filesystem(),
+            $logger,
+        );
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $messages = array_column($debugMessages, 0);
+        self::assertContains('Advisory cache hit', $messages);
+    }
+
     public function test_different_lockfile_contents_produce_distinct_cache_entries(): void
     {
         $this->writeLockfile('{"lock": "v1"}');
