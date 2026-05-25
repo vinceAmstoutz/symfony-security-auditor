@@ -51,13 +51,11 @@ final readonly class ReportRenderer
 
     private function renderCostBreakdown(AuditReport $auditReport): string
     {
-        $byRole = $auditReport->cost()->byRole();
-        if ([] === $byRole) {
-            return '';
-        }
-
+        // An empty byRole produces an empty $lines, which implode joins to ''.
+        // Keeping a single fall-through path avoids an equivalent ReturnRemoval
+        // mutant on a redundant `if ([] === $byRole) return '';` early return.
         $lines = [];
-        foreach ($byRole as $role => $entry) {
+        foreach ($auditReport->cost()->byRole() as $role => $entry) {
             $lines[] = \sprintf(
                 '  - %-8s (%s): $%.4f — %s in / %s out',
                 $role,
