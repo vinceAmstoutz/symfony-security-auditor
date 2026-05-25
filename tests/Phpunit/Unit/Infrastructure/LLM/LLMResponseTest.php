@@ -147,6 +147,21 @@ final class LLMResponseTest extends TestCase
         self::assertSame([1, 2], $data);
     }
 
+    public function test_it_extracts_json_object_when_braces_are_the_first_opener(): void
+    {
+        // Pins the `{`-opener branch in `findFirstJsonOpener`: with no `[` earlier
+        // in the content, a ReturnRemoval on the `{` branch would skip past the
+        // opener, find no other opener later, and return null — collapsing back to
+        // a JsonException rethrow. The successful object extraction proves the
+        // branch returned its tuple.
+        $content = 'prose {"key": "value"} suffix';
+        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+
+        $data = $llmResponse->parseJson();
+
+        self::assertSame(['key' => 'value'], $data);
+    }
+
     public function test_it_throws_on_invalid_json(): void
     {
         $llmResponse = LLMResponse::create('not json at all', 10, 5, 'claude', 'end_turn');
