@@ -26,5 +26,7 @@ final readonly class AuditExecutionConfiguration
         public bool $reviewerToolsEnabled = false,
         public int $reviewerMaxToolIterations = 4,
         public string $chunkingStrategy = 'feature',
+        public bool $poCSynthesisEnabled = false,
+        public string $poCSynthesisSeverityFloor = 'high',
     ) {}
 }

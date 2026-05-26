@@ -42,6 +42,8 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->audit->reviewerToolsEnabled);
         self::assertSame(4, $bundleConfiguration->audit->reviewerMaxToolIterations);
         self::assertSame('feature', $bundleConfiguration->audit->chunkingStrategy);
+        self::assertFalse($bundleConfiguration->audit->poCSynthesisEnabled);
+        self::assertSame('high', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
 
         self::assertSame(3, $bundleConfiguration->retry->maxAttempts);
         self::assertSame(500, $bundleConfiguration->retry->initialDelayMs);
@@ -179,6 +181,10 @@ final class BundleConfigurationTest extends TestCase
                 'reviewer_max_tool_iterations' => 4,
                 'chunking' => [
                     'strategy' => 'feature',
+                ],
+                'poc_synthesis' => [
+                    'enabled' => false,
+                    'severity_floor' => 'high',
                 ],
                 'budget' => [
                     'max_tokens' => null,

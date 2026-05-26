@@ -186,6 +186,21 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                                 ->end()
                             ->end()
                         ->end()
+                        ->arrayNode('poc_synthesis')
+                            ->addDefaultsIfNotSet()
+                            ->info('Optional follow-up stage that generates a concrete, copy-pasteable proof-of-concept (curl command, console invocation, payload body) for every validated finding at or above the configured severity floor. Spends extra LLM tokens per finding; off by default. Turn on when shipping reports to engineers who need actionable reproduction steps.')
+                            ->children()
+                                ->booleanNode('enabled')
+                                    ->defaultFalse()
+                                    ->info('When true, the PoCSynthesisStage runs after the audit and attaches a `synthesized_poc` field to qualifying findings. Default false.')
+                                ->end()
+                                ->enumNode('severity_floor')
+                                    ->values(['critical', 'high', 'medium', 'low', 'info'])
+                                    ->defaultValue('high')
+                                    ->info('Minimum severity that triggers PoC synthesis. Default `high` — synthesize for critical+high only; medium and below keep the attacker\'s original proof string.')
+                                ->end()
+                            ->end()
+                        ->end()
                         ->arrayNode('budget')
                             ->addDefaultsIfNotSet()
                             ->info('Hard ceiling on cumulative LLM usage per audit run. Aborts the audit cleanly (exit code 2) with the partial report instead of running away on cost.')
@@ -307,6 +322,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.enabled', $bundleConfiguration->audit->staticPreScanEnabled);
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.lean_mode', $bundleConfiguration->audit->staticPreScanLeanMode);
         $builder->setParameter('symfony_security_auditor.audit.chunking.strategy', $bundleConfiguration->audit->chunkingStrategy);
+        $builder->setParameter('symfony_security_auditor.audit.poc_synthesis.enabled', $bundleConfiguration->audit->poCSynthesisEnabled);
+        $builder->setParameter('symfony_security_auditor.audit.poc_synthesis.severity_floor', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
         $builder->setParameter('symfony_security_auditor.audit.budget.max_tokens', $bundleConfiguration->budget->maxTokens);
         $builder->setParameter('symfony_security_auditor.audit.budget.max_cost_usd', $bundleConfiguration->budget->maxCostUsd);
         $builder->setParameter('symfony_security_auditor.audit.retry.max_attempts', $bundleConfiguration->retry->maxAttempts);

@@ -74,6 +74,8 @@ final readonly class BundleConfiguration
                 reviewerToolsEnabled: $config['audit']['reviewer_tools_enabled'] ?? false,
                 reviewerMaxToolIterations: $config['audit']['reviewer_max_tool_iterations'] ?? 4,
                 chunkingStrategy: $config['audit']['chunking']['strategy'] ?? 'feature',
+                poCSynthesisEnabled: $config['audit']['poc_synthesis']['enabled'] ?? false,
+                poCSynthesisSeverityFloor: $config['audit']['poc_synthesis']['severity_floor'] ?? 'high',
             ),
             retry: new RetryConfiguration(
                 maxAttempts: $config['audit']['retry']['max_attempts'],
