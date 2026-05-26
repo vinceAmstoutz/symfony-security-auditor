@@ -73,18 +73,15 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     public function scrub(string $content): string
     {
         foreach ($this->patterns as $label => $pattern) {
-            $replacement = match ($label) {
-                'env_assignment' => '$1=***REDACTED:'.$label.'***',
-                'inline_assignment' => '$1***REDACTED:'.$label.'***$3',
-                default => '***REDACTED:'.$label.'***',
-            };
-
             // `@` silences the PCRE warning so a runaway user-supplied pattern
             // hitting the backtrack limit returns null cleanly instead of
             // escalating to a PHPUnit fail-on-warning. The null branch lets
             // the scrub `continue` with the next pattern instead of aborting
             // the whole pipeline.
-            $result = @preg_replace($pattern, $replacement, $content);
+            $result = 'inline_assignment' === $label
+                ? @preg_replace_callback($pattern, $this->redactInlineAssignment(...), $content)
+                : @preg_replace($pattern, $this->replacementFor($label), $content);
+
             if (null === $result) {
                 continue;
             }
@@ -93,6 +90,39 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         }
 
         return $content;
+    }
+
+    private function replacementFor(string $label): string
+    {
+        return match ($label) {
+            'env_assignment' => '$1=***REDACTED:'.$label.'***',
+            default => '***REDACTED:'.$label.'***',
+        };
+    }
+
+    /**
+     * @param array<int|string, string> $match
+     */
+    private function redactInlineAssignment(array $match): string
+    {
+        if ($this->isConfigPlaceholder($match[2])) {
+            return $match[0];
+        }
+
+        return $match[1].'***REDACTED:inline_assignment***'.$match[3];
+    }
+
+    /**
+     * Detects Symfony parameter references (`%env(FOO)%`, `%kernel.secret%`) and shell-style
+     * env expansions (`$FOO`, `${FOO}`). These are configuration indirections, not committed
+     * secrets — redacting them produces a false positive when an LLM sees the placeholder
+     * marker and reports an "inline credential" vulnerability for code that follows the
+     * recommended Symfony secrets pattern.
+     */
+    private function isConfigPlaceholder(string $value): bool
+    {
+        return 1 === preg_match('/\A%[^%\s]+%\z/', $value)
+            || 1 === preg_match('/\A\$\{?[A-Za-z_]\w*\}?\z/', $value);
     }
 
     private function validatePattern(string $pattern): ?string

@@ -105,6 +105,26 @@ final class RegexSecretScrubberTest extends TestCase
         ];
     }
 
+    #[DataProvider('symfonyPlaceholderCases')]
+    public function test_it_leaves_symfony_placeholder_values_unmodified(string $input): void
+    {
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame($input, $output);
+        self::assertStringNotContainsString('***REDACTED:inline_assignment***', $output);
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function symfonyPlaceholderCases(): iterable
+    {
+        yield 'env_reference_in_yaml' => ["api_key: '%env(ANTHROPIC_API_KEY)%'"];
+        yield 'env_reference_with_processor' => ["password: '%env(string:DB_PASSWORD)%'"];
+        yield 'container_parameter_reference' => ["secret: '%kernel.secret%'"];
+        yield 'shell_env_brace' => ["api_key: '\${ANTHROPIC_API_KEY}'"];
+        yield 'shell_env_bare' => ["api_key: '\$ANTHROPIC_API_KEY'"];
+        yield 'php_array_env_reference' => ["'api_key' => '%env(ANTHROPIC_API_KEY)%'"];
+    }
+
     public function test_it_leaves_non_credential_content_unmodified(): void
     {
         $code = "<?php\n\nclass UserController {\n    public function indexAction(): Response\n    {\n        return new Response('hello');\n    }\n}\n";
