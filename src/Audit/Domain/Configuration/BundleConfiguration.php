@@ -73,6 +73,7 @@ final readonly class BundleConfiguration
                 staticPreScanLeanMode: $config['audit']['static_prescan']['lean_mode'] ?? false,
                 reviewerToolsEnabled: $config['audit']['reviewer_tools_enabled'] ?? false,
                 reviewerMaxToolIterations: $config['audit']['reviewer_max_tool_iterations'] ?? 4,
+                reviewerMaxConcurrent: $config['audit']['reviewer_max_concurrent'] ?? 1,
                 chunkingStrategy: $config['audit']['chunking']['strategy'] ?? 'feature',
                 poCSynthesisEnabled: $config['audit']['poc_synthesis']['enabled'] ?? false,
                 poCSynthesisSeverityFloor: $config['audit']['poc_synthesis']['severity_floor'] ?? 'high',

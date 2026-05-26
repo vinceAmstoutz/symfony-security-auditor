@@ -41,6 +41,7 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->audit->staticPreScanLeanMode);
         self::assertFalse($bundleConfiguration->audit->reviewerToolsEnabled);
         self::assertSame(4, $bundleConfiguration->audit->reviewerMaxToolIterations);
+        self::assertSame(1, $bundleConfiguration->audit->reviewerMaxConcurrent);
         self::assertSame('feature', $bundleConfiguration->audit->chunkingStrategy);
         self::assertFalse($bundleConfiguration->audit->poCSynthesisEnabled);
         self::assertSame('high', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
@@ -185,6 +186,7 @@ final class BundleConfigurationTest extends TestCase
                 ],
                 'reviewer_tools_enabled' => false,
                 'reviewer_max_tool_iterations' => 4,
+                'reviewer_max_concurrent' => 1,
                 'chunking' => [
                     'strategy' => 'feature',
                 ],

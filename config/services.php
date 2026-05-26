@@ -330,6 +330,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(ToolRegistryFactoryInterface::class),
             param('symfony_security_auditor.audit.reviewer_tools_enabled'),
             param('symfony_security_auditor.audit.reviewer_max_tool_iterations'),
+            param('symfony_security_auditor.audit.reviewer_max_concurrent'),
         ]);
 
     $defaultsConfigurator->alias(ReviewerAgentInterface::class, ReviewerAgent::class);

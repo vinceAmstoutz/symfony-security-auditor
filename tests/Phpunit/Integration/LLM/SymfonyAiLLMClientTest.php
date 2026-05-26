@@ -257,6 +257,81 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('claude-test', $symfonyAiLLMClient->model());
     }
 
+    public function test_complete_batch_returns_empty_for_no_requests(): void
+    {
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform('x'), 'm', new NullLogger());
+
+        self::assertSame([], $symfonyAiLLMClient->completeBatch([], 4));
+    }
+
+    public function test_complete_batch_returns_one_response_per_request_in_order(): void
+    {
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform('batched'), 'm', new NullLogger());
+
+        $responses = $symfonyAiLLMClient->completeBatch([
+            ['system' => 's1', 'user' => 'u1'],
+            ['system' => 's2', 'user' => 'u2'],
+            ['system' => 's3', 'user' => 'u3'],
+        ], 2);
+
+        self::assertCount(3, $responses);
+        self::assertSame('batched', $responses[0]->content());
+        self::assertSame('batched', $responses[1]->content());
+        self::assertSame('batched', $responses[2]->content());
+    }
+
+    public function test_complete_batch_processes_more_requests_than_window_size(): void
+    {
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform('ok'), 'm', new NullLogger());
+
+        $requests = [];
+        for ($i = 0; $i < 5; ++$i) {
+            $requests[] = ['system' => 'sys'.$i, 'user' => 'usr'.$i];
+        }
+
+        $responses = $symfonyAiLLMClient->completeBatch($requests, 2);
+
+        self::assertCount(5, $responses);
+    }
+
+    public function test_complete_batch_clamps_non_positive_window_to_one(): void
+    {
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform('ok'), 'm', new NullLogger());
+
+        $responses = $symfonyAiLLMClient->completeBatch([
+            ['system' => 's', 'user' => 'u'],
+            ['system' => 's', 'user' => 'u'],
+        ], 0);
+
+        self::assertCount(2, $responses);
+    }
+
+    public function test_complete_batch_records_token_usage_per_response(): void
+    {
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            [new TextResult('one'), new TextResult('two')],
+            [new TokenUsage(promptTokens: 11, completionTokens: 7), new TokenUsage(promptTokens: 11, completionTokens: 7)],
+        );
+
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+        );
+
+        $responses = $symfonyAiLLMClient->completeBatch([
+            ['system' => 's1', 'user' => 'u1'],
+            ['system' => 's2', 'user' => 'u2'],
+        ], 2);
+
+        self::assertSame(11, $responses[0]->inputTokens());
+        self::assertSame(7, $responses[0]->outputTokens());
+        self::assertSame(11, $responses[1]->inputTokens());
+        self::assertSame(7, $responses[1]->outputTokens());
+    }
+
     public function test_complete_with_tools_returns_text_when_platform_emits_no_tool_calls(): void
     {
         $platform = $this->scriptedPlatform([

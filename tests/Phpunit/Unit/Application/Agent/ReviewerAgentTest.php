@@ -1597,6 +1597,106 @@ final class ReviewerAgentTest extends TestCase
         rmdir($this->tmpDir);
     }
 
+    public function test_it_reviews_singles_concurrently_when_batch_capable_and_concurrency_configured(): void
+    {
+        $vulnerabilities = [$this->makeVulnerabilityAt('src/A.php'), $this->makeVulnerabilityAt('src/B.php')];
+
+        $llmClient = new class implements \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface {
+            public int $batchCalls = 0;
+
+            public int $completeCalls = 0;
+
+            public function complete(string $systemPrompt, string $userMessage): \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse
+            {
+                ++$this->completeCalls;
+
+                return \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn');
+            }
+
+            public function completeWithTools(string $systemPrompt, string $userMessage, \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry $toolRegistry, int $maxToolIterations): \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse
+            {
+                return \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse::create('{}', 0, 0, 'm', 'end_turn');
+            }
+
+            public function model(): string
+            {
+                return 'm';
+            }
+
+            public function completeBatch(array $requests, int $maxConcurrent): array
+            {
+                ++$this->batchCalls;
+
+                return array_map(
+                    static fn (): \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse => \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn'),
+                    $requests,
+                );
+            }
+        };
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: new NullLogger(),
+            maxConcurrent: 4,
+        );
+
+        $reviewed = $reviewerAgent->review($vulnerabilities, [], new NullCoverageRecorder());
+
+        self::assertSame(1, $llmClient->batchCalls);
+        self::assertSame(0, $llmClient->completeCalls);
+        self::assertCount(2, $reviewed);
+        self::assertTrue($reviewed[0]->isReviewerValidated());
+        self::assertTrue($reviewed[1]->isReviewerValidated());
+    }
+
+    public function test_it_stays_sequential_when_max_concurrent_is_one_even_if_batch_capable(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = new class implements \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface {
+            public int $batchCalls = 0;
+
+            public int $completeCalls = 0;
+
+            public function complete(string $systemPrompt, string $userMessage): \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse
+            {
+                ++$this->completeCalls;
+
+                return \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn');
+            }
+
+            public function completeWithTools(string $systemPrompt, string $userMessage, \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry $toolRegistry, int $maxToolIterations): \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse
+            {
+                return \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse::create('{}', 0, 0, 'm', 'end_turn');
+            }
+
+            public function model(): string
+            {
+                return 'm';
+            }
+
+            public function completeBatch(array $requests, int $maxConcurrent): array
+            {
+                ++$this->batchCalls;
+
+                return [];
+            }
+        };
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: new NullLogger(),
+            maxConcurrent: 1,
+        );
+
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertSame(0, $llmClient->batchCalls);
+        self::assertSame(1, $llmClient->completeCalls);
+    }
+
     public function test_it_uses_tool_registry_when_tools_enabled_and_factory_provided(): void
     {
         $vulnerability = $this->makeVulnerability();

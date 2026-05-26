@@ -25,7 +25,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
@@ -39,6 +41,8 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 
     public const bool DEFAULT_TOOLS_ENABLED = false;
 
+    public const int DEFAULT_MAX_CONCURRENT = 1;
+
     private const int PARSE_FAILURE_PREVIEW_BYTES = 512;
 
     public function __construct(
@@ -49,6 +53,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         private ?ToolRegistryFactoryInterface $toolRegistryFactory = null,
         private bool $toolsEnabled = self::DEFAULT_TOOLS_ENABLED,
         private int $maxToolIterations = self::DEFAULT_MAX_TOOL_ITERATIONS,
+        private int $maxConcurrent = self::DEFAULT_MAX_CONCURRENT,
     ) {}
 
     /**
@@ -75,9 +80,9 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         $reviewed = [];
 
         if ($this->batchSize <= 1) {
-            foreach ($vulnerabilities as $vulnerability) {
-                $reviewed[] = $this->reviewSingle($vulnerability, $projectFiles, $coverageRecorder, $toolRegistry);
-            }
+            $reviewed = $this->canReviewConcurrently($useTools)
+                ? $this->reviewSinglesConcurrently($vulnerabilities, $projectFiles, $coverageRecorder)
+                : $this->reviewSinglesSequentially($vulnerabilities, $projectFiles, $coverageRecorder, $toolRegistry);
         } else {
             foreach (array_chunk($vulnerabilities, $this->batchSize) as $batch) {
                 $reviewed = [...$reviewed, ...$this->reviewBatch($batch, $projectFiles, $coverageRecorder, $toolRegistry)];
@@ -227,6 +232,64 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         return $errored;
     }
 
+    private function canReviewConcurrently(bool $useTools): bool
+    {
+        return !$useTools
+            && $this->maxConcurrent > 1
+            && $this->llmClient instanceof BatchCapableLLMClientInterface;
+    }
+
+    /**
+     * @param list<Vulnerability> $vulnerabilities
+     * @param list<ProjectFile>   $projectFiles
+     *
+     * @return list<Vulnerability>
+     */
+    private function reviewSinglesSequentially(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry): array
+    {
+        $reviewed = [];
+        foreach ($vulnerabilities as $vulnerability) {
+            $reviewed[] = $this->reviewSingle($vulnerability, $projectFiles, $coverageRecorder, $toolRegistry);
+        }
+
+        return $reviewed;
+    }
+
+    /**
+     * Resolves every single-finding review in concurrency windows via the
+     * batch-capable client, then applies each verdict. Budget and non-transient
+     * provider failures propagate (the batch client rethrows them); per-finding
+     * parse/transient failures degrade to a rejected verdict exactly as the
+     * sequential path does.
+     *
+     * @param list<Vulnerability> $vulnerabilities
+     * @param list<ProjectFile>   $projectFiles
+     *
+     * @return list<Vulnerability>
+     */
+    private function reviewSinglesConcurrently(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder): array
+    {
+        \assert($this->llmClient instanceof BatchCapableLLMClientInterface);
+
+        $requests = [];
+        foreach ($vulnerabilities as $vulnerability) {
+            $codeContext = $this->getFileContext($vulnerability->filePath(), $projectFiles);
+            $requests[] = [
+                'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
+                'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
+            ];
+        }
+
+        $responses = $this->llmClient->completeBatch($requests, $this->maxConcurrent);
+
+        $reviewed = [];
+        foreach ($vulnerabilities as $index => $vulnerability) {
+            $reviewed[] = $this->applyResponse($vulnerability, $responses[$index], $coverageRecorder);
+        }
+
+        return $reviewed;
+    }
+
     /**
      * @param list<ProjectFile> $projectFiles
      */
@@ -241,36 +304,11 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
                 ? $this->llmClient->completeWithTools($systemPrompt, $userMessage, $toolRegistry, $this->maxToolIterations)
                 : $this->llmClient->complete($systemPrompt, $userMessage);
 
-            if ($response->isEmpty()) {
-                $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
-
-                return $vulnerability->withReviewerValidation(false);
-            }
-
-            /** @var array<string, mixed>|list<array<string, mixed>> $rawData */
-            $rawData = $response->parseJson();
-
-            $reviewed = $this->applyReview($vulnerability, $rawData);
-            $coverageRecorder->recordCoverage(
-                AgentRole::Reviewer->value,
-                $vulnerability->filePath(),
-                $reviewed->isReviewerValidated() ? 'validated' : 'rejected',
-            );
-
-            return $reviewed;
+            return $this->applyResponse($vulnerability, $response, $coverageRecorder);
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
             throw $llmProviderException;
-        } catch (JsonException $exception) {
-            $this->logger->error('Failed to parse reviewer response', [
-                'vulnerability_id' => $vulnerability->id(),
-                'error' => $exception->getMessage(),
-                'content_preview' => substr($response->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
-            ]);
-            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
-
-            return $vulnerability->withReviewerValidation(false);
         } catch (Throwable $exception) {
             $this->logger->error('Reviewer LLM call failed', [
                 'vulnerability_id' => $vulnerability->id(),
@@ -280,6 +318,38 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 
             return $vulnerability->withReviewerValidation(false);
         }
+    }
+
+    private function applyResponse(Vulnerability $vulnerability, LLMResponse $response, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    {
+        if ($response->isEmpty()) {
+            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
+
+            return $vulnerability->withReviewerValidation(false);
+        }
+
+        try {
+            /** @var array<string, mixed>|list<array<string, mixed>> $rawData */
+            $rawData = $response->parseJson();
+        } catch (JsonException $exception) {
+            $this->logger->error('Failed to parse reviewer response', [
+                'vulnerability_id' => $vulnerability->id(),
+                'error' => $exception->getMessage(),
+                'content_preview' => substr($response->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
+            ]);
+            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
+
+            return $vulnerability->withReviewerValidation(false);
+        }
+
+        $reviewed = $this->applyReview($vulnerability, $rawData);
+        $coverageRecorder->recordCoverage(
+            AgentRole::Reviewer->value,
+            $vulnerability->filePath(),
+            $reviewed->isReviewerValidated() ? 'validated' : 'rejected',
+        );
+
+        return $reviewed;
     }
 
     /**

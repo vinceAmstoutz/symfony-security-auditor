@@ -164,6 +164,11 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->defaultFalse()
                             ->info('Give the reviewer access to the same tool registry the attacker uses, so it can verify cross-file context (parent-class guards, access_control rules, upstream sanitizers) instead of guessing from the Full File Context alone. Default false — adds round-trips per finding; opt-in for high-precision audits.')
                         ->end()
+                        ->integerNode('reviewer_max_concurrent')
+                            ->defaultValue(1)
+                            ->min(1)
+                            ->info('Maximum reviewer LLM calls resolved concurrently when reviewing one finding per call (reviewer_batch_size <= 1) with reviewer tools off. The reviewer phase is often half the audit wall-clock; setting this to 4-8 (within your provider rate limit) cuts it proportionally. Default 1 (sequential). Ignored when reviewer tools are enabled or the configured platform has no async transport.')
+                        ->end()
                         ->integerNode('reviewer_max_tool_iterations')
                             ->defaultValue(ReviewerAgent::DEFAULT_MAX_TOOL_ITERATIONS)
                             ->min(1)
@@ -370,6 +375,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.max_tool_iterations', $bundleConfiguration->audit->maxToolIterations);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_tools_enabled', $bundleConfiguration->audit->reviewerToolsEnabled);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_max_tool_iterations', $bundleConfiguration->audit->reviewerMaxToolIterations);
+        $builder->setParameter('symfony_security_auditor.audit.reviewer_max_concurrent', $bundleConfiguration->audit->reviewerMaxConcurrent);
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.enabled', $bundleConfiguration->audit->staticPreScanEnabled);
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.lean_mode', $bundleConfiguration->audit->staticPreScanLeanMode);
         $builder->setParameter('symfony_security_auditor.audit.chunking.strategy', $bundleConfiguration->audit->chunkingStrategy);
