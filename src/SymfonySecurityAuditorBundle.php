@@ -319,7 +319,20 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.cache.prompt_caching', $bundleConfiguration->cache->promptCaching);
         $builder->setParameter(
             'symfony_security_auditor.cache.key_salt',
-            \sprintf('%s|prompt-v%d', $bundleConfiguration->llm->attackerModel(), AttackerPromptBuilder::PROMPT_VERSION),
+            \sprintf(
+                '%s|prompt-v%d|prescan-v%d|patterns-%s',
+                $bundleConfiguration->llm->attackerModel(),
+                AttackerPromptBuilder::PROMPT_VERSION,
+                RegexStaticPreScanner::CACHE_VERSION,
+                substr(
+                    hash(
+                        'sha256',
+                        (string) json_encode($bundleConfiguration->scan->customRiskPatterns, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES),
+                    ),
+                    0,
+                    16,
+                ),
+            ),
         );
 
         $services = $container->services();

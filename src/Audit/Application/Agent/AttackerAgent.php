@@ -139,7 +139,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         $hasPreviousFindings = [] !== $previousFindings;
         $chunkMarkers = $this->markersForChunk($chunk, $markersByFile);
         $hasMarkers = [] !== $chunkMarkers;
-        $cacheable = !$bypassCache && !$hasPreviousFindings && !$hasMarkers;
+        $cacheable = !$bypassCache && !$hasPreviousFindings;
 
         if ($cacheable) {
             $cached = $this->attackerCache->get($chunk);
@@ -169,6 +169,9 @@ final readonly class AttackerAgent implements AttackerAgentInterface
                 : $this->llmClient->complete($systemPrompt, $userMessage);
 
             if ($response->isEmpty()) {
+                if ($cacheable) {
+                    $this->attackerCache->store($chunk, []);
+                }
                 $this->recordChunkCoverage($chunk, 'analyzed', $coverageRecorder);
 
                 return [];

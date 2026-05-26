@@ -609,13 +609,15 @@ final class AttackerAgentTest extends TestCase
         $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder());
     }
 
-    public function test_it_does_not_store_in_cache_when_llm_returns_empty_response(): void
+    public function test_it_stores_empty_array_in_cache_when_llm_returns_empty_response(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
 
         $cache = $this->createMock(AttackerCacheInterface::class);
         $cache->method('get')->willReturn(null);
-        $cache->expects(self::never())->method('store');
+        $cache->expects(self::once())
+            ->method('store')
+            ->with(self::isArray(), []);
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
@@ -1344,11 +1346,11 @@ final class AttackerAgentTest extends TestCase
         self::assertStringNotContainsString('src/Service/Clean.php', $sentMessages[0]);
     }
 
-    public function test_chunks_with_markers_bypass_cache(): void
+    public function test_chunks_with_markers_still_consult_cache(): void
     {
         $cache = self::createMock(AttackerCacheInterface::class);
-        $cache->expects(self::never())->method('get');
-        $cache->expects(self::never())->method('store');
+        $cache->expects(self::once())->method('get')->willReturn(null);
+        $cache->expects(self::once())->method('store');
 
         $scanner = new class implements \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface {
             public function scan(array $files): array
@@ -1369,6 +1371,22 @@ final class AttackerAgentTest extends TestCase
 
         $file = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, $cache, staticPreScanner: $scanner);
+        $attackerAgent->analyze([$file], SymfonyMapping::create(), new NullCoverageRecorder());
+    }
+
+    public function test_empty_llm_response_is_persisted_as_negative_cache_entry(): void
+    {
+        $cache = self::createMock(AttackerCacheInterface::class);
+        $cache->expects(self::once())->method('get')->willReturn(null);
+        $cache->expects(self::once())
+            ->method('store')
+            ->with(self::isType('array'), []);
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('', 0, 0, 'test', 'end_turn'));
+
+        $file = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
+        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
         $attackerAgent->analyze([$file], SymfonyMapping::create(), new NullCoverageRecorder());
     }
 

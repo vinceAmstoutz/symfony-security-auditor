@@ -27,6 +27,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInter
 final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
 {
     /**
+     * Bump when the built-in PATTERNS dictionary changes in a way that would
+     * alter scan output for existing chunk content. Folded into the attacker
+     * cache key so stale entries are invalidated.
+     */
+    public const int CACHE_VERSION = 1;
+
+    /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
      */
     public function __construct(
