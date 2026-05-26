@@ -34,21 +34,25 @@ final readonly class RunAuditUseCase
     ) {}
 
     /**
-     * @param list<string> $scanPaths   optional project-relative subdirectories
-     *                                  to restrict the scan to; empty list (the
-     *                                  default) audits the whole project
-     * @param bool         $bypassCache when true, agents skip the attacker
-     *                                  cache entirely (no reads, no writes)
+     * @param list<string> $scanPaths    optional project-relative subdirectories
+     *                                   to restrict the scan to; empty list (the
+     *                                   default) audits the whole project
+     * @param bool         $bypassCache  when true, agents skip the attacker
+     *                                   cache entirely (no reads, no writes)
+     * @param ?string      $diffSinceRef when set, only files changed against
+     *                                   this git ref are audited; null audits
+     *                                   every file in scope
      */
-    public function execute(string $projectPath, array $scanPaths = [], bool $bypassCache = false): AuditReport
+    public function execute(string $projectPath, array $scanPaths = [], bool $bypassCache = false, ?string $diffSinceRef = null): AuditReport
     {
         $this->logger->info('Starting audit', [
             'project' => $projectPath,
             'scan_paths' => $scanPaths,
             'cache_bypassed' => $bypassCache,
+            'diff_since_ref' => $diffSinceRef,
         ]);
 
-        $auditContext = AuditContext::forProject($projectPath, $scanPaths, $bypassCache);
+        $auditContext = AuditContext::forProject($projectPath, $scanPaths, $bypassCache, $diffSinceRef);
 
         try {
             $this->pipeline->process($auditContext);

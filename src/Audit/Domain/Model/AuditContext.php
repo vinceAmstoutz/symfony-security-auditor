@@ -43,6 +43,7 @@ final class AuditContext implements CoverageRecorderInterface
         private readonly string $auditId,
         private readonly array $scanPaths,
         private readonly bool $cacheBypassed,
+        private readonly ?string $diffSinceRef = null,
     ) {
         $this->startedAt = new DateTimeImmutable();
     }
@@ -54,8 +55,12 @@ final class AuditContext implements CoverageRecorderInterface
      * @param bool         $cacheBypassed when true, agents should skip the
      *                                    attacker cache entirely for this run
      *                                    (no reads, no writes)
+     * @param ?string      $diffSinceRef  when set, the IngestionStage filters
+     *                                    discovered files down to those changed
+     *                                    against this git ref (diff mode); null
+     *                                    (default) audits every file in scope
      */
-    public static function forProject(string $projectPath, array $scanPaths = [], bool $cacheBypassed = false): self
+    public static function forProject(string $projectPath, array $scanPaths = [], bool $cacheBypassed = false, ?string $diffSinceRef = null): self
     {
         if (!is_dir($projectPath)) {
             throw new InvalidArgumentException(\sprintf('Project path "%s" is not a valid directory', $projectPath));
@@ -66,7 +71,13 @@ final class AuditContext implements CoverageRecorderInterface
             auditId: \sprintf('AUDIT-%s', strtoupper(bin2hex(random_bytes(4)))),
             scanPaths: $scanPaths,
             cacheBypassed: $cacheBypassed,
+            diffSinceRef: $diffSinceRef,
         );
+    }
+
+    public function diffSinceRef(): ?string
+    {
+        return $this->diffSinceRef;
     }
 
     public function projectPath(): string

@@ -71,7 +71,7 @@ final class RunAuditUseCaseTest extends TestCase
         $runAuditUseCase->execute($this->tmpDir);
 
         self::assertSame(
-            ['Starting audit', ['project' => $this->tmpDir, 'scan_paths' => [], 'cache_bypassed' => false]],
+            ['Starting audit', ['project' => $this->tmpDir, 'scan_paths' => [], 'cache_bypassed' => false, 'diff_since_ref' => null]],
             $infoLogs[0],
         );
     }

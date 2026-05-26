@@ -97,7 +97,7 @@ final readonly class AuditCommand
                 $this->progressReporterHolder->setDelegate(new ConsoleProgressReporter($symfonyStyle));
             }
 
-            $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache);
+            $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache, $auditCommandInput->since);
             $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
 
             $exitCode = $this->auditExitCodeResolver->resolve($report);
