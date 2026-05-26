@@ -96,12 +96,6 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_output_token_estimate_uses_ceil_of_output_ratio(): void
     {
-        // Pins: `(int) ceil($input * $outputRatio)`. With input=100, ratio=0.155:
-        //   ceil(100 * 0.155) = ceil(15.5) = 16
-        //   floor(100 * 0.155) = 15
-        //   round(100 * 0.155) = 16  (banker's rounding gives 16 here)
-        //   ceil(100 / 0.155) ≈ 646
-        // Also pins `*` vs `/` for outputRatio.
         $estimateAuditCostUseCase = $this->makeUseCase(
             files: [$this->makeProjectFile('a.php', 'aaa')],
             tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
@@ -149,8 +143,6 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_logs_starting_message_with_project_path_context(): void
     {
-        // Pins: logger.info('Estimating ...', ['project' => $projectPath]) — both
-        // MethodCallRemoval (entire call gone) and ArrayItemRemoval (empty context).
         $logCalls = [];
         $logger = self::createStub(LoggerInterface::class);
         $logger->method('info')->willReturnCallback(
@@ -177,8 +169,6 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_logs_ready_message_with_estimate_breakdown(): void
     {
-        // Pins: logger.info('Dry-run estimate ready', [...]) — both MethodCallRemoval
-        // and the ArrayItemRemoval for each context field.
         $logCalls = [];
         $logger = self::createStub(LoggerInterface::class);
         $logger->method('info')->willReturnCallback(
@@ -240,16 +230,6 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_attacker_cost_in_breakdown_is_rounded_to_six_decimals(): void
     {
-        // Pins `round($attackerCostUsd, 6)` against the RoundingFamily mutants
-        // (ceil/floor) and the IncrementInteger/DecrementInteger mutants on the
-        // precision argument (6 → 5 or 6 → 7).
-        //   inputPricePerMillion = 1.234567, 100 input tokens, 0 output, 1 iter
-        //   attackerCost = (100 / 1_000_000) * 1.234567 = 0.0001234567
-        //   round(_, 6) → 0.000123  (correct)
-        //   round(_, 5) → 0.00012   (DecrementInteger)
-        //   round(_, 7) → 0.0001235 (IncrementInteger)
-        //   floor       → 0.0
-        //   ceil        → 1.0
         $estimateAuditCostUseCase = $this->makeUseCase(
             files: [$this->makeProjectFile('a.php', 'aaa')],
             tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
@@ -266,16 +246,6 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_reviewer_cost_in_breakdown_is_rounded_to_six_decimals(): void
     {
-        // Same family of mutants as the attacker test, applied to the
-        // `round($reviewerCostUsd, 6)` line.
-        //   inputPricePerMillion = 1.234567, attacker input = 100, reviewerInputRatio = 0.5
-        //   reviewerInput = ceil(100 * 0.5) = 50; reviewer output = 0
-        //   reviewerCost = (50 / 1_000_000) * 1.234567 = 0.0000617283(5)
-        //   round(_, 6) → 0.000062  (correct, 7th decimal is 8 → round up)
-        //   round(_, 5) → 0.00006   (DecrementInteger)
-        //   round(_, 7) → 0.0000617 (IncrementInteger)
-        //   floor       → 0.0
-        //   ceil        → 1.0
         $estimateAuditCostUseCase = $this->makeUseCase(
             files: [$this->makeProjectFile('a.php', 'aaa')],
             tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
@@ -292,10 +262,6 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_estimated_cost_sums_attacker_and_reviewer_contributions(): void
     {
-        // Pins `$attackerCostUsd + $reviewerCostUsd` against the Plus → Minus mutant.
-        //   attackerCost = 0.0001234567, reviewerCost = 0.00006172835
-        //   sum      = 0.00018518505 → AuditCost::of rounds to 6 decimals → 0.000185
-        //   minus    = 0.00006172835 → rounds to 0.000062 (clearly different)
         $estimateAuditCostUseCase = $this->makeUseCase(
             files: [$this->makeProjectFile('a.php', 'aaa')],
             tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
@@ -312,12 +278,6 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_reviewer_input_token_estimate_uses_ceil_not_floor_or_round(): void
     {
-        // Pins `(int) ceil($attackerInputTokens * $this->reviewerInputRatio)` against
-        // floor / round mutants on the reviewer estimation.
-        //   attackerInput = 100, reviewerInputRatio = 0.234 → 23.4
-        //   ceil  → 24  (correct)
-        //   floor → 23
-        //   round → 23  (banker's rounding)
         $estimateAuditCostUseCase = $this->makeUseCase(
             files: [$this->makeProjectFile('a.php', 'aaa')],
             tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
@@ -333,13 +293,6 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_reviewer_output_token_estimate_uses_ceil_not_floor_or_round(): void
     {
-        // Pins `(int) ceil($reviewerInputTokens * $this->outputRatio)` for the
-        // reviewer output line against both floor AND round mutants.
-        //   reviewerInput = ceil(100 * 0.5) = 50, outputRatio = 0.146
-        //   50 * 0.146 = 7.3
-        //   ceil  → 8  (correct)
-        //   floor → 7
-        //   round → 7  (banker's rounding rounds half-down here, but 7.3 < 7.5 anyway)
         $estimateAuditCostUseCase = $this->makeUseCase(
             files: [$this->makeProjectFile('a.php', 'aaa')],
             tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),

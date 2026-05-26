@@ -111,12 +111,6 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
         }
 
         foreach ($explicitFiles as $explicitFile) {
-            // Run Symfony Finder against the parent directory restricted to
-            // the exact basename and depth 0. This piggy-backs on the same
-            // `->size('<= NK')` filter Finder uses for the directory scan,
-            // so we avoid hand-rolling a `kb * 1024` byte conversion or a
-            // `filesize()` check (and the mutation-test debt that comes with
-            // either) — Symfony Components First (`.claude/rules/php-classes.md`).
             $explicitFinder = (new Finder())
                 ->files()
                 ->in(\dirname($explicitFile))

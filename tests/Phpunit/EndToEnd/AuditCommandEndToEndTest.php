@@ -38,6 +38,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttacker
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CharacterBasedTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\StaticPricingProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
@@ -318,6 +319,7 @@ final class AuditCommandEndToEndTest extends TestCase
             new NullLogger(),
         );
 
+        $progressReporterHolder = new ProgressReporterHolder();
         $auditPipeline = new AuditPipeline(
             [
                 new IngestionStage(new ProjectFileScanner(new NullLogger()), new NullLogger()),
@@ -325,6 +327,7 @@ final class AuditCommandEndToEndTest extends TestCase
                 new AuditStage($auditOrchestrator, new NullLogger()),
             ],
             new NullLogger(),
+            $progressReporterHolder,
         );
 
         $projectFileScanner = new ProjectFileScanner(new NullLogger());
@@ -342,6 +345,7 @@ final class AuditCommandEndToEndTest extends TestCase
             new AuditExitCodeResolver(),
             new AuditPresenter(),
             $estimateAuditCostUseCase,
+            $progressReporterHolder,
         );
 
         return new CommandTester($auditCommand);
@@ -387,7 +391,34 @@ final class AuditCommandEndToEndTest extends TestCase
         ]);
 
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
-        self::assertStringContainsString('Audit complete', $commandTester->getDisplay());
+        self::assertStringContainsString('Estimating audit cost', $commandTester->getDisplay());
+        self::assertStringContainsString('Dry run complete', $commandTester->getDisplay());
+        self::assertStringContainsString('Dry run', $commandTester->getDisplay());
+        self::assertStringNotContainsString('Audit complete', $commandTester->getDisplay());
+        self::assertStringNotContainsString('RISK LEVEL', $commandTester->getDisplay());
+    }
+
+    public function test_command_renders_progress_bar_in_console_format(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertStringContainsString('3/3', $commandTester->getDisplay());
+    }
+
+    public function test_command_suppresses_progress_bar_in_machine_readable_stdout(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--format' => 'json',
+        ]);
+
+        self::assertStringNotContainsString('3/3', $commandTester->getDisplay());
     }
 
     public function test_dry_run_with_machine_readable_json_format_suppresses_success_message(): void

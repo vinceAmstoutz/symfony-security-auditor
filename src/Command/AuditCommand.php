@@ -21,6 +21,8 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 
 #[AsCommand(
     name: 'audit:run',
@@ -60,6 +62,7 @@ final readonly class AuditCommand
         private AuditExitCodeResolverInterface $auditExitCodeResolver,
         private AuditPresenterInterface $auditPresenter,
         private EstimateAuditCostUseCase $estimateAuditCostUseCase,
+        private ProgressReporterHolder $progressReporterHolder,
     ) {}
 
     public function __invoke(
@@ -70,20 +73,28 @@ final readonly class AuditCommand
 
         $this->auditPresenter->header($symfonyStyle, $projectPath);
 
+        $scanPaths = $auditCommandInput->scanPaths();
+
         try {
-            $this->auditPresenter->runningSection($symfonyStyle);
-
-            $scanPaths = $auditCommandInput->scanPaths();
-
             if ($auditCommandInput->dryRun) {
+                $this->auditPresenter->estimatingSection($symfonyStyle);
                 $report = $this->estimateAuditCostUseCase->execute($projectPath, $scanPaths);
-                $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+
+                if ($auditCommandInput->isMachineReadableFormat()) {
+                    $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+                }
 
                 if (!$auditCommandInput->isMachineReadableToStdout()) {
-                    $this->auditPresenter->result($symfonyStyle, $report, Command::SUCCESS);
+                    $this->auditPresenter->dryRunResult($symfonyStyle, $report);
                 }
 
                 return Command::SUCCESS;
+            }
+
+            $this->auditPresenter->runningSection($symfonyStyle);
+
+            if (!$auditCommandInput->isMachineReadableToStdout()) {
+                $this->progressReporterHolder->setDelegate(new ConsoleProgressReporter($symfonyStyle));
             }
 
             $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache);

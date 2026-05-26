@@ -103,11 +103,6 @@ final class ScanPathFilterTest extends TestCase
 
     public function test_blank_entries_do_not_short_circuit_subsequent_scan_paths(): void
     {
-        // Pins the `continue` inside the normalize loop against a `break` mutant.
-        // With `continue` (correct), the blank entry is skipped and 'apps/api' is
-        // still added to the filter. With `break` (mutant), the loop exits before
-        // 'apps/api' is normalized, leaving the filter empty and returning every
-        // input file (including the one that should have been dropped).
         $projectFile = $this->file('apps/api/src/A.php');
         $dropped = $this->file('apps/web/src/B.php');
 
@@ -118,8 +113,6 @@ final class ScanPathFilterTest extends TestCase
 
     public function test_backslashes_in_scan_path_are_normalized_to_forward_slashes(): void
     {
-        // Pins the `str_replace('\\', '/', $trimmed)` call against UnwrapStrReplace.
-        // Without normalization (mutant), 'apps\\api' would not match 'apps/api/...'.
         $projectFile = $this->file('apps/api/src/A.php');
 
         $filtered = ScanPathFilter::apply([$projectFile], ['apps\\api']);
@@ -129,11 +122,6 @@ final class ScanPathFilterTest extends TestCase
 
     public function test_file_matching_multiple_scan_paths_is_added_only_once(): void
     {
-        // Pins the `break` inside the per-file prefix loop against a `continue` mutant.
-        // With `break` (correct), a file matching the first prefix is added and the
-        // inner loop exits. With `continue` (mutant), the file is appended once per
-        // matching prefix — here 'apps/api' and 'apps/api/src' both match, so the
-        // mutant would emit the file twice.
         $file = $this->file('apps/api/src/A.php');
 
         $filtered = ScanPathFilter::apply([$file], ['apps/api', 'apps/api/src']);

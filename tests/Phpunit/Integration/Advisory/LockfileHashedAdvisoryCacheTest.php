@@ -60,9 +60,6 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
 
     public function test_cache_hit_emits_advisory_cache_hit_debug_log_with_lockfile_hash_context(): void
     {
-        // Pins the `$this->logger->debug('Advisory cache hit', ['lockfile_hash' => …])`
-        // call against both MethodCallRemoval and ArrayItemRemoval on the context's
-        // `lockfile_hash` entry.
         $lockfileContent = '{"lock": "v1"}';
         $this->writeLockfile($lockfileContent);
         $expectedHash = hash('sha256', $lockfileContent);
@@ -179,8 +176,6 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $warnings,
             static fn (array $entry): bool => 'composer.lock present but unreadable; skipping advisory cache' === $entry[0],
         ));
-        // Pins both 'path' and 'error' entries against ArrayItemRemoval on the
-        // warning context.
         self::assertCount(1, $unreadableLogs);
         self::assertSame($this->projectDir.'/composer.lock', $unreadableLogs[0][1]['path']);
         self::assertSame('permission denied', $unreadableLogs[0][1]['error']);
@@ -234,8 +229,6 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $warnings,
             static fn (array $entry): bool => 'Advisory cache entry unreadable, falling back to live audit' === $entry[0],
         ));
-        // Pins both 'path' and 'error' entries on the warning context against
-        // ArrayItemRemoval / ArrayItem mutants.
         self::assertCount(1, $unreadableLogs);
         $path = $unreadableLogs[0][1]['path'] ?? null;
         self::assertIsString($path);
@@ -246,14 +239,6 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
 
     public function test_cache_file_is_written_at_two_char_shard_directory_under_full_hash_filename(): void
     {
-        // Pins every substr / rtrim mutant on pathForHash() against the exact
-        // on-disk layout: {cacheDir}/{first 2 chars of hash}/{full hash}.json.
-        //
-        //   - UnwrapSubstr            → shard would be the full 64-char hash
-        //   - IncrementInteger 2 → 3  → shard becomes 3 chars
-        //   - DecrementInteger 2 → 1  → shard becomes 1 char
-        //   - IncrementInteger 0 → 1  → shard takes chars 1-2 instead of 0-1
-        //   - DecrementInteger 0 → -1 → shard takes the last char instead of first
         $lockfileContent = '{"lock": "v1"}';
         $this->writeLockfile($lockfileContent);
         $expectedHash = hash('sha256', $lockfileContent);
@@ -275,9 +260,6 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
 
     public function test_cache_dir_with_trailing_slash_is_normalized_before_assembling_path(): void
     {
-        // Pins UnwrapRtrim on rtrim($this->cacheDir, '/'). The Linux kernel
-        // collapses '//' in path lookups, so asserting on glob() output is not
-        // enough; intercept the raw path the code hands to dumpFile() instead.
         $this->writeLockfile('{"lock": "v1"}');
 
         $capturedDumpPaths = [];
@@ -342,8 +324,6 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $warnings,
             static fn (array $entry): bool => 'Failed to write advisory cache entry' === $entry[0],
         ));
-        // Pins both 'path' and 'error' entries on the warning context against
-        // ArrayItemRemoval / ArrayItem mutants in the writeCache() catch.
         self::assertCount(1, $failureLogs);
         $path = $failureLogs[0][1]['path'] ?? null;
         self::assertIsString($path);
@@ -353,9 +333,6 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
 
     public function test_successful_cache_write_emits_advisory_cache_stored_debug_log_with_lockfile_hash(): void
     {
-        // Pins both the `$this->logger->debug('Advisory cache stored', …)` call
-        // against MethodCallRemoval and the `['lockfile_hash' => $hash]` entry
-        // against ArrayItemRemoval on the writeCache() success path.
         $lockfileContent = '{"lock": "v1"}';
         $this->writeLockfile($lockfileContent);
         $expectedHash = hash('sha256', $lockfileContent);

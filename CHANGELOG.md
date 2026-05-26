@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
-## [1.3.2] — 2026-05-26
+## [1.3.2] — 2026-05-26 — Sieve
 
 ### Fixed
 
@@ -66,8 +66,68 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `recommendation.contents[locale]`) followed by a trailing `[]` previously had
   the answer dropped — the first `[` was extracted as `[locale]`, failed to
   decode, and the recovery never tried the actual JSON tail.
+- `audit:run --dry-run` no longer shows
+  `RISK LEVEL: SAFE / No validated vulnerabilities found / Audit complete` —
+  output that implied a real audit had run and found nothing. Dry-run is a
+  **cost estimate only**: no LLM calls, no vulnerability scan. The new output
+  shows the estimated token counts and cost, followed by
+  `Dry run — no LLM calls were made. This is a cost estimate only.` /
+  `Dry run complete.`. For `--format=json/sarif --output=<file>` the structured
+  report is still written to disk so cost data is machine-readable; the human
+  summary is shown alongside. For `--format=json/sarif` piped to stdout, only
+  the machine-readable output is emitted.
 
-## [1.3.1] — 2026-05-26
+### Added
+
+- `audit:run` now renders a live **console progress bar** while the pipeline
+  runs. Each of the three stages (Ingestion → Mapping → Audit) advances the bar
+  by one step; the stage name appears as the bar message. The bar is suppressed
+  automatically for `--format=json/sarif` piped to stdout and for `--dry-run`.
+  Implemented via a new `ConsoleProgressReporter` (Infrastructure) driven by the
+  existing
+  `pipeline.started / stage.started / stage.completed / pipeline.completed`
+  events that `AuditPipeline` already emits, and wired through a new
+  `ProgressReporterHolder` mutable delegate so the live `SymfonyStyle` output
+  handle can be injected at invocation time without changing
+  `PipelineInterface`.
+
+### Refactored
+
+- Removed multi-line `//` comment blocks from `src/` and `tests/` that explained
+  what self-evident code does. A new `.claude/rules/no-comments.md` rule
+  codifies the policy: comments signal poorly written code; fix the code
+  instead.
+- Replaced duplicated string literals on four hot paths with `@internal`
+  backed-string enums under `Audit\Domain\Model\`: `ProgressEvent`
+  (`pipeline.started` / `stage.started` / `stage.completed` /
+  `pipeline.completed`) used by `AuditPipeline` and `ConsoleProgressReporter`;
+  `AgentRole` (`attacker` / `reviewer`) used by `AttackerAgent`, `ReviewerAgent`
+  and `EstimateAuditCostUseCase`'s by-role cost breakdown; `BuiltInStageName`
+  (`ingestion` / `mapping` / `audit`) used by the three built-in
+  `StageInterface::name()` returns; and `SecretPatternLabel` (`aws_access_key` /
+  … / `inline_assignment`) used as the key set of
+  `RegexSecretScrubber::DEFAULT_PATTERNS` and its `replacementFor()` match arm.
+  Enum values stay equal to the previously hard-coded strings so every
+  wire-format contract — `ProgressReporterInterface::report()`,
+  `CoverageRecorderInterface::recordCoverage()`, JSON/SARIF `cost.by_role` keys,
+  the `***REDACTED:<label>***` placeholder — is byte-identical; the enums are
+  not exposed on any public port signature.
+
+### Tooling
+
+- Mutation gate now kills the five escaped mutants on the new progress-bar /
+  dry-run path (`ConsoleProgressReporter::onPipelineStarted`,
+  `onStageCompleted`, `onPipelineCompleted` and `AuditCommand`'s
+  `estimatingSection` call + `isMachineReadableToStdout` negation). Added
+  targeted unit tests pinning the `starting…` initial message, the intermediate
+  `1/3` advance frame visible between `stage.completed` and the next
+  `stage.started`, and the `3/3` snap-to-max forced by `finish()`; the E2E suite
+  now wires the shared `ProgressReporterHolder` into both `AuditPipeline` and
+  `AuditCommand` so it can assert the bar renders in `--format=console` and
+  stays suppressed in `--format=json` to stdout, plus the dry-run path now
+  asserts the `Estimating audit cost` section header.
+
+## [1.3.1] — 2026-05-26 — Watertight
 
 ### Tooling
 
@@ -77,7 +137,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   that the recovery path returns the decoded array (not the wrapping list) after
   stripping fences. No production code change.
 
-## [1.3.0] — 2026-05-26
+## [1.3.0] — 2026-05-26 — Bonsaï
 
 ### Added
 
@@ -134,7 +194,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   512-byte `content_preview` of the LLM response so the actual shape of an
   unrecoverable payload is diagnosable without re-running the audit.
 
-## [1.2.1] — 2026-05-25
+## [1.2.1] — 2026-05-25 — High Temperature
 
 ### Fixed
 
@@ -512,18 +572,18 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
   `config/bundles.php` guidance in the README).
 
 [1.3.2]:
-  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.3.2
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.3.2
 [1.3.1]:
-  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.3.1
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.3.1
 [1.3.0]:
-  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.3.0
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.3.0
 [1.2.1]:
-  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.2.1
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.2.1
 [1.2.0]:
-  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.2.0
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.2.0
 [1.1.1]:
-  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.1.1
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.1.1
 [1.1.0]:
-  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.1.0
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.1.0
 [1.0.0]:
-  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.0.0
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.0.0

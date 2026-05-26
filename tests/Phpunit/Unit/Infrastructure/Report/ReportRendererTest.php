@@ -365,9 +365,6 @@ final class ReportRendererTest extends TestCase
 
     public function test_render_sarif_rule_is_not_overwritten_when_same_type_appears_twice(): void
     {
-        // ??= mutated to = would overwrite the rule each time. With identical types the rule body is the same,
-        // but the count of entries remains 1 either way. To detect the mutation we capture the rule body
-        // at first occurrence and again after the second, ensuring no extra mutations sneak in.
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
         $vuln2 = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'src/Bar.php', 10);
         $decoded = $this->decodeSarif($this->makeReport($vulnerability, $vuln2));

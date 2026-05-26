@@ -19,6 +19,7 @@ use Throwable;
 use ValueError;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
@@ -162,14 +163,14 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 
             if (null === $review) {
                 $reviewed[] = $vulnerability->withReviewerValidation(false);
-                $coverageRecorder->recordCoverage('reviewer', $vulnerability->filePath(), 'rejected');
+                $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
 
                 continue;
             }
 
             $applied = $this->applyReview($vulnerability, $review);
             $coverageRecorder->recordCoverage(
-                'reviewer',
+                AgentRole::Reviewer->value,
                 $vulnerability->filePath(),
                 $applied->isReviewerValidated() ? 'validated' : 'rejected',
             );
@@ -189,7 +190,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         $rejected = [];
         foreach ($batch as $vulnerability) {
             $rejected[] = $vulnerability->withReviewerValidation(false);
-            $coverageRecorder->recordCoverage('reviewer', $vulnerability->filePath(), 'rejected');
+            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
         }
 
         return $rejected;
@@ -205,7 +206,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         $errored = [];
         foreach ($batch as $vulnerability) {
             $errored[] = $vulnerability->withReviewerValidation(false);
-            $coverageRecorder->recordCoverage('reviewer', $vulnerability->filePath(), 'errored');
+            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
         }
 
         return $errored;
@@ -224,7 +225,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             $response = $this->llmClient->complete($systemPrompt, $userMessage);
 
             if ($response->isEmpty()) {
-                $coverageRecorder->recordCoverage('reviewer', $vulnerability->filePath(), 'rejected');
+                $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
 
                 return $vulnerability->withReviewerValidation(false);
             }
@@ -234,7 +235,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 
             $reviewed = $this->applyReview($vulnerability, $rawData);
             $coverageRecorder->recordCoverage(
-                'reviewer',
+                AgentRole::Reviewer->value,
                 $vulnerability->filePath(),
                 $reviewed->isReviewerValidated() ? 'validated' : 'rejected',
             );
@@ -250,7 +251,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
                 'error' => $exception->getMessage(),
                 'content_preview' => substr($response->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
             ]);
-            $coverageRecorder->recordCoverage('reviewer', $vulnerability->filePath(), 'errored');
+            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
 
             return $vulnerability->withReviewerValidation(false);
         } catch (Throwable $exception) {
@@ -258,7 +259,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
                 'vulnerability_id' => $vulnerability->id(),
                 'error' => $exception->getMessage(),
             ]);
-            $coverageRecorder->recordCoverage('reviewer', $vulnerability->filePath(), 'errored');
+            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
 
             return $vulnerability->withReviewerValidation(false);
         }

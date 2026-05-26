@@ -87,4 +87,9 @@ final class AuditCommandInput
     {
         return null === $this->output && OutputFormat::Console !== $this->format;
     }
+
+    public function isMachineReadableFormat(): bool
+    {
+        return OutputFormat::Console !== $this->format;
+    }
 }

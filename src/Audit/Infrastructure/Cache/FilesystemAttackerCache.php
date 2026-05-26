@@ -47,9 +47,6 @@ final readonly class FilesystemAttackerCache implements AttackerCacheInterface
         try {
             $raw = $this->filesystem->readFile($path);
 
-            // Raw json_decode (over symfony/serializer) is deliberate: cache stores opaque
-            // vulnerability dicts that VulnerabilityFactory::fromList() tolerates partially,
-            // so we want array hydration only, no class-targeted decoding.
             $decoded = json_decode($raw, true, flags: \JSON_THROW_ON_ERROR);
             if (!\is_array($decoded)) {
                 return null;

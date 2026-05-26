@@ -220,6 +220,19 @@ third-party packages.
 
 ### Console mode (truncated)
 
+The command renders a live progress bar while the pipeline runs (suppressed for
+`--format=json/sarif` to stdout and for `--dry-run`):
+
+```text
+ Running audit pipeline...
+ ─────────────────────────
+ 1/3 [=======>                  ]  33% — ingestion
+ 2/3 [===============>          ]  67% — mapping
+ 3/3 [==========================] 100% — audit
+```
+
+Full output after the pipeline completes:
+
 ```text
 ══════════════════════════════════════════════════════════════════════
   🔍 SYMFONY LLM AUDIT REPORT — AUDIT-a1b2c3d4
@@ -262,26 +275,22 @@ bin/console audit:run --dry-run
 ```
 
 ```text
-══════════════════════════════════════════════════════════════════════
-  🔍 SYMFONY LLM AUDIT REPORT — AUDIT-b7e2f901
-  vinceamstoutz/symfony-security-auditor
-══════════════════════════════════════════════════════════════════════
+ Symfony LLM Security Auditor
+ =============================
 
-  Project : /var/www/my-app
-  Started : 2026-05-22 09:10:44
-  Duration: 0.0s
-  Files   : 142 scanned
-  Tokens  : ~52,400 in / ~4,200 out (claude-opus-4-7)  [estimate]
-  Cost    : $0.3670 (estimated)
+ Project: /var/www/my-app
+ Pipeline: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer)
 
-──────────────────────────────────────────────────────────────────────
-  RISK LEVEL: SAFE  (Score: 0)
-──────────────────────────────────────────────────────────────────────
+ Estimating audit cost (dry run)...
+ ───────────────────────────────────
 
-  ✅  No validated vulnerabilities found.
+ * Model : claude-opus-4-7
+ * Tokens: 52,400 in / 4,200 out (total: 56,600)
+ * Cost  : $0.3670 (estimate)
 
+ ! [NOTE] Dry run — no LLM calls were made. This is a cost estimate only.
 
- [OK] Estimate complete. No LLM calls were made.
+ [OK] Dry run complete.
 ```
 
 No LLM calls are made; exit code is always `0`.

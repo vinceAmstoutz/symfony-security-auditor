@@ -335,10 +335,6 @@ final class AttackerAgentTest extends TestCase
 
     public function test_it_truncates_long_content_in_parse_failure_log(): void
     {
-        // Preview must clip oversized LLM responses so logs stay readable
-        // and storage does not blow up on noisy provider output. Pinning the
-        // exact boundary kills IncrementInteger / DecrementInteger mutations
-        // on the byte-cap constant.
         $errorLogs = [];
         $logger = self::createStub(LoggerInterface::class);
         $logger->method('info');
@@ -728,9 +724,6 @@ final class AttackerAgentTest extends TestCase
 
     public function test_it_records_coverage_aborted_when_llm_throws_budget_exceeded(): void
     {
-        // Pins `recordChunkCoverage($chunk, 'aborted', ...)` in the BudgetExceededException
-        // catch branch — without this assertion, removing the recordCoverage call
-        // would be undetectable.
         $files = [
             $this->makeFile('src/Controller/A.php'),
             $this->makeFile('src/Controller/B.php'),
@@ -974,9 +967,6 @@ final class AttackerAgentTest extends TestCase
 
     public function test_it_propagates_llm_provider_exception_and_records_errored_coverage(): void
     {
-        // Non-transient failures (missing platform, auth errors, retired model) must
-        // NOT be swallowed. Silently returning [] would produce a false-negative SAFE
-        // report. Both propagation and coverage recording are pinned here.
         $files = [
             $this->makeFile('src/Controller/A.php'),
             $this->makeFile('src/Controller/B.php'),
@@ -1009,10 +999,6 @@ final class AttackerAgentTest extends TestCase
 
     public function test_it_propagates_exhausted_transient_failure_and_records_errored_coverage(): void
     {
-        // Rate-limit and other transient errors that exhaust all retries are wrapped in
-        // TransientLLMFailureException. Like non-transient failures, they must NOT be
-        // swallowed — every subsequent chunk will fail identically, and silently returning
-        // [] produces a false-negative SAFE result.
         $files = [
             $this->makeFile('src/Controller/A.php'),
             $this->makeFile('src/Controller/B.php'),

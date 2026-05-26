@@ -257,12 +257,6 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
 
             try {
                 $deferredResult = $this->platform->invoke($this->model, $messageBag, $options);
-                // Eager resolution: force the HTTP body read here so 4xx/5xx
-                // errors surface inside this retry wrapper instead of escaping
-                // later from `asText()`/`getResult()` in `complete()` /
-                // `completeWithTools()`. `DeferredResult::getResult()` caches
-                // its converted output, so the subsequent caller-side calls
-                // see the same instance with no extra cost.
                 $deferredResult->getResult();
 
                 return $deferredResult;
@@ -337,10 +331,6 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
      */
     private function baseOptions(): array
     {
-        // `temperature` is rejected by some newer Claude models (e.g.
-        // extended-thinking variants of Sonnet 4.6). Send only when the
-        // operator explicitly opted in; otherwise let the provider apply
-        // its own default.
         $options = [];
         if (null !== $this->temperature) {
             $options['temperature'] = $this->temperature;
@@ -351,10 +341,6 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         }
 
         if ($this->providerJsonMode) {
-            // OpenAI-compatible JSON mode. Honored by OpenAI / Mistral / Ollama;
-            // Anthropic does not expose this knob and the option is silently
-            // dropped by providers that do not recognize it. The prompt
-            // contract ("Return ONLY the JSON array") remains authoritative.
             $options['response_format'] = ['type' => 'json_object'];
         }
 

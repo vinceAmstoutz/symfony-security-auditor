@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SecretPatternLabel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
 
@@ -34,15 +35,15 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      *                            and appear in the redaction placeholder.
      */
     private const array DEFAULT_PATTERNS = [
-        'aws_access_key' => '/\bAKIA[0-9A-Z]{16}\b/',
-        'github_token' => '/\bgh[pousr]_[A-Za-z0-9]{36,255}\b/',
-        'stripe_key' => '/\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,99}\b/',
-        'slack_token' => '/\bxox[abprs]-[A-Za-z0-9-]{10,72}\b/',
-        'google_api_key' => '/\bAIza[0-9A-Za-z_\-]{35}\b/',
-        'jwt' => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
-        'pem_private_key' => '/-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/',
-        'env_assignment' => '/((?:^|\s)(?:[A-Z][A-Z0-9_]*_(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|API_KEY|DSN)|PASSWORD|SECRET|API_KEY))\s*=\s*(?!\s*\n)([^\s#]+)/m',
-        'inline_assignment' => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=])\s*["\'])([^"\'\n]{4,})(["\'])/i',
+        SecretPatternLabel::AwsAccessKey->value => '/\bAKIA[0-9A-Z]{16}\b/',
+        SecretPatternLabel::GithubToken->value => '/\bgh[pousr]_[A-Za-z0-9]{36,255}\b/',
+        SecretPatternLabel::StripeKey->value => '/\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,99}\b/',
+        SecretPatternLabel::SlackToken->value => '/\bxox[abprs]-[A-Za-z0-9-]{10,72}\b/',
+        SecretPatternLabel::GoogleApiKey->value => '/\bAIza[0-9A-Za-z_\-]{35}\b/',
+        SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
+        SecretPatternLabel::PemPrivateKey->value => '/-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/',
+        SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9_]*_(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|API_KEY|DSN)|PASSWORD|SECRET|API_KEY))\s*=\s*(?!\s*\n)([^\s#]+)/m',
+        SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=])\s*["\'])([^"\'\n]{4,})(["\'])/i',
     ];
 
     /**
@@ -73,12 +74,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     public function scrub(string $content): string
     {
         foreach ($this->patterns as $label => $pattern) {
-            // `@` silences the PCRE warning so a runaway user-supplied pattern
-            // hitting the backtrack limit returns null cleanly instead of
-            // escalating to a PHPUnit fail-on-warning. The null branch lets
-            // the scrub `continue` with the next pattern instead of aborting
-            // the whole pipeline.
-            $result = 'inline_assignment' === $label
+            $result = SecretPatternLabel::InlineAssignment->value === $label
                 ? @preg_replace_callback($pattern, $this->redactInlineAssignment(...), $content)
                 : @preg_replace($pattern, $this->replacementFor($label), $content);
 
@@ -94,8 +90,8 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
 
     private function replacementFor(string $label): string
     {
-        return match ($label) {
-            'env_assignment' => '$1=***REDACTED:'.$label.'***',
+        return match (SecretPatternLabel::tryFrom($label)) {
+            SecretPatternLabel::EnvAssignment => '$1=***REDACTED:'.$label.'***',
             default => '***REDACTED:'.$label.'***',
         };
     }
@@ -109,7 +105,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             return $match[0];
         }
 
-        return $match[1].'***REDACTED:inline_assignment***'.$match[3];
+        return $match[1].'***REDACTED:'.SecretPatternLabel::InlineAssignment->value.'***'.$match[3];
     }
 
     /**

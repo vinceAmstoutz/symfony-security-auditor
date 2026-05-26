@@ -278,9 +278,6 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     public function test_salted_key_concatenates_salt_null_byte_and_signatures_in_that_order(): void
     {
-        // Pins the exact key-construction format `{salt}\0{sorted signatures}`
-        // against Concat / ConcatOperandRemoval mutants that would reorder
-        // operands, drop the null-byte separator, or drop the payload entirely.
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
         $signatures = 'src/A.php='.hash('sha256', 'X');
         $expectedKey = hash('sha256', "claude-opus-4-7\0".$signatures);

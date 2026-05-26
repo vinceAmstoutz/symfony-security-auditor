@@ -138,9 +138,6 @@ final class GrepToolTest extends TestCase
 
     public function test_execute_caps_results_at_max_matches_and_stops_scanning_remaining_files(): void
     {
-        // Build two files. First file has MAX_MATCHES + 5 matches; second file has unique markers we
-        // want to verify are NOT scanned. break 2 must exit both loops; break 1 would let the outer
-        // loop reach the second file.
         $contentA = '';
         for ($i = 0; $i < self::MAX_MATCHES + 5; ++$i) {
             $contentA .= "foo line\n";

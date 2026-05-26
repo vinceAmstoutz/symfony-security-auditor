@@ -18,6 +18,7 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -143,9 +144,6 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
-            // Non-transient failure (missing platform config, auth error, retired model).
-            // Every subsequent chunk will fail identically — abort immediately so the
-            // audit does not silently return a false-negative SAFE result.
             $this->recordChunkCoverage($chunk, 'errored', $coverageRecorder);
 
             throw $llmProviderException;
@@ -173,7 +171,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     private function recordChunkCoverage(array $chunk, string $status, CoverageRecorderInterface $coverageRecorder): void
     {
         foreach ($chunk as $file) {
-            $coverageRecorder->recordCoverage('attacker', $file->relativePath(), $status);
+            $coverageRecorder->recordCoverage(AgentRole::Attacker->value, $file->relativePath(), $status);
         }
     }
 

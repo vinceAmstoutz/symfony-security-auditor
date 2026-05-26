@@ -37,6 +37,44 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $symfonyStyle->section('Running audit pipeline...');
     }
 
+    public function estimatingSection(SymfonyStyle $symfonyStyle): void
+    {
+        $symfonyStyle->section('Estimating audit cost (dry run)...');
+    }
+
+    public function dryRunResult(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void
+    {
+        $cost = $auditReport->cost();
+
+        if ('' !== $cost->primaryModel()) {
+            $lines = [];
+            $lines[] = \sprintf('Model : %s', $cost->primaryModel());
+            $lines[] = \sprintf(
+                'Tokens: %s in / %s out (total: %s)',
+                number_format($cost->inputTokens()),
+                number_format($cost->outputTokens()),
+                number_format($cost->totalTokens()),
+            );
+            $lines[] = \sprintf('Cost  : $%.4f (estimate)', $cost->estimatedCostUsd());
+
+            foreach ($cost->byRole() as $role => $entry) {
+                $lines[] = \sprintf(
+                    '  %-8s (%s): $%.4f — %s in / %s out',
+                    $role,
+                    $entry['model'],
+                    $entry['estimated_cost_usd'],
+                    number_format($entry['input_tokens']),
+                    number_format($entry['output_tokens']),
+                );
+            }
+
+            $symfonyStyle->listing($lines);
+        }
+
+        $symfonyStyle->note('Dry run — no LLM calls were made. This is a cost estimate only.');
+        $symfonyStyle->success('Dry run complete.');
+    }
+
     public function error(SymfonyStyle $symfonyStyle, Throwable $throwable): void
     {
         $message = $throwable instanceof InvalidArgumentException

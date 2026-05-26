@@ -123,9 +123,6 @@ final class BundleConfigurationTest extends TestCase
 
     public function test_from_array_tolerates_omitted_provider_json_mode_key_for_bc(): void
     {
-        // BC guard: callers that built their array against the 1.0 shape (no
-        // provider_json_mode key) must keep working. fromArray must default
-        // the missing key to false rather than warning about an undefined index.
         $config = $this->treeBuilderOutput();
         unset($config['provider_json_mode']);
 
