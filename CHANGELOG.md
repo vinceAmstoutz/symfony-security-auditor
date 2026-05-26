@@ -10,6 +10,95 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-05-26 — Bloodhound
+
+A detection-and-cost release. The auditor now covers the modern Symfony 7.x/8.x
+attack surface, follows data flow across files, tracks findings across runs, and
+gives operators several opt-in levers to cut token spend. Every addition is
+backward compatible — new configuration keys, new Domain ports, a new
+`audit:run` option, new `VulnerabilityType` cases, and additive JSON/SARIF
+fields. No existing key, default, exit code, or schema field changed meaning.
+
+### Added
+
+- **Symfony 7.x/8.x attack surface.** Six new file-type detectors
+  (Authenticator, Messenger handler, Webhook consumer, EventSubscriber,
+  Normalizer, Scheduler) each get a dedicated attacker skill block hunting
+  modern failure modes: `SelfValidatingPassport` misuse, missing/`==`-based
+  webhook HMAC verification, `php_serialize` Messenger transports,
+  mass-assignment via Serializer denormalizers, lock-less recurring tasks, and
+  Live Components leaking writable props. Existing
+  controller/template/config/php blocks now also cover `#[MapRequestPayload]`,
+  Twig Components/Live Components, `html_sanitizer`, mailer header injection,
+  cache poisoning, `RateLimiterFactory` scope confusion, and `HttpClient`
+  redirect-host bypass. Seven new `VulnerabilityType` cases back this surface:
+  `missing_signature_verification`, `messenger_handler_unsafe`,
+  `missing_rate_limiting`, `cache_poisoning`, `mailer_header_injection`,
+  `webhook_replay`, `authenticator_bypass`.
+- **Static pre-scanner** (`StaticPreScannerInterface` →
+  `RegexStaticPreScanner`). A deterministic, zero-token pass tags files with ~30
+  risk markers (unserialize, shell exec, `|raw`, `csrf_protection: false`,
+  hardcoded secrets, Doctrine string concatenation, …) that are injected into
+  the attacker prompt so the LLM focuses on concrete locations. New keys
+  `audit.static_prescan.enabled` (default `true`) and
+  `audit.static_prescan.lean_mode` (default `false`; drops marker-free files to
+  slash token spend).
+- **Custom risk patterns** (`scan.custom_risk_patterns`). Project-specific regex
+  markers merged into the pre-scanner dictionary, keyed by file-type bucket.
+- **Feature-based chunking** (`audit.chunking.strategy`, default `feature`).
+  Groups a controller with its entity, repository, form, voter, and templates in
+  one chunk so the LLM can follow cross-file data flow. `type` restores the
+  legacy priority-window chunking.
+- **Cross-iteration finding propagation.** Iterations 2+ receive a compact
+  summary of already-validated findings so the attacker generalizes patterns to
+  uncovered files instead of re-discovering the same bugs.
+- **Reviewer tools** (`audit.reviewer_tools_enabled`, default `false`). The
+  reviewer can use the same `read_file`/`grep`/`list_files`/`lookup_advisory`
+  registry as the attacker to verify cross-file mitigations, with its own
+  `audit.reviewer_max_tool_iterations` cap.
+- **PoC synthesis stage** (`audit.poc_synthesis.enabled`, default `false`;
+  `audit.poc_synthesis.severity_floor`, default `high`). Generates a concrete,
+  copy-pasteable reproduction artifact (curl, console invocation, payload) for
+  validated findings at or above the floor, exposed as the additive
+  `synthesized_poc` report field.
+- **Code slicing** (`audit.code_slicing.enabled`, default `false`;
+  `audit.code_slicing.min_lines_before_slicing`, default `80`). Trims large PHP
+  files to security-relevant lines (structure, signatures, token-bearing lines),
+  eliding the rest one-for-one so line numbers stay accurate. New
+  `CodeSlicerInterface` port with `RegexCodeSlicer` / `NullCodeSlicer`.
+- **Diff mode** (`audit:run --since=<ref>`). Audits only files changed against a
+  git ref (committed `ref...HEAD` delta plus uncommitted working-tree changes),
+  for fast pull-request scans. New `GitChangedFilesResolverInterface` port with
+  a `symfony/process`-based adapter.
+- **Cheap→expensive escalation** (`audit.escalation.enabled`, default `false`;
+  `audit.escalation.cheap_model`). A cheap-model sweep runs first; the expensive
+  model only re-analyses files the sweep flagged, with the cheap findings fed in
+  as context.
+- **Cross-run finding correlation** (`audit.history.enabled`, default `false`;
+  `audit.history.dir`). `Vulnerability::fingerprint()` is a stable id
+  (`type + file + normalized code`) that survives line-number drift; the new
+  `HistoricalCorrelationStage` tags each finding `new` / `still_present` and
+  reports a `fixed` count against the previous run. New
+  `AuditHistoryStoreInterface` port and additive `fingerprint` /
+  `historical_status` report fields.
+- **Concurrent reviewer calls** (`audit.reviewer_max_concurrent`, default `1`).
+  When reviewing one finding per call with tools off, the new opt-in
+  `BatchCapableLLMClientInterface` resolves reviews concurrently (real I/O
+  overlap on async transports, safe sequential fallback otherwise), cutting the
+  reviewer phase wall-clock.
+
+### Changed
+
+- `AttackerPromptBuilder` prompt bumped to version 4 (modern-Symfony skill
+  blocks + expanded type list); the cache-key fold invalidates stale v3
+  payloads.
+- Default file chunking is now `feature` (was an internal priority-window
+  scheme). Set `audit.chunking.strategy: type` to restore the previous
+  behaviour.
+- The attacker cache key now folds in the pre-scanner version and a hash of
+  `scan.custom_risk_patterns`, so changing custom patterns invalidates stale
+  entries. Empty LLM responses are now persisted as negative-cache entries.
+
 ## [1.3.3] — 2026-05-26 — Mesh
 
 ### Changed
@@ -601,6 +690,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.4.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.4.0
 [1.3.2]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.3.2
 [1.3.1]:

@@ -161,17 +161,34 @@ bin/console audit:run --dry-run
 ## Features
 
 - **Multi-agent loop** — adversarial Attacker + skeptical Reviewer cut false
-  positives across up to 3 iterations.
-- **32 vulnerability types** covering 6 OWASP-aligned categories: Injection,
+  positives across up to 3 iterations, with confirmed findings fed back so later
+  iterations generalize patterns instead of re-finding the same bugs.
+- **39 vulnerability types** covering OWASP-aligned categories: Injection,
   Broken Access Control, Logic Flaws, Symfony-specific, Data Exposure,
-  Cryptographic.
+  Cryptographic — including the modern Symfony 7.x/8.x surface (Authenticators,
+  Messenger handlers, Webhooks, Serializer denormalizers, Schedules,
+  RateLimiter, Mailer, cache poisoning).
 - **Symfony-aware** — understands Controllers, Voters, Forms, Firewalls, Routes,
-  `#[IsGranted]`, `denyAccessUnlessGranted`, and surfaces controllers without
-  proper access checks.
+  `#[IsGranted]`, `denyAccessUnlessGranted`, `#[MapRequestPayload]`, Twig/Live
+  Components, and surfaces controllers without proper access checks.
+- **Feature-based chunking** — groups a controller with its entity, repository,
+  form, voter, and templates so the Attacker can follow data flow across files.
+- **Deterministic pre-scan** — a zero-token risk-marker pass flags concrete
+  locations (unserialize, `|raw`, hardcoded secrets, unsafe Doctrine, …) to
+  focus the LLM; optional **lean mode** drops marker-free files to cut tokens.
+- **Cross-run finding tracking** — stable fingerprints survive line-number drift
+  so reports show `new` / `still_present` / `fixed` across PRs.
+- **Diff mode** — `audit:run --since=main` audits only changed files for fast
+  pull-request CI.
+- **Cost levers** — opt-in cheap→expensive escalation, code slicing, concurrent
+  reviewer calls, and lean pre-scan to dial token spend up or down.
 - **Provider-agnostic** — swap Claude / GPT / Gemini / Mistral / Llama /
   DeepSeek / Ollama with a 2-line YAML change. No code edits.
-- **Cross-file investigation tools** — the Attacker can `read_file`, `grep`,
-  `list_files`, and `lookup_advisory` (live CVE lookups via `composer audit`).
+- **Cross-file investigation tools** — Attacker (and optionally Reviewer) can
+  `read_file`, `grep`, `list_files`, and `lookup_advisory` (live CVE lookups via
+  `composer audit`).
+- **PoC synthesis** — optionally attach a concrete, copy-pasteable reproduction
+  (curl/console/payload) to every high-severity finding.
 - **Split-model support** — pair a powerful Attacker (e.g. Claude Opus) with a
   fast Reviewer (e.g. Claude Haiku) to cut cost ~20×.
 - **Prompt caching** — Anthropic prompt caching enabled by default (~90%

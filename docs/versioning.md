@@ -33,12 +33,20 @@ Every key under `symfony_security_auditor:` documented in
 
 - `model`, `attacker_model`, `reviewer_model`, `provider_json_mode`
 - `scan.included_paths`, `scan.respect_gitignore`, `scan.max_file_size_kb`,
-  `scan.secret_scrubbing.enabled`, `scan.secret_scrubbing.additional_patterns`
+  `scan.secret_scrubbing.enabled`, `scan.secret_scrubbing.additional_patterns`,
+  `scan.custom_risk_patterns`
 - `audit.max_iterations`, `audit.min_confidence`, `audit.reviewer_batch_size`,
   `audit.tools_enabled`, `audit.max_tool_iterations`,
-  `audit.retry.max_attempts`, `audit.retry.initial_delay_ms`,
-  `audit.retry.backoff_multiplier`, `audit.retry.jitter_ratio`,
-  `audit.budget.max_tokens`, `audit.budget.max_cost_usd`
+  `audit.reviewer_tools_enabled`, `audit.reviewer_max_tool_iterations`,
+  `audit.reviewer_max_concurrent`, `audit.static_prescan.enabled`,
+  `audit.static_prescan.lean_mode`, `audit.chunking.strategy`,
+  `audit.code_slicing.enabled`, `audit.code_slicing.min_lines_before_slicing`,
+  `audit.poc_synthesis.enabled`, `audit.poc_synthesis.severity_floor`,
+  `audit.escalation.enabled`, `audit.escalation.cheap_model`,
+  `audit.history.enabled`, `audit.history.dir`, `audit.retry.max_attempts`,
+  `audit.retry.initial_delay_ms`, `audit.retry.backoff_multiplier`,
+  `audit.retry.jitter_ratio`, `audit.budget.max_tokens`,
+  `audit.budget.max_cost_usd`
 - `cache.enabled`, `cache.dir`, `cache.prompt_caching`
 
 Default values for these keys are also part of the contract. Changing a default
@@ -72,9 +80,21 @@ pipeline interfaces. Implementing one of these in your own application and
 overriding the alias in `config/services.yaml` is a supported integration path:
 
 - `LLMClientInterface`
+- `BatchCapableLLMClientInterface` — opt-in extension of `LLMClientInterface`
+  for clients that resolve several prompts concurrently. Consumers check
+  `instanceof` and fall back to looping `complete()`, so it never breaks an
+  existing client.
 - `AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`
 - `ProjectFileScannerInterface`
 - `AttackerCacheInterface`
+- `StaticPreScannerInterface` — host applications may implement this and alias
+  it to supply their own deterministic risk-marker scan.
+- `CodeSlicerInterface` — implement and alias to control how files are trimmed
+  before reaching the LLM.
+- `GitChangedFilesResolverInterface` — implement and alias to change how
+  `--since` resolves the changed-file set.
+- `AuditHistoryStoreInterface` — implement and alias to persist cross-run
+  finding fingerprints in a custom store (database, object storage, …).
 - `AdvisoryDatabaseInterface` — host applications may implement this and alias
   it to swap the CVE feed (Snyk, internal database, …). See
   [`docs/extending.md`](extending.md).
