@@ -94,14 +94,11 @@ final readonly class LLMResponse
             $decoded = json_decode($content, true, self::JSON_MAX_DEPTH, \JSON_THROW_ON_ERROR);
         } catch (JsonException $jsonException) {
             // When tools are enabled the LLM sometimes returns prose around the JSON
-            // despite the "Return ONLY the JSON array" prompt instruction. Try to
-            // recover the first balanced `[ ... ]` / `{ ... }` block before giving up.
-            $extracted = $this->extractBalancedJsonBlock($content);
-            if (null === $extracted) {
-                throw $jsonException;
-            }
-
-            $decoded = json_decode($extracted, true, self::JSON_MAX_DEPTH, \JSON_THROW_ON_ERROR);
+            // despite the "Return ONLY the JSON array" prompt instruction. The first
+            // `[`/`{` may belong to prose (e.g. PHP-style `array[key]` references) —
+            // walk every opener position and return the first balanced block that
+            // decodes successfully. If none decode, rethrow the original exception.
+            $decoded = $this->recoverDecodedJsonBlock($content) ?? throw $jsonException;
         }
 
         if (!\is_array($decoded)) {
@@ -112,39 +109,107 @@ final readonly class LLMResponse
     }
 
     /**
-     * Returns the first balanced `[ ... ]` or `{ ... }` substring, or `null` when no
-     * top-level block closes. Walks the string char-by-char while respecting JSON
-     * string literals (and their `\"` escapes) so brackets inside strings do not
-     * affect depth counting.
+     * Walks every `[`/`{` position outside JSON string literals and returns the
+     * first balanced block that decodes as JSON, or `null` when none do.
+     *
+     * When the content itself spans a single balanced block (`[ ... ]` or
+     * `{ ... }` with no surrounding prose), the top-level `json_decode` has
+     * already attempted exactly that payload — re-trying nested openers within
+     * it would silently accept shallower inner blocks (defeating depth limits,
+     * for one), so recovery is skipped in that case.
+     *
+     * Returns the decoded value as `mixed` so the existing not-array guard in
+     * `parseJson` remains the single place that enforces the array contract.
      */
-    private function extractBalancedJsonBlock(string $content): ?string
+    private function recoverDecodedJsonBlock(string $content): mixed
     {
-        $opener = $this->findFirstJsonOpener($content);
-        if (null === $opener) {
+        if ($this->contentIsSingleBalancedBlock($content)) {
             return null;
         }
 
-        return $this->scanBalancedBlockFrom($content, $opener['start'], $opener['open'], $opener['close']);
-    }
-
-    /**
-     * @return array{start: int, open: string, close: string}|null
-     */
-    private function findFirstJsonOpener(string $content): ?array
-    {
         $length = \strlen($content);
+        $inString = false;
+        $escape = false;
+
         for ($i = 0; $i < $length; ++$i) {
             $char = $content[$i];
-            if ('[' === $char) {
-                return ['start' => $i, 'open' => '[', 'close' => ']'];
+
+            if ($escape) {
+                $escape = false;
+                continue;
             }
 
-            if ('{' === $char) {
-                return ['start' => $i, 'open' => '{', 'close' => '}'];
+            if ($inString) {
+                if ('\\' === $char) {
+                    $escape = true;
+                } elseif ('"' === $char) {
+                    $inString = false;
+                }
+
+                continue;
+            }
+
+            if ('"' === $char) {
+                $inString = true;
+                continue;
+            }
+
+            if ('[' === $char) {
+                $candidate = $this->tryDecodeBalancedBlock($content, $i, '[', ']');
+            } elseif ('{' === $char) {
+                $candidate = $this->tryDecodeBalancedBlock($content, $i, '{', '}');
+            } else {
+                continue;
+            }
+
+            if (null !== $candidate) {
+                return $candidate;
             }
         }
 
         return null;
+    }
+
+    /**
+     * True when `$content` starts with an opener and `scanBalancedBlockFrom`
+     * consumes the entire string — meaning the original top-level `json_decode`
+     * call already saw exactly this payload.
+     */
+    private function contentIsSingleBalancedBlock(string $content): bool
+    {
+        if ('' === $content) {
+            return false;
+        }
+
+        $first = $content[0];
+        if ('[' === $first) {
+            $block = $this->scanBalancedBlockFrom($content, 0, '[', ']');
+        } elseif ('{' === $first) {
+            $block = $this->scanBalancedBlockFrom($content, 0, '{', '}');
+        } else {
+            return false;
+        }
+
+        return null !== $block && \strlen($block) === \strlen($content);
+    }
+
+    /**
+     * Scans a balanced block starting at `$start` and attempts to JSON-decode it.
+     * Returns the decoded value on success, or `null` when scanning hits EOF or
+     * decoding fails — the caller iterates to the next opener candidate.
+     */
+    private function tryDecodeBalancedBlock(string $content, int $start, string $open, string $close): mixed
+    {
+        $block = $this->scanBalancedBlockFrom($content, $start, $open, $close);
+        if (null === $block) {
+            return null;
+        }
+
+        try {
+            return json_decode($block, true, self::JSON_MAX_DEPTH, \JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return null;
+        }
     }
 
     private function scanBalancedBlockFrom(string $content, int $start, string $open, string $close): ?string
