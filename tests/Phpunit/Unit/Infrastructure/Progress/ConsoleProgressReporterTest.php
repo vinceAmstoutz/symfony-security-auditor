@@ -57,6 +57,35 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertStringEndsWith("\n", $this->bufferedOutput->fetch());
     }
 
+    public function test_it_shows_starting_message_when_pipeline_starts(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['ingestion']]);
+
+        self::assertStringContainsString('starting…', $this->bufferedOutput->fetch());
+    }
+
+    public function test_stage_completed_advances_progress_bar(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['a', 'b', 'c']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'a']);
+        $this->consoleProgressReporter->report('stage.completed');
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'b']);
+
+        self::assertStringContainsString('1/3', $this->bufferedOutput->fetch());
+    }
+
+    public function test_pipeline_completed_forces_progress_bar_to_max(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['a', 'b', 'c']]);
+        $this->consoleProgressReporter->report('stage.completed');
+
+        $this->bufferedOutput->fetch();
+
+        $this->consoleProgressReporter->report('pipeline.completed');
+
+        self::assertStringContainsString('3/3', $this->bufferedOutput->fetch());
+    }
+
     public function test_it_ignores_unknown_events(): void
     {
         $this->consoleProgressReporter->report('some.unknown.event', ['foo' => 'bar']);
