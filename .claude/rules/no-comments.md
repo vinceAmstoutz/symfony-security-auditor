@@ -33,9 +33,9 @@ Even then: one line, no multi-sentence prose.
 ## Never
 
 - Multi-line `//` blocks explaining design rationale.
-- "Mutation-pinning" comments in tests (`// Pins the X mutant — removing this
-  assertion allows Y`). If the test name and assertion are clear, the pin is
-  implicit.
+- "Mutation-pinning" comments in tests
+  (`// Pins the X mutant — removing this assertion allows Y`). If the test name
+  and assertion are clear, the pin is implicit.
 - Commented-out code.
 - Redundant docblocks on `final readonly` classes that just repeat the
   constructor parameters.

@@ -218,9 +218,9 @@ distinct edge-case behavior — those stay as separate test methods.
 - **`$this->expectNotToPerformAssertions()`** — forbidden. A test with no
   assertions is a test that can never fail on a logic mutation. If the only
   observable contract is "does not throw", express it structurally: use
-  `expects(self::never())` on a mock collaborator, or fire a follow-up call
-  that asserts a return value. If you truly cannot assert anything, delete the
-  test — dead coverage is worse than no coverage.
+  `expects(self::never())` on a mock collaborator, or fire a follow-up call that
+  asserts a return value. If you truly cannot assert anything, delete the test —
+  dead coverage is worse than no coverage.
 
 ## Quality Gates
 

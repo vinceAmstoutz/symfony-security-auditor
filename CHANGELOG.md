@@ -66,37 +66,36 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `recommendation.contents[locale]`) followed by a trailing `[]` previously had
   the answer dropped — the first `[` was extracted as `[locale]`, failed to
   decode, and the recovery never tried the actual JSON tail.
+- `audit:run --dry-run` no longer shows
+  `RISK LEVEL: SAFE / No validated vulnerabilities found / Audit complete` —
+  output that implied a real audit had run and found nothing. Dry-run is a
+  **cost estimate only**: no LLM calls, no vulnerability scan. The new output
+  shows the estimated token counts and cost, followed by
+  `Dry run — no LLM calls were made. This is a cost estimate only.` /
+  `Dry run complete.`. For `--format=json/sarif --output=<file>` the structured
+  report is still written to disk so cost data is machine-readable; the human
+  summary is shown alongside. For `--format=json/sarif` piped to stdout, only
+  the machine-readable output is emitted.
 
 ### Added
 
 - `audit:run` now renders a live **console progress bar** while the pipeline
-  runs. Each of the three stages (Ingestion → Mapping → Audit) advances the
-  bar by one step; the stage name appears as the bar message. The bar is
-  suppressed automatically for `--format=json/sarif` piped to stdout and for
-  `--dry-run`. Implemented via a new `ConsoleProgressReporter` (Infrastructure)
-  driven by the existing `pipeline.started / stage.started / stage.completed /
-  pipeline.completed` events that `AuditPipeline` already emits, and wired
-  through a new `ProgressReporterHolder` mutable delegate so the live
-  `SymfonyStyle` output handle can be injected at invocation time without
-  changing `PipelineInterface`.
-
-### Fixed
-
-- `audit:run --dry-run` no longer shows `RISK LEVEL: SAFE / No validated
-  vulnerabilities found / Audit complete` — output that implied a real audit
-  had run and found nothing. Dry-run is a **cost estimate only**: no LLM calls,
-  no vulnerability scan. The new output shows the estimated token counts and
-  cost, followed by `Dry run — no LLM calls were made. This is a cost estimate
-  only.` / `Dry run complete.`. For `--format=json/sarif --output=<file>` the
-  structured report is still written to disk so cost data is machine-readable;
-  the human summary is shown alongside. For `--format=json/sarif` piped to
-  stdout, only the machine-readable output is emitted.
+  runs. Each of the three stages (Ingestion → Mapping → Audit) advances the bar
+  by one step; the stage name appears as the bar message. The bar is suppressed
+  automatically for `--format=json/sarif` piped to stdout and for `--dry-run`.
+  Implemented via a new `ConsoleProgressReporter` (Infrastructure) driven by the
+  existing
+  `pipeline.started / stage.started / stage.completed / pipeline.completed`
+  events that `AuditPipeline` already emits, and wired through a new
+  `ProgressReporterHolder` mutable delegate so the live `SymfonyStyle` output
+  handle can be injected at invocation time without changing
+  `PipelineInterface`.
 
 ### Refactored
 
 - Removed multi-line `//` comment blocks from `src/` that explained what
-  self-evident code does. A new `.claude/rules/no-comments.md` rule codifies
-  the policy: comments signal poorly written code; fix the code instead.
+  self-evident code does. A new `.claude/rules/no-comments.md` rule codifies the
+  policy: comments signal poorly written code; fix the code instead.
 
 ## [1.3.1] — 2026-05-26 — Watertight
 
