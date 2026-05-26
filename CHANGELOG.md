@@ -10,6 +10,36 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.3.3] — 2026-05-26 — Mesh
+
+### Changed
+
+- `AttackerPromptBuilder` prompt bumped to version 3: the attacker is now
+  explicitly forbidden from emitting bare strings, numbers, booleans, or `null`
+  as JSON array elements, and is told to return `[]` rather than
+  `["no findings"]` or any prose substitute. Audits against vulnerability-free
+  projects previously logged a handful of `warning`-level
+  `Skipping non-array vulnerability entry from LLM` records per run because the
+  model occasionally interleaved prose entries with the expected vulnerability
+  dicts. Bumping the cache-key fold prevents stale v2 payloads — which may
+  already contain stray strings — from being replayed and re-triggering the
+  warning on a cache hit.
+- `VulnerabilityFactory` warning payload now carries an `entry_preview` field —
+  the first 120 bytes of the skipped value when it is a string, `null` otherwise
+  — so operators can see what the model emitted instead of a vulnerability dict
+  without having to enable debug logging.
+
+### Fixed
+
+- `AttackerAgent::analyzeChunk()` now filters non-array entries out of the raw
+  LLM payload before handing it to `AttackerCacheInterface::store()` and re-keys
+  the survivors as a list. Previously, any stray string, number, or `null` from
+  a chatty model was persisted to the filesystem cache as a gapped numeric-keyed
+  array, and the same warning re-fired on every subsequent cache hit. Only the
+  cache write path is affected; `VulnerabilityFactory::fromList()` still
+  receives the full unfiltered payload so the diagnostic warning continues to
+  surface model drift.
+
 ## [1.3.2] — 2026-05-26 — Sieve
 
 ### Fixed

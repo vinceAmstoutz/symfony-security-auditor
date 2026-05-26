@@ -568,6 +568,45 @@ final class AttackerAgentTest extends TestCase
         $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder());
     }
 
+    public function test_it_filters_non_array_entries_out_of_cached_payload_as_a_list(): void
+    {
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+
+        $firstFinding = [
+            'type' => 'broken_access_control',
+            'severity' => 'high',
+            'title' => 'First',
+            'description' => 'x',
+            'file_path' => 'src/Controller/UserController.php',
+            'line_start' => 1,
+            'line_end' => 2,
+            'vulnerable_code' => 'x',
+            'attack_vector' => 'x',
+            'proof' => 'x',
+            'remediation' => 'x',
+            'confidence' => 0.85,
+        ];
+        $secondFinding = ['type' => 'sql_injection'] + $firstFinding;
+        $secondFinding['title'] = 'Second';
+
+        $mixedPayload = [$firstFinding, 'stray prose entry', $secondFinding];
+
+        $cache = $this->createMock(AttackerCacheInterface::class);
+        $cache->method('get')->willReturn(null);
+        $cache->expects(self::once())
+            ->method('store')
+            ->with(self::isArray(), [$firstFinding, $secondFinding]);
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::create((string) json_encode($mixedPayload), 10, 10, 'claude', 'end_turn'));
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+
+        $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder());
+    }
+
     public function test_it_does_not_store_in_cache_when_llm_returns_empty_response(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
