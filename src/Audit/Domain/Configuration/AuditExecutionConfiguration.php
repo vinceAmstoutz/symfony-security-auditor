@@ -21,5 +21,7 @@ final readonly class AuditExecutionConfiguration
         public int $reviewerBatchSize,
         public bool $toolsEnabled,
         public int $maxToolIterations,
+        public bool $staticPreScanEnabled = true,
+        public bool $staticPreScanLeanMode = false,
     ) {}
 }

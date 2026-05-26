@@ -411,7 +411,7 @@ final class AttackerAgentTest extends TestCase
 
         $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder());
 
-        self::assertSame(['Attacker agent starting analysis', ['files' => 2, 'tools_enabled' => false, 'cache_bypassed' => false, 'previous_findings' => 0]], $infoLogs[0]);
+        self::assertSame(['Attacker agent starting analysis', ['files' => 2, 'files_filtered_lean' => 0, 'markers' => 0, 'tools_enabled' => false, 'cache_bypassed' => false, 'previous_findings' => 0]], $infoLogs[0]);
         self::assertSame(['Attacker agent complete', ['total_vulnerabilities' => 0]], $infoLogs[1]);
     }
 
@@ -1236,6 +1236,140 @@ final class AttackerAgentTest extends TestCase
         self::assertStringContainsString('src/Controller/B.php:20-25', $sentMessages[0]);
     }
 
+    public function test_it_injects_pre_scan_markers_section_when_scanner_reports_markers(): void
+    {
+        $sentMessages = [];
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
+                $sentMessages[] = $user;
+
+                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+            });
+
+        $scanner = new class implements \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface {
+            public function scan(array $files): array
+            {
+                return [
+                    \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker::create(
+                        'src/Service/Foo.php',
+                        7,
+                        'unserialize_call',
+                        'unserialize() on payload',
+                    ),
+                ];
+            }
+        };
+
+        $file = ProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
+        $attackerAgent = $this->makeAttackerAgent($llmClient, staticPreScanner: $scanner);
+        $attackerAgent->analyze([$file], SymfonyMapping::create(), new NullCoverageRecorder());
+
+        self::assertCount(1, $sentMessages);
+        self::assertStringContainsString('Pre-Scan Risk Markers', $sentMessages[0]);
+        self::assertStringContainsString('unserialize_call', $sentMessages[0]);
+        self::assertStringContainsString('L7', $sentMessages[0]);
+    }
+
+    public function test_it_does_not_inject_markers_section_when_scanner_returns_empty(): void
+    {
+        $sentMessages = [];
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
+                $sentMessages[] = $user;
+
+                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+            });
+
+        $file = ProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
+        $attackerAgent = $this->makeAttackerAgent($llmClient);
+        $attackerAgent->analyze([$file], SymfonyMapping::create(), new NullCoverageRecorder());
+
+        self::assertCount(1, $sentMessages);
+        self::assertStringNotContainsString('Pre-Scan Risk Markers', $sentMessages[0]);
+    }
+
+    public function test_lean_mode_skips_files_with_no_markers(): void
+    {
+        $llmClient = self::createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('complete');
+
+        $file = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php class Clean {}');
+        $attackerAgent = $this->makeAttackerAgent($llmClient, leanMode: true);
+
+        $result = $attackerAgent->analyze([$file], SymfonyMapping::create(), new NullCoverageRecorder());
+
+        self::assertSame([], $result);
+    }
+
+    public function test_lean_mode_keeps_files_with_markers(): void
+    {
+        $sentMessages = [];
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
+                $sentMessages[] = $user;
+
+                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+            });
+
+        $scanner = new class implements \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface {
+            public function scan(array $files): array
+            {
+                return [
+                    \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker::create(
+                        'src/Service/Risky.php',
+                        3,
+                        'eval_call',
+                        'eval() on dynamic input',
+                    ),
+                ];
+            }
+        };
+
+        $risky = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
+        $clean = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
+        $attackerAgent = $this->makeAttackerAgent($llmClient, staticPreScanner: $scanner, leanMode: true);
+
+        $attackerAgent->analyze([$risky, $clean], SymfonyMapping::create(), new NullCoverageRecorder());
+
+        self::assertCount(1, $sentMessages);
+        self::assertStringContainsString('src/Service/Risky.php', $sentMessages[0]);
+        self::assertStringNotContainsString('src/Service/Clean.php', $sentMessages[0]);
+    }
+
+    public function test_chunks_with_markers_bypass_cache(): void
+    {
+        $cache = self::createMock(AttackerCacheInterface::class);
+        $cache->expects(self::never())->method('get');
+        $cache->expects(self::never())->method('store');
+
+        $scanner = new class implements \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface {
+            public function scan(array $files): array
+            {
+                return [
+                    \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker::create(
+                        'src/Service/Risky.php',
+                        1,
+                        'p',
+                        'd',
+                    ),
+                ];
+            }
+        };
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'test', 'end_turn'));
+
+        $file = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
+        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache, staticPreScanner: $scanner);
+        $attackerAgent->analyze([$file], SymfonyMapping::create(), new NullCoverageRecorder());
+    }
+
     private function makeFile(string $path): ProjectFile
     {
         return ProjectFile::create($path, '/app/'.$path, '<?php class Foo {}');
@@ -1248,6 +1382,8 @@ final class AttackerAgentTest extends TestCase
         ?ToolRegistryFactoryInterface $toolRegistryFactory = null,
         bool $toolsEnabled = AttackerAgent::DEFAULT_TOOLS_ENABLED,
         int $maxToolIterations = AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS,
+        ?\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface $staticPreScanner = null,
+        bool $leanMode = AttackerAgent::DEFAULT_LEAN_MODE,
     ): AttackerAgent {
         return new AttackerAgent(
             llmClient: $llmClient,
@@ -1258,6 +1394,8 @@ final class AttackerAgentTest extends TestCase
             toolRegistryFactory: $toolRegistryFactory,
             toolsEnabled: $toolsEnabled,
             maxToolIterations: $maxToolIterations,
+            staticPreScanner: $staticPreScanner,
+            leanMode: $leanMode,
         );
     }
 }

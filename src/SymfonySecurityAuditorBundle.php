@@ -33,6 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
@@ -48,6 +49,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
@@ -134,6 +137,20 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->defaultValue(AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS)
                             ->min(1)
                             ->info('Maximum tool-call rounds per chunk before forcing the attacker to commit to a final answer. Bounds runaway tool use.')
+                        ->end()
+                        ->arrayNode('static_prescan')
+                            ->addDefaultsIfNotSet()
+                            ->info('Deterministic zero-token risk-marker scan that runs before the LLM. Flags concrete locations (unserialize, |raw, csrf_protection: false, hardcoded secrets, Doctrine string concatenation, etc.) so the attacker prompt can focus on them. In lean mode, files with zero markers are skipped entirely — biggest token saver on large codebases.')
+                            ->children()
+                                ->booleanNode('enabled')
+                                    ->defaultTrue()
+                                    ->info('When true, every chunk is preceded by a "Pre-Scan Risk Markers" section in the user message. Default true — pure win on detection quality, zero token cost for the scan itself.')
+                                ->end()
+                                ->booleanNode('lean_mode')
+                                    ->defaultFalse()
+                                    ->info('When true, files with zero markers are dropped before the LLM ever sees them. Slashes token spend on real codebases (often 40-70%) at the cost of missing patterns the regex pre-scanner doesn\'t know about. Default false — opt-in for cost-sensitive runs.')
+                                ->end()
+                            ->end()
                         ->end()
                         ->arrayNode('budget')
                             ->addDefaultsIfNotSet()
@@ -250,6 +267,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.reviewer_batch_size', $bundleConfiguration->audit->reviewerBatchSize);
         $builder->setParameter('symfony_security_auditor.audit.tools_enabled', $bundleConfiguration->audit->toolsEnabled);
         $builder->setParameter('symfony_security_auditor.audit.max_tool_iterations', $bundleConfiguration->audit->maxToolIterations);
+        $builder->setParameter('symfony_security_auditor.audit.static_prescan.enabled', $bundleConfiguration->audit->staticPreScanEnabled);
+        $builder->setParameter('symfony_security_auditor.audit.static_prescan.lean_mode', $bundleConfiguration->audit->staticPreScanLeanMode);
         $builder->setParameter('symfony_security_auditor.audit.budget.max_tokens', $bundleConfiguration->budget->maxTokens);
         $builder->setParameter('symfony_security_auditor.audit.budget.max_cost_usd', $bundleConfiguration->budget->maxCostUsd);
         $builder->setParameter('symfony_security_auditor.audit.retry.max_attempts', $bundleConfiguration->retry->maxAttempts);
@@ -364,5 +383,10 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $services->alias(SecretScrubberInterface::class, $scrubberServiceId);
 
         $services->alias(AdvisoryDatabaseInterface::class, ComposerAuditAdvisoryDatabase::class);
+
+        $preScannerServiceId = $bundleConfiguration->audit->staticPreScanEnabled
+            ? RegexStaticPreScanner::class
+            : NullStaticPreScanner::class;
+        $services->alias(StaticPreScannerInterface::class, $preScannerServiceId);
     }
 }

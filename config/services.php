@@ -40,6 +40,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
@@ -64,6 +65,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRegistryFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
@@ -231,6 +234,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->args([service('logger'), service(AdvisoryDatabaseInterface::class)]);
     $defaultsConfigurator->alias(ToolRegistryFactoryInterface::class, SymfonyToolRegistryFactory::class);
 
+    $defaultsConfigurator->set(NullStaticPreScanner::class);
+    $defaultsConfigurator->set(RegexStaticPreScanner::class);
+
     $defaultsConfigurator->set(AttackerAgent::class)
         ->args([
             service('security_auditor.attacker_client'),
@@ -241,6 +247,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(ToolRegistryFactoryInterface::class),
             param('symfony_security_auditor.audit.tools_enabled'),
             param('symfony_security_auditor.audit.max_tool_iterations'),
+            service(StaticPreScannerInterface::class),
+            param('symfony_security_auditor.audit.static_prescan.lean_mode'),
         ]);
 
     $defaultsConfigurator->alias(AttackerAgentInterface::class, AttackerAgent::class);
