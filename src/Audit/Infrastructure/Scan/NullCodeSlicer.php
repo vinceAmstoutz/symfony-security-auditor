@@ -19,8 +19,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class NullCodeSlicer implements CodeSlicerInterface
 {
-    public function slice(ProjectFile $file): string
+    public function slice(ProjectFile $projectFile): string
     {
-        return $file->content();
+        return $projectFile->content();
     }
 }

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
@@ -22,96 +23,131 @@ final class RegexCodeSlicerTest extends TestCase
     public function test_files_shorter_than_threshold_are_returned_unchanged(): void
     {
         $content = "<?php\nclass Tiny { public function foo() { return 1; } }";
-        $file = ProjectFile::create('src/Tiny.php', '/app/src/Tiny.php', $content);
+        $projectFile = ProjectFile::create('src/Tiny.php', '/app/src/Tiny.php', $content);
 
-        $sliced = (new RegexCodeSlicer(80))->slice($file);
-
-        self::assertSame($content, $sliced);
+        self::assertSame($content, (new RegexCodeSlicer(80))->slice($projectFile));
     }
 
     public function test_non_php_files_are_returned_unchanged(): void
     {
         $content = str_repeat("{{ value }}\n", 100);
-        $file = ProjectFile::create('templates/x.html.twig', '/app/templates/x.html.twig', $content);
+        $projectFile = ProjectFile::create('templates/x.html.twig', '/app/templates/x.html.twig', $content);
 
-        $sliced = (new RegexCodeSlicer(10))->slice($file);
-
-        self::assertSame($content, $sliced);
+        self::assertSame($content, (new RegexCodeSlicer(10))->slice($projectFile));
     }
 
-    public function test_sliced_output_preserves_line_count(): void
+    public function test_file_at_exactly_the_threshold_is_sliced(): void
     {
-        $file = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeControllerContent());
+        // Pins GreaterThanOrEqualTo (>=) against GreaterThan (>): a file whose line
+        // count equals the threshold must be sliced, so its inert line is elided.
+        $lines = array_fill(0, 9, '        $inert = 1;');
+        array_unshift($lines, '<?php');
+        $content = implode("\n", $lines); // exactly 10 lines
+        $projectFile = ProjectFile::create('src/Exact.php', '/app/src/Exact.php', $content);
 
-        $sliced = (new RegexCodeSlicer(10))->slice($file);
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('// elided', $sliced);
+    }
+
+    public function test_file_one_line_below_threshold_is_not_sliced(): void
+    {
+        $lines = array_fill(0, 8, '        $inert = 1;');
+        array_unshift($lines, '<?php');
+        $content = implode("\n", $lines); // 9 lines
+        $projectFile = ProjectFile::create('src/Below.php', '/app/src/Below.php', $content);
+
+        self::assertSame($content, (new RegexCodeSlicer(10))->slice($projectFile));
+    }
+
+    public function test_slicing_preserves_total_line_count(): void
+    {
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeController());
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
 
         self::assertSame(
-            substr_count($file->content(), "\n"),
+            substr_count($projectFile->content(), "\n"),
             substr_count($sliced, "\n"),
         );
     }
 
-    public function test_hot_method_bodies_are_retained_in_full(): void
+    public function test_lines_with_security_tokens_are_retained(): void
     {
-        $file = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeControllerContent());
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeController());
 
-        $sliced = (new RegexCodeSlicer(10))->slice($file);
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
 
-        self::assertStringContainsString('$request->get(', $sliced);
+        self::assertStringContainsString("\$request->get('payload')", $sliced);
         self::assertStringContainsString('unserialize($payload)', $sliced);
     }
 
-    public function test_cold_method_bodies_are_replaced_with_elided_placeholder(): void
+    public function test_inert_body_lines_are_elided(): void
     {
-        $file = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeControllerContent());
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeController());
 
-        $sliced = (new RegexCodeSlicer(10))->slice($file);
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
 
-        self::assertStringNotContainsString('COLD_BODY_MARKER', $sliced);
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
         self::assertStringContainsString('// elided', $sliced);
     }
 
-    public function test_cold_method_signatures_are_retained(): void
+    #[DataProvider('structuralLineCases')]
+    public function test_structural_lines_are_retained(string $structuralLine): void
     {
-        $file = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeControllerContent());
+        $content = "<?php\n".str_repeat("        \$inert = 1;\n", 20).$structuralLine."\n".str_repeat("        \$inert = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
 
-        $sliced = (new RegexCodeSlicer(10))->slice($file);
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
 
-        self::assertStringContainsString('public function cold(', $sliced);
+        self::assertStringContainsString($structuralLine, $sliced);
     }
 
-    public function test_namespace_and_use_lines_are_retained(): void
+    /** @return iterable<string, array{string}> */
+    public static function structuralLineCases(): iterable
     {
-        $file = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeControllerContent());
-
-        $sliced = (new RegexCodeSlicer(10))->slice($file);
-
-        self::assertStringContainsString('namespace App\\Controller;', $sliced);
-        self::assertStringContainsString('use Symfony\\Component\\HttpFoundation\\Request;', $sliced);
+        yield 'namespace' => ['namespace App\\Controller;'];
+        yield 'use' => ['use Symfony\\Component\\HttpFoundation\\Request;'];
+        yield 'attribute' => ['#[Route(\'/users\')]'];
+        yield 'class declaration' => ['class UserController'];
+        yield 'final class declaration' => ['final class WidgetController'];
+        yield 'interface declaration' => ['interface Foo'];
+        yield 'trait declaration' => ['trait Bar'];
+        yield 'enum declaration' => ['enum Status: string'];
+        yield 'abstract declaration' => ['abstract class Base'];
+        yield 'readonly declaration' => ['readonly class Value'];
+        yield 'public method signature' => ['public function show(): void'];
+        yield 'protected member' => ['protected string $name;'];
+        yield 'private member' => ['private int $count = 0;'];
     }
 
-    public function test_class_signature_and_php_attributes_are_retained(): void
+    public function test_indented_structural_line_is_retained(): void
     {
-        $file = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeControllerContent());
+        // Pins the ltrim() call: the method signature is indented, so detection
+        // must trim leading whitespace before matching the `public ` prefix.
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)."        public function deeplyIndented(): void\n".str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
 
-        $sliced = (new RegexCodeSlicer(10))->slice($file);
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
 
-        self::assertStringContainsString('#[Route(\'/users\')]', $sliced);
-        self::assertStringContainsString('class UserController', $sliced);
+        self::assertStringContainsString('public function deeplyIndented(): void', $sliced);
     }
 
-    public function test_sliced_output_is_strictly_smaller_than_input_when_cold_methods_exist(): void
+    public function test_inert_line_resembling_keyword_mid_line_is_elided(): void
     {
-        $file = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeControllerContent());
+        // A comment mentioning "namespace"/"class" mid-line must NOT be treated as
+        // structural — it is only structural when the keyword is at the line start.
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)."        // the class and namespace are fine\n".str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
 
-        $sliced = (new RegexCodeSlicer(10))->slice($file);
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
 
-        self::assertLessThan(\strlen($file->content()), \strlen($sliced));
+        self::assertStringNotContainsString('the class and namespace are fine', $sliced);
     }
 
-    private function largeControllerContent(): string
+    private function largeController(): string
     {
-        $coldBody = str_repeat("        \$x = COLD_BODY_MARKER; // line N\n", 30);
+        $inert = str_repeat("        \$x = INERT_MARKER;\n", 25);
 
         return <<<PHP
             <?php
@@ -120,9 +156,7 @@ final class RegexCodeSlicerTest extends TestCase
 
             use Symfony\\Component\\HttpFoundation\\Request;
             use Symfony\\Component\\HttpFoundation\\Response;
-            use Symfony\\Component\\Routing\\Annotation\\Route;
 
-            #[Route('/users')]
             class UserController
             {
                 public function hot(Request \$request): Response
@@ -130,12 +164,12 @@ final class RegexCodeSlicerTest extends TestCase
                     \$payload = \$request->get('payload');
                     \$data = unserialize(\$payload);
 
-                    return new Response(json_encode(\$data));
+                    return new Response((string) \$data);
                 }
 
                 public function cold(): Response
                 {
-            $coldBody
+            $inert
                     return new Response('ok');
                 }
             }

@@ -28,8 +28,8 @@ final class GitChangedFilesUnavailableException extends RuntimeException
         return new self(\sprintf('Git ref "%s" does not resolve in "%s". Fetch it or pick another ref (e.g. origin/main).', $ref, $projectPath));
     }
 
-    public static function fromProcessFailure(string $ref, string $stderr, Throwable $previous): self
+    public static function fromProcessFailure(string $ref, string $stderr, Throwable $throwable): self
     {
-        return new self(\sprintf('git diff against "%s" failed: %s', $ref, trim($stderr) ?: 'unknown error'), 0, $previous);
+        return new self(\sprintf('git diff against "%s" failed: %s', $ref, trim($stderr) ?: 'unknown error'), 0, $throwable);
     }
 }

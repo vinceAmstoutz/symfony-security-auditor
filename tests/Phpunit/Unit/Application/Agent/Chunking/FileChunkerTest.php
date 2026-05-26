@@ -35,7 +35,7 @@ final class FileChunkerTest extends TestCase
 
         $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
         self::assertNotNull($userChunk);
-        $userChunkPaths = array_map(static fn (ProjectFile $f): string => $f->relativePath(), $userChunk);
+        $userChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
         self::assertContains('src/Entity/User.php', $userChunkPaths);
         self::assertContains('src/Repository/UserRepository.php', $userChunkPaths);
         self::assertContains('src/Form/UserType.php', $userChunkPaths);
@@ -54,7 +54,7 @@ final class FileChunkerTest extends TestCase
 
         $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
         self::assertNotNull($userChunk);
-        $userChunkPaths = array_map(static fn (ProjectFile $f): string => $f->relativePath(), $userChunk);
+        $userChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
         self::assertContains('templates/user/index.html.twig', $userChunkPaths);
         self::assertContains('templates/user/edit.html.twig', $userChunkPaths);
     }

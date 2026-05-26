@@ -320,9 +320,9 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         }
     }
 
-    private function applyResponse(Vulnerability $vulnerability, LLMResponse $response, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    private function applyResponse(Vulnerability $vulnerability, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
-        if ($response->isEmpty()) {
+        if ($llmResponse->isEmpty()) {
             $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
 
             return $vulnerability->withReviewerValidation(false);
@@ -330,12 +330,12 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 
         try {
             /** @var array<string, mixed>|list<array<string, mixed>> $rawData */
-            $rawData = $response->parseJson();
-        } catch (JsonException $exception) {
+            $rawData = $llmResponse->parseJson();
+        } catch (JsonException $jsonException) {
             $this->logger->error('Failed to parse reviewer response', [
                 'vulnerability_id' => $vulnerability->id(),
-                'error' => $exception->getMessage(),
-                'content_preview' => substr($response->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
+                'error' => $jsonException->getMessage(),
+                'content_preview' => substr($llmResponse->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
             ]);
             $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
 

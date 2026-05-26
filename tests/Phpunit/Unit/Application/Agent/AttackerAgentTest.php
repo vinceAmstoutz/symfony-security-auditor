@@ -25,11 +25,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\Budg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
@@ -1099,9 +1104,9 @@ final class AttackerAgentTest extends TestCase
 
         $files = [$this->makeFile('src/Controller/UserController.php')];
         $previousFindings = [
-            \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability::create(
-                vulnerabilityType: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE,
-                vulnerabilitySeverity: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity::HIGH,
+            Vulnerability::create(
+                vulnerabilityType: VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE,
+                vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
                 title: 'IDOR earlier',
                 description: 'desc',
                 filePath: 'src/Controller/EarlierController.php',
@@ -1155,9 +1160,9 @@ final class AttackerAgentTest extends TestCase
 
         $files = [$this->makeFile('src/Controller/UserController.php')];
         $previousFindings = [
-            \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability::create(
-                vulnerabilityType: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType::SQL_INJECTION,
-                vulnerabilitySeverity: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity::HIGH,
+            Vulnerability::create(
+                vulnerabilityType: VulnerabilityType::SQL_INJECTION,
+                vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
                 title: 'SQLi',
                 description: 'd',
                 filePath: 'src/Repo.php',
@@ -1203,9 +1208,9 @@ final class AttackerAgentTest extends TestCase
 
         $files = [$this->makeFile('src/Controller/UserController.php')];
         $previousFindings = [
-            \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability::create(
-                vulnerabilityType: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE,
-                vulnerabilitySeverity: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity::HIGH,
+            Vulnerability::create(
+                vulnerabilityType: VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE,
+                vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
                 title: 'IDOR 1',
                 description: 'd',
                 filePath: 'src/Controller/A.php',
@@ -1217,9 +1222,9 @@ final class AttackerAgentTest extends TestCase
                 remediation: 'r',
                 confidence: 0.95,
             ),
-            \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability::create(
-                vulnerabilityType: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE,
-                vulnerabilitySeverity: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity::HIGH,
+            Vulnerability::create(
+                vulnerabilityType: VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE,
+                vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
                 title: 'IDOR 2',
                 description: 'd',
                 filePath: 'src/Controller/B.php',
@@ -1252,11 +1257,11 @@ final class AttackerAgentTest extends TestCase
                 return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
             });
 
-        $scanner = new class implements \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface {
+        $scanner = new class implements StaticPreScannerInterface {
             public function scan(array $files): array
             {
                 return [
-                    \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker::create(
+                    RiskMarker::create(
                         'src/Service/Foo.php',
                         7,
                         'unserialize_call',
@@ -1266,9 +1271,9 @@ final class AttackerAgentTest extends TestCase
             }
         };
 
-        $file = ProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
+        $projectFile = ProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, staticPreScanner: $scanner);
-        $attackerAgent->analyze([$file], SymfonyMapping::create(), new NullCoverageRecorder());
+        $attackerAgent->analyze([$projectFile], SymfonyMapping::create(), new NullCoverageRecorder());
 
         self::assertCount(1, $sentMessages);
         self::assertStringContainsString('Pre-Scan Risk Markers', $sentMessages[0]);
@@ -1288,9 +1293,9 @@ final class AttackerAgentTest extends TestCase
                 return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
             });
 
-        $file = ProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
+        $projectFile = ProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient);
-        $attackerAgent->analyze([$file], SymfonyMapping::create(), new NullCoverageRecorder());
+        $attackerAgent->analyze([$projectFile], SymfonyMapping::create(), new NullCoverageRecorder());
 
         self::assertCount(1, $sentMessages);
         self::assertStringNotContainsString('Pre-Scan Risk Markers', $sentMessages[0]);
@@ -1301,10 +1306,10 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createMock(LLMClientInterface::class);
         $llmClient->expects(self::never())->method('complete');
 
-        $file = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php class Clean {}');
+        $projectFile = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php class Clean {}');
         $attackerAgent = $this->makeAttackerAgent($llmClient, leanMode: true);
 
-        $result = $attackerAgent->analyze([$file], SymfonyMapping::create(), new NullCoverageRecorder());
+        $result = $attackerAgent->analyze([$projectFile], SymfonyMapping::create(), new NullCoverageRecorder());
 
         self::assertSame([], $result);
     }
@@ -1321,11 +1326,11 @@ final class AttackerAgentTest extends TestCase
                 return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
             });
 
-        $scanner = new class implements \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface {
+        $scanner = new class implements StaticPreScannerInterface {
             public function scan(array $files): array
             {
                 return [
-                    \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker::create(
+                    RiskMarker::create(
                         'src/Service/Risky.php',
                         3,
                         'eval_call',
@@ -1335,11 +1340,11 @@ final class AttackerAgentTest extends TestCase
             }
         };
 
-        $risky = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
+        $projectFile = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
         $clean = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, staticPreScanner: $scanner, leanMode: true);
 
-        $attackerAgent->analyze([$risky, $clean], SymfonyMapping::create(), new NullCoverageRecorder());
+        $attackerAgent->analyze([$projectFile, $clean], SymfonyMapping::create(), new NullCoverageRecorder());
 
         self::assertCount(1, $sentMessages);
         self::assertStringContainsString('src/Service/Risky.php', $sentMessages[0]);
@@ -1352,11 +1357,11 @@ final class AttackerAgentTest extends TestCase
         $cache->expects(self::once())->method('get')->willReturn(null);
         $cache->expects(self::once())->method('store');
 
-        $scanner = new class implements \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface {
+        $scanner = new class implements StaticPreScannerInterface {
             public function scan(array $files): array
             {
                 return [
-                    \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker::create(
+                    RiskMarker::create(
                         'src/Service/Risky.php',
                         1,
                         'p',
@@ -1369,9 +1374,9 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'test', 'end_turn'));
 
-        $file = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
+        $projectFile = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, $cache, staticPreScanner: $scanner);
-        $attackerAgent->analyze([$file], SymfonyMapping::create(), new NullCoverageRecorder());
+        $attackerAgent->analyze([$projectFile], SymfonyMapping::create(), new NullCoverageRecorder());
     }
 
     public function test_empty_llm_response_is_persisted_as_negative_cache_entry(): void
@@ -1380,14 +1385,14 @@ final class AttackerAgentTest extends TestCase
         $cache->expects(self::once())->method('get')->willReturn(null);
         $cache->expects(self::once())
             ->method('store')
-            ->with(self::isType('array'), []);
+            ->with(self::isArray(), []);
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(LLMResponse::create('', 0, 0, 'test', 'end_turn'));
 
-        $file = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
+        $projectFile = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
-        $attackerAgent->analyze([$file], SymfonyMapping::create(), new NullCoverageRecorder());
+        $attackerAgent->analyze([$projectFile], SymfonyMapping::create(), new NullCoverageRecorder());
     }
 
     private function makeFile(string $path): ProjectFile
@@ -1402,7 +1407,7 @@ final class AttackerAgentTest extends TestCase
         ?ToolRegistryFactoryInterface $toolRegistryFactory = null,
         bool $toolsEnabled = AttackerAgent::DEFAULT_TOOLS_ENABLED,
         int $maxToolIterations = AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS,
-        ?\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface $staticPreScanner = null,
+        ?StaticPreScannerInterface $staticPreScanner = null,
         bool $leanMode = AttackerAgent::DEFAULT_LEAN_MODE,
     ): AttackerAgent {
         return new AttackerAgent(

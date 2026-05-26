@@ -22,8 +22,8 @@ final class NullCodeSlicerTest extends TestCase
     public function test_it_returns_original_content_unchanged(): void
     {
         $content = "<?php\nclass Foo { /* … */ }";
-        $file = ProjectFile::create('src/Foo.php', '/app/src/Foo.php', $content);
+        $projectFile = ProjectFile::create('src/Foo.php', '/app/src/Foo.php', $content);
 
-        self::assertSame($content, (new NullCodeSlicer())->slice($file));
+        self::assertSame($content, (new NullCodeSlicer())->slice($projectFile));
     }
 }

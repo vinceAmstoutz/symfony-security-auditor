@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AuditHistoryStoreInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Stage\Fixture\RecordingAuditHistoryStore;
 
 final class HistoricalCorrelationStageTest extends TestCase
 {
@@ -30,9 +31,9 @@ final class HistoricalCorrelationStageTest extends TestCase
 
     public function test_name_returns_built_in_value(): void
     {
-        $stage = new HistoricalCorrelationStage($this->makeStore(), new NullLogger());
+        $historicalCorrelationStage = new HistoricalCorrelationStage($this->makeStore(), new NullLogger());
 
-        self::assertSame(BuiltInStageName::HistoricalCorrelation->value, $stage->name());
+        self::assertSame(BuiltInStageName::HistoricalCorrelation->value, $historicalCorrelationStage->name());
     }
 
     public function test_it_skips_when_disabled(): void
@@ -41,18 +42,18 @@ final class HistoricalCorrelationStageTest extends TestCase
         $store->expects(self::never())->method('loadFingerprints');
         $store->expects(self::never())->method('storeFingerprints');
 
-        $stage = new HistoricalCorrelationStage($store, new NullLogger(), false);
-        $stage->process(AuditContext::forProject($this->tmpDir));
+        $historicalCorrelationStage = new HistoricalCorrelationStage($store, new NullLogger(), false);
+        $historicalCorrelationStage->process(AuditContext::forProject($this->tmpDir));
     }
 
     public function test_it_tags_finding_as_new_when_not_in_previous_audit(): void
     {
         $vulnerability = $this->makeValidatedVulnerability();
 
-        $store = $this->makeStore(previous: []);
+        $recordingAuditHistoryStore = $this->makeStore(previous: []);
         $auditContext = $this->makeContextWith($vulnerability);
 
-        (new HistoricalCorrelationStage($store, new NullLogger(), true))->process($auditContext);
+        (new HistoricalCorrelationStage($recordingAuditHistoryStore, new NullLogger(), true))->process($auditContext);
 
         $stored = $auditContext->vulnerabilities()[$vulnerability->id()];
         self::assertSame(HistoricalStatus::New, $stored->historicalStatus());
@@ -62,10 +63,10 @@ final class HistoricalCorrelationStageTest extends TestCase
     {
         $vulnerability = $this->makeValidatedVulnerability();
 
-        $store = $this->makeStore(previous: [$vulnerability->fingerprint()]);
+        $recordingAuditHistoryStore = $this->makeStore(previous: [$vulnerability->fingerprint()]);
         $auditContext = $this->makeContextWith($vulnerability);
 
-        (new HistoricalCorrelationStage($store, new NullLogger(), true))->process($auditContext);
+        (new HistoricalCorrelationStage($recordingAuditHistoryStore, new NullLogger(), true))->process($auditContext);
 
         $stored = $auditContext->vulnerabilities()[$vulnerability->id()];
         self::assertSame(HistoricalStatus::StillPresent, $stored->historicalStatus());
@@ -73,15 +74,15 @@ final class HistoricalCorrelationStageTest extends TestCase
 
     public function test_it_records_new_and_still_present_counts_in_meta(): void
     {
-        $present = $this->makeValidatedVulnerability(filePath: 'src/Repository/UserRepository.php');
+        $vulnerability = $this->makeValidatedVulnerability(filePath: 'src/Repository/UserRepository.php');
         $fresh = $this->makeValidatedVulnerability(filePath: 'src/Repository/OrderRepository.php');
 
-        $store = $this->makeStore(previous: [$present->fingerprint()]);
+        $recordingAuditHistoryStore = $this->makeStore(previous: [$vulnerability->fingerprint()]);
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->addVulnerability($present);
+        $auditContext->addVulnerability($vulnerability);
         $auditContext->addVulnerability($fresh);
 
-        (new HistoricalCorrelationStage($store, new NullLogger(), true))->process($auditContext);
+        (new HistoricalCorrelationStage($recordingAuditHistoryStore, new NullLogger(), true))->process($auditContext);
 
         self::assertSame(1, $auditContext->getMeta('audit.history.still_present'));
         self::assertSame(1, $auditContext->getMeta('audit.history.new'));
@@ -89,12 +90,12 @@ final class HistoricalCorrelationStageTest extends TestCase
 
     public function test_it_reports_fixed_count_for_fingerprints_gone_since_last_run(): void
     {
-        $present = $this->makeValidatedVulnerability();
+        $vulnerability = $this->makeValidatedVulnerability();
 
-        $store = $this->makeStore(previous: [$present->fingerprint(), 'FP-OLDGONEXXXXX']);
-        $auditContext = $this->makeContextWith($present);
+        $recordingAuditHistoryStore = $this->makeStore(previous: [$vulnerability->fingerprint(), 'FP-OLDGONEXXXXX']);
+        $auditContext = $this->makeContextWith($vulnerability);
 
-        (new HistoricalCorrelationStage($store, new NullLogger(), true))->process($auditContext);
+        (new HistoricalCorrelationStage($recordingAuditHistoryStore, new NullLogger(), true))->process($auditContext);
 
         self::assertSame(1, $auditContext->getMeta('audit.history.fixed'));
         self::assertSame(['FP-OLDGONEXXXXX'], $auditContext->getMeta('audit.history.fixed_fingerprints'));
@@ -104,27 +105,27 @@ final class HistoricalCorrelationStageTest extends TestCase
     {
         $vulnerability = $this->makeValidatedVulnerability();
 
-        $store = $this->makeStore(previous: []);
+        $recordingAuditHistoryStore = $this->makeStore(previous: []);
         $auditContext = $this->makeContextWith($vulnerability);
 
-        (new HistoricalCorrelationStage($store, new NullLogger(), true))->process($auditContext);
+        (new HistoricalCorrelationStage($recordingAuditHistoryStore, new NullLogger(), true))->process($auditContext);
 
-        self::assertSame([$vulnerability->fingerprint()], $store->stored);
+        self::assertSame([$vulnerability->fingerprint()], $recordingAuditHistoryStore->stored);
     }
 
     public function test_it_only_correlates_validated_findings(): void
     {
-        $validated = $this->makeValidatedVulnerability(filePath: 'src/Repository/UserRepository.php');
+        $vulnerability = $this->makeValidatedVulnerability(filePath: 'src/Repository/UserRepository.php');
         $unvalidated = $this->makeVulnerability(filePath: 'src/Repository/OrderRepository.php');
 
-        $store = $this->makeStore(previous: []);
+        $recordingAuditHistoryStore = $this->makeStore(previous: []);
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->addVulnerability($validated);
+        $auditContext->addVulnerability($vulnerability);
         $auditContext->addVulnerability($unvalidated);
 
-        (new HistoricalCorrelationStage($store, new NullLogger(), true))->process($auditContext);
+        (new HistoricalCorrelationStage($recordingAuditHistoryStore, new NullLogger(), true))->process($auditContext);
 
-        self::assertSame([$validated->fingerprint()], $store->stored);
+        self::assertSame([$vulnerability->fingerprint()], $recordingAuditHistoryStore->stored);
     }
 
     protected function setUp(): void
@@ -149,27 +150,9 @@ final class HistoricalCorrelationStageTest extends TestCase
     /**
      * @param list<string> $previous
      */
-    private function makeStore(array $previous = []): object
+    private function makeStore(array $previous = []): RecordingAuditHistoryStore
     {
-        return new class($previous) implements AuditHistoryStoreInterface {
-            /** @var list<string> */
-            public array $stored = [];
-
-            /** @param list<string> $previous */
-            public function __construct(
-                private readonly array $previous,
-            ) {}
-
-            public function loadFingerprints(string $projectIdentifier): array
-            {
-                return $this->previous;
-            }
-
-            public function storeFingerprints(string $projectIdentifier, array $fingerprints): void
-            {
-                $this->stored = $fingerprints;
-            }
-        };
+        return new RecordingAuditHistoryStore($previous);
     }
 
     private function makeValidatedVulnerability(string $filePath = 'src/Repository/UserRepository.php'): Vulnerability

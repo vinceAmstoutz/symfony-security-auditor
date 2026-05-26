@@ -21,12 +21,12 @@ final class NullStaticPreScannerTest extends TestCase
 {
     public function test_it_returns_empty_array_for_any_input(): void
     {
-        $file = ProjectFile::create(
+        $projectFile = ProjectFile::create(
             'src/Foo.php',
             '/app/src/Foo.php',
             "<?php\nunserialize(\$x); shell_exec(\$y); md5(\$z);",
         );
 
-        self::assertSame([], (new NullStaticPreScanner())->scan([$file]));
+        self::assertSame([], (new NullStaticPreScanner())->scan([$projectFile]));
     }
 }

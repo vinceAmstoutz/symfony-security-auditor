@@ -19,31 +19,58 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  *
- * Lightweight regex-driven slicer that retains only the security-relevant
- * portions of a PHP file:
+ * Lightweight line classifier that retains only the security-relevant lines of
+ * a PHP file and replaces every other line with a `// elided` placeholder. A
+ * line is kept when it is either:
  *
- *   - the namespace + use declarations (so the LLM knows the type-resolution
- *     context),
- *   - every PHP attribute (`#[…]`), class/trait/interface/enum signature, and
- *     property declaration,
- *   - method signatures, plus the FULL body of methods that contain at least
- *     one security-relevant token (Request:: access, Doctrine query builder,
- *     unserialize, shell exec, mailer send, HttpClient request, …).
+ *   - structural — a `<?php` tag, `namespace`/`use` declaration, PHP attribute,
+ *     class/interface/trait/enum signature (with optional modifiers), method
+ *     signature, or property/visibility-prefixed declaration; or
+ *   - dangerous — it contains at least one security-relevant token (Request::
+ *     access, Doctrine query builder, unserialize, shell exec, mailer setters,
+ *     HttpClient request, weak crypto, …).
  *
- * Non-PHP files (Twig, YAML, XML) pass through unchanged because they are
- * already small enough that slicing them would lose context. PHP files
- * shorter than `MIN_LINES_BEFORE_SLICING` also pass through — slicing a 30-line
- * service has no token-saving upside.
+ * Because elided lines are replaced one-for-one (never removed), the file's
+ * total line count is preserved and the attacker prompt's `line_start` /
+ * `line_end` numbering protocol stays accurate against the original source.
  *
- * Eliminated lines are replaced one-for-one with a `// elided` placeholder so
- * the file's TOTAL line count is preserved — the attacker prompt's
- * `line_start` / `line_end` protocol (which counts lines from 1 in the
- * post-numbered output) remains accurate against the original source.
+ * Non-PHP files (Twig, YAML, XML) pass through unchanged — they are already
+ * small enough that slicing would only cost context. PHP files shorter than
+ * `minLinesBeforeSlicing` also pass through: slicing a short service has no
+ * token-saving upside.
  */
 final readonly class RegexCodeSlicer implements CodeSlicerInterface
 {
     public const int DEFAULT_MIN_LINES_BEFORE_SLICING = 80;
 
+    private const string ELIDED_PLACEHOLDER = '// elided';
+
+    /**
+     * Prefixes (matched after left-trim) that mark a line as structurally
+     * relevant and therefore always retained.
+     *
+     * @var list<string>
+     */
+    private const array STRUCTURAL_PREFIXES = [
+        '<?php',
+        'namespace ',
+        'use ',
+        '#[',
+        'class ',
+        'interface ',
+        'trait ',
+        'enum ',
+        'final ',
+        'abstract ',
+        'readonly ',
+        'public ',
+        'protected ',
+        'private ',
+    ];
+
+    /**
+     * @var list<string>
+     */
     private const array SECURITY_TOKENS = [
         '$request->',
         '$this->getUser(',
@@ -120,148 +147,40 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         private int $minLinesBeforeSlicing = self::DEFAULT_MIN_LINES_BEFORE_SLICING,
     ) {}
 
-    public function slice(ProjectFile $file): string
+    public function slice(ProjectFile $projectFile): string
     {
-        if (!$this->shouldSlice($file)) {
-            return $file->content();
+        if (!$this->shouldSlice($projectFile)) {
+            return $projectFile->content();
         }
 
-        return $this->slicePhpContent($file->content());
+        $output = [];
+        foreach (explode("\n", $projectFile->content()) as $line) {
+            $output[] = $this->shouldRetain($line) ? $line : self::ELIDED_PLACEHOLDER;
+        }
+
+        return implode("\n", $output);
     }
 
-    private function shouldSlice(ProjectFile $file): bool
+    private function shouldSlice(ProjectFile $projectFile): bool
     {
-        if ('php' !== pathinfo($file->relativePath(), \PATHINFO_EXTENSION)) {
+        if ('php' !== pathinfo($projectFile->relativePath(), \PATHINFO_EXTENSION)) {
             return false;
         }
 
-        return $file->linesCount() >= $this->minLinesBeforeSlicing;
+        return $projectFile->linesCount() >= $this->minLinesBeforeSlicing;
     }
 
-    private function slicePhpContent(string $content): string
+    private function shouldRetain(string $line): bool
     {
-        $lines = explode("\n", $content);
-        $totalLines = \count($lines);
-
-        $methodRanges = $this->detectMethodRanges($lines);
-        $hotMethods = $this->detectHotMethods($lines, $methodRanges);
-
-        $retain = $this->initialRetention($totalLines);
-        $this->retainAlwaysKeptLines($lines, $retain);
-        $this->retainHotMethodBodies($hotMethods, $retain);
-
-        return $this->renderWithElisions($lines, $retain);
+        return $this->isStructural($line) || $this->containsSecurityToken($line);
     }
 
-    /**
-     * @return array<int, bool>
-     */
-    private function initialRetention(int $totalLines): array
+    private function isStructural(string $line): bool
     {
-        $retain = [];
-        for ($i = 0; $i < $totalLines; ++$i) {
-            $retain[$i] = false;
-        }
+        $trimmed = ltrim($line);
 
-        return $retain;
-    }
-
-    /**
-     * @param list<string>     $lines
-     * @param array<int, bool> $retain
-     */
-    private function retainAlwaysKeptLines(array $lines, array &$retain): void
-    {
-        foreach ($lines as $index => $line) {
-            $trimmed = ltrim($line);
-
-            if (1 === preg_match('/^(<\?php|namespace\s|use\s|use\s+function\s|use\s+const\s)/', $trimmed)) {
-                $retain[$index] = true;
-
-                continue;
-            }
-
-            if (1 === preg_match('/^#\[/', $trimmed)) {
-                $retain[$index] = true;
-
-                continue;
-            }
-
-            if (1 === preg_match('/^(abstract\s+|final\s+|readonly\s+|final\s+readonly\s+)?(class|interface|trait|enum)\s/', $trimmed)) {
-                $retain[$index] = true;
-
-                continue;
-            }
-
-            if (1 === preg_match('/^(public|protected|private)\s+(static\s+)?(readonly\s+)?[^(]*\$[A-Za-z_][A-Za-z0-9_]*\s*[=;]/', $trimmed)) {
-                $retain[$index] = true;
-
-                continue;
-            }
-
-            if (1 === preg_match('/^(public|protected|private)\s+(static\s+)?function\s/', $trimmed)) {
-                $retain[$index] = true;
-            }
-        }
-    }
-
-    /**
-     * @return list<array{start: int, end: int}>
-     */
-    private function detectMethodRanges(array $lines): array
-    {
-        $ranges = [];
-        $totalLines = \count($lines);
-
-        foreach ($lines as $index => $line) {
-            if (1 !== preg_match('/^\s*(public|protected|private)\s+(static\s+)?function\s/', $line)) {
-                continue;
-            }
-
-            $bodyStart = $this->findOpeningBrace($lines, $index);
-            if (null === $bodyStart) {
-                continue;
-            }
-
-            $bodyEnd = $this->findMatchingClose($lines, $bodyStart);
-            if (null === $bodyEnd || $bodyEnd >= $totalLines) {
-                continue;
-            }
-
-            $ranges[] = ['start' => $index, 'end' => $bodyEnd];
-        }
-
-        return $ranges;
-    }
-
-    /**
-     * @param list<string>                          $lines
-     * @param list<array{start: int, end: int}>     $methodRanges
-     *
-     * @return list<array{start: int, end: int}>
-     */
-    private function detectHotMethods(array $lines, array $methodRanges): array
-    {
-        $hot = [];
-
-        foreach ($methodRanges as $range) {
-            $body = '';
-            for ($i = $range['start']; $i <= $range['end']; ++$i) {
-                $body .= $lines[$i]."\n";
-            }
-
-            if ($this->containsSecurityToken($body)) {
-                $hot[] = $range;
-            }
-        }
-
-        return $hot;
-    }
-
-    private function containsSecurityToken(string $body): bool
-    {
-        foreach (self::SECURITY_TOKENS as $token) {
-            if (str_contains($body, $token)) {
+        foreach (self::STRUCTURAL_PREFIXES as $prefix) {
+            if (str_starts_with($trimmed, $prefix)) {
                 return true;
             }
         }
@@ -269,86 +188,14 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         return false;
     }
 
-    /**
-     * @param list<array{start: int, end: int}> $hotMethods
-     * @param array<int, bool>                  $retain
-     */
-    private function retainHotMethodBodies(array $hotMethods, array &$retain): void
+    private function containsSecurityToken(string $line): bool
     {
-        foreach ($hotMethods as $range) {
-            for ($i = $range['start']; $i <= $range['end']; ++$i) {
-                $retain[$i] = true;
-            }
-        }
-    }
-
-    /**
-     * @param list<string> $lines
-     */
-    private function findOpeningBrace(array $lines, int $signatureIndex): ?int
-    {
-        $totalLines = \count($lines);
-
-        for ($i = $signatureIndex; $i < $totalLines; ++$i) {
-            if (str_contains($lines[$i], '{')) {
-                return $i;
-            }
-
-            if (str_contains($lines[$i], ';')) {
-                return null;
+        foreach (self::SECURITY_TOKENS as $token) {
+            if (str_contains($line, $token)) {
+                return true;
             }
         }
 
-        return null;
-    }
-
-    /**
-     * @param list<string> $lines
-     */
-    private function findMatchingClose(array $lines, int $openLineIndex): ?int
-    {
-        $depth = 0;
-        $totalLines = \count($lines);
-
-        for ($i = $openLineIndex; $i < $totalLines; ++$i) {
-            $stripped = $this->stripStringsAndComments($lines[$i]);
-            foreach (str_split($stripped) as $char) {
-                if ('{' === $char) {
-                    ++$depth;
-                } elseif ('}' === $char) {
-                    --$depth;
-
-                    if (0 === $depth) {
-                        return $i;
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private function stripStringsAndComments(string $line): string
-    {
-        $without = (string) preg_replace('/(?<!\\\\)\'(?:\\\\.|[^\'\\\\])*\'/', "''", $line);
-        $without = (string) preg_replace('/(?<!\\\\)"(?:\\\\.|[^"\\\\])*"/', '""', $without);
-        $without = (string) preg_replace('/\/\/.*$/', '', $without);
-
-        return (string) preg_replace('/#(?!\[).*$/', '', $without);
-    }
-
-    /**
-     * @param list<string>     $lines
-     * @param array<int, bool> $retain
-     */
-    private function renderWithElisions(array $lines, array $retain): string
-    {
-        $output = [];
-
-        foreach ($lines as $index => $line) {
-            $output[] = $retain[$index] ? $line : '// elided';
-        }
-
-        return implode("\n", $output);
+        return false;
     }
 }

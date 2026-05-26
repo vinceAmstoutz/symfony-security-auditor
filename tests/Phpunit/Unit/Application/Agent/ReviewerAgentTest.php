@@ -26,8 +26,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 
 final class ReviewerAgentTest extends TestCase
@@ -1601,21 +1604,21 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerabilities = [$this->makeVulnerabilityAt('src/A.php'), $this->makeVulnerabilityAt('src/B.php')];
 
-        $llmClient = new class implements \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface {
+        $llmClient = new class implements BatchCapableLLMClientInterface {
             public int $batchCalls = 0;
 
             public int $completeCalls = 0;
 
-            public function complete(string $systemPrompt, string $userMessage): \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse
+            public function complete(string $systemPrompt, string $userMessage): LLMResponse
             {
                 ++$this->completeCalls;
 
-                return \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn');
+                return LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn');
             }
 
-            public function completeWithTools(string $systemPrompt, string $userMessage, \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry $toolRegistry, int $maxToolIterations): \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse
+            public function completeWithTools(string $systemPrompt, string $userMessage, ToolRegistry $toolRegistry, int $maxToolIterations): LLMResponse
             {
-                return \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse::create('{}', 0, 0, 'm', 'end_turn');
+                return LLMResponse::create('{}', 0, 0, 'm', 'end_turn');
             }
 
             public function model(): string
@@ -1628,7 +1631,7 @@ final class ReviewerAgentTest extends TestCase
                 ++$this->batchCalls;
 
                 return array_map(
-                    static fn (): \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse => \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn'),
+                    static fn (): LLMResponse => LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn'),
                     $requests,
                 );
             }
@@ -1654,21 +1657,21 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
 
-        $llmClient = new class implements \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface {
+        $llmClient = new class implements BatchCapableLLMClientInterface {
             public int $batchCalls = 0;
 
             public int $completeCalls = 0;
 
-            public function complete(string $systemPrompt, string $userMessage): \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse
+            public function complete(string $systemPrompt, string $userMessage): LLMResponse
             {
                 ++$this->completeCalls;
 
-                return \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn');
+                return LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn');
             }
 
-            public function completeWithTools(string $systemPrompt, string $userMessage, \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry $toolRegistry, int $maxToolIterations): \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse
+            public function completeWithTools(string $systemPrompt, string $userMessage, ToolRegistry $toolRegistry, int $maxToolIterations): LLMResponse
             {
-                return \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse::create('{}', 0, 0, 'm', 'end_turn');
+                return LLMResponse::create('{}', 0, 0, 'm', 'end_turn');
             }
 
             public function model(): string
@@ -1710,9 +1713,9 @@ final class ReviewerAgentTest extends TestCase
                 10, 10, 'claude', 'end_turn',
             ));
 
-        $registry = new \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry([], new NullLogger());
-        $toolFactory = self::createStub(\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface::class);
-        $toolFactory->method('forProjectFiles')->willReturn($registry);
+        $toolRegistry = new ToolRegistry([], new NullLogger());
+        $toolFactory = self::createStub(ToolRegistryFactoryInterface::class);
+        $toolFactory->method('forProjectFiles')->willReturn($toolRegistry);
 
         $reviewerAgent = new ReviewerAgent(
             llmClient: $llmClient,
@@ -1738,9 +1741,9 @@ final class ReviewerAgentTest extends TestCase
                 10, 10, 'claude', 'end_turn',
             ));
 
-        $registry = new \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry([], new NullLogger());
-        $toolFactory = self::createStub(\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface::class);
-        $toolFactory->method('forProjectFiles')->willReturn($registry);
+        $toolRegistry = new ToolRegistry([], new NullLogger());
+        $toolFactory = self::createStub(ToolRegistryFactoryInterface::class);
+        $toolFactory->method('forProjectFiles')->willReturn($toolRegistry);
 
         $reviewerAgent = new ReviewerAgent(
             llmClient: $llmClient,
@@ -1772,9 +1775,9 @@ final class ReviewerAgentTest extends TestCase
             10, 10, 'claude', 'end_turn',
         ));
 
-        $registry = new \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry([], new NullLogger());
-        $toolFactory = self::createStub(\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface::class);
-        $toolFactory->method('forProjectFiles')->willReturn($registry);
+        $toolRegistry = new ToolRegistry([], new NullLogger());
+        $toolFactory = self::createStub(ToolRegistryFactoryInterface::class);
+        $toolFactory->method('forProjectFiles')->willReturn($toolRegistry);
 
         $reviewerAgent = new ReviewerAgent(
             llmClient: $llmClient,

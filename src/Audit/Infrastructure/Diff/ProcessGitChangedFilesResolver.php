@@ -82,11 +82,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
         try {
             $process->mustRun();
         } catch (ProcessFailedException $processFailedException) {
-            throw GitChangedFilesUnavailableException::fromProcessFailure(
-                $argv[\count($argv) - 1] ?? '',
-                $process->getErrorOutput(),
-                $processFailedException,
-            );
+            throw GitChangedFilesUnavailableException::fromProcessFailure($argv[\count($argv) - 1] ?? '', $process->getErrorOutput(), $processFailedException);
         }
 
         $lines = preg_split('/\R/', trim($process->getOutput())) ?: [];
@@ -115,6 +111,6 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
         $result = array_keys($normalized);
         sort($result);
 
-        return array_values($result);
+        return $result;
     }
 }

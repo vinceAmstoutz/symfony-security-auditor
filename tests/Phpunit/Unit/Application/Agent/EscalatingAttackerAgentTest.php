@@ -15,33 +15,32 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingAttackerAgent;
 
 final class EscalatingAttackerAgentTest extends TestCase
 {
     public function test_it_skips_expensive_pass_when_cheap_finds_nothing(): void
     {
-        $cheap = $this->makeRecordingAttacker([]);
+        $recordingAttackerAgent = $this->makeRecordingAttacker([]);
         $expensive = $this->makeRecordingAttacker([]);
 
-        $escalating = new EscalatingAttackerAgent($cheap, $expensive, new NullLogger());
+        $escalatingAttackerAgent = new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger());
 
-        $result = $escalating->analyze(
+        $result = $escalatingAttackerAgent->analyze(
             [$this->makeFile('src/Controller/A.php')],
             SymfonyMapping::create(),
             new NullCoverageRecorder(),
         );
 
         self::assertSame([], $result);
-        self::assertSame(1, $cheap->callCount);
+        self::assertSame(1, $recordingAttackerAgent->callCount);
         self::assertSame(0, $expensive->callCount);
     }
 
@@ -53,14 +52,14 @@ final class EscalatingAttackerAgentTest extends TestCase
             $this->makeFile('src/Controller/C.php'),
         ];
 
-        $cheap = $this->makeRecordingAttacker([
+        $recordingAttackerAgent = $this->makeRecordingAttacker([
             $this->makeVulnerability('src/Controller/A.php'),
         ]);
         $expensive = $this->makeRecordingAttacker([]);
 
-        $escalating = new EscalatingAttackerAgent($cheap, $expensive, new NullLogger());
+        $escalatingAttackerAgent = new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger());
 
-        $escalating->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $escalatingAttackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder());
 
         self::assertSame(1, $expensive->callCount);
         self::assertCount(1, $expensive->lastFiles);
@@ -69,7 +68,7 @@ final class EscalatingAttackerAgentTest extends TestCase
 
     public function test_expensive_findings_supersede_cheap_findings_on_overlap(): void
     {
-        $cheapVuln = $this->makeVulnerability(
+        $vulnerability = $this->makeVulnerability(
             'src/Controller/A.php',
             VulnerabilitySeverity::MEDIUM,
             title: 'cheap version',
@@ -80,12 +79,12 @@ final class EscalatingAttackerAgentTest extends TestCase
             title: 'expensive version',
         );
 
-        $cheap = $this->makeRecordingAttacker([$cheapVuln]);
+        $recordingAttackerAgent = $this->makeRecordingAttacker([$vulnerability]);
         $expensive = $this->makeRecordingAttacker([$expensiveVuln]);
 
-        $escalating = new EscalatingAttackerAgent($cheap, $expensive, new NullLogger());
+        $escalatingAttackerAgent = new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger());
 
-        $result = $escalating->analyze(
+        $result = $escalatingAttackerAgent->analyze(
             [$this->makeFile('src/Controller/A.php')],
             SymfonyMapping::create(),
             new NullCoverageRecorder(),
@@ -101,12 +100,12 @@ final class EscalatingAttackerAgentTest extends TestCase
         $cheapOnB = $this->makeVulnerability('src/Controller/B.php', title: 'cheap B');
         $expensiveOnA = $this->makeVulnerability('src/Controller/A.php', title: 'expensive A');
 
-        $cheap = $this->makeRecordingAttacker([$cheapOnA, $cheapOnB]);
+        $recordingAttackerAgent = $this->makeRecordingAttacker([$cheapOnA, $cheapOnB]);
         $expensive = $this->makeRecordingAttacker([$expensiveOnA]);
 
-        $escalating = new EscalatingAttackerAgent($cheap, $expensive, new NullLogger());
+        $escalatingAttackerAgent = new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger());
 
-        $result = $escalating->analyze(
+        $result = $escalatingAttackerAgent->analyze(
             [$this->makeFile('src/Controller/A.php'), $this->makeFile('src/Controller/B.php')],
             SymfonyMapping::create(),
             new NullCoverageRecorder(),
@@ -119,20 +118,20 @@ final class EscalatingAttackerAgentTest extends TestCase
 
     public function test_expensive_pass_receives_cheap_findings_as_previous_context(): void
     {
-        $cheapVuln = $this->makeVulnerability('src/Controller/A.php');
+        $vulnerability = $this->makeVulnerability('src/Controller/A.php');
 
-        $cheap = $this->makeRecordingAttacker([$cheapVuln]);
+        $recordingAttackerAgent = $this->makeRecordingAttacker([$vulnerability]);
         $expensive = $this->makeRecordingAttacker([]);
 
-        $escalating = new EscalatingAttackerAgent($cheap, $expensive, new NullLogger());
+        $escalatingAttackerAgent = new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger());
 
-        $escalating->analyze(
+        $escalatingAttackerAgent->analyze(
             [$this->makeFile('src/Controller/A.php')],
             SymfonyMapping::create(),
             new NullCoverageRecorder(),
         );
 
-        self::assertSame([$cheapVuln], $expensive->lastPreviousFindings);
+        self::assertSame([$vulnerability], $expensive->lastPreviousFindings);
     }
 
     private function makeFile(string $path): ProjectFile
@@ -142,12 +141,12 @@ final class EscalatingAttackerAgentTest extends TestCase
 
     private function makeVulnerability(
         string $filePath,
-        VulnerabilitySeverity $severity = VulnerabilitySeverity::HIGH,
+        VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,
         string $title = 'v',
     ): Vulnerability {
         return Vulnerability::create(
             vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: $severity,
+            vulnerabilitySeverity: $vulnerabilitySeverity,
             title: $title,
             description: 'd',
             filePath: $filePath,
@@ -164,35 +163,8 @@ final class EscalatingAttackerAgentTest extends TestCase
     /**
      * @param list<Vulnerability> $returnedFindings
      */
-    private function makeRecordingAttacker(array $returnedFindings): object
+    private function makeRecordingAttacker(array $returnedFindings): RecordingAttackerAgent
     {
-        return new class($returnedFindings) implements AttackerAgentInterface {
-            public int $callCount = 0;
-
-            /** @var list<ProjectFile> */
-            public array $lastFiles = [];
-
-            /** @var list<Vulnerability> */
-            public array $lastPreviousFindings = [];
-
-            /** @param list<Vulnerability> $returnedFindings */
-            public function __construct(
-                private readonly array $returnedFindings,
-            ) {}
-
-            public function analyze(
-                array $files,
-                SymfonyMapping $symfonyMapping,
-                CoverageRecorderInterface $coverageRecorder,
-                bool $bypassCache = false,
-                array $previousFindings = [],
-            ): array {
-                ++$this->callCount;
-                $this->lastFiles = $files;
-                $this->lastPreviousFindings = $previousFindings;
-
-                return $this->returnedFindings;
-            }
-        };
+        return new RecordingAttackerAgent($returnedFindings);
     }
 }

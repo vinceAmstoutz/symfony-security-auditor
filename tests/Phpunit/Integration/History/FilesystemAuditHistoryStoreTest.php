@@ -34,72 +34,72 @@ final class FilesystemAuditHistoryStoreTest extends TestCase
 
     public function test_loading_unknown_project_returns_empty_list(): void
     {
-        $store = $this->makeStore();
+        $filesystemAuditHistoryStore = $this->makeStore();
 
-        self::assertSame([], $store->loadFingerprints('/some/project'));
+        self::assertSame([], $filesystemAuditHistoryStore->loadFingerprints('/some/project'));
     }
 
     public function test_stored_fingerprints_round_trip(): void
     {
-        $store = $this->makeStore();
+        $filesystemAuditHistoryStore = $this->makeStore();
 
-        $store->storeFingerprints('/some/project', ['FP-AAA', 'FP-BBB']);
+        $filesystemAuditHistoryStore->storeFingerprints('/some/project', ['FP-AAA', 'FP-BBB']);
 
-        self::assertSame(['FP-AAA', 'FP-BBB'], $store->loadFingerprints('/some/project'));
+        self::assertSame(['FP-AAA', 'FP-BBB'], $filesystemAuditHistoryStore->loadFingerprints('/some/project'));
     }
 
     public function test_storing_overwrites_previous_snapshot(): void
     {
-        $store = $this->makeStore();
+        $filesystemAuditHistoryStore = $this->makeStore();
 
-        $store->storeFingerprints('/p', ['FP-OLD']);
-        $store->storeFingerprints('/p', ['FP-NEW']);
+        $filesystemAuditHistoryStore->storeFingerprints('/p', ['FP-OLD']);
+        $filesystemAuditHistoryStore->storeFingerprints('/p', ['FP-NEW']);
 
-        self::assertSame(['FP-NEW'], $store->loadFingerprints('/p'));
+        self::assertSame(['FP-NEW'], $filesystemAuditHistoryStore->loadFingerprints('/p'));
     }
 
     public function test_different_projects_have_isolated_snapshots(): void
     {
-        $store = $this->makeStore();
+        $filesystemAuditHistoryStore = $this->makeStore();
 
-        $store->storeFingerprints('/project-a', ['FP-A']);
-        $store->storeFingerprints('/project-b', ['FP-B']);
+        $filesystemAuditHistoryStore->storeFingerprints('/project-a', ['FP-A']);
+        $filesystemAuditHistoryStore->storeFingerprints('/project-b', ['FP-B']);
 
-        self::assertSame(['FP-A'], $store->loadFingerprints('/project-a'));
-        self::assertSame(['FP-B'], $store->loadFingerprints('/project-b'));
+        self::assertSame(['FP-A'], $filesystemAuditHistoryStore->loadFingerprints('/project-a'));
+        self::assertSame(['FP-B'], $filesystemAuditHistoryStore->loadFingerprints('/project-b'));
     }
 
     public function test_corrupt_history_file_is_treated_as_empty(): void
     {
-        $store = $this->makeStore();
-        $store->storeFingerprints('/p', ['FP-A']);
+        $filesystemAuditHistoryStore = $this->makeStore();
+        $filesystemAuditHistoryStore->storeFingerprints('/p', ['FP-A']);
 
         $file = $this->onlyJsonFile();
         file_put_contents($file, 'not-json{{{');
 
-        self::assertSame([], $store->loadFingerprints('/p'));
+        self::assertSame([], $filesystemAuditHistoryStore->loadFingerprints('/p'));
     }
 
     public function test_history_file_without_fingerprints_key_is_treated_as_empty(): void
     {
-        $store = $this->makeStore();
-        $store->storeFingerprints('/p', ['FP-A']);
+        $filesystemAuditHistoryStore = $this->makeStore();
+        $filesystemAuditHistoryStore->storeFingerprints('/p', ['FP-A']);
 
         $file = $this->onlyJsonFile();
         file_put_contents($file, json_encode(['something_else' => true]));
 
-        self::assertSame([], $store->loadFingerprints('/p'));
+        self::assertSame([], $filesystemAuditHistoryStore->loadFingerprints('/p'));
     }
 
     public function test_non_string_fingerprint_entries_are_dropped_on_load(): void
     {
-        $store = $this->makeStore();
-        $store->storeFingerprints('/p', ['FP-A']);
+        $filesystemAuditHistoryStore = $this->makeStore();
+        $filesystemAuditHistoryStore->storeFingerprints('/p', ['FP-A']);
 
         $file = $this->onlyJsonFile();
         file_put_contents($file, json_encode(['fingerprints' => ['FP-A', 123, null, 'FP-B']]));
 
-        self::assertSame(['FP-A', 'FP-B'], $store->loadFingerprints('/p'));
+        self::assertSame(['FP-A', 'FP-B'], $filesystemAuditHistoryStore->loadFingerprints('/p'));
     }
 
     protected function setUp(): void

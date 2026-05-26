@@ -40,7 +40,7 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
     public function __construct(
         private LLMClientInterface $llmClient,
         private LoggerInterface $logger,
-        private VulnerabilitySeverity $severityFloor = VulnerabilitySeverity::HIGH,
+        private VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,
     ) {}
 
     public function synthesize(array $vulnerabilities): array
@@ -86,7 +86,7 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
     private function qualifiesForSynthesis(Vulnerability $vulnerability): bool
     {
         return $vulnerability->isReviewerValidated()
-            && $vulnerability->severity()->score() >= $this->severityFloor->score();
+            && $vulnerability->severity()->score() >= $this->vulnerabilitySeverity->score();
     }
 
     private function synthesizeOne(Vulnerability $vulnerability): ?string

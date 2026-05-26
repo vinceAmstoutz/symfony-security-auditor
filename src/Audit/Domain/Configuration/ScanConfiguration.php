@@ -16,9 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 final readonly class ScanConfiguration
 {
     /**
-     * @param list<string>                                                                $includedPaths
-     * @param list<string>                                                                $additionalScrubberPatterns
-     * @param array<string, array<string, array{regex: string, description: string}>>     $customRiskPatterns
+     * @param list<string>                                                            $includedPaths
+     * @param list<string>                                                            $additionalScrubberPatterns
+     * @param array<string, array<string, array{regex: string, description: string}>> $customRiskPatterns
      */
     public function __construct(
         public array $includedPaths,

@@ -245,10 +245,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             foreach ($patternsForBucket as $label => $entry) {
                 $matches = $this->matchLines($file->content(), $entry['regex']);
 
-                foreach ($matches as $lineNumber) {
+                foreach ($matches as $match) {
                     $markers[] = RiskMarker::create(
                         $file->relativePath(),
-                        $lineNumber,
+                        $match,
                         $label,
                         $entry['description'],
                     );

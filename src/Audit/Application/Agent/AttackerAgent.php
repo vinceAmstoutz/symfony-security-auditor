@@ -134,9 +134,9 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     }
 
     /**
-     * @param list<ProjectFile>                $chunk
-     * @param list<Vulnerability>              $previousFindings
-     * @param array<string, list<RiskMarker>>  $markersByFile keyed by file relative path
+     * @param list<ProjectFile>               $chunk
+     * @param list<Vulnerability>             $previousFindings
+     * @param array<string, list<RiskMarker>> $markersByFile    keyed by file relative path
      *
      * @return list<Vulnerability>
      */
@@ -179,6 +179,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
                 if ($cacheable) {
                     $this->attackerCache->store($chunk, []);
                 }
+
                 $this->recordChunkCoverage($chunk, 'analyzed', $coverageRecorder);
 
                 return [];
@@ -240,12 +241,12 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     private function renderPreviousFindings(array $previousFindings): string
     {
         $byType = [];
-        foreach ($previousFindings as $vulnerability) {
-            $byType[$vulnerability->type()->value][] = \sprintf(
+        foreach ($previousFindings as $previouFinding) {
+            $byType[$previouFinding->type()->value][] = \sprintf(
                 '%s:%d-%d',
-                $vulnerability->filePath(),
-                $vulnerability->lineStart(),
-                $vulnerability->lineEnd(),
+                $previouFinding->filePath(),
+                $previouFinding->lineStart(),
+                $previouFinding->lineEnd(),
             );
         }
 
@@ -314,7 +315,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     {
         return array_values(array_filter(
             $files,
-            static fn (ProjectFile $file): bool => isset($markersByFile[$file->relativePath()]),
+            static fn (ProjectFile $projectFile): bool => isset($markersByFile[$projectFile->relativePath()]),
         ));
     }
 

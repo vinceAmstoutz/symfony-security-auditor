@@ -37,10 +37,15 @@ final readonly class FileChunker
         'php',
     ];
 
+    /** @var int<1, max> */
+    private int $chunkSize;
+
     public function __construct(
         private ChunkingStrategy $chunkingStrategy = ChunkingStrategy::Feature,
-        private int $chunkSize = self::DEFAULT_CHUNK_SIZE,
-    ) {}
+        int $chunkSize = self::DEFAULT_CHUNK_SIZE,
+    ) {
+        $this->chunkSize = max(1, $chunkSize);
+    }
 
     /**
      * @param list<ProjectFile> $files
@@ -64,10 +69,7 @@ final readonly class FileChunker
     {
         usort($files, fn (ProjectFile $a, ProjectFile $b): int => $this->priority($a) <=> $this->priority($b));
 
-        /** @var list<list<ProjectFile>> $chunks */
-        $chunks = array_chunk($files, $this->chunkSize);
-
-        return $chunks;
+        return array_chunk($files, $this->chunkSize);
     }
 
     /**
@@ -103,7 +105,7 @@ final readonly class FileChunker
 
         $leftovers = array_values(array_filter(
             $files,
-            static fn (ProjectFile $file): bool => !isset($assignedPaths[$file->relativePath()]),
+            static fn (ProjectFile $projectFile): bool => !isset($assignedPaths[$projectFile->relativePath()]),
         ));
 
         if ([] !== $leftovers) {
@@ -178,11 +180,12 @@ final readonly class FileChunker
     /**
      * @param list<string> $featureNames
      */
-    private function findFeatureForFile(ProjectFile $file, array $featureNames): ?string
+    private function findFeatureForFile(ProjectFile $projectFile, array $featureNames): ?string
     {
-        $baseName = basename($file->relativePath(), '.php');
+        $baseName = basename($projectFile->relativePath(), '.php');
         $baseName = basename($baseName, '.twig');
-        $relativePath = $file->relativePath();
+
+        $relativePath = $projectFile->relativePath();
 
         foreach ($featureNames as $featureName) {
             if ($baseName === $featureName) {
@@ -202,9 +205,9 @@ final readonly class FileChunker
         return null;
     }
 
-    private function priority(ProjectFile $file): int
+    private function priority(ProjectFile $projectFile): int
     {
-        $index = array_search($file->type(), self::TYPE_PRIORITY, true);
+        $index = array_search($projectFile->type(), self::TYPE_PRIORITY, true);
 
         return false !== $index ? $index : \count(self::TYPE_PRIORITY);
     }

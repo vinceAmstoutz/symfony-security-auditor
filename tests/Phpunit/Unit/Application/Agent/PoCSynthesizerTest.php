@@ -30,9 +30,9 @@ final class PoCSynthesizerTest extends TestCase
         $llmClient = self::createMock(LLMClientInterface::class);
         $llmClient->expects(self::never())->method('complete');
 
-        $synthesizer = new PoCSynthesizer($llmClient, new NullLogger());
+        $poCSynthesizer = new PoCSynthesizer($llmClient, new NullLogger());
 
-        self::assertSame([], $synthesizer->synthesize([]));
+        self::assertSame([], $poCSynthesizer->synthesize([]));
     }
 
     public function test_it_synthesizes_poc_for_validated_high_severity_finding(): void
@@ -45,9 +45,9 @@ final class PoCSynthesizerTest extends TestCase
             10, 10, 'claude', 'end_turn',
         ));
 
-        $synthesizer = new PoCSynthesizer($llmClient, new NullLogger());
+        $poCSynthesizer = new PoCSynthesizer($llmClient, new NullLogger());
 
-        $enriched = $synthesizer->synthesize([$vulnerability]);
+        $enriched = $poCSynthesizer->synthesize([$vulnerability]);
 
         self::assertNotNull($enriched[0]->synthesizedPoC());
         self::assertStringContainsString('curl -X POST /admin/users', (string) $enriched[0]->synthesizedPoC());
@@ -55,28 +55,28 @@ final class PoCSynthesizerTest extends TestCase
 
     public function test_it_skips_findings_below_severity_floor(): void
     {
-        $low = $this->makeVulnerability(VulnerabilitySeverity::LOW)->withReviewerValidation(true);
+        $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::LOW)->withReviewerValidation(true);
 
         $llmClient = self::createMock(LLMClientInterface::class);
         $llmClient->expects(self::never())->method('complete');
 
-        $synthesizer = new PoCSynthesizer($llmClient, new NullLogger(), VulnerabilitySeverity::HIGH);
+        $poCSynthesizer = new PoCSynthesizer($llmClient, new NullLogger(), VulnerabilitySeverity::HIGH);
 
-        $enriched = $synthesizer->synthesize([$low]);
+        $enriched = $poCSynthesizer->synthesize([$vulnerability]);
 
         self::assertNull($enriched[0]->synthesizedPoC());
     }
 
     public function test_it_skips_findings_not_validated_by_reviewer(): void
     {
-        $unvalidated = $this->makeVulnerability(VulnerabilitySeverity::HIGH);
+        $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH);
 
         $llmClient = self::createMock(LLMClientInterface::class);
         $llmClient->expects(self::never())->method('complete');
 
-        $synthesizer = new PoCSynthesizer($llmClient, new NullLogger());
+        $poCSynthesizer = new PoCSynthesizer($llmClient, new NullLogger());
 
-        $enriched = $synthesizer->synthesize([$unvalidated]);
+        $enriched = $poCSynthesizer->synthesize([$vulnerability]);
 
         self::assertNull($enriched[0]->synthesizedPoC());
     }
@@ -88,9 +88,9 @@ final class PoCSynthesizerTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(LLMResponse::create('', 0, 0, 'test', 'end_turn'));
 
-        $synthesizer = new PoCSynthesizer($llmClient, new NullLogger());
+        $poCSynthesizer = new PoCSynthesizer($llmClient, new NullLogger());
 
-        $enriched = $synthesizer->synthesize([$vulnerability]);
+        $enriched = $poCSynthesizer->synthesize([$vulnerability]);
 
         self::assertNull($enriched[0]->synthesizedPoC());
     }
@@ -102,16 +102,16 @@ final class PoCSynthesizerTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willThrowException(new RuntimeException('network'));
 
-        $synthesizer = new PoCSynthesizer($llmClient, new NullLogger());
+        $poCSynthesizer = new PoCSynthesizer($llmClient, new NullLogger());
 
-        $enriched = $synthesizer->synthesize([$vulnerability]);
+        $enriched = $poCSynthesizer->synthesize([$vulnerability]);
 
         self::assertNull($enriched[0]->synthesizedPoC());
     }
 
     public function test_severity_floor_medium_includes_medium_findings(): void
     {
-        $medium = $this->makeVulnerability(VulnerabilitySeverity::MEDIUM)->withReviewerValidation(true);
+        $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::MEDIUM)->withReviewerValidation(true);
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(LLMResponse::create(
@@ -119,25 +119,25 @@ final class PoCSynthesizerTest extends TestCase
             10, 10, 'claude', 'end_turn',
         ));
 
-        $synthesizer = new PoCSynthesizer($llmClient, new NullLogger(), VulnerabilitySeverity::MEDIUM);
+        $poCSynthesizer = new PoCSynthesizer($llmClient, new NullLogger(), VulnerabilitySeverity::MEDIUM);
 
-        $enriched = $synthesizer->synthesize([$medium]);
+        $enriched = $poCSynthesizer->synthesize([$vulnerability]);
 
         self::assertNotNull($enriched[0]->synthesizedPoC());
     }
 
     public function test_returned_list_preserves_input_order_and_length(): void
     {
-        $a = $this->makeVulnerability(VulnerabilitySeverity::HIGH, filePath: 'src/A.php')->withReviewerValidation(true);
+        $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH, filePath: 'src/A.php')->withReviewerValidation(true);
         $b = $this->makeVulnerability(VulnerabilitySeverity::LOW, filePath: 'src/B.php')->withReviewerValidation(true);
         $c = $this->makeVulnerability(VulnerabilitySeverity::CRITICAL, filePath: 'src/C.php')->withReviewerValidation(true);
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(LLMResponse::create('PoC', 0, 0, 'test', 'end_turn'));
 
-        $synthesizer = new PoCSynthesizer($llmClient, new NullLogger());
+        $poCSynthesizer = new PoCSynthesizer($llmClient, new NullLogger());
 
-        $enriched = $synthesizer->synthesize([$a, $b, $c]);
+        $enriched = $poCSynthesizer->synthesize([$vulnerability, $b, $c]);
 
         self::assertCount(3, $enriched);
         self::assertSame('src/A.php', $enriched[0]->filePath());
@@ -149,12 +149,12 @@ final class PoCSynthesizerTest extends TestCase
     }
 
     private function makeVulnerability(
-        VulnerabilitySeverity $severity = VulnerabilitySeverity::HIGH,
+        VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,
         string $filePath = 'src/Controller/Foo.php',
     ): Vulnerability {
         return Vulnerability::create(
             vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: $severity,
+            vulnerabilitySeverity: $vulnerabilitySeverity,
             title: 'Test',
             description: 'd',
             filePath: $filePath,

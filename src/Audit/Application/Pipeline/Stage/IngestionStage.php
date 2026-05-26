@@ -48,7 +48,7 @@ final readonly class IngestionStage implements StageInterface
         );
 
         $diffSinceRef = $auditContext->diffSinceRef();
-        if (null !== $diffSinceRef && null !== $this->gitChangedFilesResolver) {
+        if (null !== $diffSinceRef && $this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
             $files = $this->filterByGitDiff($auditContext->projectPath(), $diffSinceRef, $files);
         }
 

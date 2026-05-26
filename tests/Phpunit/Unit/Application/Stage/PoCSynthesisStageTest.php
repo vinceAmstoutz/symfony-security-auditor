@@ -29,12 +29,12 @@ final class PoCSynthesisStageTest extends TestCase
 
     public function test_name_returns_built_in_stage_value(): void
     {
-        $stage = new PoCSynthesisStage(
+        $poCSynthesisStage = new PoCSynthesisStage(
             $this->makeNoopSynthesizer(),
             new NullLogger(),
         );
 
-        self::assertSame(BuiltInStageName::PoCSynthesis->value, $stage->name());
+        self::assertSame(BuiltInStageName::PoCSynthesis->value, $poCSynthesisStage->name());
     }
 
     public function test_it_skips_when_disabled(): void
@@ -42,8 +42,8 @@ final class PoCSynthesisStageTest extends TestCase
         $synthesizer = self::createMock(PoCSynthesizerInterface::class);
         $synthesizer->expects(self::never())->method('synthesize');
 
-        $stage = new PoCSynthesisStage($synthesizer, new NullLogger(), false);
-        $stage->process(AuditContext::forProject($this->tmpDir));
+        $poCSynthesisStage = new PoCSynthesisStage($synthesizer, new NullLogger(), false);
+        $poCSynthesisStage->process(AuditContext::forProject($this->tmpDir));
     }
 
     public function test_it_does_not_call_synthesizer_when_no_validated_findings(): void
@@ -54,59 +54,59 @@ final class PoCSynthesisStageTest extends TestCase
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->addVulnerability($this->makeVulnerability());
 
-        $stage = new PoCSynthesisStage($synthesizer, new NullLogger(), true);
-        $stage->process($auditContext);
+        $poCSynthesisStage = new PoCSynthesisStage($synthesizer, new NullLogger(), true);
+        $poCSynthesisStage->process($auditContext);
     }
 
     public function test_it_replaces_validated_findings_with_enriched_copies(): void
     {
-        $original = $this->makeVulnerability()->withReviewerValidation(true);
-        $enriched = $original->withSynthesizedPoC('curl /x');
+        $vulnerability = $this->makeVulnerability()->withReviewerValidation(true);
+        $enriched = $vulnerability->withSynthesizedPoC('curl /x');
 
         $synthesizer = self::createStub(PoCSynthesizerInterface::class);
         $synthesizer->method('synthesize')->willReturn([$enriched]);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->addVulnerability($original);
+        $auditContext->addVulnerability($vulnerability);
 
-        $stage = new PoCSynthesisStage($synthesizer, new NullLogger(), true);
-        $stage->process($auditContext);
+        $poCSynthesisStage = new PoCSynthesisStage($synthesizer, new NullLogger(), true);
+        $poCSynthesisStage->process($auditContext);
 
-        $stored = $auditContext->vulnerabilities()[$original->id()];
+        $stored = $auditContext->vulnerabilities()[$vulnerability->id()];
         self::assertSame('curl /x', $stored->synthesizedPoC());
     }
 
     public function test_it_records_count_metadata_in_context(): void
     {
-        $original = $this->makeVulnerability()->withReviewerValidation(true);
-        $enriched = $original->withSynthesizedPoC('curl /x');
+        $vulnerability = $this->makeVulnerability()->withReviewerValidation(true);
+        $enriched = $vulnerability->withSynthesizedPoC('curl /x');
 
         $synthesizer = self::createStub(PoCSynthesizerInterface::class);
         $synthesizer->method('synthesize')->willReturn([$enriched]);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->addVulnerability($original);
+        $auditContext->addVulnerability($vulnerability);
 
-        $stage = new PoCSynthesisStage($synthesizer, new NullLogger(), true);
-        $stage->process($auditContext);
+        $poCSynthesisStage = new PoCSynthesisStage($synthesizer, new NullLogger(), true);
+        $poCSynthesisStage->process($auditContext);
 
         self::assertSame(1, $auditContext->getMeta('audit.poc_synthesized'));
     }
 
     public function test_it_does_not_replace_findings_whose_poc_remained_null(): void
     {
-        $original = $this->makeVulnerability()->withReviewerValidation(true);
+        $vulnerability = $this->makeVulnerability()->withReviewerValidation(true);
 
         $synthesizer = self::createStub(PoCSynthesizerInterface::class);
-        $synthesizer->method('synthesize')->willReturn([$original]);
+        $synthesizer->method('synthesize')->willReturn([$vulnerability]);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $auditContext->addVulnerability($original);
+        $auditContext->addVulnerability($vulnerability);
 
-        $stage = new PoCSynthesisStage($synthesizer, new NullLogger(), true);
-        $stage->process($auditContext);
+        $poCSynthesisStage = new PoCSynthesisStage($synthesizer, new NullLogger(), true);
+        $poCSynthesisStage->process($auditContext);
 
-        $stored = $auditContext->vulnerabilities()[$original->id()];
+        $stored = $auditContext->vulnerabilities()[$vulnerability->id()];
         self::assertNull($stored->synthesizedPoC());
     }
 

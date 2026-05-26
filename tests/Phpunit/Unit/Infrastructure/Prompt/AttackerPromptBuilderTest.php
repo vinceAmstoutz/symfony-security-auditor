@@ -602,7 +602,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_authenticator_skill_appears_before_voter_under_priority_order(): void
     {
-        $voter = ProjectFile::create(
+        $projectFile = ProjectFile::create(
             'src/Security/PostVoter.php',
             '/app/src/Security/PostVoter.php',
             '<?php class PostVoter {}',
@@ -613,7 +613,7 @@ final class AttackerPromptBuilderTest extends TestCase
             '<?php class LoginFormAuthenticator {}',
         );
 
-        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$voter, $authenticator]);
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile, $authenticator]);
 
         $authenticatorPos = strpos($prompt, '<skills role="authenticator">');
         $voterPos = strpos($prompt, '<skills role="voter">');

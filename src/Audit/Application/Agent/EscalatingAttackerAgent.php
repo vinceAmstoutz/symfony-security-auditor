@@ -91,16 +91,16 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
     }
 
     /**
-     * @param list<ProjectFile>   $files
-     * @param list<Vulnerability> $cheapFindings
+     * @param ProjectFile[]   $files
+     * @param Vulnerability[] $cheapFindings
      *
      * @return list<ProjectFile>
      */
     private function filterToHotFiles(array $files, array $cheapFindings): array
     {
         $hotPaths = [];
-        foreach ($cheapFindings as $vulnerability) {
-            $hotPaths[$vulnerability->filePath()] = true;
+        foreach ($cheapFindings as $cheapFinding) {
+            $hotPaths[$cheapFinding->filePath()] = true;
         }
 
         return array_values(array_filter(
@@ -110,8 +110,8 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
     }
 
     /**
-     * @param list<Vulnerability> $cheap
-     * @param list<Vulnerability> $expensive
+     * @param Vulnerability[] $cheap
+     * @param Vulnerability[] $expensive
      *
      * @return list<Vulnerability>
      */

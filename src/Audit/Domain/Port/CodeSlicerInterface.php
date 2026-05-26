@@ -27,5 +27,5 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
  */
 interface CodeSlicerInterface
 {
-    public function slice(ProjectFile $file): string;
+    public function slice(ProjectFile $projectFile): string;
 }
