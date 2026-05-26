@@ -58,8 +58,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\StaticPricingProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
@@ -179,7 +181,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(NullProgressReporter::class);
     $defaultsConfigurator->set(LoggerProgressReporter::class)
         ->args([service('logger')]);
-    $defaultsConfigurator->alias(ProgressReporterInterface::class, NullProgressReporter::class);
+    $defaultsConfigurator->set(ProgressReporterHolder::class);
+    $defaultsConfigurator->alias(ProgressReporterInterface::class, ProgressReporterHolder::class);
 
     $defaultsConfigurator->set(AuditPipeline::class)
         ->args([
@@ -281,6 +284,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(AuditExitCodeResolverInterface::class),
             service(AuditPresenterInterface::class),
             service(EstimateAuditCostUseCase::class),
+            service(ProgressReporterHolder::class),
         ])
         ->tag('console.command');
 };

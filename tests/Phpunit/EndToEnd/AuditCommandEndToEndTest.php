@@ -44,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRende
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 
 final class AuditCommandEndToEndTest extends TestCase
@@ -342,6 +343,7 @@ final class AuditCommandEndToEndTest extends TestCase
             new AuditExitCodeResolver(),
             new AuditPresenter(),
             $estimateAuditCostUseCase,
+            new ProgressReporterHolder(),
         );
 
         return new CommandTester($auditCommand);
@@ -387,7 +389,10 @@ final class AuditCommandEndToEndTest extends TestCase
         ]);
 
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
-        self::assertStringContainsString('Audit complete', $commandTester->getDisplay());
+        self::assertStringContainsString('Dry run complete', $commandTester->getDisplay());
+        self::assertStringContainsString('Dry run', $commandTester->getDisplay());
+        self::assertStringNotContainsString('Audit complete', $commandTester->getDisplay());
+        self::assertStringNotContainsString('RISK LEVEL', $commandTester->getDisplay());
     }
 
     public function test_dry_run_with_machine_readable_json_format_suppresses_success_message(): void
