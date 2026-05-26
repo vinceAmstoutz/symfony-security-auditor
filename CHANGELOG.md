@@ -97,6 +97,35 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   what self-evident code does. A new `.claude/rules/no-comments.md` rule
   codifies the policy: comments signal poorly written code; fix the code
   instead.
+- Replaced duplicated string literals on four hot paths with `@internal`
+  backed-string enums under `Audit\Domain\Model\`: `ProgressEvent`
+  (`pipeline.started` / `stage.started` / `stage.completed` /
+  `pipeline.completed`) used by `AuditPipeline` and `ConsoleProgressReporter`;
+  `AgentRole` (`attacker` / `reviewer`) used by `AttackerAgent`, `ReviewerAgent`
+  and `EstimateAuditCostUseCase`'s by-role cost breakdown; `BuiltInStageName`
+  (`ingestion` / `mapping` / `audit`) used by the three built-in
+  `StageInterface::name()` returns; and `SecretPatternLabel` (`aws_access_key` /
+  … / `inline_assignment`) used as the key set of
+  `RegexSecretScrubber::DEFAULT_PATTERNS` and its `replacementFor()` match arm.
+  Enum values stay equal to the previously hard-coded strings so every
+  wire-format contract — `ProgressReporterInterface::report()`,
+  `CoverageRecorderInterface::recordCoverage()`, JSON/SARIF `cost.by_role` keys,
+  the `***REDACTED:<label>***` placeholder — is byte-identical; the enums are
+  not exposed on any public port signature.
+
+### Tooling
+
+- Mutation gate now kills the five escaped mutants on the new progress-bar /
+  dry-run path (`ConsoleProgressReporter::onPipelineStarted`,
+  `onStageCompleted`, `onPipelineCompleted` and `AuditCommand`'s
+  `estimatingSection` call + `isMachineReadableToStdout` negation). Added
+  targeted unit tests pinning the `starting…` initial message, the intermediate
+  `1/3` advance frame visible between `stage.completed` and the next
+  `stage.started`, and the `3/3` snap-to-max forced by `finish()`; the E2E suite
+  now wires the shared `ProgressReporterHolder` into both `AuditPipeline` and
+  `AuditCommand` so it can assert the bar renders in `--format=console` and
+  stays suppressed in `--format=json` to stdout, plus the dry-run path now
+  asserts the `Estimating audit cost` section header.
 
 ## [1.3.1] — 2026-05-26 — Watertight
 
