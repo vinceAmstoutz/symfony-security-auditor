@@ -602,6 +602,64 @@ final class AuditOrchestratorTest extends TestCase
         self::assertCount(1, $auditContext->vulnerabilities());
     }
 
+    public function test_it_passes_previously_validated_findings_to_next_iteration(): void
+    {
+        $iterationPreviousFindingsCounts = [];
+
+        $attackerAgent = new class($iterationPreviousFindingsCounts) implements \VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface {
+            /** @var array<int, int> $captureRef */
+            public function __construct(private array &$captureRef) {}
+
+            public function analyze(
+                array $files,
+                SymfonyMapping $symfonyMapping,
+                \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface $coverageRecorder,
+                bool $bypassCache = false,
+                array $previousFindings = [],
+            ): array {
+                $this->captureRef[] = \count($previousFindings);
+                if (1 === \count($this->captureRef)) {
+                    return [\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability::create(
+                        vulnerabilityType: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType::SQL_INJECTION,
+                        vulnerabilitySeverity: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity::HIGH,
+                        title: 'First',
+                        description: 'd',
+                        filePath: 'src/A.php',
+                        lineStart: 1,
+                        lineEnd: 2,
+                        vulnerableCode: 'c',
+                        attackVector: 'a',
+                        proof: 'p',
+                        remediation: 'r',
+                        confidence: 0.9,
+                    )];
+                }
+
+                return [];
+            }
+        };
+
+        $reviewerAgent = new class implements \VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface {
+            public function review(
+                array $vulnerabilities,
+                array $projectFiles,
+                \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface $coverageRecorder,
+            ): array {
+                return array_map(
+                    static fn (\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability $vulnerability): \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability => $vulnerability->withReviewerValidation(true),
+                    $vulnerabilities,
+                );
+            }
+        };
+
+        $auditOrchestrator = new AuditOrchestrator($attackerAgent, $reviewerAgent, new NullLogger());
+        $auditContext = $this->makeContextWithMapping();
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertSame([0, 1], $iterationPreviousFindingsCounts);
+    }
+
     public function test_it_logs_starting_loop_with_custom_max_iterations(): void
     {
         $infoLogs = [];

@@ -52,11 +52,12 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     ) {}
 
     /**
-     * @param list<ProjectFile> $files
+     * @param list<ProjectFile>   $files
+     * @param list<Vulnerability> $previousFindings
      *
      * @return list<Vulnerability>
      */
-    public function analyze(array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false): array
+    public function analyze(array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, array $previousFindings = []): array
     {
         if ([] === $files) {
             return [];
@@ -68,6 +69,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             'files' => \count($files),
             'tools_enabled' => $useTools,
             'cache_bypassed' => $bypassCache,
+            'previous_findings' => \count($previousFindings),
         ]);
 
         $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($files) : null;
@@ -78,7 +80,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         foreach ($chunks as $index => $chunk) {
             $this->logger->debug(\sprintf('Analyzing chunk %d/%d', $index + 1, \count($chunks)));
 
-            $vulnerabilities = $this->analyzeChunk($chunk, $symfonyMapping, $coverageRecorder, $toolRegistry, $bypassCache);
+            $vulnerabilities = $this->analyzeChunk($chunk, $symfonyMapping, $coverageRecorder, $toolRegistry, $bypassCache, $previousFindings);
             $allVulnerabilities = [...$allVulnerabilities, ...$vulnerabilities];
 
             $this->logger->debug('Chunk analysis complete', [
@@ -96,13 +98,17 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     }
 
     /**
-     * @param list<ProjectFile> $chunk
+     * @param list<ProjectFile>   $chunk
+     * @param list<Vulnerability> $previousFindings
      *
      * @return list<Vulnerability>
      */
-    private function analyzeChunk(array $chunk, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, bool $bypassCache): array
+    private function analyzeChunk(array $chunk, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, bool $bypassCache, array $previousFindings): array
     {
-        if (!$bypassCache) {
+        $hasPreviousFindings = [] !== $previousFindings;
+        $cacheable = !$bypassCache && !$hasPreviousFindings;
+
+        if ($cacheable) {
             $cached = $this->attackerCache->get($chunk);
 
             if (null !== $cached) {
@@ -115,6 +121,10 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
         $systemPrompt = $this->attackerPromptBuilder->buildSystemPrompt($chunk);
         $userMessage = $this->attackerPromptBuilder->buildUserMessage($chunk, $symfonyMapping);
+
+        if ($hasPreviousFindings) {
+            $userMessage = $this->renderPreviousFindings($previousFindings)."\n\n".$userMessage;
+        }
 
         try {
             $response = $toolRegistry instanceof ToolRegistry
@@ -130,7 +140,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             /** @var list<mixed> $rawData */
             $rawData = $response->parseJson();
 
-            if (!$bypassCache) {
+            if ($cacheable) {
                 /** @var list<array<string, mixed>> $cacheablePayload */
                 $cacheablePayload = array_values(array_filter($rawData, 'is_array'));
                 $this->attackerCache->store($chunk, $cacheablePayload);
@@ -175,6 +185,41 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         foreach ($chunk as $file) {
             $coverageRecorder->recordCoverage(AgentRole::Attacker->value, $file->relativePath(), $status);
         }
+    }
+
+    /**
+     * @param list<Vulnerability> $previousFindings
+     */
+    private function renderPreviousFindings(array $previousFindings): string
+    {
+        $byType = [];
+        foreach ($previousFindings as $vulnerability) {
+            $byType[$vulnerability->type()->value][] = \sprintf(
+                '%s:%d-%d',
+                $vulnerability->filePath(),
+                $vulnerability->lineStart(),
+                $vulnerability->lineEnd(),
+            );
+        }
+
+        $lines = [];
+        foreach ($byType as $type => $locations) {
+            $lines[] = \sprintf('- %s: %s', $type, implode(', ', $locations));
+        }
+
+        return <<<PROMPT
+            ## Patterns Already Confirmed in Earlier Iterations
+            The reviewer has already validated the findings below. Look for the SAME PATTERNS in files not yet covered by these locations. Do NOT re-report the same vulnerability at the same line range — those entries will be filtered as duplicates.
+
+            {$this->indent(implode("\n", $lines))}
+
+            Generalize: if `insecure_direct_object_reference` was confirmed in one controller, hunt for the same idiom in every other controller in this chunk. If `sql_injection` was confirmed in one repository, look for unsafe DQL/SQL concatenation in every other repository.
+            PROMPT;
+    }
+
+    private function indent(string $content): string
+    {
+        return implode("\n", array_map(static fn (string $line): string => '  '.$line, explode("\n", $content)));
     }
 
     /**

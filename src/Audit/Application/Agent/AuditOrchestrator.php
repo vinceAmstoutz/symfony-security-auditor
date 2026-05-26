@@ -54,7 +54,14 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             ++$iteration;
             $this->logger->info(\sprintf('Audit iteration %d/%d', $iteration, $this->maxIterations));
 
-            $rawFindings = $this->attackerAgent->analyze($files, $mapping, $auditContext, $auditContext->isCacheBypassed());
+            $previousFindings = array_values($auditContext->validatedVulnerabilities());
+            $rawFindings = $this->attackerAgent->analyze(
+                $files,
+                $mapping,
+                $auditContext,
+                $auditContext->isCacheBypassed(),
+                $previousFindings,
+            );
             $filtered = $this->filterByConfidence(array_values($rawFindings));
 
             if ([] === $filtered) {
@@ -74,6 +81,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
                 )),
                 'new_unique' => $newFindings,
                 'total' => \count($auditContext->vulnerabilities()),
+                'previous_validated_passed_back' => \count($previousFindings),
             ]);
 
             if (0 === $newFindings) {

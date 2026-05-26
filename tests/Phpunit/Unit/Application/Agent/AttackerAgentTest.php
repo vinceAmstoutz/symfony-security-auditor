@@ -411,7 +411,7 @@ final class AttackerAgentTest extends TestCase
 
         $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder());
 
-        self::assertSame(['Attacker agent starting analysis', ['files' => 2, 'tools_enabled' => false, 'cache_bypassed' => false]], $infoLogs[0]);
+        self::assertSame(['Attacker agent starting analysis', ['files' => 2, 'tools_enabled' => false, 'cache_bypassed' => false, 'previous_findings' => 0]], $infoLogs[0]);
         self::assertSame(['Attacker agent complete', ['total_vulnerabilities' => 0]], $infoLogs[1]);
     }
 
@@ -1079,6 +1079,161 @@ final class AttackerAgentTest extends TestCase
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
+    }
+
+    public function test_it_injects_previous_findings_section_into_prompt_when_provided(): void
+    {
+        $sentMessages = [];
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
+                $sentMessages[] = $user;
+
+                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+            });
+
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+        $previousFindings = [
+            \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability::create(
+                vulnerabilityType: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE,
+                vulnerabilitySeverity: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity::HIGH,
+                title: 'IDOR earlier',
+                description: 'desc',
+                filePath: 'src/Controller/EarlierController.php',
+                lineStart: 42,
+                lineEnd: 46,
+                vulnerableCode: 'code',
+                attackVector: 'av',
+                proof: 'proof',
+                remediation: 'fix',
+                confidence: 0.95,
+            ),
+        ];
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient);
+        $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder(), false, $previousFindings);
+
+        self::assertCount(1, $sentMessages);
+        self::assertStringContainsString('Patterns Already Confirmed', $sentMessages[0]);
+        self::assertStringContainsString('insecure_direct_object_reference', $sentMessages[0]);
+        self::assertStringContainsString('src/Controller/EarlierController.php:42-46', $sentMessages[0]);
+    }
+
+    public function test_it_does_not_inject_previous_findings_section_when_empty(): void
+    {
+        $sentMessages = [];
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
+                $sentMessages[] = $user;
+
+                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+            });
+
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+        $attackerAgent = $this->makeAttackerAgent($llmClient);
+        $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder(), false, []);
+
+        self::assertCount(1, $sentMessages);
+        self::assertStringNotContainsString('Patterns Already Confirmed', $sentMessages[0]);
+    }
+
+    public function test_it_skips_cache_when_previous_findings_present(): void
+    {
+        $cache = self::createMock(AttackerCacheInterface::class);
+        $cache->expects(self::never())->method('get');
+        $cache->expects(self::never())->method('store');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'test', 'end_turn'));
+
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+        $previousFindings = [
+            \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability::create(
+                vulnerabilityType: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType::SQL_INJECTION,
+                vulnerabilitySeverity: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity::HIGH,
+                title: 'SQLi',
+                description: 'd',
+                filePath: 'src/Repo.php',
+                lineStart: 1,
+                lineEnd: 2,
+                vulnerableCode: 'c',
+                attackVector: 'a',
+                proof: 'p',
+                remediation: 'r',
+                confidence: 0.9,
+            ),
+        ];
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder(), false, $previousFindings);
+    }
+
+    public function test_it_reads_cache_when_no_previous_findings(): void
+    {
+        $cache = self::createMock(AttackerCacheInterface::class);
+        $cache->expects(self::once())->method('get')->willReturn(null);
+        $cache->expects(self::once())->method('store');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'test', 'end_turn'));
+
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder());
+    }
+
+    public function test_previous_findings_section_groups_locations_by_vulnerability_type(): void
+    {
+        $sentMessages = [];
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
+                $sentMessages[] = $user;
+
+                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+            });
+
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+        $previousFindings = [
+            \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability::create(
+                vulnerabilityType: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE,
+                vulnerabilitySeverity: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity::HIGH,
+                title: 'IDOR 1',
+                description: 'd',
+                filePath: 'src/Controller/A.php',
+                lineStart: 10,
+                lineEnd: 15,
+                vulnerableCode: 'c',
+                attackVector: 'a',
+                proof: 'p',
+                remediation: 'r',
+                confidence: 0.95,
+            ),
+            \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability::create(
+                vulnerabilityType: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE,
+                vulnerabilitySeverity: \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity::HIGH,
+                title: 'IDOR 2',
+                description: 'd',
+                filePath: 'src/Controller/B.php',
+                lineStart: 20,
+                lineEnd: 25,
+                vulnerableCode: 'c',
+                attackVector: 'a',
+                proof: 'p',
+                remediation: 'r',
+                confidence: 0.95,
+            ),
+        ];
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient);
+        $attackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder(), false, $previousFindings);
+
+        self::assertStringContainsString('src/Controller/A.php:10-15', $sentMessages[0]);
+        self::assertStringContainsString('src/Controller/B.php:20-25', $sentMessages[0]);
     }
 
     private function makeFile(string $path): ProjectFile
