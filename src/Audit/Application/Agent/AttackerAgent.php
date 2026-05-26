@@ -127,11 +127,13 @@ final readonly class AttackerAgent implements AttackerAgentInterface
                 return [];
             }
 
-            /** @var list<array<string, mixed>> $rawData */
+            /** @var list<mixed> $rawData */
             $rawData = $response->parseJson();
 
             if (!$bypassCache) {
-                $this->attackerCache->store($chunk, $rawData);
+                /** @var list<array<string, mixed>> $cacheablePayload */
+                $cacheablePayload = array_values(array_filter($rawData, 'is_array'));
+                $this->attackerCache->store($chunk, $cacheablePayload);
             }
 
             $this->recordChunkCoverage($chunk, 'analyzed', $coverageRecorder);
