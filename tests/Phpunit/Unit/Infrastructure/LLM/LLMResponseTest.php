@@ -162,9 +162,135 @@ final class LLMResponseTest extends TestCase
         self::assertSame(['key' => 'value'], $data);
     }
 
+    public function test_it_recovers_trailing_empty_array_when_prose_mentions_php_array_access(): void
+    {
+        // Reproduces the production log: the prose mentions `recommendation.contents[locale]`,
+        // which puts `[locale]` ahead of the real JSON. The first-opener heuristic would
+        // extract `[locale]`, fail to decode, and surface the JsonException — even though
+        // the actual JSON payload `[]` is right there at the end of the message.
+        $content = "  The controller has a route condition restricting it to dev/test only. No exploitable issue.\n  \n"
+            .'  The templates given are mostly safe - default escaping, translated strings, no `|raw` on user input.'
+            .' The recommendation card displays `recommendation.contents[locale]` without escaping override -'
+            ." but since it's autoescaped HTML, no XSS.\n  \n"
+            ."  No real exploitable vulnerabilities found in the provided files.\n  \n  []  ";
+        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+
+        $data = $llmResponse->parseJson();
+
+        self::assertSame([], $data);
+    }
+
+    public function test_it_recovers_trailing_vulnerability_list_when_prose_contains_undecodable_bracket_example(): void
+    {
+        // Prose mentions PHP-style example syntax like `[array key]` whose bracketed
+        // content is not valid JSON. The first opener block fails to decode; the
+        // iterator must continue to the trailing real vulnerability list.
+        $content = 'I noticed templates rendering `recommendation.contents[locale]` and'
+            ." constructs like [array key access] in helpers. Final list of findings:\n"
+            .'[{"type":"sql_injection","severity":"high","title":"Unsafe query",'
+            .'"description":"User input concatenated into SQL.","file_path":"src/Controller/X.php",'
+            .'"line_start":42,"line_end":42,"vulnerable_code":"$em->getConnection()->executeQuery($sql)",'
+            .'"attack_vector":"id parameter","proof":"id=1 OR 1=1","remediation":"Use parameter binding.",'
+            .'"confidence":0.9}]';
+        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+
+        $data = $llmResponse->parseJson();
+
+        self::assertSame([[
+            'type' => 'sql_injection',
+            'severity' => 'high',
+            'title' => 'Unsafe query',
+            'description' => 'User input concatenated into SQL.',
+            'file_path' => 'src/Controller/X.php',
+            'line_start' => 42,
+            'line_end' => 42,
+            'vulnerable_code' => '$em->getConnection()->executeQuery($sql)',
+            'attack_vector' => 'id parameter',
+            'proof' => 'id=1 OR 1=1',
+            'remediation' => 'Use parameter binding.',
+            'confidence' => 0.9,
+        ]], $data);
+    }
+
     public function test_it_throws_on_invalid_json(): void
     {
         $llmResponse = LLMResponse::create('not json at all', 10, 5, 'claude', 'end_turn');
+
+        $this->expectException(JsonException::class);
+        $llmResponse->parseJson();
+    }
+
+    public function test_recovery_is_skipped_when_first_character_is_an_object_opener_spanning_full_content(): void
+    {
+        // Companion to the array-opener case. An `Identical` mutation flipping
+        // the `{`-opener check to `!==` makes the guard fail for object-shaped
+        // payloads — recovery would then walk into the embedded `[1]` sub-block
+        // and return it, masking the malformed JSON. The non-mutant identifies
+        // the whole content as a single balanced object, skips recovery, and
+        // rethrows the original `JsonException`.
+        $llmResponse = LLMResponse::create('{xyz: [1]}', 10, 5, 'claude', 'end_turn');
+
+        $this->expectException(JsonException::class);
+        $llmResponse->parseJson();
+    }
+
+    public function test_recovery_is_skipped_when_first_character_opens_a_block_spanning_full_content(): void
+    {
+        // When the trimmed content is itself a single balanced block, the
+        // top-level `json_decode` already saw exactly that payload, so trying
+        // openers nested INSIDE it would silently accept shallower sub-blocks —
+        // defeating the depth limit and masking malformed payloads. An
+        // `IncrementInteger` mutation reading `$content[1]` instead of
+        // `$content[0]` would miss the leading `[`, fall through to a `false`
+        // return, and let recovery walk into the inner `[1,2]` block. Pin the
+        // index-0 lookup with a malformed list whose inner `[1,2]` decodes:
+        // original sees the full content as a balanced block, skips recovery,
+        // and rethrows `JsonException`. The mutant would recover `[1, 2]`.
+        $llmResponse = LLMResponse::create('[xyz, [1,2]]', 10, 5, 'claude', 'end_turn');
+
+        $this->expectException(JsonException::class);
+        $llmResponse->parseJson();
+    }
+
+    public function test_recovery_invokes_object_branch_only_on_brace_character(): void
+    {
+        // An `Identical` mutation flipping the `{`-opener check to `!==` makes
+        // the elseif fire on EVERY non-brace character — and skip the actual
+        // `{` position via the `else continue`. With a stray `}` before the
+        // real `{}` block, the mutant scans `{`/`}` from the leading `}` and
+        // is then forced past the real `{` opener entirely; it never recovers,
+        // so the original `JsonException` is rethrown. The non-mutant correctly
+        // recovers `{}` → `[]`.
+        $llmResponse = LLMResponse::create('}{}', 10, 5, 'claude', 'end_turn');
+
+        $data = $llmResponse->parseJson();
+
+        self::assertSame([], $data);
+    }
+
+    public function test_recovery_iterator_starts_at_index_zero_not_minus_one(): void
+    {
+        // PHP returns the last character for `$content[-1]`. A DecrementInteger
+        // mutation flipping the iterator's initial index from `0` to `-1` would
+        // pre-process the last character before reaching position 0 — when the
+        // content ends with `"`, the mutant flips `inString` on the trailing
+        // quote, then on the next iteration the leading `[` is treated as string
+        // content and skipped. The mutant fails to recover and the original
+        // `JsonException` is rethrown. The non-mutant starts cleanly at 0,
+        // decodes the leading `[1,2]` and returns the recovered array.
+        $llmResponse = LLMResponse::create('[1,2]"', 10, 5, 'claude', 'end_turn');
+
+        $data = $llmResponse->parseJson();
+
+        self::assertSame([1, 2], $data);
+    }
+
+    public function test_it_throws_when_prose_contains_unbalanced_bracket_with_no_closer(): void
+    {
+        // Prose mentions `[` but no matching `]` ever appears — every opener
+        // candidate fails to scan a balanced block, so the original
+        // `JsonException` propagates rather than masking the failure.
+        $llmResponse = LLMResponse::create('prose with [no real json here', 10, 5, 'claude', 'end_turn');
 
         $this->expectException(JsonException::class);
         $llmResponse->parseJson();
