@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Progress;
 
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 
@@ -21,43 +22,45 @@ final class ProgressReporterHolderTest extends TestCase
 {
     public function test_it_is_silent_by_default(): void
     {
-        $holder = new ProgressReporterHolder();
+        $progressReporterHolder = new ProgressReporterHolder();
+        $progressReporterHolder->report('pipeline.started', ['stages' => ['a']]);
 
-        $holder->report('pipeline.started', ['stages' => ['a']]);
-
-        self::assertTrue(true);
+        $reporter = $this->createMock(ProgressReporterInterface::class);
+        $reporter->expects(self::never())->method('report');
+        $progressReporterHolder->setDelegate($reporter);
     }
 
     public function test_it_delegates_to_set_reporter(): void
     {
-        $holder = new ProgressReporterHolder();
+        $progressReporterHolder = new ProgressReporterHolder();
 
         $reporter = $this->createMock(ProgressReporterInterface::class);
         $reporter->expects(self::once())
             ->method('report')
             ->with('stage.completed', []);
 
-        $holder->setDelegate($reporter);
-        $holder->report('stage.completed');
+        $progressReporterHolder->setDelegate($reporter);
+        $progressReporterHolder->report('stage.completed');
     }
 
     public function test_it_swallows_reporter_exceptions(): void
     {
-        $holder = new ProgressReporterHolder();
+        $progressReporterHolder = new ProgressReporterHolder();
 
-        $reporter = $this->createStub(ProgressReporterInterface::class);
-        $reporter->method('report')->willThrowException(new \RuntimeException('boom'));
+        $throwing = self::createStub(ProgressReporterInterface::class);
+        $throwing->method('report')->willThrowException(new RuntimeException('boom'));
+        $progressReporterHolder->setDelegate($throwing);
+        $progressReporterHolder->report('pipeline.completed');
 
-        $holder->setDelegate($reporter);
-
-        $holder->report('pipeline.completed');
-
-        self::assertTrue(true);
+        $working = $this->createMock(ProgressReporterInterface::class);
+        $working->expects(self::once())->method('report')->with('stage.started', []);
+        $progressReporterHolder->setDelegate($working);
+        $progressReporterHolder->report('stage.started');
     }
 
     public function test_it_forwards_context_to_delegate(): void
     {
-        $holder = new ProgressReporterHolder();
+        $progressReporterHolder = new ProgressReporterHolder();
         $context = ['stage' => 'ingestion', 'audit_id' => 'abc'];
 
         $reporter = $this->createMock(ProgressReporterInterface::class);
@@ -65,7 +68,7 @@ final class ProgressReporterHolderTest extends TestCase
             ->method('report')
             ->with('stage.started', $context);
 
-        $holder->setDelegate($reporter);
-        $holder->report('stage.started', $context);
+        $progressReporterHolder->setDelegate($reporter);
+        $progressReporterHolder->report('stage.started', $context);
     }
 }

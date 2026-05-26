@@ -36,22 +36,22 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
  */
 final class ProgressReporterHolder implements ProgressReporterInterface
 {
-    private ProgressReporterInterface $delegate;
+    private ProgressReporterInterface $progressReporter;
 
     public function __construct()
     {
-        $this->delegate = new NullProgressReporter();
+        $this->progressReporter = new NullProgressReporter();
     }
 
-    public function setDelegate(ProgressReporterInterface $reporter): void
+    public function setDelegate(ProgressReporterInterface $progressReporter): void
     {
-        $this->delegate = $reporter;
+        $this->progressReporter = $progressReporter;
     }
 
     public function report(string $event, array $context = []): void
     {
         try {
-            $this->delegate->report($event, $context);
+            $this->progressReporter->report($event, $context);
         } catch (Throwable) {
         }
     }

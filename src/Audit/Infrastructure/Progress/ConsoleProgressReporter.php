@@ -75,9 +75,10 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
 
     private function onPipelineCompleted(): void
     {
-        if ($this->progressBar === null) {
+        if (!$this->progressBar instanceof ProgressBar) {
             return;
         }
+
         $this->progressBar->finish();
         $this->output->writeln('');
     }

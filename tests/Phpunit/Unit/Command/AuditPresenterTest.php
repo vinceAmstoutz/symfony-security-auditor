@@ -150,9 +150,9 @@ final class AuditPresenterTest extends TestCase
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $report = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7'));
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7'));
 
-        $this->auditPresenter->dryRunResult($symfonyStyle, $report);
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
 
         $display = $bufferedOutput->fetch();
         self::assertStringContainsString('claude-opus-4-7', $display);

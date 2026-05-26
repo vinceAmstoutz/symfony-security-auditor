@@ -46,7 +46,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     {
         $cost = $auditReport->cost();
 
-        if ($cost !== null) {
+        if ('' !== $cost->primaryModel()) {
             $lines = [];
             $lines[] = \sprintf('Model : %s', $cost->primaryModel());
             $lines[] = \sprintf(
