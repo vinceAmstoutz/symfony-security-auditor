@@ -56,11 +56,6 @@ final class CostCalculatorTest extends TestCase
 
     public function test_cost_returns_raw_unrounded_value(): void
     {
-        // Rounding belongs to surfaces that present the cost to users
-        // (`AuditCost::of` and `BudgetTracker::costUsdUsed`); the calculator
-        // returns the raw float so the accumulator can preserve precision
-        // across multiple calls. Float arithmetic introduces a tiny binary
-        // imprecision (~1e-22 here), hence assertEqualsWithDelta.
         $costCalculator = new CostCalculator($this->fixedPricing(0.1, 0.4));
 
         // 7 input tokens @ 0.1/1M = 7e-7 = 0.0000007 (unrounded mathematically;

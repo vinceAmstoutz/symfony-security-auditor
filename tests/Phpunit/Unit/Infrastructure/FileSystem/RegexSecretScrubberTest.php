@@ -20,9 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSe
 
 final class RegexSecretScrubberTest extends TestCase
 {
-    // Credential-shaped prefixes split as constants so neither PHP CS Fixer's
-    // `no_useless_concat_operator` rule nor GitHub's secret scanner sees a
-    // contiguous match in the source. Concatenation happens at runtime.
+    // Credential-shaped prefixes split as constants so GitHub's secret scanner does not flag the source.
     private const string AWS = 'AKIA';
 
     private const string GHP = 'ghp';
@@ -175,10 +173,6 @@ final class RegexSecretScrubberTest extends TestCase
 
     public function test_inline_assignment_redaction_preserves_key_and_quotes(): void
     {
-        // Pins the `'inline_assignment' => '$1***REDACTED:...***$3'` match arm.
-        // If the arm is removed, the default replacement `***REDACTED:inline_assignment***`
-        // is used and the entire match (including the `password: "` prefix and closing
-        // `"`) is replaced — the key and surrounding quotes disappear.
         $output = $this->regexSecretScrubber->scrub('password: "supersecretvalue"');
 
         self::assertSame('password: "***REDACTED:inline_assignment***"', $output);
@@ -186,9 +180,6 @@ final class RegexSecretScrubberTest extends TestCase
 
     public function test_env_assignment_redaction_preserves_key_prefix(): void
     {
-        // Pins the `'env_assignment' => '$1=***REDACTED:...***'` match arm.
-        // Removing the arm would fall back to the default replacement and erase
-        // the leading `KEY_NAME=` text.
         $output = $this->regexSecretScrubber->scrub('STRIPE_SECRET_KEY=sk_super_secret_value');
 
         self::assertSame('STRIPE_SECRET_KEY=***REDACTED:env_assignment***', $output);
@@ -196,11 +187,6 @@ final class RegexSecretScrubberTest extends TestCase
 
     public function test_runtime_pcre_failure_continues_to_remaining_patterns(): void
     {
-        // Two custom patterns — the FIRST hits the backtrack limit, the SECOND
-        // is well-behaved and would redact `SECONDARY-123` if reached.
-        //   `continue` → second pattern runs → SECONDARY-123 is redacted.
-        //   `break`    → second pattern skipped → SECONDARY-123 stays raw.
-        // Pins both the `continue` keyword AND the runtime null-result branch.
         $regexSecretScrubber = new RegexSecretScrubber(additionalPatterns: [
             '/^(a+)+$/',
             '/SECONDARY-\d+/',
@@ -243,9 +229,6 @@ final class RegexSecretScrubberTest extends TestCase
 
     private function secretFragmentOf(string $input): string
     {
-        // For env/inline assignment cases we'd otherwise need to extract just the value half;
-        // but every credential case here has its raw secret appear verbatim in the input AND
-        // we assert it does not appear in the scrubbed output.
         if (str_contains($input, '=')) {
             $parts = explode('=', $input, 2);
 

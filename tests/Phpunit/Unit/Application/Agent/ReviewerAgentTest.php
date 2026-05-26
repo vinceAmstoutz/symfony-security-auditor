@@ -699,9 +699,6 @@ final class ReviewerAgentTest extends TestCase
 
     public function test_it_logs_debug_review_decision_when_finding_is_rejected(): void
     {
-        // Covers MethodCallRemoval on the logReviewDecision call inside the
-        // `if (!$accepted)` early-return branch in applyReview(). Without an
-        // assertion on the rejected-path debug log, removing that call escapes.
         $vulnerability = $this->makeVulnerability();
         $debugLogs = [];
 

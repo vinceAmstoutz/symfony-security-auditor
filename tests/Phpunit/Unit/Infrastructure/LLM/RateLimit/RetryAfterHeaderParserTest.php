@@ -50,9 +50,6 @@ final class RetryAfterHeaderParserTest extends TestCase
 
     public function test_typed_exception_with_zero_retry_after_returns_null(): void
     {
-        // retry-after: 0 is a degenerate hint — the parser must treat it as
-        // "no useful hint" so the caller's exponential backoff kicks in
-        // instead of an immediate (potentially-stampeding) retry.
         $rateLimitExceededException = new RateLimitExceededException(retryAfter: 0);
 
         $retryAfterHeaderParser = new RetryAfterHeaderParser();
@@ -80,10 +77,6 @@ final class RetryAfterHeaderParserTest extends TestCase
 
     public function test_message_extraction_is_case_insensitive(): void
     {
-        // Real HTTP responses surface the header as `Retry-After:` (titlecase)
-        // while symfony/ai exception messages tend to be lowercase. The regex
-        // must match both — without the `i` flag, titlecase variants would
-        // silently fall through.
         $runtimeException = new RuntimeException('HTTP 429: Retry-After: 23');
 
         $retryAfterHeaderParser = new RetryAfterHeaderParser();

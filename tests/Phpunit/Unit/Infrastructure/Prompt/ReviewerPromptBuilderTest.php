@@ -174,11 +174,6 @@ final class ReviewerPromptBuilderTest extends TestCase
 
     public function test_system_prompt_emits_sections_in_documented_order(): void
     {
-        // Locks the concat chain in buildSystemPrompt(): persona → severity rubric
-        // → FP playbook → output statement → JSON schema → decision rules. Any
-        // ConcatOperandRemoval makes one section disappear (strpos returns false,
-        // assertNotFalse fails); any Concat swap puts sections out of order (the
-        // assertLessThan fails).
         $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
 
         $personaPos = strpos($prompt, 'You are a senior AppSec engineer');
@@ -204,9 +199,6 @@ final class ReviewerPromptBuilderTest extends TestCase
 
     public function test_batch_system_prompt_emits_sections_in_documented_order(): void
     {
-        // Same ordering guarantee for the batch variant — it has an extra
-        // "batch preamble" right after the core persona and an ordering
-        // instruction right before the decision rules.
         $prompt = $this->reviewerPromptBuilder->buildBatchSystemPrompt();
 
         $personaPos = strpos($prompt, 'You are a senior AppSec engineer');

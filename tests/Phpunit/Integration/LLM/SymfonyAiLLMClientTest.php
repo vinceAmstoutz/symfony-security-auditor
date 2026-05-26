@@ -146,9 +146,6 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     public function test_complete_omits_temperature_when_left_at_default(): void
     {
-        // Some newer Claude models (e.g. extended-thinking variants of Sonnet 4.6)
-        // reject the `temperature` option. With no explicit opt-in, it must not
-        // appear in the options bag so the provider applies its own default.
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $inMemoryPlatform = new InMemoryPlatform(
             /** @param array<string, mixed> $options */
@@ -206,11 +203,6 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     public function test_complete_passes_all_base_options_together_when_multiple_flags_enabled(): void
     {
-        // With each option exercised individually the base-options array carries
-        // at most one entry, so an ArrayOneItem mutator on the return is silently
-        // absorbed (single-item slices equal the original). Enabling temperature
-        // + prompt caching + provider JSON mode together makes the full array
-        // observable: the mutant would drop two of the three keys.
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $inMemoryPlatform = new InMemoryPlatform(
             /** @param array<string, mixed> $options */
@@ -1058,10 +1050,6 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     public function test_eager_resolution_catches_transient_failure_thrown_from_deferred_result(): void
     {
-        // The original bug: Symfony HttpClient defers HTTP body read to
-        // `DeferredResult::getResult()`, so a 503 thrown from there escaped the
-        // retry wrapper. After the fix, `invokeWithRetry()` forces eager
-        // resolution and the retry loop catches the failure normally.
         $fakeSleeper = new FakeSleeper();
         $platform = $this->lazilyFailingPlatform([
             new RuntimeException('HTTP 503 Service Unavailable'),
@@ -1148,9 +1136,6 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
 
-        // Each tool-loop iteration must call rateLimiter->record() with the
-        // tokens consumed by that specific iteration — not the cumulative
-        // total, not skipped on the tool-call iteration.
         self::assertSame([[40, 10], [60, 5]], $fakeRateLimiter->recorded);
     }
 

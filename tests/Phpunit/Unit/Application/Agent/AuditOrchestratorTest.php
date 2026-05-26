@@ -108,11 +108,6 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_breaks_early_when_iteration_yields_no_new_unique_findings(): void
     {
-        // Iter 1: attacker returns vuln v1 → reviewer accepts → persisted (newFindings=1, loop continues).
-        // Iter 2: attacker returns the same vuln → duplicate, not persisted (newFindings=0) → break.
-        // audit.iterations must be 2 (not maxIterations=3). Kills:
-        //   - Break_ on line 79 (break → continue would let the loop run to iteration 3).
-        //   - DecrementInteger on line 78 (0 === → -1 === would never trigger early exit).
         $attackerLlm = self::createStub(LLMClientInterface::class);
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('complete')->willReturn(
@@ -173,9 +168,6 @@ final class AuditOrchestratorTest extends TestCase
             ->willReturnCallback(function () use (&$iterationCount): LLMResponse {
                 ++$iterationCount;
 
-                // Safety bound: if the orchestrator runs the loop more than its declared
-                // max_iterations (e.g. a faulty counter mutation), fail loud instead of
-                // looping forever. The orchestrator must call the LLM exactly 3 times.
                 if ($iterationCount > 10) {
                     throw new RuntimeException('orchestrator exceeded safety bound: '.$iterationCount.' attacker calls');
                 }
@@ -272,8 +264,6 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_continues_processing_remaining_reviewed_findings_after_duplicate(): void
     {
-        // If continue→break mutation occurred, processing would stop after the duplicate.
-        // This test ensures that when a dup is encountered, processing continues to the next item.
         $attackerLlm = self::createStub(LLMClientInterface::class);
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(

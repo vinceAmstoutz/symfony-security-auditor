@@ -363,9 +363,6 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_skips_path_roles_pairs_outside_access_control_block(): void
     {
-        // Covers the early return when 'access_control' key is absent. The regex would
-        // otherwise still match path:/roles: pairs from unrelated YAML — e.g., a routing file
-        // with per-route role guards — which should not feed the access_control map.
         $mappingStage = new MappingStage(new NullLogger());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
@@ -591,9 +588,6 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_returns_immediately_and_sets_empty_mapping_when_no_files(): void
     {
-        // Tests ReturnRemoval on `return;` after the no-files guard.
-        // If removed, the code proceeds to array_filter etc. on empty array — result is same mapping,
-        // but the logger.warning call distinguishes the paths.
         $mappingStage = new MappingStage(new NullLogger());
         $auditContext = AuditContext::forProject($this->tmpDir);
 

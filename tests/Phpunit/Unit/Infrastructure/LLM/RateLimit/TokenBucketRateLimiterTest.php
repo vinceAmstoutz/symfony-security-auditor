@@ -219,11 +219,6 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // After waking from a pause, the acquire must continue the loop —
-        // run the capacity check, consume the quota, then return. If the
-        // pause-branch `break`s instead of `continue`s, the first acquire
-        // returns without incrementing requestsUsed, and the second acquire
-        // slips through under RPM=1 with no extra sleep.
         $tokenBucketRateLimiter->pauseUntil(new DateTimeImmutable('2026-01-01T12:00:30+00:00'));
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
@@ -460,10 +455,6 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // Two acquires (5 + 10) must accumulate inputTokensUsed to 15 — a
-        // third acquire of 5 must block because (15 + 5) > 15. If acquire
-        // overwrites instead of accumulating, the bucket would read 10 and
-        // the third call would slip through.
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 5);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 10);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 5);
@@ -486,10 +477,6 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // After acquire(5) + record(5, 0) the bucket must hold exactly 5
-        // input tokens. A subsequent acquire(6) must block ((5+6) > 10).
-        // If the reconcile operator flipped to subtraction, bucket would
-        // collapse to 0 and the 6-token call would slip through.
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 5);
         $tokenBucketRateLimiter->record(inputTokens: 5, outputTokens: 0);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 6);
@@ -512,10 +499,6 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // Estimate 5, record actual 0 → frees the full 5 tokens. Next
-        // acquire(5) must fit. If max(0, $inputTokens) clamp were
-        // max(1, $inputTokens), recorded input becomes 1 instead of 0,
-        // leaving inputTokensUsed at 1; (1 + 5) > 5 would block.
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 5);
         $tokenBucketRateLimiter->record(inputTokens: 0, outputTokens: 0);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 5);
@@ -538,11 +521,6 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // After acquire+record+record, pendingInputEstimate must be exactly
-        // 0 — so the third reconcile yields inputTokensUsed=10 (not 11).
-        // A boundary acquire(0) must then succeed; if record had left
-        // pendingInputEstimate at -1, the reconcile would over-add and
-        // (11 + 0) > 10 would block.
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
         $tokenBucketRateLimiter->record(inputTokens: 5, outputTokens: 0);
         $tokenBucketRateLimiter->record(inputTokens: 5, outputTokens: 0);

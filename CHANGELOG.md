@@ -71,7 +71,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 - Removed multi-line `//` comment blocks from `src/` that explained what
   self-evident code does. A new `.claude/rules/no-comments.md` rule codifies
-  the policy: comments signal poorly-written code; fix the code instead.
+  the policy: comments signal poorly written code; fix the code instead.
 
 ## [1.3.1] — 2026-05-26 — Watertight
 
