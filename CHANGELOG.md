@@ -10,6 +10,75 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.3.2] — 2026-05-26
+
+### Fixed
+
+- `VulnerabilityFactory::fromList()` now silently drops non-array entries from
+  the decoded LLM payload (with a `warning`-level log carrying the offender's
+  `get_debug_type`). The attacker chunk-analysis path previously assumed
+  `LLMResponse::parseJson()` always returned a list of dicts; when the
+  tool-using loop exhausted its iteration cap or the model emitted a malformed
+  payload, scalar entries (string, int, null) interleaved with the expected
+  vulnerability dicts surfaced as a `TypeError` from `fromArray()` and aborted
+  the entire chunk. The guard now matches the `fromList silently drops nulls`
+  contract documented in `.claude/rules/llm-seam.md`. Phpdoc on `fromArray`
+  relaxed from `array<string, mixed>` to `array<array-key, mixed>` and on
+  `fromList` from `list<array<string, mixed>>` to `list<mixed>` so the static
+  type matches the runtime tolerance.
+- `RegexSecretScrubber::scrub()` no longer redacts Symfony configuration
+  indirections inside otherwise-credentialed assignments. Quoted values matching
+  a Symfony parameter reference (`%env(ANTHROPIC_API_KEY)%`,
+  `%env(string:DB_PASSWORD)%`, `%kernel.secret%`) or a shell-style env expansion
+  (`$NAME`, `${NAME}`) are now passed through unmodified by the
+  `inline_assignment` pattern, while literal secrets and the other pattern
+  families (AWS, GitHub, Stripe, Slack, Google, JWT, PEM, `env_assignment`) keep
+  their existing behavior. Previously, code following the recommended Symfony
+  secrets workflow (`api_key: '%env(ANTHROPIC_API_KEY)%'`) was reported to the
+  LLM as `api_key: '***REDACTED:inline_assignment***'`, which the attacker then
+  escalated to a CRITICAL "hardcoded credential" finding — a false positive on
+  the documented best practice. Implementation switched the `inline_assignment`
+  arm from `preg_replace` to `preg_replace_callback` so the placeholder check
+  can short-circuit per match without affecting the other patterns.
+- `AttackerPromptBuilder::basePrompt()` now carries a "Tool Usage Discipline"
+  section instructing the model that (1) it has a limited, finite tool-call
+  budget per chunk, (2) it must stop using tools and emit the final JSON the
+  moment evidence is sufficient, (3) it must emit `[]` immediately when the
+  initial scan surfaces no findings rather than continuing to call tools "just
+  to be thorough", and (4) any prose, reasoning, or further tool call emitted
+  after the answer-decision causes the response to be discarded as malformed.
+  Real-world audits were exhausting the `max_tool_iterations` budget (default
+  `8`) on Read/Grep/ListFiles/LookupAdvisory calls without ever emitting a final
+  answer, leaving downstream consumers with reasoning prose instead of a
+  vulnerability list. `PROMPT_VERSION` bumped from `1` to `2` so the attacker
+  cache key (which folds in the prompt version) invalidates previously-cached
+  responses produced under the old prompt.
+- `LLMResponse::parseJson()` JSON-block recovery no longer locks on the first
+  `[`/`{` it sees. The new algorithm iterates every opener position outside JSON
+  string literals, attempts `scanBalancedBlockFrom` + `json_decode` at each, and
+  returns the first block that decodes successfully; the original
+  `JsonException` is rethrown only when no candidate block decodes. Recovery is
+  skipped entirely when the trimmed content is itself a single balanced block,
+  preserving the depth-limit semantics of the top-level decode (which already
+  attempted exactly that payload) and preventing silent acceptance of shallower
+  inner sub-blocks inside malformed top-level JSON. Models that wrap their final
+  answer in prose containing PHP-style array access (e.g.
+  `recommendation.contents[locale]`) followed by a trailing `[]` previously had
+  the answer dropped — the first `[` was extracted as `[locale]`, failed to
+  decode, and the recovery never tried the actual JSON tail.
+
+## [1.3.1] — 2026-05-26
+
+### Tooling
+
+- Mutation gate now kills the `UnwrapTrim` and `ArrayOneItem` mutants escaping
+  the LLM seam (`LLMResponse::parseJson()` markdown-fence stripping path). Added
+  targeted unit tests that pin the trimmed payload around the JSON block and
+  that the recovery path returns the decoded array (not the wrapping list) after
+  stripping fences. No production code change.
+
+## [1.3.0] — 2026-05-26
+
 ### Added
 
 - New `scan.included_paths` configuration key (`string[]`, default
@@ -22,6 +91,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   outside the allow-list. If none of the entries resolve in the project root the
   scanner logs `No included paths exist in project` at `warning` level and
   returns an empty result.
+
+### Changed
+
+- The explicit-file leg of `ProjectFileScanner` now routes through Symfony
+  Finder (`->in(dirname)->depth('== 0')->name(basename)->size('<= NKi')`)
+  instead of a hand-rolled `filesize() > kb * 1024` check, so both legs of the
+  scanner share a single size-comparison implementation.
 
 ### Removed
 
@@ -37,8 +113,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   ```
 
 - **Breaking:** the internal `HARD_EXCLUDED_DIRS` list on `ProjectFileScanner`
-  is gone. With Finder scanning only included paths, walking into `vendor/` or
-  `node_modules/` no longer happens, so the prune list is unnecessary.
+  and its `additionalExcludedDirs` constructor parameter are gone. With Finder
+  scanning only included paths, walking into `vendor/` or `node_modules/` no
+  longer happens, so the prune list is unnecessary.
 
 ### Fixed
 
@@ -56,6 +133,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 - `AttackerAgent` / `ReviewerAgent` parse-failure error logs now include a
   512-byte `content_preview` of the LLM response so the actual shape of an
   unrecoverable payload is diagnosable without re-running the audit.
+
+## [1.2.1] — 2026-05-25
+
+### Fixed
+
+- `SymfonyAiLLMClient` now omits the `temperature` option from the platform
+  invocation unless the host has explicitly configured one. Forwarding the
+  default `temperature: 1.0` was rejected by reasoning-only models (notably
+  GPT-5) which require the platform's own default, surfacing as a
+  `temperature does not support` provider error before any chunk could be
+  analyzed. The option is still forwarded verbatim when set, so existing
+  configurations keep their previous behavior.
 
 ## [1.2.0] — 2026-05-25
 
@@ -422,6 +511,14 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.3.2]:
+  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.3.2
+[1.3.1]:
+  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.3.1
+[1.3.0]:
+  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.3.0
+[1.2.1]:
+  https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.2.1
 [1.2.0]:
   https://github.com/vinceamstoutz/symfony-security-auditor/releases/tag/v1.2.0
 [1.1.1]:
