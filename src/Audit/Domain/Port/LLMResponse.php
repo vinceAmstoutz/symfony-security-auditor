@@ -87,17 +87,9 @@ final readonly class LLMResponse
         $content = (string) preg_replace('/```\s*/', '', $content);
         $content = trim($content);
 
-        // Raw json_decode (over symfony/serializer) is deliberate: the LLM emits free-form
-        // payloads whose shape we cannot pre-declare as a class. We only need array hydration
-        // here; downstream factories (e.g. VulnerabilityFactory) handle structural validation.
         try {
             $decoded = json_decode($content, true, self::JSON_MAX_DEPTH, \JSON_THROW_ON_ERROR);
         } catch (JsonException $jsonException) {
-            // When tools are enabled the LLM sometimes returns prose around the JSON
-            // despite the "Return ONLY the JSON array" prompt instruction. The first
-            // `[`/`{` may belong to prose (e.g. PHP-style `array[key]` references) —
-            // walk every opener position and return the first balanced block that
-            // decodes successfully. If none decode, rethrow the original exception.
             $decoded = $this->recoverDecodedJsonBlock($content) ?? throw $jsonException;
         }
 

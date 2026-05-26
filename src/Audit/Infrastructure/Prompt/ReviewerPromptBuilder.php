@@ -97,10 +97,6 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
 
     public function buildSystemPrompt(): string
     {
-        // Sections are assembled via implode + array literal — NOT a concat
-        // chain — so Infection's `Concat` / `ConcatOperandRemoval` mutators
-        // have no `.` operators to attack. Order is enforced by the array
-        // literal and locked in by the ordering test on this builder.
         return implode("\n\n", [
             self::CORE_INSTRUCTIONS,
             self::SEVERITY_RUBRIC,

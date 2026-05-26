@@ -38,10 +38,6 @@ final readonly class ScanPathFilter
      */
     public static function apply(array $files, array $scanPaths): array
     {
-        // The empty-`$scanPaths` case is handled by the empty-`$normalized` check
-        // below: an empty input loop produces an empty `$normalized`, and we
-        // return `$files` unchanged from there. Keeping a single fall-through
-        // path avoids equivalent mutants on a redundant early return.
         $normalized = [];
         foreach ($scanPaths as $scanPath) {
             $trimmed = trim($scanPath);

@@ -73,11 +73,6 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     public function scrub(string $content): string
     {
         foreach ($this->patterns as $label => $pattern) {
-            // `@` silences the PCRE warning so a runaway user-supplied pattern
-            // hitting the backtrack limit returns null cleanly instead of
-            // escalating to a PHPUnit fail-on-warning. The null branch lets
-            // the scrub `continue` with the next pattern instead of aborting
-            // the whole pipeline.
             $result = 'inline_assignment' === $label
                 ? @preg_replace_callback($pattern, $this->redactInlineAssignment(...), $content)
                 : @preg_replace($pattern, $this->replacementFor($label), $content);

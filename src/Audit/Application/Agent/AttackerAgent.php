@@ -143,9 +143,6 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
-            // Non-transient failure (missing platform config, auth error, retired model).
-            // Every subsequent chunk will fail identically — abort immediately so the
-            // audit does not silently return a false-negative SAFE result.
             $this->recordChunkCoverage($chunk, 'errored', $coverageRecorder);
 
             throw $llmProviderException;

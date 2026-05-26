@@ -155,11 +155,6 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
         $this->requestsUsed = 0;
         $this->inputTokensUsed = 0;
         $this->outputTokensUsed = 0;
-        // pendingInputEstimate is left untouched here on purpose: acquire()
-        // always overwrites it before reading, and record() sets it back to
-        // 0 after reconciling. Resetting it here would only be observable
-        // if record() ran without a preceding acquire() — which the LLM
-        // client never does (acquire→record is the only legal pairing).
     }
 
     private function nextWindowStart(): DateTimeImmutable
@@ -176,11 +171,6 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
 
     private function sleepUntil(DateTimeImmutable $from, DateTimeImmutable $to): void
     {
-        // `Uu` formats the instant as a contiguous "seconds + microseconds"
-        // integer string (e.g. "1735732800001234"); PHP coerces the
-        // numeric-string subtraction to a native int, so the delta is in
-        // microseconds without going through floats. Dividing by 1_000 and
-        // ceil'ing yields the smallest sleep that does not undershoot.
         $deltaUs = $to->format('Uu') - $from->format('Uu');
         $this->sleeper->sleep((int) ceil($deltaUs / 1_000));
     }

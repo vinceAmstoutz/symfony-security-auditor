@@ -245,3 +245,5 @@ Rules scoped to specific paths live in `.claude/rules/`:
   interfaces/SOLID, single responsibility, Symfony components in `src/**`.
 - [`testing.md`](.claude/rules/testing.md) — TDD red/green/refactor, stub vs
   mock, suite layout, mutation score.
+- [`no-comments.md`](.claude/rules/no-comments.md) — no multi-line comment
+  blocks; comments signal poorly-written code; fix the code instead.
