@@ -93,7 +93,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Refactored
 
-- Removed multi-line `//` comment blocks from `src/` that explained what
+- Removed multi-line `//` comment blocks from `src/` and `tests/` that explained what
   self-evident code does. A new `.claude/rules/no-comments.md` rule codifies the
   policy: comments signal poorly written code; fix the code instead.
 
