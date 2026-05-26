@@ -30,6 +30,7 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(256, $bundleConfiguration->scan->maxFileSizeKb);
         self::assertTrue($bundleConfiguration->scan->secretScrubbingEnabled);
         self::assertSame([], $bundleConfiguration->scan->additionalScrubberPatterns);
+        self::assertSame([], $bundleConfiguration->scan->customRiskPatterns);
 
         self::assertSame(5, $bundleConfiguration->audit->maxIterations);
         self::assertSame(0.6, $bundleConfiguration->audit->minConfidence);
@@ -162,6 +163,7 @@ final class BundleConfigurationTest extends TestCase
                     'enabled' => true,
                     'additional_patterns' => [],
                 ],
+                'custom_risk_patterns' => [],
             ],
             'audit' => [
                 'max_iterations' => 5,

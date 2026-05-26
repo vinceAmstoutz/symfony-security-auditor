@@ -61,6 +61,7 @@ final readonly class BundleConfiguration
                 maxFileSizeKb: $config['scan']['max_file_size_kb'],
                 secretScrubbingEnabled: $config['scan']['secret_scrubbing']['enabled'],
                 additionalScrubberPatterns: $config['scan']['secret_scrubbing']['additional_patterns'],
+                customRiskPatterns: $config['scan']['custom_risk_patterns'] ?? [],
             ),
             audit: new AuditExecutionConfiguration(
                 maxIterations: $config['audit']['max_iterations'],

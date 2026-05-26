@@ -197,4 +197,65 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('unserialize_call', $patterns);
         self::assertContains('shell_invocation', $patterns);
     }
+
+    public function test_custom_patterns_are_merged_into_the_built_in_dictionary(): void
+    {
+        $scanner = new RegexStaticPreScanner([
+            'php' => [
+                'audit_log_missing' => [
+                    'regex' => '/\$this->doPrivilegedThing\(/',
+                    'description' => 'Privileged call must be followed by AuditService::log()',
+                ],
+            ],
+        ]);
+        $file = ProjectFile::create(
+            'src/Service/Privileged.php',
+            '/app/src/Service/Privileged.php',
+            "<?php\n\$this->doPrivilegedThing();",
+        );
+
+        $markers = $scanner->scan([$file]);
+
+        $patterns = array_map(static fn (RiskMarker $marker): string => $marker->pattern(), $markers);
+        self::assertContains('audit_log_missing', $patterns);
+    }
+
+    public function test_custom_patterns_do_not_disable_the_built_in_dictionary(): void
+    {
+        $scanner = new RegexStaticPreScanner([
+            'php' => [
+                'custom_one' => ['regex' => '/CUSTOM_TOKEN/', 'description' => 'custom'],
+            ],
+        ]);
+        $file = ProjectFile::create(
+            'src/Service/Mixed.php',
+            '/app/src/Service/Mixed.php',
+            "<?php\nCUSTOM_TOKEN;\nunserialize(\$x);",
+        );
+
+        $markers = $scanner->scan([$file]);
+
+        $patterns = array_map(static fn (RiskMarker $marker): string => $marker->pattern(), $markers);
+        self::assertContains('custom_one', $patterns);
+        self::assertContains('unserialize_call', $patterns);
+    }
+
+    public function test_custom_patterns_target_other_buckets(): void
+    {
+        $scanner = new RegexStaticPreScanner([
+            'config' => [
+                'forbidden_host' => ['regex' => '/internal-admin\.example\.com/', 'description' => 'Internal host should be env-referenced'],
+            ],
+        ]);
+        $file = ProjectFile::create(
+            'config/packages/clients.yaml',
+            '/app/config/packages/clients.yaml',
+            "http_client:\n    base_uri: 'https://internal-admin.example.com'",
+        );
+
+        $markers = $scanner->scan([$file]);
+
+        $patterns = array_map(static fn (RiskMarker $marker): string => $marker->pattern(), $markers);
+        self::assertContains('forbidden_host', $patterns);
+    }
 }

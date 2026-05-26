@@ -93,6 +93,20 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->min(1)
                             ->info('Skip files larger than this size, in kilobytes.')
                         ->end()
+                        ->arrayNode('custom_risk_patterns')
+                            ->info('Project-specific risk markers merged into the deterministic pre-scanner. Keyed by file-type bucket (controller, voter, entity, repository, form, template, config, php, authenticator, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler). Each entry is `<label>: { regex: <PCRE>, description: <human text> }`. Surface team idioms the built-in patterns do not know about (e.g. "must call AuditService::log() after every privileged action").')
+                            ->useAttributeAsKey('bucket')
+                            ->arrayPrototype()
+                                ->useAttributeAsKey('label')
+                                ->arrayPrototype()
+                                    ->children()
+                                        ->scalarNode('regex')->isRequired()->cannotBeEmpty()->info('PCRE pattern with delimiters, matched per-line against file content.')->end()
+                                        ->scalarNode('description')->isRequired()->cannotBeEmpty()->info('Short human description rendered in the prompt next to the marker.')->end()
+                                    ->end()
+                                ->end()
+                            ->end()
+                            ->defaultValue([])
+                        ->end()
                         ->arrayNode('secret_scrubbing')
                             ->addDefaultsIfNotSet()
                             ->info('Redact credential-shaped strings from file content before it reaches the LLM. Covers AWS/GitHub/Stripe/Slack/Google API keys, JWTs, PEM private keys, and env-style credential assignments.')
@@ -282,6 +296,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.scan.max_file_size_kb', $bundleConfiguration->scan->maxFileSizeKb);
         $builder->setParameter('symfony_security_auditor.scan.secret_scrubbing.enabled', $bundleConfiguration->scan->secretScrubbingEnabled);
         $builder->setParameter('symfony_security_auditor.scan.secret_scrubbing.additional_patterns', $bundleConfiguration->scan->additionalScrubberPatterns);
+        $builder->setParameter('symfony_security_auditor.scan.custom_risk_patterns', $bundleConfiguration->scan->customRiskPatterns);
         $builder->setParameter('symfony_security_auditor.audit.max_iterations', $bundleConfiguration->audit->maxIterations);
         $builder->setParameter('symfony_security_auditor.audit.min_confidence', $bundleConfiguration->audit->minConfidence);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_batch_size', $bundleConfiguration->audit->reviewerBatchSize);

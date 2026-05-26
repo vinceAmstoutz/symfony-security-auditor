@@ -238,7 +238,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->alias(ToolRegistryFactoryInterface::class, SymfonyToolRegistryFactory::class);
 
     $defaultsConfigurator->set(NullStaticPreScanner::class);
-    $defaultsConfigurator->set(RegexStaticPreScanner::class);
+    $defaultsConfigurator->set(RegexStaticPreScanner::class)
+        ->args([param('symfony_security_auditor.scan.custom_risk_patterns')]);
 
     $defaultsConfigurator->set(FileChunker::class)
         ->args([

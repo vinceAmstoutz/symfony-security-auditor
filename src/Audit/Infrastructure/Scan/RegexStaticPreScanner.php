@@ -27,6 +27,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInter
 final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
 {
     /**
+     * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
+     */
+    public function __construct(
+        private array $customPatterns = [],
+    ) {}
+
+    /**
      * @var array<string, array<string, array{regex: string, description: string}>>
      */
     private const array PATTERNS = [
@@ -223,7 +230,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
 
         foreach ($files as $file) {
             $bucket = $file->type();
-            $patternsForBucket = self::PATTERNS[$bucket] ?? [];
+            $patternsForBucket = [
+                ...(self::PATTERNS[$bucket] ?? []),
+                ...($this->customPatterns[$bucket] ?? []),
+            ];
 
             foreach ($patternsForBucket as $label => $entry) {
                 $matches = $this->matchLines($file->content(), $entry['regex']);
