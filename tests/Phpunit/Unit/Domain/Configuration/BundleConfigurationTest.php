@@ -40,6 +40,7 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->audit->staticPreScanLeanMode);
         self::assertFalse($bundleConfiguration->audit->reviewerToolsEnabled);
         self::assertSame(4, $bundleConfiguration->audit->reviewerMaxToolIterations);
+        self::assertSame('feature', $bundleConfiguration->audit->chunkingStrategy);
 
         self::assertSame(3, $bundleConfiguration->retry->maxAttempts);
         self::assertSame(500, $bundleConfiguration->retry->initialDelayMs);
@@ -174,6 +175,9 @@ final class BundleConfigurationTest extends TestCase
                 ],
                 'reviewer_tools_enabled' => false,
                 'reviewer_max_tool_iterations' => 4,
+                'chunking' => [
+                    'strategy' => 'feature',
+                ],
                 'budget' => [
                     'max_tokens' => null,
                     'max_cost_usd' => null,

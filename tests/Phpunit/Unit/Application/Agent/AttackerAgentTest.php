@@ -262,12 +262,14 @@ final class AttackerAgentTest extends TestCase
     /** @return iterable<string, array{string, string}> */
     public static function chunkPriorityCases(): iterable
     {
-        yield 'controllers before services' => ['src/Controller/SomeController.php', 'src/Service/SomeService.php'];
-        yield 'controllers before voters' => ['src/Controller/SomeController.php', 'src/Security/UserVoter.php'];
+        // Each pair shares a feature name (User*) so the feature chunker keeps them in
+        // the same chunk where attack-surface priority orders the files.
+        yield 'controllers before voters' => ['src/Controller/UserController.php', 'src/Security/UserVoter.php'];
         yield 'voters before entities' => ['src/Security/UserVoter.php', 'src/Entity/User.php'];
-        yield 'entities before repositories' => ['src/Entity/Product.php', 'src/Repository/UserRepository.php'];
-        yield 'repositories before forms' => ['src/Repository/OrderRepository.php', 'src/Form/UserType.php'];
-        yield 'forms before services' => ['src/Form/ProductType.php', 'src/Service/OtherService.php'];
+        yield 'entities before repositories' => ['src/Entity/User.php', 'src/Repository/UserRepository.php'];
+        yield 'repositories before forms' => ['src/Repository/UserRepository.php', 'src/Form/UserType.php'];
+        yield 'forms before services' => ['src/Form/UserType.php', 'src/Service/UserHelper.php'];
+        yield 'controllers before services' => ['src/Controller/UserController.php', 'src/Service/UserService.php'];
     }
 
     public function test_it_does_not_call_llm_when_no_files_and_returns_empty(): void

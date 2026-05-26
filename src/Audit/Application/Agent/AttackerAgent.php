@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 use JsonException;
 use Psr\Log\LoggerInterface;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
@@ -35,8 +36,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPre
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AttackerAgent implements AttackerAgentInterface
 {
-    private const int CHUNK_SIZE = 10;
-
     private const int PARSE_FAILURE_PREVIEW_BYTES = 512;
 
     public const int DEFAULT_MAX_TOOL_ITERATIONS = 8;
@@ -46,6 +45,8 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     public const bool DEFAULT_LEAN_MODE = false;
 
     private StaticPreScannerInterface $staticPreScanner;
+
+    private FileChunker $fileChunker;
 
     public function __construct(
         private LLMClientInterface $llmClient,
@@ -58,8 +59,10 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         private int $maxToolIterations = self::DEFAULT_MAX_TOOL_ITERATIONS,
         ?StaticPreScannerInterface $staticPreScanner = null,
         private bool $leanMode = self::DEFAULT_LEAN_MODE,
+        ?FileChunker $fileChunker = null,
     ) {
         $this->staticPreScanner = $staticPreScanner ?? new NullStaticPreScanner();
+        $this->fileChunker = $fileChunker ?? new FileChunker();
     }
 
     /**
@@ -334,26 +337,12 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     }
 
     /**
-     * Sorts files by security relevance (controllers first) then chunks them.
-     *
      * @param list<ProjectFile> $files
      *
      * @return list<list<ProjectFile>>
      */
     private function chunkFiles(array $files): array
     {
-        $order = ['controller', 'voter', 'entity', 'repository', 'form'];
-        usort($files, static function (ProjectFile $a, ProjectFile $b) use ($order): int {
-            $priority = static function (ProjectFile $projectFile) use ($order): int {
-                $idx = array_search($projectFile->type(), $order, true);
-
-                return false !== $idx ? $idx : \count($order);
-            };
-
-            return $priority($a) <=> $priority($b);
-        });
-
-        /* @var list<list<ProjectFile>> $chunks */
-        return array_chunk($files, self::CHUNK_SIZE);
+        return $this->fileChunker->chunk($files);
     }
 }

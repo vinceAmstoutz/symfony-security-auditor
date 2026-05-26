@@ -17,6 +17,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestratorInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
@@ -76,6 +78,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
 
+use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
@@ -237,6 +240,13 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(NullStaticPreScanner::class);
     $defaultsConfigurator->set(RegexStaticPreScanner::class);
 
+    $defaultsConfigurator->set(FileChunker::class)
+        ->args([
+            inline_service(ChunkingStrategy::class)
+                ->factory([ChunkingStrategy::class, 'from'])
+                ->args([param('symfony_security_auditor.audit.chunking.strategy')]),
+        ]);
+
     $defaultsConfigurator->set(AttackerAgent::class)
         ->args([
             service('security_auditor.attacker_client'),
@@ -249,6 +259,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.audit.max_tool_iterations'),
             service(StaticPreScannerInterface::class),
             param('symfony_security_auditor.audit.static_prescan.lean_mode'),
+            service(FileChunker::class),
         ]);
 
     $defaultsConfigurator->alias(AttackerAgentInterface::class, AttackerAgent::class);

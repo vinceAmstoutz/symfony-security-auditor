@@ -72,6 +72,7 @@ final readonly class BundleConfiguration
                 staticPreScanLeanMode: $config['audit']['static_prescan']['lean_mode'] ?? false,
                 reviewerToolsEnabled: $config['audit']['reviewer_tools_enabled'] ?? false,
                 reviewerMaxToolIterations: $config['audit']['reviewer_max_tool_iterations'] ?? 4,
+                chunkingStrategy: $config['audit']['chunking']['strategy'] ?? 'feature',
             ),
             retry: new RetryConfiguration(
                 maxAttempts: $config['audit']['retry']['max_attempts'],

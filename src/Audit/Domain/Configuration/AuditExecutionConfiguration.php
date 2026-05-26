@@ -25,5 +25,6 @@ final readonly class AuditExecutionConfiguration
         public bool $staticPreScanLeanMode = false,
         public bool $reviewerToolsEnabled = false,
         public int $reviewerMaxToolIterations = 4,
+        public string $chunkingStrategy = 'feature',
     ) {}
 }

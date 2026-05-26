@@ -161,6 +161,17 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                                 ->end()
                             ->end()
                         ->end()
+                        ->arrayNode('chunking')
+                            ->addDefaultsIfNotSet()
+                            ->info('How files are grouped into LLM calls. `feature` (default) packs a controller with its entity/repository/form/voter/templates so the LLM can follow cross-file data flow — the biggest detection-quality win. `type` keeps the legacy behaviour of sorting by attack-surface priority and slicing into fixed-size windows.')
+                            ->children()
+                                ->enumNode('strategy')
+                                    ->values(['feature', 'type'])
+                                    ->defaultValue('feature')
+                                    ->info('Chunking strategy. `feature` colocates related files (UserController + User entity + UserRepository + …) in one chunk; `type` chunks by file-type priority. Default `feature`.')
+                                ->end()
+                            ->end()
+                        ->end()
                         ->arrayNode('budget')
                             ->addDefaultsIfNotSet()
                             ->info('Hard ceiling on cumulative LLM usage per audit run. Aborts the audit cleanly (exit code 2) with the partial report instead of running away on cost.')
@@ -280,6 +291,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.reviewer_max_tool_iterations', $bundleConfiguration->audit->reviewerMaxToolIterations);
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.enabled', $bundleConfiguration->audit->staticPreScanEnabled);
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.lean_mode', $bundleConfiguration->audit->staticPreScanLeanMode);
+        $builder->setParameter('symfony_security_auditor.audit.chunking.strategy', $bundleConfiguration->audit->chunkingStrategy);
         $builder->setParameter('symfony_security_auditor.audit.budget.max_tokens', $bundleConfiguration->budget->maxTokens);
         $builder->setParameter('symfony_security_auditor.audit.budget.max_cost_usd', $bundleConfiguration->budget->maxCostUsd);
         $builder->setParameter('symfony_security_auditor.audit.retry.max_attempts', $bundleConfiguration->retry->maxAttempts);
