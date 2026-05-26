@@ -38,6 +38,8 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(8, $bundleConfiguration->audit->maxToolIterations);
         self::assertTrue($bundleConfiguration->audit->staticPreScanEnabled);
         self::assertFalse($bundleConfiguration->audit->staticPreScanLeanMode);
+        self::assertFalse($bundleConfiguration->audit->reviewerToolsEnabled);
+        self::assertSame(4, $bundleConfiguration->audit->reviewerMaxToolIterations);
 
         self::assertSame(3, $bundleConfiguration->retry->maxAttempts);
         self::assertSame(500, $bundleConfiguration->retry->initialDelayMs);
@@ -170,6 +172,8 @@ final class BundleConfigurationTest extends TestCase
                     'enabled' => true,
                     'lean_mode' => false,
                 ],
+                'reviewer_tools_enabled' => false,
+                'reviewer_max_tool_iterations' => 4,
                 'budget' => [
                     'max_tokens' => null,
                     'max_cost_usd' => null,

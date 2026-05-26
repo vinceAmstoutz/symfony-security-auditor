@@ -259,6 +259,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(ReviewerPromptBuilderInterface::class),
             service('logger'),
             param('symfony_security_auditor.audit.reviewer_batch_size'),
+            service(ToolRegistryFactoryInterface::class),
+            param('symfony_security_auditor.audit.reviewer_tools_enabled'),
+            param('symfony_security_auditor.audit.reviewer_max_tool_iterations'),
         ]);
 
     $defaultsConfigurator->alias(ReviewerAgentInterface::class, ReviewerAgent::class);

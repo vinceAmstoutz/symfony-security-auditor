@@ -27,11 +27,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ReviewerAgent implements ReviewerAgentInterface
 {
     public const int DEFAULT_BATCH_SIZE = 1;
+
+    public const int DEFAULT_MAX_TOOL_ITERATIONS = 4;
+
+    public const bool DEFAULT_TOOLS_ENABLED = false;
 
     private const int PARSE_FAILURE_PREVIEW_BYTES = 512;
 
@@ -40,6 +46,9 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         private ReviewerPromptBuilderInterface $reviewerPromptBuilder,
         private LoggerInterface $logger,
         private int $batchSize = self::DEFAULT_BATCH_SIZE,
+        private ?ToolRegistryFactoryInterface $toolRegistryFactory = null,
+        private bool $toolsEnabled = self::DEFAULT_TOOLS_ENABLED,
+        private int $maxToolIterations = self::DEFAULT_MAX_TOOL_ITERATIONS,
     ) {}
 
     /**
@@ -54,20 +63,24 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             return [];
         }
 
+        $useTools = $this->toolsEnabled && $this->toolRegistryFactory instanceof ToolRegistryFactoryInterface;
+        $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($projectFiles) : null;
+
         $this->logger->info('Reviewer agent validating findings', [
             'count' => \count($vulnerabilities),
             'batch_size' => $this->batchSize,
+            'tools_enabled' => $useTools,
         ]);
 
         $reviewed = [];
 
         if ($this->batchSize <= 1) {
             foreach ($vulnerabilities as $vulnerability) {
-                $reviewed[] = $this->reviewSingle($vulnerability, $projectFiles, $coverageRecorder);
+                $reviewed[] = $this->reviewSingle($vulnerability, $projectFiles, $coverageRecorder, $toolRegistry);
             }
         } else {
             foreach (array_chunk($vulnerabilities, $this->batchSize) as $batch) {
-                $reviewed = [...$reviewed, ...$this->reviewBatch($batch, $projectFiles, $coverageRecorder)];
+                $reviewed = [...$reviewed, ...$this->reviewBatch($batch, $projectFiles, $coverageRecorder, $toolRegistry)];
             }
         }
 
@@ -89,7 +102,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
      *
      * @return list<Vulnerability>
      */
-    private function reviewBatch(array $batch, array $projectFiles, CoverageRecorderInterface $coverageRecorder): array
+    private function reviewBatch(array $batch, array $projectFiles, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry): array
     {
         $codeContexts = [];
         foreach ($batch as $vulnerability) {
@@ -100,7 +113,9 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         $userMessage = $this->reviewerPromptBuilder->buildBatchUserMessage($batch, $codeContexts);
 
         try {
-            $response = $this->llmClient->complete($systemPrompt, $userMessage);
+            $response = $toolRegistry instanceof ToolRegistry
+                ? $this->llmClient->completeWithTools($systemPrompt, $userMessage, $toolRegistry, $this->maxToolIterations)
+                : $this->llmClient->complete($systemPrompt, $userMessage);
 
             if ($response->isEmpty()) {
                 return $this->rejectBatch($batch, $coverageRecorder);
@@ -215,14 +230,16 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
     /**
      * @param list<ProjectFile> $projectFiles
      */
-    private function reviewSingle(Vulnerability $vulnerability, array $projectFiles, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    private function reviewSingle(Vulnerability $vulnerability, array $projectFiles, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry): Vulnerability
     {
         $codeContext = $this->getFileContext($vulnerability->filePath(), $projectFiles);
         $systemPrompt = $this->reviewerPromptBuilder->buildSystemPrompt();
         $userMessage = $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext);
 
         try {
-            $response = $this->llmClient->complete($systemPrompt, $userMessage);
+            $response = $toolRegistry instanceof ToolRegistry
+                ? $this->llmClient->completeWithTools($systemPrompt, $userMessage, $toolRegistry, $this->maxToolIterations)
+                : $this->llmClient->complete($systemPrompt, $userMessage);
 
             if ($response->isEmpty()) {
                 $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');

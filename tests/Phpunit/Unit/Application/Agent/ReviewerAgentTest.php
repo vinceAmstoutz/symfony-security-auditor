@@ -542,7 +542,7 @@ final class ReviewerAgentTest extends TestCase
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
-        self::assertSame(['Reviewer agent validating findings', ['count' => 1, 'batch_size' => 1]], $infoLogs[0]);
+        self::assertSame(['Reviewer agent validating findings', ['count' => 1, 'batch_size' => 1, 'tools_enabled' => false]], $infoLogs[0]);
         self::assertSame(['Reviewer agent complete', ['reviewed' => 1, 'accepted' => 1, 'rejected' => 0]], $infoLogs[1]);
     }
 
@@ -1595,6 +1595,97 @@ final class ReviewerAgentTest extends TestCase
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
+    }
+
+    public function test_it_uses_tool_registry_when_tools_enabled_and_factory_provided(): void
+    {
+        $vulnerability = $this->makeVulnerability();
+
+        $llmClient = self::createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('complete');
+        $llmClient->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturn(LLMResponse::create(
+                (string) json_encode(['accepted' => true]),
+                10, 10, 'claude', 'end_turn',
+            ));
+
+        $registry = new \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry([], new NullLogger());
+        $toolFactory = self::createStub(\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface::class);
+        $toolFactory->method('forProjectFiles')->willReturn($registry);
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: new NullLogger(),
+            toolRegistryFactory: $toolFactory,
+            toolsEnabled: true,
+        );
+
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+    }
+
+    public function test_it_falls_back_to_complete_when_tools_disabled(): void
+    {
+        $vulnerability = $this->makeVulnerability();
+
+        $llmClient = self::createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('completeWithTools');
+        $llmClient->expects(self::once())
+            ->method('complete')
+            ->willReturn(LLMResponse::create(
+                (string) json_encode(['accepted' => true]),
+                10, 10, 'claude', 'end_turn',
+            ));
+
+        $registry = new \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry([], new NullLogger());
+        $toolFactory = self::createStub(\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface::class);
+        $toolFactory->method('forProjectFiles')->willReturn($registry);
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: new NullLogger(),
+            toolRegistryFactory: $toolFactory,
+            toolsEnabled: false,
+        );
+
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+    }
+
+    public function test_tools_enabled_logs_when_factory_provided(): void
+    {
+        $vulnerability = $this->makeVulnerability();
+        $infoLogs = [];
+
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$infoLogs): void {
+                $infoLogs[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('debug');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willReturn(LLMResponse::create(
+            (string) json_encode(['accepted' => true]),
+            10, 10, 'claude', 'end_turn',
+        ));
+
+        $registry = new \VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry([], new NullLogger());
+        $toolFactory = self::createStub(\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface::class);
+        $toolFactory->method('forProjectFiles')->willReturn($registry);
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: $logger,
+            toolRegistryFactory: $toolFactory,
+            toolsEnabled: true,
+        );
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertSame(['Reviewer agent validating findings', ['count' => 1, 'batch_size' => 1, 'tools_enabled' => true]], $infoLogs[0]);
     }
 
     private function makeReviewerAgent(LLMClientInterface $llmClient): ReviewerAgent

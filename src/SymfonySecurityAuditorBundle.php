@@ -138,6 +138,15 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->min(1)
                             ->info('Maximum tool-call rounds per chunk before forcing the attacker to commit to a final answer. Bounds runaway tool use.')
                         ->end()
+                        ->booleanNode('reviewer_tools_enabled')
+                            ->defaultFalse()
+                            ->info('Give the reviewer access to the same tool registry the attacker uses, so it can verify cross-file context (parent-class guards, access_control rules, upstream sanitizers) instead of guessing from the Full File Context alone. Default false — adds round-trips per finding; opt-in for high-precision audits.')
+                        ->end()
+                        ->integerNode('reviewer_max_tool_iterations')
+                            ->defaultValue(ReviewerAgent::DEFAULT_MAX_TOOL_ITERATIONS)
+                            ->min(1)
+                            ->info('Maximum tool-call rounds per finding before forcing the reviewer to commit to a verdict. Lower default than the attacker because the reviewer\'s job is verification, not exploration.')
+                        ->end()
                         ->arrayNode('static_prescan')
                             ->addDefaultsIfNotSet()
                             ->info('Deterministic zero-token risk-marker scan that runs before the LLM. Flags concrete locations (unserialize, |raw, csrf_protection: false, hardcoded secrets, Doctrine string concatenation, etc.) so the attacker prompt can focus on them. In lean mode, files with zero markers are skipped entirely — biggest token saver on large codebases.')
@@ -267,6 +276,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.reviewer_batch_size', $bundleConfiguration->audit->reviewerBatchSize);
         $builder->setParameter('symfony_security_auditor.audit.tools_enabled', $bundleConfiguration->audit->toolsEnabled);
         $builder->setParameter('symfony_security_auditor.audit.max_tool_iterations', $bundleConfiguration->audit->maxToolIterations);
+        $builder->setParameter('symfony_security_auditor.audit.reviewer_tools_enabled', $bundleConfiguration->audit->reviewerToolsEnabled);
+        $builder->setParameter('symfony_security_auditor.audit.reviewer_max_tool_iterations', $bundleConfiguration->audit->reviewerMaxToolIterations);
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.enabled', $bundleConfiguration->audit->staticPreScanEnabled);
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.lean_mode', $bundleConfiguration->audit->staticPreScanLeanMode);
         $builder->setParameter('symfony_security_auditor.audit.budget.max_tokens', $bundleConfiguration->budget->maxTokens);

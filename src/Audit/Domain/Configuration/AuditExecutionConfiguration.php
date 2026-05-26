@@ -23,5 +23,7 @@ final readonly class AuditExecutionConfiguration
         public int $maxToolIterations,
         public bool $staticPreScanEnabled = true,
         public bool $staticPreScanLeanMode = false,
+        public bool $reviewerToolsEnabled = false,
+        public int $reviewerMaxToolIterations = 4,
     ) {}
 }

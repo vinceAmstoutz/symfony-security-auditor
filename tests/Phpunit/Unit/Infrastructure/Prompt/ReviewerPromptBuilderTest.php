@@ -196,6 +196,23 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringContainsString('messenger.transport.symfony_serializer', $prompt);
     }
 
+    public function test_system_prompt_includes_tool_usage_discipline(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('Tool usage', $prompt);
+        self::assertStringContainsString('read_file', $prompt);
+        self::assertStringContainsString('grep', $prompt);
+    }
+
+    public function test_batch_system_prompt_includes_tool_usage_discipline(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildBatchSystemPrompt();
+
+        self::assertStringContainsString('Tool usage', $prompt);
+        self::assertStringContainsString('read_file', $prompt);
+    }
+
     public function test_system_prompt_emits_sections_in_documented_order(): void
     {
         $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();

@@ -102,6 +102,15 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         - Return ONLY the JSON array, no prose
         RULES;
 
+    private const string TOOL_USAGE_DISCIPLINE = <<<'TOOLS'
+        Tool usage (when tools are available):
+        - You may call `read_file`, `grep`, `list_files`, and `lookup_advisory` to verify cross-file context — e.g. is there a parent-class `denyAccessUnlessGranted()`, an `access_control` rule in security.yaml, a CSRF guard on the route, or an upstream sanitizer?
+        - Each call costs the audit budget. Stop calling tools as soon as you have enough evidence to accept or reject the finding.
+        - If your initial read of the Full File Context is already sufficient, do NOT call tools — emit the JSON answer directly.
+        - Tools are for cross-file checks only. Do not call tools to re-read the file you already have in `Full File Context`.
+        - Once you have decided, your response MUST contain ONLY the JSON output — no prose, no further tool calls.
+        TOOLS;
+
     public function buildSystemPrompt(): string
     {
         return implode("\n\n", [
@@ -111,6 +120,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
             'Your output must be a JSON array, one entry per vulnerability reviewed.',
             self::JSON_SCHEMA_DESCRIPTION,
             self::DECISION_RULES,
+            self::TOOL_USAGE_DISCIPLINE,
         ]);
     }
 
@@ -131,6 +141,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
             self::JSON_SCHEMA_DESCRIPTION,
             $orderingInstruction,
             self::DECISION_RULES,
+            self::TOOL_USAGE_DISCIPLINE,
         ]);
     }
 
