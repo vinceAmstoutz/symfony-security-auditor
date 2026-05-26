@@ -308,7 +308,7 @@ final class AttackerPromptBuilderTest extends TestCase
     {
         $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
 
-        self::assertStringEndsWith('Return ONLY the JSON array, no prose, no markdown fences', $prompt);
+        self::assertStringEndsWith('causes the response to be discarded as malformed.', $prompt);
     }
 
     public function test_base_prompt_has_no_trailing_separator_when_files_have_no_matching_skill(): void
@@ -321,7 +321,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
-        self::assertStringEndsWith('Return ONLY the JSON array, no prose, no markdown fences', $prompt);
+        self::assertStringEndsWith('causes the response to be discarded as malformed.', $prompt);
     }
 
     public function test_skill_block_is_separated_from_base_by_exactly_one_blank_line(): void
@@ -335,7 +335,7 @@ final class AttackerPromptBuilderTest extends TestCase
         $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
         self::assertStringContainsString(
-            "Return ONLY the JSON array, no prose, no markdown fences\n\n<skills role=\"controller\">",
+            "causes the response to be discarded as malformed.\n\n<skills role=\"controller\">",
             $prompt,
         );
     }
@@ -509,5 +509,17 @@ final class AttackerPromptBuilderTest extends TestCase
         $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
         self::assertStringContainsString("new Process(['ls', '-la'])", $prompt);
+    }
+
+    public function test_prompt_version_is_bumped_when_tool_usage_discipline_section_is_added(): void
+    {
+        self::assertSame(2, AttackerPromptBuilder::PROMPT_VERSION);
+    }
+
+    public function test_base_prompt_instructs_model_to_converge_within_tool_call_budget(): void
+    {
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('tool-call budget', $prompt);
     }
 }
