@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
@@ -93,13 +94,13 @@ final readonly class EstimateAuditCostUseCase
         $estimatedCostUsd = $attackerCostUsd + $reviewerCostUsd;
 
         $byRole = [
-            'attacker' => [
+            AgentRole::Attacker->value => [
                 'model' => $this->primaryModel,
                 'input_tokens' => $attackerInputTokens,
                 'output_tokens' => $attackerOutputTokens,
                 'estimated_cost_usd' => round($attackerCostUsd, 6),
             ],
-            'reviewer' => [
+            AgentRole::Reviewer->value => [
                 'model' => $reviewerModel,
                 'input_tokens' => $reviewerInputTokens,
                 'output_tokens' => $reviewerOutputTokens,

@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline;
 
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
@@ -54,7 +55,7 @@ final readonly class AuditPipeline implements PipelineInterface
             'stages' => $stageNames,
         ]);
 
-        $this->progressReporter->report('pipeline.started', [
+        $this->progressReporter->report(ProgressEvent::PipelineStarted->value, [
             'audit_id' => $auditContext->auditId(),
             'stages' => $stageNames,
         ]);
@@ -64,7 +65,7 @@ final readonly class AuditPipeline implements PipelineInterface
                 'audit_id' => $auditContext->auditId(),
             ]);
 
-            $this->progressReporter->report('stage.started', [
+            $this->progressReporter->report(ProgressEvent::StageStarted->value, [
                 'audit_id' => $auditContext->auditId(),
                 'stage' => $stage->name(),
             ]);
@@ -78,7 +79,7 @@ final readonly class AuditPipeline implements PipelineInterface
                 'elapsed_seconds' => $elapsed,
             ]);
 
-            $this->progressReporter->report('stage.completed', [
+            $this->progressReporter->report(ProgressEvent::StageCompleted->value, [
                 'audit_id' => $auditContext->auditId(),
                 'stage' => $stage->name(),
                 'elapsed_seconds' => $elapsed,
@@ -91,7 +92,7 @@ final readonly class AuditPipeline implements PipelineInterface
             'validated' => \count($auditContext->validatedVulnerabilities()),
         ]);
 
-        $this->progressReporter->report('pipeline.completed', [
+        $this->progressReporter->report(ProgressEvent::PipelineCompleted->value, [
             'audit_id' => $auditContext->auditId(),
             'vulnerabilities_found' => \count($auditContext->vulnerabilities()),
             'validated' => \count($auditContext->validatedVulnerabilities()),

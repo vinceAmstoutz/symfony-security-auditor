@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress;
 
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Output\OutputInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
@@ -42,12 +43,12 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
      */
     public function report(string $event, array $context = []): void
     {
-        match ($event) {
-            'pipeline.started' => $this->onPipelineStarted($context),
-            'stage.started' => $this->onStageStarted($context),
-            'stage.completed' => $this->onStageCompleted(),
-            'pipeline.completed' => $this->onPipelineCompleted(),
-            default => null,
+        match (ProgressEvent::tryFrom($event)) {
+            ProgressEvent::PipelineStarted => $this->onPipelineStarted($context),
+            ProgressEvent::StageStarted => $this->onStageStarted($context),
+            ProgressEvent::StageCompleted => $this->onStageCompleted(),
+            ProgressEvent::PipelineCompleted => $this->onPipelineCompleted(),
+            null => null,
         };
     }
 
