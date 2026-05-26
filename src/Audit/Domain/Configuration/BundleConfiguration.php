@@ -80,6 +80,8 @@ final readonly class BundleConfiguration
                 codeSlicingMinLines: $config['audit']['code_slicing']['min_lines_before_slicing'] ?? 80,
                 escalationEnabled: $config['audit']['escalation']['enabled'] ?? false,
                 escalationCheapModel: $config['audit']['escalation']['cheap_model'] ?? null,
+                historyEnabled: $config['audit']['history']['enabled'] ?? false,
+                historyDir: $config['audit']['history']['dir'] ?? '',
             ),
             retry: new RetryConfiguration(
                 maxAttempts: $config['audit']['retry']['max_attempts'],

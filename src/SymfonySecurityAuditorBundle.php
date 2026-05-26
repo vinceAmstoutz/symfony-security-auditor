@@ -32,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitCon
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AuditHistoryStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
@@ -42,6 +43,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerA
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\History\FilesystemAuditHistoryStore;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\History\NullAuditHistoryStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
@@ -220,6 +223,20 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                                 ->end()
                             ->end()
                         ->end()
+                        ->arrayNode('history')
+                            ->addDefaultsIfNotSet()
+                            ->info('Cross-run finding correlation. Persists the fingerprints surfaced by each audit and, on the next run, tags every finding new / still_present and reports a fixed count. Fingerprints survive line-number drift (hash of type + file + normalized vulnerable code), so a finding is only "fixed" when the vulnerable code is actually gone. Essential for CI workflows that track remediation across PRs.')
+                            ->children()
+                                ->booleanNode('enabled')
+                                    ->defaultFalse()
+                                    ->info('When true, the HistoricalCorrelationStage runs after the audit, tags findings, and persists fingerprints to history.dir. Default false.')
+                                ->end()
+                                ->scalarNode('dir')
+                                    ->defaultValue('%kernel.cache_dir%/symfony_security_auditor/history')
+                                    ->info('Filesystem directory where per-project fingerprint snapshots are stored. Commit this directory (or point it at a persistent CI cache) to track findings across runs.')
+                                ->end()
+                            ->end()
+                        ->end()
                         ->arrayNode('poc_synthesis')
                             ->addDefaultsIfNotSet()
                             ->info('Optional follow-up stage that generates a concrete, copy-pasteable proof-of-concept (curl command, console invocation, payload body) for every validated finding at or above the configured severity floor. Spends extra LLM tokens per finding; off by default. Turn on when shipping reports to engineers who need actionable reproduction steps.')
@@ -358,6 +375,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.chunking.strategy', $bundleConfiguration->audit->chunkingStrategy);
         $builder->setParameter('symfony_security_auditor.audit.poc_synthesis.enabled', $bundleConfiguration->audit->poCSynthesisEnabled);
         $builder->setParameter('symfony_security_auditor.audit.poc_synthesis.severity_floor', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
+        $builder->setParameter('symfony_security_auditor.audit.history.enabled', $bundleConfiguration->audit->historyEnabled);
+        $builder->setParameter('symfony_security_auditor.audit.history.dir', $bundleConfiguration->audit->historyDir);
         $builder->setParameter('symfony_security_auditor.audit.code_slicing.enabled', $bundleConfiguration->audit->codeSlicingEnabled);
         $builder->setParameter('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing', $bundleConfiguration->audit->codeSlicingMinLines);
         $builder->setParameter('symfony_security_auditor.audit.budget.max_tokens', $bundleConfiguration->budget->maxTokens);
@@ -497,6 +516,11 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ? RegexCodeSlicer::class
             : NullCodeSlicer::class;
         $services->alias(CodeSlicerInterface::class, $codeSlicerServiceId);
+
+        $historyStoreServiceId = $bundleConfiguration->audit->historyEnabled
+            ? FilesystemAuditHistoryStore::class
+            : NullAuditHistoryStore::class;
+        $services->alias(AuditHistoryStoreInterface::class, $historyStoreServiceId);
 
         if ($bundleConfiguration->audit->escalationEnabled) {
             $cheapModel = $bundleConfiguration->audit->escalationCheapModel ?? $bundleConfiguration->llm->reviewerModel();

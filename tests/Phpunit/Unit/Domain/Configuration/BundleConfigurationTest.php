@@ -44,6 +44,8 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame('feature', $bundleConfiguration->audit->chunkingStrategy);
         self::assertFalse($bundleConfiguration->audit->poCSynthesisEnabled);
         self::assertSame('high', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
+        self::assertFalse($bundleConfiguration->audit->historyEnabled);
+        self::assertSame('/cache/history', $bundleConfiguration->audit->historyDir);
         self::assertFalse($bundleConfiguration->audit->codeSlicingEnabled);
         self::assertSame(80, $bundleConfiguration->audit->codeSlicingMinLines);
         self::assertFalse($bundleConfiguration->audit->escalationEnabled);
@@ -185,6 +187,10 @@ final class BundleConfigurationTest extends TestCase
                 'reviewer_max_tool_iterations' => 4,
                 'chunking' => [
                     'strategy' => 'feature',
+                ],
+                'history' => [
+                    'enabled' => false,
+                    'dir' => '/cache/history',
                 ],
                 'poc_synthesis' => [
                     'enabled' => false,
