@@ -26,7 +26,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 1;
+    public const int PROMPT_VERSION = 2;
 
     /**
      * Skill-block emission order — by attack-surface priority, NOT alphabetical.
@@ -300,6 +300,12 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Consider the FULL call chain, not just single function calls
             - Cross-reference controllers, voters, services, and entities together
             - Return ONLY the JSON array, no prose, no markdown fences
+
+            Tool Usage Discipline:
+            - You have a LIMITED, finite tool-call budget per chunk. Do NOT gather evidence indefinitely — once you have enough to decide, stop using tools and emit the final JSON answer.
+            - The moment you have sufficient evidence (either confirming a finding or ruling one out), STOP calling tools and produce the JSON. Continuing "to be thorough" wastes the budget and risks running out before you can answer.
+            - If your initial scan of the provided files surfaces no exploitable findings, emit `[]` immediately. Do NOT keep calling tools hunting for something that is not there.
+            - Once you have decided to answer, your response MUST contain ONLY the JSON array — no prose, no reasoning, no further tool calls. Any deviation (additional tool calls after the decision, explanatory text, partial JSON) causes the response to be discarded as malformed.
             PROMPT;
     }
 
