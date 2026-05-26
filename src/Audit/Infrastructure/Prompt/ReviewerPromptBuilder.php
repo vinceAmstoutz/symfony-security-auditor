@@ -39,6 +39,12 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         - `_profiler` / `_wdt` routes gated by `when@dev` / `when@test`.
         - Form fields with `mapped: false` whose constraints validate the input — they never reach the entity setter.
         - Reflected user input echoed back as plain text inside a `Response` of `Content-Type: text/plain` (no HTML execution surface).
+        - Webhook handlers calling `hash_equals($expected, $received)` against a configured secret — that IS the constant-time check.
+        - Messenger transports configured with the framework default JSON serializer (`messenger.transport.symfony_serializer`) — no PHP-native unserialize.
+        - `#[MapRequestPayload]` / `#[MapQueryString]` over a DTO with constraint attributes (`#[Assert\…]`) — the validator runs before the controller body.
+        - `HtmlSanitizerInterface::sanitize()` output rendered with `|raw` — the sanitizer guarantees XSS-safe HTML.
+        - `RateLimiterFactory::create($userIdentifier)` on auth endpoints — per-identity scope is correct.
+        - `LockFactory::createLock($resourceId)` around a critical section — that IS the mitigation for race conditions.
         Reject these with a one-line note pointing at the specific mitigation.
         PLAYBOOK;
 
@@ -82,7 +88,8 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         state_machine_bypass, mass_assignment, insecure_deserialization, unsafe_parameter_binding,
         exposed_internal_service, misconfigured_firewall, insecure_redirect, sensitive_data_exposure,
         log_injection, path_traversal, ssrf, xxe, open_redirect, weak_cryptography, insecure_random,
-        hardcoded_secret
+        hardcoded_secret, missing_signature_verification, messenger_handler_unsafe, missing_rate_limiting,
+        cache_poisoning, mailer_header_injection, webhook_replay, authenticator_bypass
         SCHEMA;
 
     private const string DECISION_RULES = <<<'RULES'

@@ -100,6 +100,42 @@ final readonly class ProjectFile
             && str_ends_with($this->relativePath, 'Type.php');
     }
 
+    public function isMessengerHandler(): bool
+    {
+        return str_ends_with($this->relativePath, 'MessageHandler.php')
+            || (str_contains($this->relativePath, '/MessageHandler/') && str_ends_with($this->relativePath, '.php'));
+    }
+
+    public function isAuthenticator(): bool
+    {
+        return str_ends_with($this->relativePath, 'Authenticator.php');
+    }
+
+    public function isEventSubscriber(): bool
+    {
+        return str_ends_with($this->relativePath, 'Subscriber.php')
+            || str_ends_with($this->relativePath, 'EventListener.php');
+    }
+
+    public function isNormalizer(): bool
+    {
+        return str_ends_with($this->relativePath, 'Normalizer.php')
+            || str_ends_with($this->relativePath, 'Denormalizer.php');
+    }
+
+    public function isWebhookConsumer(): bool
+    {
+        return str_ends_with($this->relativePath, 'WebhookConsumer.php')
+            || str_ends_with($this->relativePath, 'WebhookParser.php')
+            || (str_contains($this->relativePath, '/Webhook/') && str_ends_with($this->relativePath, '.php'));
+    }
+
+    public function isScheduler(): bool
+    {
+        return str_ends_with($this->relativePath, 'ScheduleProvider.php')
+            || str_ends_with($this->relativePath, 'Schedule.php');
+    }
+
     public function isService(): bool
     {
         return !$this->isController()
@@ -107,6 +143,12 @@ final readonly class ProjectFile
             && !$this->isVoter()
             && !$this->isRepository()
             && !$this->isForm()
+            && !$this->isMessengerHandler()
+            && !$this->isAuthenticator()
+            && !$this->isEventSubscriber()
+            && !$this->isNormalizer()
+            && !$this->isWebhookConsumer()
+            && !$this->isScheduler()
             && str_ends_with($this->relativePath, '.php');
     }
 
@@ -171,6 +213,12 @@ final readonly class ProjectFile
             str_ends_with($path, 'Voter.php') => 'voter',
             str_ends_with($path, 'Repository.php') => 'repository',
             str_contains($path, '/Form/') => 'form',
+            str_ends_with($path, 'Authenticator.php') => 'authenticator',
+            str_ends_with($path, 'MessageHandler.php') || str_contains($path, '/MessageHandler/') => 'messenger_handler',
+            str_ends_with($path, 'WebhookConsumer.php') || str_ends_with($path, 'WebhookParser.php') || str_contains($path, '/Webhook/') => 'webhook_consumer',
+            str_ends_with($path, 'Subscriber.php') || str_ends_with($path, 'EventListener.php') => 'event_subscriber',
+            str_ends_with($path, 'Normalizer.php') || str_ends_with($path, 'Denormalizer.php') => 'normalizer',
+            str_ends_with($path, 'ScheduleProvider.php') || str_ends_with($path, 'Schedule.php') => 'scheduler',
             str_ends_with($path, '.twig') => 'template',
             str_ends_with($path, '.yaml') || str_ends_with($path, '.yml') => 'config',
             str_ends_with($path, '.php') => 'php',

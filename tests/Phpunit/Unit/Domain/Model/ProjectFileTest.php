@@ -303,4 +303,202 @@ final class ProjectFileTest extends TestCase
 
         self::assertSame(hash('sha256', 'x'), $projectFile->contentHash());
     }
+
+    public function test_it_detects_authenticator_by_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/LoginFormAuthenticator.php',
+            '/app/src/Security/LoginFormAuthenticator.php',
+            '<?php',
+        );
+
+        self::assertSame('authenticator', $projectFile->type());
+        self::assertTrue($projectFile->isAuthenticator());
+    }
+
+    public function test_it_detects_messenger_handler_by_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Messenger/SendInvoiceMessageHandler.php',
+            '/app/src/Messenger/SendInvoiceMessageHandler.php',
+            '<?php',
+        );
+
+        self::assertSame('messenger_handler', $projectFile->type());
+        self::assertTrue($projectFile->isMessengerHandler());
+    }
+
+    public function test_it_detects_messenger_handler_by_directory(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/MessageHandler/SendInvoice.php',
+            '/app/src/MessageHandler/SendInvoice.php',
+            '<?php',
+        );
+
+        self::assertSame('messenger_handler', $projectFile->type());
+        self::assertTrue($projectFile->isMessengerHandler());
+    }
+
+    public function test_it_detects_webhook_consumer_by_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Webhook/StripeWebhookConsumer.php',
+            '/app/src/Webhook/StripeWebhookConsumer.php',
+            '<?php',
+        );
+
+        self::assertSame('webhook_consumer', $projectFile->type());
+        self::assertTrue($projectFile->isWebhookConsumer());
+    }
+
+    public function test_it_detects_webhook_parser_by_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Webhook/StripeWebhookParser.php',
+            '/app/src/Webhook/StripeWebhookParser.php',
+            '<?php',
+        );
+
+        self::assertSame('webhook_consumer', $projectFile->type());
+        self::assertTrue($projectFile->isWebhookConsumer());
+    }
+
+    public function test_it_detects_event_subscriber_by_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/EventSubscriber/AuditSubscriber.php',
+            '/app/src/EventSubscriber/AuditSubscriber.php',
+            '<?php',
+        );
+
+        self::assertSame('event_subscriber', $projectFile->type());
+        self::assertTrue($projectFile->isEventSubscriber());
+    }
+
+    public function test_it_detects_event_listener_by_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Listener/ResponseEventListener.php',
+            '/app/src/Listener/ResponseEventListener.php',
+            '<?php',
+        );
+
+        self::assertSame('event_subscriber', $projectFile->type());
+        self::assertTrue($projectFile->isEventSubscriber());
+    }
+
+    public function test_it_detects_normalizer_by_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Serializer/UserNormalizer.php',
+            '/app/src/Serializer/UserNormalizer.php',
+            '<?php',
+        );
+
+        self::assertSame('normalizer', $projectFile->type());
+        self::assertTrue($projectFile->isNormalizer());
+    }
+
+    public function test_it_detects_denormalizer_by_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Serializer/UserDenormalizer.php',
+            '/app/src/Serializer/UserDenormalizer.php',
+            '<?php',
+        );
+
+        self::assertSame('normalizer', $projectFile->type());
+        self::assertTrue($projectFile->isNormalizer());
+    }
+
+    public function test_it_detects_schedule_provider_by_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Schedule/CleanupScheduleProvider.php',
+            '/app/src/Schedule/CleanupScheduleProvider.php',
+            '<?php',
+        );
+
+        self::assertSame('scheduler', $projectFile->type());
+        self::assertTrue($projectFile->isScheduler());
+    }
+
+    public function test_it_detects_schedule_class_by_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Schedule/CleanupSchedule.php',
+            '/app/src/Schedule/CleanupSchedule.php',
+            '<?php',
+        );
+
+        self::assertSame('scheduler', $projectFile->type());
+        self::assertTrue($projectFile->isScheduler());
+    }
+
+    public function test_is_service_returns_false_for_authenticator(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/LoginFormAuthenticator.php',
+            '/app/src/Security/LoginFormAuthenticator.php',
+            '<?php',
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
+
+    public function test_is_service_returns_false_for_messenger_handler(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Messenger/FooMessageHandler.php',
+            '/app/src/Messenger/FooMessageHandler.php',
+            '<?php',
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
+
+    public function test_is_service_returns_false_for_event_subscriber(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/EventSubscriber/FooSubscriber.php',
+            '/app/src/EventSubscriber/FooSubscriber.php',
+            '<?php',
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
+
+    public function test_is_service_returns_false_for_normalizer(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Serializer/FooNormalizer.php',
+            '/app/src/Serializer/FooNormalizer.php',
+            '<?php',
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
+
+    public function test_is_service_returns_false_for_webhook_consumer(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Webhook/FooWebhookConsumer.php',
+            '/app/src/Webhook/FooWebhookConsumer.php',
+            '<?php',
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
+
+    public function test_is_service_returns_false_for_scheduler(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Schedule/FooSchedule.php',
+            '/app/src/Schedule/FooSchedule.php',
+            '<?php',
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
 }
