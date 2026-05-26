@@ -46,6 +46,8 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame('high', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
         self::assertFalse($bundleConfiguration->audit->codeSlicingEnabled);
         self::assertSame(80, $bundleConfiguration->audit->codeSlicingMinLines);
+        self::assertFalse($bundleConfiguration->audit->escalationEnabled);
+        self::assertNull($bundleConfiguration->audit->escalationCheapModel);
 
         self::assertSame(3, $bundleConfiguration->retry->maxAttempts);
         self::assertSame(500, $bundleConfiguration->retry->initialDelayMs);
@@ -191,6 +193,10 @@ final class BundleConfigurationTest extends TestCase
                 'code_slicing' => [
                     'enabled' => false,
                     'min_lines_before_slicing' => 80,
+                ],
+                'escalation' => [
+                    'enabled' => false,
+                    'cheap_model' => null,
                 ],
                 'budget' => [
                     'max_tokens' => null,

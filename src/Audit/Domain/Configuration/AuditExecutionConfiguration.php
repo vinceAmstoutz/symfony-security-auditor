@@ -30,5 +30,7 @@ final readonly class AuditExecutionConfiguration
         public string $poCSynthesisSeverityFloor = 'high',
         public bool $codeSlicingEnabled = false,
         public int $codeSlicingMinLines = 80,
+        public bool $escalationEnabled = false,
+        public ?string $escalationCheapModel = null,
     ) {}
 }

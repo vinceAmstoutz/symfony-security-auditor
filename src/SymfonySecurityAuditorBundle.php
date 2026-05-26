@@ -21,7 +21,9 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
@@ -186,6 +188,20 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                                     ->values(['feature', 'type'])
                                     ->defaultValue('feature')
                                     ->info('Chunking strategy. `feature` colocates related files (UserController + User entity + UserRepository + …) in one chunk; `type` chunks by file-type priority. Default `feature`.')
+                                ->end()
+                            ->end()
+                        ->end()
+                        ->arrayNode('escalation')
+                            ->addDefaultsIfNotSet()
+                            ->info('Two-pass attacker. A cheap-model sweep runs on every chunk; the expensive model only re-analyses files the cheap sweep flagged. Cuts attacker token spend ~3-5x on real projects where most files are inert, with detection quality close to running the expensive model on everything. Off by default — opt-in for cost-sensitive audits.')
+                            ->children()
+                                ->booleanNode('enabled')
+                                    ->defaultFalse()
+                                    ->info('When true, AttackerAgentInterface is wired to the EscalatingAttackerAgent wrapper. Requires `cheap_model` to be set.')
+                                ->end()
+                                ->scalarNode('cheap_model')
+                                    ->defaultNull()
+                                    ->info('Provider model id used for the cheap first pass (e.g. claude-haiku-4-5-20251001, gpt-5-mini, mistral-small). Falls back to the reviewer model when null.')
                                 ->end()
                             ->end()
                         ->end()
@@ -481,5 +497,55 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ? RegexCodeSlicer::class
             : NullCodeSlicer::class;
         $services->alias(CodeSlicerInterface::class, $codeSlicerServiceId);
+
+        if ($bundleConfiguration->audit->escalationEnabled) {
+            $cheapModel = $bundleConfiguration->audit->escalationCheapModel ?? $bundleConfiguration->llm->reviewerModel();
+
+            $services->set('security_auditor.cheap_attacker_client', SymfonyAiLLMClient::class)
+                ->private()
+                ->args([
+                    service(PlatformInterface::class),
+                    $cheapModel,
+                    service('logger'),
+                    SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
+                    $bundleConfiguration->cache->promptCaching,
+                    service(TokenUsageRecorder::class),
+                    service(RetryPolicy::class),
+                    service(TransientFailureClassifier::class),
+                    service(SleeperInterface::class),
+                    service(BudgetTracker::class),
+                    $bundleConfiguration->llm->providerJsonMode,
+                    service(RateLimiterInterface::class),
+                    service(TokenEstimatorInterface::class),
+                    service(RetryAfterHeaderParser::class),
+                ]);
+
+            $services->set('security_auditor.cheap_attacker', AttackerAgent::class)
+                ->private()
+                ->args([
+                    service('security_auditor.cheap_attacker_client'),
+                    service(\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface::class),
+                    service(\VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory::class),
+                    service(\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface::class),
+                    service('logger'),
+                    service(\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface::class),
+                    $bundleConfiguration->audit->toolsEnabled,
+                    $bundleConfiguration->audit->maxToolIterations,
+                    service(\VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface::class),
+                    $bundleConfiguration->audit->staticPreScanLeanMode,
+                    service(\VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker::class),
+                    service(CodeSlicerInterface::class),
+                ]);
+
+            $services->set(EscalatingAttackerAgent::class)
+                ->private()
+                ->args([
+                    service('security_auditor.cheap_attacker'),
+                    service(AttackerAgent::class),
+                    service('logger'),
+                ]);
+
+            $services->alias(AttackerAgentInterface::class, EscalatingAttackerAgent::class);
+        }
     }
 }
