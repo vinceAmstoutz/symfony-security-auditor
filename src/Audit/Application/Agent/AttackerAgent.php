@@ -27,10 +27,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
@@ -48,6 +50,8 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
     private FileChunker $fileChunker;
 
+    private CodeSlicerInterface $codeSlicer;
+
     public function __construct(
         private LLMClientInterface $llmClient,
         private AttackerPromptBuilderInterface $attackerPromptBuilder,
@@ -60,9 +64,11 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         ?StaticPreScannerInterface $staticPreScanner = null,
         private bool $leanMode = self::DEFAULT_LEAN_MODE,
         ?FileChunker $fileChunker = null,
+        ?CodeSlicerInterface $codeSlicer = null,
     ) {
         $this->staticPreScanner = $staticPreScanner ?? new NullStaticPreScanner();
         $this->fileChunker = $fileChunker ?? new FileChunker();
+        $this->codeSlicer = $codeSlicer ?? new NullCodeSlicer();
     }
 
     /**
@@ -152,8 +158,9 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             }
         }
 
-        $systemPrompt = $this->attackerPromptBuilder->buildSystemPrompt($chunk);
-        $userMessage = $this->attackerPromptBuilder->buildUserMessage($chunk, $symfonyMapping);
+        $slicedChunk = $this->sliceChunk($chunk);
+        $systemPrompt = $this->attackerPromptBuilder->buildSystemPrompt($slicedChunk);
+        $userMessage = $this->attackerPromptBuilder->buildUserMessage($slicedChunk, $symfonyMapping);
 
         if ($hasMarkers) {
             $userMessage = $this->renderRiskMarkers($chunkMarkers)."\n\n".$userMessage;
@@ -347,5 +354,38 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     private function chunkFiles(array $files): array
     {
         return $this->fileChunker->chunk($files);
+    }
+
+    /**
+     * Replaces each file in the chunk with a version whose content is sliced
+     * down to security-relevant lines. The slicer preserves the original line
+     * count by replacing elided lines with a `// elided` placeholder, so the
+     * line-numbering protocol in the prompt remains accurate against the
+     * original source.
+     *
+     * @param list<ProjectFile> $chunk
+     *
+     * @return list<ProjectFile>
+     */
+    private function sliceChunk(array $chunk): array
+    {
+        $sliced = [];
+        foreach ($chunk as $file) {
+            $newContent = $this->codeSlicer->slice($file);
+
+            if ($newContent === $file->content()) {
+                $sliced[] = $file;
+
+                continue;
+            }
+
+            $sliced[] = ProjectFile::create(
+                relativePath: $file->relativePath(),
+                absolutePath: $file->absolutePath(),
+                content: $newContent,
+            );
+        }
+
+        return $sliced;
     }
 }

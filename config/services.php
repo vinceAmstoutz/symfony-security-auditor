@@ -44,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterf
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
@@ -70,7 +71,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRegistryFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
@@ -261,6 +264,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(RegexStaticPreScanner::class)
         ->args([param('symfony_security_auditor.scan.custom_risk_patterns')]);
 
+    $defaultsConfigurator->set(NullCodeSlicer::class);
+    $defaultsConfigurator->set(RegexCodeSlicer::class)
+        ->args([param('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing')]);
+
     $defaultsConfigurator->set(FileChunker::class)
         ->args([
             inline_service(ChunkingStrategy::class)
@@ -281,6 +288,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(StaticPreScannerInterface::class),
             param('symfony_security_auditor.audit.static_prescan.lean_mode'),
             service(FileChunker::class),
+            service(CodeSlicerInterface::class),
         ]);
 
     $defaultsConfigurator->alias(AttackerAgentInterface::class, AttackerAgent::class);

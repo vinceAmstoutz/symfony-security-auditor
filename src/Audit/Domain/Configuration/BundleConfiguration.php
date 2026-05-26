@@ -76,6 +76,8 @@ final readonly class BundleConfiguration
                 chunkingStrategy: $config['audit']['chunking']['strategy'] ?? 'feature',
                 poCSynthesisEnabled: $config['audit']['poc_synthesis']['enabled'] ?? false,
                 poCSynthesisSeverityFloor: $config['audit']['poc_synthesis']['severity_floor'] ?? 'high',
+                codeSlicingEnabled: $config['audit']['code_slicing']['enabled'] ?? false,
+                codeSlicingMinLines: $config['audit']['code_slicing']['min_lines_before_slicing'] ?? 80,
             ),
             retry: new RetryConfiguration(
                 maxAttempts: $config['audit']['retry']['max_attempts'],

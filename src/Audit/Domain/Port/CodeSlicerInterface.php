@@ -1,0 +1,31 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
+
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+
+/**
+ * Trims a file down to its security-relevant slices before it is sent to the
+ * LLM. Returns line-numbered output where retained lines keep their original
+ * 1-based numbering and elided runs collapse into a single placeholder, so the
+ * attacker prompt's `line_start` / `line_end` protocol remains accurate.
+ *
+ * Implementations MUST be pure (no I/O, no clock) and idempotent. They MUST
+ * NEVER renumber retained lines — the LLM relies on absolute line numbers to
+ * report findings against the original source.
+ */
+interface CodeSlicerInterface
+{
+    public function slice(ProjectFile $file): string;
+}

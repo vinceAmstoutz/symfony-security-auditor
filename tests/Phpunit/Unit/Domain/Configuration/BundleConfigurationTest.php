@@ -44,6 +44,8 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame('feature', $bundleConfiguration->audit->chunkingStrategy);
         self::assertFalse($bundleConfiguration->audit->poCSynthesisEnabled);
         self::assertSame('high', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
+        self::assertFalse($bundleConfiguration->audit->codeSlicingEnabled);
+        self::assertSame(80, $bundleConfiguration->audit->codeSlicingMinLines);
 
         self::assertSame(3, $bundleConfiguration->retry->maxAttempts);
         self::assertSame(500, $bundleConfiguration->retry->initialDelayMs);
@@ -185,6 +187,10 @@ final class BundleConfigurationTest extends TestCase
                 'poc_synthesis' => [
                     'enabled' => false,
                     'severity_floor' => 'high',
+                ],
+                'code_slicing' => [
+                    'enabled' => false,
+                    'min_lines_before_slicing' => 80,
                 ],
                 'budget' => [
                     'max_tokens' => null,

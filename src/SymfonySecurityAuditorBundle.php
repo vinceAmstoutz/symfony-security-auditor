@@ -33,6 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
@@ -49,7 +50,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
@@ -183,6 +186,21 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                                     ->values(['feature', 'type'])
                                     ->defaultValue('feature')
                                     ->info('Chunking strategy. `feature` colocates related files (UserController + User entity + UserRepository + …) in one chunk; `type` chunks by file-type priority. Default `feature`.')
+                                ->end()
+                            ->end()
+                        ->end()
+                        ->arrayNode('code_slicing')
+                            ->addDefaultsIfNotSet()
+                            ->info('Trim large PHP files down to security-relevant slices before they reach the LLM. The slicer keeps imports, attributes, class signatures, properties, and the FULL body of methods that touch security-relevant tokens (Request, Doctrine query builder, unserialize, shell exec, mailer, HttpClient, …). All other lines are replaced one-for-one with a `// elided` placeholder so line numbers stay accurate. Typical saving: 50-70% input tokens on controllers / services over 100 lines.')
+                            ->children()
+                                ->booleanNode('enabled')
+                                    ->defaultFalse()
+                                    ->info('When true, the configured CodeSlicerInterface runs over every chunked file. Default false — opt-in for cost-sensitive audits; smaller files and unfamiliar idioms keep more signal when sent unsliced.')
+                                ->end()
+                                ->integerNode('min_lines_before_slicing')
+                                    ->defaultValue(80)
+                                    ->min(10)
+                                    ->info('Skip slicing for files shorter than this. Below ~80 lines the saving is not worth the missing context.')
                                 ->end()
                             ->end()
                         ->end()
@@ -324,6 +342,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.chunking.strategy', $bundleConfiguration->audit->chunkingStrategy);
         $builder->setParameter('symfony_security_auditor.audit.poc_synthesis.enabled', $bundleConfiguration->audit->poCSynthesisEnabled);
         $builder->setParameter('symfony_security_auditor.audit.poc_synthesis.severity_floor', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
+        $builder->setParameter('symfony_security_auditor.audit.code_slicing.enabled', $bundleConfiguration->audit->codeSlicingEnabled);
+        $builder->setParameter('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing', $bundleConfiguration->audit->codeSlicingMinLines);
         $builder->setParameter('symfony_security_auditor.audit.budget.max_tokens', $bundleConfiguration->budget->maxTokens);
         $builder->setParameter('symfony_security_auditor.audit.budget.max_cost_usd', $bundleConfiguration->budget->maxCostUsd);
         $builder->setParameter('symfony_security_auditor.audit.retry.max_attempts', $bundleConfiguration->retry->maxAttempts);
@@ -456,5 +476,10 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ? RegexStaticPreScanner::class
             : NullStaticPreScanner::class;
         $services->alias(StaticPreScannerInterface::class, $preScannerServiceId);
+
+        $codeSlicerServiceId = $bundleConfiguration->audit->codeSlicingEnabled
+            ? RegexCodeSlicer::class
+            : NullCodeSlicer::class;
+        $services->alias(CodeSlicerInterface::class, $codeSlicerServiceId);
     }
 }
