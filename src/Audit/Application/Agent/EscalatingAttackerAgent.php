@@ -90,14 +90,14 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
      */
     private function filterToHotFiles(array $files, array $cheapFindings): array
     {
-        $hotPaths = [];
-        foreach ($cheapFindings as $cheapFinding) {
-            $hotPaths[$cheapFinding->filePath()] = true;
-        }
+        $hotPaths = array_map(
+            static fn (Vulnerability $vulnerability): string => $vulnerability->filePath(),
+            $cheapFindings,
+        );
 
         return array_values(array_filter(
             $files,
-            static fn (ProjectFile $projectFile): bool => isset($hotPaths[$projectFile->relativePath()]),
+            static fn (ProjectFile $projectFile): bool => \in_array($projectFile->relativePath(), $hotPaths, true),
         ));
     }
 

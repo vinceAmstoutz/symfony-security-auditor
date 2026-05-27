@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\ErrorHandler\BufferingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
@@ -137,6 +138,64 @@ final class EscalatingAttackerAgentTest extends TestCase
         self::assertSame([$vulnerability], $expensive->lastPreviousFindings);
     }
 
+    public function test_it_logs_file_counts_for_both_passes(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/A.php'),
+            $this->makeFile('src/Controller/B.php'),
+            $this->makeFile('src/Controller/C.php'),
+        ];
+        $recordingAttackerAgent = $this->makeRecordingAttacker([$this->makeVulnerability('src/Controller/A.php')]);
+        $expensive = $this->makeRecordingAttacker([]);
+        $bufferingLogger = new BufferingLogger();
+
+        (new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, $bufferingLogger))
+            ->analyze(new AttackerAnalysisRequest($files, SymfonyMapping::create()), new NullCoverageRecorder());
+
+        $logs = $bufferingLogger->cleanLogs();
+        self::assertSame(['files' => 3], $this->contextOf($logs, 'Escalation: running cheap-model first pass'));
+        self::assertSame(
+            ['cheap_findings' => 1, 'hot_files' => 1, 'cold_files_skipped' => 2],
+            $this->contextOf($logs, 'Escalation: running expensive-model deep pass on hot files'),
+        );
+    }
+
+    public function test_it_logs_when_cheap_pass_finds_nothing(): void
+    {
+        $bufferingLogger = new BufferingLogger();
+
+        (new EscalatingAttackerAgent($this->makeRecordingAttacker([]), $this->makeRecordingAttacker([]), $bufferingLogger))
+            ->analyze(new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::create()), new NullCoverageRecorder());
+
+        self::assertSame([], $this->contextOf($bufferingLogger->cleanLogs(), 'Escalation: cheap pass found nothing, skipping expensive pass'));
+    }
+
+    public function test_expensive_pass_receives_original_previous_findings_plus_all_cheap_findings(): void
+    {
+        $previous = [$this->makeVulnerability('src/Controller/Z.php', title: 'prev')];
+        $recordingAttackerAgent = $this->makeRecordingAttacker([
+            $this->makeVulnerability('src/Controller/A.php', title: 'cheapA'),
+            $this->makeVulnerability('src/Controller/B.php', title: 'cheapB'),
+        ]);
+        $expensive = $this->makeRecordingAttacker([]);
+
+        (new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger()))->analyze(
+            new AttackerAnalysisRequest(
+                [$this->makeFile('src/Controller/A.php'), $this->makeFile('src/Controller/B.php')],
+                SymfonyMapping::create(),
+                false,
+                $previous,
+            ),
+            new NullCoverageRecorder(),
+        );
+
+        $titles = array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $expensive->lastPreviousFindings);
+        self::assertCount(3, $expensive->lastPreviousFindings);
+        self::assertContains('prev', $titles);
+        self::assertContains('cheapA', $titles);
+        self::assertContains('cheapB', $titles);
+    }
+
     /**
      * @param list<ProjectFile> $files
      *
@@ -145,6 +204,26 @@ final class EscalatingAttackerAgentTest extends TestCase
     private function callAnalyze(AttackerAgentInterface $attackerAgent, array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder): array
     {
         return $attackerAgent->analyze(new AttackerAnalysisRequest($files, $symfonyMapping), $coverageRecorder);
+    }
+
+    /**
+     * @param array<mixed> $logs
+     *
+     * @return array<mixed>
+     */
+    private function contextOf(array $logs, string $message): array
+    {
+        foreach ($logs as $log) {
+            self::assertIsArray($log);
+            if ($message === ($log[1] ?? null)) {
+                $context = $log[2] ?? [];
+                self::assertIsArray($context);
+
+                return $context;
+            }
+        }
+
+        self::fail(\sprintf('No log entry with message "%s"', $message));
     }
 
     private function makeFile(string $path): ProjectFile
