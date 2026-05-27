@@ -156,7 +156,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
         run: |
-          ARGS="--configuration=infection.json5 --threads=max --coverage=build/coverage --skip-initial-tests --min-msi=100 --min-covered-msi=100"
+          ARGS="--configuration=infection.json5 --threads=max --min-msi=100 --min-covered-msi=100"
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             git fetch --depth=1 origin "$BASE_REF"
             ARGS="$ARGS --git-diff-lines --git-diff-base=origin/$BASE_REF --ignore-msi-with-no-mutations"
