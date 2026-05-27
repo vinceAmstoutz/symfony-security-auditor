@@ -6,7 +6,7 @@
         ]
     },
     "tmpDir": "var/infection",
-    "timeout": 10,
+    "timeout": 30,
     "threads": "max",
     "logs": {
         "text": "infection/infection.log",
