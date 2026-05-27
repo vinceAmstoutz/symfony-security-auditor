@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle;
 
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Test\InMemoryPlatform;
@@ -44,10 +45,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Toke
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
+#[RunTestsInSeparateProcesses]
 final class SymfonySecurityAuditorBundleTest extends TestCase
 {
-    private static int $bootSequence = 0;
-
     private string $tmpDir;
 
     private ?Kernel $bootedKernel = null;
@@ -427,29 +427,20 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     private function boot(array $bundleConfig): Kernel
     {
         $tmpDir = $this->tmpDir;
-        $containerClass = 'SsaBundleTestContainer'.(++self::$bootSequence);
-        $kernel = new class('test', true, $tmpDir, $bundleConfig, $containerClass) extends Kernel {
+        $kernel = new class('test', true, $tmpDir, $bundleConfig) extends Kernel {
             /** @var array<string, mixed> */
             private array $bundleConfig;
 
             private string $tmpDir;
 
-            private string $containerClass;
-
             /**
              * @param array<string, mixed> $bundleConfig
              */
-            public function __construct(string $environment, bool $debug, string $tmpDir, array $bundleConfig, string $containerClass)
+            public function __construct(string $environment, bool $debug, string $tmpDir, array $bundleConfig)
             {
                 parent::__construct($environment, $debug);
                 $this->tmpDir = $tmpDir;
                 $this->bundleConfig = $bundleConfig;
-                $this->containerClass = $containerClass;
-            }
-
-            protected function getContainerClass(): string
-            {
-                return $this->containerClass;
             }
 
             public function registerBundles(): iterable
