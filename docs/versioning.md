@@ -45,7 +45,10 @@ Every key under `symfony_security_auditor:` documented in
   `audit.escalation.enabled`, `audit.escalation.cheap_model`,
   `audit.retry.max_attempts`, `audit.retry.initial_delay_ms`,
   `audit.retry.backoff_multiplier`, `audit.retry.jitter_ratio`,
-  `audit.budget.max_tokens`, `audit.budget.max_cost_usd`
+  `audit.budget.max_tokens`, `audit.budget.max_cost_usd`,
+  `audit.rate_limit.requests_per_minute`,
+  `audit.rate_limit.input_tokens_per_minute`,
+  `audit.rate_limit.output_tokens_per_minute`
 - `cache.enabled`, `cache.dir`, `cache.prompt_caching`
 
 Default values for these keys are also part of the contract. Changing a default
@@ -138,8 +141,9 @@ Anything tagged `@internal` may be refactored, renamed, or removed in any
 
 - All concrete classes under `Audit/Application/Agent/` and
   `Audit/Application/Pipeline/` (`AttackerAgent`, `ReviewerAgent`,
-  `AuditOrchestrator`, `VulnerabilityFactory`, `AuditPipeline`,
-  `IngestionStage`, `MappingStage`, `AuditStage`).
+  `EscalatingAttackerAgent`, `AuditOrchestrator`, `VulnerabilityFactory`,
+  `PoCSynthesizer`, `AuditPipeline`, `IngestionStage`, `MappingStage`,
+  `AuditStage`, `PoCSynthesisStage`).
 - All concrete adapters under `Audit/Infrastructure/` — `SymfonyAiLLMClient`,
   `ProjectFileScanner`, `AttackerPromptBuilder`, `ReviewerPromptBuilder`,
   `FilesystemAttackerCache`, `NullAttackerCache`,

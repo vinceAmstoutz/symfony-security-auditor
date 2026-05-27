@@ -46,17 +46,19 @@ src/
 │   ├── Domain/          # Pure PHP — no framework, no I/O
 │   │   ├── Model/       # Value objects and enums
 │   │   ├── Pipeline/    # PipelineInterface, StageInterface, CoverageRecorderInterface, NullCoverageRecorder
-│   │   └── Port/        # Cross-layer ports — LLMClientInterface, LLMResponse,
-│   │       │              AttackerCacheInterface, ProjectFileScannerInterface,
-│   │       │              SecretScrubberInterface, TokenEstimatorInterface,
-│   │       │              RateLimiterInterface,
-│   │       │              PricingProviderInterface,
+│   │   └── Port/        # Cross-layer ports — LLMClientInterface,
+│   │       │              BatchCapableLLMClientInterface, LLMResponse,
+│   │       │              AttackerCacheInterface, AdvisoryDatabaseInterface,
+│   │       │              ProjectFileScannerInterface, SecretScrubberInterface,
+│   │       │              TokenEstimatorInterface, RateLimiterInterface,
+│   │       │              PricingProviderInterface, StaticPreScannerInterface,
+│   │       │              CodeSlicerInterface, GitChangedFilesResolverInterface,
 │   │       │              Attacker/ReviewerPromptBuilderInterface
 │   │       └── Tool/    # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
 │   ├── Application/     # Orchestration — no I/O, depends only on Domain
 │   │   ├── UseCase/     # Entry points: RunAuditUseCase, EstimateAuditCostUseCase
-│   │   ├── Pipeline/    # AuditPipeline + three Stage implementations
-│   │   └── Agent/       # Attacker/Reviewer agents (+ interfaces), AuditOrchestrator (+ interface), VulnerabilityFactory
+│   │   ├── Pipeline/    # AuditPipeline + Stage/{IngestionStage, MappingStage, AuditStage, PoCSynthesisStage}
+│   │   └── Agent/       # AttackerAgent, ReviewerAgent, EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, PoCSynthesizer, Chunking/FileChunker
 │   └── Infrastructure/  # I/O adapters
 │       ├── LLM/         # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier,
 │       │                  CharacterBasedTokenEstimator, Delay/SleeperInterface + UsleepSleeper,
@@ -119,11 +121,12 @@ flowchart TD
     ING["IngestionStage\nProjectFileScanner::scan()\nsetProjectFiles()"]
     MAP["MappingStage\nclassify files into roles\nbuild SymfonyMapping · setMapping()"]
     AUD["AuditStage\nAuditOrchestrator::orchestrate()"]
-    ATK["AttackerAgent::analyze()\nsort by priority · chunk by 10\nLLM call per chunk · parse JSON"]
+    ATK["AttackerAgent::analyze()\noptional pre-scan · chunk by feature\nLLM call per chunk · parse JSON"]
     CONF{"confidence ≥ 0.6?"}
     REV["ReviewerAgent::review()\nLLM call per vulnerability\nwithReviewerValidation()"]
     DEDUP["deduplicate\nAuditContext::addVulnerability()"]
     LOOP{"no new findings\nOR 3 iterations?"}
+    POC["PoCSynthesisStage (optional)\nsynthesize PoC for\nhigh-severity validated findings"]
     RPT["AuditReport::fromContext()\nvalidated vulnerabilities only\ncapture completedAt"]
     RENDER["ReportRenderer\nrenderConsole() or renderJson()"]
 
@@ -131,9 +134,10 @@ flowchart TD
     UC --> ING --> MAP --> AUD --> ATK
     ATK --> CONF
     CONF -- yes --> REV --> DEDUP --> LOOP
-    CONF -- none pass --> RPT
+    CONF -- none pass --> POC
     LOOP -- continue --> ATK
-    LOOP -- done --> RPT
+    LOOP -- done --> POC
+    POC --> RPT
     RPT --> RENDER
 ```
 
@@ -290,6 +294,11 @@ client for semantic mapping or fall back to heuristic classification.
 
 **`AuditStage`** — delegates entirely to
 `AuditOrchestrator::orchestrate(AuditContext)`.
+
+**`PoCSynthesisStage`** — optional final stage (off by default). When enabled,
+synthesizes a concrete reproduction artifact (the `synthesized_poc` report
+field) for validated findings at or above the configured severity floor,
+delegating to `PoCSynthesizer`.
 
 ### `AuditOrchestrator`
 
