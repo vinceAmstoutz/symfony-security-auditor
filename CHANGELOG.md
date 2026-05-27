@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
-## [1.4.0] — 2026-05-26 — Bloodhound
+## [1.4.0] — 2026-05-27 — Bloodhound
 
 A detection-and-cost release. The auditor now covers the modern Symfony 7.x/8.x
 attack surface, follows data flow across files, tracks findings across runs, and
