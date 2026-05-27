@@ -6,8 +6,10 @@
         ]
     },
     "tmpDir": "var/infection",
-    "timeout": 30,
-    "threads": "max",
+    "timeout": 60,
+    "maxTimeouts": 0,
+    "timeoutsAsEscaped": true,
+    "threads": 4,
     "logs": {
         "text": "infection/infection.log",
         "html": "infection/infection.html",
@@ -22,6 +24,7 @@
     "staticAnalysisToolOptions": "--memory-limit=500M",
     "minMsi": 100,
     "minCoveredMsi": 100,
+    "dotsPerRow": "max",
     "mutators": {
         "@default": true
     }
