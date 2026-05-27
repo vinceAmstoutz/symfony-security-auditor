@@ -164,6 +164,7 @@ final class PoCSynthesizerTest extends TestCase
 
         $logs = $bufferingLogger->cleanLogs();
         $completion = end($logs);
+        self::assertIsArray($completion);
         self::assertSame('PoC synthesis complete', $completion[1]);
         self::assertSame(['inputs' => 2, 'synthesized' => 1, 'skipped' => 1], $completion[2]);
     }
@@ -188,10 +189,13 @@ final class PoCSynthesizerTest extends TestCase
         (new PoCSynthesizer($llmClient, $bufferingLogger))->synthesize([$vulnerability]);
 
         $logs = $bufferingLogger->cleanLogs();
-        self::assertSame('error', $logs[0][0]);
-        self::assertSame('PoC synthesis call failed; keeping original proof', $logs[0][1]);
-        self::assertSame($vulnerability->id(), $logs[0][2]['vulnerability_id']);
-        self::assertSame('network down', $logs[0][2]['error']);
+        $entry = $logs[0] ?? null;
+        self::assertIsArray($entry);
+        self::assertSame('error', $entry[0]);
+        self::assertSame('PoC synthesis call failed; keeping original proof', $entry[1]);
+        self::assertIsArray($entry[2]);
+        self::assertSame($vulnerability->id(), $entry[2]['vulnerability_id']);
+        self::assertSame('network down', $entry[2]['error']);
     }
 
     public function test_it_rethrows_budget_exceeded_exception(): void
