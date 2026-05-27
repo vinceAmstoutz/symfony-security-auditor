@@ -62,14 +62,14 @@ Commit messages are validated separately in CI via
 src/
   Audit/
     Domain/          # Pure PHP — no framework, no I/O
-      Model/         # Value objects and enums (Vulnerability, AuditReport, …)
+      Model/         # Value objects and enums (Vulnerability, AuditReport, ProjectFile, ProjectFileType, …)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)
       Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, StaticPreScannerInterface, CodeSlicerInterface, GitChangedFilesResolverInterface)
         Tool/        # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
     Application/     # Orchestration — no I/O, depends only on Domain
       UseCase/       # RunAuditUseCase, EstimateAuditCostUseCase (entry points)
       Pipeline/      # AuditPipeline + Stage/{IngestionStage, MappingStage, AuditStage, PoCSynthesisStage}
-      Agent/         # AttackerAgent, ReviewerAgent, EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, PoCSynthesizer, Chunking/{ChunkingStrategy, FileChunker}
+      Agent/         # AttackerAgent (+ AttackerAnalysisRequest, RiskMarkerIndex, AttackerContextPromptRenderer), ReviewerAgent, EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, PoCSynthesizer, Chunking/{ChunkingStrategy, FileChunker}
     Infrastructure/  # I/O adapters
       LLM/           # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier, CharacterBasedTokenEstimator, Delay/, RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
       FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber

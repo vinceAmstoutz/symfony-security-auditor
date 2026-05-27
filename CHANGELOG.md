@@ -91,6 +91,25 @@ fields. No existing key, default, exit code, or schema field changed meaning.
 - The attacker cache key now folds in the pre-scanner version and a hash of
   `scan.custom_risk_patterns`, so changing custom patterns invalidates stale
   entries. Empty LLM responses are now persisted as negative-cache entries.
+- **File-type vocabulary is now a `ProjectFileType` enum** (Domain). The
+  detector, chunk-priority ordering, pre-scanner pattern buckets, and attacker
+  skill-block ordering all reference the enum instead of duplicated magic
+  strings. `ProjectFile::type()` still returns the string value (no schema
+  change); a new `ProjectFile::fileType()` exposes the typed case.
+- **`symfony/string` and `symfony/filesystem` adopted** across the Application,
+  Infrastructure, and Command layers (string manipulation and filesystem access)
+  per `.claude/rules/php-classes.md`. The Domain layer intentionally stays
+  dependency-free native PHP (documented carve-out). Adds `symfony/string` as a
+  runtime dependency.
+- **`AttackerAgent` slimmed** — `analyze()` takes an immutable
+  `AttackerAnalysisRequest` value object (was five positional parameters), and
+  risk-marker indexing and prompt-context rendering moved to dedicated
+  `RiskMarkerIndex` and `AttackerContextPromptRenderer` collaborators.
+  `AttackerAgentInterface` is `@internal`, so this is not a public API change.
+- **Internal cleanup** — `FileChunker` feature/priority logic split into smaller
+  predicates to cut cyclomatic complexity, and the unused `SEVERITY_FLOOR_*`
+  constants on `PoCSynthesizer` (superseded by the `VulnerabilitySeverity` enum)
+  were removed.
 
 ## [1.3.3] — 2026-05-26 — Mesh
 

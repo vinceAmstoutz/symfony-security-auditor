@@ -22,6 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 
+use function Symfony\Component\String\u;
+
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class FilesystemAttackerCache implements AttackerCacheInterface
 {
@@ -31,7 +33,7 @@ final readonly class FilesystemAttackerCache implements AttackerCacheInterface
         private LoggerInterface $logger,
         private string $keySalt = '',
     ) {
-        if ('' === trim($cacheDir)) {
+        if (u($cacheDir)->trim()->isEmpty()) {
             throw InvalidCacheConfigurationException::forEmptyCacheDir();
         }
     }
@@ -120,7 +122,7 @@ final readonly class FilesystemAttackerCache implements AttackerCacheInterface
     {
         $key = $this->keyForChunk($chunk);
 
-        return \sprintf('%s/%s/%s.json', rtrim($this->cacheDir, '/'), substr($key, 0, 2), $key);
+        return \sprintf('%s/%s/%s.json', u($this->cacheDir)->trimEnd('/')->toString(), u($key)->slice(0, 2)->toString(), $key);
     }
 
     /**

@@ -13,10 +13,13 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff;
 
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\GitChangedFilesUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
+
+use function Symfony\Component\String\u;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
@@ -38,9 +41,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolv
  */
 final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesResolverInterface
 {
+    public function __construct(
+        private Filesystem $filesystem = new Filesystem(),
+    ) {}
+
     public function changedSince(string $projectPath, string $ref): array
     {
-        if (!is_dir($projectPath.'/.git') && !$this->isInsideGitTree($projectPath)) {
+        if (!$this->filesystem->exists($projectPath.'/.git') && !$this->isInsideGitTree($projectPath)) {
             throw GitChangedFilesUnavailableException::forNonGitDirectory($projectPath);
         }
 
@@ -59,7 +66,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
         $process = new Process(['git', 'rev-parse', '--is-inside-work-tree'], $projectPath);
         $process->run();
 
-        return $process->isSuccessful() && 'true' === trim($process->getOutput());
+        return $process->isSuccessful() && 'true' === u($process->getOutput())->trim()->toString();
     }
 
     private function refExists(string $projectPath, string $ref): bool
@@ -85,11 +92,11 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
             throw GitChangedFilesUnavailableException::fromProcessFailure($argv[\count($argv) - 1] ?? '', $process->getErrorOutput(), $processFailedException);
         }
 
-        $lines = preg_split('/\R/', trim($process->getOutput())) ?: [];
+        $lines = preg_split('/\R/', u($process->getOutput())->trim()->toString()) ?: [];
 
         return array_values(array_filter(
             $lines,
-            static fn (string $line): bool => '' !== trim($line),
+            static fn (string $line): bool => !u($line)->trim()->isEmpty(),
         ));
     }
 
@@ -102,7 +109,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
     {
         $normalized = [];
         foreach ($paths as $path) {
-            $trimmed = ltrim(trim($path), './');
+            $trimmed = u($path)->trim()->trimStart('./')->toString();
             if ('' !== $trimmed) {
                 $normalized[$trimmed] = true;
             }

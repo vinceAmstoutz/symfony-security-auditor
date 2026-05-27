@@ -18,9 +18,39 @@ use Iterator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 
 final class ProjectFileTest extends TestCase
 {
+    public function test_file_type_returns_the_matching_enum_case(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/UserController.php',
+            '/app/src/Controller/UserController.php',
+            '<?php',
+        );
+
+        self::assertSame(ProjectFileType::CONTROLLER, $projectFile->fileType());
+    }
+
+    public function test_file_type_falls_back_to_other_for_unrecognized_paths(): void
+    {
+        $projectFile = ProjectFile::create('README.md', '/app/README.md', '# Docs');
+
+        self::assertSame(ProjectFileType::OTHER, $projectFile->fileType());
+    }
+
+    public function test_type_string_mirrors_the_file_type_enum_value(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/UserVoter.php',
+            '/app/src/Security/UserVoter.php',
+            '<?php',
+        );
+
+        self::assertSame($projectFile->fileType()->value, $projectFile->type());
+    }
+
     public static function fileTypeProvider(): Iterator
     {
         yield ['src/Controller/UserController.php', 'controller', 'isController'];

@@ -21,8 +21,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\Budg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
@@ -52,6 +50,8 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
     private CodeSlicerInterface $codeSlicer;
 
+    private AttackerContextPromptRenderer $attackerContextPromptRenderer;
+
     public function __construct(
         private LLMClientInterface $llmClient,
         private AttackerPromptBuilderInterface $attackerPromptBuilder,
@@ -65,20 +65,21 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         private bool $leanMode = self::DEFAULT_LEAN_MODE,
         ?FileChunker $fileChunker = null,
         ?CodeSlicerInterface $codeSlicer = null,
+        ?AttackerContextPromptRenderer $attackerContextPromptRenderer = null,
     ) {
         $this->staticPreScanner = $staticPreScanner ?? new NullStaticPreScanner();
         $this->fileChunker = $fileChunker ?? new FileChunker();
         $this->codeSlicer = $codeSlicer ?? new NullCodeSlicer();
+        $this->attackerContextPromptRenderer = $attackerContextPromptRenderer ?? new AttackerContextPromptRenderer();
     }
 
     /**
-     * @param list<ProjectFile>   $files
-     * @param list<Vulnerability> $previousFindings
-     *
      * @return list<Vulnerability>
      */
-    public function analyze(array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, array $previousFindings = []): array
+    public function analyze(AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder): array
     {
+        $files = $attackerAnalysisRequest->files;
+
         if ([] === $files) {
             return [];
         }
@@ -86,8 +87,8 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         $useTools = $this->toolsEnabled && $this->toolRegistryFactory instanceof ToolRegistryFactoryInterface;
 
         $markers = $this->staticPreScanner->scan($files);
-        $markersByFile = $this->groupMarkersByFile($markers);
-        $effectiveFiles = $this->leanMode ? $this->filterFilesWithMarkers($files, $markersByFile) : $files;
+        $riskMarkerIndex = new RiskMarkerIndex($markers);
+        $effectiveFiles = $this->leanMode ? $riskMarkerIndex->filesWithMarkers($files) : $files;
 
         if ([] === $effectiveFiles) {
             $this->logger->info('Attacker agent skipped — lean mode filtered all files', [
@@ -104,8 +105,8 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             'files_filtered_lean' => \count($files) - \count($effectiveFiles),
             'markers' => \count($markers),
             'tools_enabled' => $useTools,
-            'cache_bypassed' => $bypassCache,
-            'previous_findings' => \count($previousFindings),
+            'cache_bypassed' => $attackerAnalysisRequest->bypassCache,
+            'previous_findings' => \count($attackerAnalysisRequest->previousFindings),
         ]);
 
         $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($effectiveFiles) : null;
@@ -116,7 +117,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         foreach ($chunks as $index => $chunk) {
             $this->logger->debug(\sprintf('Analyzing chunk %d/%d', $index + 1, \count($chunks)));
 
-            $vulnerabilities = $this->analyzeChunk($chunk, $symfonyMapping, $coverageRecorder, $toolRegistry, $bypassCache, $previousFindings, $markersByFile);
+            $vulnerabilities = $this->analyzeChunk($chunk, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
             $allVulnerabilities = [...$allVulnerabilities, ...$vulnerabilities];
 
             $this->logger->debug('Chunk analysis complete', [
@@ -134,18 +135,16 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     }
 
     /**
-     * @param list<ProjectFile>               $chunk
-     * @param list<Vulnerability>             $previousFindings
-     * @param array<string, list<RiskMarker>> $markersByFile    keyed by file relative path
+     * @param list<ProjectFile> $chunk
      *
      * @return list<Vulnerability>
      */
-    private function analyzeChunk(array $chunk, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, bool $bypassCache, array $previousFindings, array $markersByFile): array
+    private function analyzeChunk(array $chunk, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, RiskMarkerIndex $riskMarkerIndex): array
     {
-        $hasPreviousFindings = [] !== $previousFindings;
-        $chunkMarkers = $this->markersForChunk($chunk, $markersByFile);
+        $hasPreviousFindings = [] !== $attackerAnalysisRequest->previousFindings;
+        $chunkMarkers = $riskMarkerIndex->forChunk($chunk);
         $hasMarkers = [] !== $chunkMarkers;
-        $cacheable = !$bypassCache && !$hasPreviousFindings;
+        $cacheable = !$attackerAnalysisRequest->bypassCache && !$hasPreviousFindings;
 
         if ($cacheable) {
             $cached = $this->attackerCache->get($chunk);
@@ -160,14 +159,14 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
         $slicedChunk = $this->sliceChunk($chunk);
         $systemPrompt = $this->attackerPromptBuilder->buildSystemPrompt($slicedChunk);
-        $userMessage = $this->attackerPromptBuilder->buildUserMessage($slicedChunk, $symfonyMapping);
+        $userMessage = $this->attackerPromptBuilder->buildUserMessage($slicedChunk, $attackerAnalysisRequest->symfonyMapping);
 
         if ($hasMarkers) {
-            $userMessage = $this->renderRiskMarkers($chunkMarkers)."\n\n".$userMessage;
+            $userMessage = $this->attackerContextPromptRenderer->renderRiskMarkers($chunkMarkers)."\n\n".$userMessage;
         }
 
         if ($hasPreviousFindings) {
-            $userMessage = $this->renderPreviousFindings($previousFindings)."\n\n".$userMessage;
+            $userMessage = $this->attackerContextPromptRenderer->renderPreviousFindings($attackerAnalysisRequest->previousFindings)."\n\n".$userMessage;
         }
 
         try {
@@ -233,118 +232,6 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         foreach ($chunk as $file) {
             $coverageRecorder->recordCoverage(AgentRole::Attacker->value, $file->relativePath(), $status);
         }
-    }
-
-    /**
-     * @param list<Vulnerability> $previousFindings
-     */
-    private function renderPreviousFindings(array $previousFindings): string
-    {
-        $byType = [];
-        foreach ($previousFindings as $previouFinding) {
-            $byType[$previouFinding->type()->value][] = \sprintf(
-                '%s:%d-%d',
-                $previouFinding->filePath(),
-                $previouFinding->lineStart(),
-                $previouFinding->lineEnd(),
-            );
-        }
-
-        $lines = [];
-        foreach ($byType as $type => $locations) {
-            $lines[] = \sprintf('- %s: %s', $type, implode(', ', $locations));
-        }
-
-        return <<<PROMPT
-            ## Patterns Already Confirmed in Earlier Iterations
-            The reviewer has already validated the findings below. Look for the SAME PATTERNS in files not yet covered by these locations. Do NOT re-report the same vulnerability at the same line range — those entries will be filtered as duplicates.
-
-            {$this->indent(implode("\n", $lines))}
-
-            Generalize: if `insecure_direct_object_reference` was confirmed in one controller, hunt for the same idiom in every other controller in this chunk. If `sql_injection` was confirmed in one repository, look for unsafe DQL/SQL concatenation in every other repository.
-            PROMPT;
-    }
-
-    private function indent(string $content): string
-    {
-        return implode("\n", array_map(static fn (string $line): string => '  '.$line, explode("\n", $content)));
-    }
-
-    /**
-     * @param list<RiskMarker> $markers
-     *
-     * @return array<string, list<RiskMarker>>
-     */
-    private function groupMarkersByFile(array $markers): array
-    {
-        $byFile = [];
-
-        foreach ($markers as $marker) {
-            $byFile[$marker->filePath()][] = $marker;
-        }
-
-        return $byFile;
-    }
-
-    /**
-     * @param list<ProjectFile>               $chunk
-     * @param array<string, list<RiskMarker>> $markersByFile
-     *
-     * @return list<RiskMarker>
-     */
-    private function markersForChunk(array $chunk, array $markersByFile): array
-    {
-        $chunkMarkers = [];
-
-        foreach ($chunk as $file) {
-            foreach ($markersByFile[$file->relativePath()] ?? [] as $marker) {
-                $chunkMarkers[] = $marker;
-            }
-        }
-
-        return $chunkMarkers;
-    }
-
-    /**
-     * @param list<ProjectFile>               $files
-     * @param array<string, list<RiskMarker>> $markersByFile
-     *
-     * @return list<ProjectFile>
-     */
-    private function filterFilesWithMarkers(array $files, array $markersByFile): array
-    {
-        return array_values(array_filter(
-            $files,
-            static fn (ProjectFile $projectFile): bool => isset($markersByFile[$projectFile->relativePath()]),
-        ));
-    }
-
-    /**
-     * @param list<RiskMarker> $markers
-     */
-    private function renderRiskMarkers(array $markers): string
-    {
-        $byFile = [];
-        foreach ($markers as $marker) {
-            $byFile[$marker->filePath()][] = \sprintf(
-                'L%d %s — %s',
-                $marker->line(),
-                $marker->pattern(),
-                $marker->description(),
-            );
-        }
-
-        $blocks = [];
-        foreach ($byFile as $filePath => $lines) {
-            $blocks[] = \sprintf("%s:\n%s", $filePath, $this->indent(implode("\n", $lines)));
-        }
-
-        return <<<PROMPT
-            ## Pre-Scan Risk Markers (Deterministic Hints)
-            A static pre-scanner flagged the locations below in the chunk. They are NOT confirmed vulnerabilities — only patterns worth investigating. Use them to focus your analysis; ignore markers that the surrounding context proves safe.
-
-            {$this->indent(implode("\n", $blocks))}
-            PROMPT;
     }
 
     /**

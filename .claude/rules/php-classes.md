@@ -93,3 +93,23 @@ Prefer Symfony components over hand-rolled or raw PHP equivalents:
 Reach for plain PHP only when no Symfony component fits or when the component
 would add a dependency disproportionate to the need — and justify it in the PR
 description.
+
+### Domain-layer exception
+
+This rule applies to the **Application, Infrastructure, and Command** layers
+only. The **Domain layer** (`src/Audit/Domain/`) is pure PHP by mandate (see
+[[ddd-layers]]: _"No Symfony, no `symfony/ai`, no I/O"_) and therefore keeps
+native functions — `str_ends_with`, `str_contains`, `trim`, `is_dir`, … — even
+where a Symfony component would otherwise be preferred. Do **not** import
+`symfony/string`, `symfony/filesystem`, or any other Symfony component into a
+Domain class; the layer boundary wins over the components-first preference.
+
+Concretely:
+
+- `symfony/string` (`u()` / `b()`) is used freely in Application /
+  Infrastructure / Command, but never in `src/Audit/Domain/`.
+- A directory-vs-file predicate (`is_dir` / `is_file`) has no
+  `symfony/filesystem` equivalent (`Filesystem::exists()` cannot distinguish the
+  two), so those calls stay native at the scanning boundary; use
+  `Filesystem::exists()` only where mere existence — not the file type — is the
+  actual question.

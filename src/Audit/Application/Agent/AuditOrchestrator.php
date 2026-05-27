@@ -56,13 +56,15 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
             $previousFindings = array_values($auditContext->validatedVulnerabilities());
             $rawFindings = $this->attackerAgent->analyze(
-                $files,
-                $mapping,
+                new AttackerAnalysisRequest(
+                    files: $files,
+                    symfonyMapping: $mapping,
+                    bypassCache: $auditContext->isCacheBypassed(),
+                    previousFindings: $previousFindings,
+                ),
                 $auditContext,
-                $auditContext->isCacheBypassed(),
-                $previousFindings,
             );
-            $filtered = $this->filterByConfidence(array_values($rawFindings));
+            $filtered = $this->filterByConfidence($rawFindings);
 
             if ([] === $filtered) {
                 $this->logger->info('Attacker found no new findings, stopping');

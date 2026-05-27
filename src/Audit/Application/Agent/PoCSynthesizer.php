@@ -21,6 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 
+use function Symfony\Component\String\u;
+
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  *
@@ -31,12 +33,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
  */
 final readonly class PoCSynthesizer implements PoCSynthesizerInterface
 {
-    public const string SEVERITY_FLOOR_HIGH = 'high';
-
-    public const string SEVERITY_FLOOR_CRITICAL = 'critical';
-
-    public const string SEVERITY_FLOOR_MEDIUM = 'medium';
-
     public function __construct(
         private LLMClientInterface $llmClient,
         private LoggerInterface $logger,
@@ -101,7 +97,7 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
                 return null;
             }
 
-            $content = trim($response->content());
+            $content = u($response->content())->trim()->toString();
 
             return '' === $content ? null : $content;
         } catch (BudgetExceededException $budgetExceededException) {

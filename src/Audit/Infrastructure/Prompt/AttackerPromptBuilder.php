@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 
@@ -32,22 +33,24 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * Skill-block emission order — by attack-surface priority, NOT alphabetical.
      * The LLM weights earlier-in-context instructions more heavily (primacy), so
      * higher-risk surfaces are listed first.
+     *
+     * @var list<ProjectFileType>
      */
     private const array SKILL_PRIORITY = [
-        'controller',
-        'authenticator',
-        'voter',
-        'webhook_consumer',
-        'messenger_handler',
-        'event_subscriber',
-        'normalizer',
-        'scheduler',
-        'form',
-        'repository',
-        'entity',
-        'template',
-        'config',
-        'php',
+        ProjectFileType::CONTROLLER,
+        ProjectFileType::AUTHENTICATOR,
+        ProjectFileType::VOTER,
+        ProjectFileType::WEBHOOK_CONSUMER,
+        ProjectFileType::MESSENGER_HANDLER,
+        ProjectFileType::EVENT_SUBSCRIBER,
+        ProjectFileType::NORMALIZER,
+        ProjectFileType::SCHEDULER,
+        ProjectFileType::FORM,
+        ProjectFileType::REPOSITORY,
+        ProjectFileType::ENTITY,
+        ProjectFileType::TEMPLATE,
+        ProjectFileType::CONFIG,
+        ProjectFileType::PHP,
     ];
 
     /**
@@ -58,7 +61,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * @var array<string, string>
      */
     private const array SKILLS = [
-        'controller' => <<<'SKILL'
+        ProjectFileType::CONTROLLER->value => <<<'SKILL'
             <skills role="controller">
             Hunt:
             - Missing `denyAccessUnlessGranted()` / `#[IsGranted]` on state-changing or sensitive read actions.
@@ -76,7 +79,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - `#[MapRequestPayload]` / `#[MapQueryString]` over a DTO with validation constraints (`#[Assert\…]`) AND no privileged setters.
             </skills>
             SKILL,
-        'authenticator' => <<<'SKILL'
+        ProjectFileType::AUTHENTICATOR->value => <<<'SKILL'
             <skills role="authenticator">
             Hunt:
             - `authenticate()` returning a `SelfValidatingPassport` for password-bearing flows (skips credential check → auth bypass).
@@ -92,7 +95,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - `RememberMeBadge` on long-lived auth — that is the documented opt-in pattern.
             </skills>
             SKILL,
-        'webhook_consumer' => <<<'SKILL'
+        ProjectFileType::WEBHOOK_CONSUMER->value => <<<'SKILL'
             <skills role="webhook_consumer">
             Hunt:
             - `RequestParserInterface::parse()` / `RemoteEventConsumerInterface::consume()` consuming the payload without HMAC / signature verification (`hash_equals` with the configured secret).
@@ -106,7 +109,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - `WebhookComponent::validate($request, $secret)` invocations — those use constant-time comparison internally.
             </skills>
             SKILL,
-        'messenger_handler' => <<<'SKILL'
+        ProjectFileType::MESSENGER_HANDLER->value => <<<'SKILL'
             <skills role="messenger_handler">
             Hunt:
             - `#[AsMessageHandler]` / `MessageHandlerInterface::__invoke()` calling `unserialize()` / `igbinary_unserialize()` on payload fields.
@@ -121,7 +124,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Handlers using `Symfony\Component\Messenger\Stamp\BusNameStamp` / `TransportNamesStamp` — those are routing, not security smells.
             </skills>
             SKILL,
-        'event_subscriber' => <<<'SKILL'
+        ProjectFileType::EVENT_SUBSCRIBER->value => <<<'SKILL'
             <skills role="event_subscriber">
             Hunt:
             - `KernelEvents::CONTROLLER` / `KernelEvents::REQUEST` subscribers mutating `$event->getRequest()->attributes` to inject privileged values (role, user id) before the controller runs.
@@ -135,7 +138,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Listeners calling `LoggerInterface::info()` with structured arrays — not log injection unless raw `$_REQUEST` is interpolated.
             </skills>
             SKILL,
-        'normalizer' => <<<'SKILL'
+        ProjectFileType::NORMALIZER->value => <<<'SKILL'
             <skills role="normalizer">
             Hunt:
             - `denormalize()` building an Entity from request payload with `'allow_extra_attributes' => true` (mass-assignment) or without `'attributes' => [...]` allowlist.
@@ -149,7 +152,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Normalizers operating purely on read-only DTOs with no setters.
             </skills>
             SKILL,
-        'scheduler' => <<<'SKILL'
+        ProjectFileType::SCHEDULER->value => <<<'SKILL'
             <skills role="scheduler">
             Hunt:
             - `#[AsSchedule]` / `ScheduleProviderInterface::getSchedule()` registering tasks that read user-input from DB and pass it unsanitized to `Process` / shell.
@@ -162,7 +165,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Schedules using `LockableTrait` with a project-unique lock name.
             </skills>
             SKILL,
-        'voter' => <<<'SKILL'
+        ProjectFileType::VOTER->value => <<<'SKILL'
             <skills role="voter">
             Hunt:
             - `supports($attribute, $subject)` mismatched with attributes consumers actually pass (typo → silent allow).
@@ -175,7 +178,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Voters using `Security::isGranted('ROLE_USER')` after a positive ownership check.
             </skills>
             SKILL,
-        'entity' => <<<'SKILL'
+        ProjectFileType::ENTITY->value => <<<'SKILL'
             <skills role="entity">
             Hunt:
             - Lifecycle callbacks (`#[PrePersist]`, `#[PreUpdate]`) calling unsanitized methods, command execution, or external HTTP.
@@ -188,7 +191,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - `#[ORM\Column]` with `nullable: true` — nullability is a schema concern, not a security one.
             </skills>
             SKILL,
-        'repository' => <<<'SKILL'
+        ProjectFileType::REPOSITORY->value => <<<'SKILL'
             <skills role="repository">
             Hunt:
             - DQL/SQL injection via string concatenation in custom finder methods; absence of `setParameter()`.
@@ -201,7 +204,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - `findOneBy([...])` / `findAll()` on non-sensitive entities; access control belongs to the voter, not the repository.
             </skills>
             SKILL,
-        'form' => <<<'SKILL'
+        ProjectFileType::FORM->value => <<<'SKILL'
             <skills role="form">
             Hunt:
             - `'csrf_protection' => false` on forms processing state changes (acceptable only for stateless APIs with their own auth).
@@ -214,7 +217,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Fields declared `mapped: false` and re-validated by a constraint — those don't reach the entity setter.
             </skills>
             SKILL,
-        'template' => <<<'SKILL'
+        ProjectFileType::TEMPLATE->value => <<<'SKILL'
             <skills role="template">
             Hunt:
             - `|raw` filter applied to variables originating from user input or untrusted DB content.
@@ -231,7 +234,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - `{% component %}` / `<twig:…/>` with statically-typed props in a `LiveComponent` whose writable props are constrained by validators.
             </skills>
             SKILL,
-        'config' => <<<'SKILL'
+        ProjectFileType::CONFIG->value => <<<'SKILL'
             <skills role="config">
             Hunt:
             - Hardcoded secrets, API keys, DSNs (look for `_KEY`, `_SECRET`, `_TOKEN`, `password:`, full DSN strings).
@@ -253,7 +256,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - `framework.messenger.transports.*.serializer: messenger.transport.symfony_serializer` — the safe default.
             </skills>
             SKILL,
-        'php' => <<<'SKILL'
+        ProjectFileType::PHP->value => <<<'SKILL'
             <skills role="php">
             Hunt:
             - Symfony ExpressionLanguage / Security Expression evaluating strings derived from user input.
@@ -438,14 +441,14 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
     private function skillsForFiles(array $files): string
     {
         $presentTypes = array_map(
-            static fn (ProjectFile $projectFile): string => $projectFile->type(),
+            static fn (ProjectFile $projectFile): ProjectFileType => $projectFile->fileType(),
             $files,
         );
 
         $blocks = [];
         foreach (self::SKILL_PRIORITY as $type) {
             if (\in_array($type, $presentTypes, true)) {
-                $blocks[] = self::SKILLS[$type];
+                $blocks[] = self::SKILLS[$type->value];
             }
         }
 

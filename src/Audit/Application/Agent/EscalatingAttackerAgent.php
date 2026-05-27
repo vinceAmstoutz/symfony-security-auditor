@@ -15,7 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
@@ -51,19 +50,15 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
         private LoggerInterface $logger,
     ) {}
 
-    public function analyze(array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, array $previousFindings = []): array
+    public function analyze(AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder): array
     {
+        $files = $attackerAnalysisRequest->files;
+
         $this->logger->info('Escalation: running cheap-model first pass', [
             'files' => \count($files),
         ]);
 
-        $cheapFindings = $this->cheapAttacker->analyze(
-            $files,
-            $symfonyMapping,
-            $coverageRecorder,
-            $bypassCache,
-            $previousFindings,
-        );
+        $cheapFindings = $this->cheapAttacker->analyze($attackerAnalysisRequest, $coverageRecorder);
 
         if ([] === $cheapFindings) {
             $this->logger->info('Escalation: cheap pass found nothing, skipping expensive pass');
@@ -80,11 +75,8 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
         ]);
 
         $expensiveFindings = $this->expensiveAttacker->analyze(
-            $hotFiles,
-            $symfonyMapping,
+            $attackerAnalysisRequest->withFilesAndFindings($hotFiles, [...$attackerAnalysisRequest->previousFindings, ...$cheapFindings]),
             $coverageRecorder,
-            $bypassCache,
-            [...$previousFindings, ...$cheapFindings],
         );
 
         return $this->merge($cheapFindings, $expensiveFindings);

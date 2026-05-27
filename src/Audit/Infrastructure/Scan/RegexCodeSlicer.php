@@ -16,6 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 
+use function Symfony\Component\String\u;
+
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  *
@@ -181,25 +183,11 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
 
     private function isStructural(string $line): bool
     {
-        $trimmed = ltrim($line);
-
-        foreach (self::STRUCTURAL_PREFIXES as $prefix) {
-            if (str_starts_with($trimmed, $prefix)) {
-                return true;
-            }
-        }
-
-        return false;
+        return u($line)->trimStart()->startsWith(self::STRUCTURAL_PREFIXES);
     }
 
     private function containsSecurityToken(string $line): bool
     {
-        foreach (self::SECURITY_TOKENS as $token) {
-            if (str_contains($line, $token)) {
-                return true;
-            }
-        }
-
-        return false;
+        return u($line)->containsAny(self::SECURITY_TOKENS);
     }
 }

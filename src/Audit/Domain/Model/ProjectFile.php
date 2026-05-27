@@ -21,7 +21,7 @@ final readonly class ProjectFile
         private string $relativePath,
         private string $absolutePath,
         private string $content,
-        private string $type,
+        private ProjectFileType $projectFileType,
         private int $linesCount,
     ) {}
 
@@ -38,7 +38,7 @@ final readonly class ProjectFile
             relativePath: $relativePath,
             absolutePath: $absolutePath,
             content: $content,
-            type: self::detectType($relativePath),
+            projectFileType: self::detectType($relativePath),
             linesCount: substr_count($content, "\n") + 1,
         );
     }
@@ -60,7 +60,12 @@ final readonly class ProjectFile
 
     public function type(): string
     {
-        return $this->type;
+        return $this->projectFileType->value;
+    }
+
+    public function fileType(): ProjectFileType
+    {
+        return $this->projectFileType;
     }
 
     public function linesCount(): int
@@ -194,7 +199,7 @@ final readonly class ProjectFile
     {
         return [
             'path' => $this->relativePath,
-            'type' => $this->type,
+            'type' => $this->projectFileType->value,
             'lines' => $this->linesCount,
             'is_controller' => $this->isController(),
             'is_entity' => $this->isEntity(),
@@ -205,24 +210,24 @@ final readonly class ProjectFile
         ];
     }
 
-    private static function detectType(string $path): string
+    private static function detectType(string $path): ProjectFileType
     {
         return match (true) {
-            str_ends_with($path, 'Controller.php') => 'controller',
-            str_contains($path, '/Entity/') => 'entity',
-            str_ends_with($path, 'Voter.php') => 'voter',
-            str_ends_with($path, 'Repository.php') => 'repository',
-            str_contains($path, '/Form/') => 'form',
-            str_ends_with($path, 'Authenticator.php') => 'authenticator',
-            str_ends_with($path, 'MessageHandler.php') || str_contains($path, '/MessageHandler/') => 'messenger_handler',
-            str_ends_with($path, 'WebhookConsumer.php') || str_ends_with($path, 'WebhookParser.php') || str_contains($path, '/Webhook/') => 'webhook_consumer',
-            str_ends_with($path, 'Subscriber.php') || str_ends_with($path, 'EventListener.php') => 'event_subscriber',
-            str_ends_with($path, 'Normalizer.php') || str_ends_with($path, 'Denormalizer.php') => 'normalizer',
-            str_ends_with($path, 'ScheduleProvider.php') || str_ends_with($path, 'Schedule.php') => 'scheduler',
-            str_ends_with($path, '.twig') => 'template',
-            str_ends_with($path, '.yaml') || str_ends_with($path, '.yml') => 'config',
-            str_ends_with($path, '.php') => 'php',
-            default => 'other',
+            str_ends_with($path, 'Controller.php') => ProjectFileType::CONTROLLER,
+            str_contains($path, '/Entity/') => ProjectFileType::ENTITY,
+            str_ends_with($path, 'Voter.php') => ProjectFileType::VOTER,
+            str_ends_with($path, 'Repository.php') => ProjectFileType::REPOSITORY,
+            str_contains($path, '/Form/') => ProjectFileType::FORM,
+            str_ends_with($path, 'Authenticator.php') => ProjectFileType::AUTHENTICATOR,
+            str_ends_with($path, 'MessageHandler.php') || str_contains($path, '/MessageHandler/') => ProjectFileType::MESSENGER_HANDLER,
+            str_ends_with($path, 'WebhookConsumer.php') || str_ends_with($path, 'WebhookParser.php') || str_contains($path, '/Webhook/') => ProjectFileType::WEBHOOK_CONSUMER,
+            str_ends_with($path, 'Subscriber.php') || str_ends_with($path, 'EventListener.php') => ProjectFileType::EVENT_SUBSCRIBER,
+            str_ends_with($path, 'Normalizer.php') || str_ends_with($path, 'Denormalizer.php') => ProjectFileType::NORMALIZER,
+            str_ends_with($path, 'ScheduleProvider.php') || str_ends_with($path, 'Schedule.php') => ProjectFileType::SCHEDULER,
+            str_ends_with($path, '.twig') => ProjectFileType::TEMPLATE,
+            str_ends_with($path, '.yaml') || str_ends_with($path, '.yml') => ProjectFileType::CONFIG,
+            str_ends_with($path, '.php') => ProjectFileType::PHP,
+            default => ProjectFileType::OTHER,
         };
     }
 }

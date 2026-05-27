@@ -15,12 +15,15 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingAttackerAgent;
 
@@ -33,7 +36,7 @@ final class EscalatingAttackerAgentTest extends TestCase
 
         $escalatingAttackerAgent = new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger());
 
-        $result = $escalatingAttackerAgent->analyze(
+        $result = $this->callAnalyze($escalatingAttackerAgent,
             [$this->makeFile('src/Controller/A.php')],
             SymfonyMapping::create(),
             new NullCoverageRecorder(),
@@ -59,7 +62,7 @@ final class EscalatingAttackerAgentTest extends TestCase
 
         $escalatingAttackerAgent = new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger());
 
-        $escalatingAttackerAgent->analyze($files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($escalatingAttackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
 
         self::assertSame(1, $expensive->callCount);
         self::assertCount(1, $expensive->lastFiles);
@@ -84,7 +87,7 @@ final class EscalatingAttackerAgentTest extends TestCase
 
         $escalatingAttackerAgent = new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger());
 
-        $result = $escalatingAttackerAgent->analyze(
+        $result = $this->callAnalyze($escalatingAttackerAgent,
             [$this->makeFile('src/Controller/A.php')],
             SymfonyMapping::create(),
             new NullCoverageRecorder(),
@@ -105,7 +108,7 @@ final class EscalatingAttackerAgentTest extends TestCase
 
         $escalatingAttackerAgent = new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger());
 
-        $result = $escalatingAttackerAgent->analyze(
+        $result = $this->callAnalyze($escalatingAttackerAgent,
             [$this->makeFile('src/Controller/A.php'), $this->makeFile('src/Controller/B.php')],
             SymfonyMapping::create(),
             new NullCoverageRecorder(),
@@ -125,13 +128,23 @@ final class EscalatingAttackerAgentTest extends TestCase
 
         $escalatingAttackerAgent = new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger());
 
-        $escalatingAttackerAgent->analyze(
+        $this->callAnalyze($escalatingAttackerAgent,
             [$this->makeFile('src/Controller/A.php')],
             SymfonyMapping::create(),
             new NullCoverageRecorder(),
         );
 
         self::assertSame([$vulnerability], $expensive->lastPreviousFindings);
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     *
+     * @return list<Vulnerability>
+     */
+    private function callAnalyze(AttackerAgentInterface $attackerAgent, array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder): array
+    {
+        return $attackerAgent->analyze(new AttackerAnalysisRequest($files, $symfonyMapping), $coverageRecorder);
     }
 
     private function makeFile(string $path): ProjectFile

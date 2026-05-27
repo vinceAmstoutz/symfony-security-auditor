@@ -14,27 +14,33 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
+
+use function Symfony\Component\String\u;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class FileChunker
 {
     private const int DEFAULT_CHUNK_SIZE = 10;
 
+    /**
+     * @var list<ProjectFileType>
+     */
     private const array TYPE_PRIORITY = [
-        'controller',
-        'authenticator',
-        'voter',
-        'webhook_consumer',
-        'messenger_handler',
-        'event_subscriber',
-        'normalizer',
-        'entity',
-        'repository',
-        'form',
-        'scheduler',
-        'template',
-        'config',
-        'php',
+        ProjectFileType::CONTROLLER,
+        ProjectFileType::AUTHENTICATOR,
+        ProjectFileType::VOTER,
+        ProjectFileType::WEBHOOK_CONSUMER,
+        ProjectFileType::MESSENGER_HANDLER,
+        ProjectFileType::EVENT_SUBSCRIBER,
+        ProjectFileType::NORMALIZER,
+        ProjectFileType::ENTITY,
+        ProjectFileType::REPOSITORY,
+        ProjectFileType::FORM,
+        ProjectFileType::SCHEDULER,
+        ProjectFileType::TEMPLATE,
+        ProjectFileType::CONFIG,
+        ProjectFileType::PHP,
     ];
 
     /** @var int<1, max> */
@@ -67,9 +73,7 @@ final readonly class FileChunker
      */
     private function chunkByType(array $files): array
     {
-        usort($files, fn (ProjectFile $a, ProjectFile $b): int => $this->priority($a) <=> $this->priority($b));
-
-        return array_chunk($files, $this->chunkSize);
+        return $this->prioritizedChunks($files);
     }
 
     /**
@@ -92,31 +96,52 @@ final readonly class FileChunker
                 continue;
             }
 
-            usort($featureFiles, fn (ProjectFile $a, ProjectFile $b): int => $this->priority($a) <=> $this->priority($b));
-
-            foreach (array_chunk($featureFiles, $this->chunkSize) as $sliceOfFeature) {
-                $chunks[] = $sliceOfFeature;
-            }
-
-            foreach ($featureFiles as $featureFile) {
-                $assignedPaths[$featureFile->relativePath()] = true;
-            }
+            $chunks = [...$chunks, ...$this->prioritizedChunks($featureFiles)];
+            $assignedPaths = $this->markAssigned($featureFiles, $assignedPaths);
         }
 
-        $leftovers = array_values(array_filter(
+        return [...$chunks, ...$this->prioritizedChunks($this->leftovers($files, $assignedPaths))];
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     *
+     * @return list<list<ProjectFile>>
+     */
+    private function prioritizedChunks(array $files): array
+    {
+        usort($files, fn (ProjectFile $a, ProjectFile $b): int => $this->priority($a) <=> $this->priority($b));
+
+        return array_chunk($files, $this->chunkSize);
+    }
+
+    /**
+     * @param list<ProjectFile>   $featureFiles
+     * @param array<string, true> $assignedPaths
+     *
+     * @return array<string, true>
+     */
+    private function markAssigned(array $featureFiles, array $assignedPaths): array
+    {
+        foreach ($featureFiles as $featureFile) {
+            $assignedPaths[$featureFile->relativePath()] = true;
+        }
+
+        return $assignedPaths;
+    }
+
+    /**
+     * @param list<ProjectFile>   $files
+     * @param array<string, true> $assignedPaths
+     *
+     * @return list<ProjectFile>
+     */
+    private function leftovers(array $files, array $assignedPaths): array
+    {
+        return array_values(array_filter(
             $files,
             static fn (ProjectFile $projectFile): bool => !isset($assignedPaths[$projectFile->relativePath()]),
         ));
-
-        if ([] !== $leftovers) {
-            usort($leftovers, fn (ProjectFile $a, ProjectFile $b): int => $this->priority($a) <=> $this->priority($b));
-
-            foreach (array_chunk($leftovers, $this->chunkSize) as $leftoverChunk) {
-                $chunks[] = $leftoverChunk;
-            }
-        }
-
-        return $chunks;
     }
 
     /**
@@ -128,26 +153,31 @@ final readonly class FileChunker
     {
         $names = [];
         foreach ($files as $file) {
-            if ('controller' !== $file->type()) {
-                continue;
+            $featureName = $this->featureNameOf($file);
+
+            if (null !== $featureName) {
+                $names[$featureName] = true;
             }
-
-            $baseName = basename($file->relativePath(), '.php');
-
-            if (!str_ends_with($baseName, 'Controller')) {
-                continue;
-            }
-
-            $featureName = substr($baseName, 0, -\strlen('Controller'));
-
-            if ('' === $featureName) {
-                continue;
-            }
-
-            $names[$featureName] = true;
         }
 
         return array_keys($names);
+    }
+
+    private function featureNameOf(ProjectFile $projectFile): ?string
+    {
+        if (ProjectFileType::CONTROLLER !== $projectFile->fileType()) {
+            return null;
+        }
+
+        $baseName = u(basename($projectFile->relativePath(), '.php'));
+
+        if (!$baseName->endsWith('Controller')) {
+            return null;
+        }
+
+        $featureName = $baseName->beforeLast('Controller')->toString();
+
+        return '' === $featureName ? null : $featureName;
     }
 
     /**
@@ -182,22 +212,11 @@ final readonly class FileChunker
      */
     private function findFeatureForFile(ProjectFile $projectFile, array $featureNames): ?string
     {
-        $baseName = basename($projectFile->relativePath(), '.php');
-        $baseName = basename($baseName, '.twig');
-
+        $baseName = basename(basename($projectFile->relativePath(), '.php'), '.twig');
         $relativePath = $projectFile->relativePath();
 
         foreach ($featureNames as $featureName) {
-            if ($baseName === $featureName) {
-                return $featureName;
-            }
-
-            if (str_starts_with($baseName, $featureName)) {
-                return $featureName;
-            }
-
-            $lowerFeature = strtolower($featureName);
-            if (str_contains(strtolower($relativePath), '/'.$lowerFeature.'/')) {
+            if ($this->fileBelongsToFeature($baseName, $relativePath, $featureName)) {
                 return $featureName;
             }
         }
@@ -205,9 +224,22 @@ final readonly class FileChunker
         return null;
     }
 
+    private function fileBelongsToFeature(string $baseName, string $relativePath, string $featureName): bool
+    {
+        if ($baseName === $featureName) {
+            return true;
+        }
+
+        if (u($baseName)->startsWith($featureName)) {
+            return true;
+        }
+
+        return u($relativePath)->ignoreCase()->containsAny('/'.$featureName.'/');
+    }
+
     private function priority(ProjectFile $projectFile): int
     {
-        $index = array_search($projectFile->type(), self::TYPE_PRIORITY, true);
+        $index = array_search($projectFile->fileType(), self::TYPE_PRIORITY, true);
 
         return false !== $index ? $index : \count(self::TYPE_PRIORITY);
     }

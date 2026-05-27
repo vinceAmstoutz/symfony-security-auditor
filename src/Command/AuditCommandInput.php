@@ -17,6 +17,8 @@ use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\Option;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
+use function Symfony\Component\String\u;
+
 /**
  * Symfony Console MapInput reflects class properties and requires public mutable fields
  * with property-level defaults; promoted readonly ctor params are invisible to its reflection.
@@ -55,7 +57,7 @@ final class AuditCommandInput
      */
     public function resolvedProjectPath(?callable $cwdResolver = null): string
     {
-        if (null !== $this->projectPath && '' !== trim($this->projectPath)) {
+        if (null !== $this->projectPath && !u($this->projectPath)->trim()->isEmpty()) {
             return $this->projectPath;
         }
 
@@ -75,12 +77,12 @@ final class AuditCommandInput
     {
         $normalized = [];
         foreach ($this->paths as $path) {
-            $trimmed = trim($path);
-            if ('' === $trimmed) {
+            $trimmed = u($path)->trim();
+            if ($trimmed->isEmpty()) {
                 continue;
             }
 
-            $normalized[] = rtrim($trimmed, '/');
+            $normalized[] = $trimmed->trimEnd('/')->toString();
         }
 
         return $normalized;

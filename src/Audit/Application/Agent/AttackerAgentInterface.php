@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
@@ -22,19 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
 interface AttackerAgentInterface
 {
     /**
-     * @param ProjectFile[]   $files
-     * @param bool            $bypassCache      when true, the agent must skip both
-     *                                          reads from and writes to the
-     *                                          `AttackerCacheInterface` for this call
-     * @param Vulnerability[] $previousFindings findings already validated by the
-     *                                          reviewer in earlier iterations.
-     *                                          The agent injects a compact pattern
-     *                                          summary into the prompt so the LLM
-     *                                          generalizes them to files not yet
-     *                                          covered instead of re-discovering
-     *                                          the same bugs at the same lines.
-     *
-     * @return Vulnerability[]
+     * @return list<Vulnerability>
      */
-    public function analyze(array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, array $previousFindings = []): array;
+    public function analyze(AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder): array;
 }

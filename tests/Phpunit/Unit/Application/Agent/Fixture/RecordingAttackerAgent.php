@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
@@ -45,12 +45,12 @@ final class RecordingAttackerAgent implements AttackerAgentInterface
         private readonly array $returnFindings = [],
     ) {}
 
-    public function analyze(array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, array $previousFindings = []): array
+    public function analyze(AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder): array
     {
         ++$this->callCount;
-        $this->lastFiles = array_values($files);
-        $this->lastPreviousFindings = array_values($previousFindings);
-        $this->previousFindingsCountPerCall[] = \count($previousFindings);
+        $this->lastFiles = $attackerAnalysisRequest->files;
+        $this->lastPreviousFindings = $attackerAnalysisRequest->previousFindings;
+        $this->previousFindingsCountPerCall[] = \count($attackerAnalysisRequest->previousFindings);
 
         return $this->returnFindings;
     }

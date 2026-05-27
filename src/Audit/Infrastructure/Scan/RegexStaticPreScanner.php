@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 
@@ -44,7 +45,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * @var array<string, array<string, array{regex: string, description: string}>>
      */
     private const array PATTERNS = [
-        'php' => [
+        ProjectFileType::PHP->value => [
             'unserialize_call' => [
                 'regex' => '/\b(?:unserialize|igbinary_unserialize)\s*\(/',
                 'description' => 'unserialize() on potentially untrusted payload — RCE gadget chain risk',
@@ -86,7 +87,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'ExpressionLanguage::evaluate() — verify expression not built from user input',
             ],
         ],
-        'controller' => [
+        ProjectFileType::CONTROLLER->value => [
             'request_get' => [
                 'regex' => '/\$request->(?:get|getContent|query->get|request->get|attributes->get)\s*\(/',
                 'description' => 'Request input read — trace flow to dangerous sinks',
@@ -104,7 +105,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => '#[MapRequestPayload] — verify the DTO has validation constraints and no privileged setters',
             ],
         ],
-        'voter' => [
+        ProjectFileType::VOTER->value => [
             'voter_default_true' => [
                 'regex' => '/return\s+true\s*;/',
                 'description' => 'Voter returning true — verify it is not an unrestricted default branch',
@@ -114,7 +115,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'getRoles() consulted — verify per-resource ownership check is also performed',
             ],
         ],
-        'repository' => [
+        ProjectFileType::REPOSITORY->value => [
             'native_query_concat' => [
                 'regex' => '/->executeQuery\s*\(\s*[\'"][^\'"]*\.\s*\$/',
                 'description' => 'Native SQL with string concatenation — SQL injection risk',
@@ -128,7 +129,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'where() with string interpolation — verify setParameter is used',
             ],
         ],
-        'form' => [
+        ProjectFileType::FORM->value => [
             'csrf_disabled' => [
                 'regex' => '/[\'"]csrf_protection[\'"]\s*=>\s*false/',
                 'description' => 'CSRF protection disabled — state-changing forms must enable it',
@@ -138,13 +139,13 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'allow_extra_fields: true — mass-assignment vector',
             ],
         ],
-        'entity' => [
+        ProjectFileType::ENTITY->value => [
             'sensitive_setter' => [
                 'regex' => '/public\s+function\s+set(?:Roles?|IsAdmin|PasswordHash|Password|Admin|Superuser)\b/i',
                 'description' => 'Public setter on sensitive field — verify it is not bound by a form',
             ],
         ],
-        'template' => [
+        ProjectFileType::TEMPLATE->value => [
             'raw_filter' => [
                 'regex' => '/\|\s*raw\b/',
                 'description' => '|raw filter — verify upstream sanitization',
@@ -158,7 +159,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'Dynamic template include — SSTI risk',
             ],
         ],
-        'config' => [
+        ProjectFileType::CONFIG->value => [
             'hardcoded_secret' => [
                 'regex' => '/(?:password|secret|api[_-]?key|token)\s*:\s*[\'"]?(?!%env\()[A-Za-z0-9+\/=]{16,}/i',
                 'description' => 'Possible hardcoded credential — use %env(...)% reference',
@@ -180,7 +181,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'Messenger transport with php_serialize — PHP-native unserialize on dequeue',
             ],
         ],
-        'authenticator' => [
+        ProjectFileType::AUTHENTICATOR->value => [
             'self_validating_passport' => [
                 'regex' => '/new\s+SelfValidatingPassport\s*\(/',
                 'description' => 'SelfValidatingPassport — skips credential check; verify the flow is OAuth/token, not password',
@@ -190,7 +191,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'supports() returning null — Symfony treats null as "supports", silently letting non-matching paths through',
             ],
         ],
-        'messenger_handler' => [
+        ProjectFileType::MESSENGER_HANDLER->value => [
             'unserialize_in_handler' => [
                 'regex' => '/\b(?:unserialize|igbinary_unserialize)\s*\(/',
                 'description' => 'unserialize() in handler — gadget-chain risk on transported payload',
@@ -200,25 +201,25 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'Process construction in handler — verify argv is not built from message fields',
             ],
         ],
-        'webhook_consumer' => [
+        ProjectFileType::WEBHOOK_CONSUMER->value => [
             'no_hash_equals' => [
                 'regex' => '/(?:signature|hmac|hash)[^;]{0,80}===/i',
                 'description' => 'Signature/HMAC compared with === — use hash_equals() for constant-time',
             ],
         ],
-        'event_subscriber' => [
+        ProjectFileType::EVENT_SUBSCRIBER->value => [
             'request_attributes_mutation' => [
                 'regex' => '/->getRequest\(\)->attributes->set\s*\(/',
                 'description' => 'Subscriber mutating request attributes — verify it cannot inject privileged values',
             ],
         ],
-        'normalizer' => [
+        ProjectFileType::NORMALIZER->value => [
             'allow_extra_attributes' => [
                 'regex' => '/[\'"]allow_extra_attributes[\'"]\s*=>\s*true/',
                 'description' => 'Denormalizer with allow_extra_attributes: true — mass-assignment vector',
             ],
         ],
-        'scheduler' => [
+        ProjectFileType::SCHEDULER->value => [
             'no_lock' => [
                 'regex' => '/RecurringMessage::every|#\[AsSchedule/',
                 'description' => 'Scheduled task — verify lock is held to prevent overlapping runs',

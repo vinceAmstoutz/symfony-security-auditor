@@ -238,11 +238,14 @@ output and LLM prompts.
 
 ### `ProjectFile` — immutable scanned file
 
-Holds `relativePath`, `absolutePath`, `content`, `type` (auto-detected string),
-`linesCount`. Classification methods (`isController()`, `isEntity()`,
-`isVoter()`, `isRepository()`, `isForm()`, `isService()`, `isTemplate()`,
-`isConfiguration()`) drive both `SymfonyMapping` construction and
-`AttackerAgent` chunking priority.
+Holds `relativePath`, `absolutePath`, `content`, a `ProjectFileType` enum case,
+and `linesCount`. `type()` returns the enum's string value (stable wire format);
+`fileType()` returns the typed `ProjectFileType` case. Classification methods
+(`isController()`, `isEntity()`, `isVoter()`, `isRepository()`, `isForm()`,
+`isService()`, `isTemplate()`, `isConfiguration()`) drive both `SymfonyMapping`
+construction and `AttackerAgent` chunking priority. `ProjectFileType` is the
+single source of truth for the file-type vocabulary, referenced by the chunker,
+the static pre-scanner buckets, and the attacker skill-block ordering.
 
 ### `SymfonyMapping` — immutable project structure snapshot
 
@@ -329,9 +332,16 @@ Sorts files by security priority before chunking:
 | 4        | Forms           |
 | 5        | Everything else |
 
-Chunks sorted list into groups of 10 (`CHUNK_SIZE`). For each chunk: builds
-prompts via `AttackerPromptBuilder`, then either calls
-`LLMClientInterface::complete()` (single-shot) or
+`analyze()` takes an immutable `AttackerAnalysisRequest` (files, mapping,
+`bypassCache`, `previousFindings`) plus a `CoverageRecorderInterface`. The
+chunk-priority ordering above is defined once on `FileChunker` over
+`ProjectFileType` cases. Risk markers are indexed by `RiskMarkerIndex`, and the
+deterministic-marker / prior-findings prompt preambles are rendered by
+`AttackerContextPromptRenderer`.
+
+Chunks the files (default `feature` strategy; `type` for the legacy
+priority-window). For each chunk: builds prompts via `AttackerPromptBuilder`,
+then either calls `LLMClientInterface::complete()` (single-shot) or
 `LLMClientInterface::completeWithTools()` (tool-using loop) depending on
 `audit.tools_enabled`. With tools enabled, the attacker can call `read_file`,
 `grep`, `list_files`, and `lookup_advisory` for cross-file investigation,
