@@ -16,6 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Rat
 use DateTimeImmutable;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use Psr\Clock\ClockInterface;
+use RuntimeException;
 use Symfony\Component\Clock\MockClock;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
@@ -35,7 +37,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: 50_000,
                 outputTokensPerMinute: 10_000,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -55,7 +57,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -79,7 +81,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: 100,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -102,7 +104,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -125,7 +127,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: 100,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -148,7 +150,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: 100,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -172,7 +174,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: 100,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -194,7 +196,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -215,7 +217,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -238,7 +240,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -262,7 +264,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
     }
@@ -278,7 +280,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: 100,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -299,7 +301,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: 100,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -320,7 +322,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: 100,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -346,7 +348,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: 1,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -370,7 +372,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -398,7 +400,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: 10,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -424,7 +426,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: 10,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -451,7 +453,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: 15,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -473,7 +475,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: 10,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -495,7 +497,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: 5,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -517,7 +519,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: 10,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -540,7 +542,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -563,7 +565,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -586,7 +588,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 inputTokensPerMinute: null,
                 outputTokensPerMinute: null,
             ),
-            clock: $mockClock,
+            clock: $this->boundedClock($mockClock),
             sleeper: $sleeper,
         );
 
@@ -596,6 +598,27 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
 
         self::assertSame([2], $sleeper->sleepsMs);
+    }
+
+    private function boundedClock(ClockInterface $clock): ClockInterface
+    {
+        return new class($clock, 50) implements ClockInterface {
+            private int $calls = 0;
+
+            public function __construct(
+                private readonly ClockInterface $clock,
+                private readonly int $maxCalls,
+            ) {}
+
+            public function now(): DateTimeImmutable
+            {
+                if (++$this->calls > $this->maxCalls) {
+                    throw new RuntimeException(\sprintf('Clock queried %d times — acquire() never terminated (a mutation removed a loop-exit branch).', $this->calls));
+                }
+
+                return DateTimeImmutable::createFromInterface($this->clock->now());
+            }
+        };
     }
 
     /**

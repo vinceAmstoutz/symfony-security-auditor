@@ -65,8 +65,8 @@ final class SymfonyAiLLMClientTest extends TestCase
 {
     public function test_complete_returns_text_from_platform_invoke(): void
     {
-        $inMemoryPlatform = new InMemoryPlatform('Hello from LLM');
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', new NullLogger());
+        $platform = $this->scriptedPlatform([new TextResult('Hello from LLM')]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger());
 
         $llmResponse = $symfonyAiLLMClient->complete('You are a helper.', 'Tell me a joke.');
 
@@ -79,7 +79,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     public function test_complete_logs_debug_with_prompt_lengths_and_temperature(): void
     {
-        $inMemoryPlatform = new InMemoryPlatform('ok');
+        $platform = $this->scriptedPlatform([new TextResult('ok')]);
         /** @var list<array{string, array<string, mixed>}> $logs */
         $logs = [];
         $logger = self::createStub(LoggerInterface::class);
@@ -89,7 +89,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             },
         );
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', $logger, temperature: 0.42);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', $logger, temperature: 0.42);
         $symfonyAiLLMClient->complete('sys', 'usr-message');
 
         $startLog = $logs[0];
@@ -102,7 +102,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     public function test_complete_logs_debug_response_with_content_length(): void
     {
-        $inMemoryPlatform = new InMemoryPlatform('twelve-chars');
+        $platform = $this->scriptedPlatform([new TextResult('twelve-chars')]);
         /** @var list<array{string, array<string, mixed>}> $logs */
         $logs = [];
         $logger = self::createStub(LoggerInterface::class);
@@ -112,7 +112,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             },
         );
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', $logger);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', $logger);
         $symfonyAiLLMClient->complete('s', 'u');
 
         $respondedLogs = array_values(array_filter(
@@ -127,16 +127,9 @@ final class SymfonyAiLLMClientTest extends TestCase
     public function test_complete_passes_temperature_via_options(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
-        $inMemoryPlatform = new InMemoryPlatform(
-            /** @param array<string, mixed> $options */
-            static function (object $model, mixed $input, array $options) use ($invocationOptionsCapture): TextResult {
-                $invocationOptionsCapture->options ??= $options;
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-                return new TextResult('out');
-            },
-        );
-
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', new NullLogger(), temperature: 0.7);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger(), temperature: 0.7);
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -147,16 +140,9 @@ final class SymfonyAiLLMClientTest extends TestCase
     public function test_complete_omits_temperature_when_left_at_default(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
-        $inMemoryPlatform = new InMemoryPlatform(
-            /** @param array<string, mixed> $options */
-            static function (object $model, mixed $input, array $options) use ($invocationOptionsCapture): TextResult {
-                $invocationOptionsCapture->options ??= $options;
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-                return new TextResult('out');
-            },
-        );
-
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger());
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -166,16 +152,9 @@ final class SymfonyAiLLMClientTest extends TestCase
     public function test_complete_passes_prompt_caching_flag_when_enabled(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
-        $inMemoryPlatform = new InMemoryPlatform(
-            /** @param array<string, mixed> $options */
-            static function (object $model, mixed $input, array $options) use ($invocationOptionsCapture): TextResult {
-                $invocationOptionsCapture->options ??= $options;
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-                return new TextResult('out');
-            },
-        );
-
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', new NullLogger(), promptCaching: true);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger(), promptCaching: true);
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -185,16 +164,9 @@ final class SymfonyAiLLMClientTest extends TestCase
     public function test_complete_passes_provider_json_mode_response_format_when_enabled(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
-        $inMemoryPlatform = new InMemoryPlatform(
-            /** @param array<string, mixed> $options */
-            static function (object $model, mixed $input, array $options) use ($invocationOptionsCapture): TextResult {
-                $invocationOptionsCapture->options ??= $options;
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-                return new TextResult('out');
-            },
-        );
-
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', new NullLogger(), providerJsonMode: true);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger(), providerJsonMode: true);
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -204,17 +176,10 @@ final class SymfonyAiLLMClientTest extends TestCase
     public function test_complete_passes_all_base_options_together_when_multiple_flags_enabled(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
-        $inMemoryPlatform = new InMemoryPlatform(
-            /** @param array<string, mixed> $options */
-            static function (object $model, mixed $input, array $options) use ($invocationOptionsCapture): TextResult {
-                $invocationOptionsCapture->options ??= $options;
-
-                return new TextResult('out');
-            },
-        );
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $inMemoryPlatform,
+            $platform,
             'test-model',
             new NullLogger(),
             temperature: 0.5,
@@ -232,18 +197,11 @@ final class SymfonyAiLLMClientTest extends TestCase
     public function test_complete_omits_response_format_when_provider_json_mode_disabled(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
-        $inMemoryPlatform = new InMemoryPlatform(
-            /** @param array<string, mixed> $options */
-            static function (object $model, mixed $input, array $options) use ($invocationOptionsCapture): TextResult {
-                $invocationOptionsCapture->options ??= $options;
-
-                return new TextResult('out');
-            },
-        );
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
         // Default constructor (no providerJsonMode) — option must be absent so providers
         // that reject unknown keys keep working.
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($inMemoryPlatform, 'test-model', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger());
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -418,6 +376,10 @@ final class SymfonyAiLLMClientTest extends TestCase
 
             public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
             {
+                if ($this->calls >= 2) {
+                    throw new RuntimeException('batch-fallback platform invoked more than twice — invokeWithRetry never returned (a mutation removed a loop-exit branch).');
+                }
+
                 $converter = 0 === $this->calls++
                     ? new ThrowingConverter(new RuntimeException('boom'))
                     : new PlainConverter(new TextResult('recovered'));
@@ -1030,7 +992,11 @@ final class SymfonyAiLLMClientTest extends TestCase
 
             public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
             {
-                $result = array_shift($this->results) ?? new TextResult('exhausted');
+                $result = array_shift($this->results);
+                if (!$result instanceof ResultInterface) {
+                    throw new RuntimeException('scriptedPlatformWithTokenUsage invoked more times than scripted — invokeWithRetry never returned (a mutation removed a loop-exit branch).');
+                }
+
                 $tokenUsage = array_shift($this->tokenUsages);
                 $deferredResult = new DeferredResult(
                     new PlainConverter($result),
@@ -1306,9 +1272,9 @@ final class SymfonyAiLLMClientTest extends TestCase
     public function test_acquire_runs_before_invoke_with_estimated_input_tokens(): void
     {
         $fakeRateLimiter = new FakeRateLimiter();
-        $inMemoryPlatform = new InMemoryPlatform('ok');
+        $platform = $this->scriptedPlatform([new TextResult('ok')]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $inMemoryPlatform,
+            $platform,
             'm',
             new NullLogger(),
             rateLimiter: $fakeRateLimiter,
@@ -1443,9 +1409,13 @@ final class SymfonyAiLLMClientTest extends TestCase
             public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 $next = array_shift($this->remaining);
+                if (null === $next) {
+                    throw new RuntimeException('lazilyFailingPlatform invoked more times than scripted — invokeWithRetry never returned (a mutation removed a loop-exit branch).');
+                }
+
                 $converter = $next instanceof RuntimeException
                     ? new ThrowingConverter($next)
-                    : new PlainConverter($next ?? new TextResult('exhausted'));
+                    : new PlainConverter($next);
 
                 return new DeferredResult(
                     $converter,
@@ -1483,7 +1453,11 @@ final class SymfonyAiLLMClientTest extends TestCase
                     throw $next;
                 }
 
-                $result = $next ?? new TextResult('exhausted');
+                if (!$next instanceof ResultInterface) {
+                    throw new RuntimeException('flakyPlatform invoked more times than scripted — invokeWithRetry never returned (a mutation removed a loop-exit branch).');
+                }
+
+                $result = $next;
 
                 return new DeferredResult(
                     new PlainConverter($result),
@@ -1527,7 +1501,10 @@ final class SymfonyAiLLMClientTest extends TestCase
                     }
                 }
 
-                $result = array_shift($this->remaining) ?? new TextResult('exhausted');
+                $result = array_shift($this->remaining);
+                if (!$result instanceof ResultInterface) {
+                    throw new RuntimeException('scriptedPlatform invoked more times than scripted — invokeWithRetry never returned (a mutation removed a loop-exit branch).');
+                }
 
                 return new DeferredResult(
                     new PlainConverter($result),
@@ -1548,6 +1525,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         InvocationOptionsCapture $invocationOptionsCapture,
     ): PlatformInterface {
         return new class($result, $invocationOptionsCapture) implements PlatformInterface {
+            private int $invocations = 0;
+
             public function __construct(
                 private readonly ResultInterface $result,
                 private readonly InvocationOptionsCapture $invocationOptionsCapture,
@@ -1555,6 +1534,10 @@ final class SymfonyAiLLMClientTest extends TestCase
 
             public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
             {
+                if (++$this->invocations > 1) {
+                    throw new RuntimeException('scriptedPlatformCapturingOptions invoked more than once — invokeWithRetry never returned (a mutation removed a loop-exit branch).');
+                }
+
                 $this->invocationOptionsCapture->options ??= $options;
 
                 return new DeferredResult(

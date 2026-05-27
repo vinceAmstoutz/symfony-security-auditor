@@ -13,12 +13,14 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Test\InMemoryPlatform;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Test\TestContainer;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
@@ -32,9 +34,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
@@ -42,6 +46,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSec
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
@@ -281,6 +290,34 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertInstanceOf(NullSecretScrubber::class, $this->getPrivateService($kernel, SecretScrubberInterface::class));
     }
 
+    public function test_bundle_wires_regex_static_pre_scanner_by_default(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        self::assertInstanceOf(RegexStaticPreScanner::class, $this->getPrivateService($kernel, StaticPreScannerInterface::class));
+    }
+
+    public function test_bundle_wires_null_static_pre_scanner_when_disabled(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['static_prescan' => ['enabled' => false]]]);
+
+        self::assertInstanceOf(NullStaticPreScanner::class, $this->getPrivateService($kernel, StaticPreScannerInterface::class));
+    }
+
+    public function test_bundle_wires_regex_code_slicer_when_enabled(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['enabled' => true]]]);
+
+        self::assertInstanceOf(RegexCodeSlicer::class, $this->getPrivateService($kernel, CodeSlicerInterface::class));
+    }
+
+    public function test_bundle_wires_null_code_slicer_by_default(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        self::assertInstanceOf(NullCodeSlicer::class, $this->getPrivateService($kernel, CodeSlicerInterface::class));
+    }
+
     public function test_bundle_wires_composer_audit_advisory_database_as_default_implementation(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -335,6 +372,154 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $kernel = $this->boot(['model' => 'gpt-4o']);
 
         self::assertInstanceOf(RunAuditUseCase::class, $this->getPrivateService($kernel, RunAuditUseCase::class));
+    }
+
+    public function test_bundle_exposes_audit_defaults_as_parameters(): void
+    {
+        $container = $this->boot(['model' => 'gpt-4o'])->getContainer();
+
+        self::assertSame(1, $container->getParameter('symfony_security_auditor.audit.reviewer_max_concurrent'));
+        self::assertSame(80, $container->getParameter('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing'));
+        self::assertTrue($container->getParameter('symfony_security_auditor.audit.static_prescan.enabled'));
+        self::assertFalse($container->getParameter('symfony_security_auditor.audit.code_slicing.enabled'));
+        self::assertNull($container->getParameter('symfony_security_auditor.audit.budget.max_tokens'));
+        self::assertNull($container->getParameter('symfony_security_auditor.audit.budget.max_cost_usd'));
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    #[DataProvider('integerNodeMinimumCases')]
+    public function test_bundle_accepts_integer_node_at_its_documented_minimum(array $config, string $parameter, int $expected): void
+    {
+        $container = $this->boot($config)->getContainer();
+
+        self::assertSame($expected, $container->getParameter($parameter));
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, string, int}> */
+    public static function integerNodeMinimumCases(): iterable
+    {
+        yield 'reviewer_max_concurrent' => [['model' => 'gpt-4o', 'audit' => ['reviewer_max_concurrent' => 1]], 'symfony_security_auditor.audit.reviewer_max_concurrent', 1];
+        yield 'reviewer_max_tool_iterations' => [['model' => 'gpt-4o', 'audit' => ['reviewer_max_tool_iterations' => 1]], 'symfony_security_auditor.audit.reviewer_max_tool_iterations', 1];
+        yield 'code_slicing min_lines' => [['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['min_lines_before_slicing' => 10]]], 'symfony_security_auditor.audit.code_slicing.min_lines_before_slicing', 10];
+        yield 'budget max_tokens' => [['model' => 'gpt-4o', 'audit' => ['budget' => ['max_tokens' => 1]]], 'symfony_security_auditor.audit.budget.max_tokens', 1];
+        yield 'retry max_attempts' => [['model' => 'gpt-4o', 'audit' => ['retry' => ['max_attempts' => 1]]], 'symfony_security_auditor.audit.retry.max_attempts', 1];
+        yield 'retry initial_delay_ms' => [['model' => 'gpt-4o', 'audit' => ['retry' => ['initial_delay_ms' => 0]]], 'symfony_security_auditor.audit.retry.initial_delay_ms', 0];
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    #[DataProvider('integerNodeBelowMinimumCases')]
+    public function test_bundle_rejects_integer_node_below_its_documented_minimum(array $config): void
+    {
+        $this->expectException(Throwable::class);
+
+        $this->boot($config);
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function integerNodeBelowMinimumCases(): iterable
+    {
+        yield 'reviewer_max_concurrent' => [['model' => 'gpt-4o', 'audit' => ['reviewer_max_concurrent' => 0]]];
+        yield 'reviewer_max_tool_iterations' => [['model' => 'gpt-4o', 'audit' => ['reviewer_max_tool_iterations' => 0]]];
+        yield 'code_slicing min_lines' => [['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['min_lines_before_slicing' => 9]]]];
+        yield 'budget max_tokens' => [['model' => 'gpt-4o', 'audit' => ['budget' => ['max_tokens' => 0]]]];
+        yield 'retry initial_delay_ms' => [['model' => 'gpt-4o', 'audit' => ['retry' => ['initial_delay_ms' => -1]]]];
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    #[DataProvider('rateLimitDimensionBelowMinimumCases')]
+    public function test_bundle_rejects_rate_limit_dimension_below_one(array $config): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->boot($config);
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function rateLimitDimensionBelowMinimumCases(): iterable
+    {
+        yield 'requests_per_minute' => [['model' => 'gpt-4o', 'audit' => ['rate_limit' => ['requests_per_minute' => 0]]]];
+        yield 'input_tokens_per_minute' => [['model' => 'gpt-4o', 'audit' => ['rate_limit' => ['input_tokens_per_minute' => 0]]]];
+        yield 'output_tokens_per_minute' => [['model' => 'gpt-4o', 'audit' => ['rate_limit' => ['output_tokens_per_minute' => 0]]]];
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    #[DataProvider('rateLimitDimensionMinimumCases')]
+    public function test_bundle_accepts_each_rate_limit_dimension_at_its_minimum(array $config): void
+    {
+        $kernel = $this->boot($config);
+
+        self::assertInstanceOf(TokenBucketRateLimiter::class, $this->getPrivateService($kernel, RateLimiterInterface::class));
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function rateLimitDimensionMinimumCases(): iterable
+    {
+        yield 'requests_per_minute' => [['model' => 'gpt-4o', 'audit' => ['rate_limit' => ['requests_per_minute' => 1]]]];
+        yield 'input_tokens_per_minute' => [['model' => 'gpt-4o', 'audit' => ['rate_limit' => ['input_tokens_per_minute' => 1]]]];
+        yield 'output_tokens_per_minute' => [['model' => 'gpt-4o', 'audit' => ['rate_limit' => ['output_tokens_per_minute' => 1]]]];
+    }
+
+    #[DataProvider('chunkingStrategyCases')]
+    public function test_bundle_accepts_each_chunking_strategy(string $strategy): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['chunking' => ['strategy' => $strategy]]]);
+
+        self::assertSame($strategy, $kernel->getContainer()->getParameter('symfony_security_auditor.audit.chunking.strategy'));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function chunkingStrategyCases(): iterable
+    {
+        yield 'feature' => ['feature'];
+        yield 'type' => ['type'];
+    }
+
+    #[DataProvider('pocSeverityFloorCases')]
+    public function test_bundle_accepts_each_poc_synthesis_severity_floor(string $severityFloor): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['poc_synthesis' => ['severity_floor' => $severityFloor]]]);
+
+        self::assertSame($severityFloor, $kernel->getContainer()->getParameter('symfony_security_auditor.audit.poc_synthesis.severity_floor'));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function pocSeverityFloorCases(): iterable
+    {
+        yield 'critical' => ['critical'];
+        yield 'high' => ['high'];
+        yield 'medium' => ['medium'];
+        yield 'low' => ['low'];
+        yield 'info' => ['info'];
+    }
+
+    public function test_bundle_derives_advisory_cache_dir_from_cache_dir(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['dir' => '/custom/cache']]);
+
+        self::assertSame('/custom/cache/advisory', $kernel->getContainer()->getParameter('symfony_security_auditor.cache.advisory_dir'));
+    }
+
+    public function test_bundle_cache_key_salt_embeds_a_sixteen_char_truncated_pattern_hash(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        $expectedPatternHash = substr(hash('sha256', json_encode([], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)), 0, 16);
+        $expectedKeySalt = \sprintf(
+            'gpt-4o|prompt-v%d|prescan-v%d|patterns-%s',
+            AttackerPromptBuilder::PROMPT_VERSION,
+            RegexStaticPreScanner::CACHE_VERSION,
+            $expectedPatternHash,
+        );
+
+        self::assertSame($expectedKeySalt, $kernel->getContainer()->getParameter('symfony_security_auditor.cache.key_salt'));
     }
 
     private function getPrivateService(Kernel $kernel, string $id): object

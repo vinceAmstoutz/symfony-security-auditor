@@ -374,6 +374,21 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame('claude-opus-4-7', $auditReport->cost()->primaryModel());
     }
 
+    public function test_max_iterations_defaults_to_three(): void
+    {
+        $estimateAuditCostUseCase = new EstimateAuditCostUseCase(
+            $this->fixedScanner([]),
+            $this->fixedEstimator(perRoundTokens: 99),
+            new CostCalculator($this->zeroPricing()),
+            new NullLogger(),
+            primaryModel: 'gpt-4o',
+        );
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(99 * 3, $auditReport->cost()->byRole()['attacker']['input_tokens']);
+    }
+
     /**
      * @param list<ProjectFile> $files
      */

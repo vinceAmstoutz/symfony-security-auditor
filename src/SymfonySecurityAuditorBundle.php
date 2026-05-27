@@ -15,7 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor;
 
 use Psr\Clock\ClockInterface;
 use Symfony\AI\Platform\PlatformInterface;
-use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -431,7 +430,6 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                     $bundleConfiguration->rateLimit->inputTokensPerMinute,
                     $bundleConfiguration->rateLimit->outputTokensPerMinute,
                 ]);
-            $services->set(ClockInterface::class, NativeClock::class)->private();
             $services->set(TokenBucketRateLimiter::class)
                 ->private()
                 ->args([

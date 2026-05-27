@@ -122,6 +122,17 @@ final class PoCSynthesisStageTest extends TestCase
         (new PoCSynthesisStage($synthesizer, new NullLogger(), false))->process($auditContext);
     }
 
+    public function test_stage_is_disabled_by_default_even_with_validated_findings(): void
+    {
+        $synthesizer = self::createMock(PoCSynthesizerInterface::class);
+        $synthesizer->expects(self::never())->method('synthesize');
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability($this->makeVulnerability()->withReviewerValidation(true));
+
+        (new PoCSynthesisStage($synthesizer, new NullLogger()))->process($auditContext);
+    }
+
     public function test_it_logs_debug_when_disabled(): void
     {
         $bufferingLogger = new BufferingLogger();

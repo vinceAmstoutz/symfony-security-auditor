@@ -257,6 +257,16 @@ final class FileChunkerTest extends TestCase
         self::assertNotContains('src/Service/Misc.php', $paths);
     }
 
+    public function test_non_positive_chunk_size_is_clamped_to_one(): void
+    {
+        $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Type, 0))->chunk($files);
+
+        self::assertCount(2, $chunks);
+        self::assertCount(1, $chunks[0]);
+    }
+
     private function makeFile(string $path): ProjectFile
     {
         return ProjectFile::create($path, '/app/'.$path, '<?php');

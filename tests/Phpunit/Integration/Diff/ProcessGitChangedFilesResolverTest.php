@@ -58,6 +58,21 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         self::assertSame(['src/A.php', 'src/B.php'], $srcChanged);
     }
 
+    public function test_a_path_changed_in_both_committed_and_uncommitted_diffs_is_deduplicated(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // initial', 'init');
+        $this->createBranch('feature');
+        $this->commit('src/Shared.php', '<?php // committed change', 'add shared');
+        $this->writeFile('src/Shared.php', '<?php // committed change + uncommitted edit');
+        $this->stage('src/Shared.php');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+        $shared = array_values(array_filter($changed, static fn (string $path): bool => 'src/Shared.php' === $path));
+
+        self::assertSame(['src/Shared.php'], $shared);
+    }
+
     public function test_it_returns_files_changed_against_ref(): void
     {
         $this->initRepo();
