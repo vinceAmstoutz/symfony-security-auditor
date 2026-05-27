@@ -74,10 +74,10 @@ final class AttackerContextPromptRendererTest extends TestCase
         self::assertMatchesRegularExpression('/^  - sql_injection: src\/Repo\.php:10-20$/m', $output);
     }
 
-    private function makeVulnerability(VulnerabilityType $type, string $filePath, int $start, int $end): Vulnerability
+    private function makeVulnerability(VulnerabilityType $vulnerabilityType, string $filePath, int $start, int $end): Vulnerability
     {
         return Vulnerability::create(
-            vulnerabilityType: $type,
+            vulnerabilityType: $vulnerabilityType,
             vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
             title: 'T',
             description: 'd',

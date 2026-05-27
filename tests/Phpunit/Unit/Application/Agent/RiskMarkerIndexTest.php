@@ -22,13 +22,13 @@ final class RiskMarkerIndexTest extends TestCase
 {
     public function test_for_chunk_returns_all_markers_of_files_in_the_chunk(): void
     {
-        $index = new RiskMarkerIndex([
+        $riskMarkerIndex = new RiskMarkerIndex([
             RiskMarker::create('src/A.php', 1, 'p1', 'd1'),
             RiskMarker::create('src/A.php', 2, 'p2', 'd2'),
             RiskMarker::create('src/B.php', 3, 'p3', 'd3'),
         ]);
 
-        $markers = $index->forChunk([$this->file('src/A.php')]);
+        $markers = $riskMarkerIndex->forChunk([$this->file('src/A.php')]);
 
         self::assertCount(2, $markers);
         self::assertSame([1, 2], [$markers[0]->line(), $markers[1]->line()]);
@@ -36,12 +36,12 @@ final class RiskMarkerIndexTest extends TestCase
 
     public function test_for_chunk_excludes_markers_of_files_not_in_the_chunk(): void
     {
-        $index = new RiskMarkerIndex([
+        $riskMarkerIndex = new RiskMarkerIndex([
             RiskMarker::create('src/A.php', 1, 'p1', 'd1'),
             RiskMarker::create('src/B.php', 3, 'p3', 'd3'),
         ]);
 
-        $markers = $index->forChunk([$this->file('src/A.php')]);
+        $markers = $riskMarkerIndex->forChunk([$this->file('src/A.php')]);
 
         self::assertCount(1, $markers);
         self::assertSame('src/A.php', $markers[0]->filePath());
@@ -49,16 +49,16 @@ final class RiskMarkerIndexTest extends TestCase
 
     public function test_for_chunk_is_empty_when_no_file_has_markers(): void
     {
-        $index = new RiskMarkerIndex([RiskMarker::create('src/A.php', 1, 'p', 'd')]);
+        $riskMarkerIndex = new RiskMarkerIndex([RiskMarker::create('src/A.php', 1, 'p', 'd')]);
 
-        self::assertSame([], $index->forChunk([$this->file('src/Other.php')]));
+        self::assertSame([], $riskMarkerIndex->forChunk([$this->file('src/Other.php')]));
     }
 
     public function test_files_with_markers_keeps_only_flagged_files_in_order(): void
     {
-        $index = new RiskMarkerIndex([RiskMarker::create('src/B.php', 1, 'p', 'd')]);
+        $riskMarkerIndex = new RiskMarkerIndex([RiskMarker::create('src/B.php', 1, 'p', 'd')]);
 
-        $kept = $index->filesWithMarkers([
+        $kept = $riskMarkerIndex->filesWithMarkers([
             $this->file('src/A.php'),
             $this->file('src/B.php'),
             $this->file('src/C.php'),

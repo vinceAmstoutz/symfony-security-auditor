@@ -25,49 +25,49 @@ final class AttackerAnalysisRequestTest extends TestCase
 {
     public function test_bypass_cache_defaults_to_false(): void
     {
-        $request = new AttackerAnalysisRequest([], SymfonyMapping::create());
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::create());
 
-        self::assertFalse($request->bypassCache);
+        self::assertFalse($attackerAnalysisRequest->bypassCache);
     }
 
     public function test_previous_findings_default_to_empty(): void
     {
-        $request = new AttackerAnalysisRequest([], SymfonyMapping::create());
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::create());
 
-        self::assertSame([], $request->previousFindings);
+        self::assertSame([], $attackerAnalysisRequest->previousFindings);
     }
 
     public function test_it_exposes_the_constructor_arguments(): void
     {
         $files = [ProjectFile::create('src/A.php', '/app/src/A.php', '<?php')];
-        $mapping = SymfonyMapping::create();
+        $symfonyMapping = SymfonyMapping::create();
         $findings = [$this->makeVulnerability()];
 
-        $request = new AttackerAnalysisRequest($files, $mapping, true, $findings);
+        $attackerAnalysisRequest = new AttackerAnalysisRequest($files, $symfonyMapping, true, $findings);
 
-        self::assertSame($files, $request->files);
-        self::assertSame($mapping, $request->symfonyMapping);
-        self::assertTrue($request->bypassCache);
-        self::assertSame($findings, $request->previousFindings);
+        self::assertSame($files, $attackerAnalysisRequest->files);
+        self::assertSame($symfonyMapping, $attackerAnalysisRequest->symfonyMapping);
+        self::assertTrue($attackerAnalysisRequest->bypassCache);
+        self::assertSame($findings, $attackerAnalysisRequest->previousFindings);
     }
 
     public function test_with_files_and_findings_replaces_both_and_preserves_mapping_and_bypass(): void
     {
-        $mapping = SymfonyMapping::create();
-        $original = new AttackerAnalysisRequest(
+        $symfonyMapping = SymfonyMapping::create();
+        $attackerAnalysisRequest = new AttackerAnalysisRequest(
             [ProjectFile::create('src/A.php', '/app/src/A.php', '<?php')],
-            $mapping,
+            $symfonyMapping,
             true,
             [],
         );
 
         $newFiles = [ProjectFile::create('src/B.php', '/app/src/B.php', '<?php')];
         $newFindings = [$this->makeVulnerability()];
-        $derived = $original->withFilesAndFindings($newFiles, $newFindings);
+        $derived = $attackerAnalysisRequest->withFilesAndFindings($newFiles, $newFindings);
 
         self::assertSame($newFiles, $derived->files);
         self::assertSame($newFindings, $derived->previousFindings);
-        self::assertSame($mapping, $derived->symfonyMapping);
+        self::assertSame($symfonyMapping, $derived->symfonyMapping);
         self::assertTrue($derived->bypassCache);
     }
 
