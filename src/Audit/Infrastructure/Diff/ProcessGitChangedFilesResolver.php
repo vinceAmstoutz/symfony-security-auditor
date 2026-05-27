@@ -111,11 +111,11 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
         foreach ($paths as $path) {
             $trimmed = u($path)->trim()->trimStart('./')->toString();
             if ('' !== $trimmed) {
-                $normalized[$trimmed] = true;
+                $normalized[] = $trimmed;
             }
         }
 
-        $result = array_keys($normalized);
+        $result = array_values(array_unique($normalized));
         sort($result);
 
         return $result;

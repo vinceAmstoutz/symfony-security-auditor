@@ -28,6 +28,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     public function test_it_throws_when_directory_is_not_a_git_tree(): void
     {
         $this->expectException(GitChangedFilesUnavailableException::class);
+        $this->expectExceptionMessage('is not a git working tree');
 
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
     }
@@ -37,8 +38,24 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->initRepo();
 
         $this->expectException(GitChangedFilesUnavailableException::class);
+        $this->expectExceptionMessage('does not resolve');
 
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'does-not-exist');
+    }
+
+    public function test_merged_committed_and_uncommitted_paths_are_sorted(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Z.php', '<?php', 'z');
+        $this->createBranch('feature');
+        $this->commit('src/B.php', '<?php', 'committed b');
+        $this->writeFile('src/A.php', '<?php // uncommitted');
+        $this->stage('src/A.php');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+        $srcChanged = array_values(array_filter($changed, static fn (string $path): bool => str_starts_with($path, 'src/')));
+
+        self::assertSame(['src/A.php', 'src/B.php'], $srcChanged);
     }
 
     public function test_it_returns_files_changed_against_ref(): void
@@ -78,6 +95,21 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $changedFiltered = array_values(array_filter($changed, static fn (string $p): bool => str_starts_with($p, 'src/')));
 
         self::assertSame(['src/A.php', 'src/M.php'], $changedFiltered);
+    }
+
+    public function test_it_resolves_from_a_subdirectory_where_dot_git_is_not_present(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // initial', 'init');
+        $this->createBranch('feature');
+        $this->commit('src/sub/Bar.php', '<?php // new', 'add bar');
+
+        // From src/ there is no .git; the resolver must rely on `git rev-parse
+        // --is-inside-work-tree` to recognise it as a working tree rather than
+        // throwing. Any mutation that breaks that detection makes this throw.
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir.'/src', 'main');
+
+        self::assertContains('src/sub/Bar.php', $changed);
     }
 
     protected function setUp(): void
