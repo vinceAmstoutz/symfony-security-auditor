@@ -198,6 +198,24 @@ final class PoCSynthesizerTest extends TestCase
         self::assertSame('network down', $entry[2]['error']);
     }
 
+    public function test_it_continues_to_the_next_finding_after_one_yields_no_poc(): void
+    {
+        $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH, filePath: 'src/First.php')->withReviewerValidation(true);
+        $second = $this->makeVulnerability(VulnerabilitySeverity::HIGH, filePath: 'src/Second.php')->withReviewerValidation(true);
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnOnConsecutiveCalls(
+            LLMResponse::create('', 0, 0, 'test', 'end_turn'),
+            LLMResponse::create('curl /x', 0, 0, 'test', 'end_turn'),
+        );
+
+        $enriched = (new PoCSynthesizer($llmClient, new NullLogger()))->synthesize([$vulnerability, $second]);
+
+        self::assertCount(2, $enriched);
+        self::assertNull($enriched[0]->synthesizedPoC());
+        self::assertSame('curl /x', $enriched[1]->synthesizedPoC());
+    }
+
     public function test_it_rethrows_budget_exceeded_exception(): void
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);

@@ -92,11 +92,6 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
 
         try {
             $response = $this->llmClient->complete($systemPrompt, $userMessage);
-
-            if ($response->isEmpty()) {
-                return null;
-            }
-
             $content = u($response->content())->trim()->toString();
 
             return '' === $content ? null : $content;
