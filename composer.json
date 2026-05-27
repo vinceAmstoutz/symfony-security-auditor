@@ -62,6 +62,7 @@
         "staabm/phpstan-todo-by": "^0.3",
         "symfony/clock": "^7.4 || ^8.0",
         "symfony/dotenv": "^7.4 || ^8.0",
+        "symfony/error-handler": "^7.4 || ^8.0",
         "symfony/var-dumper": "^7.4 || ^8.0"
     },
     "suggest": {

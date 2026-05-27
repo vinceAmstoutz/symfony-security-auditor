@@ -16,7 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\Component\ErrorHandler\BufferingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
@@ -146,6 +149,71 @@ final class PoCSynthesizerTest extends TestCase
         self::assertNotNull($enriched[0]->synthesizedPoC());
         self::assertNull($enriched[1]->synthesizedPoC());
         self::assertNotNull($enriched[2]->synthesizedPoC());
+    }
+
+    public function test_it_logs_completion_summary_with_inputs_synthesized_and_skipped_counts(): void
+    {
+        $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
+        $belowFloor = $this->makeVulnerability(VulnerabilitySeverity::LOW)->withReviewerValidation(true);
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('curl /x', 10, 10, 'claude', 'end_turn'));
+
+        $bufferingLogger = new BufferingLogger();
+        (new PoCSynthesizer($llmClient, $bufferingLogger))->synthesize([$vulnerability, $belowFloor]);
+
+        $logs = $bufferingLogger->cleanLogs();
+        $completion = end($logs);
+        self::assertSame('PoC synthesis complete', $completion[1]);
+        self::assertSame(['inputs' => 2, 'synthesized' => 1, 'skipped' => 1], $completion[2]);
+    }
+
+    public function test_it_does_not_log_completion_for_empty_input(): void
+    {
+        $bufferingLogger = new BufferingLogger();
+
+        (new PoCSynthesizer(self::createStub(LLMClientInterface::class), $bufferingLogger))->synthesize([]);
+
+        self::assertSame([], $bufferingLogger->cleanLogs());
+    }
+
+    public function test_it_logs_vulnerability_id_and_error_when_synthesis_throws(): void
+    {
+        $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willThrowException(new RuntimeException('network down'));
+
+        $bufferingLogger = new BufferingLogger();
+        (new PoCSynthesizer($llmClient, $bufferingLogger))->synthesize([$vulnerability]);
+
+        $logs = $bufferingLogger->cleanLogs();
+        self::assertSame('error', $logs[0][0]);
+        self::assertSame('PoC synthesis call failed; keeping original proof', $logs[0][1]);
+        self::assertSame($vulnerability->id(), $logs[0][2]['vulnerability_id']);
+        self::assertSame('network down', $logs[0][2]['error']);
+    }
+
+    public function test_it_rethrows_budget_exceeded_exception(): void
+    {
+        $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willThrowException(BudgetExceededException::forCost(2.0, 1.0));
+
+        $this->expectException(BudgetExceededException::class);
+        (new PoCSynthesizer($llmClient, new NullLogger()))->synthesize([$vulnerability]);
+    }
+
+    public function test_it_rethrows_llm_provider_exception(): void
+    {
+        $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willThrowException(new LLMProviderException('retired model'));
+
+        $this->expectException(LLMProviderException::class);
+        (new PoCSynthesizer($llmClient, new NullLogger()))->synthesize([$vulnerability]);
     }
 
     private function makeVulnerability(
