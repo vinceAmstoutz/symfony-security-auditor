@@ -13,11 +13,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 ## [1.4.0] — 2026-05-27 — Bloodhound
 
 A detection-and-cost release. The auditor now covers the modern Symfony 7.x/8.x
-attack surface, follows data flow across files, tracks findings across runs, and
-gives operators several opt-in levers to cut token spend. Every addition is
-backward compatible — new configuration keys, new Domain ports, a new
-`audit:run` option, new `VulnerabilityType` cases, and additive JSON/SARIF
-fields. No existing key, default, exit code, or schema field changed meaning.
+attack surface, follows data flow across files, and gives operators several
+opt-in levers to cut token spend. Every addition is backward compatible — new
+configuration keys, new Domain ports, a new `audit:run` option, new
+`VulnerabilityType` cases, and additive JSON/SARIF fields. No existing key,
+default, exit code, or schema field changed meaning.
 
 ### Added
 
