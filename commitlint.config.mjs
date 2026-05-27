@@ -44,6 +44,7 @@ export default {
                 'tool',
                 'cache',
                 'report',
+                'prompt',
                 'scan',
                 'rate-limit',
             ],
