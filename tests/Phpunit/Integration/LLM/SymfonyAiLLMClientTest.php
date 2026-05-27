@@ -332,6 +332,49 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(7, $responses[1]->outputTokens());
     }
 
+    public function test_complete_batch_acquires_rate_limit_for_each_request(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new InMemoryPlatform('ok'),
+            'm',
+            new NullLogger(),
+            rateLimiter: $fakeRateLimiter,
+            tokenEstimator: new FixedTokenEstimator(123),
+        );
+
+        $symfonyAiLLMClient->completeBatch([
+            ['system' => 's1', 'user' => 'u1'],
+            ['system' => 's2', 'user' => 'u2'],
+            ['system' => 's3', 'user' => 'u3'],
+        ], 2);
+
+        self::assertSame([246, 246, 246], $fakeRateLimiter->acquired);
+    }
+
+    public function test_complete_batch_records_budget_and_aborts_when_a_response_exceeds_it(): void
+    {
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('done'),
+            new TokenUsage(promptTokens: 500, completionTokens: 0),
+        );
+        $budgetTracker = new BudgetTracker(
+            AuditBudget::forTokens(100),
+            new CostCalculator($this->stubPricing(0.0, 0.0)),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: new TokenUsageRecorder(),
+            budgetTracker: $budgetTracker,
+        );
+
+        $this->expectException(BudgetExceededException::class);
+
+        $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+    }
+
     public function test_complete_with_tools_returns_text_when_platform_emits_no_tool_calls(): void
     {
         $platform = $this->scriptedPlatform([

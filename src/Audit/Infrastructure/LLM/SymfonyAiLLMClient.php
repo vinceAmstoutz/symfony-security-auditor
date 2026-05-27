@@ -116,10 +116,6 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
 
     public function completeBatch(array $requests, int $maxConcurrent): array
     {
-        if ([] === $requests) {
-            return [];
-        }
-
         \assert('' !== $this->model, 'Model must be a non-empty string');
 
         $windowSize = max(1, $maxConcurrent);
@@ -170,8 +166,6 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
         foreach ($window as $index => $request) {
             $resolved[$index] = $this->resolveOne($deferred[$index], $request);
         }
-
-        ksort($resolved);
 
         return array_values($resolved);
     }
