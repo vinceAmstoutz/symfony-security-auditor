@@ -74,13 +74,6 @@ fields. No existing key, default, exit code, or schema field changed meaning.
   `audit.escalation.cheap_model`). A cheap-model sweep runs first; the expensive
   model only re-analyses files the sweep flagged, with the cheap findings fed in
   as context.
-- **Cross-run finding correlation** (`audit.history.enabled`, default `false`;
-  `audit.history.dir`). `Vulnerability::fingerprint()` is a stable id
-  (`type + file + normalized code`) that survives line-number drift; the new
-  `HistoricalCorrelationStage` tags each finding `new` / `still_present` and
-  reports a `fixed` count against the previous run. New
-  `AuditHistoryStoreInterface` port and additive `fingerprint` /
-  `historical_status` report fields.
 - **Concurrent reviewer calls** (`audit.reviewer_max_concurrent`, default `1`).
   When reviewing one finding per call with tools off, the new opt-in
   `BatchCapableLLMClientInterface` resolves reviews concurrently (real I/O

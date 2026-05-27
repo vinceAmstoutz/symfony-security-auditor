@@ -108,7 +108,7 @@ final class RegexCodeSlicerTest extends TestCase
     {
         yield 'namespace' => ['namespace App\\Controller;'];
         yield 'use' => ['use Symfony\\Component\\HttpFoundation\\Request;'];
-        yield 'attribute' => ['#[Route(\'/users\')]'];
+        yield 'attribute' => ["#[Route('/users')]"];
         yield 'class declaration' => ['class UserController'];
         yield 'final class declaration' => ['final class WidgetController'];
         yield 'interface declaration' => ['interface Foo'];
@@ -169,7 +169,7 @@ final class RegexCodeSlicerTest extends TestCase
 
                 public function cold(): Response
                 {
-            $inert
+            {$inert}
                     return new Response('ok');
                 }
             }

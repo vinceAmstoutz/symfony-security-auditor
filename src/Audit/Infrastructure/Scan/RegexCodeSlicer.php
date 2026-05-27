@@ -172,7 +172,11 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
 
     private function shouldRetain(string $line): bool
     {
-        return $this->isStructural($line) || $this->containsSecurityToken($line);
+        if ($this->isStructural($line)) {
+            return true;
+        }
+
+        return $this->containsSecurityToken($line);
     }
 
     private function isStructural(string $line): bool

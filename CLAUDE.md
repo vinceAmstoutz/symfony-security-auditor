@@ -64,18 +64,17 @@ src/
     Domain/          # Pure PHP — no framework, no I/O
       Model/         # Value objects and enums (Vulnerability, AuditReport, …)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)
-      Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, StaticPreScannerInterface, CodeSlicerInterface, GitChangedFilesResolverInterface, AuditHistoryStoreInterface)
+      Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, StaticPreScannerInterface, CodeSlicerInterface, GitChangedFilesResolverInterface)
         Tool/        # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
     Application/     # Orchestration — no I/O, depends only on Domain
       UseCase/       # RunAuditUseCase, EstimateAuditCostUseCase (entry points)
-      Pipeline/      # AuditPipeline + Stage/{IngestionStage, MappingStage, AuditStage, PoCSynthesisStage, HistoricalCorrelationStage}
+      Pipeline/      # AuditPipeline + Stage/{IngestionStage, MappingStage, AuditStage, PoCSynthesisStage}
       Agent/         # AttackerAgent, ReviewerAgent, EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, PoCSynthesizer, Chunking/{ChunkingStrategy, FileChunker}
     Infrastructure/  # I/O adapters
       LLM/           # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier, CharacterBasedTokenEstimator, Delay/, RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
       FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
       Scan/          # RegexStaticPreScanner, NullStaticPreScanner, RegexCodeSlicer, NullCodeSlicer
       Diff/          # ProcessGitChangedFilesResolver (git diff for --since)
-      History/       # FilesystemAuditHistoryStore, NullAuditHistoryStore (cross-run fingerprints)
       Prompt/        # AttackerPromptBuilder, ReviewerPromptBuilder
       Cache/         # FilesystemAttackerCache, NullAttackerCache
       Advisory/      # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase (fallback), SymfonyProcessComposerAuditRunner
@@ -125,9 +124,8 @@ Command → Application → Domain ← Infrastructure (implements ports)
    concurrently), may adjust severity
 5. Deduplicate → persist to `AuditContext`
 
-After the loop, optional stages run: `PoCSynthesisStage` (concrete reproduction
-artifacts) and `HistoricalCorrelationStage` (tag findings new/still_present and
-report fixed vs. the previous run by stable fingerprint).
+After the loop, the optional `PoCSynthesisStage` runs (concrete reproduction
+artifacts for high-severity findings).
 
 Full details: [`docs/architecture.md`](docs/architecture.md)
 

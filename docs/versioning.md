@@ -43,10 +43,9 @@ Every key under `symfony_security_auditor:` documented in
   `audit.code_slicing.enabled`, `audit.code_slicing.min_lines_before_slicing`,
   `audit.poc_synthesis.enabled`, `audit.poc_synthesis.severity_floor`,
   `audit.escalation.enabled`, `audit.escalation.cheap_model`,
-  `audit.history.enabled`, `audit.history.dir`, `audit.retry.max_attempts`,
-  `audit.retry.initial_delay_ms`, `audit.retry.backoff_multiplier`,
-  `audit.retry.jitter_ratio`, `audit.budget.max_tokens`,
-  `audit.budget.max_cost_usd`
+  `audit.retry.max_attempts`, `audit.retry.initial_delay_ms`,
+  `audit.retry.backoff_multiplier`, `audit.retry.jitter_ratio`,
+  `audit.budget.max_tokens`, `audit.budget.max_cost_usd`
 - `cache.enabled`, `cache.dir`, `cache.prompt_caching`
 
 Default values for these keys are also part of the contract. Changing a default
@@ -93,8 +92,6 @@ overriding the alias in `config/services.yaml` is a supported integration path:
   before reaching the LLM.
 - `GitChangedFilesResolverInterface` — implement and alias to change how
   `--since` resolves the changed-file set.
-- `AuditHistoryStoreInterface` — implement and alias to persist cross-run
-  finding fingerprints in a custom store (database, object storage, …).
 - `AdvisoryDatabaseInterface` — host applications may implement this and alias
   it to swap the CVE feed (Snyk, internal database, …). See
   [`docs/extending.md`](extending.md).

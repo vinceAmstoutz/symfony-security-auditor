@@ -35,7 +35,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AuditHistoryStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
@@ -49,8 +48,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttacker
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\History\FilesystemAuditHistoryStore;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\History\NullAuditHistoryStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
@@ -232,20 +229,6 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                                 ->end()
                             ->end()
                         ->end()
-                        ->arrayNode('history')
-                            ->addDefaultsIfNotSet()
-                            ->info('Cross-run finding correlation. Persists the fingerprints surfaced by each audit and, on the next run, tags every finding new / still_present and reports a fixed count. Fingerprints survive line-number drift (hash of type + file + normalized vulnerable code), so a finding is only "fixed" when the vulnerable code is actually gone. Essential for CI workflows that track remediation across PRs.')
-                            ->children()
-                                ->booleanNode('enabled')
-                                    ->defaultFalse()
-                                    ->info('When true, the HistoricalCorrelationStage runs after the audit, tags findings, and persists fingerprints to history.dir. Default false.')
-                                ->end()
-                                ->scalarNode('dir')
-                                    ->defaultValue('%kernel.cache_dir%/symfony_security_auditor/history')
-                                    ->info('Filesystem directory where per-project fingerprint snapshots are stored. Commit this directory (or point it at a persistent CI cache) to track findings across runs.')
-                                ->end()
-                            ->end()
-                        ->end()
                         ->arrayNode('poc_synthesis')
                             ->addDefaultsIfNotSet()
                             ->info('Optional follow-up stage that generates a concrete, copy-pasteable proof-of-concept (curl command, console invocation, payload body) for every validated finding at or above the configured severity floor. Spends extra LLM tokens per finding; off by default. Turn on when shipping reports to engineers who need actionable reproduction steps.')
@@ -354,7 +337,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *     reviewer_model: string|null,
      *     provider_json_mode: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, history: array{enabled: bool, dir: string}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * } $config
      */
@@ -385,8 +368,6 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.chunking.strategy', $bundleConfiguration->audit->chunkingStrategy);
         $builder->setParameter('symfony_security_auditor.audit.poc_synthesis.enabled', $bundleConfiguration->audit->poCSynthesisEnabled);
         $builder->setParameter('symfony_security_auditor.audit.poc_synthesis.severity_floor', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
-        $builder->setParameter('symfony_security_auditor.audit.history.enabled', $bundleConfiguration->audit->historyEnabled);
-        $builder->setParameter('symfony_security_auditor.audit.history.dir', $bundleConfiguration->audit->historyDir);
         $builder->setParameter('symfony_security_auditor.audit.code_slicing.enabled', $bundleConfiguration->audit->codeSlicingEnabled);
         $builder->setParameter('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing', $bundleConfiguration->audit->codeSlicingMinLines);
         $builder->setParameter('symfony_security_auditor.audit.budget.max_tokens', $bundleConfiguration->budget->maxTokens);
@@ -526,11 +507,6 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ? RegexCodeSlicer::class
             : NullCodeSlicer::class;
         $services->alias(CodeSlicerInterface::class, $codeSlicerServiceId);
-
-        $historyStoreServiceId = $bundleConfiguration->audit->historyEnabled
-            ? FilesystemAuditHistoryStore::class
-            : NullAuditHistoryStore::class;
-        $services->alias(AuditHistoryStoreInterface::class, $historyStoreServiceId);
 
         if ($bundleConfiguration->audit->escalationEnabled) {
             $cheapModel = $bundleConfiguration->audit->escalationCheapModel ?? $bundleConfiguration->llm->reviewerModel();

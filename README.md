@@ -176,8 +176,6 @@ bin/console audit:run --dry-run
 - **Deterministic pre-scan** — a zero-token risk-marker pass flags concrete
   locations (unserialize, `|raw`, hardcoded secrets, unsafe Doctrine, …) to
   focus the LLM; optional **lean mode** drops marker-free files to cut tokens.
-- **Cross-run finding tracking** — stable fingerprints survive line-number drift
-  so reports show `new` / `still_present` / `fixed` across PRs.
 - **Diff mode** — `audit:run --since=main` audits only changed files for fast
   pull-request CI.
 - **Cost levers** — opt-in cheap→expensive escalation, code slicing, concurrent

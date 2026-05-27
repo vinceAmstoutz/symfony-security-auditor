@@ -434,11 +434,10 @@ $report->riskLevel(): string                         // SAFE|LOW|MEDIUM|HIGH|CRI
 $report->toArray(): array<string, mixed>             // fully serializable; includes 'cost' key
 ```
 
-`Vulnerability::toArray()` keys: `id`, `fingerprint`, `type`, `category`,
-`owasp`, `severity`, `severity_score`, `title`, `description`, `file`,
-`line_start`, `line_end`, `vulnerable_code`, `attack_vector`, `proof`,
-`remediation`, `confidence`, `reviewer_validated`, `detected_at`,
-`synthesized_poc`, `historical_status`.
+`Vulnerability::toArray()` keys: `id`, `type`, `category`, `owasp`, `severity`,
+`severity_score`, `title`, `description`, `file`, `line_start`, `line_end`,
+`vulnerable_code`, `attack_vector`, `proof`, `remediation`, `confidence`,
+`reviewer_validated`, `detected_at`, `synthesized_poc`.
 
 ### Built-in formats
 
@@ -482,10 +481,6 @@ in `config/services.yaml` to override the bundled behaviour (see
 - `GitChangedFilesResolverInterface` — change how `--since` resolves the
   changed-file set (default: `ProcessGitChangedFilesResolver`, backed by
   `git diff`).
-- `AuditHistoryStoreInterface` — persist cross-run finding fingerprints in a
-  custom store such as a database or object storage (default:
-  `FilesystemAuditHistoryStore` when `audit.history.enabled: true`, otherwise
-  `NullAuditHistoryStore`).
 - `BatchCapableLLMClientInterface` — an opt-in extension of `LLMClientInterface`
   for clients that resolve several prompts concurrently; the reviewer uses it
   when `audit.reviewer_max_concurrent > 1`.

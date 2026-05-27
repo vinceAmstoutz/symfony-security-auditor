@@ -54,8 +54,7 @@ flowchart LR
         MAP["Map\nRoutes · Firewalls · Roles"]:::stage
         AUD["Audit"]:::stage
         POC["PoC Synthesis\n(opt-in)"]:::stage
-        HIST["Historical Correlation\nnew · still_present · fixed\n(opt-in)"]:::stage
-        ING --> MAP --> AUD --> POC --> HIST
+        ING --> MAP --> AUD --> POC
     end
 
     subgraph LOOP["  Dual-Agent Loop — max 3 iterations  "]
@@ -67,7 +66,7 @@ flowchart LR
         REV -. "iterate: feed back confirmed findings" .-> ATK
     end
 
-    RPT(["AuditReport\nrisk level · fingerprint · JSON · SARIF · console"]):::report
+    RPT(["AuditReport\nrisk level · JSON · SARIF · console"]):::report
 
     CLI --> PIPE
     AUD --> PRE
