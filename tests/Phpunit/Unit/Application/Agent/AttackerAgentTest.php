@@ -19,9 +19,11 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\Component\ErrorHandler\BufferingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
@@ -35,6 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
@@ -63,6 +66,117 @@ final class AttackerAgentTest extends TestCase
             new AttackerAnalysisRequest($files, $symfonyMapping, $bypassCache, $previousFindings),
             $coverageRecorder,
         );
+    }
+
+    public function test_lean_mode_skip_logs_counts_records_skipped_coverage_and_returns_empty(): void
+    {
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('complete');
+
+        $staticPreScanner = self::createStub(StaticPreScannerInterface::class);
+        $staticPreScanner->method('scan')->willReturn([]);
+
+        $bufferingLogger = new BufferingLogger();
+        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $bufferingLogger, null, false, AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS, $staticPreScanner, true);
+
+        $coverageRecorder = new class implements CoverageRecorderInterface {
+            /** @var list<string> */
+            public array $statuses = [];
+
+            public function recordCoverage(string $stage, string $filePath, string $status): void
+            {
+                $this->statuses[] = $status;
+            }
+        };
+
+        $result = $attackerAgent->analyze(
+            new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php'), $this->makeFile('src/Controller/B.php')], SymfonyMapping::create()),
+            $coverageRecorder,
+        );
+
+        self::assertSame([], $result);
+        self::assertSame(['skipped', 'skipped'], $coverageRecorder->statuses);
+
+        $logs = $bufferingLogger->cleanLogs();
+        self::assertSame(['files' => 2, 'markers' => 0], $this->contextOf($logs, 'Attacker agent skipped — lean mode filtered all files'));
+        $messages = array_map(static function (mixed $entry): mixed {
+            self::assertIsArray($entry);
+
+            return $entry[1] ?? null;
+        }, $logs);
+        self::assertNotContains('Attacker agent starting analysis', $messages);
+    }
+
+    public function test_risk_markers_are_prepended_before_the_user_message(): void
+    {
+        $markers = [RiskMarker::create('src/Controller/A.php', 10, 'request_get', 'Request input read')];
+        $staticPreScanner = self::createStub(StaticPreScannerInterface::class);
+        $staticPreScanner->method('scan')->willReturn($markers);
+
+        $captured = '';
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
+            $captured = $user;
+
+            return LLMResponse::create('[]', 0, 0, 'claude', 'end_turn');
+        });
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, null, new NullLogger(), null, false, AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS, $staticPreScanner);
+
+        $attackerAgent->analyze(new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::create()), new NullCoverageRecorder());
+
+        self::assertStringStartsWith((new AttackerContextPromptRenderer())->renderRiskMarkers($markers)."\n\n", $captured);
+        self::assertStringContainsString('## Source Code', $captured);
+    }
+
+    public function test_previous_findings_are_prepended_before_the_user_message(): void
+    {
+        $previousFindings = [$this->makeVulnerabilityFor('src/Controller/A.php')];
+
+        $captured = '';
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
+            $captured = $user;
+
+            return LLMResponse::create('[]', 0, 0, 'claude', 'end_turn');
+        });
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient);
+
+        $attackerAgent->analyze(
+            new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::create(), false, $previousFindings),
+            new NullCoverageRecorder(),
+        );
+
+        self::assertStringStartsWith((new AttackerContextPromptRenderer())->renderPreviousFindings($previousFindings)."\n\n", $captured);
+        self::assertStringContainsString('## Source Code', $captured);
+    }
+
+    public function test_it_sends_the_sliced_content_to_the_llm(): void
+    {
+        $codeSlicer = self::createStub(CodeSlicerInterface::class);
+        $codeSlicer->method('slice')->willReturn("<?php\n// SLICED-MARKER");
+
+        $captured = '';
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
+            $captured = $user;
+
+            return LLMResponse::create('[]', 0, 0, 'claude', 'end_turn');
+        });
+
+        $attackerAgent = new AttackerAgent(
+            llmClient: $llmClient,
+            attackerPromptBuilder: new AttackerPromptBuilder(),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger()),
+            attackerCache: new NullAttackerCache(),
+            logger: new NullLogger(),
+            codeSlicer: $codeSlicer,
+        );
+
+        $attackerAgent->analyze(new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::create()), new NullCoverageRecorder());
+
+        self::assertStringContainsString('SLICED-MARKER', $captured);
     }
 
     public function test_it_returns_empty_array_when_no_files(): void
@@ -1415,6 +1529,44 @@ final class AttackerAgentTest extends TestCase
     private function makeFile(string $path): ProjectFile
     {
         return ProjectFile::create($path, '/app/'.$path, '<?php class Foo {}');
+    }
+
+    private function makeVulnerabilityFor(string $filePath): Vulnerability
+    {
+        return Vulnerability::create(
+            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
+            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
+            title: 'T',
+            description: 'd',
+            filePath: $filePath,
+            lineStart: 1,
+            lineEnd: 2,
+            vulnerableCode: 'c',
+            attackVector: 'a',
+            proof: 'p',
+            remediation: 'r',
+            confidence: 0.9,
+        );
+    }
+
+    /**
+     * @param array<mixed> $logs
+     *
+     * @return array<mixed>
+     */
+    private function contextOf(array $logs, string $message): array
+    {
+        foreach ($logs as $log) {
+            self::assertIsArray($log);
+            if ($message === ($log[1] ?? null)) {
+                $context = $log[2] ?? [];
+                self::assertIsArray($context);
+
+                return $context;
+            }
+        }
+
+        self::fail(\sprintf('No log entry with message "%s"', $message));
     }
 
     private function makeAttackerAgent(
