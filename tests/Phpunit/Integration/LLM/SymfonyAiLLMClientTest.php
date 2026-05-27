@@ -375,6 +375,42 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
     }
 
+    public function test_complete_batch_dispatches_one_request_per_window_when_concurrency_is_one(): void
+    {
+        $rateLimiter = new class implements RateLimiterInterface {
+            /** @var list<string> */
+            public array $events = [];
+
+            public function acquire(int $estimatedInputTokens): void
+            {
+                $this->events[] = 'acquire';
+            }
+
+            public function record(int $inputTokens, int $outputTokens): void
+            {
+                $this->events[] = 'record';
+            }
+
+            public function pauseUntil(DateTimeImmutable $until): void {}
+        };
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new InMemoryPlatform('ok'),
+            'm',
+            new NullLogger(),
+            rateLimiter: $rateLimiter,
+        );
+
+        $symfonyAiLLMClient->completeBatch([
+            ['system' => 's1', 'user' => 'u1'],
+            ['system' => 's2', 'user' => 'u2'],
+        ], 1);
+
+        // window size 1 ⇒ acquire+resolve one request before the next; a larger
+        // window would acquire both before resolving either.
+        self::assertSame(['acquire', 'record', 'acquire', 'record'], $rateLimiter->events);
+    }
+
     public function test_complete_with_tools_returns_text_when_platform_emits_no_tool_calls(): void
     {
         $platform = $this->scriptedPlatform([

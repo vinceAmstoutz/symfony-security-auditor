@@ -160,7 +160,7 @@ final class PoCSynthesizerTest extends TestCase
         $llmClient->method('complete')->willReturn(LLMResponse::create('curl /x', 10, 10, 'claude', 'end_turn'));
 
         $bufferingLogger = new BufferingLogger();
-        (new PoCSynthesizer($llmClient, $bufferingLogger))->synthesize([$vulnerability, $belowFloor]);
+        (new PoCSynthesizer($llmClient, $bufferingLogger))->synthesize([$belowFloor, $vulnerability]);
 
         $logs = $bufferingLogger->cleanLogs();
         $completion = end($logs);
