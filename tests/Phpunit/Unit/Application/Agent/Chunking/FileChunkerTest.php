@@ -172,6 +172,91 @@ final class FileChunkerTest extends TestCase
         self::assertCount(2, $chunks[0]);
     }
 
+    public function test_feature_extraction_skips_non_controllers_without_stopping(): void
+    {
+        $files = [
+            $this->makeFile('src/Service/Foo.php'),
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/Entity/User.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        self::assertNotNull($userChunk);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
+        self::assertContains('src/Entity/User.php', $paths);
+        self::assertNotContains('src/Service/Foo.php', $paths);
+    }
+
+    public function test_feature_assignment_continues_past_unrelated_files(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/Service/Unrelated.php'),
+            $this->makeFile('src/Entity/User.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        self::assertNotNull($userChunk);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
+        self::assertContains('src/Entity/User.php', $paths);
+        self::assertNotContains('src/Service/Unrelated.php', $paths);
+    }
+
+    public function test_feature_matches_files_whose_basename_starts_with_the_feature(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/Entity/UserProfile.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        self::assertNotNull($userChunk);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
+        self::assertContains('src/Entity/UserProfile.php', $paths);
+    }
+
+    public function test_feature_directory_match_requires_the_feature_segment_bounded_by_slashes(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/MyUser/Thing.php'),
+            $this->makeFile('src/username/Other.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        self::assertNotNull($userChunk);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
+        self::assertNotContains('src/MyUser/Thing.php', $paths);
+        self::assertNotContains('src/username/Other.php', $paths);
+    }
+
+    public function test_each_feature_keeps_its_own_assignments(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/Entity/User.php'),
+            $this->makeFile('src/Controller/OrderController.php'),
+            $this->makeFile('src/Entity/Order.php'),
+            $this->makeFile('src/Service/Misc.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $orderChunk = $this->findChunkContaining($chunks, 'src/Controller/OrderController.php');
+        self::assertNotNull($orderChunk);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $orderChunk);
+        self::assertContains('src/Entity/Order.php', $paths);
+        self::assertNotContains('src/Service/Misc.php', $paths);
+    }
+
     private function makeFile(string $path): ProjectFile
     {
         return ProjectFile::create($path, '/app/'.$path, '<?php');

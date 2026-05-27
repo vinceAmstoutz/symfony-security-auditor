@@ -153,29 +153,23 @@ final readonly class FileChunker
     {
         $names = [];
         foreach ($files as $file) {
+            if (ProjectFileType::CONTROLLER !== $file->fileType()) {
+                continue;
+            }
+
             $featureName = $this->featureNameOf($file);
 
             if (null !== $featureName) {
-                $names[$featureName] = true;
+                $names[] = $featureName;
             }
         }
 
-        return array_keys($names);
+        return array_values(array_unique($names));
     }
 
     private function featureNameOf(ProjectFile $projectFile): ?string
     {
-        if (ProjectFileType::CONTROLLER !== $projectFile->fileType()) {
-            return null;
-        }
-
-        $baseName = u(basename($projectFile->relativePath(), '.php'));
-
-        if (!$baseName->endsWith('Controller')) {
-            return null;
-        }
-
-        $featureName = $baseName->beforeLast('Controller')->toString();
+        $featureName = u(basename($projectFile->relativePath(), '.php'))->beforeLast('Controller')->toString();
 
         return '' === $featureName ? null : $featureName;
     }
@@ -226,10 +220,6 @@ final readonly class FileChunker
 
     private function fileBelongsToFeature(string $baseName, string $relativePath, string $featureName): bool
     {
-        if ($baseName === $featureName) {
-            return true;
-        }
-
         if (u($baseName)->startsWith($featureName)) {
             return true;
         }
