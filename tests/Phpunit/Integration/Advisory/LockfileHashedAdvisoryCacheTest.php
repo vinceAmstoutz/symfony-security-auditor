@@ -44,6 +44,28 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertGreaterThan(0, \count(glob($this->cacheDir.'/*/*.json') ?: []));
     }
 
+    public function test_missing_lockfile_does_not_emit_an_unreadable_warning(): void
+    {
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$warnings): void {
+                $warnings[] = $message;
+            },
+        );
+
+        $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache(
+            $this->recordingRunner('{"advisories": {}}'),
+            $this->cacheDir,
+            new Filesystem(),
+            $logger,
+        );
+
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame([], $warnings);
+    }
+
     public function test_returns_cached_payload_without_invoking_inner(): void
     {
         $this->writeLockfile('{"lock": "v1"}');

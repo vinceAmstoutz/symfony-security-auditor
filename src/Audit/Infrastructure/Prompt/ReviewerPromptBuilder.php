@@ -39,6 +39,12 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         - `_profiler` / `_wdt` routes gated by `when@dev` / `when@test`.
         - Form fields with `mapped: false` whose constraints validate the input — they never reach the entity setter.
         - Reflected user input echoed back as plain text inside a `Response` of `Content-Type: text/plain` (no HTML execution surface).
+        - Webhook handlers calling `hash_equals($expected, $received)` against a configured secret — that IS the constant-time check.
+        - Messenger transports configured with the framework default JSON serializer (`messenger.transport.symfony_serializer`) — no PHP-native unserialize.
+        - `#[MapRequestPayload]` / `#[MapQueryString]` over a DTO with constraint attributes (`#[Assert\…]`) — the validator runs before the controller body.
+        - `HtmlSanitizerInterface::sanitize()` output rendered with `|raw` — the sanitizer guarantees XSS-safe HTML.
+        - `RateLimiterFactory::create($userIdentifier)` on auth endpoints — per-identity scope is correct.
+        - `LockFactory::createLock($resourceId)` around a critical section — that IS the mitigation for race conditions.
         Reject these with a one-line note pointing at the specific mitigation.
         PLAYBOOK;
 
@@ -82,7 +88,8 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         state_machine_bypass, mass_assignment, insecure_deserialization, unsafe_parameter_binding,
         exposed_internal_service, misconfigured_firewall, insecure_redirect, sensitive_data_exposure,
         log_injection, path_traversal, ssrf, xxe, open_redirect, weak_cryptography, insecure_random,
-        hardcoded_secret
+        hardcoded_secret, missing_signature_verification, messenger_handler_unsafe, missing_rate_limiting,
+        cache_poisoning, mailer_header_injection, webhook_replay, authenticator_bypass
         SCHEMA;
 
     private const string DECISION_RULES = <<<'RULES'
@@ -95,6 +102,15 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         - Return ONLY the JSON array, no prose
         RULES;
 
+    private const string TOOL_USAGE_DISCIPLINE = <<<'TOOLS'
+        Tool usage (when tools are available):
+        - You may call `read_file`, `grep`, `list_files`, and `lookup_advisory` to verify cross-file context — e.g. is there a parent-class `denyAccessUnlessGranted()`, an `access_control` rule in security.yaml, a CSRF guard on the route, or an upstream sanitizer?
+        - Each call costs the audit budget. Stop calling tools as soon as you have enough evidence to accept or reject the finding.
+        - If your initial read of the Full File Context is already sufficient, do NOT call tools — emit the JSON answer directly.
+        - Tools are for cross-file checks only. Do not call tools to re-read the file you already have in `Full File Context`.
+        - Once you have decided, your response MUST contain ONLY the JSON output — no prose, no further tool calls.
+        TOOLS;
+
     public function buildSystemPrompt(): string
     {
         return implode("\n\n", [
@@ -104,6 +120,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
             'Your output must be a JSON array, one entry per vulnerability reviewed.',
             self::JSON_SCHEMA_DESCRIPTION,
             self::DECISION_RULES,
+            self::TOOL_USAGE_DISCIPLINE,
         ]);
     }
 
@@ -124,6 +141,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
             self::JSON_SCHEMA_DESCRIPTION,
             $orderingInstruction,
             self::DECISION_RULES,
+            self::TOOL_USAGE_DISCIPLINE,
         ]);
     }
 

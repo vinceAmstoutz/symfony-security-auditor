@@ -17,6 +17,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestratorInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
@@ -26,20 +30,25 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipelin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\PoCSynthesisStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
@@ -49,6 +58,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileH
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff\ProcessGitChangedFilesResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
@@ -64,6 +74,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRegistryFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
@@ -73,6 +87,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
 
+use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
@@ -158,8 +173,15 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(AuditPresenter::class);
     $defaultsConfigurator->alias(AuditPresenterInterface::class, AuditPresenter::class);
 
+    $defaultsConfigurator->set(ProcessGitChangedFilesResolver::class);
+    $defaultsConfigurator->alias(GitChangedFilesResolverInterface::class, ProcessGitChangedFilesResolver::class);
+
     $defaultsConfigurator->set(IngestionStage::class)
-        ->args([service(ProjectFileScannerInterface::class), service('logger')]);
+        ->args([
+            service(ProjectFileScannerInterface::class),
+            service('logger'),
+            service(GitChangedFilesResolverInterface::class),
+        ]);
 
     $defaultsConfigurator->set(MappingStage::class)
         ->args([service('logger')]);
@@ -176,6 +198,23 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(AuditStage::class)
         ->args([service(AuditOrchestratorInterface::class), service('logger')]);
+
+    $defaultsConfigurator->set(PoCSynthesizer::class)
+        ->args([
+            service('security_auditor.reviewer_client'),
+            service('logger'),
+            inline_service(VulnerabilitySeverity::class)
+                ->factory([VulnerabilitySeverity::class, 'from'])
+                ->args([param('symfony_security_auditor.audit.poc_synthesis.severity_floor')]),
+        ]);
+    $defaultsConfigurator->alias(PoCSynthesizerInterface::class, PoCSynthesizer::class);
+
+    $defaultsConfigurator->set(PoCSynthesisStage::class)
+        ->args([
+            service(PoCSynthesizerInterface::class),
+            service('logger'),
+            param('symfony_security_auditor.audit.poc_synthesis.enabled'),
+        ]);
 
     $defaultsConfigurator->set(NullProgressReporter::class);
     $defaultsConfigurator->set(LoggerProgressReporter::class)
@@ -231,6 +270,21 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->args([service('logger'), service(AdvisoryDatabaseInterface::class)]);
     $defaultsConfigurator->alias(ToolRegistryFactoryInterface::class, SymfonyToolRegistryFactory::class);
 
+    $defaultsConfigurator->set(NullStaticPreScanner::class);
+    $defaultsConfigurator->set(RegexStaticPreScanner::class)
+        ->args([param('symfony_security_auditor.scan.custom_risk_patterns')]);
+
+    $defaultsConfigurator->set(NullCodeSlicer::class);
+    $defaultsConfigurator->set(RegexCodeSlicer::class)
+        ->args([param('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing')]);
+
+    $defaultsConfigurator->set(FileChunker::class)
+        ->args([
+            inline_service(ChunkingStrategy::class)
+                ->factory([ChunkingStrategy::class, 'from'])
+                ->args([param('symfony_security_auditor.audit.chunking.strategy')]),
+        ]);
+
     $defaultsConfigurator->set(AttackerAgent::class)
         ->args([
             service('security_auditor.attacker_client'),
@@ -241,6 +295,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(ToolRegistryFactoryInterface::class),
             param('symfony_security_auditor.audit.tools_enabled'),
             param('symfony_security_auditor.audit.max_tool_iterations'),
+            service(StaticPreScannerInterface::class),
+            param('symfony_security_auditor.audit.static_prescan.lean_mode'),
+            service(FileChunker::class),
+            service(CodeSlicerInterface::class),
         ]);
 
     $defaultsConfigurator->alias(AttackerAgentInterface::class, AttackerAgent::class);
@@ -251,6 +309,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(ReviewerPromptBuilderInterface::class),
             service('logger'),
             param('symfony_security_auditor.audit.reviewer_batch_size'),
+            service(ToolRegistryFactoryInterface::class),
+            param('symfony_security_auditor.audit.reviewer_tools_enabled'),
+            param('symfony_security_auditor.audit.reviewer_max_tool_iterations'),
+            param('symfony_security_auditor.audit.reviewer_max_concurrent'),
         ]);
 
     $defaultsConfigurator->alias(ReviewerAgentInterface::class, ReviewerAgent::class);

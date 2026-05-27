@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Throwable;
 
+use function Symfony\Component\String\u;
+
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class TransientFailureClassifier
 {
@@ -68,19 +70,11 @@ final readonly class TransientFailureClassifier
     {
         $joined = $this->joinMessages($throwable);
 
-        foreach (self::NON_TRANSIENT_HINTS as $hint) {
-            if (str_contains($joined, $hint)) {
-                return false;
-            }
+        if (u($joined)->containsAny(self::NON_TRANSIENT_HINTS)) {
+            return false;
         }
 
-        foreach (self::TRANSIENT_HINTS as $hint) {
-            if (str_contains($joined, $hint)) {
-                return true;
-            }
-        }
-
-        return false;
+        return u($joined)->containsAny(self::TRANSIENT_HINTS);
     }
 
     /**
@@ -92,13 +86,7 @@ final readonly class TransientFailureClassifier
     {
         $joined = $this->joinMessages($throwable);
 
-        foreach (self::RATE_LIMIT_HINTS as $hint) {
-            if (str_contains($joined, $hint)) {
-                return true;
-            }
-        }
-
-        return false;
+        return u($joined)->containsAny(self::RATE_LIMIT_HINTS);
     }
 
     private function joinMessages(Throwable $throwable): string
@@ -106,7 +94,7 @@ final readonly class TransientFailureClassifier
         $messages = [];
         $current = $throwable;
         while ($current instanceof Throwable) {
-            $messages[] = strtolower($current->getMessage());
+            $messages[] = u($current->getMessage())->lower()->toString();
             $current = $current->getPrevious();
         }
 

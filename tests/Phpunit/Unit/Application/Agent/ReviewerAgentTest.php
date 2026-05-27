@@ -26,8 +26,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 
 final class ReviewerAgentTest extends TestCase
@@ -542,7 +545,7 @@ final class ReviewerAgentTest extends TestCase
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
-        self::assertSame(['Reviewer agent validating findings', ['count' => 1, 'batch_size' => 1]], $infoLogs[0]);
+        self::assertSame(['Reviewer agent validating findings', ['count' => 1, 'batch_size' => 1, 'tools_enabled' => false]], $infoLogs[0]);
         self::assertSame(['Reviewer agent complete', ['reviewed' => 1, 'accepted' => 1, 'rejected' => 0]], $infoLogs[1]);
     }
 
@@ -1595,6 +1598,197 @@ final class ReviewerAgentTest extends TestCase
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
+    }
+
+    public function test_it_reviews_singles_concurrently_when_batch_capable_and_concurrency_configured(): void
+    {
+        $vulnerabilities = [$this->makeVulnerabilityAt('src/A.php'), $this->makeVulnerabilityAt('src/B.php')];
+
+        $llmClient = new class implements BatchCapableLLMClientInterface {
+            public int $batchCalls = 0;
+
+            public int $completeCalls = 0;
+
+            public function complete(string $systemPrompt, string $userMessage): LLMResponse
+            {
+                ++$this->completeCalls;
+
+                return LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn');
+            }
+
+            public function completeWithTools(string $systemPrompt, string $userMessage, ToolRegistry $toolRegistry, int $maxToolIterations): LLMResponse
+            {
+                return LLMResponse::create('{}', 0, 0, 'm', 'end_turn');
+            }
+
+            public function model(): string
+            {
+                return 'm';
+            }
+
+            public function completeBatch(array $requests, int $maxConcurrent): array
+            {
+                ++$this->batchCalls;
+
+                return array_map(
+                    static fn (): LLMResponse => LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn'),
+                    $requests,
+                );
+            }
+        };
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: new NullLogger(),
+            maxConcurrent: 4,
+        );
+
+        $reviewed = $reviewerAgent->review($vulnerabilities, [], new NullCoverageRecorder());
+
+        self::assertSame(1, $llmClient->batchCalls);
+        self::assertSame(0, $llmClient->completeCalls);
+        self::assertCount(2, $reviewed);
+        self::assertTrue($reviewed[0]->isReviewerValidated());
+        self::assertTrue($reviewed[1]->isReviewerValidated());
+    }
+
+    public function test_it_stays_sequential_when_max_concurrent_is_one_even_if_batch_capable(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = new class implements BatchCapableLLMClientInterface {
+            public int $batchCalls = 0;
+
+            public int $completeCalls = 0;
+
+            public function complete(string $systemPrompt, string $userMessage): LLMResponse
+            {
+                ++$this->completeCalls;
+
+                return LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn');
+            }
+
+            public function completeWithTools(string $systemPrompt, string $userMessage, ToolRegistry $toolRegistry, int $maxToolIterations): LLMResponse
+            {
+                return LLMResponse::create('{}', 0, 0, 'm', 'end_turn');
+            }
+
+            public function model(): string
+            {
+                return 'm';
+            }
+
+            public function completeBatch(array $requests, int $maxConcurrent): array
+            {
+                ++$this->batchCalls;
+
+                return [];
+            }
+        };
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: new NullLogger(),
+            maxConcurrent: 1,
+        );
+
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertSame(0, $llmClient->batchCalls);
+        self::assertSame(1, $llmClient->completeCalls);
+    }
+
+    public function test_it_uses_tool_registry_when_tools_enabled_and_factory_provided(): void
+    {
+        $vulnerability = $this->makeVulnerability();
+
+        $llmClient = self::createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('complete');
+        $llmClient->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturn(LLMResponse::create(
+                (string) json_encode(['accepted' => true]),
+                10, 10, 'claude', 'end_turn',
+            ));
+
+        $toolRegistry = new ToolRegistry([], new NullLogger());
+        $toolFactory = self::createStub(ToolRegistryFactoryInterface::class);
+        $toolFactory->method('forProjectFiles')->willReturn($toolRegistry);
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: new NullLogger(),
+            toolRegistryFactory: $toolFactory,
+            toolsEnabled: true,
+        );
+
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+    }
+
+    public function test_it_falls_back_to_complete_when_tools_disabled(): void
+    {
+        $vulnerability = $this->makeVulnerability();
+
+        $llmClient = self::createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('completeWithTools');
+        $llmClient->expects(self::once())
+            ->method('complete')
+            ->willReturn(LLMResponse::create(
+                (string) json_encode(['accepted' => true]),
+                10, 10, 'claude', 'end_turn',
+            ));
+
+        $toolRegistry = new ToolRegistry([], new NullLogger());
+        $toolFactory = self::createStub(ToolRegistryFactoryInterface::class);
+        $toolFactory->method('forProjectFiles')->willReturn($toolRegistry);
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: new NullLogger(),
+            toolRegistryFactory: $toolFactory,
+            toolsEnabled: false,
+        );
+
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+    }
+
+    public function test_tools_enabled_logs_when_factory_provided(): void
+    {
+        $vulnerability = $this->makeVulnerability();
+        $infoLogs = [];
+
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$infoLogs): void {
+                $infoLogs[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('debug');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willReturn(LLMResponse::create(
+            (string) json_encode(['accepted' => true]),
+            10, 10, 'claude', 'end_turn',
+        ));
+
+        $toolRegistry = new ToolRegistry([], new NullLogger());
+        $toolFactory = self::createStub(ToolRegistryFactoryInterface::class);
+        $toolFactory->method('forProjectFiles')->willReturn($toolRegistry);
+
+        $reviewerAgent = new ReviewerAgent(
+            llmClient: $llmClient,
+            reviewerPromptBuilder: new ReviewerPromptBuilder(),
+            logger: $logger,
+            toolRegistryFactory: $toolFactory,
+            toolsEnabled: true,
+        );
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertSame(['Reviewer agent validating findings', ['count' => 1, 'batch_size' => 1, 'tools_enabled' => true]], $infoLogs[0]);
     }
 
     private function makeReviewerAgent(LLMClientInterface $llmClient): ReviewerAgent

@@ -19,6 +19,8 @@ use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
 
+use function Symfony\Component\String\u;
+
 /**
  * Runs `composer audit --format=json --locked` via symfony/process. Composer's
  * exit code is non-zero whenever advisories are found, so we only treat a failure
@@ -62,7 +64,7 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
         }
 
         $stdout = $process->getOutput();
-        if ('' === trim($stdout)) {
+        if (u($stdout)->trim()->isEmpty()) {
             throw AdvisorySourceUnavailableException::forFailedProcess($projectPath, $process->getErrorOutput() ?: 'empty stdout', $process->isSuccessful() ? null : new ProcessFailedException($process));
         }
 

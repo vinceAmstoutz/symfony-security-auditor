@@ -46,6 +46,20 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame('controller', $files[0]->type());
     }
 
+    public function test_gitignored_files_are_scanned_by_default(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/.gitignore', "Ignored.php\n");
+        file_put_contents($this->tmpDir.'/src/Ignored.php', '<?php class Ignored {}');
+        file_put_contents($this->tmpDir.'/src/Kept.php', '<?php class Kept {}');
+
+        $files = (new ProjectFileScanner(new NullLogger(), ['src']))->scan($this->tmpDir);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files);
+
+        self::assertContains('src/Ignored.php', $paths);
+        self::assertContains('src/Kept.php', $paths);
+    }
+
     public function test_it_scans_multiple_file_types(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);

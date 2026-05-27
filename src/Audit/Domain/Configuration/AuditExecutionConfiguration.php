@@ -21,5 +21,17 @@ final readonly class AuditExecutionConfiguration
         public int $reviewerBatchSize,
         public bool $toolsEnabled,
         public int $maxToolIterations,
+        public bool $staticPreScanEnabled = true,
+        public bool $staticPreScanLeanMode = false,
+        public bool $reviewerToolsEnabled = false,
+        public int $reviewerMaxToolIterations = 4,
+        public int $reviewerMaxConcurrent = 1,
+        public string $chunkingStrategy = 'feature',
+        public bool $poCSynthesisEnabled = false,
+        public string $poCSynthesisSeverityFloor = 'high',
+        public bool $codeSlicingEnabled = false,
+        public int $codeSlicingMinLines = 80,
+        public bool $escalationEnabled = false,
+        public ?string $escalationCheapModel = null,
     ) {}
 }

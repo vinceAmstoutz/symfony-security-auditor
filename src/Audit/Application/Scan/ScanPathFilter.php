@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
+use function Symfony\Component\String\u;
+
 /**
  * Keeps every `ProjectFile` whose relative path lives under any of the
  * configured scan paths. Used by the `--path` option on the CLI to restrict
@@ -40,12 +42,12 @@ final readonly class ScanPathFilter
     {
         $normalized = [];
         foreach ($scanPaths as $scanPath) {
-            $trimmed = trim($scanPath);
-            if ('' === $trimmed) {
+            $trimmed = u($scanPath)->trim();
+            if ($trimmed->isEmpty()) {
                 continue;
             }
 
-            $normalized[] = rtrim(str_replace('\\', '/', $trimmed), '/');
+            $normalized[] = $trimmed->replace('\\', '/')->trimEnd('/')->toString();
         }
 
         if ([] === $normalized) {
@@ -54,9 +56,9 @@ final readonly class ScanPathFilter
 
         $filtered = [];
         foreach ($files as $file) {
-            $relative = str_replace('\\', '/', $file->relativePath());
+            $relative = u($file->relativePath())->replace('\\', '/')->toString();
             foreach ($normalized as $prefix) {
-                if ($relative === $prefix || str_starts_with($relative, $prefix.'/')) {
+                if ($relative === $prefix || u($relative)->startsWith($prefix.'/')) {
                     $filtered[] = $file;
 
                     break;

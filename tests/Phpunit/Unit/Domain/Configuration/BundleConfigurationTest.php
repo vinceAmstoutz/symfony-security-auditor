@@ -30,12 +30,25 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(256, $bundleConfiguration->scan->maxFileSizeKb);
         self::assertTrue($bundleConfiguration->scan->secretScrubbingEnabled);
         self::assertSame([], $bundleConfiguration->scan->additionalScrubberPatterns);
+        self::assertSame([], $bundleConfiguration->scan->customRiskPatterns);
 
         self::assertSame(5, $bundleConfiguration->audit->maxIterations);
         self::assertSame(0.6, $bundleConfiguration->audit->minConfidence);
         self::assertSame(1, $bundleConfiguration->audit->reviewerBatchSize);
         self::assertTrue($bundleConfiguration->audit->toolsEnabled);
         self::assertSame(8, $bundleConfiguration->audit->maxToolIterations);
+        self::assertTrue($bundleConfiguration->audit->staticPreScanEnabled);
+        self::assertFalse($bundleConfiguration->audit->staticPreScanLeanMode);
+        self::assertFalse($bundleConfiguration->audit->reviewerToolsEnabled);
+        self::assertSame(4, $bundleConfiguration->audit->reviewerMaxToolIterations);
+        self::assertSame(1, $bundleConfiguration->audit->reviewerMaxConcurrent);
+        self::assertSame('feature', $bundleConfiguration->audit->chunkingStrategy);
+        self::assertFalse($bundleConfiguration->audit->poCSynthesisEnabled);
+        self::assertSame('high', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
+        self::assertFalse($bundleConfiguration->audit->codeSlicingEnabled);
+        self::assertSame(80, $bundleConfiguration->audit->codeSlicingMinLines);
+        self::assertFalse($bundleConfiguration->audit->escalationEnabled);
+        self::assertNull($bundleConfiguration->audit->escalationCheapModel);
 
         self::assertSame(3, $bundleConfiguration->retry->maxAttempts);
         self::assertSame(500, $bundleConfiguration->retry->initialDelayMs);
@@ -137,8 +150,8 @@ final class BundleConfigurationTest extends TestCase
      *     attacker_model: string|null,
      *     reviewer_model: string|null,
      *     provider_json_mode: bool,
-     *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
+     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * }
      */
@@ -157,6 +170,7 @@ final class BundleConfigurationTest extends TestCase
                     'enabled' => true,
                     'additional_patterns' => [],
                 ],
+                'custom_risk_patterns' => [],
             ],
             'audit' => [
                 'max_iterations' => 5,
@@ -164,6 +178,28 @@ final class BundleConfigurationTest extends TestCase
                 'reviewer_batch_size' => 1,
                 'tools_enabled' => true,
                 'max_tool_iterations' => 8,
+                'static_prescan' => [
+                    'enabled' => true,
+                    'lean_mode' => false,
+                ],
+                'reviewer_tools_enabled' => false,
+                'reviewer_max_tool_iterations' => 4,
+                'reviewer_max_concurrent' => 1,
+                'chunking' => [
+                    'strategy' => 'feature',
+                ],
+                'poc_synthesis' => [
+                    'enabled' => false,
+                    'severity_floor' => 'high',
+                ],
+                'code_slicing' => [
+                    'enabled' => false,
+                    'min_lines_before_slicing' => 80,
+                ],
+                'escalation' => [
+                    'enabled' => false,
+                    'cheap_model' => null,
+                ],
                 'budget' => [
                     'max_tokens' => null,
                     'max_cost_usd' => null,

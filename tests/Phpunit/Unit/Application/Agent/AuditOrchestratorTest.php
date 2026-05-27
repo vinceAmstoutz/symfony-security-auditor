@@ -24,11 +24,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingAttackerAgent;
 
 /**
  * Drives the orchestrator end-to-end via real AttackerAgent + ReviewerAgent,
@@ -600,6 +604,39 @@ final class AuditOrchestratorTest extends TestCase
         $auditOrchestrator->orchestrate($auditContext);
 
         self::assertCount(1, $auditContext->vulnerabilities());
+    }
+
+    public function test_it_passes_previously_validated_findings_to_next_iteration(): void
+    {
+        $vulnerability = Vulnerability::create(
+            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
+            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
+            title: 'First',
+            description: 'd',
+            filePath: 'src/A.php',
+            lineStart: 1,
+            lineEnd: 2,
+            vulnerableCode: 'c',
+            attackVector: 'a',
+            proof: 'p',
+            remediation: 'r',
+            confidence: 0.9,
+        );
+
+        // Returns the same finding every iteration; iteration 1 persists it (0 previous),
+        // iteration 2 sees it as previous (1) and re-finds a duplicate → loop stops.
+        $recordingAttackerAgent = new RecordingAttackerAgent([$vulnerability]);
+
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerAgent = new ReviewerAgent($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger());
+
+        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger());
+        $auditContext = $this->makeContextWithMapping();
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertSame([0, 1], $recordingAttackerAgent->previousFindingsCountPerCall);
     }
 
     public function test_it_logs_starting_loop_with_custom_max_iterations(): void

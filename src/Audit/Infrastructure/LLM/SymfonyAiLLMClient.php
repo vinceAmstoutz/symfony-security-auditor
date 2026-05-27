@@ -31,8 +31,9 @@ use Symfony\AI\Platform\Tool\ExecutionReference;
 use Symfony\AI\Platform\Tool\Tool;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
@@ -46,7 +47,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Null
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class SymfonyAiLLMClient implements LLMClientInterface
+final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterface
 {
     public const ?float DEFAULT_TEMPERATURE = null;
 
@@ -111,6 +112,94 @@ final readonly class SymfonyAiLLMClient implements LLMClientInterface
         $this->budgetTracker?->assertWithinBudget();
 
         return $llmResponse;
+    }
+
+    public function completeBatch(array $requests, int $maxConcurrent): array
+    {
+        \assert('' !== $this->model, 'Model must be a non-empty string');
+
+        $windowSize = max(1, $maxConcurrent);
+        $responses = [];
+
+        foreach (array_chunk($requests, $windowSize) as $window) {
+            foreach ($this->resolveWindow($window) as $llmResponse) {
+                $responses[] = $llmResponse;
+            }
+        }
+
+        return $responses;
+    }
+
+    /**
+     * Dispatches every request in the window via the platform WITHOUT blocking,
+     * then resolves them. When the platform's transport is async (the symfony/ai
+     * DeferredResult contract), the resolutions overlap on the wire. Any request
+     * that fails to dispatch or resolve falls back to the proven sequential
+     * complete() path (full retry) so the batch path is never less correct than
+     * the per-call path.
+     *
+     * @param list<array{system: string, user: string}> $window
+     *
+     * @return list<LLMResponse>
+     */
+    private function resolveWindow(array $window): array
+    {
+        \assert('' !== $this->model, 'Model must be a non-empty string');
+
+        $deferred = [];
+        foreach ($window as $index => $request) {
+            $messageBag = new MessageBag(
+                Message::forSystem($request['system']),
+                Message::ofUser($request['user']),
+            );
+            $estimatedInputTokens = $this->estimateInputTokens($request['system'], $request['user']);
+            $this->rateLimiter()->acquire($estimatedInputTokens);
+
+            try {
+                $deferred[$index] = $this->platform->invoke($this->model, $messageBag, $this->baseOptions());
+            } catch (Throwable) {
+                $deferred[$index] = null;
+            }
+        }
+
+        $resolved = [];
+        foreach ($window as $index => $request) {
+            $resolved[$index] = $this->resolveOne($deferred[$index], $request);
+        }
+
+        return array_values($resolved);
+    }
+
+    /**
+     * @param array{system: string, user: string} $request
+     */
+    private function resolveOne(?DeferredResult $deferredResult, array $request): LLMResponse
+    {
+        if (!$deferredResult instanceof DeferredResult) {
+            return $this->complete($request['system'], $request['user']);
+        }
+
+        try {
+            $content = $deferredResult->asText();
+            [$inputTokens, $outputTokens] = $this->extractTokens($deferredResult);
+            $this->rateLimiter()->record($inputTokens, $outputTokens);
+
+            $llmResponse = LLMResponse::create(
+                content: $content,
+                inputTokens: $inputTokens,
+                outputTokens: $outputTokens,
+                model: $this->model,
+                stopReason: 'end_turn',
+            );
+            $this->budgetTracker?->recordCall($llmResponse);
+            $this->budgetTracker?->assertWithinBudget();
+
+            return $llmResponse;
+        } catch (BudgetExceededException $budgetExceededException) {
+            throw $budgetExceededException;
+        } catch (Throwable) {
+            return $this->complete($request['system'], $request['user']);
+        }
     }
 
     public function completeWithTools(

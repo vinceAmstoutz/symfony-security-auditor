@@ -20,6 +20,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 
+use function Symfony\Component\String\u;
+
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class MappingStage implements StageInterface
 {
@@ -94,7 +96,7 @@ final readonly class MappingStage implements StageInterface
 
             $content = $file->content();
 
-            if (str_contains($file->relativePath(), 'security')) {
+            if (u($file->relativePath())->containsAny('security')) {
                 $firewallRules = [...$firewallRules, ...$this->extractFirewallRules($content)];
             }
 
@@ -119,7 +121,7 @@ final readonly class MappingStage implements StageInterface
      */
     private function extractAccessControl(string $content): array
     {
-        if (!str_contains($content, 'access_control')) {
+        if (!u($content)->containsAny('access_control')) {
             return [];
         }
 
@@ -127,7 +129,7 @@ final readonly class MappingStage implements StageInterface
 
         $map = [];
         foreach ($matches[1] as $i => $pathRaw) {
-            $path = trim($pathRaw);
+            $path = u($pathRaw)->trim()->toString();
             $rolesRaw = $matches[2][$i] ?? '';
             $map[$path] = array_map('trim', explode(',', $rolesRaw));
         }

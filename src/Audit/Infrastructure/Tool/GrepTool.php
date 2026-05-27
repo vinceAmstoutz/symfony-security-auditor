@@ -17,6 +17,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
+use function Symfony\Component\String\u;
+
 /**
  * Case-sensitive substring search across the project files scanned by the
  * ingestion stage. Returns up to MAX_MATCHES matches as path:line lines.
@@ -72,8 +74,8 @@ final readonly class GrepTool implements ToolInterface
 
             $lines = explode("\n", $file->content());
             foreach ($lines as $lineIndex => $line) {
-                if (str_contains($line, $pattern)) {
-                    $matches[] = \sprintf('%s:%d:%s', $file->relativePath(), $lineIndex + 1, trim($line));
+                if (u($line)->containsAny($pattern)) {
+                    $matches[] = \sprintf('%s:%d:%s', $file->relativePath(), $lineIndex + 1, u($line)->trim()->toString());
                     if (\count($matches) >= self::MAX_MATCHES) {
                         break 2;
                     }

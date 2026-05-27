@@ -41,8 +41,8 @@ final readonly class BundleConfiguration
      *     attacker_model: string|null,
      *     reviewer_model: string|null,
      *     provider_json_mode?: bool,
-     *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
+     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * } $config
      */
@@ -61,6 +61,7 @@ final readonly class BundleConfiguration
                 maxFileSizeKb: $config['scan']['max_file_size_kb'],
                 secretScrubbingEnabled: $config['scan']['secret_scrubbing']['enabled'],
                 additionalScrubberPatterns: $config['scan']['secret_scrubbing']['additional_patterns'],
+                customRiskPatterns: $config['scan']['custom_risk_patterns'],
             ),
             audit: new AuditExecutionConfiguration(
                 maxIterations: $config['audit']['max_iterations'],
@@ -68,6 +69,18 @@ final readonly class BundleConfiguration
                 reviewerBatchSize: $config['audit']['reviewer_batch_size'],
                 toolsEnabled: $config['audit']['tools_enabled'],
                 maxToolIterations: $config['audit']['max_tool_iterations'],
+                staticPreScanEnabled: $config['audit']['static_prescan']['enabled'],
+                staticPreScanLeanMode: $config['audit']['static_prescan']['lean_mode'],
+                reviewerToolsEnabled: $config['audit']['reviewer_tools_enabled'],
+                reviewerMaxToolIterations: $config['audit']['reviewer_max_tool_iterations'],
+                reviewerMaxConcurrent: $config['audit']['reviewer_max_concurrent'],
+                chunkingStrategy: $config['audit']['chunking']['strategy'],
+                poCSynthesisEnabled: $config['audit']['poc_synthesis']['enabled'],
+                poCSynthesisSeverityFloor: $config['audit']['poc_synthesis']['severity_floor'],
+                codeSlicingEnabled: $config['audit']['code_slicing']['enabled'],
+                codeSlicingMinLines: $config['audit']['code_slicing']['min_lines_before_slicing'],
+                escalationEnabled: $config['audit']['escalation']['enabled'],
+                escalationCheapModel: $config['audit']['escalation']['cheap_model'],
             ),
             retry: new RetryConfiguration(
                 maxAttempts: $config['audit']['retry']['max_attempts'],

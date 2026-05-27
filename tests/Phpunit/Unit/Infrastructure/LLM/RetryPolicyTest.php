@@ -313,6 +313,17 @@ final class RetryPolicyTest extends TestCase
         new RetryPolicy(rateLimitMaxDelayMs: -1);
     }
 
+    public function test_zero_rate_limit_delays_are_accepted_and_clamp_to_zero(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            rateLimitInitialDelayMs: 0,
+            rateLimitMaxDelayMs: 0,
+            jitterSource: static fn (): float => 0.5,
+        );
+
+        self::assertSame(0, $retryPolicy->rateLimitDelayMs(1));
+    }
+
     public function test_exponential_delay_is_also_clamped_to_max(): void
     {
         $retryPolicy = new RetryPolicy(

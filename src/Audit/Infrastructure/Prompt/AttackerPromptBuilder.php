@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 
@@ -26,22 +27,30 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 3;
+    public const int PROMPT_VERSION = 4;
 
     /**
      * Skill-block emission order — by attack-surface priority, NOT alphabetical.
      * The LLM weights earlier-in-context instructions more heavily (primacy), so
      * higher-risk surfaces are listed first.
+     *
+     * @var list<ProjectFileType>
      */
     private const array SKILL_PRIORITY = [
-        'controller',
-        'voter',
-        'form',
-        'repository',
-        'entity',
-        'template',
-        'config',
-        'php',
+        ProjectFileType::CONTROLLER,
+        ProjectFileType::AUTHENTICATOR,
+        ProjectFileType::VOTER,
+        ProjectFileType::WEBHOOK_CONSUMER,
+        ProjectFileType::MESSENGER_HANDLER,
+        ProjectFileType::EVENT_SUBSCRIBER,
+        ProjectFileType::NORMALIZER,
+        ProjectFileType::SCHEDULER,
+        ProjectFileType::FORM,
+        ProjectFileType::REPOSITORY,
+        ProjectFileType::ENTITY,
+        ProjectFileType::TEMPLATE,
+        ProjectFileType::CONFIG,
+        ProjectFileType::PHP,
     ];
 
     /**
@@ -52,21 +61,111 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * @var array<string, string>
      */
     private const array SKILLS = [
-        'controller' => <<<'SKILL'
+        ProjectFileType::CONTROLLER->value => <<<'SKILL'
             <skills role="controller">
             Hunt:
             - Missing `denyAccessUnlessGranted()` / `#[IsGranted]` on state-changing or sensitive read actions.
-            - `ParamConverter` / `MapEntity` flows for IDOR: path id → entity fetch with no ownership check.
+            - `ParamConverter` / `MapEntity` / `#[MapRequestPayload]` / `#[MapQueryString]` flows for IDOR: path id → entity fetch with no ownership check.
             - Mass-assignment: form `->submit($request->request->all())` without `allow_extra_fields: false` or restricted setters.
+            - `#[MapRequestPayload]` / `#[MapQueryString]` DTO mapping over an entity-shaped class with public mutable properties (mass-assignment via Serializer).
             - Redirect targets and `RedirectResponse` arguments against open-redirect via user-controlled URLs.
             - File-upload handlers: missing MIME validation, predictable upload paths, no content-type enforcement.
+            - Authentication endpoints (login, password reset, 2FA, registration) without rate-limiter binding (`#[IsSignatureValid]` / `RateLimiterFactory::create()` / `framework.rate_limiter`).
             - `Request::get()` / `getContent()` flowing into Doctrine raw queries, `exec`, `passthru`, `eval`, `unserialize`, `simplexml_load_string`.
+            - Live Components: `#[LiveAction]` / `#[LiveProp(writable: true)]` exposing privileged setters or unbounded properties to the browser.
             Do NOT flag:
             - Controllers inheriting `denyAccessUnlessGranted()` from a parent class or a `#[IsGranted]` attribute on the class itself.
             - Routes restricted by `methods: ['POST']` plus a CSRF-protected form — the form covers the CSRF concern.
+            - `#[MapRequestPayload]` / `#[MapQueryString]` over a DTO with validation constraints (`#[Assert\…]`) AND no privileged setters.
             </skills>
             SKILL,
-        'voter' => <<<'SKILL'
+        ProjectFileType::AUTHENTICATOR->value => <<<'SKILL'
+            <skills role="authenticator">
+            Hunt:
+            - `authenticate()` returning a `SelfValidatingPassport` for password-bearing flows (skips credential check → auth bypass).
+            - `supports()` returning `null` instead of `false` for unsupported requests — `null` means "supports", silently letting non-matching paths through.
+            - `onAuthenticationSuccess()` calling `RedirectResponse` with a user-controlled `_target_path` / `referer` without protocol+host allowlist.
+            - `AccessTokenHandler::getUserBadgeFrom($accessToken)` not verifying signature/audience/issuer of JWT/opaque tokens.
+            - Custom `LoginFormAuthenticator` storing the password in the session, log, or exception trace.
+            - Missing `CsrfTokenBadge` on form-based login authenticators where CSRF was previously enforced.
+            - OAuth/OIDC handlers omitting `state` parameter verification (CSRF on auth callback) or PKCE for public clients.
+            - `UserBadge::setUserLoader()` query running with a user-controlled `identifier` without normalization (`User WHERE email = :id` accepting wildcards/case-insensitive variants).
+            Do NOT flag:
+            - Authenticators that explicitly throw `AuthenticationException` on missing credentials.
+            - `RememberMeBadge` on long-lived auth — that is the documented opt-in pattern.
+            </skills>
+            SKILL,
+        ProjectFileType::WEBHOOK_CONSUMER->value => <<<'SKILL'
+            <skills role="webhook_consumer">
+            Hunt:
+            - `RequestParserInterface::parse()` / `RemoteEventConsumerInterface::consume()` consuming the payload without HMAC / signature verification (`hash_equals` with the configured secret).
+            - Signature compared with `===` / `==` (timing-attack vulnerable) instead of `hash_equals()`.
+            - Missing replay-attack defense: no nonce check, no timestamp check, no idempotency key — same payload can be replayed indefinitely.
+            - `#[AsRemoteEventConsumer]` handler trusting `$payload['user_id']` / `$payload['amount']` without re-validating against the authenticated source.
+            - JSON / XML parsers without bounded depth/size (DoS via large or deeply-nested payloads).
+            - Webhook routes mounted under a firewall that allows anonymous access AND lacks IP allowlist or mutual-TLS gating.
+            Do NOT flag:
+            - Webhook handlers calling `hash_equals($expected, $received)` against the framework's secret.
+            - `WebhookComponent::validate($request, $secret)` invocations — those use constant-time comparison internally.
+            </skills>
+            SKILL,
+        ProjectFileType::MESSENGER_HANDLER->value => <<<'SKILL'
+            <skills role="messenger_handler">
+            Hunt:
+            - `#[AsMessageHandler]` / `MessageHandlerInterface::__invoke()` calling `unserialize()` / `igbinary_unserialize()` on payload fields.
+            - Handlers invoking `Process` / `shell_exec` / SQL with values from `$message` without sanitization (queue-to-shell injection).
+            - Missing idempotency: handler with side effects (charge card, send email, mutate balance) not deduping by message id (`AmqpStamp::getApplicationHeaders()['x-message-id']`).
+            - No replay protection: handler trusts `$message->createdAt` / `$message->userId` without verifying current state (stale message attack).
+            - Transport configured with `serializer: php` (PHP-native serialize on untrusted bus) — gadget-chain RCE.
+            - Handler swallowing exceptions silently → poisoned messages re-driven infinitely.
+            - Privileged action triggered solely by message presence with no authorization (`InvalidateUserCommand`, `PromoteToAdmin`, etc.).
+            Do NOT flag:
+            - Handlers using the default `JsonSerializer` transport — well-typed via Symfony Serializer.
+            - Handlers using `Symfony\Component\Messenger\Stamp\BusNameStamp` / `TransportNamesStamp` — those are routing, not security smells.
+            </skills>
+            SKILL,
+        ProjectFileType::EVENT_SUBSCRIBER->value => <<<'SKILL'
+            <skills role="event_subscriber">
+            Hunt:
+            - `KernelEvents::CONTROLLER` / `KernelEvents::REQUEST` subscribers mutating `$event->getRequest()->attributes` to inject privileged values (role, user id) before the controller runs.
+            - `SecurityEvents::AUTHENTICATION_SUCCESS` listeners auto-elevating roles based on payload fields without re-checking the source.
+            - `kernel.exception` listeners leaking stack traces, env vars, or internal hostnames in the response body.
+            - Subscribers calling `Process` / making HTTP requests with values from the event (SSRF via event payload).
+            - Listeners with side effects (DB write, mailer send) NOT wrapped in a Doctrine transaction or messenger envelope — request fails mid-way, state diverges.
+            - Doctrine `postLoad` / `postFlush` events writing user-derived fields back without escaping (stored XSS, log injection).
+            Do NOT flag:
+            - Subscribers using `$event->setResponse()` to short-circuit — that is the documented kernel.controller pattern.
+            - Listeners calling `LoggerInterface::info()` with structured arrays — not log injection unless raw `$_REQUEST` is interpolated.
+            </skills>
+            SKILL,
+        ProjectFileType::NORMALIZER->value => <<<'SKILL'
+            <skills role="normalizer">
+            Hunt:
+            - `denormalize()` building an Entity from request payload with `'allow_extra_attributes' => true` (mass-assignment) or without `'attributes' => [...]` allowlist.
+            - `denormalize()` calling private setters via reflection / `ObjectNormalizer` ignoring `#[Ignore]` on sensitive fields (`roles`, `passwordHash`, `isAdmin`).
+            - `normalize()` leaking sensitive fields by default (no `groups`, no `ignored_attributes`) — API leaks password hashes, tokens, internal ids.
+            - `supportsDenormalization()` returning `true` for `object` or untyped data — gadget-chain entry point.
+            - Custom denormalizer using `unserialize()` to decode a transport field.
+            - `getSupportedTypes()` returning `'*'` widely — denormalizer steals control from safer normalizers downstream.
+            Do NOT flag:
+            - `Symfony\Component\Serializer\Normalizer\PropertyNormalizer` without `setIgnoredAttributes()` when the model has only safe public properties.
+            - Normalizers operating purely on read-only DTOs with no setters.
+            </skills>
+            SKILL,
+        ProjectFileType::SCHEDULER->value => <<<'SKILL'
+            <skills role="scheduler">
+            Hunt:
+            - `#[AsSchedule]` / `ScheduleProviderInterface::getSchedule()` registering tasks that read user-input from DB and pass it unsanitized to `Process` / shell.
+            - Cron-like schedules invoking privileged operations (mass email, payout, account deletion) without an audit log or kill-switch.
+            - Tasks with no lock (`LockableTrait`, `LockFactory`) — overlapping runs cause duplicate billing or double notifications.
+            - Schedules running with `RunCommandMessage` whose `command` string is built from user input — RCE via the schedule.
+            - Recurring tasks fetching remote URLs (`HttpClient::request($urlFromDb)`) without a host allowlist (SSRF).
+            Do NOT flag:
+            - `RecurringMessage::every('1 hour', $message)` with a statically-typed message class and no user input.
+            - Schedules using `LockableTrait` with a project-unique lock name.
+            </skills>
+            SKILL,
+        ProjectFileType::VOTER->value => <<<'SKILL'
             <skills role="voter">
             Hunt:
             - `supports($attribute, $subject)` mismatched with attributes consumers actually pass (typo → silent allow).
@@ -79,7 +178,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Voters using `Security::isGranted('ROLE_USER')` after a positive ownership check.
             </skills>
             SKILL,
-        'entity' => <<<'SKILL'
+        ProjectFileType::ENTITY->value => <<<'SKILL'
             <skills role="entity">
             Hunt:
             - Lifecycle callbacks (`#[PrePersist]`, `#[PreUpdate]`) calling unsanitized methods, command execution, or external HTTP.
@@ -92,7 +191,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - `#[ORM\Column]` with `nullable: true` — nullability is a schema concern, not a security one.
             </skills>
             SKILL,
-        'repository' => <<<'SKILL'
+        ProjectFileType::REPOSITORY->value => <<<'SKILL'
             <skills role="repository">
             Hunt:
             - DQL/SQL injection via string concatenation in custom finder methods; absence of `setParameter()`.
@@ -105,7 +204,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - `findOneBy([...])` / `findAll()` on non-sensitive entities; access control belongs to the voter, not the repository.
             </skills>
             SKILL,
-        'form' => <<<'SKILL'
+        ProjectFileType::FORM->value => <<<'SKILL'
             <skills role="form">
             Hunt:
             - `'csrf_protection' => false` on forms processing state changes (acceptable only for stateless APIs with their own auth).
@@ -118,20 +217,24 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Fields declared `mapped: false` and re-validated by a constraint — those don't reach the entity setter.
             </skills>
             SKILL,
-        'template' => <<<'SKILL'
+        ProjectFileType::TEMPLATE->value => <<<'SKILL'
             <skills role="template">
             Hunt:
             - `|raw` filter applied to variables originating from user input or untrusted DB content.
             - `autoescape` overridden to `false` or to a context that does not match the surrounding HTML/JS/URL context.
             - `{{ include(user_input) }}` or `{% include %}` with dynamic template names — SSTI vector.
+            - `{% sandbox %}` / `{% apply %}` blocks lifting restrictions on user-supplied template fragments.
             - Inline JavaScript context (`<script>var x = {{ value }};`) without `|json_encode` — XSS via Twig.
             - URL attributes (`href`, `src`) built from user input without `|url_encode` and protocol whitelist (javascript:, data:).
+            - Twig Components (`<twig:Component …/>`) passing user input through `data-*` attributes without escaping (`<twig:UserCard name="{{ name|raw }}"/>`).
+            - Live Components emitting `data-live-action-param` / `data-live-prop` with untrusted values — bound back to the server unchecked.
             Do NOT flag:
             - Default `{{ value }}` interpolation — Twig auto-escapes for the active context.
-            - `|raw` on values originating from a `Markdown` / `Sanitize` transformation upstream — trust the sanitizer unless evidence shows otherwise.
+            - `|raw` on values originating from a `Markdown` / `Sanitize` (HtmlSanitizer) transformation upstream — trust the sanitizer unless evidence shows otherwise.
+            - `{% component %}` / `<twig:…/>` with statically-typed props in a `LiveComponent` whose writable props are constrained by validators.
             </skills>
             SKILL,
-        'config' => <<<'SKILL'
+        ProjectFileType::CONFIG->value => <<<'SKILL'
             <skills role="config">
             Hunt:
             - Hardcoded secrets, API keys, DSNs (look for `_KEY`, `_SECRET`, `_TOKEN`, `password:`, full DSN strings).
@@ -140,23 +243,39 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Dev-only routes (`_profiler`, `_wdt`) not gated by environment or IP allowlist.
             - `cors.allow_origin: '*'` combined with `allow_credentials: true` — credential leak.
             - Exposed services with public `true` that wrap dangerous primitives (filesystem, process, raw SQL).
+            - `framework.rate_limiter` absent for login / password-reset / API endpoints declared elsewhere.
+            - `framework.messenger.transports.*.serializer: 'php_serialize'` or any class implementing `SerializerInterface` that calls `unserialize` on dequeued payloads.
+            - `framework.webhook` declared without an HMAC secret env var or with the secret committed in plaintext.
+            - `framework.lock` not configured for routes that perform balance-affecting operations.
+            - `framework.html_sanitizer` set with `allowAllStaticAttributes()` or wide `allowElement()` lists — XSS via "sanitized" output.
+            - `framework.http_client.scoped_clients.*.verify_peer: false` / `verify_host: false` — MITM exposure.
+            - `messenger.routing` directing privileged commands to a transport with `failure_transport: null` — silent loss of audit trail.
             Do NOT flag:
             - Environment-variable references like `%env(DATABASE_URL)%` — those are externalized, not hardcoded.
             - `_profiler` / `_wdt` declarations gated by `when@dev` / `when@test`.
+            - `framework.messenger.transports.*.serializer: messenger.transport.symfony_serializer` — the safe default.
             </skills>
             SKILL,
-        'php' => <<<'SKILL'
+        ProjectFileType::PHP->value => <<<'SKILL'
             <skills role="php">
             Hunt:
             - Symfony ExpressionLanguage / Security Expression evaluating strings derived from user input.
-            - `HttpClientInterface` calls with user-controlled URL or host — SSRF; check for protocol & host allowlist.
+            - `HttpClientInterface` calls with user-controlled URL or host — SSRF; check for protocol & host allowlist; `max_redirects` not bounded + redirect host not re-validated.
             - `unserialize()` / `igbinary_unserialize()` on untrusted payloads (cache values, queue messages, request body).
             - `Process` / `proc_open` / `shell_exec` constructed with user input concatenation; no `escapeshellarg`.
             - PSR-3 logger sinks receiving raw request payloads without redaction (log injection, log forging).
             - Cryptography: `md5`/`sha1` for security purposes, `random_int` vs `rand`/`mt_rand`, hardcoded IVs/keys.
+            - `MailerInterface::send()` with `Email::from($userInput)` / `subject($userInput)` / `addBcc($userInput)` — header injection via newline in user data.
+            - `CacheInterface::get($key, ...)` where `$key` is derived from request input without normalization — cache poisoning / cross-tenant leak.
+            - `CacheItemPoolInterface` reads writing user-derived payloads then trusting them on subsequent reads (poisoned cache → privilege bypass).
+            - `LockFactory::createLock()` missing on critical sections (refund, balance mutation, idempotent webhook) — race condition.
+            - `HtmlSanitizerInterface::sanitize()` configured with `allowElement('script')` / `allowAttribute('on*')` — sanitizer disarmed.
+            - `RateLimiterFactory::create($key)` with `$key` constant (`'global'`) instead of per-user/per-IP — limiter trivially exhausted.
+            - PSR-16 / PSR-6 store handing back unserialized objects when the cache backend was filled with user input.
             Do NOT flag:
             - `md5`/`sha1` on non-security data (cache keys, ETags, file fingerprints) — those are integrity, not authentication.
             - `Process` invocations with hardcoded argument arrays (`new Process(['ls', '-la'])`) — no shell interpolation occurs.
+            - `HttpClient::request()` against `%env(INTERNAL_SERVICE_URL)%` — that is an externally-configured trusted host, not SSRF.
             </skills>
             SKILL,
     ];
@@ -213,16 +332,21 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             Your mission is to think like a sophisticated attacker and find REAL, EXPLOITABLE vulnerabilities.
 
             You have deep expertise in:
-            - Symfony internals: Voters, EventListeners, Forms, Serializer, Security component
+            - Symfony internals (7.x/8.x): Voters, Authenticators, EventListeners, Forms, Serializer, Security component, Messenger, Webhook, Schedule, RateLimiter, Lock, HtmlSanitizer
             - PHP deserialization gadget chains
             - Doctrine ORM injection patterns (DQL injection, query builder abuse)
-            - Twig SSTI (Server Side Template Injection) vectors
-            - Symfony routing and access control bypass patterns
+            - Twig SSTI (Server Side Template Injection) and Twig Components / Live Components vectors
+            - Symfony routing and access control bypass patterns (firewall rules, access_control, voters)
             - Business logic and workflow exploitation
-            - Mass assignment via Symfony Forms and ParamConverter
+            - Mass assignment via Symfony Forms, ParamConverter, `#[MapRequestPayload]`, Serializer denormalizers
             - CSRF token bypass techniques specific to Symfony
             - Broken Voters and missing denyAccessUnlessGranted() calls
             - Complex multi-step injection paths through service chains
+            - Messenger transports: PHP serializer abuse, missing idempotency, replay attacks via queues
+            - Webhook signature verification gaps (HMAC, timing-attack via `==`/`===`, replay protection)
+            - OAuth/OIDC handlers, AccessTokenHandler audience/issuer/signature gaps, `state`/PKCE bypass
+            - Custom Authenticator failure modes: `SelfValidatingPassport` misuse, `supports()` returning null
+            - Cache poisoning, mailer header injection, rate-limiter scope confusion
 
             Your output must be a valid JSON array of vulnerability objects.
             Each object must have:
@@ -248,7 +372,8 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             state_machine_bypass, mass_assignment, insecure_deserialization, unsafe_parameter_binding,
             exposed_internal_service, misconfigured_firewall, insecure_redirect, sensitive_data_exposure,
             log_injection, path_traversal, ssrf, xxe, open_redirect, weak_cryptography, insecure_random,
-            hardcoded_secret
+            hardcoded_secret, missing_signature_verification, messenger_handler_unsafe, missing_rate_limiting,
+            cache_poisoning, mailer_header_injection, webhook_replay, authenticator_bypass
 
             Severity rubric (calibrate every finding against this scale — do NOT inflate severity for emphasis):
             - critical: unauthenticated RCE, full authentication bypass, mass data exfiltration without auth, hardcoded production secret in a committed file.
@@ -316,14 +441,14 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
     private function skillsForFiles(array $files): string
     {
         $presentTypes = array_map(
-            static fn (ProjectFile $projectFile): string => $projectFile->type(),
+            static fn (ProjectFile $projectFile): ProjectFileType => $projectFile->fileType(),
             $files,
         );
 
         $blocks = [];
         foreach (self::SKILL_PRIORITY as $type) {
             if (\in_array($type, $presentTypes, true)) {
-                $blocks[] = self::SKILLS[$type];
+                $blocks[] = self::SKILLS[$type->value];
             }
         }
 

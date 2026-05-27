@@ -14,10 +14,13 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
 use Composer\InstalledVersions;
+use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+
+use function Symfony\Component\String\u;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ReportRenderer
@@ -27,6 +30,10 @@ final readonly class ReportRenderer
     public const string UNKNOWN_VERSION = 'unknown';
 
     private const string TEMPLATE_DIR = __DIR__.'/Template';
+
+    public function __construct(
+        private Filesystem $filesystem = new Filesystem(),
+    ) {}
 
     public function renderConsole(AuditReport $auditReport): string
     {
@@ -194,7 +201,7 @@ final readonly class ReportRenderer
 
     private function loadTemplate(string $name): string
     {
-        return rtrim((string) file_get_contents(self::TEMPLATE_DIR.'/'.$name), "\n");
+        return u($this->filesystem->readFile(self::TEMPLATE_DIR.'/'.$name))->trimEnd("\n")->toString();
     }
 
     private function packageVersion(): string

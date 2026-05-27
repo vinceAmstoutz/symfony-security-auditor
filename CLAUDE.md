@@ -62,17 +62,19 @@ Commit messages are validated separately in CI via
 src/
   Audit/
     Domain/          # Pure PHP — no framework, no I/O
-      Model/         # Value objects and enums (Vulnerability, AuditReport, …)
+      Model/         # Value objects and enums (Vulnerability, AuditReport, ProjectFile, ProjectFileType, …)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)
-      Port/          # Cross-layer ports (LLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface)
+      Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, StaticPreScannerInterface, CodeSlicerInterface, GitChangedFilesResolverInterface)
         Tool/        # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
     Application/     # Orchestration — no I/O, depends only on Domain
       UseCase/       # RunAuditUseCase, EstimateAuditCostUseCase (entry points)
-      Pipeline/      # AuditPipeline + IngestionStage, MappingStage, AuditStage
-      Agent/         # AttackerAgent, ReviewerAgent, AuditOrchestrator, VulnerabilityFactory
+      Pipeline/      # AuditPipeline + Stage/{IngestionStage, MappingStage, AuditStage, PoCSynthesisStage}
+      Agent/         # AttackerAgent (+ AttackerAnalysisRequest, RiskMarkerIndex, AttackerContextPromptRenderer), ReviewerAgent, EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, PoCSynthesizer, Chunking/{ChunkingStrategy, FileChunker}
     Infrastructure/  # I/O adapters
       LLM/           # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier, CharacterBasedTokenEstimator, Delay/, RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
       FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
+      Scan/          # RegexStaticPreScanner, NullStaticPreScanner, RegexCodeSlicer, NullCodeSlicer
+      Diff/          # ProcessGitChangedFilesResolver (git diff for --since)
       Prompt/        # AttackerPromptBuilder, ReviewerPromptBuilder
       Cache/         # FilesystemAttackerCache, NullAttackerCache
       Advisory/      # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase (fallback), SymfonyProcessComposerAuditRunner
@@ -110,11 +112,20 @@ Command → Application → Domain ← Infrastructure (implements ports)
 
 **Dual-agent loop** (up to 3 iterations, stops earlier when no new findings):
 
-1. `AttackerAgent` — chunks files by priority (controllers first), calls LLM,
-   parses JSON vulnerabilities
-2. Filter — confidence ≥ 0.6
-3. `ReviewerAgent` — validates each finding one-by-one, may adjust severity
-4. Deduplicate → persist to `AuditContext`
+1. (optional) `StaticPreScanner` tags files with deterministic risk markers;
+   (optional) `CodeSlicer` trims large files to security-relevant lines
+2. `AttackerAgent` — chunks files (default `feature` strategy: a controller with
+   its entity/repository/form/voter/templates together; `type` for the legacy
+   priority window), injects markers + prior-iteration findings, calls LLM,
+   parses JSON vulnerabilities. Optional `EscalatingAttackerAgent` runs a cheap
+   model first and only escalates flagged files to the expensive model.
+3. Filter — confidence ≥ 0.6
+4. `ReviewerAgent` — validates each finding (optionally with tools; optionally
+   concurrently), may adjust severity
+5. Deduplicate → persist to `AuditContext`
+
+After the loop, the optional `PoCSynthesisStage` runs (concrete reproduction
+artifacts for high-severity findings).
 
 Full details: [`docs/architecture.md`](docs/architecture.md)
 

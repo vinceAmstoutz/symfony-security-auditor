@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 
+use function Symfony\Component\String\u;
+
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class CharacterBasedTokenEstimator implements TokenEstimatorInterface
 {
@@ -76,13 +78,13 @@ final readonly class CharacterBasedTokenEstimator implements TokenEstimatorInter
     private function charsPerToken(string $model): float
     {
         foreach ($this->charsPerTokenByPrefix as $prefix => $ratio) {
-            if (str_starts_with($model, $prefix)) {
+            if (u($model)->startsWith($prefix)) {
                 return $ratio;
             }
         }
 
         foreach (self::DEFAULT_RATIOS as $entry) {
-            if (str_starts_with($model, $entry['prefix'])) {
+            if (u($model)->startsWith($entry['prefix'])) {
                 return $entry['charsPerToken'];
             }
         }

@@ -47,26 +47,29 @@ flowchart LR
     classDef agent fill:#ede9fe,stroke:#7c3aed,color:#3b0764
     classDef report fill:#d1fae5,stroke:#059669,color:#064e3b
 
-    CLI(["audit:run\n/path/to/project"]):::cmd
+    CLI(["audit:run\n/path/to/project\n(--since for diff mode)"]):::cmd
 
     subgraph PIPE["  Pipeline  "]
-        ING["Ingest\nPHP · Twig · YAML · XML"]:::stage
+        ING["Ingest\nPHP · Twig · YAML · XML\n(--since git diff filter)"]:::stage
         MAP["Map\nRoutes · Firewalls · Roles"]:::stage
         AUD["Audit"]:::stage
-        ING --> MAP --> AUD
+        POC["PoC Synthesis\n(opt-in)"]:::stage
+        ING --> MAP --> AUD --> POC
     end
 
     subgraph LOOP["  Dual-Agent Loop — max 3 iterations  "]
-        ATK["Attacker Agent\nchunk × 10 · LLM call\nfind vulnerabilities"]:::agent
-        REV["Reviewer Agent\nper-finding · LLM call\nvalidate + score"]:::agent
+        PRE["Pre-scan + slice\nrisk markers · feature chunks"]:::stage
+        ATK["Attacker Agent\nLLM call · find vulnerabilities\n(opt. cheap→expensive escalation)"]:::agent
+        REV["Reviewer Agent\nper-finding · LLM call\nvalidate + score (opt. concurrent)"]:::agent
+        PRE --> ATK
         ATK -- "confidence ≥ 0.6" --> REV
-        REV -. "iterate" .-> ATK
+        REV -. "iterate: feed back confirmed findings" .-> ATK
     end
 
-    RPT(["AuditReport\nrisk level · JSON · console"]):::report
+    RPT(["AuditReport\nrisk level · JSON · SARIF · console"]):::report
 
     CLI --> PIPE
-    AUD --> ATK
+    AUD --> PRE
     REV -- "validated findings" --> RPT
 ```
 

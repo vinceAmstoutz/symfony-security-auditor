@@ -9,6 +9,7 @@ All extension points are PHP interfaces. Wire your implementations via
 - [2. Custom Pipeline Stage](#2-custom-pipeline-stage)
 - [3. Custom Agent (Attacker or Reviewer)](#3-custom-agent-attacker-or-reviewer)
 - [4. Custom Report Output](#4-custom-report-output)
+- [5. Other Pluggable Ports](#5-other-pluggable-ports)
 
 > See also: [Architecture](architecture.md) · [Configuration](configuration.md)
 > · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
@@ -436,7 +437,7 @@ $report->toArray(): array<string, mixed>             // fully serializable; incl
 `Vulnerability::toArray()` keys: `id`, `type`, `category`, `owasp`, `severity`,
 `severity_score`, `title`, `description`, `file`, `line_start`, `line_end`,
 `vulnerable_code`, `attack_vector`, `proof`, `remediation`, `confidence`,
-`reviewer_validated`, `detected_at`.
+`reviewer_validated`, `detected_at`, `synthesized_poc`.
 
 ### Built-in formats
 
@@ -461,3 +462,25 @@ for SARIF upload workflows).
 inject it directly into any consumer (custom command, controller, event
 listener) and serialize it however fits your output target without going through
 `ReportRenderer`.
+
+---
+
+## 5. Other Pluggable Ports
+
+Beyond the seams above, these Domain ports can each be implemented and aliased
+in `config/services.yaml` to override the bundled behaviour (see
+[`docs/versioning.md`](versioning.md) for the full BC-protected list):
+
+- `StaticPreScannerInterface` — supply your own deterministic risk-marker scan
+  (default: `RegexStaticPreScanner`, or set
+  `audit.static_prescan.enabled: false` for the null scanner). Project-specific
+  markers can also be added without a new class via `scan.custom_risk_patterns`.
+- `CodeSlicerInterface` — control how files are trimmed before the LLM (default:
+  `NullCodeSlicer`; enable the bundled `RegexCodeSlicer` with
+  `audit.code_slicing.enabled: true`).
+- `GitChangedFilesResolverInterface` — change how `--since` resolves the
+  changed-file set (default: `ProcessGitChangedFilesResolver`, backed by
+  `git diff`).
+- `BatchCapableLLMClientInterface` — an opt-in extension of `LLMClientInterface`
+  for clients that resolve several prompts concurrently; the reviewer uses it
+  when `audit.reviewer_max_concurrent > 1`.

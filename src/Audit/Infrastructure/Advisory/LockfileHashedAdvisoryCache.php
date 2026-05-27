@@ -18,6 +18,8 @@ use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Throwable;
 
+use function Symfony\Component\String\u;
+
 /**
  * Decorator over `ComposerAuditRunnerInterface` that persists the JSON payload
  * across audit runs, keyed by a SHA-256 hash of the project's `composer.lock`.
@@ -64,7 +66,7 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
 
     private function lockfileHash(string $projectPath): ?string
     {
-        $lockfilePath = rtrim($projectPath, '/').'/composer.lock';
+        $lockfilePath = u($projectPath)->trimEnd('/')->toString().'/composer.lock';
 
         if (!$this->filesystem->exists($lockfilePath)) {
             return null;
@@ -86,7 +88,7 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
 
     private function pathForHash(string $hash): string
     {
-        return \sprintf('%s/%s/%s.json', rtrim($this->cacheDir, '/'), substr($hash, 0, 2), $hash);
+        return \sprintf('%s/%s/%s.json', u($this->cacheDir)->trimEnd('/')->toString(), u($hash)->slice(0, 2)->toString(), $hash);
     }
 
     private function readCache(string $hash): ?string

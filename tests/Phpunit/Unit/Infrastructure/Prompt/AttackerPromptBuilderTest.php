@@ -511,9 +511,192 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString("new Process(['ls', '-la'])", $prompt);
     }
 
-    public function test_prompt_version_is_bumped_when_tool_usage_discipline_section_is_added(): void
+    public function test_prompt_version_is_bumped_when_modern_symfony_skill_blocks_are_added(): void
     {
-        self::assertSame(3, AttackerPromptBuilder::PROMPT_VERSION);
+        self::assertSame(4, AttackerPromptBuilder::PROMPT_VERSION);
+    }
+
+    public function test_it_injects_authenticator_skills_when_authenticator_in_chunk(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/LoginFormAuthenticator.php',
+            '/app/src/Security/LoginFormAuthenticator.php',
+            '<?php class LoginFormAuthenticator {}',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('<skills role="authenticator">', $prompt);
+        self::assertStringContainsString('SelfValidatingPassport', $prompt);
+    }
+
+    public function test_it_injects_messenger_handler_skills_when_handler_in_chunk(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Messenger/Handler/SendInvoiceMessageHandler.php',
+            '/app/src/Messenger/Handler/SendInvoiceMessageHandler.php',
+            '<?php class SendInvoiceMessageHandler {}',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('<skills role="messenger_handler">', $prompt);
+        self::assertStringContainsString('AsMessageHandler', $prompt);
+    }
+
+    public function test_it_injects_webhook_consumer_skills_when_webhook_in_chunk(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Webhook/StripeWebhookConsumer.php',
+            '/app/src/Webhook/StripeWebhookConsumer.php',
+            '<?php class StripeWebhookConsumer {}',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('<skills role="webhook_consumer">', $prompt);
+        self::assertStringContainsString('hash_equals', $prompt);
+    }
+
+    public function test_it_injects_event_subscriber_skills_when_subscriber_in_chunk(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/EventSubscriber/AuditSubscriber.php',
+            '/app/src/EventSubscriber/AuditSubscriber.php',
+            '<?php class AuditSubscriber {}',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('<skills role="event_subscriber">', $prompt);
+        self::assertStringContainsString('KernelEvents::CONTROLLER', $prompt);
+    }
+
+    public function test_it_injects_normalizer_skills_when_normalizer_in_chunk(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Serializer/UserNormalizer.php',
+            '/app/src/Serializer/UserNormalizer.php',
+            '<?php class UserNormalizer {}',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('<skills role="normalizer">', $prompt);
+        self::assertStringContainsString('allow_extra_attributes', $prompt);
+    }
+
+    public function test_it_injects_scheduler_skills_when_schedule_in_chunk(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Schedule/CleanupSchedule.php',
+            '/app/src/Schedule/CleanupSchedule.php',
+            '<?php class CleanupSchedule {}',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('<skills role="scheduler">', $prompt);
+        self::assertStringContainsString('AsSchedule', $prompt);
+    }
+
+    public function test_authenticator_skill_appears_before_voter_under_priority_order(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/PostVoter.php',
+            '/app/src/Security/PostVoter.php',
+            '<?php class PostVoter {}',
+        );
+        $authenticator = ProjectFile::create(
+            'src/Security/LoginFormAuthenticator.php',
+            '/app/src/Security/LoginFormAuthenticator.php',
+            '<?php class LoginFormAuthenticator {}',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile, $authenticator]);
+
+        $authenticatorPos = strpos($prompt, '<skills role="authenticator">');
+        $voterPos = strpos($prompt, '<skills role="voter">');
+
+        self::assertNotFalse($authenticatorPos);
+        self::assertNotFalse($voterPos);
+        self::assertLessThan($voterPos, $authenticatorPos);
+    }
+
+    public function test_base_prompt_lists_modern_symfony_vulnerability_types(): void
+    {
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('missing_signature_verification', $prompt);
+        self::assertStringContainsString('messenger_handler_unsafe', $prompt);
+        self::assertStringContainsString('missing_rate_limiting', $prompt);
+        self::assertStringContainsString('cache_poisoning', $prompt);
+        self::assertStringContainsString('mailer_header_injection', $prompt);
+        self::assertStringContainsString('webhook_replay', $prompt);
+        self::assertStringContainsString('authenticator_bypass', $prompt);
+    }
+
+    public function test_base_prompt_references_modern_symfony_components_in_expertise(): void
+    {
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('Messenger', $prompt);
+        self::assertStringContainsString('Webhook', $prompt);
+        self::assertStringContainsString('Authenticator', $prompt);
+        self::assertStringContainsString('RateLimiter', $prompt);
+    }
+
+    public function test_controller_skill_block_covers_map_request_payload(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/UserController.php',
+            '/app/src/Controller/UserController.php',
+            '<?php class UserController {}',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('#[MapRequestPayload]', $prompt);
+    }
+
+    public function test_template_skill_block_covers_live_components(): void
+    {
+        $projectFile = ProjectFile::create(
+            'templates/user/index.html.twig',
+            '/app/templates/user/index.html.twig',
+            '{{ user.name }}',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('Live Components', $prompt);
+    }
+
+    public function test_php_skill_block_covers_mailer_header_injection(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Service/Mailer.php',
+            '/app/src/Service/Mailer.php',
+            '<?php class Mailer {}',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('MailerInterface::send()', $prompt);
+        self::assertStringContainsString('header injection', $prompt);
+    }
+
+    public function test_config_skill_block_covers_messenger_transport_serializer(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/messenger.yaml',
+            '/app/config/packages/messenger.yaml',
+            'framework: { messenger: {} }',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('php_serialize', $prompt);
     }
 
     public function test_base_prompt_forbids_non_object_array_elements(): void

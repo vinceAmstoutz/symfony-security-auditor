@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
@@ -27,6 +28,7 @@ final readonly class IngestionStage implements StageInterface
     public function __construct(
         private ProjectFileScannerInterface $projectFileScanner,
         private LoggerInterface $logger,
+        private ?GitChangedFilesResolverInterface $gitChangedFilesResolver = null,
     ) {}
 
     public function name(): string
@@ -45,6 +47,11 @@ final readonly class IngestionStage implements StageInterface
             $auditContext->scanPaths(),
         );
 
+        $diffSinceRef = $auditContext->diffSinceRef();
+        if (null !== $diffSinceRef && $this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
+            $files = $this->filterByGitDiff($auditContext->projectPath(), $diffSinceRef, $files);
+        }
+
         if ([] === $files) {
             $this->logger->warning('No files found in project', [
                 'path' => $auditContext->projectPath(),
@@ -61,5 +68,30 @@ final readonly class IngestionStage implements StageInterface
             'files' => \count($files),
             'lines' => $auditContext->getMeta('ingestion.total_lines'),
         ]);
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     *
+     * @return list<ProjectFile>
+     */
+    private function filterByGitDiff(string $projectPath, string $ref, array $files): array
+    {
+        $changed = $this->gitChangedFilesResolver?->changedSince($projectPath, $ref) ?? [];
+        $changedSet = array_flip($changed);
+
+        $filtered = array_values(array_filter(
+            $files,
+            static fn (ProjectFile $projectFile): bool => isset($changedSet[$projectFile->relativePath()]),
+        ));
+
+        $this->logger->info('Diff filter applied', [
+            'ref' => $ref,
+            'changed_in_diff' => \count($changed),
+            'kept_after_intersection' => \count($filtered),
+            'dropped' => \count($files) - \count($filtered),
+        ]);
+
+        return $filtered;
     }
 }

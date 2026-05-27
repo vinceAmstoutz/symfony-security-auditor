@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Stage;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Symfony\Component\ErrorHandler\BufferingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
@@ -26,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\Mappin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
@@ -93,6 +95,51 @@ final class StagesTest extends TestCase
 
         self::assertCount(1, $auditContext->projectFiles());
         self::assertSame('apps/api/src/A.php', $auditContext->projectFiles()[0]->relativePath());
+    }
+
+    public function test_ingestion_stage_filters_to_git_changed_files_and_logs_the_diff(): void
+    {
+        $scanner = self::createStub(ProjectFileScannerInterface::class);
+        $scanner->method('scan')->willReturn([
+            ProjectFile::create('src/ChangedA.php', '/app/src/ChangedA.php', '<?php'),
+            ProjectFile::create('src/ChangedB.php', '/app/src/ChangedB.php', '<?php'),
+            ProjectFile::create('src/Unchanged.php', '/app/src/Unchanged.php', '<?php'),
+        ]);
+
+        $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
+        $gitChangedFilesResolver->method('changedSince')->willReturn(['src/ChangedA.php', 'src/ChangedB.php']);
+
+        $bufferingLogger = new BufferingLogger();
+        $ingestionStage = new IngestionStage($scanner, $bufferingLogger, $gitChangedFilesResolver);
+        $auditContext = AuditContext::forProject($this->tmpDir, [], false, 'main');
+
+        $ingestionStage->process($auditContext);
+
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles());
+        self::assertContains('src/ChangedA.php', $paths);
+        self::assertContains('src/ChangedB.php', $paths);
+        self::assertNotContains('src/Unchanged.php', $paths);
+
+        self::assertSame(
+            ['ref' => 'main', 'changed_in_diff' => 2, 'kept_after_intersection' => 2, 'dropped' => 1],
+            $this->contextOf($bufferingLogger->cleanLogs(), 'Diff filter applied'),
+        );
+    }
+
+    public function test_ingestion_stage_does_not_filter_when_no_resolver_even_with_since_ref(): void
+    {
+        $scanner = self::createStub(ProjectFileScannerInterface::class);
+        $scanner->method('scan')->willReturn([
+            ProjectFile::create('src/Changed.php', '/app/src/Changed.php', '<?php'),
+            ProjectFile::create('src/Unchanged.php', '/app/src/Unchanged.php', '<?php'),
+        ]);
+
+        $ingestionStage = new IngestionStage($scanner, new NullLogger());
+        $auditContext = AuditContext::forProject($this->tmpDir, [], false, 'main');
+
+        $ingestionStage->process($auditContext);
+
+        self::assertCount(2, $auditContext->projectFiles());
     }
 
     public function test_mapping_stage_has_correct_name(): void
@@ -596,6 +643,26 @@ final class StagesTest extends TestCase
         $mapping = $auditContext->mapping();
         self::assertNotNull($mapping);
         self::assertSame(0, $mapping->totalFiles());
+    }
+
+    /**
+     * @param array<mixed> $logs
+     *
+     * @return array<mixed>
+     */
+    private function contextOf(array $logs, string $message): array
+    {
+        foreach ($logs as $log) {
+            self::assertIsArray($log);
+            if ($message === ($log[1] ?? null)) {
+                $context = $log[2] ?? [];
+                self::assertIsArray($context);
+
+                return $context;
+            }
+        }
+
+        self::fail(\sprintf('No log entry with message "%s"', $message));
     }
 
     protected function setUp(): void
