@@ -394,6 +394,53 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isWebhookConsumer());
     }
 
+    public function test_it_detects_webhook_consumer_suffix_outside_webhook_directory(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Notification/StripeWebhookConsumer.php',
+            '/app/src/Notification/StripeWebhookConsumer.php',
+            '<?php',
+        );
+
+        self::assertSame('webhook_consumer', $projectFile->type());
+        self::assertTrue($projectFile->isWebhookConsumer());
+    }
+
+    public function test_it_detects_webhook_parser_suffix_outside_webhook_directory(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Notification/StripeWebhookParser.php',
+            '/app/src/Notification/StripeWebhookParser.php',
+            '<?php',
+        );
+
+        self::assertSame('webhook_consumer', $projectFile->type());
+        self::assertTrue($projectFile->isWebhookConsumer());
+    }
+
+    public function test_it_detects_plain_php_inside_webhook_directory(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Webhook/Handler.php',
+            '/app/src/Webhook/Handler.php',
+            '<?php',
+        );
+
+        self::assertSame('webhook_consumer', $projectFile->type());
+        self::assertTrue($projectFile->isWebhookConsumer());
+    }
+
+    public function test_non_php_inside_webhook_directory_is_not_a_webhook_consumer(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Webhook/config.yaml',
+            '/app/src/Webhook/config.yaml',
+            'foo: bar',
+        );
+
+        self::assertFalse($projectFile->isWebhookConsumer());
+    }
+
     public function test_it_detects_event_subscriber_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
