@@ -411,6 +411,80 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(['acquire', 'record', 'acquire', 'record'], $rateLimiter->events);
     }
 
+    public function test_complete_batch_falls_back_to_complete_when_resolving_a_response_throws(): void
+    {
+        $platform = new class implements PlatformInterface {
+            private int $calls = 0;
+
+            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                $converter = 0 === $this->calls++
+                    ? new ThrowingConverter(new RuntimeException('boom'))
+                    : new PlainConverter(new TextResult('recovered'));
+
+                return new DeferredResult($converter, new InMemoryRawResult(['text' => ''], [], (object) []), $options);
+            }
+
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+
+        $responses = $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+
+        self::assertSame('recovered', $responses[0]->content());
+    }
+
+    public function test_complete_batch_rethrows_budget_exceeded_without_falling_back_to_complete(): void
+    {
+        $platformInvocationLog = new PlatformInvocationLog();
+        $platform = new class($platformInvocationLog) implements PlatformInterface {
+            public function __construct(private readonly PlatformInvocationLog $platformInvocationLog) {}
+
+            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                ++$this->platformInvocationLog->invocations;
+                $deferredResult = new DeferredResult(
+                    new PlainConverter(new TextResult('x')),
+                    new InMemoryRawResult(['text' => ''], [], (object) []),
+                    $options,
+                );
+                $deferredResult->getMetadata()->add('token_usage', new TokenUsage(promptTokens: 500, completionTokens: 0));
+
+                return $deferredResult;
+            }
+
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+
+        $budgetTracker = new BudgetTracker(
+            AuditBudget::forTokens(100),
+            new CostCalculator($this->stubPricing(0.0, 0.0)),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: new TokenUsageRecorder(),
+            budgetTracker: $budgetTracker,
+        );
+
+        try {
+            $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+            self::fail('Expected BudgetExceededException');
+        } catch (BudgetExceededException) {
+            // expected — the batch must abort rather than retry via complete().
+        }
+
+        self::assertSame(1, $platformInvocationLog->invocations);
+    }
+
     public function test_complete_with_tools_returns_text_when_platform_emits_no_tool_calls(): void
     {
         $platform = $this->scriptedPlatform([

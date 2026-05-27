@@ -209,11 +209,17 @@ final class PoCSynthesizerTest extends TestCase
             LLMResponse::create('curl /x', 0, 0, 'test', 'end_turn'),
         );
 
-        $enriched = (new PoCSynthesizer($llmClient, new NullLogger()))->synthesize([$vulnerability, $second]);
+        $bufferingLogger = new BufferingLogger();
+        $enriched = (new PoCSynthesizer($llmClient, $bufferingLogger))->synthesize([$vulnerability, $second]);
 
         self::assertCount(2, $enriched);
         self::assertNull($enriched[0]->synthesizedPoC());
         self::assertSame('curl /x', $enriched[1]->synthesizedPoC());
+
+        $logs = $bufferingLogger->cleanLogs();
+        $completion = end($logs);
+        self::assertIsArray($completion);
+        self::assertSame(['inputs' => 2, 'synthesized' => 1, 'skipped' => 1], $completion[2]);
     }
 
     public function test_it_rethrows_budget_exceeded_exception(): void

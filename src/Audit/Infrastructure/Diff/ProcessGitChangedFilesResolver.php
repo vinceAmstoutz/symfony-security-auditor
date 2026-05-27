@@ -115,7 +115,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
             }
         }
 
-        $result = array_values(array_unique($normalized));
+        $result = array_unique($normalized);
         sort($result);
 
         return $result;

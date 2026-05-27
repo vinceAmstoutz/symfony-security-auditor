@@ -112,6 +112,43 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         self::assertContains('src/sub/Bar.php', $changed);
     }
 
+    public function test_it_relies_on_rev_parse_when_a_dot_git_path_exists_but_is_not_a_repo(): void
+    {
+        $this->filesystem->mkdir($this->tmpDir.'/.git');
+
+        $this->expectException(GitChangedFilesUnavailableException::class);
+        $this->expectExceptionMessage('does not resolve');
+
+        (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+    }
+
+    public function test_it_throws_for_a_path_inside_the_git_directory_not_the_work_tree(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php', 'init');
+
+        $this->expectException(GitChangedFilesUnavailableException::class);
+        $this->expectExceptionMessage('is not a git working tree');
+
+        (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir.'/.git', 'main');
+    }
+
+    public function test_it_diffs_branch_commits_since_merge_base_not_the_raw_ref_diff(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // v1', 'init');
+        $this->createBranch('feature');
+        $this->commit('src/Bar.php', '<?php // bar', 'add bar');
+        $this->runGit(['git', 'checkout', 'main']);
+        $this->commit('src/Foo.php', '<?php // v2 changed on main', 'change foo on main');
+        $this->runGit(['git', 'checkout', 'feature']);
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+
+        self::assertContains('src/Bar.php', $changed);
+        self::assertNotContains('src/Foo.php', $changed);
+    }
+
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/git_diff_resolver_test_'.uniqid('', true);

@@ -101,12 +101,13 @@ final class StagesTest extends TestCase
     {
         $scanner = self::createStub(ProjectFileScannerInterface::class);
         $scanner->method('scan')->willReturn([
-            ProjectFile::create('src/Changed.php', '/app/src/Changed.php', '<?php'),
+            ProjectFile::create('src/ChangedA.php', '/app/src/ChangedA.php', '<?php'),
+            ProjectFile::create('src/ChangedB.php', '/app/src/ChangedB.php', '<?php'),
             ProjectFile::create('src/Unchanged.php', '/app/src/Unchanged.php', '<?php'),
         ]);
 
         $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
-        $gitChangedFilesResolver->method('changedSince')->willReturn(['src/Changed.php']);
+        $gitChangedFilesResolver->method('changedSince')->willReturn(['src/ChangedA.php', 'src/ChangedB.php']);
 
         $bufferingLogger = new BufferingLogger();
         $ingestionStage = new IngestionStage($scanner, $bufferingLogger, $gitChangedFilesResolver);
@@ -115,11 +116,12 @@ final class StagesTest extends TestCase
         $ingestionStage->process($auditContext);
 
         $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles());
-        self::assertContains('src/Changed.php', $paths);
+        self::assertContains('src/ChangedA.php', $paths);
+        self::assertContains('src/ChangedB.php', $paths);
         self::assertNotContains('src/Unchanged.php', $paths);
 
         self::assertSame(
-            ['ref' => 'main', 'changed_in_diff' => 1, 'kept_after_intersection' => 1, 'dropped' => 1],
+            ['ref' => 'main', 'changed_in_diff' => 2, 'kept_after_intersection' => 2, 'dropped' => 1],
             $this->contextOf($bufferingLogger->cleanLogs(), 'Diff filter applied'),
         );
     }
