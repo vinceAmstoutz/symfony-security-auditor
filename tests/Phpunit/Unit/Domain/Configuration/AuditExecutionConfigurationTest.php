@@ -40,5 +40,6 @@ final class AuditExecutionConfigurationTest extends TestCase
         self::assertSame(80, $auditExecutionConfiguration->codeSlicingMinLines);
         self::assertFalse($auditExecutionConfiguration->escalationEnabled);
         self::assertNull($auditExecutionConfiguration->escalationCheapModel);
+        self::assertTrue($auditExecutionConfiguration->structuredCollection);
     }
 }

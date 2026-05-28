@@ -96,6 +96,23 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame('claude-sonnet', $kernel->getContainer()->getParameter('symfony_security_auditor.reviewer_model'));
     }
 
+    public function test_bundle_defaults_structured_collection_to_true_so_provider_validates_findings(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        self::assertTrue($kernel->getContainer()->getParameter('symfony_security_auditor.audit.structured_collection'));
+    }
+
+    public function test_bundle_propagates_structured_collection_opt_out_to_parameter(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'audit' => ['structured_collection' => false],
+        ]);
+
+        self::assertFalse($kernel->getContainer()->getParameter('symfony_security_auditor.audit.structured_collection'));
+    }
+
     public function test_bundle_propagates_scan_config_to_parameters(): void
     {
         $kernel = $this->boot([

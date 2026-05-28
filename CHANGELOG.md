@@ -10,6 +10,48 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-05-28 — Sentinel
+
+A correctness release. The attacker now records findings through a strict
+JSON-Schema tool call validated by the provider, replacing the JSON-array parse
+path as the default. Bundle-level switch keeps the legacy path available for
+environments without tool-use support.
+
+### Added
+
+- **Schema-enforced finding collection.** New `RecordVulnerabilityTool` exposes
+  a `record_vulnerability` tool with a strict JSON-Schema input mirroring the
+  `Vulnerability` shape. The attacker now calls this tool once per finding
+  instead of returning a JSON array; the provider validates each call against
+  the schema before the agent ever sees it, making bare-string drift (`"dev"`,
+  `"test"`) and wrapper-object drift (`{"vulnerabilities": [...]}`) structurally
+  impossible across Anthropic, OpenAI, Mistral, and tool-capable Ollama models.
+- **`audit.structured_collection` config key** — `true` by default. Set to
+  `false` to fall back to the tightened JSON-array prompt path, which remains as
+  the safety net for models without tool-use support. Public API per
+  `docs/versioning.md`.
+- **`VulnerabilityCollector` and `RecordVulnerabilityToolFactoryInterface`**
+  (Application). The collector is the documented mutable context carrier the
+  tool writes into; the factory is the seam Infrastructure plugs into so the
+  agent can build a fresh collector + tool pair per chunk without importing
+  Infrastructure types. The bundle wires `RecordVulnerabilityToolFactory`
+  (Infrastructure) at the composition root.
+- **Tightened JSON-array safety net.** When `audit.structured_collection` is set
+  to `false`, the prompt explicitly forbids non-object array elements,
+  environment-keyed wrapper objects, and bare environment-name strings — the
+  failure modes that previously slipped past the parser and were silently
+  dropped by `VulnerabilityFactory::fromList()`. Both paths ship in this
+  release; the JSON-array path is now opt-in.
+
+### Changed
+
+- **Default attacker collection mechanism is now the `record_vulnerability` tool
+  call.** Existing audits that did not pin `audit.structured_collection` will
+  switch to the tool-call path on upgrade and benefit from provider-side schema
+  validation. Behavior is preserved for opt-out users: set
+  `audit.structured_collection: false` in
+  `config/packages/symfony_security_auditor.yaml` to keep the JSON array path.
+
 ## [1.5.0] — 2026-05-28 — Cartographer
 
 A visibility, hardening, and coverage release. The auditor now reports how much

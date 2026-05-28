@@ -69,7 +69,7 @@ src/
     Application/     # Orchestration — no I/O, depends only on Domain
       UseCase/       # RunAuditUseCase, EstimateAuditCostUseCase (entry points)
       Pipeline/      # AuditPipeline + Stage/{IngestionStage, MappingStage, AuditStage, PoCSynthesisStage}
-      Agent/         # AttackerAgent (+ AttackerAnalysisRequest, RiskMarkerIndex, AttackerContextPromptRenderer), ReviewerAgent, EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, PoCSynthesizer, Chunking/{ChunkingStrategy, FileChunker}
+      Agent/         # AttackerAgent (+ AttackerAnalysisRequest, RiskMarkerIndex, AttackerContextPromptRenderer), ReviewerAgent, EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, VulnerabilityCollector, RecordVulnerabilityToolFactoryInterface, PoCSynthesizer, Chunking/{ChunkingStrategy, FileChunker}
     Infrastructure/  # I/O adapters
       LLM/           # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier, CharacterBasedTokenEstimator, Delay/, RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
       FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
@@ -79,7 +79,7 @@ src/
       Cache/         # FilesystemAttackerCache, NullAttackerCache
       Advisory/      # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase (fallback), SymfonyProcessComposerAuditRunner
       Pricing/       # StaticPricingProvider
-      Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory
+      Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory
       Report/        # ReportRenderer (+ Template/*.txt stubs)
   Command/           # AuditCommand (Symfony Console: audit:run) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, OutputFormat enum
   SymfonySecurityAuditorBundle.php  # Bundle class (configure + loadExtension)
@@ -116,9 +116,12 @@ Command → Application → Domain ← Infrastructure (implements ports)
    (optional) `CodeSlicer` trims large files to security-relevant lines
 2. `AttackerAgent` — chunks files (default `feature` strategy: a controller with
    its entity/repository/form/voter/templates together; `type` for the legacy
-   priority window), injects markers + prior-iteration findings, calls LLM,
-   parses JSON vulnerabilities. Optional `EscalatingAttackerAgent` runs a cheap
-   model first and only escalates flagged files to the expensive model.
+   priority window), injects markers + prior-iteration findings, calls LLM. By
+   default (`audit.structured_collection: true`), findings come in through
+   `record_vulnerability` tool calls validated by the provider against the
+   tool's JSON schema; with the flag off, the attacker parses a JSON array from
+   the response. Optional `EscalatingAttackerAgent` runs a cheap model first and
+   only escalates flagged files to the expensive model.
 3. Filter — confidence ≥ 0.6
 4. `ReviewerAgent` — validates each finding (optionally with tools; optionally
    concurrently), may adjust severity

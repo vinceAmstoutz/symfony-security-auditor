@@ -45,6 +45,8 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
     public const bool DEFAULT_LEAN_MODE = false;
 
+    public const bool DEFAULT_STRUCTURED_COLLECTION = true;
+
     private StaticPreScannerInterface $staticPreScanner;
 
     private FileChunker $fileChunker;
@@ -67,6 +69,8 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         ?FileChunker $fileChunker = null,
         ?CodeSlicerInterface $codeSlicer = null,
         ?AttackerContextPromptRenderer $attackerContextPromptRenderer = null,
+        private ?RecordVulnerabilityToolFactoryInterface $recordVulnerabilityToolFactory = null,
+        private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
     ) {
         $this->staticPreScanner = $staticPreScanner ?? new NullStaticPreScanner();
         $this->fileChunker = $fileChunker ?? new FileChunker();
@@ -177,6 +181,10 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         }
 
         try {
+            if ($this->useStructuredCollection && $this->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface) {
+                return $this->analyzeChunkViaStructuredCollection($chunk, $systemPrompt, $userMessage, $cacheable, $coverageRecorder);
+            }
+
             $response = $toolRegistry instanceof ToolRegistry
                 ? $this->llmClient->completeWithTools($systemPrompt, $userMessage, $toolRegistry, $this->maxToolIterations)
                 : $this->llmClient->complete($systemPrompt, $userMessage);
@@ -229,6 +237,35 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
             return VulnerabilityHydrationResult::empty();
         }
+    }
+
+    /**
+     * @param list<ProjectFile> $chunk
+     */
+    private function analyzeChunkViaStructuredCollection(
+        array $chunk,
+        string $systemPrompt,
+        string $userMessage,
+        bool $cacheable,
+        CoverageRecorderInterface $coverageRecorder,
+    ): VulnerabilityHydrationResult {
+        \assert($this->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface);
+
+        $vulnerabilityCollector = new VulnerabilityCollector();
+        $recordTool = $this->recordVulnerabilityToolFactory->create($vulnerabilityCollector);
+        $toolRegistry = new ToolRegistry([$recordTool], $this->logger);
+
+        $this->llmClient->completeWithTools($systemPrompt, $userMessage, $toolRegistry, $this->maxToolIterations);
+
+        $rawData = $vulnerabilityCollector->drain();
+
+        if ($cacheable) {
+            $this->attackerCache->store($chunk, $rawData);
+        }
+
+        $this->recordChunkCoverage($chunk, 'analyzed', $coverageRecorder);
+
+        return $this->vulnerabilityFactory->fromList($rawData);
     }
 
     /**

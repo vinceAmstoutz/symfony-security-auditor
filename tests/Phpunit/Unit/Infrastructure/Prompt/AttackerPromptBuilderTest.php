@@ -575,33 +575,37 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_base_prompt_has_no_trailing_separator_when_no_files(): void
     {
-        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
 
         self::assertStringEndsWith('causes the response to be discarded as malformed.', $prompt);
     }
 
     public function test_base_prompt_has_no_trailing_separator_when_files_have_no_matching_skill(): void
     {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
         $projectFile = ProjectFile::create(
             'unknown.bin',
             '/app/unknown.bin',
             'binary',
         );
 
-        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+        $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
         self::assertStringEndsWith('causes the response to be discarded as malformed.', $prompt);
     }
 
     public function test_skill_block_is_separated_from_base_by_exactly_one_blank_line(): void
     {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
         $projectFile = ProjectFile::create(
             'src/Controller/UserController.php',
             '/app/src/Controller/UserController.php',
             '<?php class UserController {}',
         );
 
-        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+        $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
         self::assertStringContainsString(
             "causes the response to be discarded as malformed.\n\n<skills role=\"controller\">",
@@ -723,7 +727,9 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_base_prompt_includes_few_shot_example_with_traceable_line_numbers(): void
     {
-        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
 
         self::assertStringContainsString('Example finding', $prompt);
         self::assertStringContainsString('"line_start": 42', $prompt);
@@ -782,7 +788,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_prompt_version_is_bumped_when_modern_symfony_skill_blocks_are_added(): void
     {
-        self::assertSame(5, AttackerPromptBuilder::PROMPT_VERSION);
+        self::assertSame(6, AttackerPromptBuilder::PROMPT_VERSION);
     }
 
     public function test_entity_skill_block_mentions_over_permissive_serializer_groups(): void
@@ -984,11 +990,34 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_base_prompt_forbids_non_object_array_elements(): void
     {
-        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
 
         self::assertStringContainsString('Every element of the JSON array MUST be a vulnerability object', $prompt);
         self::assertStringContainsString('NEVER emit a bare string, number, boolean, or null as an array element', $prompt);
         self::assertStringContainsString('return `[]`', $prompt);
+    }
+
+    public function test_base_prompt_forbids_object_wrappers_around_findings(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('The top-level value MUST be a JSON array', $prompt);
+        self::assertStringContainsString('{"vulnerabilities": [...]}', $prompt);
+        self::assertStringContainsString('{"dev": [...], "test": [...]}', $prompt);
+    }
+
+    public function test_base_prompt_forbids_environment_names_as_array_elements(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('Environment names, group names, role names', $prompt);
+        self::assertStringContainsString('["dev", "test", {...vulnerability...}]', $prompt);
     }
 
     public function test_base_prompt_instructs_model_to_converge_within_tool_call_budget(): void
@@ -996,5 +1025,80 @@ final class AttackerPromptBuilderTest extends TestCase
         $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
 
         self::assertStringContainsString('tool-call budget', $prompt);
+    }
+
+    public function test_structured_collection_prompt_directs_model_to_call_record_vulnerability_tool(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: true);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('`record_vulnerability` tool', $prompt);
+        self::assertStringContainsString('one call per finding', $prompt);
+    }
+
+    public function test_structured_collection_prompt_does_not_request_a_json_array_response(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: true);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringNotContainsString('Return ONLY the JSON array', $prompt);
+        self::assertStringNotContainsString('The top-level value MUST be a JSON array', $prompt);
+    }
+
+    public function test_structured_collection_prompt_instructs_no_tool_calls_when_no_findings(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: true);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('call no tools', $prompt);
+    }
+
+    public function test_default_prompt_drives_findings_through_the_record_vulnerability_tool(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder();
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('`record_vulnerability` tool', $prompt);
+        self::assertStringNotContainsString('Return ONLY the JSON array', $prompt);
+    }
+
+    public function test_opt_out_prompt_keeps_the_json_array_rules_as_the_safety_net(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('Return ONLY the JSON array', $prompt);
+        self::assertStringNotContainsString('`record_vulnerability` tool', $prompt);
+    }
+
+    public function test_base_prompt_orders_sections_intro_output_rubrics_scope_example_rules(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder();
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        $introPosition = strpos($prompt, 'You are an elite offensive security researcher');
+        $outputPosition = strpos($prompt, 'Your output');
+        $rubricsPosition = strpos($prompt, 'Severity rubric');
+        $scopePosition = strpos($prompt, 'File-numbering protocol');
+        $examplePosition = strpos($prompt, 'Example finding');
+        $rulesPosition = strpos($prompt, 'Tool Usage Discipline');
+
+        self::assertIsInt($introPosition);
+        self::assertIsInt($outputPosition);
+        self::assertIsInt($rubricsPosition);
+        self::assertIsInt($scopePosition);
+        self::assertIsInt($examplePosition);
+        self::assertIsInt($rulesPosition);
+        self::assertLessThan($outputPosition, $introPosition);
+        self::assertLessThan($rubricsPosition, $outputPosition);
+        self::assertLessThan($scopePosition, $rubricsPosition);
+        self::assertLessThan($examplePosition, $scopePosition);
+        self::assertLessThan($rulesPosition, $examplePosition);
     }
 }

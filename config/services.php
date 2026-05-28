@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\Chunki
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
@@ -86,6 +87,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserForm
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRegistryFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
@@ -168,7 +170,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger')->ignoreOnInvalid(),
             inline_service(ValidatorInterface::class)->factory([Validation::class, 'createValidator']),
         ]);
-    $defaultsConfigurator->set(AttackerPromptBuilder::class);
+    $defaultsConfigurator->set(AttackerPromptBuilder::class)
+        ->args([param('symfony_security_auditor.audit.structured_collection')]);
     $defaultsConfigurator->alias(AttackerPromptBuilderInterface::class, AttackerPromptBuilder::class);
 
     $defaultsConfigurator->set(ReviewerPromptBuilder::class);
@@ -311,6 +314,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
                 ->args([param('symfony_security_auditor.audit.chunking.strategy')]),
         ]);
 
+    $defaultsConfigurator->set(RecordVulnerabilityToolFactory::class);
+    $defaultsConfigurator->alias(RecordVulnerabilityToolFactoryInterface::class, RecordVulnerabilityToolFactory::class);
+
     $defaultsConfigurator->set(AttackerAgent::class)
         ->args([
             service('security_auditor.attacker_client'),
@@ -325,6 +331,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.audit.static_prescan.lean_mode'),
             service(FileChunker::class),
             service(CodeSlicerInterface::class),
+            null,
+            service(RecordVulnerabilityToolFactoryInterface::class),
+            param('symfony_security_auditor.audit.structured_collection'),
         ]);
 
     $defaultsConfigurator->alias(AttackerAgentInterface::class, AttackerAgent::class);

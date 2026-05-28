@@ -25,6 +25,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityCollector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
@@ -43,11 +47,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
 
 #[AllowMockObjectsWithoutExpectations]
 final class AttackerAgentTest extends TestCase
@@ -1602,6 +1608,220 @@ final class AttackerAgentTest extends TestCase
         }
 
         self::fail(\sprintf('No log entry with message "%s"', $message));
+    }
+
+    public function test_structured_collection_drives_findings_via_record_vulnerability_tool_calls(): void
+    {
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('complete');
+        $llmClient
+            ->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
+                self::assertTrue($toolRegistry->has('record_vulnerability'));
+                $toolRegistry->execute('record_vulnerability', [
+                    'type' => 'broken_access_control',
+                    'severity' => 'high',
+                    'title' => 'IDOR on user show',
+                    'description' => 'No ownership check on the controller.',
+                    'file_path' => 'src/Controller/UserController.php',
+                    'line_start' => 12,
+                    'line_end' => 14,
+                    'vulnerable_code' => '$repo->find($id);',
+                    'attack_vector' => 'GET /user/9999',
+                    'proof' => '200 OK leaking other tenant data',
+                    'remediation' => "Add denyAccessUnlessGranted('VIEW', \$user).",
+                    'confidence' => 0.9,
+                ]);
+
+                return LLMResponse::create('', 100, 50, 'claude', 'end_turn');
+            });
+
+        $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient);
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+
+        self::assertCount(1, $vulnerabilities);
+        self::assertSame('IDOR on user show', $vulnerabilities[0]->title());
+    }
+
+    public function test_structured_collection_returns_empty_when_llm_makes_no_tool_calls(): void
+    {
+        $files = [$this->makeFile('src/Controller/Safe.php')];
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturn(LLMResponse::create('', 0, 0, 'claude', 'end_turn'));
+
+        $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient);
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+
+        self::assertSame([], $vulnerabilities);
+    }
+
+    public function test_structured_collection_drains_collector_between_chunks_so_findings_are_not_duplicated(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/A.php'),
+            $this->makeFile('src/Controller/B.php'),
+        ];
+
+        $callIndex = 0;
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry) use (&$callIndex): LLMResponse {
+                ++$callIndex;
+                $toolRegistry->execute('record_vulnerability', [
+                    'type' => 'broken_access_control',
+                    'severity' => 'high',
+                    'title' => 'finding-'.$callIndex,
+                    'description' => 'd',
+                    'file_path' => 'src/Controller/A.php',
+                    'line_start' => 1,
+                    'line_end' => 1,
+                    'vulnerable_code' => 'c',
+                    'attack_vector' => 'a',
+                    'proof' => 'p',
+                    'remediation' => 'r',
+                    'confidence' => 0.9,
+                ]);
+
+                return LLMResponse::create('', 0, 0, 'claude', 'end_turn');
+            });
+
+        $attackerPromptBuilder = new AttackerPromptBuilder();
+        $attackerAgent = new AttackerAgent(
+            llmClient: $llmClient,
+            attackerPromptBuilder: $attackerPromptBuilder,
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+            attackerCache: new NullAttackerCache(),
+            logger: new NullLogger(),
+            fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+            recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
+            useStructuredCollection: true,
+        );
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+
+        self::assertCount(2, $vulnerabilities);
+        self::assertSame(['finding-1', 'finding-2'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
+    }
+
+    public function test_structured_collection_stores_drained_findings_in_the_attacker_cache_when_cacheable(): void
+    {
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
+                $toolRegistry->execute('record_vulnerability', [
+                    'type' => 'broken_access_control',
+                    'severity' => 'high',
+                    'title' => 'cached-finding',
+                    'description' => 'd',
+                    'file_path' => 'src/Controller/UserController.php',
+                    'line_start' => 1,
+                    'line_end' => 1,
+                    'vulnerable_code' => 'c',
+                    'attack_vector' => 'a',
+                    'proof' => 'p',
+                    'remediation' => 'r',
+                    'confidence' => 0.9,
+                ]);
+
+                return LLMResponse::create('', 0, 0, 'claude', 'end_turn');
+            });
+
+        $attackerCache = $this->createMock(AttackerCacheInterface::class);
+        $attackerCache->expects(self::once())->method('store')->with(
+            self::callback(static fn (array $chunk): bool => 1 === \count($chunk)),
+            self::callback(static function (array $payload): bool {
+                if (1 !== \count($payload)) {
+                    return false;
+                }
+
+                $first = $payload[0];
+
+                return \is_array($first) && 'cached-finding' === ($first['title'] ?? null);
+            }),
+        );
+
+        $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient, $attackerCache);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+    }
+
+    public function test_structured_collection_skips_cache_store_when_bypass_cache_is_requested(): void
+    {
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->method('completeWithTools')
+            ->willReturn(LLMResponse::create('', 0, 0, 'claude', 'end_turn'));
+
+        $attackerCache = $this->createMock(AttackerCacheInterface::class);
+        $attackerCache->expects(self::never())->method('store');
+
+        $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient, $attackerCache);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), bypassCache: true);
+    }
+
+    public function test_structured_collection_records_chunk_coverage_as_analyzed(): void
+    {
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->method('completeWithTools')
+            ->willReturn(LLMResponse::create('', 0, 0, 'claude', 'end_turn'));
+
+        $coverageRecorder = new class implements CoverageRecorderInterface {
+            /** @var list<array{stage: string, file: string, status: string}> */
+            public array $records = [];
+
+            public function recordCoverage(string $stage, string $filePath, string $status): void
+            {
+                $this->records[] = ['stage' => $stage, 'file' => $filePath, 'status' => $status];
+            }
+        };
+
+        $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $coverageRecorder);
+
+        self::assertSame([['stage' => 'attacker', 'file' => 'src/Controller/UserController.php', 'status' => 'analyzed']], $coverageRecorder->records);
+    }
+
+    private function makeStructuredCollectionAttackerAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null): AttackerAgent
+    {
+        return new AttackerAgent(
+            llmClient: $llmClient,
+            attackerPromptBuilder: new AttackerPromptBuilder(),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+            attackerCache: $attackerCache ?? new NullAttackerCache(),
+            logger: new NullLogger(),
+            recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
+            useStructuredCollection: true,
+        );
+    }
+
+    private function makeRecordToolFactory(): RecordVulnerabilityToolFactoryInterface
+    {
+        return new class implements RecordVulnerabilityToolFactoryInterface {
+            public function create(VulnerabilityCollector $vulnerabilityCollector): ToolInterface
+            {
+                return new RecordVulnerabilityTool($vulnerabilityCollector);
+            }
+        };
     }
 
     private function makeAttackerAgent(

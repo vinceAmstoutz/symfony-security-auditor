@@ -32,3 +32,11 @@ Application and LLM I/O.
   importing Infrastructure.
 - `VulnerabilityFactory::fromArray()` returns `null` on invalid data —
   `fromList()` silently drops nulls. Do not throw from the factory.
+- **Structured collection seam.** When `audit.structured_collection: true`
+  (default), findings flow through `RecordVulnerabilityTool` (Infrastructure,
+  Domain `ToolInterface`) into `VulnerabilityCollector` (Application). The
+  tool's JSON-Schema input is the contract — the provider validates each call
+  before invocation, so the agent never sees malformed payloads. To extend the
+  contract (extra fields, tighter enums), swap
+  `RecordVulnerabilityToolFactoryInterface` (Application) at the composition
+  root; do **not** introduce post-hoc validation in the agent.

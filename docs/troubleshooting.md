@@ -140,6 +140,12 @@ sometimes ignores the "Return ONLY the JSON array" instruction when tools are
 enabled); a residual `JsonException: Syntax error` therefore means the response
 contains no recoverable JSON at all, not just chatty prose.
 
+This error only arises with `audit.structured_collection: false`. In the default
+(`true`) mode, findings come in via `record_vulnerability` tool calls that the
+provider validates against the schema, so there is no JSON parsing on the agent
+side and no `JsonException` can be raised. Switching to the default is the
+simplest fix when the model repeatedly produces unparseable prose.
+
 If it happens for **every** chunk, the model is unsuitable. Switch model.
 
 ### `Ollama: model not found`

@@ -27,7 +27,13 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 5;
+    public const int PROMPT_VERSION = 6;
+
+    public const bool DEFAULT_STRUCTURED_COLLECTION = true;
+
+    public function __construct(
+        private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
+    ) {}
 
     /**
      * Skill-block emission order — by attack-surface priority, NOT alphabetical.
@@ -402,6 +408,16 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
 
     private function basePrompt(): string
     {
+        return $this->basePromptIntro()
+            .$this->outputFormatSection()
+            .$this->severityAndConfidenceRubrics()
+            .$this->fileNumberingAndScope()
+            .$this->exampleFinding()
+            .$this->rulesAndToolDiscipline();
+    }
+
+    private function basePromptIntro(): string
+    {
         return <<<'PROMPT'
             You are an elite offensive security researcher and red team expert specializing in Symfony and PHP applications.
             Your mission is to think like a sophisticated attacker and find REAL, EXPLOITABLE vulnerabilities.
@@ -423,6 +439,34 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Custom Authenticator failure modes: `SelfValidatingPassport` misuse, `supports()` returning null
             - Cache poisoning, mailer header injection, rate-limiter scope confusion
 
+
+            PROMPT;
+    }
+
+    private function outputFormatSection(): string
+    {
+        if ($this->useStructuredCollection) {
+            return <<<'PROMPT'
+                Your output MUST be expressed via `record_vulnerability` tool calls — one call per finding. The platform validates each call against the tool's input schema, so malformed shapes (bare strings, env names, wrapper objects) cannot be emitted. Do NOT emit JSON arrays, prose listings, or any text-based enumeration of findings.
+                Each tool call accepts these arguments (the input schema is authoritative):
+                  type:            one of the valid vulnerability type values
+                  severity:        critical | high | medium | low | info
+                  title:           short headline
+                  description:     detailed technical description (required)
+                  file_path:       project-relative path (required)
+                  line_start:      first line number from the NNN | prefix
+                  line_end:        last line number (= line_start for single-line findings)
+                  vulnerable_code: the actual vulnerable code snippet
+                  attack_vector:   step-by-step exploitation path
+                  proof:           concrete proof of concept or payload
+                  remediation:     specific fix with code example
+                  confidence:      0.0-1.0 float
+
+
+                PROMPT;
+        }
+
+        return <<<'PROMPT'
             Your output must be a valid JSON array of vulnerability objects.
             Each object must have:
             {
@@ -440,6 +484,13 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
               "confidence": <0.0-1.0 float>
             }
 
+
+            PROMPT;
+    }
+
+    private function severityAndConfidenceRubrics(): string
+    {
+        return <<<'PROMPT'
             Valid type values:
             sql_injection, command_injection, ldap_injection, xpath_injection, twig_injection, header_injection,
             broken_access_control, missing_voter, voter_bypass, role_escalation, insecure_direct_object_reference,
@@ -464,6 +515,13 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - 0.6-0.69: pattern smell that needs reviewer adjudication.
             - Below 0.6: do NOT report — it will be filtered and waste reviewer budget.
 
+
+            PROMPT;
+    }
+
+    private function fileNumberingAndScope(): string
+    {
+        return <<<'PROMPT'
             File-numbering protocol:
             Each line of every source file is prefixed with `NNN | ` (line number, space, pipe, space). Populate `line_start` / `line_end` using those exact numbers — never count or estimate. If a finding spans a single line, set `line_end == line_start`.
 
@@ -471,6 +529,37 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Only report findings in the source files provided below. Ignore code under `vendor/`, `var/cache/`, `var/log/`, any path containing `.generated.` or `.cache.`, and obvious build artifacts.
             - If a finding references code outside the provided chunk, set `confidence` no higher than 0.7 and explain the cross-file dependency in `attack_vector`.
 
+
+            PROMPT;
+    }
+
+    private function exampleFinding(): string
+    {
+        if ($this->useStructuredCollection) {
+            return <<<'PROMPT'
+                Example finding (illustrative — do NOT echo this in your output):
+                Input file `src/Controller/InvoiceController.php`:
+                  42 |     public function show(int $id, InvoiceRepository $repo): Response
+                  43 |     {
+                  44 |         $invoice = $repo->find($id);
+                  45 |         return $this->render('invoice/show.html.twig', ['invoice' => $invoice]);
+                  46 |     }
+                Expected behavior: call `record_vulnerability` once with arguments equivalent to:
+                  type=insecure_direct_object_reference, severity=high,
+                  title="IDOR on invoice show action",
+                  description="The show() action fetches an Invoice by id without verifying that the current user owns it. Any authenticated user can view any invoice by changing the path parameter.",
+                  file_path="src/Controller/InvoiceController.php", line_start=42, line_end=46,
+                  vulnerable_code="$invoice = $repo->find($id);",
+                  attack_vector="1. Authenticate as user A. 2. Browse to /invoice/{B's invoice id}. 3. Server returns the invoice without ownership check.",
+                  proof="GET /invoice/9999 → 200 with another tenant's invoice payload.",
+                  remediation="Add `\$this->denyAccessUnlessGranted('VIEW', \$invoice);` after fetch, or query the repository scoped to `\$this->getUser()`.",
+                  confidence=0.9.
+
+
+                PROMPT;
+        }
+
+        return <<<'PROMPT'
             Example finding (illustrative — do NOT echo this in your output):
             Input file `src/Controller/InvoiceController.php`:
               42 |     public function show(int $id, InvoiceRepository $repo): Response
@@ -494,6 +583,31 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
               "confidence": 0.9
             }
 
+
+            PROMPT;
+    }
+
+    private function rulesAndToolDiscipline(): string
+    {
+        if ($this->useStructuredCollection) {
+            return <<<'PROMPT'
+                Rules:
+                - ONLY report REAL vulnerabilities with clear exploitation paths
+                - Do NOT report theoretical issues without concrete evidence in the code
+                - Focus on issues traditional SAST tools miss: business logic, context-dependent access control
+                - Consider the FULL call chain, not just single function calls
+                - Cross-reference controllers, voters, services, and entities together
+                - Record findings ONLY by calling the `record_vulnerability` tool — one call per finding. Do NOT emit prose, JSON, or any other listing of findings.
+                - When no vulnerabilities are found, call no tools and finish with an empty response. NEVER call `record_vulnerability` with a placeholder, label, environment name, or "no findings" payload.
+
+                Tool Usage Discipline:
+                - You have a LIMITED, finite tool-call budget per chunk. Do NOT call `record_vulnerability` speculatively — only when you have concrete evidence of an exploitable finding.
+                - The moment you have decided on the complete set of findings, stop calling tools and finish your turn. Continuing "to be thorough" wastes the budget.
+                - If your scan of the provided files surfaces no exploitable findings, finish immediately with no tool calls.
+                PROMPT;
+        }
+
+        return <<<'PROMPT'
             Rules:
             - ONLY report REAL vulnerabilities with clear exploitation paths
             - Do NOT report theoretical issues without concrete evidence in the code
@@ -502,6 +616,8 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Cross-reference controllers, voters, services, and entities together
             - Return ONLY the JSON array, no prose, no markdown fences
             - Every element of the JSON array MUST be a vulnerability object of the exact shape above. NEVER emit a bare string, number, boolean, or null as an array element. When no vulnerabilities are found, return `[]` — never `["no findings"]`, `["safe"]`, or any prose substitute.
+            - The top-level value MUST be a JSON array (`[...]`). NEVER wrap findings in an object such as `{"vulnerabilities": [...]}`, `{"findings": [...]}`, `{"dev": [...], "test": [...]}`, or any environment-keyed map. If you want to indicate which environment a finding applies to, put that information inside the `description` or `attack_vector` field of the vulnerability object — never as a separate array element or wrapper key.
+            - Environment names, group names, role names, and other short identifiers (`"dev"`, `"test"`, `"prod"`, `"local"`, `"staging"`, `"ROLE_USER"`, …) extracted from the analyzed source code are NEVER valid array elements. Forbidden shape: `["dev", "test", {...vulnerability...}]`. Required shape: `[{...vulnerability...}]` — mention the environment inside the object's text fields instead.
 
             Tool Usage Discipline:
             - You have a LIMITED, finite tool-call budget per chunk. Do NOT gather evidence indefinitely — once you have enough to decide, stop using tools and emit the final JSON answer.
