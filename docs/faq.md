@@ -282,12 +282,23 @@ loss in practice.
 
 ### Can I tune model parameters (temperature, max_tokens)?
 
-Yes, via two equivalent syntaxes:
+Yes. For `max_tokens`, use the dedicated bundle key — it defaults to `4096` and
+avoids `symfony/ai`'s built-in ~1000-token cap:
+
+```yaml
+symfony_security_auditor:
+    max_output_tokens: 4096
+    # or, split per agent:
+    attacker_max_output_tokens: 8192
+    reviewer_max_output_tokens: 2048
+```
+
+Other params (e.g. `temperature`) flow through the model name:
 
 ```yaml
 # Query-string
 symfony_security_auditor:
-    model: 'claude-opus-4-7?temperature=0.1&max_tokens=4096'
+    model: 'claude-opus-4-7?temperature=0.1'
 
 # Expanded
 symfony_security_auditor:
@@ -295,7 +306,6 @@ symfony_security_auditor:
         name: 'claude-opus-4-7'
         options:
             temperature: 0.1
-            max_tokens: 4096
 ```
 
 See [Configuration → Model Options](configuration.md#model-options).
