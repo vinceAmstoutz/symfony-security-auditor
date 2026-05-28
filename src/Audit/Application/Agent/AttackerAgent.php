@@ -153,7 +153,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
                 $this->logger->info('Attacker chunk served from cache', ['files' => \count($chunk)]);
                 $this->recordChunkCoverage($chunk, 'cached', $coverageRecorder);
 
-                return $this->vulnerabilityFactory->fromList(array_values($cached));
+                return $this->vulnerabilityFactory->fromList(array_values($cached))->vulnerabilities();
             }
         }
 
@@ -195,7 +195,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
             $this->recordChunkCoverage($chunk, 'analyzed', $coverageRecorder);
 
-            return $this->vulnerabilityFactory->fromList($rawData);
+            return $this->vulnerabilityFactory->fromList($rawData)->vulnerabilities();
         } catch (BudgetExceededException $budgetExceededException) {
             // Budget exhaustion is a deliberate abort, not an LLM failure;
             // let it bubble up so RunAuditUseCase can wrap it with a partial report.
