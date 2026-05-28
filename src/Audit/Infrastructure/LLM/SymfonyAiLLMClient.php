@@ -41,6 +41,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
@@ -89,7 +90,12 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
         \assert('' !== $this->model, 'Model must be a non-empty string');
 
         $estimatedInputTokens = $this->estimateInputTokens($systemPrompt, $userMessage);
-        $deferredResult = $this->invokeWithRetry($messageBag, $this->baseOptions(), $estimatedInputTokens);
+        try {
+            $deferredResult = $this->invokeWithRetry($messageBag, $this->baseOptions(), $estimatedInputTokens);
+        } catch (EmptyLLMResponseException $emptyllmResponseException) {
+            return $this->emptyResponseAndLog($emptyllmResponseException);
+        }
+
         $content = $deferredResult->asText();
         [$inputTokens, $outputTokens] = $this->extractTokens($deferredResult);
 
@@ -224,7 +230,12 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
         $totalInputTokens = 0;
         $totalOutputTokens = 0;
         while ($iteration < $maxToolIterations) {
-            $deferredResult = $this->invokeWithRetry($messageBag, $options, $estimatedInputTokens);
+            try {
+                $deferredResult = $this->invokeWithRetry($messageBag, $options, $estimatedInputTokens);
+            } catch (EmptyLLMResponseException $emptyllmResponseException) {
+                return $this->emptyToolLoopResponseAndLog($emptyllmResponseException, $iteration, $totalInputTokens, $totalOutputTokens);
+            }
+
             $platformResult = $deferredResult->getResult();
             [$callInput, $callOutput] = $this->extractTokens($deferredResult);
             $totalInputTokens += $callInput;
@@ -295,6 +306,43 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
         return $this->model;
     }
 
+    private function emptyResponseAndLog(EmptyLLMResponseException $emptyllmResponseException): LLMResponse
+    {
+        $this->logger->warning('LLM returned a response with no content blocks', [
+            'error' => $emptyllmResponseException->getMessage(),
+        ]);
+
+        return LLMResponse::create(
+            content: '',
+            inputTokens: 0,
+            outputTokens: 0,
+            model: $this->model,
+            stopReason: 'empty_content',
+        );
+    }
+
+    private function emptyToolLoopResponseAndLog(
+        EmptyLLMResponseException $emptyllmResponseException,
+        int $iteration,
+        int $totalInputTokens,
+        int $totalOutputTokens,
+    ): LLMResponse {
+        $this->logger->warning('Tool-using loop ended with empty content response', [
+            'iterations' => $iteration,
+            'input_tokens' => $totalInputTokens,
+            'output_tokens' => $totalOutputTokens,
+            'error' => $emptyllmResponseException->getMessage(),
+        ]);
+
+        return LLMResponse::create(
+            content: '',
+            inputTokens: $totalInputTokens,
+            outputTokens: $totalOutputTokens,
+            model: $this->model,
+            stopReason: 'empty_content',
+        );
+    }
+
     /**
      * @return list<ToolCall>
      */
@@ -350,6 +398,10 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
 
                 return $deferredResult;
             } catch (Throwable $throwable) {
+                if ($classifier->isEmptyContent($throwable)) {
+                    throw EmptyLLMResponseException::from($throwable);
+                }
+
                 if (!$classifier->isTransient($throwable)) {
                     throw NonTransientLLMFailureException::from($throwable);
                 }

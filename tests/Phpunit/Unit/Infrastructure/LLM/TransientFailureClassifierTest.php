@@ -105,4 +105,40 @@ final class TransientFailureClassifierTest extends TestCase
             new RuntimeException('connection reset', previous: new RuntimeException('HTTP 401')),
         ];
     }
+
+    #[DataProvider('emptyContentCases')]
+    public function test_it_recognizes_empty_content_failures(Throwable $throwable): void
+    {
+        self::assertTrue((new TransientFailureClassifier())->isEmptyContent($throwable));
+    }
+
+    /** @return iterable<string, array{Throwable}> */
+    public static function emptyContentCases(): iterable
+    {
+        yield 'symfony_ai_canonical_message' => [new RuntimeException('Response does not contain any content.')];
+        yield 'response_does_not_contain_variant' => [new RuntimeException('Response does not contain text blocks')];
+        yield 'no_content_blocks_variant' => [new RuntimeException('Anthropic returned no content blocks')];
+        yield 'case_insensitive_match' => [new RuntimeException('RESPONSE DOES NOT CONTAIN ANY CONTENT.')];
+        yield 'wrapped_empty_content' => [
+            new RuntimeException(
+                'platform invoke failed',
+                previous: new RuntimeException('Response does not contain any content.'),
+            ),
+        ];
+    }
+
+    #[DataProvider('nonEmptyContentCases')]
+    public function test_it_does_not_classify_unrelated_errors_as_empty_content(Throwable $throwable): void
+    {
+        self::assertFalse((new TransientFailureClassifier())->isEmptyContent($throwable));
+    }
+
+    /** @return iterable<string, array{Throwable}> */
+    public static function nonEmptyContentCases(): iterable
+    {
+        yield 'transient_503' => [new RuntimeException('HTTP 503 Service Unavailable')];
+        yield 'unauthorized_401' => [new RuntimeException('HTTP 401 Unauthorized')];
+        yield 'rate_limit' => [new RuntimeException('rate_limit exceeded')];
+        yield 'unrelated_runtime_error' => [new RuntimeException('connection reset by peer')];
+    }
 }

@@ -39,9 +39,12 @@ final class AuditContextTest extends TestCase
 
     public function test_audit_id_matches_expected_format(): void
     {
-        $auditContext = AuditContext::forProject($this->tmpDir);
-
-        self::assertMatchesRegularExpression('/^AUDIT-[A-F0-9]{8}$/', $auditContext->auditId());
+        for ($i = 0; $i < 64; ++$i) {
+            self::assertMatchesRegularExpression(
+                '/^AUDIT-[A-F0-9]{8}$/',
+                AuditContext::forProject($this->tmpDir)->auditId(),
+            );
+        }
     }
 
     public function test_it_throws_on_invalid_project_path(): void
