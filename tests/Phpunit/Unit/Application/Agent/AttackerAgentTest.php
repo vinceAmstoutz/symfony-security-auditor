@@ -33,6 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityDropReason;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
@@ -552,6 +553,39 @@ final class AttackerAgentTest extends TestCase
 
         self::assertSame(['Attacker agent starting analysis', ['files' => 2, 'files_filtered_lean' => 0, 'markers' => 0, 'tools_enabled' => false, 'cache_bypassed' => false, 'previous_findings' => 0]], $infoLogs[0]);
         self::assertSame(['Attacker agent complete', ['total_vulnerabilities' => 0, 'total_dropped_entries' => 0, 'dropped_by_reason' => []]], $infoLogs[1]);
+    }
+
+    public function test_it_aggregates_drop_counts_across_chunks_in_complete_log(): void
+    {
+        $infoLogs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$infoLogs): void {
+                $infoLogs[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('debug');
+        $logger->method('warning');
+
+        $files = [];
+        for ($i = 1; $i <= 15; ++$i) {
+            $files[] = $this->makeFile(\sprintf('src/Service/Service%d.php', $i));
+        }
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::create('["not-an-array-entry", "another-bad-one"]', 10, 10, 'claude', 'end_turn'));
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $logger);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+
+        $completeLog = $infoLogs[\count($infoLogs) - 1];
+        self::assertSame('Attacker agent complete', $completeLog[0]);
+        self::assertSame(0, $completeLog[1]['total_vulnerabilities']);
+        self::assertSame(4, $completeLog[1]['total_dropped_entries']);
+        self::assertSame([VulnerabilityDropReason::NON_ARRAY_ENTRY->value => 4], $completeLog[1]['dropped_by_reason']);
     }
 
     public function test_it_logs_debug_chunk_complete_with_exact_context(): void
