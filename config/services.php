@@ -346,6 +346,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(AuditPresenterInterface::class),
             service(EstimateAuditCostUseCase::class),
             service(ProgressReporterHolder::class),
+            param('symfony_security_auditor.scan.secret_scrubbing.enabled'),
         ])
         ->tag('console.command');
 };

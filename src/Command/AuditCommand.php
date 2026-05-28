@@ -63,6 +63,7 @@ final readonly class AuditCommand
         private AuditPresenterInterface $auditPresenter,
         private EstimateAuditCostUseCase $estimateAuditCostUseCase,
         private ProgressReporterHolder $progressReporterHolder,
+        private bool $secretScrubbingEnabled,
     ) {}
 
     public function __invoke(
@@ -72,6 +73,10 @@ final readonly class AuditCommand
         $projectPath = $auditCommandInput->resolvedProjectPath();
 
         $this->auditPresenter->header($symfonyStyle, $projectPath);
+
+        if (!$auditCommandInput->isMachineReadableToStdout()) {
+            $this->auditPresenter->preflightWarnings($symfonyStyle, $this->secretScrubbingEnabled);
+        }
 
         $scanPaths = $auditCommandInput->scanPaths();
 
