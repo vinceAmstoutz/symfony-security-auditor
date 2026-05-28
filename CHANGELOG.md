@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
-## [1.6.3] — 2026-05-28 — Redacted
+## [1.6.3] — 2026-05-28 — Watertight
 
 A bug-fix release closing a credential-leak gap in the secret scrubber. URIs
 with embedded credentials — the canonical Symfony `DATABASE_URL` / `REDIS_URL`
