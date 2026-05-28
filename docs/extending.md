@@ -10,6 +10,7 @@ All extension points are PHP interfaces. Wire your implementations via
 - [3. Custom Agent (Attacker or Reviewer)](#3-custom-agent-attacker-or-reviewer)
 - [4. Custom Report Output](#4-custom-report-output)
 - [5. Other Pluggable Ports](#5-other-pluggable-ports)
+- [6. Schema-Enforced Collection (`audit.structured_collection`)](#6-schema-enforced-collection-auditstructured_collection)
 
 > See also: [Architecture](architecture.md) · [Configuration](configuration.md)
 > · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
@@ -492,3 +493,46 @@ in `config/services.yaml` to override the bundled behaviour (see
 - `BatchCapableLLMClientInterface` — an opt-in extension of `LLMClientInterface`
   for clients that resolve several prompts concurrently; the reviewer uses it
   when `audit.reviewer_max_concurrent > 1`.
+- `RecordVulnerabilityToolFactoryInterface` — builds the schema-enforced tool
+  used in `audit.structured_collection` mode (default:
+  `RecordVulnerabilityToolFactory` returning `RecordVulnerabilityTool`). Swap
+  the factory if you want to enrich the tool's schema (extra fields,
+  tighter enums) without forking the agent — every provider that supports tool
+  use will validate calls against the schema you publish.
+
+## 6. Schema-Enforced Collection (`audit.structured_collection`)
+
+By default, the attacker emits findings as a JSON array. Some providers
+occasionally drift from that shape — `["dev", "test", {...}]` or
+`{"vulnerabilities": [...]}` — which the tolerant `VulnerabilityFactory`
+silently drops with a warning.
+
+Setting `audit.structured_collection: true` flips the seam: the attacker is
+given a `record_vulnerability` tool with a strict JSON-Schema input, and the
+prompt instructs it to make one tool call per finding. The provider validates
+each call against the schema before the agent ever sees it, so bare strings,
+wrapper objects, and missing required fields are structurally impossible.
+
+Internals:
+
+- `RecordVulnerabilityTool` (Infrastructure) implements the Domain port
+  `ToolInterface`; its `parametersSchema` mirrors the `Vulnerability` shape and
+  enumerates `VulnerabilityType::cases()` / `VulnerabilitySeverity::cases()`,
+  so adding a new case in Domain auto-propagates to the tool.
+- `VulnerabilityCollector` (Application) accumulates the validated payloads
+  during the conversation and is drained by `AttackerAgent` after each chunk.
+- `RecordVulnerabilityToolFactoryInterface` (Application) is the seam if you
+  want to publish a richer schema.
+
+Provider coverage:
+
+| Provider  | Tool input validation                                          |
+| --------- | -------------------------------------------------------------- |
+| Anthropic | Strict — already used by the agent for investigation tools     |
+| OpenAI    | Strict (`strict: true`)                                        |
+| Mistral   | Validated                                                      |
+| Ollama    | Validated, only on tool-capable models                         |
+
+When the flag is off (default), the JSON-array path still runs with the
+tightened prompt that forbids object wrappers and env-name array elements —
+the structured collection mode is layered on top, not a replacement.

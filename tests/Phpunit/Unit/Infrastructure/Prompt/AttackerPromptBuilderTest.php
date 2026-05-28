@@ -782,7 +782,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_prompt_version_is_bumped_when_modern_symfony_skill_blocks_are_added(): void
     {
-        self::assertSame(6, AttackerPromptBuilder::PROMPT_VERSION);
+        self::assertSame(7, AttackerPromptBuilder::PROMPT_VERSION);
     }
 
     public function test_entity_skill_block_mentions_over_permissive_serializer_groups(): void
@@ -1013,5 +1013,44 @@ final class AttackerPromptBuilderTest extends TestCase
         $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
 
         self::assertStringContainsString('tool-call budget', $prompt);
+    }
+
+    public function test_structured_collection_prompt_directs_model_to_call_record_vulnerability_tool(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: true);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('`record_vulnerability` tool', $prompt);
+        self::assertStringContainsString('one call per finding', $prompt);
+    }
+
+    public function test_structured_collection_prompt_does_not_request_a_json_array_response(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: true);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringNotContainsString('Return ONLY the JSON array', $prompt);
+        self::assertStringNotContainsString('The top-level value MUST be a JSON array', $prompt);
+    }
+
+    public function test_structured_collection_prompt_instructs_no_tool_calls_when_no_findings(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: true);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('call no tools', $prompt);
+    }
+
+    public function test_default_prompt_keeps_the_json_array_rules_for_backwards_compatibility(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder();
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('Return ONLY the JSON array', $prompt);
+        self::assertStringNotContainsString('`record_vulnerability` tool', $prompt);
     }
 }
