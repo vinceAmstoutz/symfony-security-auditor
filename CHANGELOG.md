@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.6.3] — 2026-05-28 — Redacted
+
+A bug-fix release closing a credential-leak gap in the secret scrubber. URIs
+with embedded credentials — the canonical Symfony `DATABASE_URL` / `REDIS_URL`
+shape — were sent verbatim to the LLM provider because no pattern matched them.
+The scrubber now redacts connection-string credentials before any content leaves
+the machine.
+
 ### Fixed
 
 - **Connection-string credentials leaked to the LLM.** `RegexSecretScrubber`
