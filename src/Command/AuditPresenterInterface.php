@@ -22,6 +22,8 @@ interface AuditPresenterInterface
 {
     public function header(SymfonyStyle $symfonyStyle, string $projectPath): void;
 
+    public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled): void;
+
     public function runningSection(SymfonyStyle $symfonyStyle): void;
 
     public function estimatingSection(SymfonyStyle $symfonyStyle): void;

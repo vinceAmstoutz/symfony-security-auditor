@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderExcep
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityHydrationResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
@@ -113,22 +114,30 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
         $chunks = $this->chunkFiles($effectiveFiles);
         $allVulnerabilities = [];
+        $totalDropsByReason = [];
 
         foreach ($chunks as $index => $chunk) {
             $this->logger->debug(\sprintf('Analyzing chunk %d/%d', $index + 1, \count($chunks)));
 
-            $vulnerabilities = $this->analyzeChunk($chunk, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
-            $allVulnerabilities = [...$allVulnerabilities, ...$vulnerabilities];
+            $chunkResult = $this->analyzeChunk($chunk, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
+            $allVulnerabilities = [...$allVulnerabilities, ...$chunkResult->vulnerabilities()];
+
+            foreach ($chunkResult->dropsByReason() as $reason => $count) {
+                $totalDropsByReason[$reason] = ($totalDropsByReason[$reason] ?? 0) + $count;
+            }
 
             $this->logger->debug('Chunk analysis complete', [
                 'chunk' => $index + 1,
-                'found' => \count($vulnerabilities),
+                'found' => \count($chunkResult->vulnerabilities()),
+                'dropped' => $chunkResult->totalDropped(),
                 'total_so_far' => \count($allVulnerabilities),
             ]);
         }
 
         $this->logger->info('Attacker agent complete', [
             'total_vulnerabilities' => \count($allVulnerabilities),
+            'total_dropped_entries' => array_sum($totalDropsByReason),
+            'dropped_by_reason' => $totalDropsByReason,
         ]);
 
         return $allVulnerabilities;
@@ -136,10 +145,8 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
     /**
      * @param list<ProjectFile> $chunk
-     *
-     * @return list<Vulnerability>
      */
-    private function analyzeChunk(array $chunk, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, RiskMarkerIndex $riskMarkerIndex): array
+    private function analyzeChunk(array $chunk, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, RiskMarkerIndex $riskMarkerIndex): VulnerabilityHydrationResult
     {
         $hasPreviousFindings = [] !== $attackerAnalysisRequest->previousFindings;
         $chunkMarkers = $riskMarkerIndex->forChunk($chunk);
@@ -181,7 +188,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
                 $this->recordChunkCoverage($chunk, 'analyzed', $coverageRecorder);
 
-                return [];
+                return VulnerabilityHydrationResult::empty();
             }
 
             /** @var list<mixed> $rawData */
@@ -213,14 +220,14 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             ]);
             $this->recordChunkCoverage($chunk, 'errored', $coverageRecorder);
 
-            return [];
+            return VulnerabilityHydrationResult::empty();
         } catch (Throwable $exception) {
             $this->logger->error('Attacker agent LLM call failed', [
                 'error' => $exception->getMessage(),
             ]);
             $this->recordChunkCoverage($chunk, 'errored', $coverageRecorder);
 
-            return [];
+            return VulnerabilityHydrationResult::empty();
         }
     }
 

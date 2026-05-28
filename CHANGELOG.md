@@ -10,6 +10,91 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-05-28 — Cartographer
+
+A visibility, hardening, and coverage release. The auditor now reports how much
+LLM output it had to drop on the floor, warns operators on stderr when sensitive
+content will be sent to the cloud unscrubbed, looks for over-permissive
+serializer groups on entities, and parses controller routes and access-control
+attributes into a graph fed to the attacker prompt. Every change is backward
+compatible — no existing key, default, exit code, JSON/SARIF schema field, or
+Domain port signature changed.
+
+### Added
+
+- **Visible hydration drops.** `VulnerabilityFactory::fromList()` now returns a
+  `VulnerabilityHydrationResult` value object (vulnerabilities + drop counts
+  bucketed by `VulnerabilityDropReason`: `non_array_entry`, `validation_failed`,
+  `hydration_failed`). Each drop is logged with a structured `reason` code, and
+  per-audit totals appear on the `Attacker agent complete` info log line under
+  `total_dropped_entries` / `dropped_by_reason` — so silent loss of an LLM-
+  proposed vulnerability is no longer invisible to operators.
+- **`symfony/validator` constraints on hydrated findings.** The factory now
+  validates raw LLM payloads against `Assert\Collection` constraints (non-blank
+  `title` / `description` / `file_path`, sane length bounds on all free-text
+  fields) and drops violators under the new `validation_failed` reason, with the
+  structured violation messages in the log payload. Catches pathological LLM
+  output (empty file paths, 100 KB descriptions) that previously slipped through
+  `Vulnerability::create`'s coarser guards.
+- **Secret-scrubbing pre-flight warning.** `audit:run` now emits a one-shot
+  warning on **stderr** after the header when `scan.secret_scrubbing.enabled` is
+  set to `false`, explaining that file contents will be sent verbatim to the
+  configured LLM provider. Routing to stderr means the warning always surfaces
+  (including when `--format=json|sarif` writes to stdout) without polluting the
+  parseable machine-readable payload. The default (`true`) is unchanged.
+- **`over_permissive_serializer_group` coverage.** New
+  `VulnerabilityType::OVER_PERMISSIVE_SERIALIZER_GROUP` (category
+  Symfony-Specific, OWASP A05:2021) plus a `RegexStaticPreScanner` marker for
+  the PHP-attribute and annotation forms of `#[Groups(...)]` / `@Groups({...})`
+  on entities. The attacker entity skill block now flags privileged fields
+  (`roles`, `isAdmin`, `passwordHash`, `apiToken`) landing in write-side groups
+  (`*:write`) and sensitive fields leaking via read-side groups (`*:read`,
+  `public`).
+- **Full route → controller → voter → form semantic graph.** Three new Domain
+  ports (`ControllerAccessControlParserInterface`,
+  `VoterCapabilityParserInterface`, `FormBindingParserInterface`) with AST-based
+  default implementations (backed by `nikic/php-parser`):
+  - `PhpParserControllerAccessControlParser` walks every controller and emits
+    one `RouteAccessControl` per public action, capturing the
+    `#[Route(path:, methods:)]` attribute, both class- and method-level
+    `#[IsGranted(...)]`, and `denyAccessUnlessGranted()` call sites.
+  - `PhpParserVoterCapabilityParser` walks every voter file and emits a
+    `VoterCapability` describing the attribute strings and `instanceof` subject
+    types referenced inside its `supports()` body.
+  - `PhpParserFormBindingParser` walks every controller and emits one
+    `FormBinding` per `$this->createForm(SomeFormType::class)` call site.
+
+  `SymfonyMapping` gains `routeAccessControls()`,
+  `controllersWithoutAccessCheck()`, `voterCapabilities()`, `votersFor()`,
+  `formBindings()`, and `formBindingsForController()` accessors. `MappingStage`
+  populates the graph and surfaces `mapping.routes`,
+  `mapping.routes_without_access_check`, `mapping.voter_capabilities`, and
+  `mapping.form_bindings` metadata on `AuditContext`. The attacker prompt now
+  ships three new context blocks — `Route Access-Control Map`, `Voter Coverage`,
+  and `Form Bindings` — so the LLM can cross-reference an
+  `#[IsGranted('ATTR', $subject)]` against the voters that actually accept that
+  attribute on that subject (a `missing_voter` finding when nothing matches),
+  and cross-reference `createForm()` call sites against the form types involved
+  (mass-assignment / CSRF surface).
+
+### Changed
+
+- `AttackerPromptBuilder::PROMPT_VERSION` bumped to **5** and
+  `RegexStaticPreScanner::CACHE_VERSION` bumped to **2** so cached attacker
+  responses invalidate automatically against the new prompt and pattern.
+- `VulnerabilityFactory` now takes a
+  `Symfony\Component\Validator\Validator\ValidatorInterface` as a constructor
+  argument (autowired via a private inline factory in `config/services.php`).
+  The factory is `@internal`, so this is a non-BC change for end users;
+  downstream custom-agent code that constructs the factory manually must pass a
+  `ValidatorInterface` (typically `Validation::createValidator()`).
+- `MappingStage` now takes three optional parser arguments
+  (`ControllerAccessControlParserInterface`, `VoterCapabilityParserInterface`,
+  `FormBindingParserInterface`); each defaults to a no-op parser, preserving the
+  previous shape. The DI wiring binds the real parsers in production.
+- `nikic/php-parser ^5.3` is now a runtime dependency (previously transitive via
+  `phpunit/php-code-coverage`); used by the three AST parsers.
+
 ## [1.4.0] — 2026-05-27 — Bloodhound
 
 A detection-and-cost release. The auditor now covers the modern Symfony 7.x/8.x

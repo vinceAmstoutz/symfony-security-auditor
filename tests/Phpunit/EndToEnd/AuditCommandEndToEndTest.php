@@ -19,6 +19,7 @@ use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
@@ -69,6 +70,43 @@ final class AuditCommandEndToEndTest extends TestCase
         $commandTester->execute(['project-path' => $this->fixtureDir]);
 
         self::assertStringContainsString('SAFE', $commandTester->getDisplay());
+    }
+
+    public function test_command_emits_secret_scrubbing_warning_when_scrubbing_disabled(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}', secretScrubbingEnabled: false);
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertStringContainsString('Secret scrubbing is disabled', $commandTester->getDisplay());
+    }
+
+    public function test_command_is_silent_about_scrubbing_when_enabled(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}', secretScrubbingEnabled: true);
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertStringNotContainsString('Secret scrubbing is disabled', $commandTester->getDisplay());
+    }
+
+    public function test_command_still_emits_scrubbing_warning_for_machine_readable_output_on_stderr(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}', secretScrubbingEnabled: false);
+        $commandTester->execute(
+            [
+                'project-path' => $this->fixtureDir,
+                '--format' => 'json',
+            ],
+            ['capture_stderr_separately' => true],
+        );
+
+        self::assertStringContainsString('Secret scrubbing is disabled', $commandTester->getErrorOutput());
+        self::assertStringNotContainsString('Secret scrubbing is disabled', $commandTester->getDisplay());
     }
 
     public function test_command_exits_failure_for_nonexistent_project_path(): void
@@ -296,7 +334,7 @@ final class AuditCommandEndToEndTest extends TestCase
         );
     }
 
-    private function makeCommandTester(string $attackerResponse, string $reviewerResponse): CommandTester
+    private function makeCommandTester(string $attackerResponse, string $reviewerResponse, bool $secretScrubbingEnabled = true): CommandTester
     {
         $attackerLLM = self::createStub(LLMClientInterface::class);
         $attackerLLM->method('complete')->willReturn(
@@ -308,13 +346,13 @@ final class AuditCommandEndToEndTest extends TestCase
             LLMResponse::create($reviewerResponse, 0, 0, 'stub', 'end_turn'),
         );
 
-        return $this->makeCommandTesterWithLLM($attackerLLM, $reviewerLLM);
+        return $this->makeCommandTesterWithLLM($attackerLLM, $reviewerLLM, $secretScrubbingEnabled);
     }
 
-    private function makeCommandTesterWithLLM(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM): CommandTester
+    private function makeCommandTesterWithLLM(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, bool $secretScrubbingEnabled = true): CommandTester
     {
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger()), new NullAttackerCache(), new NullLogger()),
+            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger()),
             new ReviewerAgent($reviewerLLM, new ReviewerPromptBuilder(), new NullLogger()),
             new NullLogger(),
         );
@@ -346,6 +384,7 @@ final class AuditCommandEndToEndTest extends TestCase
             new AuditPresenter(),
             $estimateAuditCostUseCase,
             $progressReporterHolder,
+            secretScrubbingEnabled: $secretScrubbingEnabled,
         );
 
         return new CommandTester($auditCommand);

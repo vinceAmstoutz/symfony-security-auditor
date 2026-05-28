@@ -255,9 +255,46 @@ the static pre-scanner buckets, and the attacker skill-block ordering.
 
 Groups `ProjectFile` instances by role and holds `routeAccessMap` and
 `firewallRules`. Passed to `AttackerAgent` so it can reason about the full
-security surface rather than file contents alone. Notable helper:
-`controllersWithoutVoters()` surfaces controllers that lack `#[IsGranted]` or
-`denyAccessUnlessGranted` calls.
+security surface rather than file contents alone. Notable helpers:
+
+- `controllersWithoutVoters()` surfaces controllers that lack `#[IsGranted]` or
+  `denyAccessUnlessGranted` calls (filename-heuristic).
+- `routeAccessControls()` returns the route → controller graph: one
+  `RouteAccessControl` per public action with its parsed `#[Route]`, class- and
+  method-level `#[IsGranted]`, and `denyAccessUnlessGranted()` call sites.
+- `controllersWithoutAccessCheck()` filters the graph to actions that carry a
+  route but no enforcement.
+
+### `RouteAccessControl` — immutable per-action access-control summary
+
+One entry per public controller action emitted by
+`ControllerAccessControlParserInterface` (default impl
+`PhpParserControllerAccessControlParser`, AST-based via `nikic/php-parser`).
+Captures `filePath`, `methodName`, `routePath`, `routeMethods`, plus three
+boolean / list signals — `methodLevelIsGranted`, `methodHasDenyAccess`,
+`classHasIsGranted` — combined by `hasAccessCheck()` and `lacksAccessCheck()`.
+The attacker prompt renders the full graph as a `Route Access-Control Map` block
+so the LLM can spot missing enforcement without re-deriving it from source.
+
+### `VoterCapability` — immutable per-voter `supports()` summary
+
+One entry per voter file emitted by `VoterCapabilityParserInterface` (default
+impl `PhpParserVoterCapabilityParser`). Captures `filePath`, `className`,
+`supportedAttributes` (string literals seen inside `supports()`) and
+`supportedSubjects` (right-hand class names of `instanceof` checks). Helpers
+`coversAttribute(string)` and `coversSubject(string)` answer "is there a voter
+that handles this access decision?" so the prompt's `Voter Coverage` block lets
+the LLM flag `#[IsGranted('ATTR', $subject)]` calls that no voter actually
+backs.
+
+### `FormBinding` — immutable controller → form-type binding
+
+One entry per `$this->createForm(SomeFormType::class)` call site emitted by
+`FormBindingParserInterface` (default impl `PhpParserFormBindingParser`).
+Captures `controllerFilePath`, `controllerMethod`, and `formTypeClass`. The
+attacker prompt renders the list as a `Form Bindings` block so the LLM can
+cross-reference call sites against the form types involved for mass-assignment /
+CSRF analysis without re-deriving the binding from source.
 
 ### Pipeline ports (`Domain/Pipeline/`)
 
@@ -376,10 +413,20 @@ any error: returns the vulnerability with `reviewerValidated = false`.
 ### `VulnerabilityFactory`
 
 Parses raw `array<string, mixed>` from LLM JSON output into `Vulnerability`
-instances. Invalid or missing fields are handled with null-coalescing casts.
-Invalid enum values cause a caught `\Throwable` — `fromArray()` returns `null`.
-`fromList()` silently drops nulls, returning only successfully hydrated
-instances.
+instances. Each entry is first checked against `symfony/validator` constraints
+(non-blank `title` / `description` / `file_path`, sane length bounds on every
+free-text field); on violation the entry is dropped under
+`VulnerabilityDropReason::VALIDATION_FAILED`. Surviving entries are hydrated;
+invalid or missing fields are handled with null-coalescing casts; invalid enum
+values cause a caught `\Throwable` and the entry is dropped under
+`VulnerabilityDropReason::HYDRATION_FAILED`. Non-array list entries are dropped
+under `VulnerabilityDropReason::NON_ARRAY_ENTRY`.
+
+`fromArray()` still returns `?Vulnerability`. `fromList()` returns a
+`VulnerabilityHydrationResult` value object exposing both the hydrated
+vulnerabilities and per-reason drop counts. `AttackerAgent::analyze` aggregates
+the per-chunk drop counts and surfaces them on its `Attacker agent complete`
+info log as `total_dropped_entries` / `dropped_by_reason`.
 
 ---
 

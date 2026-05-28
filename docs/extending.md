@@ -301,7 +301,7 @@ final class RuleBasedAttackerAgent implements AttackerAgentInterface
             return [];
         }
 
-        return $this->factory->fromList($response->parseJson());
+        return $this->factory->fromList($response->parseJson())->vulnerabilities();
     }
 
     private function systemPrompt(): string
@@ -399,13 +399,21 @@ convert raw LLM arrays into domain objects.
 
 ```php
 // $rawList is the decoded JSON array from the LLM.
-$vulnerabilities = $this->factory->fromList($rawList); // list<Vulnerability>
+$result = $this->factory->fromList($rawList); // VulnerabilityHydrationResult
+
+$vulnerabilities = $result->vulnerabilities(); // list<Vulnerability>
+$result->totalDropped();                       // int — entries the factory dropped
+$result->droppedBy(VulnerabilityDropReason::HYDRATION_FAILED); // per-reason count
 ```
 
 `fromList()` calls `fromArray()` per item and drops any entry that fails
 validation (unknown `type`/`severity` enum value, empty `title`,
-`line_end < line_start`, `confidence` outside `[0.0, 1.0]`). Failures are logged
-at `warning` level via the injected `LoggerInterface`.
+`line_end < line_start`, `confidence` outside `[0.0, 1.0]`). Each drop is logged
+at `warning` level with a structured `reason` code
+(`VulnerabilityDropReason::NON_ARRAY_ENTRY` for non-array entries,
+`VulnerabilityDropReason::HYDRATION_FAILED` for invalid shapes) and aggregated
+in the returned `VulnerabilityHydrationResult` so callers can surface drop
+counts in their reports or metrics.
 
 ---
 

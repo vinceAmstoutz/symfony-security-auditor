@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\ErrorHandler\BufferingLogger;
+use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
@@ -25,12 +26,18 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditS
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
@@ -147,6 +154,165 @@ final class StagesTest extends TestCase
         $mappingStage = new MappingStage(new NullLogger());
 
         self::assertSame('mapping', $mappingStage->name());
+    }
+
+    public function test_mapping_stage_routes_controllers_through_the_access_control_parser(): void
+    {
+        $controllerFile = ProjectFile::create('src/Controller/AdminController.php', '/app/x', '<?php class AdminController {}');
+        $protected = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'edit',
+            routePath: '/admin/edit',
+            routeMethods: ['POST'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: ['ROLE_ADMIN'],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+        $unprotected = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'leak',
+            routePath: '/admin/leak',
+            routeMethods: [],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+        $parser = new readonly class([$protected, $unprotected]) implements ControllerAccessControlParserInterface {
+            /** @param list<RouteAccessControl> $entries */
+            public function __construct(private array $entries) {}
+
+            public function parse(ProjectFile $projectFile): array
+            {
+                return $this->entries;
+            }
+        };
+
+        $mappingStage = new MappingStage(new NullLogger(), $parser);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([$controllerFile]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertSame([$protected, $unprotected], $mapping->routeAccessControls());
+        self::assertSame([$unprotected], $mapping->controllersWithoutAccessCheck());
+        self::assertSame(2, $auditContext->getMeta('mapping.routes'));
+        self::assertSame(1, $auditContext->getMeta('mapping.routes_without_access_check'));
+    }
+
+    public function test_mapping_stage_aggregates_route_access_controls_from_multiple_controllers(): void
+    {
+        $controllerA = ProjectFile::create('src/Controller/AController.php', '/app/A', '<?php class AController {}');
+        $controllerB = ProjectFile::create('src/Controller/BController.php', '/app/B', '<?php class BController {}');
+        $entryA = new RouteAccessControl('src/Controller/AController.php', 'a', '/a', ['GET'], true, ['ROLE_A'], false, false);
+        $entryB = new RouteAccessControl('src/Controller/BController.php', 'b', '/b', ['POST'], true, ['ROLE_B'], false, false);
+
+        $parser = new readonly class($entryA, $entryB) implements ControllerAccessControlParserInterface {
+            public function __construct(private RouteAccessControl $entryA, private RouteAccessControl $entryB) {}
+
+            public function parse(ProjectFile $projectFile): array
+            {
+                return 'src/Controller/AController.php' === $projectFile->relativePath() ? [$this->entryA] : [$this->entryB];
+            }
+        };
+
+        $mappingStage = new MappingStage(new NullLogger(), $parser);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([$controllerA, $controllerB]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertSame([$entryA, $entryB], $mapping->routeAccessControls());
+    }
+
+    public function test_mapping_stage_routes_voters_through_the_voter_capability_parser(): void
+    {
+        $voterFileA = ProjectFile::create('src/Security/UserVoter.php', '/app/U', '<?php class UserVoter {}');
+        $voterFileB = ProjectFile::create('src/Security/CommentVoter.php', '/app/C', '<?php class CommentVoter {}');
+        $capabilityA = new VoterCapability('src/Security/UserVoter.php', 'UserVoter', ['EDIT'], ['User']);
+        $capabilityB = new VoterCapability('src/Security/CommentVoter.php', 'CommentVoter', ['VIEW'], ['Comment']);
+        $parser = new readonly class($capabilityA, $capabilityB) implements VoterCapabilityParserInterface {
+            public function __construct(private VoterCapability $capA, private VoterCapability $capB) {}
+
+            public function parse(ProjectFile $projectFile): ?VoterCapability
+            {
+                return match ($projectFile->relativePath()) {
+                    'src/Security/UserVoter.php' => $this->capA,
+                    'src/Security/CommentVoter.php' => $this->capB,
+                    default => null,
+                };
+            }
+        };
+
+        $mappingStage = new MappingStage(new NullLogger(), null, $parser);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([$voterFileA, $voterFileB]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertSame([$capabilityA, $capabilityB], $mapping->voterCapabilities());
+        self::assertSame(2, $auditContext->getMeta('mapping.voter_capabilities'));
+    }
+
+    public function test_mapping_stage_skips_null_voter_parser_results(): void
+    {
+        $voterFile = ProjectFile::create('src/Security/SilentVoter.php', '/app/x', '<?php class SilentVoter {}');
+        $parser = new readonly class implements VoterCapabilityParserInterface {
+            public function parse(ProjectFile $projectFile): ?VoterCapability
+            {
+                return null;
+            }
+        };
+
+        $mappingStage = new MappingStage(new NullLogger(), null, $parser);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([$voterFile]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertSame([], $mapping->voterCapabilities());
+    }
+
+    public function test_mapping_stage_routes_controllers_through_the_form_binding_parser(): void
+    {
+        $controllerA = ProjectFile::create('src/Controller/UserController.php', '/app/U', '<?php class UserController {}');
+        $controllerB = ProjectFile::create('src/Controller/AdminController.php', '/app/A', '<?php class AdminController {}');
+        $bindingA = new FormBinding('src/Controller/UserController.php', 'edit', 'App\\Form\\UserType');
+        $bindingB = new FormBinding('src/Controller/AdminController.php', 'create', 'App\\Form\\AdminType');
+
+        $parser = new readonly class($bindingA, $bindingB) implements FormBindingParserInterface {
+            public function __construct(private FormBinding $a, private FormBinding $b) {}
+
+            public function parse(ProjectFile $projectFile): array
+            {
+                return match ($projectFile->relativePath()) {
+                    'src/Controller/UserController.php' => [$this->a],
+                    'src/Controller/AdminController.php' => [$this->b],
+                    default => [],
+                };
+            }
+        };
+
+        $mappingStage = new MappingStage(new NullLogger(), null, null, $parser);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([$controllerA, $controllerB]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertSame([$bindingA, $bindingB], $mapping->formBindings());
+        self::assertSame(2, $auditContext->getMeta('mapping.form_bindings'));
     }
 
     public function test_mapping_stage_creates_mapping_from_project_files(): void
@@ -684,7 +850,7 @@ final class StagesTest extends TestCase
             attackerAgent: new AttackerAgent(
                 llmClient: $attackerLlm ?? self::createStub(LLMClientInterface::class),
                 attackerPromptBuilder: new AttackerPromptBuilder(),
-                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger()),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
                 attackerCache: new NullAttackerCache(),
                 logger: new NullLogger(),
             ),

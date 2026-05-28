@@ -32,6 +32,15 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         ]);
     }
 
+    public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled): void
+    {
+        if ($secretScrubbingEnabled) {
+            return;
+        }
+
+        $symfonyStyle->getErrorStyle()->warning('Secret scrubbing is disabled. File contents will be sent verbatim to the configured LLM provider. If that provider runs in the cloud, credentials in committed configs or .env.dist files may be exposed. Re-enable scan.secret_scrubbing.enabled (the default) or confirm you are using a local provider.');
+    }
+
     public function runningSection(SymfonyStyle $symfonyStyle): void
     {
         $symfonyStyle->section('Running audit pipeline...');

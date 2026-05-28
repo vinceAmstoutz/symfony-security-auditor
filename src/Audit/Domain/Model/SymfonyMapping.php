@@ -25,6 +25,9 @@ final readonly class SymfonyMapping
      * @param list<ProjectFile>           $templates
      * @param array<string, list<string>> $routeAccessMap
      * @param list<string>                $firewallRules
+     * @param list<RouteAccessControl>    $routeAccessControls
+     * @param list<VoterCapability>       $voterCapabilities
+     * @param list<FormBinding>           $formBindings
      */
     private function __construct(
         private array $controllers,
@@ -36,6 +39,9 @@ final readonly class SymfonyMapping
         private array $templates,
         private array $routeAccessMap,
         private array $firewallRules,
+        private array $routeAccessControls,
+        private array $voterCapabilities,
+        private array $formBindings,
     ) {}
 
     /**
@@ -48,6 +54,9 @@ final readonly class SymfonyMapping
      * @param list<ProjectFile>           $templates
      * @param array<string, list<string>> $routeAccessMap
      * @param list<string>                $firewallRules
+     * @param list<RouteAccessControl>    $routeAccessControls
+     * @param list<VoterCapability>       $voterCapabilities
+     * @param list<FormBinding>           $formBindings
      */
     public static function create(
         array $controllers = [],
@@ -59,6 +68,9 @@ final readonly class SymfonyMapping
         array $templates = [],
         array $routeAccessMap = [],
         array $firewallRules = [],
+        array $routeAccessControls = [],
+        array $voterCapabilities = [],
+        array $formBindings = [],
     ): self {
         return new self(
             controllers: $controllers,
@@ -70,6 +82,9 @@ final readonly class SymfonyMapping
             templates: $templates,
             routeAccessMap: $routeAccessMap,
             firewallRules: $firewallRules,
+            routeAccessControls: $routeAccessControls,
+            voterCapabilities: $voterCapabilities,
+            formBindings: $formBindings,
         );
     }
 
@@ -125,6 +140,51 @@ final readonly class SymfonyMapping
     public function firewallRules(): array
     {
         return $this->firewallRules;
+    }
+
+    /** @return list<RouteAccessControl> */
+    public function routeAccessControls(): array
+    {
+        return $this->routeAccessControls;
+    }
+
+    /** @return list<RouteAccessControl> */
+    public function controllersWithoutAccessCheck(): array
+    {
+        return array_values(array_filter(
+            $this->routeAccessControls,
+            static fn (RouteAccessControl $routeAccessControl): bool => $routeAccessControl->lacksAccessCheck(),
+        ));
+    }
+
+    /** @return list<VoterCapability> */
+    public function voterCapabilities(): array
+    {
+        return $this->voterCapabilities;
+    }
+
+    /** @return list<VoterCapability> */
+    public function votersFor(string $attribute, string $subject): array
+    {
+        return array_values(array_filter(
+            $this->voterCapabilities,
+            static fn (VoterCapability $voterCapability): bool => $voterCapability->coversAttribute($attribute) && $voterCapability->coversSubject($subject),
+        ));
+    }
+
+    /** @return list<FormBinding> */
+    public function formBindings(): array
+    {
+        return $this->formBindings;
+    }
+
+    /** @return list<FormBinding> */
+    public function formBindingsForController(string $controllerFilePath): array
+    {
+        return array_values(array_filter(
+            $this->formBindings,
+            static fn (FormBinding $formBinding): bool => $formBinding->controllerFilePath() === $controllerFilePath,
+        ));
     }
 
     public function totalFiles(): int

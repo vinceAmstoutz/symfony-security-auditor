@@ -27,7 +27,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 4;
+    public const int PROMPT_VERSION = 5;
 
     /**
      * Skill-block emission order — by attack-surface priority, NOT alphabetical.
@@ -186,9 +186,13 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Custom Doctrine types using `convertToPHPValue` with `unserialize` or `eval`-equivalent.
             - DQL/QueryBuilder usage with string concatenation of request input — even inside the entity class.
             - Boolean / enum coercion via Doctrine type juggling that lets attacker promote a role string.
+            - Serializer groups: `#[Groups([...])]` (or `@Groups({...})`) that places a privileged field (`roles`, `isAdmin`, `passwordHash`, `apiToken`, `internal*`) into a write-side group (e.g. `user:write`, `*:write`, `admin:*`) — denormalization will set it from request payload. Report as `over_permissive_serializer_group`.
+            - Read-side groups (`*:read`, `public`) leaking sensitive fields (`passwordHash`, `tokens`, internal ids) when the entity is serialized in API responses — also `over_permissive_serializer_group`.
             Do NOT flag:
             - Public setters on non-sensitive fields (titles, descriptions) where the form `mapped: false` or constraints validate input.
             - `#[ORM\Column]` with `nullable: true` — nullability is a schema concern, not a security one.
+            - Read-only groups on safe fields (display name, public bio) — non-sensitive read groups are by design.
+            - Fields annotated `#[Ignore]` / `#[SerializedName]` redirecting to a public alias — those are explicit safe overrides.
             </skills>
             SKILL,
         ProjectFileType::REPOSITORY->value => <<<'SKILL'
@@ -309,6 +313,10 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             $symfonyMapping->controllersWithoutVoters(),
         ));
 
+        $accessControlMap = $this->renderRouteAccessControlMap($symfonyMapping);
+        $voterCoverage = $this->renderVoterCoverage($symfonyMapping);
+        $formBindings = $this->renderFormBindings($symfonyMapping);
+
         return <<<PROMPT
             ## Project Mapping Summary
             {$summary}
@@ -316,13 +324,80 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             ## Controllers WITHOUT Security Annotations (High Priority)
             {$noVoterList}
 
-            ## Source Code
+            {$accessControlMap}{$voterCoverage}{$formBindings}## Source Code
             Analyze these files for exploitable vulnerabilities. Each line is prefixed with its line number (`NNN | code`) — use those exact numbers when populating `line_start` and `line_end`; do NOT count manually or guess.
 
             {$context}
 
             Return a JSON array of all vulnerabilities found.
             PROMPT;
+    }
+
+    private function renderVoterCoverage(SymfonyMapping $symfonyMapping): string
+    {
+        $voterCapabilities = $symfonyMapping->voterCapabilities();
+        if ([] === $voterCapabilities) {
+            return '';
+        }
+
+        $lines = ['## Voter Coverage'];
+        $lines[] = 'Each line summarises a `Voter::supports()` body: the attributes it accepts and the subject types it gates. Use this to spot `#[IsGranted(\'ATTR\', $subject)]` calls referencing an attribute or subject type that no voter actually covers — that is a `missing_voter` finding.';
+        foreach ($voterCapabilities as $voterCapability) {
+            $attributes = [] === $voterCapability->supportedAttributes() ? '(none)' : implode(',', $voterCapability->supportedAttributes());
+            $subjects = [] === $voterCapability->supportedSubjects() ? '(none)' : implode(',', $voterCapability->supportedSubjects());
+            $lines[] = \sprintf('- %s — attributes: [%s] — subjects: [%s] — %s', $voterCapability->className(), $attributes, $subjects, $voterCapability->filePath());
+        }
+
+        return implode("\n", $lines)."\n\n";
+    }
+
+    private function renderFormBindings(SymfonyMapping $symfonyMapping): string
+    {
+        $formBindings = $symfonyMapping->formBindings();
+        if ([] === $formBindings) {
+            return '';
+        }
+
+        $lines = ['## Form Bindings'];
+        $lines[] = 'Each line records a `$this->createForm(FormType::class)` call site. Cross-reference with the form type to spot mass-assignment vectors (`allow_extra_fields: true`, unbounded `EntityType` choices, missing CSRF on state-changing actions).';
+        foreach ($formBindings as $formBinding) {
+            $lines[] = \sprintf('- %s::%s — %s', $formBinding->controllerFilePath(), $formBinding->controllerMethod(), $formBinding->formTypeClass());
+        }
+
+        return implode("\n", $lines)."\n\n";
+    }
+
+    private function renderRouteAccessControlMap(SymfonyMapping $symfonyMapping): string
+    {
+        $routeAccessControls = $symfonyMapping->routeAccessControls();
+        if ([] === $routeAccessControls) {
+            return '';
+        }
+
+        $lines = ['## Route Access-Control Map'];
+        $lines[] = 'Each line describes a controller action: HTTP method(s), route path, source location, and the access-control surface (class- and method-level `#[IsGranted]`, `denyAccessUnlessGranted()` body calls). Lines marked at the end with the LACKS marker carry a route but no enforcement — treat them as primary candidates for `broken_access_control` and `missing_voter` findings unless a parent firewall covers them.';
+
+        foreach ($routeAccessControls as $routeAccessControl) {
+            $methods = [] === $routeAccessControl->routeMethods() ? 'ANY' : implode(',', $routeAccessControl->routeMethods());
+            $path = $routeAccessControl->routePath() ?? '(unresolved)';
+            $checks = [];
+            if ($routeAccessControl->classHasIsGranted()) {
+                $checks[] = 'class:#[IsGranted]';
+            }
+
+            if ([] !== $routeAccessControl->methodLevelIsGranted()) {
+                $checks[] = 'method:#[IsGranted('.implode(',', $routeAccessControl->methodLevelIsGranted()).')]';
+            }
+
+            if ($routeAccessControl->methodHasDenyAccess()) {
+                $checks[] = 'body:denyAccessUnlessGranted()';
+            }
+
+            $checkLabel = [] === $checks ? 'LACKS_ACCESS_CHECK' : implode(' + ', $checks);
+            $lines[] = \sprintf('- %s %s — %s::%s — %s', $methods, $path, $routeAccessControl->filePath(), $routeAccessControl->methodName(), $checkLabel);
+        }
+
+        return implode("\n", $lines)."\n\n";
     }
 
     private function basePrompt(): string
@@ -373,7 +448,8 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             exposed_internal_service, misconfigured_firewall, insecure_redirect, sensitive_data_exposure,
             log_injection, path_traversal, ssrf, xxe, open_redirect, weak_cryptography, insecure_random,
             hardcoded_secret, missing_signature_verification, messenger_handler_unsafe, missing_rate_limiting,
-            cache_poisoning, mailer_header_injection, webhook_replay, authenticator_bypass
+            cache_poisoning, mailer_header_injection, webhook_replay, authenticator_bypass,
+            over_permissive_serializer_group
 
             Severity rubric (calibrate every finding against this scale — do NOT inflate severity for emphasis):
             - critical: unauthenticated RCE, full authentication bypass, mass data exfiltration without auth, hardcoded production secret in a committed file.

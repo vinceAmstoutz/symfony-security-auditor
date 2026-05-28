@@ -74,6 +74,20 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame(2, $markers[0]->line());
     }
 
+    public function test_it_flags_groups_attribute_on_entity(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Entity/User.php',
+            '/app/src/Entity/User.php',
+            "<?php\nclass User {\n    #[Groups(['user:write', 'admin:write'])]\n    private string \$role;\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('serializer_groups_attribute', $patterns);
+    }
+
     public function test_it_flags_csrf_disabled_in_form(): void
     {
         $projectFile = ProjectFile::create(
