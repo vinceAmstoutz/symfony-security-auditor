@@ -1075,4 +1075,30 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('Return ONLY the JSON array', $prompt);
         self::assertStringNotContainsString('`record_vulnerability` tool', $prompt);
     }
+
+    public function test_base_prompt_orders_sections_intro_output_rubrics_scope_example_rules(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder();
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        $introPosition = strpos($prompt, 'You are an elite offensive security researcher');
+        $outputPosition = strpos($prompt, 'Your output');
+        $rubricsPosition = strpos($prompt, 'Severity rubric');
+        $scopePosition = strpos($prompt, 'File-numbering protocol');
+        $examplePosition = strpos($prompt, 'Example finding');
+        $rulesPosition = strpos($prompt, 'Tool Usage Discipline');
+
+        self::assertIsInt($introPosition);
+        self::assertIsInt($outputPosition);
+        self::assertIsInt($rubricsPosition);
+        self::assertIsInt($scopePosition);
+        self::assertIsInt($examplePosition);
+        self::assertIsInt($rulesPosition);
+        self::assertLessThan($outputPosition, $introPosition);
+        self::assertLessThan($rubricsPosition, $outputPosition);
+        self::assertLessThan($scopePosition, $rubricsPosition);
+        self::assertLessThan($examplePosition, $scopePosition);
+        self::assertLessThan($rulesPosition, $examplePosition);
+    }
 }

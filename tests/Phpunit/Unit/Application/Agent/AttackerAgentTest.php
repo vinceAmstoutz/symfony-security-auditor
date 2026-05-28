@@ -1713,13 +1713,101 @@ final class AttackerAgentTest extends TestCase
         self::assertSame(['finding-1', 'finding-2'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
     }
 
-    private function makeStructuredCollectionAttackerAgent(LLMClientInterface $llmClient): AttackerAgent
+    public function test_structured_collection_stores_drained_findings_in_the_attacker_cache_when_cacheable(): void
+    {
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
+                $toolRegistry->execute('record_vulnerability', [
+                    'type' => 'broken_access_control',
+                    'severity' => 'high',
+                    'title' => 'cached-finding',
+                    'description' => 'd',
+                    'file_path' => 'src/Controller/UserController.php',
+                    'line_start' => 1,
+                    'line_end' => 1,
+                    'vulnerable_code' => 'c',
+                    'attack_vector' => 'a',
+                    'proof' => 'p',
+                    'remediation' => 'r',
+                    'confidence' => 0.9,
+                ]);
+
+                return LLMResponse::create('', 0, 0, 'claude', 'end_turn');
+            });
+
+        $attackerCache = $this->createMock(AttackerCacheInterface::class);
+        $attackerCache->expects(self::once())->method('store')->with(
+            self::callback(static fn (array $chunk): bool => 1 === \count($chunk)),
+            self::callback(static function (array $payload): bool {
+                if (1 !== \count($payload)) {
+                    return false;
+                }
+
+                $first = $payload[0];
+
+                return \is_array($first) && 'cached-finding' === ($first['title'] ?? null);
+            }),
+        );
+
+        $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient, $attackerCache);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+    }
+
+    public function test_structured_collection_skips_cache_store_when_bypass_cache_is_requested(): void
+    {
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->method('completeWithTools')
+            ->willReturn(LLMResponse::create('', 0, 0, 'claude', 'end_turn'));
+
+        $attackerCache = $this->createMock(AttackerCacheInterface::class);
+        $attackerCache->expects(self::never())->method('store');
+
+        $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient, $attackerCache);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), bypassCache: true);
+    }
+
+    public function test_structured_collection_records_chunk_coverage_as_analyzed(): void
+    {
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->method('completeWithTools')
+            ->willReturn(LLMResponse::create('', 0, 0, 'claude', 'end_turn'));
+
+        $coverageRecorder = new class implements CoverageRecorderInterface {
+            /** @var list<array{stage: string, file: string, status: string}> */
+            public array $records = [];
+
+            public function recordCoverage(string $stage, string $filePath, string $status): void
+            {
+                $this->records[] = ['stage' => $stage, 'file' => $filePath, 'status' => $status];
+            }
+        };
+
+        $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $coverageRecorder);
+
+        self::assertSame([['stage' => 'attacker', 'file' => 'src/Controller/UserController.php', 'status' => 'analyzed']], $coverageRecorder->records);
+    }
+
+    private function makeStructuredCollectionAttackerAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null): AttackerAgent
     {
         return new AttackerAgent(
             llmClient: $llmClient,
             attackerPromptBuilder: new AttackerPromptBuilder(),
             vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-            attackerCache: new NullAttackerCache(),
+            attackerCache: $attackerCache ?? new NullAttackerCache(),
             logger: new NullLogger(),
             recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
             useStructuredCollection: true,
