@@ -27,7 +27,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 5;
+    public const int PROMPT_VERSION = 6;
 
     /**
      * Skill-block emission order — by attack-surface priority, NOT alphabetical.
@@ -502,6 +502,8 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Cross-reference controllers, voters, services, and entities together
             - Return ONLY the JSON array, no prose, no markdown fences
             - Every element of the JSON array MUST be a vulnerability object of the exact shape above. NEVER emit a bare string, number, boolean, or null as an array element. When no vulnerabilities are found, return `[]` — never `["no findings"]`, `["safe"]`, or any prose substitute.
+            - The top-level value MUST be a JSON array (`[...]`). NEVER wrap findings in an object such as `{"vulnerabilities": [...]}`, `{"findings": [...]}`, `{"dev": [...], "test": [...]}`, or any environment-keyed map. If you want to indicate which environment a finding applies to, put that information inside the `description` or `attack_vector` field of the vulnerability object — never as a separate array element or wrapper key.
+            - Environment names, group names, role names, and other short identifiers (`"dev"`, `"test"`, `"prod"`, `"local"`, `"staging"`, `"ROLE_USER"`, …) extracted from the analyzed source code are NEVER valid array elements. Forbidden shape: `["dev", "test", {...vulnerability...}]`. Required shape: `[{...vulnerability...}]` — mention the environment inside the object's text fields instead.
 
             Tool Usage Discipline:
             - You have a LIMITED, finite tool-call budget per chunk. Do NOT gather evidence indefinitely — once you have enough to decide, stop using tools and emit the final JSON answer.

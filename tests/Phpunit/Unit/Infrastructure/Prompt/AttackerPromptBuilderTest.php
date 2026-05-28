@@ -782,7 +782,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_prompt_version_is_bumped_when_modern_symfony_skill_blocks_are_added(): void
     {
-        self::assertSame(5, AttackerPromptBuilder::PROMPT_VERSION);
+        self::assertSame(6, AttackerPromptBuilder::PROMPT_VERSION);
     }
 
     public function test_entity_skill_block_mentions_over_permissive_serializer_groups(): void
@@ -989,6 +989,23 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('Every element of the JSON array MUST be a vulnerability object', $prompt);
         self::assertStringContainsString('NEVER emit a bare string, number, boolean, or null as an array element', $prompt);
         self::assertStringContainsString('return `[]`', $prompt);
+    }
+
+    public function test_base_prompt_forbids_object_wrappers_around_findings(): void
+    {
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('The top-level value MUST be a JSON array', $prompt);
+        self::assertStringContainsString('{"vulnerabilities": [...]}', $prompt);
+        self::assertStringContainsString('{"dev": [...], "test": [...]}', $prompt);
+    }
+
+    public function test_base_prompt_forbids_environment_names_as_array_elements(): void
+    {
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('Environment names, group names, role names', $prompt);
+        self::assertStringContainsString('["dev", "test", {...vulnerability...}]', $prompt);
     }
 
     public function test_base_prompt_instructs_model_to_converge_within_tool_call_budget(): void
