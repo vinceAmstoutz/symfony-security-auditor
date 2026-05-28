@@ -513,7 +513,21 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_prompt_version_is_bumped_when_modern_symfony_skill_blocks_are_added(): void
     {
-        self::assertSame(4, AttackerPromptBuilder::PROMPT_VERSION);
+        self::assertSame(5, AttackerPromptBuilder::PROMPT_VERSION);
+    }
+
+    public function test_entity_skill_block_mentions_over_permissive_serializer_groups(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Entity/User.php',
+            '/app/src/Entity/User.php',
+            '<?php namespace App\\Entity; class User {}',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('#[Groups(', $prompt);
+        self::assertStringContainsString('over_permissive_serializer_group', $prompt);
     }
 
     public function test_it_injects_authenticator_skills_when_authenticator_in_chunk(): void

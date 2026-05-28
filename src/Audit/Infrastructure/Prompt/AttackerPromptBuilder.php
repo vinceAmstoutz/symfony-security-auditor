@@ -27,7 +27,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 4;
+    public const int PROMPT_VERSION = 5;
 
     /**
      * Skill-block emission order — by attack-surface priority, NOT alphabetical.
@@ -186,9 +186,13 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Custom Doctrine types using `convertToPHPValue` with `unserialize` or `eval`-equivalent.
             - DQL/QueryBuilder usage with string concatenation of request input — even inside the entity class.
             - Boolean / enum coercion via Doctrine type juggling that lets attacker promote a role string.
+            - Serializer groups: `#[Groups([...])]` (or `@Groups({...})`) that places a privileged field (`roles`, `isAdmin`, `passwordHash`, `apiToken`, `internal*`) into a write-side group (e.g. `user:write`, `*:write`, `admin:*`) — denormalization will set it from request payload. Report as `over_permissive_serializer_group`.
+            - Read-side groups (`*:read`, `public`) leaking sensitive fields (`passwordHash`, `tokens`, internal ids) when the entity is serialized in API responses — also `over_permissive_serializer_group`.
             Do NOT flag:
             - Public setters on non-sensitive fields (titles, descriptions) where the form `mapped: false` or constraints validate input.
             - `#[ORM\Column]` with `nullable: true` — nullability is a schema concern, not a security one.
+            - Read-only groups on safe fields (display name, public bio) — non-sensitive read groups are by design.
+            - Fields annotated `#[Ignore]` / `#[SerializedName]` redirecting to a public alias — those are explicit safe overrides.
             </skills>
             SKILL,
         ProjectFileType::REPOSITORY->value => <<<'SKILL'
@@ -373,7 +377,8 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             exposed_internal_service, misconfigured_firewall, insecure_redirect, sensitive_data_exposure,
             log_injection, path_traversal, ssrf, xxe, open_redirect, weak_cryptography, insecure_random,
             hardcoded_secret, missing_signature_verification, messenger_handler_unsafe, missing_rate_limiting,
-            cache_poisoning, mailer_header_injection, webhook_replay, authenticator_bypass
+            cache_poisoning, mailer_header_injection, webhook_replay, authenticator_bypass,
+            over_permissive_serializer_group
 
             Severity rubric (calibrate every finding against this scale — do NOT inflate severity for emphasis):
             - critical: unauthenticated RCE, full authentication bypass, mass data exfiltration without auth, hardcoded production secret in a committed file.
