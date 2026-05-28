@@ -129,24 +129,46 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertSame(['App\\Entity\\User', 'App\\Entity\\Comment'], $voterCapability->supportedSubjects());
     }
 
-    public function test_it_deduplicates_repeated_subject_type_in_supports_body(): void
+    public function test_it_deduplicates_repeated_subject_type_in_supports_body_and_continues_to_collect_later_unique_types(): void
     {
         $source = <<<'PHP'
             <?php
             namespace App\Security;
             use App\Entity\User;
-            final class RepeatVoter {
+            use App\Entity\Comment;
+            final class MixedVoter {
                 public function supports(string $attribute, mixed $subject): bool {
-                    return $subject instanceof User || ($subject instanceof User && $attribute === 'EDIT');
+                    return $subject instanceof User
+                        || $subject instanceof User
+                        || $subject instanceof Comment;
                 }
             }
             PHP;
-        $projectFile = ProjectFile::create('src/Security/RepeatVoter.php', '/app/x', $source);
+        $projectFile = ProjectFile::create('src/Security/MixedVoter.php', '/app/x', $source);
 
         $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
 
         self::assertNotNull($voterCapability);
-        self::assertSame(['App\\Entity\\User'], $voterCapability->supportedSubjects());
+        self::assertSame(['App\\Entity\\User', 'App\\Entity\\Comment'], $voterCapability->supportedSubjects());
+    }
+
+    public function test_it_deduplicates_repeated_string_literal_in_supports_body_and_continues_to_collect_later_unique_attributes(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class RepeatAttrVoter {
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, ['EDIT', 'EDIT', 'DELETE'], true);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/RepeatAttrVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['EDIT', 'DELETE'], $voterCapability->supportedAttributes());
     }
 
     public function test_it_extracts_class_name_with_namespace(): void
