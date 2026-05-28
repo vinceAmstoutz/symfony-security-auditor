@@ -13,10 +13,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 ## [1.5.0] — 2026-05-28 — Bloodhound II
 
 A visibility, hardening, and coverage release. The auditor now reports how much
-LLM output it had to drop on the floor, warns operators when sensitive content
-will be sent to the cloud unscrubbed, and looks for over-permissive serializer
-groups on entities. Every change is backward compatible — no existing key,
-default, exit code, JSON/SARIF schema field, or Domain port signature changed.
+LLM output it had to drop on the floor, warns operators on stderr when
+sensitive content will be sent to the cloud unscrubbed, looks for
+over-permissive serializer groups on entities, and parses controller routes
+and access-control attributes into a graph fed to the attacker prompt. Every
+change is backward compatible — no existing key, default, exit code,
+JSON/SARIF schema field, or Domain port signature changed.
 
 ### Added
 
@@ -35,11 +37,11 @@ default, exit code, JSON/SARIF schema field, or Domain port signature changed.
   output (empty file paths, 100 KB descriptions) that previously slipped through
   `Vulnerability::create`'s coarser guards.
 - **Secret-scrubbing pre-flight warning.** `audit:run` now emits a one-shot
-  warning after the header when `scan.secret_scrubbing.enabled` is set to
-  `false`, explaining that file contents will be sent verbatim to the configured
-  LLM provider. The warning is suppressed for machine-readable output
-  (`--format=json|sarif` to stdout) so CI pipelines keep parseable output. The
-  default (`true`) is unchanged.
+  warning on **stderr** after the header when `scan.secret_scrubbing.enabled`
+  is set to `false`, explaining that file contents will be sent verbatim to the
+  configured LLM provider. Routing to stderr means the warning always surfaces
+  (including when `--format=json|sarif` writes to stdout) without polluting the
+  parseable machine-readable payload. The default (`true`) is unchanged.
 - **`over_permissive_serializer_group` coverage.** New
   `VulnerabilityType::OVER_PERMISSIVE_SERIALIZER_GROUP` (category
   Symfony-Specific, OWASP A05:2021) plus a `RegexStaticPreScanner` marker for
@@ -48,10 +50,23 @@ default, exit code, JSON/SARIF schema field, or Domain port signature changed.
   (`roles`, `isAdmin`, `passwordHash`, `apiToken`) landing in write-side groups
   (`*:write`) and sensitive fields leaking via read-side groups (`*:read`,
   `public`).
+- **Route → controller access-control graph (Phase 1).** A new
+  `ControllerAccessControlParserInterface` port (default implementation
+  `PhpParserControllerAccessControlParser` using `nikic/php-parser`) walks
+  every controller's AST and emits one `RouteAccessControl` value object per
+  public action, capturing the `#[Route(path:, methods:)]` attribute, both
+  class- and method-level `#[IsGranted(...)]`, and `denyAccessUnlessGranted()`
+  call sites. `SymfonyMapping` gains `routeAccessControls()` and
+  `controllersWithoutAccessCheck()` accessors. `MappingStage` populates the
+  graph and surfaces `mapping.routes` / `mapping.routes_without_access_check`
+  metadata on `AuditContext`. The attacker prompt now ships a `Route
+  Access-Control Map` block listing every action with its enforcement
+  surface — actions tagged with the LACKS marker are direct candidates for
+  `broken_access_control` and `missing_voter` findings.
 
 ### Changed
 
-- `AttackerPromptBuilder::PROMPT_VERSION` bumped to **5** and
+- `AttackerPromptBuilder::PROMPT_VERSION` bumped to **6** and
   `RegexStaticPreScanner::CACHE_VERSION` bumped to **2** so cached attacker
   responses invalidate automatically against the new prompt and pattern.
 - `VulnerabilityFactory` now takes a `Symfony\Component\Validator\Validator\ValidatorInterface`
@@ -60,6 +75,11 @@ default, exit code, JSON/SARIF schema field, or Domain port signature changed.
   for end users; downstream custom-agent code that constructs the factory
   manually must pass a `ValidatorInterface` (typically
   `Validation::createValidator()`).
+- `MappingStage` now takes an optional `ControllerAccessControlParserInterface`
+  constructor argument (defaults to a no-op parser to preserve the previous
+  shape). The DI wiring binds the real parser in production.
+- `nikic/php-parser ^5.3` is now a runtime dependency (previously transitive
+  via `phpunit/php-code-coverage`); used by the new controller AST parser.
 
 ## [1.4.0] — 2026-05-27 — Bloodhound
 

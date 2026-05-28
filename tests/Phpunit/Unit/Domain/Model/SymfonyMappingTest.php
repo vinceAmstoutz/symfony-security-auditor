@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 
 final class SymfonyMappingTest extends TestCase
@@ -32,7 +33,38 @@ final class SymfonyMappingTest extends TestCase
         self::assertEmpty($symfonyMapping->templates());
         self::assertEmpty($symfonyMapping->routeAccessMap());
         self::assertEmpty($symfonyMapping->firewallRules());
+        self::assertEmpty($symfonyMapping->routeAccessControls());
+        self::assertEmpty($symfonyMapping->controllersWithoutAccessCheck());
         self::assertSame(0, $symfonyMapping->totalFiles());
+    }
+
+    public function test_it_exposes_route_access_controls(): void
+    {
+        $protected = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'list',
+            routePath: '/admin',
+            routeMethods: ['GET'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: ['ROLE_ADMIN'],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+        $unprotected = new RouteAccessControl(
+            filePath: 'src/Controller/PublicController.php',
+            methodName: 'leak',
+            routePath: '/leak',
+            routeMethods: [],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::create(routeAccessControls: [$protected, $unprotected]);
+
+        self::assertSame([$protected, $unprotected], $symfonyMapping->routeAccessControls());
+        self::assertSame([$unprotected], $symfonyMapping->controllersWithoutAccessCheck());
     }
 
     public function test_it_counts_total_files_correctly(): void

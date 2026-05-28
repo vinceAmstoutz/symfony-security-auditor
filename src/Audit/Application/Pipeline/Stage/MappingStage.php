@@ -17,17 +17,25 @@ use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullControllerAccessControlParser;
 
 use function Symfony\Component\String\u;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class MappingStage implements StageInterface
 {
+    private ControllerAccessControlParserInterface $controllerAccessControlParser;
+
     public function __construct(
         private LoggerInterface $logger,
-    ) {}
+        ?ControllerAccessControlParserInterface $controllerAccessControlParser = null,
+    ) {
+        $this->controllerAccessControlParser = $controllerAccessControlParser ?? new NullControllerAccessControlParser();
+    }
 
     public function name(): string
     {
@@ -54,6 +62,7 @@ final readonly class MappingStage implements StageInterface
         $templates = array_values(array_filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isTemplate()));
 
         [$routeAccessMap, $firewallRules] = $this->extractSecurityConfig($files);
+        $routeAccessControls = $this->parseControllerAccessControls($controllers);
 
         $symfonyMapping = SymfonyMapping::create(
             controllers: $controllers,
@@ -65,6 +74,7 @@ final readonly class MappingStage implements StageInterface
             templates: $templates,
             routeAccessMap: $routeAccessMap,
             firewallRules: $firewallRules,
+            routeAccessControls: $routeAccessControls,
         );
 
         $auditContext->setMapping($symfonyMapping);
@@ -72,11 +82,30 @@ final readonly class MappingStage implements StageInterface
         $auditContext->setMeta('mapping.entities', \count($entities));
         $auditContext->setMeta('mapping.voters', \count($voters));
         $auditContext->setMeta('mapping.no_voter_controllers', \count($symfonyMapping->controllersWithoutVoters()));
+        $auditContext->setMeta('mapping.routes', \count($routeAccessControls));
+        $auditContext->setMeta('mapping.routes_without_access_check', \count($symfonyMapping->controllersWithoutAccessCheck()));
 
         $this->logger->info('Mapping complete', [
             'summary' => $symfonyMapping->toSummary(),
             'unprotected_controllers' => \count($symfonyMapping->controllersWithoutVoters()),
+            'routes_without_access_check' => \count($symfonyMapping->controllersWithoutAccessCheck()),
         ]);
+    }
+
+    /**
+     * @param list<ProjectFile> $controllers
+     *
+     * @return list<RouteAccessControl>
+     */
+    private function parseControllerAccessControls(array $controllers): array
+    {
+        $entries = [];
+
+        foreach ($controllers as $controller) {
+            $entries = [...$entries, ...$this->controllerAccessControlParser->parse($controller)];
+        }
+
+        return $entries;
     }
 
     /**

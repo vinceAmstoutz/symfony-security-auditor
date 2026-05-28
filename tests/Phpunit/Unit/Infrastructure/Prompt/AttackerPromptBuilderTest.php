@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 
@@ -40,6 +41,140 @@ final class AttackerPromptBuilderTest extends TestCase
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
 
         self::assertStringContainsString('  - src/Controller/PublicController.php', $message);
+    }
+
+    public function test_user_message_renders_route_access_control_map_with_lacks_check_marker(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/AdminController.php',
+            '/app/src/Controller/AdminController.php',
+            '<?php class AdminController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'deleteUser',
+            routePath: '/admin/users/{id}',
+            routeMethods: ['DELETE'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::create(
+            controllers: [$projectFile],
+            routeAccessControls: [$routeAccessControl],
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('Route Access-Control Map', $message);
+        self::assertStringContainsString('/admin/users/{id}', $message);
+        self::assertStringContainsString('DELETE', $message);
+        self::assertStringContainsString('AdminController.php::deleteUser', $message);
+        self::assertStringContainsString('LACKS_ACCESS_CHECK', $message);
+    }
+
+    public function test_user_message_renders_access_check_labels_for_protected_action(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/UserController.php',
+            '/app/src/Controller/UserController.php',
+            '<?php class UserController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/UserController.php',
+            methodName: 'show',
+            routePath: '/users/{id}',
+            routeMethods: ['GET'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: ['ROLE_USER'],
+            methodHasDenyAccess: true,
+            classHasIsGranted: true,
+        );
+
+        $symfonyMapping = SymfonyMapping::create(
+            controllers: [$projectFile],
+            routeAccessControls: [$routeAccessControl],
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('class:#[IsGranted]', $message);
+        self::assertStringContainsString('method:#[IsGranted(ROLE_USER)]', $message);
+        self::assertStringContainsString('body:denyAccessUnlessGranted()', $message);
+        self::assertStringNotContainsString('LACKS_ACCESS_CHECK', $message);
+    }
+
+    public function test_user_message_omits_access_control_section_when_no_routes_parsed(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/PlainController.php',
+            '/app/src/Controller/PlainController.php',
+            '<?php class PlainController {}',
+        );
+
+        $symfonyMapping = SymfonyMapping::create(controllers: [$projectFile]);
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringNotContainsString('Route Access-Control Map', $message);
+    }
+
+    public function test_user_message_renders_any_label_when_route_methods_are_unspecified(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/AnyController.php',
+            '/app/src/Controller/AnyController.php',
+            '<?php class AnyController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/AnyController.php',
+            methodName: 'index',
+            routePath: '/any',
+            routeMethods: [],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::create(
+            controllers: [$projectFile],
+            routeAccessControls: [$routeAccessControl],
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('ANY /any', $message);
+    }
+
+    public function test_user_message_renders_unresolved_label_when_route_path_is_missing(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/UnresolvedController.php',
+            '/app/src/Controller/UnresolvedController.php',
+            '<?php class UnresolvedController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/UnresolvedController.php',
+            methodName: 'index',
+            routePath: null,
+            routeMethods: ['GET'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::create(
+            controllers: [$projectFile],
+            routeAccessControls: [$routeAccessControl],
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('(unresolved)', $message);
     }
 
     public function test_it_excludes_secured_controllers_from_no_voter_list(): void
@@ -513,7 +648,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_prompt_version_is_bumped_when_modern_symfony_skill_blocks_are_added(): void
     {
-        self::assertSame(5, AttackerPromptBuilder::PROMPT_VERSION);
+        self::assertSame(6, AttackerPromptBuilder::PROMPT_VERSION);
     }
 
     public function test_entity_skill_block_mentions_over_permissive_serializer_groups(): void

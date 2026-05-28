@@ -27,7 +27,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 5;
+    public const int PROMPT_VERSION = 6;
 
     /**
      * Skill-block emission order — by attack-surface priority, NOT alphabetical.
@@ -313,6 +313,8 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             $symfonyMapping->controllersWithoutVoters(),
         ));
 
+        $accessControlMap = $this->renderRouteAccessControlMap($symfonyMapping);
+
         return <<<PROMPT
             ## Project Mapping Summary
             {$summary}
@@ -320,6 +322,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             ## Controllers WITHOUT Security Annotations (High Priority)
             {$noVoterList}
 
+            {$accessControlMap}
             ## Source Code
             Analyze these files for exploitable vulnerabilities. Each line is prefixed with its line number (`NNN | code`) — use those exact numbers when populating `line_start` and `line_end`; do NOT count manually or guess.
 
@@ -327,6 +330,39 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
 
             Return a JSON array of all vulnerabilities found.
             PROMPT;
+    }
+
+    private function renderRouteAccessControlMap(SymfonyMapping $symfonyMapping): string
+    {
+        $routeAccessControls = $symfonyMapping->routeAccessControls();
+        if ([] === $routeAccessControls) {
+            return '';
+        }
+
+        $lines = ['## Route Access-Control Map'];
+        $lines[] = 'Each line describes a controller action: HTTP method(s), route path, source location, and the access-control surface (class- and method-level `#[IsGranted]`, `denyAccessUnlessGranted()` body calls). Lines marked at the end with the LACKS marker carry a route but no enforcement — treat them as primary candidates for `broken_access_control` and `missing_voter` findings unless a parent firewall covers them.';
+
+        foreach ($routeAccessControls as $routeAccessControl) {
+            $methods = [] === $routeAccessControl->routeMethods() ? 'ANY' : implode(',', $routeAccessControl->routeMethods());
+            $path = $routeAccessControl->routePath() ?? '(unresolved)';
+            $checks = [];
+            if ($routeAccessControl->classHasIsGranted()) {
+                $checks[] = 'class:#[IsGranted]';
+            }
+
+            if ([] !== $routeAccessControl->methodLevelIsGranted()) {
+                $checks[] = 'method:#[IsGranted('.implode(',', $routeAccessControl->methodLevelIsGranted()).')]';
+            }
+
+            if ($routeAccessControl->methodHasDenyAccess()) {
+                $checks[] = 'body:denyAccessUnlessGranted()';
+            }
+
+            $checkLabel = [] === $checks ? 'LACKS_ACCESS_CHECK' : implode(' + ', $checks);
+            $lines[] = \sprintf('- %s %s — %s::%s — %s', $methods, $path, $routeAccessControl->filePath(), $routeAccessControl->methodName(), $checkLabel);
+        }
+
+        return implode("\n", $lines)."\n\n";
     }
 
     private function basePrompt(): string

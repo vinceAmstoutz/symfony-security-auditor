@@ -79,6 +79,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRende
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRegistryFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
@@ -189,8 +191,11 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(GitChangedFilesResolverInterface::class),
         ]);
 
+    $defaultsConfigurator->set(PhpParserControllerAccessControlParser::class);
+    $defaultsConfigurator->alias(ControllerAccessControlParserInterface::class, PhpParserControllerAccessControlParser::class);
+
     $defaultsConfigurator->set(MappingStage::class)
-        ->args([service('logger')]);
+        ->args([service('logger'), service(ControllerAccessControlParserInterface::class)]);
 
     $defaultsConfigurator->set(AuditOrchestrator::class)
         ->args([

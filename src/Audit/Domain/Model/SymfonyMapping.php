@@ -16,15 +16,16 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 final readonly class SymfonyMapping
 {
     /**
-     * @param list<ProjectFile>           $controllers
-     * @param list<ProjectFile>           $entities
-     * @param list<ProjectFile>           $voters
-     * @param list<ProjectFile>           $repositories
-     * @param list<ProjectFile>           $forms
-     * @param list<ProjectFile>           $services
-     * @param list<ProjectFile>           $templates
+     * @param list<ProjectFile>         $controllers
+     * @param list<ProjectFile>         $entities
+     * @param list<ProjectFile>         $voters
+     * @param list<ProjectFile>         $repositories
+     * @param list<ProjectFile>         $forms
+     * @param list<ProjectFile>         $services
+     * @param list<ProjectFile>         $templates
      * @param array<string, list<string>> $routeAccessMap
-     * @param list<string>                $firewallRules
+     * @param list<string>              $firewallRules
+     * @param list<RouteAccessControl>  $routeAccessControls
      */
     private function __construct(
         private array $controllers,
@@ -36,18 +37,20 @@ final readonly class SymfonyMapping
         private array $templates,
         private array $routeAccessMap,
         private array $firewallRules,
+        private array $routeAccessControls,
     ) {}
 
     /**
-     * @param list<ProjectFile>           $controllers
-     * @param list<ProjectFile>           $entities
-     * @param list<ProjectFile>           $voters
-     * @param list<ProjectFile>           $repositories
-     * @param list<ProjectFile>           $forms
-     * @param list<ProjectFile>           $services
-     * @param list<ProjectFile>           $templates
+     * @param list<ProjectFile>         $controllers
+     * @param list<ProjectFile>         $entities
+     * @param list<ProjectFile>         $voters
+     * @param list<ProjectFile>         $repositories
+     * @param list<ProjectFile>         $forms
+     * @param list<ProjectFile>         $services
+     * @param list<ProjectFile>         $templates
      * @param array<string, list<string>> $routeAccessMap
-     * @param list<string>                $firewallRules
+     * @param list<string>              $firewallRules
+     * @param list<RouteAccessControl>  $routeAccessControls
      */
     public static function create(
         array $controllers = [],
@@ -59,6 +62,7 @@ final readonly class SymfonyMapping
         array $templates = [],
         array $routeAccessMap = [],
         array $firewallRules = [],
+        array $routeAccessControls = [],
     ): self {
         return new self(
             controllers: $controllers,
@@ -70,6 +74,7 @@ final readonly class SymfonyMapping
             templates: $templates,
             routeAccessMap: $routeAccessMap,
             firewallRules: $firewallRules,
+            routeAccessControls: $routeAccessControls,
         );
     }
 
@@ -125,6 +130,21 @@ final readonly class SymfonyMapping
     public function firewallRules(): array
     {
         return $this->firewallRules;
+    }
+
+    /** @return list<RouteAccessControl> */
+    public function routeAccessControls(): array
+    {
+        return $this->routeAccessControls;
+    }
+
+    /** @return list<RouteAccessControl> */
+    public function controllersWithoutAccessCheck(): array
+    {
+        return array_values(array_filter(
+            $this->routeAccessControls,
+            static fn (RouteAccessControl $routeAccessControl): bool => $routeAccessControl->lacksAccessCheck(),
+        ));
     }
 
     public function totalFiles(): int

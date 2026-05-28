@@ -62,9 +62,9 @@ Commit messages are validated separately in CI via
 src/
   Audit/
     Domain/          # Pure PHP — no framework, no I/O
-      Model/         # Value objects and enums (Vulnerability, AuditReport, ProjectFile, ProjectFileType, VulnerabilityHydrationResult, VulnerabilityDropReason, …)
+      Model/         # Value objects and enums (Vulnerability, AuditReport, ProjectFile, ProjectFileType, RouteAccessControl, VulnerabilityHydrationResult, VulnerabilityDropReason, …)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)
-      Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, StaticPreScannerInterface, CodeSlicerInterface, GitChangedFilesResolverInterface)
+      Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, StaticPreScannerInterface, CodeSlicerInterface, ControllerAccessControlParserInterface, GitChangedFilesResolverInterface)
         Tool/        # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
     Application/     # Orchestration — no I/O, depends only on Domain
       UseCase/       # RunAuditUseCase, EstimateAuditCostUseCase (entry points)
@@ -73,7 +73,7 @@ src/
     Infrastructure/  # I/O adapters
       LLM/           # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier, CharacterBasedTokenEstimator, Delay/, RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
       FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
-      Scan/          # RegexStaticPreScanner, NullStaticPreScanner, RegexCodeSlicer, NullCodeSlicer
+      Scan/          # RegexStaticPreScanner, NullStaticPreScanner, RegexCodeSlicer, NullCodeSlicer, PhpParserControllerAccessControlParser, NullControllerAccessControlParser
       Diff/          # ProcessGitChangedFilesResolver (git diff for --since)
       Prompt/        # AttackerPromptBuilder, ReviewerPromptBuilder
       Cache/         # FilesystemAttackerCache, NullAttackerCache

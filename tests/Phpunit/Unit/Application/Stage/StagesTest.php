@@ -27,7 +27,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\Ingest
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -148,6 +150,54 @@ final class StagesTest extends TestCase
         $mappingStage = new MappingStage(new NullLogger());
 
         self::assertSame('mapping', $mappingStage->name());
+    }
+
+    public function test_mapping_stage_routes_controllers_through_the_access_control_parser(): void
+    {
+        $controllerFile = ProjectFile::create('src/Controller/AdminController.php', '/app/x', '<?php class AdminController {}');
+        $protected = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'edit',
+            routePath: '/admin/edit',
+            routeMethods: ['POST'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: ['ROLE_ADMIN'],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+        $unprotected = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'leak',
+            routePath: '/admin/leak',
+            routeMethods: [],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+        $parser = new readonly class([$protected, $unprotected]) implements ControllerAccessControlParserInterface {
+            /** @param list<RouteAccessControl> $entries */
+            public function __construct(private array $entries) {}
+
+            public function parse(ProjectFile $projectFile): array
+            {
+                return $this->entries;
+            }
+        };
+
+        $mappingStage = new MappingStage(new NullLogger(), $parser);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([$controllerFile]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertSame([$protected, $unprotected], $mapping->routeAccessControls());
+        self::assertSame([$unprotected], $mapping->controllersWithoutAccessCheck());
+        self::assertSame(2, $auditContext->getMeta('mapping.routes'));
+        self::assertSame(1, $auditContext->getMeta('mapping.routes_without_access_check'));
     }
 
     public function test_mapping_stage_creates_mapping_from_project_files(): void

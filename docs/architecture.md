@@ -255,9 +255,28 @@ the static pre-scanner buckets, and the attacker skill-block ordering.
 
 Groups `ProjectFile` instances by role and holds `routeAccessMap` and
 `firewallRules`. Passed to `AttackerAgent` so it can reason about the full
-security surface rather than file contents alone. Notable helper:
-`controllersWithoutVoters()` surfaces controllers that lack `#[IsGranted]` or
-`denyAccessUnlessGranted` calls.
+security surface rather than file contents alone. Notable helpers:
+
+- `controllersWithoutVoters()` surfaces controllers that lack `#[IsGranted]` or
+  `denyAccessUnlessGranted` calls (filename-heuristic).
+- `routeAccessControls()` returns the route → controller graph: one
+  `RouteAccessControl` per public action with its parsed `#[Route]`,
+  class- and method-level `#[IsGranted]`, and `denyAccessUnlessGranted()`
+  call sites.
+- `controllersWithoutAccessCheck()` filters the graph to actions that carry a
+  route but no enforcement.
+
+### `RouteAccessControl` — immutable per-action access-control summary
+
+One entry per public controller action emitted by
+`ControllerAccessControlParserInterface` (default impl
+`PhpParserControllerAccessControlParser`, AST-based via `nikic/php-parser`).
+Captures `filePath`, `methodName`, `routePath`, `routeMethods`, plus three
+boolean / list signals — `methodLevelIsGranted`, `methodHasDenyAccess`,
+`classHasIsGranted` — combined by `hasAccessCheck()` and `lacksAccessCheck()`.
+The attacker prompt renders the full graph as a `Route Access-Control Map`
+block so the LLM can spot missing enforcement without re-deriving it from
+source.
 
 ### Pipeline ports (`Domain/Pipeline/`)
 
