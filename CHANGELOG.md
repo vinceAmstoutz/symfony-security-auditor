@@ -13,12 +13,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 ## [1.5.0] — 2026-05-28 — Bloodhound II
 
 A visibility, hardening, and coverage release. The auditor now reports how much
-LLM output it had to drop on the floor, warns operators on stderr when
-sensitive content will be sent to the cloud unscrubbed, looks for
-over-permissive serializer groups on entities, and parses controller routes
-and access-control attributes into a graph fed to the attacker prompt. Every
-change is backward compatible — no existing key, default, exit code,
-JSON/SARIF schema field, or Domain port signature changed.
+LLM output it had to drop on the floor, warns operators on stderr when sensitive
+content will be sent to the cloud unscrubbed, looks for over-permissive
+serializer groups on entities, and parses controller routes and access-control
+attributes into a graph fed to the attacker prompt. Every change is backward
+compatible — no existing key, default, exit code, JSON/SARIF schema field, or
+Domain port signature changed.
 
 ### Added
 
@@ -37,8 +37,8 @@ JSON/SARIF schema field, or Domain port signature changed.
   output (empty file paths, 100 KB descriptions) that previously slipped through
   `Vulnerability::create`'s coarser guards.
 - **Secret-scrubbing pre-flight warning.** `audit:run` now emits a one-shot
-  warning on **stderr** after the header when `scan.secret_scrubbing.enabled`
-  is set to `false`, explaining that file contents will be sent verbatim to the
+  warning on **stderr** after the header when `scan.secret_scrubbing.enabled` is
+  set to `false`, explaining that file contents will be sent verbatim to the
   configured LLM provider. Routing to stderr means the warning always surfaces
   (including when `--format=json|sarif` writes to stdout) without polluting the
   parseable machine-readable payload. The default (`true`) is unchanged.
@@ -50,8 +50,8 @@ JSON/SARIF schema field, or Domain port signature changed.
   (`roles`, `isAdmin`, `passwordHash`, `apiToken`) landing in write-side groups
   (`*:write`) and sensitive fields leaking via read-side groups (`*:read`,
   `public`).
-- **Full route → controller → voter → form semantic graph.** Three new
-  Domain ports (`ControllerAccessControlParserInterface`,
+- **Full route → controller → voter → form semantic graph.** Three new Domain
+  ports (`ControllerAccessControlParserInterface`,
   `VoterCapabilityParserInterface`, `FormBindingParserInterface`) with AST-based
   default implementations (backed by `nikic/php-parser`):
   - `PhpParserControllerAccessControlParser` walks every controller and emits
@@ -69,31 +69,31 @@ JSON/SARIF schema field, or Domain port signature changed.
   `formBindings()`, and `formBindingsForController()` accessors. `MappingStage`
   populates the graph and surfaces `mapping.routes`,
   `mapping.routes_without_access_check`, `mapping.voter_capabilities`, and
-  `mapping.form_bindings` metadata on `AuditContext`. The attacker prompt
-  now ships three new context blocks — `Route Access-Control Map`,
-  `Voter Coverage`, and `Form Bindings` — so the LLM can cross-reference an
-  `#[IsGranted('ATTR', $subject)]` against the voters that actually accept
-  that attribute on that subject (a `missing_voter` finding when nothing
-  matches), and cross-reference `createForm()` call sites against the form
-  types involved (mass-assignment / CSRF surface).
+  `mapping.form_bindings` metadata on `AuditContext`. The attacker prompt now
+  ships three new context blocks — `Route Access-Control Map`, `Voter Coverage`,
+  and `Form Bindings` — so the LLM can cross-reference an
+  `#[IsGranted('ATTR', $subject)]` against the voters that actually accept that
+  attribute on that subject (a `missing_voter` finding when nothing matches),
+  and cross-reference `createForm()` call sites against the form types involved
+  (mass-assignment / CSRF surface).
 
 ### Changed
 
 - `AttackerPromptBuilder::PROMPT_VERSION` bumped to **7** and
   `RegexStaticPreScanner::CACHE_VERSION` bumped to **2** so cached attacker
   responses invalidate automatically against the new prompt and pattern.
-- `VulnerabilityFactory` now takes a `Symfony\Component\Validator\Validator\ValidatorInterface`
-  as a constructor argument (autowired via a private inline factory in
-  `config/services.php`). The factory is `@internal`, so this is a non-BC change
-  for end users; downstream custom-agent code that constructs the factory
-  manually must pass a `ValidatorInterface` (typically
-  `Validation::createValidator()`).
+- `VulnerabilityFactory` now takes a
+  `Symfony\Component\Validator\Validator\ValidatorInterface` as a constructor
+  argument (autowired via a private inline factory in `config/services.php`).
+  The factory is `@internal`, so this is a non-BC change for end users;
+  downstream custom-agent code that constructs the factory manually must pass a
+  `ValidatorInterface` (typically `Validation::createValidator()`).
 - `MappingStage` now takes three optional parser arguments
   (`ControllerAccessControlParserInterface`, `VoterCapabilityParserInterface`,
-  `FormBindingParserInterface`); each defaults to a no-op parser, preserving
-  the previous shape. The DI wiring binds the real parsers in production.
-- `nikic/php-parser ^5.3` is now a runtime dependency (previously transitive
-  via `phpunit/php-code-coverage`); used by the three AST parsers.
+  `FormBindingParserInterface`); each defaults to a no-op parser, preserving the
+  previous shape. The DI wiring binds the real parsers in production.
+- `nikic/php-parser ^5.3` is now a runtime dependency (previously transitive via
+  `phpunit/php-code-coverage`); used by the three AST parsers.
 
 ## [1.4.0] — 2026-05-27 — Bloodhound
 

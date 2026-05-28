@@ -260,9 +260,8 @@ security surface rather than file contents alone. Notable helpers:
 - `controllersWithoutVoters()` surfaces controllers that lack `#[IsGranted]` or
   `denyAccessUnlessGranted` calls (filename-heuristic).
 - `routeAccessControls()` returns the route → controller graph: one
-  `RouteAccessControl` per public action with its parsed `#[Route]`,
-  class- and method-level `#[IsGranted]`, and `denyAccessUnlessGranted()`
-  call sites.
+  `RouteAccessControl` per public action with its parsed `#[Route]`, class- and
+  method-level `#[IsGranted]`, and `denyAccessUnlessGranted()` call sites.
 - `controllersWithoutAccessCheck()` filters the graph to actions that carry a
   route but no enforcement.
 
@@ -274,9 +273,8 @@ One entry per public controller action emitted by
 Captures `filePath`, `methodName`, `routePath`, `routeMethods`, plus three
 boolean / list signals — `methodLevelIsGranted`, `methodHasDenyAccess`,
 `classHasIsGranted` — combined by `hasAccessCheck()` and `lacksAccessCheck()`.
-The attacker prompt renders the full graph as a `Route Access-Control Map`
-block so the LLM can spot missing enforcement without re-deriving it from
-source.
+The attacker prompt renders the full graph as a `Route Access-Control Map` block
+so the LLM can spot missing enforcement without re-deriving it from source.
 
 ### `VoterCapability` — immutable per-voter `supports()` summary
 
@@ -284,10 +282,10 @@ One entry per voter file emitted by `VoterCapabilityParserInterface` (default
 impl `PhpParserVoterCapabilityParser`). Captures `filePath`, `className`,
 `supportedAttributes` (string literals seen inside `supports()`) and
 `supportedSubjects` (right-hand class names of `instanceof` checks). Helpers
-`coversAttribute(string)` and `coversSubject(string)` answer
-"is there a voter that handles this access decision?" so the prompt's
-`Voter Coverage` block lets the LLM flag `#[IsGranted('ATTR', $subject)]`
-calls that no voter actually backs.
+`coversAttribute(string)` and `coversSubject(string)` answer "is there a voter
+that handles this access decision?" so the prompt's `Voter Coverage` block lets
+the LLM flag `#[IsGranted('ATTR', $subject)]` calls that no voter actually
+backs.
 
 ### `FormBinding` — immutable controller → form-type binding
 
@@ -295,8 +293,8 @@ One entry per `$this->createForm(SomeFormType::class)` call site emitted by
 `FormBindingParserInterface` (default impl `PhpParserFormBindingParser`).
 Captures `controllerFilePath`, `controllerMethod`, and `formTypeClass`. The
 attacker prompt renders the list as a `Form Bindings` block so the LLM can
-cross-reference call sites against the form types involved for mass-assignment
-/ CSRF analysis without re-deriving the binding from source.
+cross-reference call sites against the form types involved for mass-assignment /
+CSRF analysis without re-deriving the binding from source.
 
 ### Pipeline ports (`Domain/Pipeline/`)
 
