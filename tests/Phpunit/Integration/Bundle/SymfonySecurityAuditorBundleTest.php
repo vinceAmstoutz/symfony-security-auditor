@@ -466,6 +466,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         yield 'retry initial_delay_ms' => [['model' => 'gpt-4o', 'audit' => ['retry' => ['initial_delay_ms' => 0]]], 'symfony_security_auditor.audit.retry.initial_delay_ms', 0];
         yield 'attacker_max_output_tokens' => [['model' => 'gpt-4o', 'attacker_max_output_tokens' => 1], 'symfony_security_auditor.attacker_max_output_tokens', 1];
         yield 'reviewer_max_output_tokens' => [['model' => 'gpt-4o', 'reviewer_max_output_tokens' => 1], 'symfony_security_auditor.reviewer_max_output_tokens', 1];
+        yield 'max_output_tokens' => [['model' => 'gpt-4o', 'max_output_tokens' => 1], 'symfony_security_auditor.attacker_max_output_tokens', 1];
     }
 
     /**
