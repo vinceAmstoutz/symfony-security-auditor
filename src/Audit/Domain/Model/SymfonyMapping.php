@@ -16,18 +16,18 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 final readonly class SymfonyMapping
 {
     /**
-     * @param list<ProjectFile>         $controllers
-     * @param list<ProjectFile>         $entities
-     * @param list<ProjectFile>         $voters
-     * @param list<ProjectFile>         $repositories
-     * @param list<ProjectFile>         $forms
-     * @param list<ProjectFile>         $services
-     * @param list<ProjectFile>         $templates
+     * @param list<ProjectFile>           $controllers
+     * @param list<ProjectFile>           $entities
+     * @param list<ProjectFile>           $voters
+     * @param list<ProjectFile>           $repositories
+     * @param list<ProjectFile>           $forms
+     * @param list<ProjectFile>           $services
+     * @param list<ProjectFile>           $templates
      * @param array<string, list<string>> $routeAccessMap
-     * @param list<string>              $firewallRules
-     * @param list<RouteAccessControl>  $routeAccessControls
-     * @param list<VoterCapability>     $voterCapabilities
-     * @param list<FormBinding>         $formBindings
+     * @param list<string>                $firewallRules
+     * @param list<RouteAccessControl>    $routeAccessControls
+     * @param list<VoterCapability>       $voterCapabilities
+     * @param list<FormBinding>           $formBindings
      */
     private function __construct(
         private array $controllers,
@@ -45,18 +45,18 @@ final readonly class SymfonyMapping
     ) {}
 
     /**
-     * @param list<ProjectFile>         $controllers
-     * @param list<ProjectFile>         $entities
-     * @param list<ProjectFile>         $voters
-     * @param list<ProjectFile>         $repositories
-     * @param list<ProjectFile>         $forms
-     * @param list<ProjectFile>         $services
-     * @param list<ProjectFile>         $templates
+     * @param list<ProjectFile>           $controllers
+     * @param list<ProjectFile>           $entities
+     * @param list<ProjectFile>           $voters
+     * @param list<ProjectFile>           $repositories
+     * @param list<ProjectFile>           $forms
+     * @param list<ProjectFile>           $services
+     * @param list<ProjectFile>           $templates
      * @param array<string, list<string>> $routeAccessMap
-     * @param list<string>              $firewallRules
-     * @param list<RouteAccessControl>  $routeAccessControls
-     * @param list<VoterCapability>     $voterCapabilities
-     * @param list<FormBinding>         $formBindings
+     * @param list<string>                $firewallRules
+     * @param list<RouteAccessControl>    $routeAccessControls
+     * @param list<VoterCapability>       $voterCapabilities
+     * @param list<FormBinding>           $formBindings
      */
     public static function create(
         array $controllers = [],
