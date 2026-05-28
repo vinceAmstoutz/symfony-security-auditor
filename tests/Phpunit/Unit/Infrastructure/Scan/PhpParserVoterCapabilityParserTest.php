@@ -33,6 +33,22 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
 
+    public function test_it_returns_null_for_non_voter_file_even_when_it_defines_a_supports_method(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Service;
+            final class Helper {
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, ['CAN_HELP'], true);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Service/Helper.php', '/app/x', $source);
+
+        self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
+    }
+
     public function test_it_returns_null_for_unparseable_voter(): void
     {
         $projectFile = ProjectFile::create('src/Security/Broken.php', '/app/x', '<?php class Broken { public function');

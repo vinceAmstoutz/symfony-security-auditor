@@ -33,6 +33,73 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
 
+    public function test_it_skips_non_controller_files_even_when_they_call_create_form(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Service;
+            use App\Form\UserType;
+            final class Helper {
+                public function build(): void {
+                    $form = $this->createForm(UserType::class);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Service/Helper.php', '/app/x', $source);
+
+        self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
+    }
+
+    public function test_it_collects_bindings_from_multiple_methods_in_the_same_controller(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Form\UserType;
+            use App\Form\ProfileType;
+            final class UserController {
+                public function edit(): void {
+                    $form = $this->createForm(UserType::class);
+                }
+
+                public function profile(): void {
+                    $form = $this->createForm(ProfileType::class);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+
+        $bindings = $this->phpParserFormBindingParser->parse($projectFile);
+
+        self::assertCount(2, $bindings);
+        self::assertSame('edit', $bindings[0]->controllerMethod());
+        self::assertSame('App\\Form\\UserType', $bindings[0]->formTypeClass());
+        self::assertSame('profile', $bindings[1]->controllerMethod());
+        self::assertSame('App\\Form\\ProfileType', $bindings[1]->formTypeClass());
+    }
+
+    public function test_it_continues_past_private_helpers_to_reach_public_create_form(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Form\UserType;
+            final class HelpController {
+                private function helperOne(): void {}
+                private function helperTwo(): void {}
+                public function edit(): void {
+                    $form = $this->createForm(UserType::class);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Controller/HelpController.php', '/app/x', $source);
+
+        $bindings = $this->phpParserFormBindingParser->parse($projectFile);
+
+        self::assertCount(1, $bindings);
+        self::assertSame('edit', $bindings[0]->controllerMethod());
+    }
+
     public function test_it_returns_empty_for_unparseable_controller(): void
     {
         $projectFile = ProjectFile::create('src/Controller/Broken.php', '/app/x', '<?php class Broken { public function');

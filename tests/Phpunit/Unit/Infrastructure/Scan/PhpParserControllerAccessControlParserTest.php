@@ -188,6 +188,104 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame('show', $entries[0]->methodName());
     }
 
+    public function test_it_extracts_methods_when_route_uses_methods_only(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class GetOnlyController {
+                #[Route(methods: ['GET'])]
+                public function index(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/GetOnlyController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertCount(1, $entries);
+        self::assertSame(['GET'], $entries[0]->routeMethods());
+        self::assertNull($entries[0]->routePath());
+    }
+
+    public function test_it_extracts_multiple_http_methods_from_route_attribute(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class MultiMethodController {
+                #[Route(path: '/multi', methods: ['GET', 'POST', 'PATCH'])]
+                public function multi(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/MultiMethodController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['GET', 'POST', 'PATCH'], $entries[0]->routeMethods());
+    }
+
+    public function test_it_records_multiple_is_granted_attributes_on_same_method(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            final class MultiCheckController {
+                #[Route(path: '/double')]
+                #[IsGranted('ROLE_USER')]
+                #[IsGranted('ROLE_ADMIN')]
+                public function doubleCheck(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/MultiCheckController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['ROLE_USER', 'ROLE_ADMIN'], $entries[0]->methodLevelIsGranted());
+    }
+
+    public function test_it_keeps_only_first_string_argument_of_is_granted_attribute(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            final class TwoArgController {
+                #[Route(path: '/two-args')]
+                #[IsGranted('PRIMARY_ROLE', 'SECONDARY_ROLE')]
+                public function twoArgs(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/TwoArgController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['PRIMARY_ROLE'], $entries[0]->methodLevelIsGranted());
+    }
+
+    public function test_it_finds_is_granted_in_attribute_group_after_a_non_is_granted_attribute(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            final class GroupedController {
+                #[Route(path: '/grouped'), IsGranted('ROLE_GROUPED')]
+                public function grouped(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/GroupedController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['ROLE_GROUPED'], $entries[0]->methodLevelIsGranted());
+    }
+
     public function test_it_returns_empty_for_unparseable_source(): void
     {
         $projectFile = $this->makeFile('src/Controller/Broken.php', '<?php class Broken { public function');

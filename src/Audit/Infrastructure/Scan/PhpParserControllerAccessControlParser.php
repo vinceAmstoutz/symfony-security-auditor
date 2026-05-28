@@ -110,14 +110,13 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
 
                 $path = null;
                 $methods = [];
-                $positionalIndex = 0;
+                $firstPositionalConsumed = false;
                 foreach ($attribute->args as $arg) {
                     $argName = $arg->name?->toString();
-                    if (null === $argName && 0 === $positionalIndex) {
+                    if (null === $argName && !$firstPositionalConsumed) {
                         $argName = 'path';
+                        $firstPositionalConsumed = true;
                     }
-
-                    ++$positionalIndex;
 
                     if ('path' === $argName && $arg->value instanceof String_) {
                         $path = $arg->value->value;
