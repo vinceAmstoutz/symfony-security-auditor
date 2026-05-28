@@ -10,6 +10,44 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.6.1] — 2026-05-28 — Soft Landing
+
+A resilience release. The LLM client now treats truly empty model responses as a
+graceful drop instead of a fatal abort, and the mutation gate becomes
+deterministic on `AuditContext::auditId` so the test matrix stops flapping on
+randomness.
+
+### Fixed
+
+- **Empty-content LLM responses no longer abort the audit.** Anthropic (and
+  other providers) occasionally return a successful response with zero content
+  blocks — refusal-style stops, content-filter hits, or quirks under heavy
+  prompt-cache pressure. `symfony/ai`'s converter then throws "Response does not
+  contain any content." from `DeferredResult::getResult()`. Previously that
+  bubbled through `SymfonyAiLLMClient::invokeWithRetry()` →
+  `TransientFailureClassifier` (no transient match) →
+  `NonTransientLLMFailureException`, aborting the entire audit mid-run — most
+  visibly at ~50% on a long `audit.structured_collection: true` run where the
+  attacker had already recorded findings via `record_vulnerability` tool calls.
+  `TransientFailureClassifier` now exposes `isEmptyContent()`; the client
+  rethrows those as the new internal `EmptyLLMResponseException`, and
+  `complete()` / `completeWithTools()` catch and translate into an empty
+  `LLMResponse` with `stopReason: 'empty_content'`. The attacker chunk records
+  as `analyzed`, the `VulnerabilityCollector` still drains any
+  `record_vulnerability` calls that preceded the empty turn, and the pipeline
+  continues. The retry classifier is unchanged for transport / auth / rate-limit
+  failures — only the framework-level "no content blocks" signature is reclassed
+  out of the non-transient path.
+
+### Tooling
+
+- Mutation gate now deterministically kills the `UnwrapStrToUpper` mutant on
+  `AuditContext::forProject()`'s `auditId` formatting. The single-draw assertion
+  let the mutant escape whenever `bin2hex(random_bytes(4))` rolled all digits
+  (~2.33% per Infection run, ~19% across the 9-cell PHP × Symfony matrix) — the
+  source of the matrix-cell-specific escapes recently observed on `main`. The
+  test now loops 64 draws, dropping the escape probability to ~10⁻¹⁰⁴.
+
 ## [1.6.0] — 2026-05-28 — Sentinel
 
 A correctness release. The attacker now records findings through a strict
