@@ -65,6 +65,24 @@ final class SymfonyMappingTest extends TestCase
         self::assertSame([], $symfonyMapping->votersFor('PUBLISH', 'Post'));
     }
 
+    public function test_voters_for_excludes_voter_matching_attribute_but_not_subject(): void
+    {
+        $voterCapability = new VoterCapability('src/Security/UserVoter.php', 'UserVoter', ['EDIT'], ['User']);
+
+        $symfonyMapping = SymfonyMapping::create(voterCapabilities: [$voterCapability]);
+
+        self::assertSame([], $symfonyMapping->votersFor('EDIT', 'Comment'));
+    }
+
+    public function test_voters_for_excludes_voter_matching_subject_but_not_attribute(): void
+    {
+        $voterCapability = new VoterCapability('src/Security/UserVoter.php', 'UserVoter', ['EDIT'], ['User']);
+
+        $symfonyMapping = SymfonyMapping::create(voterCapabilities: [$voterCapability]);
+
+        self::assertSame([], $symfonyMapping->votersFor('PUBLISH', 'User'));
+    }
+
     public function test_it_exposes_form_bindings_and_can_filter_by_controller(): void
     {
         $userEdit = new FormBinding('src/Controller/UserController.php', 'edit', 'App\\Form\\UserType');

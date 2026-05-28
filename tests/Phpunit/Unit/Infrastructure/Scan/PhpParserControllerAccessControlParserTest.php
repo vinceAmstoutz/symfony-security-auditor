@@ -147,6 +147,47 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame('delete', $entries[1]->methodName());
     }
 
+    public function test_it_extracts_path_from_positional_route_argument(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class HomeController {
+                #[Route('/home', methods: ['GET'])]
+                public function index(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/HomeController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertCount(1, $entries);
+        self::assertSame('/home', $entries[0]->routePath());
+        self::assertSame(['GET'], $entries[0]->routeMethods());
+    }
+
+    public function test_it_continues_past_private_methods_to_reach_public_action_below(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class HelpController {
+                private function helperOne(): void {}
+                private function helperTwo(): void {}
+                #[Route(path: '/help', methods: ['GET'])]
+                public function show(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/HelpController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertCount(1, $entries);
+        self::assertSame('show', $entries[0]->methodName());
+    }
+
     public function test_it_returns_empty_for_unparseable_source(): void
     {
         $projectFile = $this->makeFile('src/Controller/Broken.php', '<?php class Broken { public function');

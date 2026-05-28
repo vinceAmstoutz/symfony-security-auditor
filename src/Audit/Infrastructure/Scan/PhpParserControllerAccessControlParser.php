@@ -21,8 +21,6 @@ use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\ParserFactory;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -56,10 +54,6 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
             if (null === $ast) {
                 return [];
             }
-
-            $nodeTraverser = new NodeTraverser();
-            $nodeTraverser->addVisitor(new NameResolver());
-            $ast = $nodeTraverser->traverse($ast);
         } catch (Throwable) {
             return [];
         }

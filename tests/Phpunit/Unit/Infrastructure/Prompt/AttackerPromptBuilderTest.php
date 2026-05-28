@@ -246,6 +246,56 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('App\\Form\\UserType', $message);
     }
 
+    public function test_route_access_map_section_ends_with_blank_line_before_voter_coverage(): void
+    {
+        $projectFile = ProjectFile::create('src/Controller/X.php', '/app/x', '<?php class X {}');
+        $routeAccessControl = new RouteAccessControl('src/Controller/X.php', 'a', '/x', ['GET'], true, ['ROLE_X'], false, false);
+        $voterCapability = new VoterCapability('src/Security/V.php', 'V', ['EDIT'], ['User']);
+
+        $message = $this->attackerPromptBuilder->buildUserMessage(
+            [$projectFile],
+            SymfonyMapping::create(routeAccessControls: [$routeAccessControl], voterCapabilities: [$voterCapability]),
+        );
+
+        self::assertMatchesRegularExpression(
+            '/- GET \/x[^\n]+\n\n## Voter Coverage/',
+            $message,
+        );
+    }
+
+    public function test_voter_coverage_section_ends_with_blank_line_before_form_bindings(): void
+    {
+        $projectFile = ProjectFile::create('src/Controller/X.php', '/app/x', '<?php class X {}');
+        $voterCapability = new VoterCapability('src/Security/V.php', 'App\\Security\\V', ['EDIT'], ['User']);
+        $formBinding = new FormBinding('src/Controller/X.php', 'edit', 'App\\Form\\UserType');
+
+        $message = $this->attackerPromptBuilder->buildUserMessage(
+            [$projectFile],
+            SymfonyMapping::create(voterCapabilities: [$voterCapability], formBindings: [$formBinding]),
+        );
+
+        self::assertMatchesRegularExpression(
+            '/- App\\\\Security\\\\V[^\n]+\n\n## Form Bindings/',
+            $message,
+        );
+    }
+
+    public function test_form_bindings_section_ends_with_blank_line_before_source_code(): void
+    {
+        $projectFile = ProjectFile::create('src/Controller/X.php', '/app/x', '<?php class X {}');
+        $formBinding = new FormBinding('src/Controller/X.php', 'edit', 'App\\Form\\UserType');
+
+        $message = $this->attackerPromptBuilder->buildUserMessage(
+            [$projectFile],
+            SymfonyMapping::create(formBindings: [$formBinding]),
+        );
+
+        self::assertMatchesRegularExpression(
+            '/- src\/Controller\/X\.php::edit[^\n]+\n\n## Source Code/',
+            $message,
+        );
+    }
+
     public function test_user_message_omits_form_bindings_section_when_empty(): void
     {
         $projectFile = ProjectFile::create(
