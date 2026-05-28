@@ -464,6 +464,8 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         yield 'budget max_tokens' => [['model' => 'gpt-4o', 'audit' => ['budget' => ['max_tokens' => 1]]], 'symfony_security_auditor.audit.budget.max_tokens', 1];
         yield 'retry max_attempts' => [['model' => 'gpt-4o', 'audit' => ['retry' => ['max_attempts' => 1]]], 'symfony_security_auditor.audit.retry.max_attempts', 1];
         yield 'retry initial_delay_ms' => [['model' => 'gpt-4o', 'audit' => ['retry' => ['initial_delay_ms' => 0]]], 'symfony_security_auditor.audit.retry.initial_delay_ms', 0];
+        yield 'attacker_max_output_tokens' => [['model' => 'gpt-4o', 'attacker_max_output_tokens' => 1], 'symfony_security_auditor.attacker_max_output_tokens', 1];
+        yield 'reviewer_max_output_tokens' => [['model' => 'gpt-4o', 'reviewer_max_output_tokens' => 1], 'symfony_security_auditor.reviewer_max_output_tokens', 1];
     }
 
     /**
@@ -485,6 +487,8 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         yield 'code_slicing min_lines' => [['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['min_lines_before_slicing' => 9]]]];
         yield 'budget max_tokens' => [['model' => 'gpt-4o', 'audit' => ['budget' => ['max_tokens' => 0]]]];
         yield 'retry initial_delay_ms' => [['model' => 'gpt-4o', 'audit' => ['retry' => ['initial_delay_ms' => -1]]]];
+        yield 'attacker_max_output_tokens' => [['model' => 'gpt-4o', 'attacker_max_output_tokens' => 0]];
+        yield 'reviewer_max_output_tokens' => [['model' => 'gpt-4o', 'reviewer_max_output_tokens' => 0]];
     }
 
     /**

@@ -49,6 +49,14 @@ final class LLMConfigurationTest extends TestCase
         self::assertSame(4096, $lLMConfiguration->reviewerMaxOutputTokens());
     }
 
+    public function test_max_output_tokens_defaults_to_4096_when_omitted_at_construction(): void
+    {
+        $lLMConfiguration = new LLMConfiguration('m', null, null);
+
+        self::assertSame(4096, $lLMConfiguration->attackerMaxOutputTokens());
+        self::assertSame(4096, $lLMConfiguration->reviewerMaxOutputTokens());
+    }
+
     public function test_agent_max_output_tokens_overrides_take_precedence_over_the_shared_cap(): void
     {
         $lLMConfiguration = new LLMConfiguration('m', null, null, 4096, 8192, 2048);

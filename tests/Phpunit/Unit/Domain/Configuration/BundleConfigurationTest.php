@@ -177,6 +177,17 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->llm->providerJsonMode);
     }
 
+    public function test_from_array_defaults_max_output_tokens_to_4096_when_key_omitted_for_bc(): void
+    {
+        $config = $this->treeBuilderOutput();
+        unset($config['max_output_tokens'], $config['attacker_max_output_tokens'], $config['reviewer_max_output_tokens']);
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertSame(4096, $bundleConfiguration->llm->attackerMaxOutputTokens());
+        self::assertSame(4096, $bundleConfiguration->llm->reviewerMaxOutputTokens());
+    }
+
     public function test_from_array_defaults_structured_collection_to_true_when_audit_key_omits_it(): void
     {
         $config = $this->treeBuilderOutput();
