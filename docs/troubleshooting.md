@@ -148,6 +148,27 @@ simplest fix when the model repeatedly produces unparseable prose.
 
 If it happens for **every** chunk, the model is unsuitable. Switch model.
 
+### `Tool-using loop ended with empty content response` warnings
+
+Logged at `warning` level when the attacker's tool loop ends with an empty final
+content block. Look at the `output_tokens` field: if it sits near a multiple of
+~1000 (e.g. `1971`, `2000`), the model is being truncated by `symfony/ai`'s
+default `max_tokens = 1000` that ships with the Anthropic bridge. Set
+`max_output_tokens` in the bundle config (default `4096` since this fix) — or
+`attacker_max_output_tokens` / `reviewer_max_output_tokens` for per-agent
+tuning:
+
+```yaml
+symfony_security_auditor:
+    max_output_tokens: 4096
+    attacker_max_output_tokens: 8192 # optional, for chunks with many findings
+    reviewer_max_output_tokens: 2048 # optional, reviewer needs less headroom
+```
+
+When raising the cap, raise `audit.rate_limit.output_tokens_per_minute`
+proportionally — otherwise the output-tokens bucket becomes the binding
+throttle.
+
 ### `Ollama: model not found`
 
 Pull the model first:

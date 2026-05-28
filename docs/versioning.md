@@ -31,7 +31,9 @@ Everything below is part of the public API and **will not break in a `MINOR` or
 Every key under `symfony_security_auditor:` documented in
 [`docs/configuration.md`](configuration.md):
 
-- `model`, `attacker_model`, `reviewer_model`, `provider_json_mode`
+- `model`, `attacker_model`, `reviewer_model`, `max_output_tokens`,
+  `attacker_max_output_tokens`, `reviewer_max_output_tokens`,
+  `provider_json_mode`
 - `scan.included_paths`, `scan.respect_gitignore`, `scan.max_file_size_kb`,
   `scan.secret_scrubbing.enabled`, `scan.secret_scrubbing.additional_patterns`,
   `scan.custom_risk_patterns`

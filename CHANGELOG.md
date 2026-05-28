@@ -10,6 +10,57 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.6.2] — 2026-05-28 — Headroom
+
+A bug-fix release. The audit was silently truncating every LLM call at ~1000
+output tokens because `symfony/ai`'s Anthropic bridge defaults `max_tokens` to
+`1000` when callers don't supply one, and the bundle never did. The bundle now
+sets `max_tokens` explicitly on every platform request and exposes the value as
+a public configuration key.
+
+### Fixed
+
+- **Silent 1000-token output cap.** `SymfonyAiLLMClient::baseOptions()`
+  (`src/Audit/Infrastructure/LLM/SymfonyAiLLMClient.php`) never set `max_tokens`
+  on platform invocations. `symfony/ai`'s Claude bridge then applied its
+  built-in `max_tokens = 1000` default, capping every attacker / reviewer /
+  cheap-attacker call. In structured-collection mode this cut off
+  `record_vulnerability` tool-call arguments mid-finding (severity, location,
+  proof, remediation fields), inflated tool-loop iteration counts, and most
+  visibly surfaced as
+  `WARNING [app] Tool-using loop ended with empty content response` log lines
+  with cumulative `output_tokens` clustering at ~1000 × `iterations`.
+  `baseOptions()` now sets `max_tokens` from the new
+  `LLMConfiguration::maxOutputTokens` / `attackerMaxOutputTokens` /
+  `reviewerMaxOutputTokens` accessors so the value is bounded by bundle
+  configuration rather than the upstream default.
+
+### Added
+
+- **`max_output_tokens` configuration key** — top-level `int`, default `4096`.
+  Sets `max_tokens` on every LLM call. The new default is enough headroom for
+  detailed `record_vulnerability` tool-call arguments on a typical chunk while
+  staying well inside provider per-response ceilings. Public API per
+  `docs/versioning.md`.
+- **`attacker_max_output_tokens` / `reviewer_max_output_tokens`** — optional
+  per-role overrides (`int|null`, default `null`). Fall back to
+  `max_output_tokens` when null. Mirrors the existing `attacker_model` /
+  `reviewer_model` split, so split-model setups can give the attacker more
+  headroom for detailed findings (e.g. `8192`) while leaving the reviewer on a
+  tighter cap (e.g. `2048`).
+
+### Notes
+
+- This release sets `max_tokens` explicitly on every request where it previously
+  omitted the option. Existing audits will see longer (untruncated) completions,
+  fewer tool-loop iterations per chunk, and an effectively higher output-token
+  spend per call.
+- When raising `max_output_tokens` substantially, consider raising
+  `audit.rate_limit.output_tokens_per_minute` proportionally — see
+  [`docs/configuration.md`](docs/configuration.md). With the default `4096` cap
+  and an `80_000` OTPM ceiling the limiter trips after ~19 calls/min; doubling
+  the cap halves that.
+
 ## [1.6.1] — 2026-05-28 — Soft Landing
 
 A resilience release. The LLM client now treats truly empty model responses as a
@@ -867,8 +918,18 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.6.2]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.6.2
+[1.6.1]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.6.1
+[1.6.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.6.0
+[1.5.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.5.0
 [1.4.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.4.0
+[1.3.3]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.3.3
 [1.3.2]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.3.2
 [1.3.1]:

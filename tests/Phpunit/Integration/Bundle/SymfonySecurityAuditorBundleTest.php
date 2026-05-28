@@ -96,6 +96,47 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame('claude-sonnet', $kernel->getContainer()->getParameter('symfony_security_auditor.reviewer_model'));
     }
 
+    public function test_bundle_defaults_max_output_tokens_to_4096_for_both_agents(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+        $container = $kernel->getContainer();
+
+        self::assertSame(4096, $container->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
+        self::assertSame(4096, $container->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
+    }
+
+    public function test_bundle_honors_split_max_output_tokens_overrides(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'attacker_max_output_tokens' => 8192,
+            'reviewer_max_output_tokens' => 2048,
+        ]);
+        $container = $kernel->getContainer();
+
+        self::assertSame(8192, $container->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
+        self::assertSame(2048, $container->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
+    }
+
+    public function test_bundle_max_output_tokens_falls_back_to_shared_cap_when_overrides_omitted(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'max_output_tokens' => 6000,
+        ]);
+        $container = $kernel->getContainer();
+
+        self::assertSame(6000, $container->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
+        self::assertSame(6000, $container->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
+    }
+
+    public function test_bundle_rejects_max_output_tokens_below_one(): void
+    {
+        $this->expectException(Throwable::class);
+
+        $this->boot(['model' => 'gpt-4o', 'max_output_tokens' => 0]);
+    }
+
     public function test_bundle_defaults_structured_collection_to_true_so_provider_validates_findings(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -423,6 +464,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         yield 'budget max_tokens' => [['model' => 'gpt-4o', 'audit' => ['budget' => ['max_tokens' => 1]]], 'symfony_security_auditor.audit.budget.max_tokens', 1];
         yield 'retry max_attempts' => [['model' => 'gpt-4o', 'audit' => ['retry' => ['max_attempts' => 1]]], 'symfony_security_auditor.audit.retry.max_attempts', 1];
         yield 'retry initial_delay_ms' => [['model' => 'gpt-4o', 'audit' => ['retry' => ['initial_delay_ms' => 0]]], 'symfony_security_auditor.audit.retry.initial_delay_ms', 0];
+        yield 'attacker_max_output_tokens' => [['model' => 'gpt-4o', 'attacker_max_output_tokens' => 1], 'symfony_security_auditor.attacker_max_output_tokens', 1];
+        yield 'reviewer_max_output_tokens' => [['model' => 'gpt-4o', 'reviewer_max_output_tokens' => 1], 'symfony_security_auditor.reviewer_max_output_tokens', 1];
+        yield 'max_output_tokens' => [['model' => 'gpt-4o', 'max_output_tokens' => 1], 'symfony_security_auditor.attacker_max_output_tokens', 1];
     }
 
     /**
@@ -444,6 +488,8 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         yield 'code_slicing min_lines' => [['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['min_lines_before_slicing' => 9]]]];
         yield 'budget max_tokens' => [['model' => 'gpt-4o', 'audit' => ['budget' => ['max_tokens' => 0]]]];
         yield 'retry initial_delay_ms' => [['model' => 'gpt-4o', 'audit' => ['retry' => ['initial_delay_ms' => -1]]]];
+        yield 'attacker_max_output_tokens' => [['model' => 'gpt-4o', 'attacker_max_output_tokens' => 0]];
+        yield 'reviewer_max_output_tokens' => [['model' => 'gpt-4o', 'reviewer_max_output_tokens' => 0]];
     }
 
     /**

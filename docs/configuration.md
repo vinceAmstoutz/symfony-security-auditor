@@ -50,15 +50,27 @@ following keys:
 
 ### Top-level
 
-| Key                  | Type   | Default             | Description                                                                                                                                                                                                                                                                                                                                                                              |
-| -------------------- | ------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `model`              | string | `'claude-opus-4-7'` | Model name used for both Attacker and Reviewer roles                                                                                                                                                                                                                                                                                                                                     |
-| `attacker_model`     | string | `null`              | Override: dedicated model for the Attacker role                                                                                                                                                                                                                                                                                                                                          |
-| `reviewer_model`     | string | `null`              | Override: dedicated model for the Reviewer role                                                                                                                                                                                                                                                                                                                                          |
-| `provider_json_mode` | bool   | `false`             | Send `response_format: {type: json_object}` on every LLM call so the provider enforces JSON output natively. Honored by OpenAI / Mistral / Ollama; silently ignored by Anthropic (no equivalent knob). Default `false` because behaviour is provider-dependent — only enable when your provider supports it. The prompt contract (_"Return ONLY the JSON array"_) remains authoritative. |
+| Key                          | Type        | Default             | Description                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------- | ----------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`                      | string      | `'claude-opus-4-7'` | Model name used for both Attacker and Reviewer roles                                                                                                                                                                                                                                                                                                                                     |
+| `attacker_model`             | string      | `null`              | Override: dedicated model for the Attacker role                                                                                                                                                                                                                                                                                                                                          |
+| `reviewer_model`             | string      | `null`              | Override: dedicated model for the Reviewer role                                                                                                                                                                                                                                                                                                                                          |
+| `max_output_tokens`          | `int` (≥ 1) | `4096`              | Maximum output tokens per LLM call, set as `max_tokens` on every platform request. Default `4096` — `symfony/ai`'s Anthropic bridge would otherwise apply its own much smaller default (~1000) and silently truncate `record_vulnerability` tool-call arguments mid-finding.                                                                                                             |
+| `attacker_max_output_tokens` | `int` (≥ 1) | `null`              | Override: dedicated max output tokens for the Attacker. Falls back to `max_output_tokens` when `null`. Useful for headroom on detailed tool-call arguments.                                                                                                                                                                                                                              |
+| `reviewer_max_output_tokens` | `int` (≥ 1) | `null`              | Override: dedicated max output tokens for the Reviewer. Falls back to `max_output_tokens` when `null`.                                                                                                                                                                                                                                                                                   |
+| `provider_json_mode`         | bool        | `false`             | Send `response_format: {type: json_object}` on every LLM call so the provider enforces JSON output natively. Honored by OpenAI / Mistral / Ollama; silently ignored by Anthropic (no equivalent knob). Default `false` because behaviour is provider-dependent — only enable when your provider supports it. The prompt contract (_"Return ONLY the JSON array"_) remains authoritative. |
 
-`attacker_model` and `reviewer_model` fall back to `model` when not set. Model
-names must be supported by the platform configured in `ai.yaml`.
+`attacker_model` / `reviewer_model` and `attacker_max_output_tokens` /
+`reviewer_max_output_tokens` fall back to `model` and `max_output_tokens`
+respectively when not set. Model names must be supported by the platform
+configured in `ai.yaml`.
+
+When raising `max_output_tokens`, consider raising
+`audit.rate_limit.output_tokens_per_minute` proportionally — otherwise the
+output-tokens bucket becomes the binding throttle long before
+`requests_per_minute` does. For example, with the default `4096` cap and an 80
+000 OTPM ceiling the limiter trips after ~19 calls/min; doubling the cap halves
+that.
 
 ### `scan.*` — file discovery
 
@@ -272,15 +284,21 @@ ai:
 
 ## Model Options
 
-Provider-specific parameters such as `max_tokens` and `temperature` are passed
-via the model name. Two syntaxes are supported in
-`symfony_security_auditor.yaml`.
+The bundle exposes `max_output_tokens` directly at the top level (see
+[Top-level](#top-level)) — prefer that key for capping per-call output, since
+its default (`4096`) bypasses `symfony/ai`'s much smaller built-in default
+(~1000) that would otherwise truncate `record_vulnerability` tool-call arguments
+mid-finding.
+
+Other provider-specific parameters (e.g. `temperature`) can still be passed
+through the model name using either of the two syntaxes supported by
+`symfony/ai-bundle`:
 
 ### Query-string syntax
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-7?max_tokens=4096&temperature=0.2'
+    model: 'claude-opus-4-7?temperature=0.2'
 ```
 
 ### Expanded syntax
@@ -290,12 +308,12 @@ symfony_security_auditor:
     model:
         name: 'claude-opus-4-7'
         options:
-            max_tokens: 4096
             temperature: 0.2
 ```
 
 Both forms are equivalent. Use expanded syntax when setting many options or
-preferring readability.
+preferring readability. `max_tokens` set via either form overrides the bundle's
+`max_output_tokens` for that role.
 
 ---
 

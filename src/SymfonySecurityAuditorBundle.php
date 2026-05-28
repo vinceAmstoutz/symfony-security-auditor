@@ -81,6 +81,21 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                     ->defaultNull()
                     ->info('Override: dedicated model for the Reviewer role. Falls back to `model` when null.')
                 ->end()
+                ->integerNode('max_output_tokens')
+                    ->defaultValue(4096)
+                    ->min(1)
+                    ->info("Maximum output tokens per LLM call for both Attacker and Reviewer. Sets `max_tokens` in every platform request. Default 4096; symfony/ai's Anthropic bridge otherwise defaults to a much smaller value (~1000) that silently truncates findings.")
+                ->end()
+                ->integerNode('attacker_max_output_tokens')
+                    ->defaultNull()
+                    ->min(1)
+                    ->info('Override: dedicated max output tokens for the Attacker role. Falls back to `max_output_tokens` when null. Useful when the attacker needs more headroom for detailed `record_vulnerability` tool-call arguments.')
+                ->end()
+                ->integerNode('reviewer_max_output_tokens')
+                    ->defaultNull()
+                    ->min(1)
+                    ->info('Override: dedicated max output tokens for the Reviewer role. Falls back to `max_output_tokens` when null.')
+                ->end()
                 ->booleanNode('provider_json_mode')
                     ->defaultFalse()
                     ->info('Opt into the provider-native JSON mode by sending `response_format: {type: json_object}` on every LLM call. Honored by OpenAI/Mistral/Ollama; silently ignored by Anthropic (which has no equivalent knob). Default false because behaviour is provider-dependent — only enable if your provider supports it. The prompt contract ("Return ONLY the JSON array") remains authoritative.')
@@ -339,6 +354,9 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *     model: string,
      *     attacker_model: string|null,
      *     reviewer_model: string|null,
+     *     max_output_tokens: int,
+     *     attacker_max_output_tokens: int|null,
+     *     reviewer_max_output_tokens: int|null,
      *     provider_json_mode: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
      *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
@@ -353,6 +371,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
 
         $builder->setParameter('symfony_security_auditor.attacker_model', $bundleConfiguration->llm->attackerModel());
         $builder->setParameter('symfony_security_auditor.reviewer_model', $bundleConfiguration->llm->reviewerModel());
+        $builder->setParameter('symfony_security_auditor.attacker_max_output_tokens', $bundleConfiguration->llm->attackerMaxOutputTokens());
+        $builder->setParameter('symfony_security_auditor.reviewer_max_output_tokens', $bundleConfiguration->llm->reviewerMaxOutputTokens());
         $builder->setParameter('symfony_security_auditor.scan.included_paths', $bundleConfiguration->scan->includedPaths);
         $builder->setParameter('symfony_security_auditor.scan.respect_gitignore', $bundleConfiguration->scan->respectGitignore);
         $builder->setParameter('symfony_security_auditor.scan.max_file_size_kb', $bundleConfiguration->scan->maxFileSizeKb);
@@ -467,6 +487,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service(RateLimiterInterface::class),
                 service(TokenEstimatorInterface::class),
                 service(RetryAfterHeaderParser::class),
+                $bundleConfiguration->llm->attackerMaxOutputTokens(),
             ]);
 
         $services->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
@@ -486,6 +507,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service(RateLimiterInterface::class),
                 service(TokenEstimatorInterface::class),
                 service(RetryAfterHeaderParser::class),
+                $bundleConfiguration->llm->reviewerMaxOutputTokens(),
             ]);
 
         $services->alias(LLMClientInterface::class, 'security_auditor.attacker_client');
@@ -532,6 +554,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                     service(RateLimiterInterface::class),
                     service(TokenEstimatorInterface::class),
                     service(RetryAfterHeaderParser::class),
+                    $bundleConfiguration->llm->attackerMaxOutputTokens(),
                 ]);
 
             $services->set('security_auditor.cheap_attacker', AttackerAgent::class)

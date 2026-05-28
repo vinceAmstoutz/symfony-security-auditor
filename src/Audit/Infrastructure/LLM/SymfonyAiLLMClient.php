@@ -56,6 +56,8 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
 
     public const bool DEFAULT_PROVIDER_JSON_MODE = false;
 
+    public const ?int DEFAULT_MAX_OUTPUT_TOKENS = null;
+
     public function __construct(
         private PlatformInterface $platform,
         private string $model,
@@ -71,6 +73,7 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
         private ?RateLimiterInterface $rateLimiter = null,
         private ?TokenEstimatorInterface $tokenEstimator = null,
         private ?RetryAfterHeaderParser $retryAfterHeaderParser = null,
+        private ?int $maxOutputTokens = self::DEFAULT_MAX_OUTPUT_TOKENS,
     ) {}
 
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
@@ -483,6 +486,10 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
 
         if ($this->providerJsonMode) {
             $options['response_format'] = ['type' => 'json_object'];
+        }
+
+        if (null !== $this->maxOutputTokens) {
+            $options['max_tokens'] = $this->maxOutputTokens;
         }
 
         return $options;
