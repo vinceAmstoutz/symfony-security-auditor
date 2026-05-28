@@ -150,13 +150,13 @@ If it happens for **every** chunk, the model is unsuitable. Switch model.
 
 ### `Tool-using loop ended with empty content response` warnings
 
-Logged at `warning` level when the attacker's tool loop ends with an empty
-final content block. Look at the `output_tokens` field: if it sits near a
-multiple of ~1000 (e.g. `1971`, `2000`), the model is being truncated by
-`symfony/ai`'s default `max_tokens = 1000` that ships with the Anthropic
-bridge. Set `max_output_tokens` in the bundle config (default `4096` since
-this fix) — or `attacker_max_output_tokens` / `reviewer_max_output_tokens`
-for per-agent tuning:
+Logged at `warning` level when the attacker's tool loop ends with an empty final
+content block. Look at the `output_tokens` field: if it sits near a multiple of
+~1000 (e.g. `1971`, `2000`), the model is being truncated by `symfony/ai`'s
+default `max_tokens = 1000` that ships with the Anthropic bridge. Set
+`max_output_tokens` in the bundle config (default `4096` since this fix) — or
+`attacker_max_output_tokens` / `reviewer_max_output_tokens` for per-agent
+tuning:
 
 ```yaml
 symfony_security_auditor:
