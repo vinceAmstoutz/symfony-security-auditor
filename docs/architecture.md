@@ -507,14 +507,27 @@ root).
 Build system and user prompts fed to `LLMClientInterface::complete()`. Both are
 pure string builders with no network or I/O dependencies.
 
-The attacker prompt instructs the model to output a JSON array of vulnerability
-objects matching `VulnerabilityFactory::fromArray()`'s expected keys. It injects
-a short severity and confidence rubric, scope-exclusion guidance, a single
-few-shot example, and — when files of the corresponding `ProjectFile` type
-appear in the chunk — per-artifact skill blocks (controller, voter, form,
-repository, entity, template, config, php). Skill blocks emit both attack
-patterns to hunt and patterns explicitly NOT to flag, reducing reviewer noise.
-Blocks are emitted in attack-surface priority order, not alphabetically.
+The attacker prompt has two modes selected by `audit.structured_collection`:
+
+- **`true` (default)** — the prompt instructs the model to record findings via
+  the `record_vulnerability` tool, one call per finding. The tool's input schema
+  mirrors the `Vulnerability` shape and the provider validates each call before
+  the agent ever sees it, so bare-string and wrapper-object drift is
+  structurally impossible.
+- **`false`** — the prompt instructs the model to output a JSON array of
+  vulnerability objects matching `VulnerabilityFactory::fromArray()`'s expected
+  keys. The tightened rules block forbids non-object array elements,
+  environment-keyed wrapper objects, and bare environment-name strings; the
+  `VulnerabilityFactory` then validates each entry with `symfony/validator`
+  before hydration.
+
+Both modes share the same intro, severity/confidence rubrics, file-numbering
+protocol, scope guidance, single few-shot example, and — when files of the
+corresponding `ProjectFile` type appear in the chunk — per-artifact skill blocks
+(controller, voter, form, repository, entity, template, config, php). Skill
+blocks emit both attack patterns to hunt and patterns explicitly NOT to flag,
+reducing reviewer noise. Blocks are emitted in attack-surface priority order,
+not alphabetically.
 
 Source files are wrapped as `<file path="…" type="…">…</file>` and every line is
 prefixed with a line-number marker of the form `` `NNN | ` `` (line number,

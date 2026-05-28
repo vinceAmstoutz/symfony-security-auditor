@@ -788,7 +788,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_prompt_version_is_bumped_when_modern_symfony_skill_blocks_are_added(): void
     {
-        self::assertSame(7, AttackerPromptBuilder::PROMPT_VERSION);
+        self::assertSame(6, AttackerPromptBuilder::PROMPT_VERSION);
     }
 
     public function test_entity_skill_block_mentions_over_permissive_serializer_groups(): void

@@ -496,31 +496,30 @@ in `config/services.yaml` to override the bundled behaviour (see
 - `RecordVulnerabilityToolFactoryInterface` — builds the schema-enforced tool
   used in `audit.structured_collection` mode (default:
   `RecordVulnerabilityToolFactory` returning `RecordVulnerabilityTool`). Swap
-  the factory if you want to enrich the tool's schema (extra fields,
-  tighter enums) without forking the agent — every provider that supports tool
-  use will validate calls against the schema you publish.
+  the factory if you want to enrich the tool's schema (extra fields, tighter
+  enums) without forking the agent — every provider that supports tool use will
+  validate calls against the schema you publish.
 
 ## 6. Schema-Enforced Collection (`audit.structured_collection`)
 
 By default (`audit.structured_collection: true`), the attacker is given a
 `record_vulnerability` tool with a strict JSON-Schema input and the prompt
-instructs it to make one tool call per finding. The provider validates each
-call against the schema before the agent ever sees it, so bare strings,
-wrapper objects, and missing required fields are structurally impossible.
+instructs it to make one tool call per finding. The provider validates each call
+against the schema before the agent ever sees it, so bare strings, wrapper
+objects, and missing required fields are structurally impossible.
 
-Setting `audit.structured_collection: false` falls back to the legacy
-JSON-array prompt path. The tightened prompt still forbids the common drift
-shapes (`["dev", "test", {...}]`, `{"vulnerabilities": [...]}`), but
-enforcement is then prompt-based rather than schema-based — keep this
-fallback for models without tool-use support or when you specifically want
-the JSON path.
+Setting `audit.structured_collection: false` falls back to the legacy JSON-array
+prompt path. The tightened prompt still forbids the common drift shapes
+(`["dev", "test", {...}]`, `{"vulnerabilities": [...]}`), but enforcement is
+then prompt-based rather than schema-based — keep this fallback for models
+without tool-use support or when you specifically want the JSON path.
 
 Internals:
 
 - `RecordVulnerabilityTool` (Infrastructure) implements the Domain port
   `ToolInterface`; its `parametersSchema` mirrors the `Vulnerability` shape and
-  enumerates `VulnerabilityType::cases()` / `VulnerabilitySeverity::cases()`,
-  so adding a new case in Domain auto-propagates to the tool.
+  enumerates `VulnerabilityType::cases()` / `VulnerabilitySeverity::cases()`, so
+  adding a new case in Domain auto-propagates to the tool.
 - `VulnerabilityCollector` (Application) accumulates the validated payloads
   during the conversation and is drained by `AttackerAgent` after each chunk.
 - `RecordVulnerabilityToolFactoryInterface` (Application) is the seam if you
@@ -528,12 +527,12 @@ Internals:
 
 Provider coverage:
 
-| Provider  | Tool input validation                                          |
-| --------- | -------------------------------------------------------------- |
-| Anthropic | Strict — already used by the agent for investigation tools     |
-| OpenAI    | Strict (`strict: true`)                                        |
-| Mistral   | Validated                                                      |
-| Ollama    | Validated, only on tool-capable models                         |
+| Provider  | Tool input validation                                      |
+| --------- | ---------------------------------------------------------- |
+| Anthropic | Strict — already used by the agent for investigation tools |
+| OpenAI    | Strict (`strict: true`)                                    |
+| Mistral   | Validated                                                  |
+| Ollama    | Validated, only on tool-capable models                     |
 
 When the flag is off, the JSON-array path runs with the tightened prompt that
 forbids object wrappers and env-name array elements — that path remains the
