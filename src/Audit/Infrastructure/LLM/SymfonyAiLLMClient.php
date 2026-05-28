@@ -312,17 +312,13 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
             'error' => $emptyllmResponseException->getMessage(),
         ]);
 
-        $llmResponse = LLMResponse::create(
+        return LLMResponse::create(
             content: '',
             inputTokens: 0,
             outputTokens: 0,
             model: $this->model,
             stopReason: 'empty_content',
         );
-        $this->budgetTracker?->recordCall($llmResponse);
-        $this->budgetTracker?->assertWithinBudget();
-
-        return $llmResponse;
     }
 
     private function emptyToolLoopResponseAndLog(

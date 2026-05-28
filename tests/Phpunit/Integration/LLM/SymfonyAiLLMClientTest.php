@@ -1206,6 +1206,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('', $llmResponse->content());
         self::assertSame('empty_content', $llmResponse->stopReason());
         self::assertTrue($llmResponse->isEmpty());
+        self::assertSame(0, $llmResponse->inputTokens());
+        self::assertSame(0, $llmResponse->outputTokens());
         self::assertSame([], $fakeSleeper->durations);
     }
 
@@ -1256,6 +1258,8 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         self::assertSame('', $llmResponse->content());
         self::assertSame('empty_content', $llmResponse->stopReason());
+        self::assertSame(0, $llmResponse->inputTokens());
+        self::assertSame(0, $llmResponse->outputTokens());
     }
 
     public function test_complete_with_tools_logs_warning_when_platform_reports_empty_content(): void
@@ -1287,6 +1291,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         ));
         self::assertCount(1, $emptyLogs);
         self::assertSame(0, $emptyLogs[0][1]['iterations']);
+        self::assertSame(
+            'LLM returned a response with no content: Response does not contain any content.',
+            $emptyLogs[0][1]['error'],
+        );
     }
 
     public function test_complete_does_not_retry_empty_content_failures(): void
