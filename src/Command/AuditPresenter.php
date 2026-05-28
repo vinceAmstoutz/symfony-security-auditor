@@ -38,7 +38,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             return;
         }
 
-        $symfonyStyle->warning(
+        $symfonyStyle->getErrorStyle()->warning(
             'Secret scrubbing is disabled. File contents will be sent verbatim to the configured LLM provider. '
             .'If that provider runs in the cloud, credentials in committed configs or .env.dist files may be exposed. '
             .'Re-enable scan.secret_scrubbing.enabled (the default) or confirm you are using a local provider.',

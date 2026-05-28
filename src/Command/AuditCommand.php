@@ -74,9 +74,7 @@ final readonly class AuditCommand
 
         $this->auditPresenter->header($symfonyStyle, $projectPath);
 
-        if (!$auditCommandInput->isMachineReadableToStdout()) {
-            $this->auditPresenter->preflightWarnings($symfonyStyle, $this->secretScrubbingEnabled);
-        }
+        $this->auditPresenter->preflightWarnings($symfonyStyle, $this->secretScrubbingEnabled);
 
         $scanPaths = $auditCommandInput->scanPaths();
 

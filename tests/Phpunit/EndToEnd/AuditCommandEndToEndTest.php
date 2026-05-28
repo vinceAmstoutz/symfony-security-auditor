@@ -92,16 +92,20 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('Secret scrubbing is disabled', $commandTester->getDisplay());
     }
 
-    public function test_command_suppresses_scrubbing_warning_when_output_is_machine_readable(): void
+    public function test_command_still_emits_scrubbing_warning_for_machine_readable_output_on_stderr(): void
     {
         $this->createProjectDir();
 
         $commandTester = $this->makeCommandTester('[]', '{}', secretScrubbingEnabled: false);
-        $commandTester->execute([
-            'project-path' => $this->fixtureDir,
-            '--format' => 'json',
-        ]);
+        $commandTester->execute(
+            [
+                'project-path' => $this->fixtureDir,
+                '--format' => 'json',
+            ],
+            ['capture_stderr_separately' => true],
+        );
 
+        self::assertStringContainsString('Secret scrubbing is disabled', $commandTester->getErrorOutput());
         self::assertStringNotContainsString('Secret scrubbing is disabled', $commandTester->getDisplay());
     }
 
