@@ -115,8 +115,10 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->preflightWarnings($symfonyStyle, secretScrubbingEnabled: false);
 
         $display = $bufferedOutput->fetch();
-        self::assertStringContainsString('Secret scrubbing is disabled', $display);
-        self::assertStringContainsString('scan.secret_scrubbing.enabled', $display);
+        $flattened = preg_replace('/\s+/', ' ', $display) ?? '';
+        self::assertStringContainsString('Secret scrubbing is disabled. File contents will be sent verbatim to the configured LLM provider.', $flattened);
+        self::assertStringContainsString('If that provider runs in the cloud, credentials in committed configs or .env.dist files may be exposed.', $flattened);
+        self::assertStringContainsString('Re-enable scan.secret_scrubbing.enabled (the default) or confirm you are using a local provider.', $flattened);
     }
 
     public function test_preflight_warnings_are_silent_when_secret_scrubbing_enabled(): void
