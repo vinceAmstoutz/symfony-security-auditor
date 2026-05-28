@@ -80,7 +80,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlice
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRegistryFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
@@ -194,8 +198,19 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(PhpParserControllerAccessControlParser::class);
     $defaultsConfigurator->alias(ControllerAccessControlParserInterface::class, PhpParserControllerAccessControlParser::class);
 
+    $defaultsConfigurator->set(PhpParserVoterCapabilityParser::class);
+    $defaultsConfigurator->alias(VoterCapabilityParserInterface::class, PhpParserVoterCapabilityParser::class);
+
+    $defaultsConfigurator->set(PhpParserFormBindingParser::class);
+    $defaultsConfigurator->alias(FormBindingParserInterface::class, PhpParserFormBindingParser::class);
+
     $defaultsConfigurator->set(MappingStage::class)
-        ->args([service('logger'), service(ControllerAccessControlParserInterface::class)]);
+        ->args([
+            service('logger'),
+            service(ControllerAccessControlParserInterface::class),
+            service(VoterCapabilityParserInterface::class),
+            service(FormBindingParserInterface::class),
+        ]);
 
     $defaultsConfigurator->set(AuditOrchestrator::class)
         ->args([

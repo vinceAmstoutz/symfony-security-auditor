@@ -278,6 +278,26 @@ The attacker prompt renders the full graph as a `Route Access-Control Map`
 block so the LLM can spot missing enforcement without re-deriving it from
 source.
 
+### `VoterCapability` — immutable per-voter `supports()` summary
+
+One entry per voter file emitted by `VoterCapabilityParserInterface` (default
+impl `PhpParserVoterCapabilityParser`). Captures `filePath`, `className`,
+`supportedAttributes` (string literals seen inside `supports()`) and
+`supportedSubjects` (right-hand class names of `instanceof` checks). Helpers
+`coversAttribute(string)` and `coversSubject(string)` answer
+"is there a voter that handles this access decision?" so the prompt's
+`Voter Coverage` block lets the LLM flag `#[IsGranted('ATTR', $subject)]`
+calls that no voter actually backs.
+
+### `FormBinding` — immutable controller → form-type binding
+
+One entry per `$this->createForm(SomeFormType::class)` call site emitted by
+`FormBindingParserInterface` (default impl `PhpParserFormBindingParser`).
+Captures `controllerFilePath`, `controllerMethod`, and `formTypeClass`. The
+attacker prompt renders the list as a `Form Bindings` block so the LLM can
+cross-reference call sites against the form types involved for mass-assignment
+/ CSRF analysis without re-deriving the binding from source.
+
 ### Pipeline ports (`Domain/Pipeline/`)
 
 - `PipelineInterface::process(AuditContext): void`

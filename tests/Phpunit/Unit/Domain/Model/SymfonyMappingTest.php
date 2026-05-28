@@ -14,9 +14,11 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 
 final class SymfonyMappingTest extends TestCase
 {
@@ -35,7 +37,45 @@ final class SymfonyMappingTest extends TestCase
         self::assertEmpty($symfonyMapping->firewallRules());
         self::assertEmpty($symfonyMapping->routeAccessControls());
         self::assertEmpty($symfonyMapping->controllersWithoutAccessCheck());
+        self::assertEmpty($symfonyMapping->voterCapabilities());
+        self::assertEmpty($symfonyMapping->formBindings());
         self::assertSame(0, $symfonyMapping->totalFiles());
+    }
+
+    public function test_it_exposes_voter_capabilities_and_can_find_voters_for_attribute_and_subject(): void
+    {
+        $userVoter = new VoterCapability(
+            filePath: 'src/Security/UserVoter.php',
+            className: 'App\\Security\\UserVoter',
+            supportedAttributes: ['EDIT', 'DELETE'],
+            supportedSubjects: ['App\\Entity\\User'],
+        );
+        $commentVoter = new VoterCapability(
+            filePath: 'src/Security/CommentVoter.php',
+            className: 'App\\Security\\CommentVoter',
+            supportedAttributes: ['VIEW'],
+            supportedSubjects: ['App\\Entity\\Comment'],
+        );
+
+        $symfonyMapping = SymfonyMapping::create(voterCapabilities: [$userVoter, $commentVoter]);
+
+        self::assertSame([$userVoter, $commentVoter], $symfonyMapping->voterCapabilities());
+        self::assertSame([$userVoter], $symfonyMapping->votersFor('EDIT', 'User'));
+        self::assertSame([$commentVoter], $symfonyMapping->votersFor('VIEW', 'App\\Entity\\Comment'));
+        self::assertSame([], $symfonyMapping->votersFor('PUBLISH', 'Post'));
+    }
+
+    public function test_it_exposes_form_bindings_and_can_filter_by_controller(): void
+    {
+        $userEdit = new FormBinding('src/Controller/UserController.php', 'edit', 'App\\Form\\UserType');
+        $userPassword = new FormBinding('src/Controller/UserController.php', 'changePassword', 'App\\Form\\PasswordType');
+        $admin = new FormBinding('src/Controller/AdminController.php', 'create', 'App\\Form\\AdminType');
+
+        $symfonyMapping = SymfonyMapping::create(formBindings: [$userEdit, $userPassword, $admin]);
+
+        self::assertSame([$userEdit, $userPassword, $admin], $symfonyMapping->formBindings());
+        self::assertSame([$userEdit, $userPassword], $symfonyMapping->formBindingsForController('src/Controller/UserController.php'));
+        self::assertSame([], $symfonyMapping->formBindingsForController('src/Controller/Other.php'));
     }
 
     public function test_it_exposes_route_access_controls(): void

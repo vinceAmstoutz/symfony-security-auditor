@@ -15,8 +15,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 
 final class AttackerPromptBuilderTest extends TestCase
@@ -175,6 +177,88 @@ final class AttackerPromptBuilderTest extends TestCase
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
 
         self::assertStringContainsString('(unresolved)', $message);
+    }
+
+    public function test_user_message_renders_voter_coverage_when_capabilities_present(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/UserVoter.php',
+            '/app/src/Security/UserVoter.php',
+            '<?php class UserVoter {}',
+        );
+        $voterCapability = new VoterCapability(
+            filePath: 'src/Security/UserVoter.php',
+            className: 'App\\Security\\UserVoter',
+            supportedAttributes: ['EDIT', 'DELETE'],
+            supportedSubjects: ['App\\Entity\\User'],
+        );
+
+        $symfonyMapping = SymfonyMapping::create(
+            voters: [$projectFile],
+            voterCapabilities: [$voterCapability],
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('Voter Coverage', $message);
+        self::assertStringContainsString('App\\Security\\UserVoter', $message);
+        self::assertStringContainsString('attributes: [EDIT,DELETE]', $message);
+        self::assertStringContainsString('subjects: [App\\Entity\\User]', $message);
+    }
+
+    public function test_user_message_omits_voter_coverage_section_when_no_capabilities(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/PlainController.php',
+            '/app/src/Controller/PlainController.php',
+            '<?php class PlainController {}',
+        );
+
+        $symfonyMapping = SymfonyMapping::create(controllers: [$projectFile]);
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringNotContainsString('Voter Coverage', $message);
+    }
+
+    public function test_user_message_renders_form_bindings_section(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/UserController.php',
+            '/app/src/Controller/UserController.php',
+            '<?php class UserController {}',
+        );
+        $formBinding = new FormBinding(
+            controllerFilePath: 'src/Controller/UserController.php',
+            controllerMethod: 'edit',
+            formTypeClass: 'App\\Form\\UserType',
+        );
+
+        $symfonyMapping = SymfonyMapping::create(
+            controllers: [$projectFile],
+            formBindings: [$formBinding],
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('Form Bindings', $message);
+        self::assertStringContainsString('src/Controller/UserController.php::edit', $message);
+        self::assertStringContainsString('App\\Form\\UserType', $message);
+    }
+
+    public function test_user_message_omits_form_bindings_section_when_empty(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/PlainController.php',
+            '/app/src/Controller/PlainController.php',
+            '<?php class PlainController {}',
+        );
+
+        $symfonyMapping = SymfonyMapping::create(controllers: [$projectFile]);
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringNotContainsString('Form Bindings', $message);
     }
 
     public function test_it_excludes_secured_controllers_from_no_voter_list(): void
@@ -648,7 +732,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_prompt_version_is_bumped_when_modern_symfony_skill_blocks_are_added(): void
     {
-        self::assertSame(6, AttackerPromptBuilder::PROMPT_VERSION);
+        self::assertSame(7, AttackerPromptBuilder::PROMPT_VERSION);
     }
 
     public function test_entity_skill_block_mentions_over_permissive_serializer_groups(): void

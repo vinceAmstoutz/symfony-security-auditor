@@ -50,23 +50,36 @@ JSON/SARIF schema field, or Domain port signature changed.
   (`roles`, `isAdmin`, `passwordHash`, `apiToken`) landing in write-side groups
   (`*:write`) and sensitive fields leaking via read-side groups (`*:read`,
   `public`).
-- **Route → controller access-control graph (Phase 1).** A new
-  `ControllerAccessControlParserInterface` port (default implementation
-  `PhpParserControllerAccessControlParser` using `nikic/php-parser`) walks
-  every controller's AST and emits one `RouteAccessControl` value object per
-  public action, capturing the `#[Route(path:, methods:)]` attribute, both
-  class- and method-level `#[IsGranted(...)]`, and `denyAccessUnlessGranted()`
-  call sites. `SymfonyMapping` gains `routeAccessControls()` and
-  `controllersWithoutAccessCheck()` accessors. `MappingStage` populates the
-  graph and surfaces `mapping.routes` / `mapping.routes_without_access_check`
-  metadata on `AuditContext`. The attacker prompt now ships a `Route
-  Access-Control Map` block listing every action with its enforcement
-  surface — actions tagged with the LACKS marker are direct candidates for
-  `broken_access_control` and `missing_voter` findings.
+- **Full route → controller → voter → form semantic graph.** Three new
+  Domain ports (`ControllerAccessControlParserInterface`,
+  `VoterCapabilityParserInterface`, `FormBindingParserInterface`) with AST-based
+  default implementations (backed by `nikic/php-parser`):
+  - `PhpParserControllerAccessControlParser` walks every controller and emits
+    one `RouteAccessControl` per public action, capturing the
+    `#[Route(path:, methods:)]` attribute, both class- and method-level
+    `#[IsGranted(...)]`, and `denyAccessUnlessGranted()` call sites.
+  - `PhpParserVoterCapabilityParser` walks every voter file and emits a
+    `VoterCapability` describing the attribute strings and `instanceof` subject
+    types referenced inside its `supports()` body.
+  - `PhpParserFormBindingParser` walks every controller and emits one
+    `FormBinding` per `$this->createForm(SomeFormType::class)` call site.
+
+  `SymfonyMapping` gains `routeAccessControls()`,
+  `controllersWithoutAccessCheck()`, `voterCapabilities()`, `votersFor()`,
+  `formBindings()`, and `formBindingsForController()` accessors. `MappingStage`
+  populates the graph and surfaces `mapping.routes`,
+  `mapping.routes_without_access_check`, `mapping.voter_capabilities`, and
+  `mapping.form_bindings` metadata on `AuditContext`. The attacker prompt
+  now ships three new context blocks — `Route Access-Control Map`,
+  `Voter Coverage`, and `Form Bindings` — so the LLM can cross-reference an
+  `#[IsGranted('ATTR', $subject)]` against the voters that actually accept
+  that attribute on that subject (a `missing_voter` finding when nothing
+  matches), and cross-reference `createForm()` call sites against the form
+  types involved (mass-assignment / CSRF surface).
 
 ### Changed
 
-- `AttackerPromptBuilder::PROMPT_VERSION` bumped to **6** and
+- `AttackerPromptBuilder::PROMPT_VERSION` bumped to **7** and
   `RegexStaticPreScanner::CACHE_VERSION` bumped to **2** so cached attacker
   responses invalidate automatically against the new prompt and pattern.
 - `VulnerabilityFactory` now takes a `Symfony\Component\Validator\Validator\ValidatorInterface`
@@ -75,11 +88,12 @@ JSON/SARIF schema field, or Domain port signature changed.
   for end users; downstream custom-agent code that constructs the factory
   manually must pass a `ValidatorInterface` (typically
   `Validation::createValidator()`).
-- `MappingStage` now takes an optional `ControllerAccessControlParserInterface`
-  constructor argument (defaults to a no-op parser to preserve the previous
-  shape). The DI wiring binds the real parser in production.
+- `MappingStage` now takes three optional parser arguments
+  (`ControllerAccessControlParserInterface`, `VoterCapabilityParserInterface`,
+  `FormBindingParserInterface`); each defaults to a no-op parser, preserving
+  the previous shape. The DI wiring binds the real parsers in production.
 - `nikic/php-parser ^5.3` is now a runtime dependency (previously transitive
-  via `phpunit/php-code-coverage`); used by the new controller AST parser.
+  via `phpunit/php-code-coverage`); used by the three AST parsers.
 
 ## [1.4.0] — 2026-05-27 — Bloodhound
 

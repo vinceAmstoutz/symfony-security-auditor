@@ -27,7 +27,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 6;
+    public const int PROMPT_VERSION = 7;
 
     /**
      * Skill-block emission order — by attack-surface priority, NOT alphabetical.
@@ -314,6 +314,8 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
         ));
 
         $accessControlMap = $this->renderRouteAccessControlMap($symfonyMapping);
+        $voterCoverage = $this->renderVoterCoverage($symfonyMapping);
+        $formBindings = $this->renderFormBindings($symfonyMapping);
 
         return <<<PROMPT
             ## Project Mapping Summary
@@ -322,14 +324,47 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             ## Controllers WITHOUT Security Annotations (High Priority)
             {$noVoterList}
 
-            {$accessControlMap}
-            ## Source Code
+            {$accessControlMap}{$voterCoverage}{$formBindings}## Source Code
             Analyze these files for exploitable vulnerabilities. Each line is prefixed with its line number (`NNN | code`) — use those exact numbers when populating `line_start` and `line_end`; do NOT count manually or guess.
 
             {$context}
 
             Return a JSON array of all vulnerabilities found.
             PROMPT;
+    }
+
+    private function renderVoterCoverage(SymfonyMapping $symfonyMapping): string
+    {
+        $voterCapabilities = $symfonyMapping->voterCapabilities();
+        if ([] === $voterCapabilities) {
+            return '';
+        }
+
+        $lines = ['## Voter Coverage'];
+        $lines[] = 'Each line summarises a `Voter::supports()` body: the attributes it accepts and the subject types it gates. Use this to spot `#[IsGranted(\'ATTR\', $subject)]` calls referencing an attribute or subject type that no voter actually covers — that is a `missing_voter` finding.';
+        foreach ($voterCapabilities as $voterCapability) {
+            $attributes = [] === $voterCapability->supportedAttributes() ? '(none)' : implode(',', $voterCapability->supportedAttributes());
+            $subjects = [] === $voterCapability->supportedSubjects() ? '(none)' : implode(',', $voterCapability->supportedSubjects());
+            $lines[] = \sprintf('- %s — attributes: [%s] — subjects: [%s] — %s', $voterCapability->className(), $attributes, $subjects, $voterCapability->filePath());
+        }
+
+        return implode("\n", $lines)."\n\n";
+    }
+
+    private function renderFormBindings(SymfonyMapping $symfonyMapping): string
+    {
+        $formBindings = $symfonyMapping->formBindings();
+        if ([] === $formBindings) {
+            return '';
+        }
+
+        $lines = ['## Form Bindings'];
+        $lines[] = 'Each line records a `$this->createForm(FormType::class)` call site. Cross-reference with the form type to spot mass-assignment vectors (`allow_extra_fields: true`, unbounded `EntityType` choices, missing CSRF on state-changing actions).';
+        foreach ($formBindings as $formBinding) {
+            $lines[] = \sprintf('- %s::%s — %s', $formBinding->controllerFilePath(), $formBinding->controllerMethod(), $formBinding->formTypeClass());
+        }
+
+        return implode("\n", $lines)."\n\n";
     }
 
     private function renderRouteAccessControlMap(SymfonyMapping $symfonyMapping): string
