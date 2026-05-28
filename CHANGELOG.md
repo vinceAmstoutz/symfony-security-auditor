@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
-## [1.5.0] — 2026-05-28 — Bloodhound II
+## [1.5.0] — 2026-05-28 — Cartographer
 
 A visibility, hardening, and coverage release. The auditor now reports how much
 LLM output it had to drop on the floor, warns operators on stderr when sensitive
@@ -79,7 +79,7 @@ Domain port signature changed.
 
 ### Changed
 
-- `AttackerPromptBuilder::PROMPT_VERSION` bumped to **7** and
+- `AttackerPromptBuilder::PROMPT_VERSION` bumped to **5** and
   `RegexStaticPreScanner::CACHE_VERSION` bumped to **2** so cached attacker
   responses invalidate automatically against the new prompt and pattern.
 - `VulnerabilityFactory` now takes a

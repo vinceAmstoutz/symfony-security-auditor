@@ -27,7 +27,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 7;
+    public const int PROMPT_VERSION = 5;
 
     /**
      * Skill-block emission order — by attack-surface priority, NOT alphabetical.
