@@ -575,33 +575,37 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_base_prompt_has_no_trailing_separator_when_no_files(): void
     {
-        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
 
         self::assertStringEndsWith('causes the response to be discarded as malformed.', $prompt);
     }
 
     public function test_base_prompt_has_no_trailing_separator_when_files_have_no_matching_skill(): void
     {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
         $projectFile = ProjectFile::create(
             'unknown.bin',
             '/app/unknown.bin',
             'binary',
         );
 
-        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+        $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
         self::assertStringEndsWith('causes the response to be discarded as malformed.', $prompt);
     }
 
     public function test_skill_block_is_separated_from_base_by_exactly_one_blank_line(): void
     {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
         $projectFile = ProjectFile::create(
             'src/Controller/UserController.php',
             '/app/src/Controller/UserController.php',
             '<?php class UserController {}',
         );
 
-        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+        $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
         self::assertStringContainsString(
             "causes the response to be discarded as malformed.\n\n<skills role=\"controller\">",
@@ -723,7 +727,9 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_base_prompt_includes_few_shot_example_with_traceable_line_numbers(): void
     {
-        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
 
         self::assertStringContainsString('Example finding', $prompt);
         self::assertStringContainsString('"line_start": 42', $prompt);
@@ -984,7 +990,9 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_base_prompt_forbids_non_object_array_elements(): void
     {
-        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
 
         self::assertStringContainsString('Every element of the JSON array MUST be a vulnerability object', $prompt);
         self::assertStringContainsString('NEVER emit a bare string, number, boolean, or null as an array element', $prompt);
@@ -993,7 +1001,9 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_base_prompt_forbids_object_wrappers_around_findings(): void
     {
-        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
 
         self::assertStringContainsString('The top-level value MUST be a JSON array', $prompt);
         self::assertStringContainsString('{"vulnerabilities": [...]}', $prompt);
@@ -1002,7 +1012,9 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_base_prompt_forbids_environment_names_as_array_elements(): void
     {
-        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
 
         self::assertStringContainsString('Environment names, group names, role names', $prompt);
         self::assertStringContainsString('["dev", "test", {...vulnerability...}]', $prompt);
@@ -1044,9 +1056,19 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('call no tools', $prompt);
     }
 
-    public function test_default_prompt_keeps_the_json_array_rules_for_backwards_compatibility(): void
+    public function test_default_prompt_drives_findings_through_the_record_vulnerability_tool(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder();
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('`record_vulnerability` tool', $prompt);
+        self::assertStringNotContainsString('Return ONLY the JSON array', $prompt);
+    }
+
+    public function test_opt_out_prompt_keeps_the_json_array_rules_as_the_safety_net(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
 
         $prompt = $attackerPromptBuilder->buildSystemPrompt();
 

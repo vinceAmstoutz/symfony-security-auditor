@@ -29,7 +29,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      */
     public const int PROMPT_VERSION = 7;
 
-    public const bool DEFAULT_STRUCTURED_COLLECTION = false;
+    public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
     public function __construct(
         private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,

@@ -81,7 +81,7 @@ final readonly class BundleConfiguration
                 codeSlicingMinLines: $config['audit']['code_slicing']['min_lines_before_slicing'],
                 escalationEnabled: $config['audit']['escalation']['enabled'],
                 escalationCheapModel: $config['audit']['escalation']['cheap_model'],
-                structuredCollection: $config['audit']['structured_collection'] ?? false,
+                structuredCollection: $config['audit']['structured_collection'] ?? true,
             ),
             retry: new RetryConfiguration(
                 maxAttempts: $config['audit']['retry']['max_attempts'],

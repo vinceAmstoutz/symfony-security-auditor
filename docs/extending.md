@@ -502,16 +502,18 @@ in `config/services.yaml` to override the bundled behaviour (see
 
 ## 6. Schema-Enforced Collection (`audit.structured_collection`)
 
-By default, the attacker emits findings as a JSON array. Some providers
-occasionally drift from that shape — `["dev", "test", {...}]` or
-`{"vulnerabilities": [...]}` — which the tolerant `VulnerabilityFactory`
-silently drops with a warning.
-
-Setting `audit.structured_collection: true` flips the seam: the attacker is
-given a `record_vulnerability` tool with a strict JSON-Schema input, and the
-prompt instructs it to make one tool call per finding. The provider validates
-each call against the schema before the agent ever sees it, so bare strings,
+By default (`audit.structured_collection: true`), the attacker is given a
+`record_vulnerability` tool with a strict JSON-Schema input and the prompt
+instructs it to make one tool call per finding. The provider validates each
+call against the schema before the agent ever sees it, so bare strings,
 wrapper objects, and missing required fields are structurally impossible.
+
+Setting `audit.structured_collection: false` falls back to the legacy
+JSON-array prompt path. The tightened prompt still forbids the common drift
+shapes (`["dev", "test", {...}]`, `{"vulnerabilities": [...]}`), but
+enforcement is then prompt-based rather than schema-based — keep this
+fallback for models without tool-use support or when you specifically want
+the JSON path.
 
 Internals:
 
@@ -533,6 +535,6 @@ Provider coverage:
 | Mistral   | Validated                                                      |
 | Ollama    | Validated, only on tool-capable models                         |
 
-When the flag is off (default), the JSON-array path still runs with the
-tightened prompt that forbids object wrappers and env-name array elements —
-the structured collection mode is layered on top, not a replacement.
+When the flag is off, the JSON-array path runs with the tightened prompt that
+forbids object wrappers and env-name array elements — that path remains the
+safety net for environments without provider-side tool validation.

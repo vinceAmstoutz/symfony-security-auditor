@@ -45,7 +45,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
     public const bool DEFAULT_LEAN_MODE = false;
 
-    public const bool DEFAULT_STRUCTURED_COLLECTION = false;
+    public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
     private StaticPreScannerInterface $staticPreScanner;
 

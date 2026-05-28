@@ -33,6 +33,6 @@ final readonly class AuditExecutionConfiguration
         public int $codeSlicingMinLines = 80,
         public bool $escalationEnabled = false,
         public ?string $escalationCheapModel = null,
-        public bool $structuredCollection = false,
+        public bool $structuredCollection = true,
     ) {}
 }
