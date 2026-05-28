@@ -78,6 +78,27 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame('App\\Form\\ProfileType', $bindings[1]->formTypeClass());
     }
 
+    public function test_it_skips_unresolvable_create_form_call_but_keeps_subsequent_ones(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Form\UserType;
+            final class MixedController {
+                public function edit(string $dynamicClass): void {
+                    $unresolvable = $this->createForm($dynamicClass);
+                    $resolvable = $this->createForm(UserType::class);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Controller/MixedController.php', '/app/x', $source);
+
+        $bindings = $this->phpParserFormBindingParser->parse($projectFile);
+
+        self::assertCount(1, $bindings);
+        self::assertSame('App\\Form\\UserType', $bindings[0]->formTypeClass());
+    }
+
     public function test_it_continues_past_private_helpers_to_reach_public_create_form(): void
     {
         $source = <<<'PHP'

@@ -108,6 +108,47 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertSame(['App\\Entity\\Comment'], $voterCapability->supportedSubjects());
     }
 
+    public function test_it_collects_multiple_subject_types_from_supports_body(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            use App\Entity\User;
+            use App\Entity\Comment;
+            final class CrossVoter {
+                public function supports(string $attribute, mixed $subject): bool {
+                    return $subject instanceof User || $subject instanceof Comment;
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/CrossVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['App\\Entity\\User', 'App\\Entity\\Comment'], $voterCapability->supportedSubjects());
+    }
+
+    public function test_it_deduplicates_repeated_subject_type_in_supports_body(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            use App\Entity\User;
+            final class RepeatVoter {
+                public function supports(string $attribute, mixed $subject): bool {
+                    return $subject instanceof User || ($subject instanceof User && $attribute === 'EDIT');
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/RepeatVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['App\\Entity\\User'], $voterCapability->supportedSubjects());
+    }
+
     public function test_it_extracts_class_name_with_namespace(): void
     {
         $source = <<<'PHP'

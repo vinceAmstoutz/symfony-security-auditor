@@ -109,7 +109,6 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
     private function collectStringLiterals(array $body, NodeFinder $nodeFinder): array
     {
         $values = [];
-        $seen = [];
         $stringNodes = $nodeFinder->findInstanceOf($body, String_::class);
         foreach ($stringNodes as $stringNode) {
             $value = $stringNode->value;
@@ -117,11 +116,10 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
                 continue;
             }
 
-            if (isset($seen[$value])) {
+            if (\in_array($value, $values, true)) {
                 continue;
             }
 
-            $seen[$value] = true;
             $values[] = $value;
         }
 
@@ -136,7 +134,6 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
     private function collectInstanceofClassNames(array $body, NodeFinder $nodeFinder): array
     {
         $names = [];
-        $seen = [];
         $instanceofNodes = $nodeFinder->findInstanceOf($body, Instanceof_::class);
         foreach ($instanceofNodes as $instanceofNode) {
             $classExpression = $instanceofNode->class;
@@ -145,11 +142,10 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
             }
 
             $resolved = $classExpression->toString();
-            if (isset($seen[$resolved])) {
+            if (\in_array($resolved, $names, true)) {
                 continue;
             }
 
-            $seen[$resolved] = true;
             $names[] = $resolved;
         }
 
