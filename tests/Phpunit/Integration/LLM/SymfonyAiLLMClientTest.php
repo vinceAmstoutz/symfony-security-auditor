@@ -208,6 +208,56 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertArrayNotHasKey('response_format', $invocationOptionsCapture->options);
     }
 
+    public function test_complete_passes_max_output_tokens_via_options_when_configured(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'test-model',
+            new NullLogger(),
+            maxOutputTokens: 4096,
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertSame(4096, $invocationOptionsCapture->options['max_tokens']);
+    }
+
+    public function test_complete_omits_max_output_tokens_when_left_at_default(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger());
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertArrayNotHasKey('max_tokens', $invocationOptionsCapture->options);
+    }
+
+    public function test_complete_with_tools_passes_max_output_tokens_via_options_when_configured(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(
+            new MultiPartResult([new TextResult('done')]),
+            $invocationOptionsCapture,
+        );
+        $toolRegistry = new ToolRegistry([$this->makeTool('lookup', 'lookup')], new NullLogger());
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'test-model',
+            new NullLogger(),
+            maxOutputTokens: 8192,
+        );
+        $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 3);
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertSame(8192, $invocationOptionsCapture->options['max_tokens']);
+    }
+
     public function test_model_returns_configured_model_name(): void
     {
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform(''), 'claude-test', new NullLogger());

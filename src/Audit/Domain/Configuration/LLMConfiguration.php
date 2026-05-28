@@ -19,6 +19,9 @@ final readonly class LLMConfiguration
         private string $model,
         private ?string $attackerModelOverride,
         private ?string $reviewerModelOverride,
+        private int $maxOutputTokens = 4096,
+        private ?int $attackerMaxOutputTokensOverride = null,
+        private ?int $reviewerMaxOutputTokensOverride = null,
         public bool $providerJsonMode = false,
     ) {}
 
@@ -30,5 +33,15 @@ final readonly class LLMConfiguration
     public function reviewerModel(): string
     {
         return $this->reviewerModelOverride ?? $this->model;
+    }
+
+    public function attackerMaxOutputTokens(): int
+    {
+        return $this->attackerMaxOutputTokensOverride ?? $this->maxOutputTokens;
+    }
+
+    public function reviewerMaxOutputTokens(): int
+    {
+        return $this->reviewerMaxOutputTokensOverride ?? $this->maxOutputTokens;
     }
 }

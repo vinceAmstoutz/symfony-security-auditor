@@ -40,4 +40,20 @@ final class LLMConfigurationTest extends TestCase
         self::assertSame('attacker-override', $lLMConfiguration->attackerModel());
         self::assertSame('reviewer-override', $lLMConfiguration->reviewerModel());
     }
+
+    public function test_agent_max_output_tokens_fall_back_to_the_shared_cap_when_no_override_is_set(): void
+    {
+        $lLMConfiguration = new LLMConfiguration('m', null, null, 4096);
+
+        self::assertSame(4096, $lLMConfiguration->attackerMaxOutputTokens());
+        self::assertSame(4096, $lLMConfiguration->reviewerMaxOutputTokens());
+    }
+
+    public function test_agent_max_output_tokens_overrides_take_precedence_over_the_shared_cap(): void
+    {
+        $lLMConfiguration = new LLMConfiguration('m', null, null, 4096, 8192, 2048);
+
+        self::assertSame(8192, $lLMConfiguration->attackerMaxOutputTokens());
+        self::assertSame(2048, $lLMConfiguration->reviewerMaxOutputTokens());
+    }
 }

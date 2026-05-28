@@ -96,6 +96,47 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame('claude-sonnet', $kernel->getContainer()->getParameter('symfony_security_auditor.reviewer_model'));
     }
 
+    public function test_bundle_defaults_max_output_tokens_to_4096_for_both_agents(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+        $container = $kernel->getContainer();
+
+        self::assertSame(4096, $container->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
+        self::assertSame(4096, $container->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
+    }
+
+    public function test_bundle_honors_split_max_output_tokens_overrides(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'attacker_max_output_tokens' => 8192,
+            'reviewer_max_output_tokens' => 2048,
+        ]);
+        $container = $kernel->getContainer();
+
+        self::assertSame(8192, $container->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
+        self::assertSame(2048, $container->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
+    }
+
+    public function test_bundle_max_output_tokens_falls_back_to_shared_cap_when_overrides_omitted(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'max_output_tokens' => 6000,
+        ]);
+        $container = $kernel->getContainer();
+
+        self::assertSame(6000, $container->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
+        self::assertSame(6000, $container->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
+    }
+
+    public function test_bundle_rejects_max_output_tokens_below_one(): void
+    {
+        $this->expectException(Throwable::class);
+
+        $this->boot(['model' => 'gpt-4o', 'max_output_tokens' => 0]);
+    }
+
     public function test_bundle_defaults_structured_collection_to_true_so_provider_validates_findings(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);

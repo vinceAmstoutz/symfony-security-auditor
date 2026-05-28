@@ -106,6 +106,39 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame('claude-opus-4-7', $bundleConfiguration->llm->reviewerModel());
     }
 
+    public function test_max_output_tokens_defaults_flow_through_to_both_agents_when_overrides_omitted(): void
+    {
+        $bundleConfiguration = BundleConfiguration::fromArray($this->treeBuilderOutput());
+
+        self::assertSame(4096, $bundleConfiguration->llm->attackerMaxOutputTokens());
+        self::assertSame(4096, $bundleConfiguration->llm->reviewerMaxOutputTokens());
+    }
+
+    public function test_max_output_tokens_overrides_flow_through_per_agent(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['attacker_max_output_tokens'] = 8192;
+        $config['reviewer_max_output_tokens'] = 2048;
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertSame(8192, $bundleConfiguration->llm->attackerMaxOutputTokens());
+        self::assertSame(2048, $bundleConfiguration->llm->reviewerMaxOutputTokens());
+    }
+
+    public function test_attacker_max_output_tokens_falls_back_to_top_level_when_override_omitted(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['max_output_tokens'] = 6000;
+        $config['attacker_max_output_tokens'] = null;
+        $config['reviewer_max_output_tokens'] = null;
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertSame(6000, $bundleConfiguration->llm->attackerMaxOutputTokens());
+        self::assertSame(6000, $bundleConfiguration->llm->reviewerMaxOutputTokens());
+    }
+
     public function test_budget_is_not_unlimited_when_token_cap_set(): void
     {
         $config = $this->treeBuilderOutput();
@@ -169,6 +202,9 @@ final class BundleConfigurationTest extends TestCase
      *     model: string,
      *     attacker_model: string|null,
      *     reviewer_model: string|null,
+     *     max_output_tokens: int,
+     *     attacker_max_output_tokens: int|null,
+     *     reviewer_max_output_tokens: int|null,
      *     provider_json_mode: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
      *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
@@ -181,6 +217,9 @@ final class BundleConfigurationTest extends TestCase
             'model' => 'claude-opus-4-7',
             'attacker_model' => null,
             'reviewer_model' => 'claude-haiku-4-5-20251001',
+            'max_output_tokens' => 4096,
+            'attacker_max_output_tokens' => null,
+            'reviewer_max_output_tokens' => null,
             'provider_json_mode' => false,
             'scan' => [
                 'included_paths' => ['src', 'config', 'templates', 'public/index.php'],
