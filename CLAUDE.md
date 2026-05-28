@@ -62,7 +62,7 @@ Commit messages are validated separately in CI via
 src/
   Audit/
     Domain/          # Pure PHP — no framework, no I/O
-      Model/         # Value objects and enums (Vulnerability, AuditReport, ProjectFile, ProjectFileType, …)
+      Model/         # Value objects and enums (Vulnerability, AuditReport, ProjectFile, ProjectFileType, VulnerabilityHydrationResult, VulnerabilityDropReason, …)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)
       Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, StaticPreScannerInterface, CodeSlicerInterface, GitChangedFilesResolverInterface)
         Tool/        # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface

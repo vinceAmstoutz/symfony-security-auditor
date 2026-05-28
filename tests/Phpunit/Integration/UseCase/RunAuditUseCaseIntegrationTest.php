@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\UseCase;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
@@ -153,7 +154,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         $reviewerLLM->method('complete')->willReturn(LLMResponse::create('{}', 0, 0, 'gpt-4o', 'end_turn'));
 
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger()), new NullAttackerCache(), new NullLogger()),
+            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger()),
             new ReviewerAgent($reviewerLLM, new ReviewerPromptBuilder(), new NullLogger()),
             new NullLogger(),
         );
@@ -230,7 +231,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
         // batchSize > 1 routes through reviewBatch instead of reviewSingle.
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger()), new NullAttackerCache(), new NullLogger()),
+            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger()),
             new ReviewerAgent($reviewerLLM, new ReviewerPromptBuilder(), new NullLogger(), batchSize: 5),
             new NullLogger(),
         );
@@ -335,7 +336,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         LoggerInterface $logger,
     ): RunAuditUseCase {
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger()), new NullAttackerCache(), new NullLogger()),
+            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger()),
             new ReviewerAgent($reviewerLLM, new ReviewerPromptBuilder(), new NullLogger()),
             new NullLogger(),
         );
@@ -368,7 +369,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         );
 
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger()), new NullAttackerCache(), new NullLogger()),
+            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger()),
             new ReviewerAgent($reviewerLLM, new ReviewerPromptBuilder(), new NullLogger()),
             new NullLogger(),
         );

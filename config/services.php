@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Validator\Validation;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
@@ -155,7 +157,11 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ]);
     $defaultsConfigurator->alias(ProjectFileScannerInterface::class, ProjectFileScanner::class);
 
-    $defaultsConfigurator->set(VulnerabilityFactory::class);
+    $defaultsConfigurator->set(VulnerabilityFactory::class)
+        ->args([
+            service('logger')->ignoreOnInvalid(),
+            inline_service(ValidatorInterface::class)->factory([Validation::class, 'createValidator']),
+        ]);
     $defaultsConfigurator->set(AttackerPromptBuilder::class);
     $defaultsConfigurator->alias(AttackerPromptBuilderInterface::class, AttackerPromptBuilder::class);
 

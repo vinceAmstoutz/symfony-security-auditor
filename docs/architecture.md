@@ -376,10 +376,20 @@ any error: returns the vulnerability with `reviewerValidated = false`.
 ### `VulnerabilityFactory`
 
 Parses raw `array<string, mixed>` from LLM JSON output into `Vulnerability`
-instances. Invalid or missing fields are handled with null-coalescing casts.
-Invalid enum values cause a caught `\Throwable` — `fromArray()` returns `null`.
-`fromList()` silently drops nulls, returning only successfully hydrated
-instances.
+instances. Each entry is first checked against `symfony/validator` constraints
+(non-blank `title` / `description` / `file_path`, sane length bounds on every
+free-text field); on violation the entry is dropped under
+`VulnerabilityDropReason::VALIDATION_FAILED`. Surviving entries are hydrated;
+invalid or missing fields are handled with null-coalescing casts; invalid enum
+values cause a caught `\Throwable` and the entry is dropped under
+`VulnerabilityDropReason::HYDRATION_FAILED`. Non-array list entries are dropped
+under `VulnerabilityDropReason::NON_ARRAY_ENTRY`.
+
+`fromArray()` still returns `?Vulnerability`. `fromList()` returns a
+`VulnerabilityHydrationResult` value object exposing both the hydrated
+vulnerabilities and per-reason drop counts. `AttackerAgent::analyze` aggregates
+the per-chunk drop counts and surfaces them on its `Attacker agent complete`
+info log as `total_dropped_entries` / `dropped_by_reason`.
 
 ---
 

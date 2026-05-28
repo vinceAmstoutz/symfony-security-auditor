@@ -20,6 +20,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\ErrorHandler\BufferingLogger;
+use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
@@ -168,7 +169,7 @@ final class AttackerAgentTest extends TestCase
         $attackerAgent = new AttackerAgent(
             llmClient: $llmClient,
             attackerPromptBuilder: new AttackerPromptBuilder(),
-            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger()),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
             attackerCache: new NullAttackerCache(),
             logger: new NullLogger(),
             codeSlicer: $codeSlicer,
@@ -550,7 +551,7 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
 
         self::assertSame(['Attacker agent starting analysis', ['files' => 2, 'files_filtered_lean' => 0, 'markers' => 0, 'tools_enabled' => false, 'cache_bypassed' => false, 'previous_findings' => 0]], $infoLogs[0]);
-        self::assertSame(['Attacker agent complete', ['total_vulnerabilities' => 0]], $infoLogs[1]);
+        self::assertSame(['Attacker agent complete', ['total_vulnerabilities' => 0, 'total_dropped_entries' => 0, 'dropped_by_reason' => []]], $infoLogs[1]);
     }
 
     public function test_it_logs_debug_chunk_complete_with_exact_context(): void
@@ -578,7 +579,7 @@ final class AttackerAgentTest extends TestCase
         self::assertCount(2, $debugLogs);
         self::assertSame('Analyzing chunk 1/1', $debugLogs[0][0]);
         self::assertSame('Chunk analysis complete', $debugLogs[1][0]);
-        self::assertSame(['chunk' => 1, 'found' => 0, 'total_so_far' => 0], $debugLogs[1][1]);
+        self::assertSame(['chunk' => 1, 'found' => 0, 'dropped' => 0, 'total_so_far' => 0], $debugLogs[1][1]);
     }
 
     public function test_it_logs_debug_analyzing_chunk_with_one_based_index_for_multiple_chunks(): void
@@ -1582,7 +1583,7 @@ final class AttackerAgentTest extends TestCase
         return new AttackerAgent(
             llmClient: $llmClient,
             attackerPromptBuilder: new AttackerPromptBuilder(),
-            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger()),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
             attackerCache: $attackerCache ?? new NullAttackerCache(),
             logger: $logger ?? new NullLogger(),
             toolRegistryFactory: $toolRegistryFactory,

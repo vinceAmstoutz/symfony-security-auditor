@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
@@ -206,7 +207,7 @@ final class FullAuditEndToEndTest extends TestCase
     private function makeUseCase(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM): RunAuditUseCase
     {
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger()), new NullAttackerCache(), new NullLogger()),
+            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger()),
             new ReviewerAgent($reviewerLLM, new ReviewerPromptBuilder(), new NullLogger()),
             new NullLogger(),
         );

@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\ErrorHandler\BufferingLogger;
+use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
@@ -684,7 +685,7 @@ final class StagesTest extends TestCase
             attackerAgent: new AttackerAgent(
                 llmClient: $attackerLlm ?? self::createStub(LLMClientInterface::class),
                 attackerPromptBuilder: new AttackerPromptBuilder(),
-                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger()),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
                 attackerCache: new NullAttackerCache(),
                 logger: new NullLogger(),
             ),
