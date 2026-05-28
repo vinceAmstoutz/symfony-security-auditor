@@ -101,6 +101,14 @@ final class RegexSecretScrubberTest extends TestCase
             "'api_key' => 'abcdefghij1234567890'",
             '***REDACTED:inline_assignment***',
         ];
+        yield 'database_url_connection_string' => [
+            'DATABASE_URL=postgres://app_user:s3cr3tValue@db.example.com:5432/app',
+            '***REDACTED:connection_uri***',
+        ];
+        yield 'redis_url_connection_string_without_user' => [
+            'REDIS_URL=redis://:s3cr3tValue@localhost:6379',
+            '***REDACTED:connection_uri***',
+        ];
     }
 
     #[DataProvider('symfonyPlaceholderCases')]
@@ -183,6 +191,20 @@ final class RegexSecretScrubberTest extends TestCase
         $output = $this->regexSecretScrubber->scrub('STRIPE_SECRET_KEY=sk_super_secret_value');
 
         self::assertSame('STRIPE_SECRET_KEY=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_connection_uri_redaction_preserves_scheme_and_host(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('DATABASE_URL=postgres://app_user:s3cr3tValue@db.internal:5432/app');
+
+        self::assertSame('DATABASE_URL=postgres://***REDACTED:connection_uri***@db.internal:5432/app', $output);
+    }
+
+    public function test_it_leaves_credential_free_urls_unmodified(): void
+    {
+        $url = 'see https://example.com:8080/docs?token=public for details';
+
+        self::assertSame($url, $this->regexSecretScrubber->scrub($url));
     }
 
     public function test_runtime_pcre_failure_continues_to_remaining_patterns(): void
