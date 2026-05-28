@@ -66,6 +66,13 @@ final readonly class TransientFailureClassifier
         'rate_limit',
     ];
 
+    /** @var list<string> */
+    private const array EMPTY_CONTENT_HINTS = [
+        'does not contain any content',
+        'response does not contain',
+        'no content blocks',
+    ];
+
     public function isTransient(Throwable $throwable): bool
     {
         $joined = $this->joinMessages($throwable);
@@ -75,6 +82,19 @@ final readonly class TransientFailureClassifier
         }
 
         return u($joined)->containsAny(self::TRANSIENT_HINTS);
+    }
+
+    /**
+     * Recognises framework-level "the LLM returned no content blocks" errors
+     * raised by symfony/ai converters when the model responds with an empty
+     * content array. Such responses are not a transport or auth failure —
+     * the call succeeded, the model chose to say nothing — so they must not
+     * abort the audit. Callers translate this into an empty `LLMResponse`
+     * and continue.
+     */
+    public function isEmptyContent(Throwable $throwable): bool
+    {
+        return u($this->joinMessages($throwable))->containsAny(self::EMPTY_CONTENT_HINTS);
     }
 
     /**

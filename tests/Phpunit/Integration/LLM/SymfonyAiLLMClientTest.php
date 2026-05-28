@@ -1188,6 +1188,127 @@ final class SymfonyAiLLMClientTest extends TestCase
         }
     }
 
+    public function test_complete_returns_empty_response_when_platform_reports_empty_content(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->emptyContentPlatform('Response does not contain any content.');
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(maxAttempts: 5, jitterSource: static fn (): float => 0.5),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+        );
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame('', $llmResponse->content());
+        self::assertSame('empty_content', $llmResponse->stopReason());
+        self::assertTrue($llmResponse->isEmpty());
+        self::assertSame([], $fakeSleeper->durations);
+    }
+
+    public function test_complete_logs_warning_when_platform_reports_empty_content(): void
+    {
+        /** @var list<array{string, array<string, mixed>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $this->emptyContentPlatform('Response does not contain any content.'),
+            'm',
+            $logger,
+            transientFailureClassifier: new TransientFailureClassifier(),
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        $emptyLogs = array_values(array_filter(
+            $warnings,
+            static fn (array $entry): bool => 'LLM returned a response with no content blocks' === $entry[0],
+        ));
+        self::assertCount(1, $emptyLogs);
+        self::assertSame(
+            'LLM returned a response with no content: Response does not contain any content.',
+            $emptyLogs[0][1]['error'],
+        );
+    }
+
+    public function test_complete_with_tools_returns_empty_response_when_platform_reports_empty_content_on_first_iteration(): void
+    {
+        $tool = $this->makeTool('lookup', 'lookup');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $this->emptyContentPlatform('Response does not contain any content.'),
+            'm',
+            new NullLogger(),
+            transientFailureClassifier: new TransientFailureClassifier(),
+        );
+
+        $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
+
+        self::assertSame('', $llmResponse->content());
+        self::assertSame('empty_content', $llmResponse->stopReason());
+    }
+
+    public function test_complete_with_tools_logs_warning_when_platform_reports_empty_content(): void
+    {
+        $tool = $this->makeTool('lookup', 'lookup');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        /** @var list<array{string, array<string, mixed>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $this->emptyContentPlatform('Response does not contain any content.'),
+            'm',
+            $logger,
+            transientFailureClassifier: new TransientFailureClassifier(),
+        );
+
+        $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
+
+        $emptyLogs = array_values(array_filter(
+            $warnings,
+            static fn (array $entry): bool => 'Tool-using loop ended with empty content response' === $entry[0],
+        ));
+        self::assertCount(1, $emptyLogs);
+        self::assertSame(0, $emptyLogs[0][1]['iterations']);
+    }
+
+    public function test_complete_does_not_retry_empty_content_failures(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $platformInvocationLog = new PlatformInvocationLog();
+        $platform = $this->emptyContentPlatform('Response does not contain any content.', $platformInvocationLog);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(maxAttempts: 5, jitterSource: static fn (): float => 0.5),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: $fakeSleeper,
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame(1, $platformInvocationLog->invocations);
+        self::assertSame([], $fakeSleeper->durations);
+    }
+
     public function test_complete_uses_rate_limit_delay_for_429_errors(): void
     {
         $fakeSleeper = new FakeSleeper();
@@ -1419,6 +1540,34 @@ final class SymfonyAiLLMClientTest extends TestCase
 
                 return new DeferredResult(
                     $converter,
+                    new InMemoryRawResult(['text' => ''], [], (object) []),
+                    $options,
+                );
+            }
+
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+    }
+
+    private function emptyContentPlatform(string $message, ?PlatformInvocationLog $platformInvocationLog = null): PlatformInterface
+    {
+        return new class($message, $platformInvocationLog) implements PlatformInterface {
+            public function __construct(
+                private readonly string $message,
+                private readonly ?PlatformInvocationLog $platformInvocationLog,
+            ) {}
+
+            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                if ($this->platformInvocationLog instanceof PlatformInvocationLog) {
+                    ++$this->platformInvocationLog->invocations;
+                }
+
+                return new DeferredResult(
+                    new ThrowingConverter(new RuntimeException($this->message)),
                     new InMemoryRawResult(['text' => ''], [], (object) []),
                     $options,
                 );
