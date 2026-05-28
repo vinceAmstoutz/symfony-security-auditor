@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Fixed
+
+- **Connection-string credentials leaked to the LLM.** `RegexSecretScrubber`
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) had no pattern
+  for URIs with embedded credentials, so values like
+  `DATABASE_URL=postgres://user:s3cret@host` or `REDIS_URL=redis://:pass@host`
+  were sent verbatim to the LLM provider — the env-assignment pattern only
+  matches names ending in `_TOKEN`/`_SECRET`/`_PASSWORD`/`_KEY`/`_DSN`, never
+  `_URL`. A new `connection_uri` pattern surgically redacts the `user:pass@`
+  segment while preserving the scheme and host
+  (`postgres://***REDACTED:connection_uri***@host`).
+
 ## [1.6.2] — 2026-05-28 — Headroom
 
 A bug-fix release. The audit was silently truncating every LLM call at ~1000

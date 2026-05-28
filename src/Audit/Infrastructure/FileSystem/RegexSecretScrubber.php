@@ -22,7 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Excepti
  *
  * The pattern set covers common high-signal leaks: cloud provider keys, version-control
  * tokens, payment processor keys, generic credential assignments, JWT-shaped tokens,
- * PEM-encoded private keys, and env-style token assignments. Each match is replaced
+ * PEM-encoded private keys, env-style token assignments, and connection-string URIs with
+ * embedded credentials (e.g. `postgres://user:pass@host`). Each match is replaced
  * with `***REDACTED:<label>***` so downstream prompt builders can still emit a coherent
  * file context without exposing the secret to the LLM.
  *
@@ -42,6 +43,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         SecretPatternLabel::GoogleApiKey->value => '/\bAIza[0-9A-Za-z_\-]{35}\b/',
         SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
         SecretPatternLabel::PemPrivateKey->value => '/-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/',
+        SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]*://)[^:@/\s]*:[^@/\s]+@~i',
         SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9_]*_(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|API_KEY|DSN)|PASSWORD|SECRET|API_KEY))\s*=\s*(?!\s*\n)([^\s#]+)/m',
         SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=])\s*["\'])([^"\'\n]{4,})(["\'])/i',
     ];
@@ -92,6 +94,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     {
         return match (SecretPatternLabel::tryFrom($label)) {
             SecretPatternLabel::EnvAssignment => '$1=***REDACTED:'.$label.'***',
+            SecretPatternLabel::ConnectionUri => '$1***REDACTED:'.$label.'***@',
             default => '***REDACTED:'.$label.'***',
         };
     }
