@@ -97,7 +97,6 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(3, $startLog[1]['system_length']);
         self::assertSame(11, $startLog[1]['user_length']);
         self::assertSame(0.42, $startLog[1]['temperature']);
-        self::assertFalse($startLog[1]['prompt_caching']);
     }
 
     public function test_complete_logs_debug_response_with_content_length(): void
@@ -149,49 +148,62 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertArrayNotHasKey('temperature', $invocationOptionsCapture->options);
     }
 
-    public function test_complete_passes_prompt_caching_flag_when_enabled(): void
+    public function test_complete_never_sends_cache_control_even_for_anthropic_model(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger(), promptCaching: true);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'claude-opus-4-8', new NullLogger());
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
-        self::assertSame(['type' => 'ephemeral'], $invocationOptionsCapture->options['cache_control']);
+        self::assertArrayNotHasKey('cache_control', $invocationOptionsCapture->options);
     }
 
-    public function test_complete_passes_provider_json_mode_response_format_when_enabled(): void
+    public function test_complete_passes_provider_json_mode_response_format_for_anthropic_model(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger(), providerJsonMode: true);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'claude-opus-4-8', new NullLogger(), providerJsonMode: true);
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
         self::assertSame(['type' => 'json_object'], $invocationOptionsCapture->options['response_format']);
     }
 
-    public function test_complete_passes_all_base_options_together_when_multiple_flags_enabled(): void
+    public function test_complete_omits_response_format_for_non_anthropic_model_even_when_json_mode_enabled(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'gemini-3.1-pro-preview', new NullLogger(), providerJsonMode: true);
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertArrayNotHasKey('response_format', $invocationOptionsCapture->options);
+    }
+
+    public function test_complete_passes_all_anthropic_options_together_when_multiple_flags_enabled(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
             $platform,
-            'test-model',
+            'claude-opus-4-8',
             new NullLogger(),
             temperature: 0.5,
-            promptCaching: true,
             providerJsonMode: true,
+            maxOutputTokens: 4096,
         );
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
         self::assertSame(0.5, $invocationOptionsCapture->options['temperature']);
-        self::assertSame(['type' => 'ephemeral'], $invocationOptionsCapture->options['cache_control']);
         self::assertSame(['type' => 'json_object'], $invocationOptionsCapture->options['response_format']);
+        self::assertSame(4096, $invocationOptionsCapture->options['max_tokens']);
+        self::assertArrayNotHasKey('cache_control', $invocationOptionsCapture->options);
     }
 
     public function test_complete_omits_response_format_when_provider_json_mode_disabled(): void
@@ -199,23 +211,21 @@ final class SymfonyAiLLMClientTest extends TestCase
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-        // Default constructor (no providerJsonMode) — option must be absent so providers
-        // that reject unknown keys keep working.
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'claude-opus-4-8', new NullLogger());
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
         self::assertArrayNotHasKey('response_format', $invocationOptionsCapture->options);
     }
 
-    public function test_complete_passes_max_output_tokens_via_options_when_configured(): void
+    public function test_complete_passes_max_output_tokens_via_options_for_anthropic_model(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
             $platform,
-            'test-model',
+            'claude-opus-4-8',
             new NullLogger(),
             maxOutputTokens: 4096,
         );
@@ -225,19 +235,48 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(4096, $invocationOptionsCapture->options['max_tokens']);
     }
 
-    public function test_complete_omits_max_output_tokens_when_left_at_default(): void
+    public function test_complete_omits_max_output_tokens_for_non_anthropic_model_even_when_configured(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'gemini-3.1-pro-preview',
+            new NullLogger(),
+            maxOutputTokens: 4096,
+        );
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
         self::assertArrayNotHasKey('max_tokens', $invocationOptionsCapture->options);
     }
 
-    public function test_complete_with_tools_passes_max_output_tokens_via_options_when_configured(): void
+    public function test_complete_still_sends_temperature_for_non_anthropic_model(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'gemini-3.1-pro-preview', new NullLogger(), temperature: 0.7);
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertSame(0.7, $invocationOptionsCapture->options['temperature']);
+    }
+
+    public function test_complete_omits_max_output_tokens_when_left_at_default(): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'claude-opus-4-8', new NullLogger());
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertNotNull($invocationOptionsCapture->options);
+        self::assertArrayNotHasKey('max_tokens', $invocationOptionsCapture->options);
+    }
+
+    public function test_complete_with_tools_passes_max_output_tokens_via_options_for_anthropic_model(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(
@@ -248,7 +287,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
             $platform,
-            'test-model',
+            'claude-opus-4-8',
             new NullLogger(),
             maxOutputTokens: 8192,
         );

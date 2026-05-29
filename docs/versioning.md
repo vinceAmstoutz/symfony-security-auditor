@@ -51,7 +51,9 @@ Every key under `symfony_security_auditor:` documented in
   `audit.budget.max_cost_usd`, `audit.rate_limit.requests_per_minute`,
   `audit.rate_limit.input_tokens_per_minute`,
   `audit.rate_limit.output_tokens_per_minute`
-- `cache.enabled`, `cache.dir`, `cache.prompt_caching`
+- `cache.enabled`, `cache.dir`, `cache.prompt_caching` (the last is **deprecated
+  since 1.7** — see [Deprecation policy](#deprecation-policy) — still accepted
+  but ignored)
 
 Default values for these keys are also part of the contract. Changing a default
 is a `MAJOR` change.
@@ -179,6 +181,17 @@ When a public-API element needs to be removed:
 Triggering `@trigger_error(..., E_USER_DEPRECATED)` at runtime is reserved for
 behavior changes that callers may notice; pure naming or signature deprecations
 are documented in the changelog only.
+
+### Currently deprecated
+
+- **`cache.prompt_caching`** (since 1.7) — once set `cache_control: ephemeral`
+  on every LLM call, but current `symfony/ai` bridges no longer read that
+  option: Anthropic caching is driven by `cache_retention` on the platform in
+  `ai.yaml` (default `short`), and OpenAI/Gemini cache automatically. The key is
+  still accepted and emits a Symfony deprecation when set; it has no effect.
+  Remove it from your config and, if you want a longer Anthropic cache window,
+  set `cache_retention: long` on the `anthropic` platform in `ai.yaml`.
+  Scheduled for removal in the next `MAJOR`.
 
 ---
 

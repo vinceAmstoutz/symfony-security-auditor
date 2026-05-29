@@ -186,8 +186,9 @@ prompt caching enabled (default):
 | GPT-4o only                         | $2 – $6              |
 | DeepSeek / Mistral / Ollama (local) | ~$0 / $0             |
 
-Tips: enable `cache.prompt_caching` (default), use `cache.enabled` for repeated
-CI runs, use split-model in CI, run nightly not per-PR. See
+Tips: enable Anthropic prompt caching (`cache_retention` in `ai.yaml`; default
+`short` already on), use `cache.enabled` for repeated CI runs, use split-model
+in CI, run nightly not per-PR. See
 [CI → Managing LLM Costs](ci.md#managing-llm-costs).
 
 ### How long does an audit take?
@@ -203,9 +204,12 @@ The Attacker chunks files in groups of 10 and computes a content hash. Identical
 chunks (same files, same content) skip the LLM entirely — `cache.enabled: true`
 (the default) gives ~80% cost reduction on repeated CI runs of unchanged code.
 
-`cache.prompt_caching: true` (also default) is Anthropic-specific prompt caching
-for ~90% **input-token** discount on prompts that share a long system message.
-Silently ignored by non-Anthropic providers (zero cost to leave on).
+Provider-side **prompt caching** stacks on top of that for a ~90%
+**input-token** discount on prompts that share a long system message. It is
+configured on the `symfony/ai` platform, not in this bundle: set
+`cache_retention` (`short`/`long`) on the `anthropic` platform in `ai.yaml`
+(default `short` already enables it); OpenAI and Gemini cache automatically. The
+old `cache.prompt_caching` bundle flag is deprecated since 1.7 and ignored.
 
 ---
 

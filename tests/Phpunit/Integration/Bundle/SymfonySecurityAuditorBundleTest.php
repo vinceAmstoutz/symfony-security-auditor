@@ -290,14 +290,26 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             'cache' => [
                 'enabled' => false,
                 'dir' => '/custom/cache/path',
-                'prompt_caching' => false,
             ],
         ]);
         $container = $kernel->getContainer();
 
         self::assertFalse($container->getParameter('symfony_security_auditor.cache.enabled'));
         self::assertSame('/custom/cache/path', $container->getParameter('symfony_security_auditor.cache.dir'));
-        self::assertFalse($container->getParameter('symfony_security_auditor.cache.prompt_caching'));
+    }
+
+    public function test_bundle_accepts_deprecated_prompt_caching_key_and_still_exposes_its_value(): void
+    {
+        $this->expectUserDeprecationMessageMatches('/The "prompt_caching" option is deprecated and no longer has any effect/');
+
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'cache' => [
+                'prompt_caching' => false,
+            ],
+        ]);
+
+        self::assertFalse($kernel->getContainer()->getParameter('symfony_security_auditor.cache.prompt_caching'));
     }
 
     public function test_bundle_wires_filesystem_attacker_cache_when_cache_enabled(): void
