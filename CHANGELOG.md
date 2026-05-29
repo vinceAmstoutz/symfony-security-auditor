@@ -34,16 +34,17 @@ structured-collection mode, not an error.
   very first call returns empty (genuine anomaly — refusal, content filter, or
   provider quirk before any work was done). The message string and payload shape
   are unchanged so existing log scrapers / dashboards continue to match.
-- **Misleading `(estimated)` suffix on the real-run cost line.**
+- **Cost line removed from the real-run console report.**
   `ReportRenderer::renderConsole()`
-  (`src/Audit/Infrastructure/Report/ReportRenderer.php`) appended `(estimated)`
-  to the `Cost    : $X.XXXX` line of the console report even after a real audit,
-  where the cost is computed from the platform's reported token usage — not
-  estimated. The suffix made operators second-guess what they actually spent.
-  The line now reads `Cost    : $0.3755` flat. The dry-run path
-  (`AuditPresenter::dryRunResult()`) still renders `(estimate)` because the cost
-  there really is an estimate from `EstimateAuditCostUseCase` with no LLM calls.
-  The SARIF `properties.estimated_cost_usd` key is unchanged (schema-stable).
+  (`src/Audit/Infrastructure/Report/ReportRenderer.php`) used to print
+  `Cost    : $X.XXXX` and a per-role breakdown after every audit. The number
+  comes from a static `PricingProvider` table multiplied against actual token
+  usage, so it's a rough estimate that diverges from real provider invoices
+  (volume discounts, contract pricing, prompt-cache rebates) and operators
+  shouldn't anchor on it. The tokens line still prints (factual, model-tagged),
+  and the dry-run path (`AuditPresenter::dryRunResult()`) is unchanged —
+  estimating cost is its whole point. JSON and SARIF outputs still carry
+  `estimated_cost_usd` for downstream parsers / dashboards.
 
 ## [1.6.3] — 2026-05-28 — Watertight
 
