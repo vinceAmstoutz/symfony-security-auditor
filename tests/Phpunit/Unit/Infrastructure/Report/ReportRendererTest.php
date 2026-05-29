@@ -518,6 +518,15 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('{{primaryModel}}', $output);
     }
 
+    public function test_render_console_renders_cost_without_estimated_suffix(): void
+    {
+        $auditReport = $this->makeReportWithCost(AuditCost::of(100, 50, 0.3755, 'claude-opus-4-7'));
+        $output = $this->reportRenderer->renderConsole($auditReport);
+
+        self::assertStringContainsString('Cost    : $0.3755', $output);
+        self::assertStringNotContainsString('(estimated)', $output);
+    }
+
     public function test_render_console_substitutes_actual_model_name_when_primary_model_is_set(): void
     {
         $auditReport = $this->makeReportWithCost(AuditCost::of(100, 50, 0.05, 'claude-opus-4-7'));

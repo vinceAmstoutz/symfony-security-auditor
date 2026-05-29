@@ -34,6 +34,16 @@ structured-collection mode, not an error.
   very first call returns empty (genuine anomaly — refusal, content filter, or
   provider quirk before any work was done). The message string and payload shape
   are unchanged so existing log scrapers / dashboards continue to match.
+- **Misleading `(estimated)` suffix on the real-run cost line.**
+  `ReportRenderer::renderConsole()`
+  (`src/Audit/Infrastructure/Report/ReportRenderer.php`) appended `(estimated)`
+  to the `Cost    : $X.XXXX` line of the console report even after a real audit,
+  where the cost is computed from the platform's reported token usage — not
+  estimated. The suffix made operators second-guess what they actually spent.
+  The line now reads `Cost    : $0.3755` flat. The dry-run path
+  (`AuditPresenter::dryRunResult()`) still renders `(estimate)` because the cost
+  there really is an estimate from `EstimateAuditCostUseCase` with no LLM calls.
+  The SARIF `properties.estimated_cost_usd` key is unchanged (schema-stable).
 
 ## [1.6.3] — 2026-05-28 — Watertight
 

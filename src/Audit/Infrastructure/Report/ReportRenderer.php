@@ -48,7 +48,7 @@ final readonly class ReportRenderer
             '{{filesScanned}}' => $auditReport->filesScanned(),
             '{{tokens}}' => \sprintf('%s in / %s out', number_format($cost->inputTokens()), number_format($cost->outputTokens())),
             '{{primaryModel}}' => '' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel(),
-            '{{cost}}' => \sprintf('$%.4f (estimated)', $cost->estimatedCostUsd()),
+            '{{cost}}' => \sprintf('$%.4f', $cost->estimatedCostUsd()),
             '{{costBreakdown}}' => $this->renderCostBreakdown($auditReport),
             '{{riskLevel}}' => $auditReport->riskLevel(),
             '{{riskScore}}' => $auditReport->riskScore(),
