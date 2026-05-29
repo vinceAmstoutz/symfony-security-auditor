@@ -10,6 +10,42 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.6.4] — 2026-05-28 — Hush
+
+A log-hygiene release. `audit:run` no longer emits a `warning` when the
+attacker's structured-collection tool loop ends with empty content after at
+least one tool-using iteration — that is the intended termination signal in
+structured-collection mode, not an error.
+
+### Fixed
+
+- **`Tool-using loop ended with empty content response` no longer fires at
+  `warning` level for normal-flow completions.** In structured-collection mode
+  (default since 1.6.0), the attacker emits findings via `record_vulnerability`
+  tool calls and is contracted to return no final prose — the empty content
+  block is how the model says "I'm done."
+  `SymfonyAiLLMClient::emptyToolLoopResponseAndLog()`
+  (`src/Audit/Infrastructure/LLM/SymfonyAiLLMClient.php`) was logging at
+  `warning` level regardless of iteration count, spamming the audit output once
+  per chunk on healthy runs (typical signature:
+  `iterations: 1, output_tokens: 1485, error: "Response does not contain any content."`).
+  The log now routes through `debug` when at least one tool-using iteration has
+  produced findings before the empty turn, and only stays at `warning` when the
+  very first call returns empty (genuine anomaly — refusal, content filter, or
+  provider quirk before any work was done). The message string and payload shape
+  are unchanged so existing log scrapers / dashboards continue to match.
+- **Cost line removed from the real-run console report.**
+  `ReportRenderer::renderConsole()`
+  (`src/Audit/Infrastructure/Report/ReportRenderer.php`) used to print
+  `Cost    : $X.XXXX` and a per-role breakdown after every audit. The number
+  comes from a static `PricingProvider` table multiplied against actual token
+  usage, so it's a rough estimate that diverges from real provider invoices
+  (volume discounts, contract pricing, prompt-cache rebates) and operators
+  shouldn't anchor on it. The tokens line still prints (factual, model-tagged),
+  and the dry-run path (`AuditPresenter::dryRunResult()`) is unchanged —
+  estimating cost is its whole point. JSON and SARIF outputs still carry
+  `estimated_cost_usd` for downstream parsers / dashboards.
+
 ## [1.6.3] — 2026-05-28 — Watertight
 
 A bug-fix release closing a credential-leak gap in the secret scrubber. URIs
@@ -938,6 +974,10 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.6.4]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.6.4
+[1.6.3]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.6.3
 [1.6.2]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.6.2
 [1.6.1]:

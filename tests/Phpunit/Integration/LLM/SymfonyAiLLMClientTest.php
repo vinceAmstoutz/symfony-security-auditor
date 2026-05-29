@@ -1347,6 +1347,49 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
     }
 
+    public function test_complete_with_tools_demotes_empty_content_to_debug_after_at_least_one_tool_iteration(): void
+    {
+        $tool = $this->makeTool('lookup', 'lookup');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        /** @var list<array{string, array<string, mixed>}> $warnings */
+        $warnings = [];
+        /** @var list<array{string, array<string, mixed>}> $debugs */
+        $debugs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('debug')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$debugs): void {
+                $debugs[] = [$msg, $ctx];
+            },
+        );
+
+        $platform = $this->lazilyFailingPlatform([
+            new MultiPartResult([new ToolCallResult([new ToolCall('1', 'lookup')])]),
+            new RuntimeException('Response does not contain any content.'),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            $logger,
+            transientFailureClassifier: new TransientFailureClassifier(),
+        );
+
+        $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
+
+        $matchesMessage = static fn (array $entry): bool => 'Tool-using loop ended with empty content response' === $entry[0];
+
+        self::assertCount(0, array_filter($warnings, $matchesMessage));
+        $emptyDebugs = array_values(array_filter($debugs, $matchesMessage));
+        self::assertCount(1, $emptyDebugs);
+        self::assertSame(1, $emptyDebugs[0][1]['iterations']);
+    }
+
     public function test_complete_does_not_retry_empty_content_failures(): void
     {
         $fakeSleeper = new FakeSleeper();

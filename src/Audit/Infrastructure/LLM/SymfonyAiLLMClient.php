@@ -330,12 +330,18 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
         int $totalInputTokens,
         int $totalOutputTokens,
     ): LLMResponse {
-        $this->logger->warning('Tool-using loop ended with empty content response', [
+        $context = [
             'iterations' => $iteration,
             'input_tokens' => $totalInputTokens,
             'output_tokens' => $totalOutputTokens,
             'error' => $emptyllmResponseException->getMessage(),
-        ]);
+        ];
+
+        if ($iteration > 0) {
+            $this->logger->debug('Tool-using loop ended with empty content response', $context);
+        } else {
+            $this->logger->warning('Tool-using loop ended with empty content response', $context);
+        }
 
         return LLMResponse::create(
             content: '',
