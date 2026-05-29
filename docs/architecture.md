@@ -591,8 +591,10 @@ Nested sections:
   `budget.max_tokens`, `budget.max_cost_usd` (abort limits);
   `retry.max_attempts`, `retry.initial_delay_ms`, `retry.backoff_multiplier`,
   `retry.jitter_ratio` (LLM resilience)
-- `cache.*` — `enabled`, `dir`, `prompt_caching` (chunk cache + provider-side
-  prompt cache)
+- `cache.*` — `enabled`, `dir` (chunk cache). `prompt_caching` is deprecated
+  since 1.7 and ignored; provider-side prompt caching is configured on the
+  `symfony/ai` platform (`cache_retention` in `ai.yaml` for Anthropic; automatic
+  for OpenAI/Gemini).
 
 Model names must be supported by the platform configured in
 `config/packages/ai.yaml`. See [`docs/configuration.md`](configuration.md) for
@@ -627,9 +629,9 @@ The `loadExtension()` method (receiving `$config`, `ContainerConfigurator`,
 `SymfonyAiLLMClient` service definitions (`security_auditor.attacker_client` and
 `security_auditor.reviewer_client`). Each receives `PlatformInterface`, the
 resolved model name (`attacker_model` or `reviewer_model`, falling back to
-`model`), the default temperature, and the `cache.prompt_caching` flag, so
-`AttackerAgent` and `ReviewerAgent` each receive the correct client. Sets
-`LLMClientInterface::class` as a private alias to the attacker client.
+`model`) and the default temperature, so `AttackerAgent` and `ReviewerAgent`
+each receive the correct client. Sets `LLMClientInterface::class` as a private
+alias to the attacker client.
 
 `AttackerCacheInterface` is aliased to `FilesystemAttackerCache` when
 `cache.enabled: true`, otherwise to `NullAttackerCache`.

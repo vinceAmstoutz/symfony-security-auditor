@@ -241,8 +241,8 @@ Expected behavior on large projects. Mitigations:
 - Tighten `scan.included_paths` to specific sub-directories — e.g. point it at
   `src/Controller`, `src/Form`, `src/Voter`, `config`, `templates` so high-value
   surfaces are audited and infrastructure code is dropped.
-- Enable both caches: `cache.enabled: true` and `cache.prompt_caching: true`
-  (defaults).
+- Enable both caches: `cache.enabled: true` (default) and Anthropic prompt
+  caching via `cache_retention` in `ai.yaml` (default `short` already on).
 
 ### Cost blew past my budget
 
@@ -255,8 +255,8 @@ Expected behavior on large projects. Mitigations:
   `config/` if you only want to audit PHP, or replace `src` with a list of
   specific sub-directories (e.g. `src/Controller`, `src/Form`, `src/Voter`) to
   focus the audit on high-value security surfaces.
-- Confirm `cache.prompt_caching: true` (default) — Anthropic provides ~90%
-  input-token discount on cached prompts.
+- Confirm Anthropic prompt caching is on — `cache_retention` in `ai.yaml`
+  (default `short`) gives a ~90% input-token discount on cached prompts.
 - Confirm `cache.enabled: true` (default) — repeated chunks skip the LLM
   entirely.
 - Lower `audit.max_tool_iterations` from `8` to `4` or `5` — caps chatty

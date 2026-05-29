@@ -169,7 +169,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                         ->end()
                         ->booleanNode('tools_enabled')
                             ->defaultTrue()
-                            ->info('Give the attacker access to tools (read_file, grep, list_files, lookup_advisory) for cross-file investigation. Default true — without tools, lookup_advisory is dead weight and the attacker is blind across files. Costs more LLM round-trips per chunk; combine with cache.prompt_caching on Anthropic.')
+                            ->info('Give the attacker access to tools (read_file, grep, list_files, lookup_advisory) for cross-file investigation. Default true — without tools, lookup_advisory is dead weight and the attacker is blind across files. Costs more LLM round-trips per chunk; combine with Anthropic prompt caching (`cache_retention` in `ai.yaml`) to offset the input-token cost.')
                         ->end()
                         ->booleanNode('structured_collection')
                             ->defaultTrue()
@@ -341,7 +341,12 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                         ->end()
                         ->booleanNode('prompt_caching')
                             ->defaultTrue()
-                            ->info('Opt into provider-side prompt caching by setting `cache_control: ephemeral` on every LLM call. Default true — honored by Anthropic for ~90% input-token discount; silently ignored by other providers (zero cost to leave on).')
+                            ->setDeprecated(
+                                'vinceamstoutz/symfony-security-auditor',
+                                '1.7',
+                                'The "%node%" option is deprecated and no longer has any effect. Prompt caching is controlled by your Symfony AI platform: set `cache_retention` (none|short|long) on the anthropic platform in `ai.yaml` (default `short` already enables it); OpenAI and Gemini cache automatically.',
+                            )
+                            ->info('Deprecated and ignored since 1.7. Prompt caching is configured on the Symfony AI platform, not here: set `cache_retention` (none|short|long) on the anthropic platform in `ai.yaml`. OpenAI and Gemini cache automatically.')
                         ->end()
                     ->end()
                 ->end()
@@ -477,7 +482,6 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration->llm->attackerModel(),
                 service('logger'),
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
-                $bundleConfiguration->cache->promptCaching,
                 service(TokenUsageRecorder::class),
                 service(RetryPolicy::class),
                 service(TransientFailureClassifier::class),
@@ -497,7 +501,6 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration->llm->reviewerModel(),
                 service('logger'),
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
-                $bundleConfiguration->cache->promptCaching,
                 service(TokenUsageRecorder::class),
                 service(RetryPolicy::class),
                 service(TransientFailureClassifier::class),
@@ -544,7 +547,6 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                     $cheapModel,
                     service('logger'),
                     SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
-                    $bundleConfiguration->cache->promptCaching,
                     service(TokenUsageRecorder::class),
                     service(RetryPolicy::class),
                     service(TransientFailureClassifier::class),

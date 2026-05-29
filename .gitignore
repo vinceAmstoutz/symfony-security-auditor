@@ -4,6 +4,7 @@ composer.lock
 .phpunit.cache/
 infection/
 /build/coverage/
+.playwright-mcp/
 
 .castor.stub.php
 

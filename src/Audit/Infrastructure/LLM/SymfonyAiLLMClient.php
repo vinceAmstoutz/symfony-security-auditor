@@ -52,8 +52,6 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
 {
     public const ?float DEFAULT_TEMPERATURE = null;
 
-    public const bool DEFAULT_PROMPT_CACHING = false;
-
     public const bool DEFAULT_PROVIDER_JSON_MODE = false;
 
     public const ?int DEFAULT_MAX_OUTPUT_TOKENS = null;
@@ -63,7 +61,6 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
         private string $model,
         private LoggerInterface $logger,
         private ?float $temperature = self::DEFAULT_TEMPERATURE,
-        private bool $promptCaching = self::DEFAULT_PROMPT_CACHING,
         private ?TokenUsageRecorder $tokenUsageRecorder = null,
         private ?RetryPolicy $retryPolicy = null,
         private ?TransientFailureClassifier $transientFailureClassifier = null,
@@ -82,7 +79,6 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
             'system_length' => \strlen($systemPrompt),
             'user_length' => \strlen($userMessage),
             'temperature' => $this->temperature,
-            'prompt_caching' => $this->promptCaching,
         ]);
 
         $messageBag = new MessageBag(
@@ -486,19 +482,22 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
             $options['temperature'] = $this->temperature;
         }
 
-        if ($this->promptCaching) {
-            $options['cache_control'] = ['type' => 'ephemeral'];
-        }
+        if ($this->usesAnthropicOptionDialect()) {
+            if ($this->providerJsonMode) {
+                $options['response_format'] = ['type' => 'json_object'];
+            }
 
-        if ($this->providerJsonMode) {
-            $options['response_format'] = ['type' => 'json_object'];
-        }
-
-        if (null !== $this->maxOutputTokens) {
-            $options['max_tokens'] = $this->maxOutputTokens;
+            if (null !== $this->maxOutputTokens) {
+                $options['max_tokens'] = $this->maxOutputTokens;
+            }
         }
 
         return $options;
+    }
+
+    private function usesAnthropicOptionDialect(): bool
+    {
+        return str_contains($this->model, 'claude');
     }
 
     /**
