@@ -10,7 +10,48 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
-## [1.6.4] — 2026-05-28 — Hush
+## [1.7.0] — 2026-05-29 — Polyglot
+
+### Fixed
+
+- **Non-Anthropic providers no longer crash on `cache_control` / `max_tokens`.**
+  `SymfonyAiLLMClient::baseOptions()` sent Anthropic-dialect options on every
+  call regardless of the configured provider. The `symfony/ai` Gemini bridge
+  forwards unrecognized options verbatim into `generationConfig`, so a normal
+  run on a `gemini-*` model aborted with
+  `Invalid JSON payload received. Unknown name "cache_control" at 'generation_config'`
+  / `Unknown name "max_tokens" at 'generation_config'`. The OpenAI Responses
+  bridge (which expects `max_output_tokens`) was hit by the same `max_tokens`
+  leak. Provider-specific options (`max_tokens`, `response_format`) are now
+  gated to Claude models; every other provider receives only `temperature` and
+  uses its own native (large) output limit, so long findings are no longer
+  truncated.
+
+### Added
+
+- **Pricing coverage for every commercial platform shipped by `symfony/ai`.**
+  `StaticPricingProvider` now carries current standard-tier prices for Anthropic
+  (including `claude-opus-4-8`), OpenAI (including the GPT-5 family), Google
+  Gemini (including `gemini-3.1-pro-preview`), Mistral, Cohere, DeepSeek,
+  Perplexity, and Cerebras — with dated-snapshot aliases where providers pin
+  them. Prompt-size-tiered models (Gemini `*-pro`, GPT-5.x) are listed at their
+  base tier. Self-hosted platforms (Ollama, LM Studio, Docker Model Runner,
+  TransformersPHP) stay absent — they bill no per-token cost. This clears the
+  `No pricing entry for LLM model — cost reporting will show zero` warning for
+  current models.
+
+### Deprecated
+
+- **`cache.prompt_caching`** no longer has any effect and emits a deprecation
+  notice when set. It previously put `cache_control: ephemeral` on every LLM
+  call, but current `symfony/ai` bridges no longer read that option. Configure
+  prompt caching on the platform instead: set `cache_retention` (`none` |
+  `short` | `long`) on the `anthropic` platform in `ai.yaml` (default `short`
+  already enables the ~90% input-token discount); OpenAI and Gemini cache
+  automatically. The key stays accepted for backward compatibility until the
+  next major. See [`docs/versioning.md`](docs/versioning.md).
+
+## [1.6.4] — 2026-05-29 — Hush
 
 A log-hygiene release. `audit:run` no longer emits a `warning` when the
 attacker's structured-collection tool loop ends with empty content after at
