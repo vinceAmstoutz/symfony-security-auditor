@@ -258,8 +258,6 @@ Full output after the pipeline completes:
   Started : 2026-05-22 09:14:02
   Duration: 2m 31s
   Files   : 142 scanned
-  Tokens  : 48,210 in / 3,820 out (claude-opus-4-7)
-  Cost    : $0.3366 (estimated)
 
 ──────────────────────────────────────────────────────────────────────
   RISK LEVEL: HIGH  (Score: 34)
