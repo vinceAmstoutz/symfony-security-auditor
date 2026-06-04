@@ -10,7 +10,7 @@
 [![CI](https://github.com/vinceamstoutz/symfony-security-auditor/actions/workflows/ci.yaml/badge.svg)](https://github.com/vinceamstoutz/symfony-security-auditor/actions/workflows/ci.yaml)
 [![Total Downloads](https://poser.pugx.org/vinceamstoutz/symfony-security-auditor/downloads)](https://packagist.org/packages/vinceamstoutz/symfony-security-auditor)
 ![PHP 8.3+](https://img.shields.io/badge/PHP-8.3%2B-blue)
-![Symfony 7+](https://img.shields.io/badge/Symfony-7%2B-black)
+![Symfony 7.4+](https://img.shields.io/badge/Symfony-7.4%2B-black)
 ![License MIT](https://img.shields.io/badge/License-MIT-green)
 [![SemVer 2.0.0](https://img.shields.io/badge/SemVer-2.0.0-brightgreen)](docs/versioning.md)
 
