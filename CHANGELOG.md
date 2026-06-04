@@ -10,6 +10,41 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.7.1] — 2026-06-04 — Parachute
+
+A bare-install resilience release. Installing the bundle into a fresh Symfony
+skeleton — where the `symfony/ai-bundle` recipe ships `config/packages/ai.yaml`
+with every platform commented out — no longer breaks container compilation.
+
+### Fixed
+
+- **`cache:clear` no longer crashes when no AI platform is configured.** The
+  bundle's three `SymfonyAiLLMClient` service definitions
+  (`src/SymfonySecurityAuditorBundle.php`) hard-referenced
+  `Symfony\AI\Platform\PlatformInterface`. On a bare skeleton the
+  `symfony/ai-bundle` recipe registers no platform, so the alias never exists
+  and `CheckExceptionOnInvalidReferenceBehaviorPass` aborted **every** console
+  command (`cache:clear`, `cache:warmup`, recipe CI installs) with:
+
+  ```text
+  The service "security_auditor.attacker_client" has a dependency on a
+  non-existent service "Symfony\AI\Platform\PlatformInterface"
+  ```
+
+  The references are now declared `nullOnInvalid()` and the client constructor
+  accepts `?PlatformInterface`, so the container compiles without a platform.
+  The first actual LLM call raises the new `MissingAiPlatformException` (extends
+  `LLMProviderException`, so agents rethrow it instead of swallowing it into a
+  false-negative SAFE report) with an actionable message:
+
+  ```text
+  No AI platform is configured. Enable a platform (e.g. "anthropic") in
+  config/packages/ai.yaml and set its API key — the symfony/ai-bundle recipe
+  ships with every platform commented out.
+  ```
+
+  Every other console command keeps working; only `audit:run` needs a platform.
+
 ## [1.7.0] — 2026-05-29 — Polyglot
 
 ### Fixed
@@ -1015,6 +1050,10 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.7.1]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.7.1
+[1.7.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.7.0
 [1.6.4]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.6.4
 [1.6.3]:

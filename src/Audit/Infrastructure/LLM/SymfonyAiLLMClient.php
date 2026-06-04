@@ -42,6 +42,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
@@ -57,7 +58,7 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
     public const ?int DEFAULT_MAX_OUTPUT_TOKENS = null;
 
     public function __construct(
-        private PlatformInterface $platform,
+        private ?PlatformInterface $platform,
         private string $model,
         private LoggerInterface $logger,
         private ?float $temperature = self::DEFAULT_TEMPERATURE,
@@ -151,6 +152,7 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
     {
         \assert('' !== $this->model, 'Model must be a non-empty string');
 
+        $platform = $this->platform();
         $deferred = [];
         foreach ($window as $index => $request) {
             $messageBag = new MessageBag(
@@ -161,7 +163,7 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
             $this->rateLimiter()->acquire($estimatedInputTokens);
 
             try {
-                $deferred[$index] = $this->platform->invoke($this->model, $messageBag, $this->baseOptions());
+                $deferred[$index] = $platform->invoke($this->model, $messageBag, $this->baseOptions());
             } catch (Throwable) {
                 $deferred[$index] = null;
             }
@@ -384,6 +386,7 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
     /** @param array<string, mixed> $options */
     private function invokeWithRetry(MessageBag $messageBag, array $options, int $estimatedInputTokens): DeferredResult
     {
+        $platform = $this->platform();
         $rateLimiter = $this->rateLimiter();
         $retryPolicy = $this->retryPolicy ?? new RetryPolicy();
         $classifier = $this->transientFailureClassifier ?? new TransientFailureClassifier();
@@ -398,7 +401,7 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
             $rateLimiter->acquire($estimatedInputTokens);
 
             try {
-                $deferredResult = $this->platform->invoke($this->model, $messageBag, $options);
+                $deferredResult = $platform->invoke($this->model, $messageBag, $options);
                 $deferredResult->getResult();
 
                 return $deferredResult;
@@ -438,6 +441,11 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
                 ++$attempt;
             }
         }
+    }
+
+    private function platform(): PlatformInterface
+    {
+        return $this->platform ?? throw MissingAiPlatformException::create();
     }
 
     private function rateLimiter(): RateLimiterInterface

@@ -68,6 +68,13 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertInstanceOf(AuditCommand::class, $this->getPrivateService($kernel, AuditCommand::class));
     }
 
+    public function test_bundle_boots_without_an_ai_platform_service(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o'], registerPlatform: false);
+
+        self::assertInstanceOf(AuditCommand::class, $this->getPrivateService($kernel, AuditCommand::class));
+    }
+
     public function test_bundle_default_model_is_claude_opus_4_5(): void
     {
         $kernel = $this->boot([]);
@@ -684,23 +691,26 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     /**
      * @param array<string, mixed> $bundleConfig
      */
-    private function boot(array $bundleConfig): Kernel
+    private function boot(array $bundleConfig, bool $registerPlatform = true): Kernel
     {
         $tmpDir = $this->tmpDir;
-        $kernel = new class('test', true, $tmpDir, $bundleConfig) extends Kernel {
+        $kernel = new class('test', true, $tmpDir, $bundleConfig, $registerPlatform) extends Kernel {
             /** @var array<string, mixed> */
             private array $bundleConfig;
 
             private string $tmpDir;
 
+            private bool $registerPlatform;
+
             /**
              * @param array<string, mixed> $bundleConfig
              */
-            public function __construct(string $environment, bool $debug, string $tmpDir, array $bundleConfig)
+            public function __construct(string $environment, bool $debug, string $tmpDir, array $bundleConfig, bool $registerPlatform)
             {
                 parent::__construct($environment, $debug);
                 $this->tmpDir = $tmpDir;
                 $this->bundleConfig = $bundleConfig;
+                $this->registerPlatform = $registerPlatform;
             }
 
             public function registerBundles(): iterable
@@ -712,7 +722,8 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             public function registerContainerConfiguration(LoaderInterface $loader): void
             {
                 $bundleConfig = $this->bundleConfig;
-                $loader->load(static function (ContainerBuilder $containerBuilder) use ($bundleConfig): void {
+                $registerPlatform = $this->registerPlatform;
+                $loader->load(static function (ContainerBuilder $containerBuilder) use ($bundleConfig, $registerPlatform): void {
                     $containerBuilder->loadFromExtension('framework', [
                         'secret' => 'test',
                         'http_method_override' => false,
@@ -723,9 +734,11 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
                     ]);
                     $containerBuilder->loadFromExtension('symfony_security_auditor', $bundleConfig);
 
-                    $containerBuilder->register(PlatformInterface::class, InMemoryPlatform::class)
-                        ->setArguments(['stub-response'])
-                        ->setPublic(true);
+                    if ($registerPlatform) {
+                        $containerBuilder->register(PlatformInterface::class, InMemoryPlatform::class)
+                            ->setArguments(['stub-response'])
+                            ->setPublic(true);
+                    }
                 });
             }
 

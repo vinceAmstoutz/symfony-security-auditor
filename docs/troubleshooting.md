@@ -40,10 +40,20 @@ Symfony\AI\AiBundle\AiBundle::class => ['all' => true],
 VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['dev' => true, 'test' => true],
 ```
 
+### `No AI platform is configured`
+
+`audit:run` aborts with this message when no
+`Symfony\AI\Platform\PlatformInterface` service exists in the container. The
+`symfony/ai-bundle` recipe ships `config/packages/ai.yaml` with **every platform
+commented out** — uncomment one (e.g. `anthropic`) and set its API key. See
+[Configuration → Platform Configuration](configuration.md#platform-configuration).
+
 ### `The service "VinceAmstoutz\..." has a dependency on a non-existent service "Symfony\AI\Platform\PlatformInterface"`
 
-No platform configured in `config/packages/ai.yaml`. Add one — see
-[Configuration → Platform Configuration](configuration.md#platform-configuration).
+Same root cause as above, surfaced at container compile time (`cache:clear`,
+`cache:warmup`) by versions **≤ 1.7.0**. Upgrade to `1.7.1` or later — the
+container then compiles without a platform and the actionable error above is
+raised only when an audit actually runs.
 
 ### `Argument #1 ... must be of type Symfony\AI\Platform\PlatformInterface, NULL given`
 

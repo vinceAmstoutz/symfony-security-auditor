@@ -249,6 +249,9 @@ Canonical policy: [`docs/versioning.md`](docs/versioning.md).
 
 Rules scoped to specific paths live in `.claude/rules/`:
 
+- [`changelog.md`](.claude/rules/changelog.md) — classify every change
+  (major/minor/patch or Unreleased) and update `CHANGELOG.md` in the same
+  commit; release-notes format.
 - [`ddd-layers.md`](.claude/rules/ddd-layers.md) — dependency direction across
   layers.
 - [`domain-models.md`](.claude/rules/domain-models.md) — immutability,
