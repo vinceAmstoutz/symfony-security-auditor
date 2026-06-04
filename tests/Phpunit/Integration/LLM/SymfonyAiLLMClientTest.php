@@ -55,6 +55,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
@@ -302,6 +303,37 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform(''), 'claude-test', new NullLogger());
 
         self::assertSame('claude-test', $symfonyAiLLMClient->model());
+    }
+
+    public function test_complete_throws_when_no_ai_platform_is_configured(): void
+    {
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(null, 'test-model', new NullLogger());
+
+        $this->expectException(MissingAiPlatformException::class);
+        $this->expectExceptionMessage('No AI platform is configured');
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+    }
+
+    public function test_complete_with_tools_throws_when_no_ai_platform_is_configured(): void
+    {
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(null, 'test-model', new NullLogger());
+        $toolRegistry = new ToolRegistry([$this->makeTool('lookup', 'lookup')], new NullLogger());
+
+        $this->expectException(MissingAiPlatformException::class);
+        $this->expectExceptionMessage('config/packages/ai.yaml');
+
+        $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 3);
+    }
+
+    public function test_complete_batch_throws_when_no_ai_platform_is_configured(): void
+    {
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(null, 'test-model', new NullLogger());
+
+        $this->expectException(MissingAiPlatformException::class);
+        $this->expectExceptionMessage('No AI platform is configured');
+
+        $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 2);
     }
 
     public function test_complete_batch_returns_empty_for_no_requests(): void

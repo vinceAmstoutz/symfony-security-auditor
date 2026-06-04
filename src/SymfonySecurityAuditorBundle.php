@@ -478,7 +478,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $services->set('security_auditor.attacker_client', SymfonyAiLLMClient::class)
             ->private()
             ->args([
-                service(PlatformInterface::class),
+                service(PlatformInterface::class)->nullOnInvalid(),
                 $bundleConfiguration->llm->attackerModel(),
                 service('logger'),
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
@@ -497,7 +497,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $services->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
             ->private()
             ->args([
-                service(PlatformInterface::class),
+                service(PlatformInterface::class)->nullOnInvalid(),
                 $bundleConfiguration->llm->reviewerModel(),
                 service('logger'),
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
@@ -543,7 +543,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             $services->set('security_auditor.cheap_attacker_client', SymfonyAiLLMClient::class)
                 ->private()
                 ->args([
-                    service(PlatformInterface::class),
+                    service(PlatformInterface::class)->nullOnInvalid(),
                     $cheapModel,
                     service('logger'),
                     SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
