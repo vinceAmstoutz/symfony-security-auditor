@@ -62,11 +62,25 @@ Security Dashboard.
 
 ## Getting Started
 
-### 1. Install
+### 1. Install — Symfony Flex wires everything
 
 ```bash
 composer require --dev vinceamstoutz/symfony-security-auditor
 ```
+
+The official
+[Flex recipe](https://github.com/symfony/recipes-contrib/tree/main/vinceamstoutz/symfony-security-auditor)
+(published in
+[`symfony/recipes-contrib`](https://github.com/symfony/recipes-contrib))
+automatically:
+
+- registers `SymfonySecurityAuditorBundle` in `config/bundles.php` for the `dev`
+  and `test` environments;
+- creates a pre-configured `config/packages/symfony_security_auditor.yaml` with
+  a default model and commented split-model and rate-limit examples ready to
+  uncomment.
+
+Not using Flex? See [Manual setup](#manual-setup-without-flex).
 
 ### 2. Install a platform bridge (Anthropic shown)
 
@@ -77,19 +91,7 @@ composer require symfony/ai-anthropic-platform
 Full list of supported providers:
 [Configuration → Supported platforms](docs/configuration.md#supported-platforms).
 
-### 3. Register bundles (`config/bundles.php`)
-
-Symfony Flex does this automatically via recipe. Otherwise:
-
-```php
-return [
-    // ...
-    Symfony\AI\AiBundle\AiBundle::class => ['all' => true],
-    VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['dev' => true, 'test' => true],
-];
-```
-
-### 4. Configure the platform (`config/packages/ai.yaml`)
+### 3. Configure the platform (`config/packages/ai.yaml`)
 
 ```yaml
 ai:
@@ -98,14 +100,16 @@ ai:
       api_key: '%env(ANTHROPIC_API_KEY)%'
 ```
 
-### 5. Configure the auditor (`config/packages/symfony_security_auditor.yaml`)
+### 4. Adjust the auditor config (`config/packages/symfony_security_auditor.yaml`)
+
+The Flex recipe already created this file — pick your model:
 
 ```yaml
 symfony_security_auditor:
     model: 'claude-opus-4-7'
 ```
 
-### 6. Run
+### 5. Run
 
 ```bash
 # audit the current directory
@@ -138,6 +142,25 @@ bin/console audit:run --dry-run
 > [Report Visibility on Public Repositories](docs/ci.md#report-visibility-on-public-repositories)
 > for details.
 
+### Manual setup (without Flex)
+
+Without Symfony Flex (or with `composer require --no-scripts`), do by hand what
+the recipe automates:
+
+1. Register the bundles in `config/bundles.php`:
+
+   ```php
+   return [
+       // ...
+       Symfony\AI\AiBundle\AiBundle::class => ['all' => true],
+       VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['dev' => true, 'test' => true],
+   ];
+   ```
+
+2. Create `config/packages/symfony_security_auditor.yaml` yourself (step 4
+   above), or copy the
+   [recipe's template](https://github.com/symfony/recipes-contrib/blob/main/vinceamstoutz/symfony-security-auditor/1.0/config/packages/symfony_security_auditor.yaml).
+
 ---
 
 > [!TIP]
@@ -160,6 +183,10 @@ bin/console audit:run --dry-run
 
 ## Features
 
+- **Symfony Flex recipe** — one `composer require` registers the bundle and
+  ships a pre-configured `symfony_security_auditor.yaml`
+  ([official recipe](https://github.com/symfony/recipes-contrib/tree/main/vinceamstoutz/symfony-security-auditor)
+  in `symfony/recipes-contrib`).
 - **Multi-agent loop** — adversarial Attacker + skeptical Reviewer cut false
   positives across up to 3 iterations, with confirmed findings fed back so later
   iterations generalize patterns instead of re-finding the same bugs.
