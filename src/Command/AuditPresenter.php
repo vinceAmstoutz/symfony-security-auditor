@@ -17,11 +17,15 @@ use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditPresenter implements AuditPresenterInterface
 {
+    public function __construct(private PricingProviderInterface $pricingProvider) {}
+
     public function header(SymfonyStyle $symfonyStyle, string $projectPath): void
     {
         $symfonyStyle->title('Symfony LLM Security Auditor');
@@ -39,6 +43,34 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         }
 
         $symfonyStyle->getErrorStyle()->warning('Secret scrubbing is disabled. File contents will be sent verbatim to the configured LLM provider. If that provider runs in the cloud, credentials in committed configs or .env.dist files may be exposed. Re-enable scan.secret_scrubbing.enabled (the default) or confirm you are using a local provider.');
+    }
+
+    public function unsupportedModelWarnings(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void
+    {
+        $unsupportedModels = $this->unsupportedModels($auditReport->cost());
+
+        if ([] === $unsupportedModels) {
+            return;
+        }
+
+        $symfonyStyle->getErrorStyle()->warning(\sprintf(
+            'No pricing data for the configured model(s): %s. The dry-run cost estimate shows $0.00 for these and may be inaccurate. Check the model name(s) in your symfony_security_auditor configuration against the models supported by your symfony/ai platform.',
+            implode(', ', $unsupportedModels),
+        ));
+    }
+
+    /** @return array<string, string> */
+    private function unsupportedModels(AuditCost $auditCost): array
+    {
+        $unsupportedModels = [];
+        foreach ($auditCost->byRole() as $entry) {
+            $model = $entry['model'];
+            if (!$this->pricingProvider->hasModel($model)) {
+                $unsupportedModels[$model] = $model;
+            }
+        }
+
+        return $unsupportedModels;
     }
 
     public function runningSection(SymfonyStyle $symfonyStyle): void

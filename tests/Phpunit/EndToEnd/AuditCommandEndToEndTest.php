@@ -381,7 +381,7 @@ final class AuditCommandEndToEndTest extends TestCase
             new RunAuditUseCase($auditPipeline, new NullLogger()),
             new ReportWriter(new ReportRenderer(), new Filesystem()),
             new AuditExitCodeResolver(),
-            new AuditPresenter(),
+            new AuditPresenter(new StaticPricingProvider(new NullLogger())),
             $estimateAuditCostUseCase,
             $progressReporterHolder,
             secretScrubbingEnabled: $secretScrubbingEnabled,
@@ -435,6 +435,37 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('Dry run', $commandTester->getDisplay());
         self::assertStringNotContainsString('Audit complete', $commandTester->getDisplay());
         self::assertStringNotContainsString('RISK LEVEL', $commandTester->getDisplay());
+    }
+
+    public function test_dry_run_warns_when_configured_model_is_unsupported(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringContainsString('No pricing data', $commandTester->getDisplay());
+    }
+
+    public function test_dry_run_model_warning_is_emitted_on_stderr_for_machine_readable_output(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(
+            [
+                'project-path' => $this->fixtureDir,
+                '--dry-run' => true,
+                '--format' => 'json',
+            ],
+            ['capture_stderr_separately' => true],
+        );
+
+        self::assertStringContainsString('No pricing data', $commandTester->getErrorOutput());
+        self::assertStringNotContainsString('No pricing data', $commandTester->getDisplay());
     }
 
     public function test_command_renders_progress_bar_in_console_format(): void

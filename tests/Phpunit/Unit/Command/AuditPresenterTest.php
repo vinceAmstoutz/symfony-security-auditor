@@ -26,6 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 
 final class AuditPresenterTest extends TestCase
@@ -36,7 +37,7 @@ final class AuditPresenterTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->auditPresenter = new AuditPresenter();
+        $this->auditPresenter = new AuditPresenter($this->pricingProviderKnowing('claude-opus-4-7', 'claude-haiku-4-5-20251001'));
         $this->tmpDir = sys_get_temp_dir().'/presenter_test_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
     }
@@ -182,6 +183,91 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('claude-opus-4-7', $display);
         self::assertStringContainsString('1,000', $display);
         self::assertStringContainsString('0.0123', $display);
+    }
+
+    public function test_unsupported_model_warning_names_every_unsupported_model(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->unsupportedModelWarnings($symfonyStyle, $this->reportWithRoleModels('made-up-attacker-model', 'made-up-reviewer-model'));
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('made-up-attacker-model', $display);
+        self::assertStringContainsString('made-up-reviewer-model', $display);
+    }
+
+    public function test_unsupported_model_warning_ignores_supported_models(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->unsupportedModelWarnings($symfonyStyle, $this->reportWithRoleModels('made-up-attacker-model', 'claude-opus-4-7'));
+
+        self::assertStringNotContainsString('claude-opus-4-7', $bufferedOutput->fetch());
+    }
+
+    public function test_unsupported_model_warning_is_silent_when_all_models_supported(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->unsupportedModelWarnings($symfonyStyle, $this->reportWithRoleModels('claude-opus-4-7', 'claude-haiku-4-5-20251001'));
+
+        self::assertSame('', $bufferedOutput->fetch());
+    }
+
+    public function test_unsupported_model_warning_is_silent_when_no_models_present(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->unsupportedModelWarnings($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
+
+        self::assertSame('', $bufferedOutput->fetch());
+    }
+
+    public function test_unsupported_model_warning_names_a_shared_model_only_once(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->unsupportedModelWarnings($symfonyStyle, $this->reportWithRoleModels('made-up-model', 'made-up-model'));
+
+        self::assertSame(1, substr_count($bufferedOutput->fetch(), 'made-up-model'));
+    }
+
+    private function reportWithRoleModels(string $attackerModel, string $reviewerModel): AuditReport
+    {
+        $auditCost = AuditCost::of(1000, 200, 0.0, $attackerModel, [
+            'attacker' => ['model' => $attackerModel, 'input_tokens' => 800, 'output_tokens' => 150, 'estimated_cost_usd' => 0.0],
+            'reviewer' => ['model' => $reviewerModel, 'input_tokens' => 200, 'output_tokens' => 50, 'estimated_cost_usd' => 0.0],
+        ]);
+
+        return AuditReport::fromContext(AuditContext::forProject($this->tmpDir), $auditCost);
+    }
+
+    private function pricingProviderKnowing(string ...$supportedModels): PricingProviderInterface
+    {
+        return new class($supportedModels) implements PricingProviderInterface {
+            /** @param array<string> $supportedModels */
+            public function __construct(private array $supportedModels) {}
+
+            public function pricePerMillionInputTokens(string $model): float
+            {
+                return 0.0;
+            }
+
+            public function pricePerMillionOutputTokens(string $model): float
+            {
+                return 0.0;
+            }
+
+            public function hasModel(string $model): bool
+            {
+                return \in_array($model, $this->supportedModels, true);
+            }
+        };
     }
 
     private function makeCriticalReport(): AuditReport

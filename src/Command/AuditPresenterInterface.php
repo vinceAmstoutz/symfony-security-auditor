@@ -24,6 +24,8 @@ interface AuditPresenterInterface
 
     public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled): void;
 
+    public function unsupportedModelWarnings(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void;
+
     public function runningSection(SymfonyStyle $symfonyStyle): void;
 
     public function estimatingSection(SymfonyStyle $symfonyStyle): void;

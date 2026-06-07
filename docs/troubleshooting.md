@@ -277,6 +277,27 @@ Expected behavior on large projects. Mitigations:
   [CI → Set a spend cap](ci.md#set-a-spend-cap).
 - Run weekly instead of nightly for large monorepos.
 
+### `--dry-run` estimate shows `$0.00`
+
+The cost estimate multiplies token counts by per-model prices from the
+configured `PricingProviderInterface` (the bundled `StaticPricingProvider`
+carries a fixed price table). When a configured model (`model`,
+`attacker_model`, or `reviewer_model`) is absent from that table — a typo, or a
+model `symfony/ai` supports but the table does not yet list — its price resolves
+to `0.0` and the dry run now prints a stderr warning:
+
+```text
+No pricing data for the configured model(s): <model>. The dry-run cost estimate
+shows $0.00 for these and may be inaccurate. Check the model name(s) in your
+symfony_security_auditor configuration against the models supported by your
+symfony/ai platform.
+```
+
+Fix the model identifier if it is a typo. If the name is correct but missing
+from the table, the token counts in the report are still accurate — only the USD
+figure is unavailable. Alias your own `PricingProviderInterface` implementation
+to supply prices (see [Extending](extending.md)).
+
 ---
 
 ## Cache Issues
