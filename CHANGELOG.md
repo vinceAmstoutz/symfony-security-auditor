@@ -10,6 +10,38 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.7.2] — 2026-06-07 — Lighthouse
+
+A dry-run transparency release. `audit:run --dry-run` no longer hides an
+unsupported model behind a silent `$0.00` estimate: it now warns, on stderr,
+whenever a configured model has no pricing data, so a typo or an as-yet-unpriced
+model can no longer masquerade as free.
+
+### Fixed
+
+- **`audit:run --dry-run` now warns when a configured model has no pricing
+  data.** A dry run estimates cost via `EstimateAuditCostUseCase` →
+  `CostCalculator` → `StaticPricingProvider`. For a model absent from the
+  provider's price table (a typo, or a model `symfony/ai` supports but the table
+  does not yet list), `StaticPricingProvider` returns `0.0` and logs a
+  `No pricing entry for LLM model` warning to the PSR logger only — invisible on
+  the console. The dry run therefore reported `Cost : $0.0000 (estimate)` with
+  no hint that the figure was unreliable, so an unsupported `model` /
+  `attacker_model` / `reviewer_model` looked free. `AuditPresenter`
+  (`src/Command/AuditPresenter.php`) now inspects the per-role models of the
+  estimate against `PricingProviderInterface::hasModel()` and emits a stderr
+  warning before the cost block:
+
+  ```text
+  No pricing data for the configured model(s): <model>. The dry-run cost
+  estimate shows $0.00 for these and may be inaccurate. Check the model name(s)
+  in your symfony_security_auditor configuration against the models supported by
+  your symfony/ai platform.
+  ```
+
+  The warning is written to `getErrorStyle()`, so it surfaces even for
+  `--format=json` / `--format=sarif` without polluting machine-readable stdout.
+
 ## [1.7.1] — 2026-06-04 — Parachute
 
 A bare-install resilience release. Installing the bundle into a fresh Symfony
@@ -1050,6 +1082,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.7.2]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.7.2
 [1.7.1]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.7.1
 [1.7.0]:

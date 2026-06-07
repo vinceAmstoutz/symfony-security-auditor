@@ -83,6 +83,8 @@ final readonly class AuditCommand
                 $this->auditPresenter->estimatingSection($symfonyStyle);
                 $report = $this->estimateAuditCostUseCase->execute($projectPath, $scanPaths);
 
+                $this->auditPresenter->unsupportedModelWarnings($symfonyStyle, $report);
+
                 if ($auditCommandInput->isMachineReadableFormat()) {
                     $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
                 }
