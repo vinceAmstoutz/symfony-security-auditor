@@ -269,8 +269,8 @@ prompt receives the resulting CVE summaries, not your dependency list itself.
 
 | Goal              | Recommended setup                                                               |
 | ----------------- | ------------------------------------------------------------------------------- |
-| Highest accuracy  | `attacker_model: claude-opus-4-7` + `reviewer_model: claude-opus-4-7`           |
-| Best cost/quality | `attacker_model: claude-opus-4-7` + `reviewer_model: claude-haiku-4-5-20251001` |
+| Highest accuracy  | `attacker_model: claude-opus-4-8` + `reviewer_model: claude-opus-4-8`           |
+| Best cost/quality | `attacker_model: claude-opus-4-8` + `reviewer_model: claude-haiku-4-5-20251001` |
 | Cheapest paid     | `model: deepseek-chat` or `mistral-large`                                       |
 | Offline / free    | `model: llama3.3` via Ollama                                                    |
 | Enterprise        | Azure OpenAI / AWS Bedrock with split-model                                     |
@@ -302,12 +302,12 @@ Other params (e.g. `temperature`) flow through the model name:
 ```yaml
 # Query-string
 symfony_security_auditor:
-    model: 'claude-opus-4-7?temperature=0.1'
+    model: 'claude-opus-4-8?temperature=0.1'
 
 # Expanded
 symfony_security_auditor:
     model:
-        name: 'claude-opus-4-7'
+        name: 'claude-opus-4-8'
         options:
             temperature: 0.1
 ```
