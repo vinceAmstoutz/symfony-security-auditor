@@ -57,7 +57,7 @@ final class StaticPricingProvider implements PricingProviderInterface
      * cost more. Unknown models resolve to 0.0 (cost reporting disabled), never
      * an error.
      *
-     * Sources, last updated 2026-05-29:
+     * Sources, last updated 2026-06-11:
      * - Anthropic: https://platform.claude.com/docs/en/about-claude/models/overview
      * - OpenAI:    https://platform.openai.com/docs/pricing
      * - Google:    https://ai.google.dev/gemini-api/docs/pricing
@@ -69,6 +69,7 @@ final class StaticPricingProvider implements PricingProviderInterface
      */
     private const array PRICES = [
         // Anthropic Claude — current
+        'claude-fable-5' => [10.00, 50.00],
         'claude-opus-4-8' => [5.00, 25.00],
         'claude-sonnet-4-6' => [3.00, 15.00],
         'claude-haiku-4-5-20251001' => [1.00, 5.00],
@@ -118,8 +119,8 @@ final class StaticPricingProvider implements PricingProviderInterface
         'mistral-large-2512' => [0.50, 1.50],
         'mistral-medium-latest' => [1.50, 7.50],
         'mistral-medium-2604' => [1.50, 7.50],
-        'mistral-small-latest' => [0.15, 0.60],
-        'mistral-small-2603' => [0.15, 0.60],
+        'mistral-small-latest' => [0.10, 0.30],
+        'mistral-small-2603' => [0.10, 0.30],
         'codestral-latest' => [0.30, 0.90],
         'codestral-2508' => [0.30, 0.90],
         'devstral-medium-2512' => [0.40, 2.00],
@@ -136,7 +137,7 @@ final class StaticPricingProvider implements PricingProviderInterface
         'deepseek-chat' => [0.14, 0.28],
         'deepseek-reasoner' => [0.14, 0.28],
         'deepseek-v4-flash' => [0.14, 0.28],
-        'deepseek-v4-pro' => [1.74, 3.48],
+        'deepseek-v4-pro' => [0.435, 0.87],
         // Perplexity (per-token only; sonar models also bill a per-request search fee)
         'sonar' => [1.00, 1.00],
         'sonar-pro' => [3.00, 15.00],

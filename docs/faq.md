@@ -181,6 +181,7 @@ prompt caching enabled (default):
 
 | Setup                               | Approx. cost per run |
 | ----------------------------------- | -------------------- |
+| Claude Fable 5 only                 | $6 – $16             |
 | Claude Opus only                    | $3 – $8              |
 | Claude Opus + Haiku (split-model)   | $0.50 – $2           |
 | GPT-4o only                         | $2 – $6              |
@@ -269,6 +270,7 @@ prompt receives the resulting CVE summaries, not your dependency list itself.
 
 | Goal              | Recommended setup                                                               |
 | ----------------- | ------------------------------------------------------------------------------- |
+| Most demanding    | `attacker_model: claude-fable-5` + `reviewer_model: claude-haiku-4-5-20251001`  |
 | Highest accuracy  | `attacker_model: claude-opus-4-8` + `reviewer_model: claude-opus-4-8`           |
 | Best cost/quality | `attacker_model: claude-opus-4-8` + `reviewer_model: claude-haiku-4-5-20251001` |
 | Cheapest paid     | `model: deepseek-chat` or `mistral-large`                                       |
