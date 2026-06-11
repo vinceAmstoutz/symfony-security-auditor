@@ -42,6 +42,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   cross-file tools (`reviewer_tools_enabled`) and the concurrent fast path
   (`reviewer_max_concurrent`). Default `false` (JSON-array output, the previous
   behaviour).
+- **New `audit.stable_system_prompt` config key for cheaper multi-chunk
+  audits.** By default the attacker emits only the expert skill blocks matching
+  a chunk's file types, so its system prompt differs chunk-to-chunk and provider
+  prompt caching (Anthropic `cache_retention` in `ai.yaml`) rarely gets a hit on
+  it. Setting `symfony_security_auditor.audit.stable_system_prompt: true` makes
+  `AttackerPromptBuilder`
+  (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) emit the full
+  skill set for every chunk, so the system-prompt prefix is byte-identical
+  across chunks: the first chunk pays a cache write and every subsequent chunk
+  reads the prefix at the provider's discounted cache-read rate. The trade-off
+  is a larger prompt when caching is off, so the key defaults to `false`
+  (relevance-only skills, the previous behaviour).
 
 ### Changed
 
