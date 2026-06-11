@@ -22,6 +22,8 @@ final readonly class CharacterBasedTokenEstimator implements TokenEstimatorInter
 {
     public const float CHARS_PER_TOKEN_CLAUDE = 3.5;
 
+    public const float CHARS_PER_TOKEN_CLAUDE_FABLE = 2.7;
+
     public const float CHARS_PER_TOKEN_GPT = 4.0;
 
     public const float CHARS_PER_TOKEN_GEMINI = 3.8;
@@ -43,6 +45,8 @@ final readonly class CharacterBasedTokenEstimator implements TokenEstimatorInter
      * @var list<array{prefix: string, charsPerToken: float}>
      */
     private const array DEFAULT_RATIOS = [
+        ['prefix' => 'claude-fable', 'charsPerToken' => self::CHARS_PER_TOKEN_CLAUDE_FABLE],
+        ['prefix' => 'claude-mythos', 'charsPerToken' => self::CHARS_PER_TOKEN_CLAUDE_FABLE],
         ['prefix' => 'claude-', 'charsPerToken' => self::CHARS_PER_TOKEN_CLAUDE],
         ['prefix' => 'gpt-', 'charsPerToken' => self::CHARS_PER_TOKEN_GPT],
         ['prefix' => 'o3', 'charsPerToken' => self::CHARS_PER_TOKEN_GPT],

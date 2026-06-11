@@ -54,6 +54,8 @@ final class CharacterBasedTokenEstimatorTest extends TestCase
     public static function modelDivisorCases(): iterable
     {
         yield 'claude_uses_claude_divisor' => ['claude-opus-4-7', 29];
+        yield 'claude_fable_uses_denser_fable_divisor' => ['claude-fable-5', 38];
+        yield 'claude_mythos_uses_denser_fable_divisor' => ['claude-mythos-5', 38];
         yield 'gpt_uses_gpt_divisor' => ['gpt-4o', 25];
         yield 'o3_uses_gpt_divisor' => ['o3', 25];
         yield 'o4_uses_gpt_divisor' => ['o4-mini', 25];
