@@ -32,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
 
 final class ReviewerAgentTest extends TestCase
 {
@@ -545,7 +546,7 @@ final class ReviewerAgentTest extends TestCase
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
-        self::assertSame(['Reviewer agent validating findings', ['count' => 1, 'batch_size' => 1, 'tools_enabled' => false]], $infoLogs[0]);
+        self::assertSame(['Reviewer agent validating findings', ['count' => 1, 'batch_size' => 1, 'tools_enabled' => false, 'structured_collection' => false]], $infoLogs[0]);
         self::assertSame(['Reviewer agent complete', ['reviewed' => 1, 'accepted' => 1, 'rejected' => 0]], $infoLogs[1]);
     }
 
@@ -1788,7 +1789,7 @@ final class ReviewerAgentTest extends TestCase
         );
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
-        self::assertSame(['Reviewer agent validating findings', ['count' => 1, 'batch_size' => 1, 'tools_enabled' => true]], $infoLogs[0]);
+        self::assertSame(['Reviewer agent validating findings', ['count' => 1, 'batch_size' => 1, 'tools_enabled' => true, 'structured_collection' => false]], $infoLogs[0]);
     }
 
     private function makeReviewerAgent(LLMClientInterface $llmClient): ReviewerAgent
@@ -1798,6 +1799,170 @@ final class ReviewerAgentTest extends TestCase
             reviewerPromptBuilder: new ReviewerPromptBuilder(),
             logger: new NullLogger(),
         );
+    }
+
+    public function test_structured_collection_validates_a_finding_via_a_record_review_tool_call(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('complete');
+        $llmClient
+            ->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry) use ($vulnerability): LLMResponse {
+                self::assertTrue($toolRegistry->has('record_review'));
+                $toolRegistry->execute('record_review', [
+                    'id' => $vulnerability->id(),
+                    'accepted' => true,
+                    'adjusted_severity' => 'critical',
+                    'reviewer_notes' => 'confirmed',
+                ]);
+
+                return LLMResponse::create('', 10, 5, 'claude', 'end_turn');
+            });
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(useStructuredCollection: true),
+            new NullLogger(),
+            recordReviewToolFactory: new RecordReviewToolFactory(),
+            useStructuredCollection: true,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertCount(1, $result);
+        self::assertTrue($result[0]->isReviewerValidated());
+        self::assertSame(VulnerabilitySeverity::CRITICAL, $result[0]->severity());
+    }
+
+    public function test_structured_collection_rejects_a_finding_when_no_verdict_is_recorded(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willReturn(LLMResponse::create('', 0, 0, 'claude', 'end_turn'));
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(useStructuredCollection: true),
+            new NullLogger(),
+            recordReviewToolFactory: new RecordReviewToolFactory(),
+            useStructuredCollection: true,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertCount(1, $result);
+        self::assertFalse($result[0]->isReviewerValidated());
+    }
+
+    public function test_structured_collection_rejects_a_finding_when_the_llm_call_fails(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willThrowException(new RuntimeException('transport hiccup'));
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(useStructuredCollection: true),
+            new NullLogger(),
+            recordReviewToolFactory: new RecordReviewToolFactory(),
+            useStructuredCollection: true,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertCount(1, $result);
+        self::assertFalse($result[0]->isReviewerValidated());
+    }
+
+    public function test_structured_collection_batch_rekeys_verdicts_by_id(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/Accepted.php');
+        $rejected = $this->makeVulnerabilityAt('src/Rejected.php');
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry) use ($vulnerability, $rejected): LLMResponse {
+                $toolRegistry->execute('record_review', ['id' => $rejected->id(), 'accepted' => false]);
+                $toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
+
+                return LLMResponse::create('', 10, 5, 'claude', 'end_turn');
+            });
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(useStructuredCollection: true),
+            new NullLogger(),
+            batchSize: 5,
+            recordReviewToolFactory: new RecordReviewToolFactory(),
+            useStructuredCollection: true,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability, $rejected], [], new NullCoverageRecorder());
+
+        self::assertCount(2, $result);
+        self::assertTrue($result[0]->isReviewerValidated());
+        self::assertFalse($result[1]->isReviewerValidated());
+    }
+
+    public function test_structured_collection_takes_precedence_over_the_concurrent_fast_path(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = $this->createMock(BatchCapableLLMClientInterface::class);
+        $llmClient->expects(self::never())->method('completeBatch');
+        $llmClient
+            ->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry) use ($vulnerability): LLMResponse {
+                $toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
+
+                return LLMResponse::create('', 10, 5, 'claude', 'end_turn');
+            });
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(useStructuredCollection: true),
+            new NullLogger(),
+            maxConcurrent: 4,
+            recordReviewToolFactory: new RecordReviewToolFactory(),
+            useStructuredCollection: true,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertCount(1, $result);
+        self::assertTrue($result[0]->isReviewerValidated());
+    }
+
+    public function test_structured_collection_flag_without_factory_falls_back_to_json_path(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('completeWithTools');
+        $llmClient
+            ->expects(self::once())
+            ->method('complete')
+            ->willReturn(LLMResponse::create((string) json_encode(['accepted' => true]), 0, 0, 'test', 'end_turn'));
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(),
+            new NullLogger(),
+            useStructuredCollection: true,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertCount(1, $result);
+        self::assertTrue($result[0]->isReviewerValidated());
     }
 
     private function makeVulnerabilityAt(

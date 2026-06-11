@@ -378,6 +378,70 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('  1 | ', $message);
     }
 
+    public function test_structured_system_prompt_directs_verdicts_through_record_review_tool(): void
+    {
+        $reviewerPromptBuilder = new ReviewerPromptBuilder(useStructuredCollection: true);
+
+        $prompt = $reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('`record_review` tool calls', $prompt);
+        self::assertStringContainsString('EXACTLY one call per finding', $prompt);
+        self::assertStringNotContainsString('Return ONLY the JSON array', $prompt);
+        self::assertStringNotContainsString('Each entry of the JSON array MUST be shaped', $prompt);
+    }
+
+    public function test_structured_system_prompt_keeps_rubric_and_playbook(): void
+    {
+        $reviewerPromptBuilder = new ReviewerPromptBuilder(useStructuredCollection: true);
+
+        $prompt = $reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('Severity rubric', $prompt);
+        self::assertStringContainsString('false-positive playbook', $prompt);
+    }
+
+    public function test_structured_batch_system_prompt_directs_one_record_review_call_per_input(): void
+    {
+        $reviewerPromptBuilder = new ReviewerPromptBuilder(useStructuredCollection: true);
+
+        $prompt = $reviewerPromptBuilder->buildBatchSystemPrompt();
+
+        self::assertStringContainsString('Record EXACTLY one review per input vulnerability via the `record_review` tool.', $prompt);
+        self::assertStringContainsString('Verdicts are re-keyed by "id" when we collect your calls', $prompt);
+        self::assertStringNotContainsString('Your output MUST be a JSON array', $prompt);
+    }
+
+    public function test_structured_single_user_message_asks_for_a_record_review_call(): void
+    {
+        $reviewerPromptBuilder = new ReviewerPromptBuilder(useStructuredCollection: true);
+
+        $message = $reviewerPromptBuilder->buildUserMessage($this->makeVulnerability('src/A.php'), 'code');
+
+        self::assertStringContainsString('record your verdict via the `record_review` tool', $message);
+        self::assertStringNotContainsString('return your review JSON', $message);
+    }
+
+    public function test_structured_batch_user_message_asks_for_record_review_calls(): void
+    {
+        $reviewerPromptBuilder = new ReviewerPromptBuilder(useStructuredCollection: true);
+        $vulnerabilities = [$this->makeVulnerability('src/A.php')];
+
+        $message = $reviewerPromptBuilder->buildBatchUserMessage($vulnerabilities, []);
+
+        self::assertStringContainsString('Record one review per finding above via the `record_review` tool.', $message);
+        self::assertStringNotContainsString('Return a JSON array of reviews', $message);
+    }
+
+    public function test_default_mode_keeps_the_json_array_contract(): void
+    {
+        $reviewerPromptBuilder = new ReviewerPromptBuilder();
+
+        $prompt = $reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('Return ONLY the JSON array', $prompt);
+        self::assertStringNotContainsString('record_review', $prompt);
+    }
+
     private function makeVulnerability(string $filePath): Vulnerability
     {
         return Vulnerability::create(
