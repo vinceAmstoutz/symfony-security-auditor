@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Phpunit\Unit\Infrastructure\Tool;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewCollector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
@@ -20,6 +21,35 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewT
 
 final class RecordReviewToolTest extends TestCase
 {
+    /**
+     * @param array{type: string, maxLength?: int} $expectedConstraints
+     */
+    #[DataProvider('propertyConstraintCases')]
+    public function test_definition_schema_pins_property_constraints(string $propertyName, array $expectedConstraints): void
+    {
+        $properties = (new RecordReviewTool(new ReviewCollector()))->definition()->parametersSchema['properties'] ?? [];
+        self::assertIsArray($properties);
+        $property = $properties[$propertyName] ?? null;
+        self::assertIsArray($property);
+
+        foreach ($expectedConstraints as $key => $expectedValue) {
+            self::assertSame($expectedValue, $property[$key] ?? null, \sprintf('Property "%s" should have %s=%s.', $propertyName, $key, var_export($expectedValue, true)));
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, array{type: string, maxLength?: int}}>
+     */
+    public static function propertyConstraintCases(): iterable
+    {
+        yield 'id is string with 100 char cap' => ['id', ['type' => 'string', 'maxLength' => 100]];
+        yield 'accepted is boolean' => ['accepted', ['type' => 'boolean']];
+        yield 'adjusted_severity is string' => ['adjusted_severity', ['type' => 'string']];
+        yield 'corrected_type is string' => ['corrected_type', ['type' => 'string']];
+        yield 'reviewer_notes is string with 5000 char cap' => ['reviewer_notes', ['type' => 'string', 'maxLength' => 5000]];
+        yield 'additional_attack_paths is string with 5000 char cap' => ['additional_attack_paths', ['type' => 'string', 'maxLength' => 5000]];
+    }
+
     public function test_definition_exposes_record_review_name(): void
     {
         $recordReviewTool = new RecordReviewTool(new ReviewCollector());

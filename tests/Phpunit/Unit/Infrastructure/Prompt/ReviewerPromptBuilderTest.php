@@ -396,6 +396,7 @@ final class ReviewerPromptBuilderTest extends TestCase
 
         $prompt = $reviewerPromptBuilder->buildSystemPrompt();
 
+        self::assertStringContainsString('You are a senior AppSec engineer', $prompt);
         self::assertStringContainsString('Severity rubric', $prompt);
         self::assertStringContainsString('false-positive playbook', $prompt);
     }
@@ -406,6 +407,7 @@ final class ReviewerPromptBuilderTest extends TestCase
 
         $prompt = $reviewerPromptBuilder->buildBatchSystemPrompt();
 
+        self::assertStringContainsString('You are a senior AppSec engineer', $prompt);
         self::assertStringContainsString('Record EXACTLY one review per input vulnerability via the `record_review` tool.', $prompt);
         self::assertStringContainsString('Verdicts are re-keyed by "id" when we collect your calls', $prompt);
         self::assertStringNotContainsString('Your output MUST be a JSON array', $prompt);
@@ -428,7 +430,8 @@ final class ReviewerPromptBuilderTest extends TestCase
 
         $message = $reviewerPromptBuilder->buildBatchUserMessage($vulnerabilities, []);
 
-        self::assertStringContainsString('Record one review per finding above via the `record_review` tool.', $message);
+        self::assertStringStartsWith('## Vulnerability Reports to Review', $message);
+        self::assertStringEndsWith('Record one review per finding above via the `record_review` tool. Each call\'s "id" must match the input finding; we re-key by id when collecting your calls, so call order does not matter.', $message);
         self::assertStringNotContainsString('Return a JSON array of reviews', $message);
     }
 

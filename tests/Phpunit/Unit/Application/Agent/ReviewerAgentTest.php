@@ -31,6 +31,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
 
@@ -1963,6 +1964,135 @@ final class ReviewerAgentTest extends TestCase
 
         self::assertCount(1, $result);
         self::assertTrue($result[0]->isReviewerValidated());
+    }
+
+    public function test_structured_collection_records_errored_coverage_and_returns_rejected_on_throwable(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willThrowException(new RuntimeException('transport hiccup'));
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(useStructuredCollection: true),
+            new NullLogger(),
+            recordReviewToolFactory: new RecordReviewToolFactory(),
+            useStructuredCollection: true,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], $auditContext);
+
+        self::assertFalse($result[0]->isReviewerValidated());
+        self::assertSame(
+            [['stage' => 'reviewer', 'file' => 'src/A.php', 'status' => 'errored']],
+            $auditContext->coverage(),
+        );
+    }
+
+    public function test_structured_collection_propagates_llm_provider_exception(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willThrowException(new NonTransientLLMFailureException('retired model'));
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(useStructuredCollection: true),
+            new NullLogger(),
+            recordReviewToolFactory: new RecordReviewToolFactory(),
+            useStructuredCollection: true,
+        );
+
+        $this->expectException(LLMProviderException::class);
+
+        $reviewerAgent->review([$this->makeVulnerabilityAt('src/A.php')], [], new NullCoverageRecorder());
+    }
+
+    public function test_structured_collection_propagates_budget_exceeded_exception(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willThrowException(new BudgetExceededException('budget gone'));
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(useStructuredCollection: true),
+            new NullLogger(),
+            recordReviewToolFactory: new RecordReviewToolFactory(),
+            useStructuredCollection: true,
+        );
+
+        $this->expectException(BudgetExceededException::class);
+
+        $reviewerAgent->review([$this->makeVulnerabilityAt('src/A.php')], [], new NullCoverageRecorder());
+    }
+
+    public function test_structured_collection_batch_marks_errored_on_throwable(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willThrowException(new RuntimeException('transport hiccup'));
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(useStructuredCollection: true),
+            new NullLogger(),
+            batchSize: 5,
+            recordReviewToolFactory: new RecordReviewToolFactory(),
+            useStructuredCollection: true,
+        );
+
+        $result = $reviewerAgent->review([$this->makeVulnerabilityAt('src/A.php'), $this->makeVulnerabilityAt('src/B.php')], [], $auditContext);
+
+        self::assertFalse($result[0]->isReviewerValidated());
+        self::assertFalse($result[1]->isReviewerValidated());
+        self::assertSame(
+            [
+                ['stage' => 'reviewer', 'file' => 'src/A.php', 'status' => 'errored'],
+                ['stage' => 'reviewer', 'file' => 'src/B.php', 'status' => 'errored'],
+            ],
+            $auditContext->coverage(),
+        );
+    }
+
+    public function test_structured_collection_batch_propagates_llm_provider_exception(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willThrowException(new NonTransientLLMFailureException('retired model'));
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(useStructuredCollection: true),
+            new NullLogger(),
+            batchSize: 5,
+            recordReviewToolFactory: new RecordReviewToolFactory(),
+            useStructuredCollection: true,
+        );
+
+        $this->expectException(LLMProviderException::class);
+
+        $reviewerAgent->review([$this->makeVulnerabilityAt('src/A.php')], [], new NullCoverageRecorder());
+    }
+
+    public function test_structured_collection_batch_propagates_budget_exceeded_exception(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willThrowException(new BudgetExceededException('budget gone'));
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(useStructuredCollection: true),
+            new NullLogger(),
+            batchSize: 5,
+            recordReviewToolFactory: new RecordReviewToolFactory(),
+            useStructuredCollection: true,
+        );
+
+        $this->expectException(BudgetExceededException::class);
+
+        $reviewerAgent->review([$this->makeVulnerabilityAt('src/A.php')], [], new NullCoverageRecorder());
     }
 
     private function makeVulnerabilityAt(

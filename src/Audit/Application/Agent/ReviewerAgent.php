@@ -303,33 +303,13 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         try {
             $this->llmClient->completeWithTools($systemPrompt, $userMessage, $toolRegistry, $this->maxToolIterations);
 
-            $review = $reviewCollector->drain()[0] ?? null;
-            if (null === $review) {
-                $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
-
-                return $vulnerability->withReviewerValidation(false);
-            }
-
-            $applied = $this->applyReview($vulnerability, $review);
-            $coverageRecorder->recordCoverage(
-                AgentRole::Reviewer->value,
-                $vulnerability->filePath(),
-                $applied->isReviewerValidated() ? 'validated' : 'rejected',
-            );
-
-            return $applied;
+            return $this->recordVerdict($vulnerability, $reviewCollector->drain()[0] ?? null, $coverageRecorder);
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
             throw $llmProviderException;
         } catch (Throwable $exception) {
-            $this->logger->error('Reviewer LLM call failed', [
-                'vulnerability_id' => $vulnerability->id(),
-                'error' => $exception->getMessage(),
-            ]);
-            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
-
-            return $vulnerability->withReviewerValidation(false);
+            return $this->recordReviewError($vulnerability, $exception, $coverageRecorder);
         }
     }
 
@@ -427,22 +407,14 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         } catch (LLMProviderException $llmProviderException) {
             throw $llmProviderException;
         } catch (Throwable $exception) {
-            $this->logger->error('Reviewer LLM call failed', [
-                'vulnerability_id' => $vulnerability->id(),
-                'error' => $exception->getMessage(),
-            ]);
-            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
-
-            return $vulnerability->withReviewerValidation(false);
+            return $this->recordReviewError($vulnerability, $exception, $coverageRecorder);
         }
     }
 
     private function applyResponse(Vulnerability $vulnerability, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
         if ($llmResponse->isEmpty()) {
-            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
-
-            return $vulnerability->withReviewerValidation(false);
+            return $this->recordVerdict($vulnerability, null, $coverageRecorder);
         }
 
         try {
@@ -459,7 +431,26 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             return $vulnerability->withReviewerValidation(false);
         }
 
-        $reviewed = $this->applyReview($vulnerability, $rawData);
+        return $this->recordVerdict($vulnerability, $rawData, $coverageRecorder);
+    }
+
+    /**
+     * Applies one verdict payload to a finding and records reviewer coverage.
+     * Shared by the JSON path (`applyResponse`) and the structured `record_review`
+     * path so the accept/reject coverage logic lives in a single tested place.
+     * A null payload — empty response or no recorded verdict — rejects the finding.
+     *
+     * @param array<string, mixed>|list<array<string, mixed>>|null $review
+     */
+    private function recordVerdict(Vulnerability $vulnerability, ?array $review, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    {
+        if (null === $review) {
+            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
+
+            return $vulnerability->withReviewerValidation(false);
+        }
+
+        $reviewed = $this->applyReview($vulnerability, $review);
         $coverageRecorder->recordCoverage(
             AgentRole::Reviewer->value,
             $vulnerability->filePath(),
@@ -467,6 +458,17 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         );
 
         return $reviewed;
+    }
+
+    private function recordReviewError(Vulnerability $vulnerability, Throwable $throwable, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    {
+        $this->logger->error('Reviewer LLM call failed', [
+            'vulnerability_id' => $vulnerability->id(),
+            'error' => $throwable->getMessage(),
+        ]);
+        $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
+
+        return $vulnerability->withReviewerValidation(false);
     }
 
     /**
