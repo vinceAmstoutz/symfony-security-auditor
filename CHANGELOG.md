@@ -10,6 +10,50 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.8.0] — 2026-06-11 — Fable
+
+A model-coverage release. Anthropic's Claude Fable 5 — released the day before —
+is now priced in the cost estimator, so `audit:run --dry-run` reports a real
+figure for it instead of a misleading `$0.00`.
+
+### Added
+
+- **Cost estimates now cover Claude Fable 5 (`claude-fable-5`).**
+  `StaticPricingProvider`
+  (`src/Audit/Infrastructure/Pricing/StaticPricingProvider.php`) gained the
+  entry `'claude-fable-5' => [10.00, 50.00]` (USD per million input/output
+  tokens, Anthropic list price). Before this, configuring `claude-fable-5` made
+  `PricingProviderInterface::hasModel()` return `false`, so a dry run estimated
+  `$0.00` and logged a `No pricing entry for LLM model` warning (and, since
+  1.7.2, the `AuditPresenter` stderr notice). The pricing table's source-date
+  comment is bumped to `2026-06-11`. Every provider's entries (Anthropic,
+  OpenAI, Google, Mistral, Cohere, DeepSeek, Perplexity, Cerebras) were
+  re-verified against current published list prices on 2026-06-11; two stale
+  entries were corrected (see _Fixed_ below), the rest are unchanged.
+
+### Changed
+
+- **`docs/faq.md` documents Claude Fable 5.** The Model Selection table gains a
+  "Most demanding" row (`attacker_model: claude-fable-5` +
+  `reviewer_model: claude-haiku-4-5-20251001`), and the cost table gains a
+  "Claude Fable 5 only" row (≈ `$6 – $16` per run — roughly 2× Claude Opus, in
+  line with the `$10/$50` vs `$5/$25` per-MTok pricing).
+
+### Fixed
+
+- **Corrected stale list prices for two non-Anthropic models in the cost
+  estimator.** During the 2026-06-11 re-verification of every provider's pricing
+  in `StaticPricingProvider`, two entries no longer matched the provider's
+  published list price and were producing inaccurate `audit:run --dry-run`
+  estimates:
+  - `mistral-small-latest` / `mistral-small-2603`: `$0.15/$0.60` → `$0.10/$0.30`
+    per million input/output tokens.
+  - `deepseek-v4-pro`: `$1.74/$3.48` → `$0.435/$0.87` per million input/output
+    tokens.
+
+  All other entries across Anthropic, OpenAI, Google, Cohere, Perplexity, and
+  Cerebras matched their current list prices and are unchanged.
+
 ## [1.7.2] — 2026-06-07 — Lighthouse
 
 A dry-run transparency release. `audit:run --dry-run` no longer hides an
@@ -1082,6 +1126,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.8.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.8.0
 [1.7.2]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.7.2
 [1.7.1]:

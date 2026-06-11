@@ -35,6 +35,7 @@ final class StaticPricingProviderTest extends TestCase
     public static function knownModelCases(): iterable
     {
         // Anthropic Claude — current
+        yield 'claude-fable-5' => ['claude-fable-5', 10.00, 50.00];
         yield 'claude-opus-4-8' => ['claude-opus-4-8', 5.00, 25.00];
         yield 'claude-sonnet-4-6' => ['claude-sonnet-4-6', 3.00, 15.00];
         yield 'claude-haiku-4-5-20251001' => ['claude-haiku-4-5-20251001', 1.00, 5.00];
@@ -84,8 +85,8 @@ final class StaticPricingProviderTest extends TestCase
         yield 'mistral-large-2512' => ['mistral-large-2512', 0.50, 1.50];
         yield 'mistral-medium-latest' => ['mistral-medium-latest', 1.50, 7.50];
         yield 'mistral-medium-2604' => ['mistral-medium-2604', 1.50, 7.50];
-        yield 'mistral-small-latest' => ['mistral-small-latest', 0.15, 0.60];
-        yield 'mistral-small-2603' => ['mistral-small-2603', 0.15, 0.60];
+        yield 'mistral-small-latest' => ['mistral-small-latest', 0.10, 0.30];
+        yield 'mistral-small-2603' => ['mistral-small-2603', 0.10, 0.30];
         yield 'codestral-latest' => ['codestral-latest', 0.30, 0.90];
         yield 'codestral-2508' => ['codestral-2508', 0.30, 0.90];
         yield 'devstral-medium-2512' => ['devstral-medium-2512', 0.40, 2.00];
@@ -102,7 +103,7 @@ final class StaticPricingProviderTest extends TestCase
         yield 'deepseek-chat' => ['deepseek-chat', 0.14, 0.28];
         yield 'deepseek-reasoner' => ['deepseek-reasoner', 0.14, 0.28];
         yield 'deepseek-v4-flash' => ['deepseek-v4-flash', 0.14, 0.28];
-        yield 'deepseek-v4-pro' => ['deepseek-v4-pro', 1.74, 3.48];
+        yield 'deepseek-v4-pro' => ['deepseek-v4-pro', 0.435, 0.87];
         // Perplexity
         yield 'sonar' => ['sonar', 1.00, 1.00];
         yield 'sonar-pro' => ['sonar-pro', 3.00, 15.00];
