@@ -79,6 +79,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   more-specific prefixes (`claude-fable`, `claude-mythos`) are now matched ahead
   of `claude-` with a denser 2.7-characters-per-token ratio, so the dry-run
   estimate reflects the real token count. Non-Fable Claude models are unchanged.
+- **The attacker's Route Access-Control Map now flags firewall-covered routes
+  instead of mislabelling them as unprotected.** `AttackerPromptBuilder`
+  (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) rendered every
+  controller action with no `#[IsGranted]` / `denyAccessUnlessGranted()` as
+  `LACKS_ACCESS_CHECK`, even when a `security.yaml` `access_control` rule
+  already gated the route path — so the attacker flagged it as
+  `broken_access_control` and the reviewer then spent tool calls (or, in batch
+  mode, lacked the tools) rediscovering the firewall rule. The map now
+  cross-references each route path against the `access_control` patterns already
+  parsed into `SymfonyMapping::routeAccessMap()` and, on a match, tags the line
+  `COVERED_BY access_control[…]` with the gating roles, telling the model the
+  firewall protects it (unless the role is too permissive). This removes a whole
+  class of false positive at zero extra LLM cost. The attacker `PROMPT_VERSION`
+  is bumped `7` → `8`, invalidating previously cached responses.
 
 ## [1.8.0] — 2026-06-11 — Fable
 
