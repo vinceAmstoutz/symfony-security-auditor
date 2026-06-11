@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **The attacker now learns which findings the reviewer already rejected.**
+  After the first iteration, `AuditOrchestrator`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) collected only the
+  reviewer-_validated_ findings to feed back to the attacker; rejected findings
+  were invisible, so every subsequent iteration re-reported them, the confidence
+  filter let them through, and the reviewer re-rejected them — burning attacker
+  tool-call and reviewer budget each round before the deduplication step finally
+  discarded them. The orchestrator now also gathers reviewer-rejected findings
+  and passes them through a new `AttackerAnalysisRequest::$rejectedFindings`
+  field; `AttackerContextPromptRenderer::renderRejectedFindings()` injects a
+  `Findings Already Rejected by the Reviewer` preamble instructing the model not
+  to re-report those locations. Chunks carrying rejected-finding context are not
+  served from the attacker cache (the same rule already applied to validated
+  prior findings), so the new context always reaches the model.
+
 ### Changed
 
 - **Reviewer no longer drops real-but-hard-to-prove findings.** The reviewer

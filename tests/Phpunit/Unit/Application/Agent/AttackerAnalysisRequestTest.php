@@ -37,6 +37,32 @@ final class AttackerAnalysisRequestTest extends TestCase
         self::assertSame([], $attackerAnalysisRequest->previousFindings);
     }
 
+    public function test_rejected_findings_default_to_empty(): void
+    {
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::create());
+
+        self::assertSame([], $attackerAnalysisRequest->rejectedFindings);
+    }
+
+    public function test_it_exposes_rejected_findings_from_the_constructor(): void
+    {
+        $rejected = [$this->makeVulnerability()];
+
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::create(), false, [], $rejected);
+
+        self::assertSame($rejected, $attackerAnalysisRequest->rejectedFindings);
+    }
+
+    public function test_with_files_and_findings_preserves_rejected_findings(): void
+    {
+        $rejected = [$this->makeVulnerability()];
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::create(), true, [], $rejected);
+
+        $derived = $attackerAnalysisRequest->withFilesAndFindings([], []);
+
+        self::assertSame($rejected, $derived->rejectedFindings);
+    }
+
     public function test_it_exposes_the_constructor_arguments(): void
     {
         $files = [ProjectFile::create('src/A.php', '/app/src/A.php', '<?php')];

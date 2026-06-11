@@ -640,6 +640,40 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame([0, 1], $recordingAttackerAgent->previousFindingsCountPerCall);
     }
 
+    public function test_it_passes_reviewer_rejected_findings_to_next_iteration(): void
+    {
+        $vulnerability = Vulnerability::create(
+            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
+            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
+            title: 'First',
+            description: 'd',
+            filePath: 'src/A.php',
+            lineStart: 1,
+            lineEnd: 2,
+            vulnerableCode: 'c',
+            attackVector: 'a',
+            proof: 'p',
+            remediation: 'r',
+            confidence: 0.9,
+        );
+
+        // Attacker re-finds the same finding each iteration. The reviewer rejects it,
+        // so iteration 1 persists it as rejected (0 rejected passed in); iteration 2
+        // receives it as a rejected finding (1) and re-finds a duplicate → loop stops.
+        $recordingAttackerAgent = new RecordingAttackerAgent([$vulnerability]);
+
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willReturn($this->reviewerRejectResponse());
+        $reviewerAgent = new ReviewerAgent($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger());
+
+        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger());
+        $auditContext = $this->makeContextWithMapping();
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertSame([0, 1], $recordingAttackerAgent->rejectedFindingsCountPerCall);
+    }
+
     public function test_it_logs_starting_loop_with_custom_max_iterations(): void
     {
         $infoLogs = [];
