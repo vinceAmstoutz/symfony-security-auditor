@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Changed
+
+- **Reviewer no longer drops real-but-hard-to-prove findings.** The reviewer
+  decision rules in `ReviewerPromptBuilder`
+  (`src/Audit/Infrastructure/Prompt/ReviewerPromptBuilder.php`) opened with
+  `Be strict: reject any finding where exploitation is not clearly demonstrated`
+  — and current models follow that literally, silently discarding the very class
+  of issues the auditor exists to surface (race conditions, business-logic
+  flaws, context-dependent access control). The rules now invert the default:
+  reject only when a specific mitigating control can be named (a guard clause, a
+  parameterized query, an `access_control` rule, a framework default) or the
+  pattern is absent; when the pattern is present but exploitability is
+  uncertain, the reviewer accepts it with a downgraded severity (down to `info`)
+  and records the missing evidence in `reviewer_notes` instead of rejecting. The
+  false-positive playbook — which rejects against concrete Symfony mitigations —
+  is unchanged, so precision on known-safe patterns is preserved.
+
 ### Fixed
 
 - **Attacker prompt no longer contradicts itself in the default
