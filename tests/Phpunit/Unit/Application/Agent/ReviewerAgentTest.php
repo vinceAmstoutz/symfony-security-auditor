@@ -1968,13 +1968,13 @@ final class ReviewerAgentTest extends TestCase
 
     public function test_structured_collection_single_path_returns_a_verdict_for_every_finding(): void
     {
-        $first = $this->makeVulnerabilityAt('src/First.php');
+        $vulnerability = $this->makeVulnerabilityAt('src/First.php');
         $second = $this->makeVulnerabilityAt('src/Second.php');
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('completeWithTools')->willReturnCallback(
-            static function (string $system, string $user, ToolRegistry $toolRegistry) use ($first, $second): LLMResponse {
-                $id = str_contains($user, 'src/First.php') ? $first->id() : $second->id();
+            static function (string $system, string $user, ToolRegistry $toolRegistry) use ($vulnerability, $second): LLMResponse {
+                $id = str_contains($user, 'src/First.php') ? $vulnerability->id() : $second->id();
                 $toolRegistry->execute('record_review', ['id' => $id, 'accepted' => true]);
 
                 return LLMResponse::create('', 10, 5, 'claude', 'end_turn');
@@ -1989,7 +1989,7 @@ final class ReviewerAgentTest extends TestCase
             useStructuredCollection: true,
         );
 
-        $result = $reviewerAgent->review([$first, $second], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability, $second], [], new NullCoverageRecorder());
 
         self::assertCount(2, $result);
         self::assertSame('src/First.php', $result[0]->filePath());
