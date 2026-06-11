@@ -642,41 +642,43 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_passes_only_reviewer_rejected_findings_to_next_iteration(): void
     {
-        $accepted = Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'KeepMe',
-            description: 'd',
-            filePath: 'src/Accepted.php',
-            lineStart: 1,
-            lineEnd: 2,
-            vulnerableCode: 'c',
-            attackVector: 'a',
-            proof: 'p',
-            remediation: 'r',
-            confidence: 0.9,
-        );
-        $rejected = Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'DropMe',
-            description: 'd',
-            filePath: 'src/Rejected.php',
-            lineStart: 1,
-            lineEnd: 2,
-            vulnerableCode: 'c',
-            attackVector: 'a',
-            proof: 'p',
-            remediation: 'r',
-            confidence: 0.9,
-        );
-
         // The attacker returns both findings every iteration. The reviewer accepts
-        // 'KeepMe' and rejects 'DropMe'. Iteration 2 must receive ONLY the rejected
-        // finding as rejected context (count 1) — never the accepted one (which
-        // would make it 2 if the !isReviewerValidated() filter were dropped). Both
-        // findings dedupe in iteration 2, so the loop stops.
-        $recordingAttackerAgent = new RecordingAttackerAgent([$accepted, $rejected]);
+        // 'KeepMe' (src/Accepted.php) and rejects 'DropMe' (src/Rejected.php).
+        // Iteration 2 must receive ONLY the rejected finding as rejected context:
+        // - dropping the array_filter would feed back both (count 2);
+        // - flipping !isReviewerValidated() would feed back the ACCEPTED finding
+        //   instead, so the identity assertion below pins the correct one.
+        // Both findings dedupe in iteration 2, so the loop stops.
+        $recordingAttackerAgent = new RecordingAttackerAgent([
+            Vulnerability::create(
+                vulnerabilityType: VulnerabilityType::SQL_INJECTION,
+                vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
+                title: 'KeepMe',
+                description: 'd',
+                filePath: 'src/Accepted.php',
+                lineStart: 1,
+                lineEnd: 2,
+                vulnerableCode: 'c',
+                attackVector: 'a',
+                proof: 'p',
+                remediation: 'r',
+                confidence: 0.9,
+            ),
+            Vulnerability::create(
+                vulnerabilityType: VulnerabilityType::SQL_INJECTION,
+                vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
+                title: 'DropMe',
+                description: 'd',
+                filePath: 'src/Rejected.php',
+                lineStart: 1,
+                lineEnd: 2,
+                vulnerableCode: 'c',
+                attackVector: 'a',
+                proof: 'p',
+                remediation: 'r',
+                confidence: 0.9,
+            ),
+        ]);
 
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $reviewerLlm->method('complete')->willReturnCallback(
@@ -693,6 +695,8 @@ final class AuditOrchestratorTest extends TestCase
 
         self::assertSame([0, 1], $recordingAttackerAgent->rejectedFindingsCountPerCall);
         self::assertSame([0, 1], $recordingAttackerAgent->previousFindingsCountPerCall);
+        self::assertCount(1, $recordingAttackerAgent->lastRejectedFindings);
+        self::assertSame('src/Rejected.php', $recordingAttackerAgent->lastRejectedFindings[0]->filePath());
     }
 
     public function test_it_logs_starting_loop_with_custom_max_iterations(): void
