@@ -1966,6 +1966,36 @@ final class ReviewerAgentTest extends TestCase
         self::assertTrue($result[0]->isReviewerValidated());
     }
 
+    public function test_structured_collection_single_path_returns_a_verdict_for_every_finding(): void
+    {
+        $first = $this->makeVulnerabilityAt('src/First.php');
+        $second = $this->makeVulnerabilityAt('src/Second.php');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('completeWithTools')->willReturnCallback(
+            static function (string $system, string $user, ToolRegistry $toolRegistry) use ($first, $second): LLMResponse {
+                $id = str_contains($user, 'src/First.php') ? $first->id() : $second->id();
+                $toolRegistry->execute('record_review', ['id' => $id, 'accepted' => true]);
+
+                return LLMResponse::create('', 10, 5, 'claude', 'end_turn');
+            },
+        );
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(useStructuredCollection: true),
+            new NullLogger(),
+            recordReviewToolFactory: new RecordReviewToolFactory(),
+            useStructuredCollection: true,
+        );
+
+        $result = $reviewerAgent->review([$first, $second], [], new NullCoverageRecorder());
+
+        self::assertCount(2, $result);
+        self::assertSame('src/First.php', $result[0]->filePath());
+        self::assertSame('src/Second.php', $result[1]->filePath());
+    }
+
     public function test_structured_collection_records_errored_coverage_and_returns_rejected_on_throwable(): void
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
