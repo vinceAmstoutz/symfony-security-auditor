@@ -28,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
@@ -58,6 +59,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         private int $maxConcurrent = self::DEFAULT_MAX_CONCURRENT,
         private ?RecordReviewToolFactoryInterface $recordReviewToolFactory = null,
         private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
+        private ?ReviewerCacheInterface $reviewerCache = null,
     ) {}
 
     /**
@@ -66,7 +68,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
      *
      * @return list<Vulnerability>
      */
-    public function review(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder): array
+    public function review(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false): array
     {
         if ([] === $vulnerabilities) {
             return [];
@@ -91,7 +93,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             } else {
                 $reviewed = $this->canReviewConcurrently($useTools)
                     ? $this->reviewSinglesConcurrently($vulnerabilities, $projectFiles, $coverageRecorder)
-                    : $this->reviewSinglesSequentially($vulnerabilities, $projectFiles, $coverageRecorder, $toolRegistry);
+                    : $this->reviewSinglesSequentially($vulnerabilities, $projectFiles, $coverageRecorder, $toolRegistry, $bypassCache);
             }
         } else {
             foreach (array_chunk($vulnerabilities, $this->batchSize) as $batch) {
@@ -274,11 +276,11 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
      *
      * @return list<Vulnerability>
      */
-    private function reviewSinglesSequentially(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry): array
+    private function reviewSinglesSequentially(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, bool $bypassCache): array
     {
         $reviewed = [];
         foreach ($vulnerabilities as $vulnerability) {
-            $reviewed[] = $this->reviewSingle($vulnerability, $projectFiles, $coverageRecorder, $toolRegistry);
+            $reviewed[] = $this->reviewSingle($vulnerability, $projectFiles, $coverageRecorder, $toolRegistry, $bypassCache);
         }
 
         return $reviewed;
@@ -399,9 +401,20 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
     /**
      * @param list<ProjectFile> $projectFiles
      */
-    private function reviewSingle(Vulnerability $vulnerability, array $projectFiles, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry): Vulnerability
+    private function reviewSingle(Vulnerability $vulnerability, array $projectFiles, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, bool $bypassCache): Vulnerability
     {
         $codeContext = $this->getFileContext($vulnerability->filePath(), $projectFiles);
+
+        $useCache = !$bypassCache && $this->reviewerCache instanceof ReviewerCacheInterface;
+        if ($useCache) {
+            $cached = $this->reviewerCache->get($vulnerability, $codeContext);
+            if (null !== $cached) {
+                $this->logger->debug('Reviewer verdict served from cache', ['vulnerability_id' => $vulnerability->id()]);
+
+                return $this->recordVerdict($vulnerability, $cached, $coverageRecorder);
+            }
+        }
+
         $systemPrompt = $this->reviewerPromptBuilder->buildSystemPrompt();
         $userMessage = $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext);
 
@@ -410,7 +423,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
                 ? $this->llmClient->completeWithTools($systemPrompt, $userMessage, $toolRegistry, $this->maxToolIterations)
                 : $this->llmClient->complete($systemPrompt, $userMessage);
 
-            return $this->applyResponse($vulnerability, $response, $coverageRecorder);
+            return $this->applyResponse($vulnerability, $response, $coverageRecorder, $useCache ? $codeContext : null);
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
@@ -420,7 +433,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         }
     }
 
-    private function applyResponse(Vulnerability $vulnerability, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    private function applyResponse(Vulnerability $vulnerability, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder, ?string $codeContextForCache = null): Vulnerability
     {
         if ($llmResponse->isEmpty()) {
             return $this->recordVerdict($vulnerability, null, $coverageRecorder);
@@ -440,14 +453,19 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             return $vulnerability->withReviewerValidation(false);
         }
 
+        if (null !== $codeContextForCache && $this->reviewerCache instanceof ReviewerCacheInterface) {
+            $this->reviewerCache->store($vulnerability, $codeContextForCache, $this->extractSingleReview($rawData));
+        }
+
         return $this->recordVerdict($vulnerability, $rawData, $coverageRecorder);
     }
 
     /**
      * Applies one verdict payload to a finding and records reviewer coverage.
-     * Shared by the JSON path (`applyResponse`) and the structured `record_review`
-     * path so the accept/reject coverage logic lives in a single tested place.
-     * A null payload — empty response or no recorded verdict — rejects the finding.
+     * Shared by the JSON path (`applyResponse`), the cache-hit path, and the
+     * structured `record_review` path so the accept/reject coverage logic lives
+     * in a single tested place. A null payload — empty response or no recorded
+     * verdict — rejects the finding.
      *
      * @param array<string, mixed>|list<array<string, mixed>>|null $review
      */
@@ -485,8 +503,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
      */
     private function applyReview(Vulnerability $vulnerability, array $reviewData): Vulnerability
     {
-        /** @var array<string, mixed> $review */
-        $review = isset($reviewData[0]) && \is_array($reviewData[0]) ? $reviewData[0] : $reviewData;
+        $review = $this->extractSingleReview($reviewData);
 
         $accepted = (bool) ($review['accepted'] ?? false);
         $rawSeverity = $review['adjusted_severity'] ?? null;
@@ -541,6 +558,26 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         }
 
         return '';
+    }
+
+    /**
+     * Normalizes the reviewer payload to the single review object: a defensive
+     * unwrap when the model returns a one-element array instead of an object.
+     *
+     * @param array<string, mixed>|list<array<string, mixed>> $reviewData
+     *
+     * @return array<string, mixed>
+     */
+    private function extractSingleReview(array $reviewData): array
+    {
+        $candidate = isset($reviewData[0]) && \is_array($reviewData[0]) ? $reviewData[0] : $reviewData;
+
+        $review = [];
+        foreach ($candidate as $key => $value) {
+            $review[(string) $key] = $value;
+        }
+
+        return $review;
     }
 
     /** @param array<string, mixed> $review */

@@ -95,6 +95,9 @@ overriding the alias in `config/services.yaml` is a supported integration path:
 - `AttackerPromptBuilderInterface`, `ReviewerPromptBuilderInterface`
 - `ProjectFileScannerInterface`
 - `AttackerCacheInterface`
+- `ReviewerCacheInterface` — host applications may implement this and alias it
+  to back the reviewer-verdict cache with their own store (Redis, a shared
+  filesystem, …).
 - `StaticPreScannerInterface` — host applications may implement this and alias
   it to supply their own deterministic risk-marker scan.
 - `CodeSlicerInterface` — implement and alias to control how files are trimmed

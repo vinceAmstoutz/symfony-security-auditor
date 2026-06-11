@@ -54,6 +54,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   reads the prefix at the provider's discounted cache-read rate. The trade-off
   is a larger prompt when caching is off, so the key defaults to `false`
   (relevance-only skills, the previous behaviour).
+- **Reviewer verdicts are now cached across runs, skipping redundant reviewer
+  LLM calls.** A new filesystem cache
+  (`src/Audit/Infrastructure/Cache/FilesystemReviewerCache.php`, behind the
+  Domain port `src/Audit/Domain/Port/ReviewerCacheInterface.php`) stores each
+  reviewer verdict keyed by the SHA-256 of the finding's stable content (its
+  `Vulnerability::toArray()` minus the non-deterministic `id`) plus the reviewed
+  code context, folded behind a salt of `{reviewer_model}|reviewer-v{N}`. When
+  the attacker re-surfaces a finding with identical content against unchanged
+  code — the common case on repeated CI/PR scans — `ReviewerAgent::review()`
+  reuses the stored verdict instead of calling the LLM again. The cache reuses
+  the existing `cache.enabled` switch (when `false`, a `NullReviewerCache` no-op
+  is wired) and lives in a `reviewer` subdirectory alongside the attacker cache
+  under `cache.dir`. The `--no-cache` flag bypasses it for the run (no reads, no
+  writes), mirroring the attacker cache. A reviewer-prompt or verdict-contract
+  change is invalidated by bumping `FilesystemReviewerCache::CACHE_VERSION`.
 
 ### Changed
 

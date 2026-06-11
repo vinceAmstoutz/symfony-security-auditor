@@ -29,6 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecor
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
@@ -2123,6 +2124,105 @@ final class ReviewerAgentTest extends TestCase
         $this->expectException(BudgetExceededException::class);
 
         $reviewerAgent->review([$this->makeVulnerabilityAt('src/A.php')], [], new NullCoverageRecorder());
+    }
+
+    public function test_cache_hit_short_circuits_the_llm_call_and_applies_the_stored_verdict(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php', VulnerabilitySeverity::MEDIUM);
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('complete');
+        $llmClient->expects(self::never())->method('completeWithTools');
+
+        $reviewerCache = self::createStub(ReviewerCacheInterface::class);
+        $reviewerCache->method('get')->willReturn(['accepted' => true, 'adjusted_severity' => 'critical']);
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(),
+            new NullLogger(),
+            reviewerCache: $reviewerCache,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertTrue($result[0]->isReviewerValidated());
+        self::assertSame(VulnerabilitySeverity::CRITICAL, $result[0]->severity());
+    }
+
+    public function test_cache_miss_calls_the_llm_and_stores_the_parsed_verdict(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(
+            LLMResponse::create((string) json_encode(['accepted' => true]), 0, 0, 'test', 'end_turn'),
+        );
+
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->method('get')->willReturn(null);
+        $reviewerCache->expects(self::once())
+            ->method('store')
+            ->with($vulnerability, '', ['accepted' => true]);
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(),
+            new NullLogger(),
+            reviewerCache: $reviewerCache,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertTrue($result[0]->isReviewerValidated());
+    }
+
+    public function test_bypass_cache_skips_both_get_and_store(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(
+            LLMResponse::create((string) json_encode(['accepted' => true]), 0, 0, 'test', 'end_turn'),
+        );
+
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->expects(self::never())->method('get');
+        $reviewerCache->expects(self::never())->method('store');
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(),
+            new NullLogger(),
+            reviewerCache: $reviewerCache,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder(), bypassCache: true);
+
+        self::assertTrue($result[0]->isReviewerValidated());
+    }
+
+    public function test_cache_miss_does_not_store_when_the_response_is_empty(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('', 0, 0, 'test', 'end_turn'));
+
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->method('get')->willReturn(null);
+        $reviewerCache->expects(self::never())->method('store');
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(),
+            new NullLogger(),
+            reviewerCache: $reviewerCache,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertFalse($result[0]->isReviewerValidated());
     }
 
     private function makeVulnerabilityAt(
