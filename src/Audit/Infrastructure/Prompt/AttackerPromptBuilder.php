@@ -27,7 +27,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 6;
+    public const int PROMPT_VERSION = 7;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
@@ -322,6 +322,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
         $accessControlMap = $this->renderRouteAccessControlMap($symfonyMapping);
         $voterCoverage = $this->renderVoterCoverage($symfonyMapping);
         $formBindings = $this->renderFormBindings($symfonyMapping);
+        $closingInstruction = $this->closingInstruction();
 
         return <<<PROMPT
             ## Project Mapping Summary
@@ -335,8 +336,17 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
 
             {$context}
 
-            Return a JSON array of all vulnerabilities found.
+            {$closingInstruction}
             PROMPT;
+    }
+
+    private function closingInstruction(): string
+    {
+        if ($this->useStructuredCollection) {
+            return 'Record every vulnerability you find via the `record_vulnerability` tool — one call per finding.';
+        }
+
+        return 'Return a JSON array of all vulnerabilities found.';
     }
 
     private function renderVoterCoverage(SymfonyMapping $symfonyMapping): string

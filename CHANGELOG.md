@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Fixed
+
+- **Attacker prompt no longer contradicts itself in the default
+  structured-collection mode.** `AttackerPromptBuilder::buildUserMessage()`
+  (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) always closed
+  the user message with `Return a JSON array of all vulnerabilities found.`,
+  even when `audit.structured_collection` is enabled (the default), where the
+  system prompt forbids JSON-array output and mandates `record_vulnerability`
+  tool calls. The conflicting instruction could push the model to emit a stray
+  JSON array that the pipeline then discards as malformed. The closing line is
+  now conditional: structured mode tells the model to record findings via the
+  `record_vulnerability` tool, and only the opt-out
+  (`structured_collection: false`) path keeps the JSON-array wording. The
+  attacker `PROMPT_VERSION` is bumped `6` → `7`, invalidating previously cached
+  attacker responses so the corrected prompt takes effect.
+- **Reviewer can now relabel a finding to `over_permissive_serializer_group`.**
+  The `corrected_type` enum advertised to the reviewer in
+  `ReviewerPromptBuilder`
+  (`src/Audit/Infrastructure/Prompt/ReviewerPromptBuilder.php`) listed 39 of the
+  40 `VulnerabilityType` cases — `over_permissive_serializer_group`, which the
+  attacker can already emit, was missing, so the reviewer could neither correct
+  a mislabelled finding to it nor recognise it as a valid type. The value is now
+  listed, and a regression test asserts every `VulnerabilityType` case appears
+  in both the attacker and reviewer prompts so the two enumerations cannot drift
+  apart again.
+
 ## [1.8.0] — 2026-06-11 — Fable
 
 A model-coverage release. Anthropic's Claude Fable 5 — released the day before —

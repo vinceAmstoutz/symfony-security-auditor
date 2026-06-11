@@ -13,12 +13,14 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 
 final class AttackerPromptBuilderTest extends TestCase
@@ -788,7 +790,53 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_prompt_version_is_bumped_when_modern_symfony_skill_blocks_are_added(): void
     {
-        self::assertSame(6, AttackerPromptBuilder::PROMPT_VERSION);
+        self::assertSame(7, AttackerPromptBuilder::PROMPT_VERSION);
+    }
+
+    #[DataProvider('vulnerabilityTypeValues')]
+    public function test_base_prompt_lists_every_vulnerability_type_as_valid(string $typeValue): void
+    {
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString($typeValue, $prompt);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function vulnerabilityTypeValues(): iterable
+    {
+        foreach (VulnerabilityType::cases() as $vulnerabilityType) {
+            yield $vulnerabilityType->value => [$vulnerabilityType->value];
+        }
+    }
+
+    public function test_structured_collection_user_message_does_not_request_a_json_array(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: true);
+        $projectFile = ProjectFile::create(
+            'src/Controller/UserController.php',
+            '/app/src/Controller/UserController.php',
+            '<?php class UserController {}',
+        );
+
+        $message = $attackerPromptBuilder->buildUserMessage([$projectFile], SymfonyMapping::create());
+
+        self::assertStringNotContainsString('Return a JSON array', $message);
+        self::assertStringContainsString('record_vulnerability', $message);
+    }
+
+    public function test_opt_out_user_message_requests_a_json_array(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
+        $projectFile = ProjectFile::create(
+            'src/Controller/UserController.php',
+            '/app/src/Controller/UserController.php',
+            '<?php class UserController {}',
+        );
+
+        $message = $attackerPromptBuilder->buildUserMessage([$projectFile], SymfonyMapping::create());
+
+        self::assertStringContainsString('Return a JSON array of all vulnerabilities found.', $message);
+        self::assertStringNotContainsString('record_vulnerability', $message);
     }
 
     public function test_entity_skill_block_mentions_over_permissive_serializer_groups(): void

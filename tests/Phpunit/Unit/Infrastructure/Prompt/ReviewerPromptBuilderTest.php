@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
@@ -180,6 +181,30 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringContainsString('messenger_handler_unsafe', $prompt);
         self::assertStringContainsString('webhook_replay', $prompt);
         self::assertStringContainsString('authenticator_bypass', $prompt);
+    }
+
+    #[DataProvider('vulnerabilityTypeValues')]
+    public function test_system_prompt_lists_every_vulnerability_type_as_corrected_type(string $typeValue): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString($typeValue, $prompt);
+    }
+
+    #[DataProvider('vulnerabilityTypeValues')]
+    public function test_batch_system_prompt_lists_every_vulnerability_type_as_corrected_type(string $typeValue): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildBatchSystemPrompt();
+
+        self::assertStringContainsString($typeValue, $prompt);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function vulnerabilityTypeValues(): iterable
+    {
+        foreach (VulnerabilityType::cases() as $vulnerabilityType) {
+            yield $vulnerabilityType->value => [$vulnerabilityType->value];
+        }
     }
 
     public function test_false_positive_playbook_covers_constant_time_signature_comparison(): void
