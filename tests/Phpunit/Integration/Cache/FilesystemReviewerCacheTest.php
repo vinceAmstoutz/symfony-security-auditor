@@ -176,6 +176,7 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertCount(1, $warnings);
         self::assertSame('Reviewer cache entry was unreadable, ignoring', $warnings[0][0]);
         self::assertArrayHasKey('path', $warnings[0][1]);
+        self::assertArrayHasKey('error', $warnings[0][1]);
         self::assertNotSame('', $warnings[0][1]['error']);
     }
 
@@ -317,6 +318,7 @@ final class FilesystemReviewerCacheTest extends TestCase
         $failures = array_values(array_filter($warnings, static fn (array $e): bool => 'Failed to write reviewer cache entry' === $e[0]));
         self::assertCount(1, $failures);
         self::assertArrayHasKey('path', $failures[0][1]);
+        self::assertArrayHasKey('error', $failures[0][1]);
         self::assertNotSame('', $failures[0][1]['error']);
     }
 

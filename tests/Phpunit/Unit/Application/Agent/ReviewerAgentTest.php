@@ -2150,6 +2150,40 @@ final class ReviewerAgentTest extends TestCase
         self::assertSame(VulnerabilitySeverity::CRITICAL, $result[0]->severity());
     }
 
+    public function test_cache_hit_logs_debug_message_with_the_vulnerability_id(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php', VulnerabilitySeverity::MEDIUM);
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+
+        $reviewerCache = self::createStub(ReviewerCacheInterface::class);
+        $reviewerCache->method('get')->willReturn(['accepted' => true]);
+
+        $debugLogs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$debugLogs): void {
+                $debugLogs[] = [$message, $context];
+            },
+        );
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(),
+            $logger,
+            reviewerCache: $reviewerCache,
+        );
+
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        $cacheHitLogs = array_values(array_filter(
+            $debugLogs,
+            static fn (array $entry): bool => 'Reviewer verdict served from cache' === $entry[0],
+        ));
+        self::assertCount(1, $cacheHitLogs);
+        self::assertSame(['vulnerability_id' => $vulnerability->id()], $cacheHitLogs[0][1]);
+    }
+
     public function test_cache_miss_calls_the_llm_and_stores_the_parsed_verdict(): void
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
