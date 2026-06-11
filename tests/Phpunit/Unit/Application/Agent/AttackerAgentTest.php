@@ -161,6 +161,31 @@ final class AttackerAgentTest extends TestCase
         self::assertStringContainsString('## Source Code', $captured);
     }
 
+    public function test_rejected_findings_are_prepended_before_the_user_message_with_a_blank_line(): void
+    {
+        $rejectedFindings = [$this->makeVulnerabilityFor('src/Controller/Rejected.php')];
+
+        $captured = '';
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
+            $captured = $user;
+
+            return LLMResponse::create('[]', 0, 0, 'claude', 'end_turn');
+        });
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient);
+
+        $attackerAgent->analyze(
+            new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::create(), false, [], $rejectedFindings),
+            new NullCoverageRecorder(),
+        );
+
+        // Pins both the rejected-findings preamble AND the "\n\n" separator
+        // before the rest of the message (no other preamble is present).
+        self::assertStringStartsWith((new AttackerContextPromptRenderer())->renderRejectedFindings($rejectedFindings)."\n\n", $captured);
+        self::assertStringContainsString('## Source Code', $captured);
+    }
+
     public function test_it_sends_the_sliced_content_to_the_llm(): void
     {
         $codeSlicer = self::createStub(CodeSlicerInterface::class);
