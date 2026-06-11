@@ -158,13 +158,27 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 
             return $this->markBatchErrored($batch, $coverageRecorder);
         } catch (Throwable $exception) {
-            $this->logger->error('Reviewer batch LLM call failed', [
-                'batch_size' => \count($batch),
-                'error' => $exception->getMessage(),
-            ]);
-
-            return $this->markBatchErrored($batch, $coverageRecorder);
+            return $this->recordBatchError($batch, $exception, $coverageRecorder);
         }
+    }
+
+    /**
+     * Logs a failed batch LLM call and marks every finding in the batch errored.
+     * Shared by the JSON batch path and the structured `record_review` batch
+     * path so the error log + coverage live in a single tested place.
+     *
+     * @param list<Vulnerability> $batch
+     *
+     * @return list<Vulnerability>
+     */
+    private function recordBatchError(array $batch, Throwable $throwable, CoverageRecorderInterface $coverageRecorder): array
+    {
+        $this->logger->error('Reviewer batch LLM call failed', [
+            'batch_size' => \count($batch),
+            'error' => $throwable->getMessage(),
+        ]);
+
+        return $this->markBatchErrored($batch, $coverageRecorder);
     }
 
     /**
@@ -343,12 +357,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         } catch (LLMProviderException $llmProviderException) {
             throw $llmProviderException;
         } catch (Throwable $exception) {
-            $this->logger->error('Reviewer batch LLM call failed', [
-                'batch_size' => \count($batch),
-                'error' => $exception->getMessage(),
-            ]);
-
-            return $this->markBatchErrored($batch, $coverageRecorder);
+            return $this->recordBatchError($batch, $exception, $coverageRecorder);
         }
     }
 

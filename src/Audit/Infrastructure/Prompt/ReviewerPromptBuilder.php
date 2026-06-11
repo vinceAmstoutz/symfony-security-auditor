@@ -257,17 +257,16 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
             );
         }
 
-        return "## Vulnerability Reports to Review\n\n".implode("\n\n", $sections)
-            ."\n\n".$this->batchClosingInstruction();
+        return "## Vulnerability Reports to Review\n\n".implode("\n\n", $sections).$this->batchClosingInstruction();
     }
 
     private function batchClosingInstruction(): string
     {
         if ($this->useStructuredCollection) {
-            return 'Record one review per finding above via the `record_review` tool. Each call\'s "id" must match the input finding; we re-key by id when collecting your calls, so call order does not matter.';
+            return "\n\nRecord one review per finding above via the `record_review` tool. Each call's \"id\" must match the input finding; we re-key by id when collecting your calls, so call order does not matter.";
         }
 
-        return 'Return a JSON array of reviews — one entry per finding above. Each entry\'s "id" must match the input; we re-key by id on parse, so a misordered array with correct ids will still be accepted.';
+        return "\n\nReturn a JSON array of reviews — one entry per finding above. Each entry's \"id\" must match the input; we re-key by id on parse, so a misordered array with correct ids will still be accepted.";
     }
 
     public function buildUserMessage(Vulnerability $vulnerability, string $codeContext): string
