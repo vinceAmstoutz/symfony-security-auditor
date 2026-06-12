@@ -546,6 +546,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     public static function integerNodeMinimumCases(): iterable
     {
         yield 'reviewer_max_concurrent' => [['model' => 'gpt-4o', 'audit' => ['reviewer_max_concurrent' => 1]], 'symfony_security_auditor.audit.reviewer_max_concurrent', 1];
+        yield 'attacker_max_concurrent' => [['model' => 'gpt-4o', 'audit' => ['attacker_max_concurrent' => 1]], 'symfony_security_auditor.audit.attacker_max_concurrent', 1];
         yield 'reviewer_max_tool_iterations' => [['model' => 'gpt-4o', 'audit' => ['reviewer_max_tool_iterations' => 1]], 'symfony_security_auditor.audit.reviewer_max_tool_iterations', 1];
         yield 'code_slicing min_lines' => [['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['min_lines_before_slicing' => 10]]], 'symfony_security_auditor.audit.code_slicing.min_lines_before_slicing', 10];
         yield 'budget max_tokens' => [['model' => 'gpt-4o', 'audit' => ['budget' => ['max_tokens' => 1]]], 'symfony_security_auditor.audit.budget.max_tokens', 1];
@@ -571,6 +572,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     public static function integerNodeBelowMinimumCases(): iterable
     {
         yield 'reviewer_max_concurrent' => [['model' => 'gpt-4o', 'audit' => ['reviewer_max_concurrent' => 0]]];
+        yield 'attacker_max_concurrent' => [['model' => 'gpt-4o', 'audit' => ['attacker_max_concurrent' => 0]]];
         yield 'reviewer_max_tool_iterations' => [['model' => 'gpt-4o', 'audit' => ['reviewer_max_tool_iterations' => 0]]];
         yield 'code_slicing min_lines' => [['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['min_lines_before_slicing' => 9]]]];
         yield 'budget max_tokens' => [['model' => 'gpt-4o', 'audit' => ['budget' => ['max_tokens' => 0]]]];

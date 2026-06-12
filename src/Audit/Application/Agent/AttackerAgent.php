@@ -219,9 +219,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             if ($context['cacheable']) {
                 $cached = $this->cacheGet($chunk, $context['contextKey']);
                 if (null !== $cached) {
-                    $this->logger->info('Attacker chunk served from cache', ['files' => \count($chunk)]);
-                    $this->recordChunkCoverage($chunk, 'cached', $coverageRecorder);
-                    $cachedResults[$index] = $this->vulnerabilityFactory->fromList(array_values($cached));
+                    $cachedResults[$index] = $this->servedFromCache($chunk, $cached, $coverageRecorder);
 
                     continue;
                 }
@@ -287,6 +285,18 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     }
 
     /**
+     * @param list<ProjectFile>                $chunk
+     * @param array<int, array<string, mixed>> $cached
+     */
+    private function servedFromCache(array $chunk, array $cached, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
+    {
+        $this->logger->info('Attacker chunk served from cache', ['files' => \count($chunk)]);
+        $this->recordChunkCoverage($chunk, 'cached', $coverageRecorder);
+
+        return $this->vulnerabilityFactory->fromList(array_values($cached));
+    }
+
+    /**
      * @param array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector} $entry
      */
     private function finalizeConcurrentChunk(array $entry, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
@@ -317,10 +327,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             $cached = $this->cacheGet($chunk, $contextKey);
 
             if (null !== $cached) {
-                $this->logger->info('Attacker chunk served from cache', ['files' => \count($chunk)]);
-                $this->recordChunkCoverage($chunk, 'cached', $coverageRecorder);
-
-                return $this->vulnerabilityFactory->fromList(array_values($cached));
+                return $this->servedFromCache($chunk, $cached, $coverageRecorder);
             }
         }
 

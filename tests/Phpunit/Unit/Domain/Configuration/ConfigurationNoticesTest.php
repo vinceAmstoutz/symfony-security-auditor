@@ -181,6 +181,48 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertSame([], $notices);
     }
 
+    public function test_reviewer_concurrency_of_one_with_tools_emits_no_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->cache(enabled: true),
+            $this->audit(reviewerBatchSize: 1, reviewerMaxConcurrent: 1, reviewerToolsEnabled: true),
+            $this->llm(),
+        );
+
+        self::assertSame([], $notices);
+    }
+
+    public function test_attacker_concurrency_of_one_with_tools_emits_no_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->cache(enabled: true),
+            $this->audit(reviewerBatchSize: 1, attackerMaxConcurrent: 1, toolsEnabled: true),
+            $this->llm(),
+        );
+
+        self::assertSame([], $notices);
+    }
+
+    public function test_multiple_simultaneous_footguns_each_emit_their_own_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->cache(enabled: true),
+            $this->audit(
+                reviewerBatchSize: 5,
+                reviewerMaxConcurrent: 4,
+                reviewerToolsEnabled: true,
+                attackerMaxConcurrent: 4,
+                toolsEnabled: true,
+            ),
+            $this->llm(),
+        );
+
+        self::assertCount(3, $notices);
+        self::assertStringContainsString('reviewer-verdict cache', $notices[0]);
+        self::assertStringContainsString('audit.reviewer_max_concurrent', $notices[1]);
+        self::assertStringContainsString('audit.attacker_max_concurrent', $notices[2]);
+    }
+
     private function llm(string $model = 'claude-opus-4-8'): LLMConfiguration
     {
         return new LLMConfiguration($model, null, null);

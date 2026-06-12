@@ -33,6 +33,7 @@ final class AuditExecutionConfigurationTest extends TestCase
         self::assertFalse($auditExecutionConfiguration->reviewerToolsEnabled);
         self::assertSame(4, $auditExecutionConfiguration->reviewerMaxToolIterations);
         self::assertSame(1, $auditExecutionConfiguration->reviewerMaxConcurrent);
+        self::assertSame(1, $auditExecutionConfiguration->attackerMaxConcurrent);
         self::assertSame('feature', $auditExecutionConfiguration->chunkingStrategy);
         self::assertFalse($auditExecutionConfiguration->poCSynthesisEnabled);
         self::assertSame('high', $auditExecutionConfiguration->poCSynthesisSeverityFloor);
