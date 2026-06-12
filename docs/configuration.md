@@ -299,7 +299,7 @@ ai:
     # meta:
     #   api_key: '%env(META_API_KEY)%'
     # ollama:
-    #   host_url: 'http://localhost:11434'
+    #   endpoint: 'http://localhost:11434'
 ```
 
 ---

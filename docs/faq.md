@@ -240,7 +240,7 @@ locally pulled model:
 ai:
   platform:
     ollama:
-      host_url: 'http://localhost:11434'
+      endpoint: 'http://localhost:11434'
 
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:

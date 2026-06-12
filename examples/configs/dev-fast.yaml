@@ -5,7 +5,7 @@
 #   ai:
 #     platform:
 #       ollama:
-#         host_url: 'http://localhost:11434'
+#         endpoint: 'http://localhost:11434'
 #
 # Drop in as: config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
