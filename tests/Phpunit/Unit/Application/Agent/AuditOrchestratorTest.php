@@ -34,6 +34,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttacker
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingAttackerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 /**
  * Drives the orchestrator end-to-end via real AttackerAgent + ReviewerAgent,
@@ -742,12 +743,64 @@ final class AuditOrchestratorTest extends TestCase
         rmdir($this->tmpDir);
     }
 
+    public function test_it_reports_each_iteration_start_with_iteration_counts(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'Vuln v1')]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, recordingProgressReporter: $recordingProgressReporter);
+
+        $auditOrchestrator->orchestrate($this->makeContextWithMapping());
+
+        self::assertSame(
+            [
+                ['audit.iteration.started', ['iteration' => 1, 'max_iterations' => 3]],
+                ['audit.iteration.started', ['iteration' => 2, 'max_iterations' => 3]],
+            ],
+            array_values(array_filter(
+                $recordingProgressReporter->events,
+                static fn (array $event): bool => 'audit.iteration.started' === $event[0],
+            )),
+        );
+    }
+
+    public function test_it_reports_review_start_with_finding_count(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'Vuln v1')]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, recordingProgressReporter: $recordingProgressReporter);
+
+        $auditOrchestrator->orchestrate($this->makeContextWithMapping());
+
+        self::assertSame(
+            [
+                ['review.started', ['findings' => 1]],
+            ],
+            array_values(array_filter(
+                $recordingProgressReporter->events,
+                static fn (array $event): bool => 'review.started' === $event[0],
+            )),
+        );
+    }
+
     private function makeOrchestrator(
         LLMClientInterface $attackerLlm,
         LLMClientInterface $reviewerLlm,
         ?LoggerInterface $logger = null,
         int $maxIterations = AuditOrchestrator::DEFAULT_MAX_ITERATIONS,
         float $minConfidence = AuditOrchestrator::DEFAULT_MIN_CONFIDENCE,
+        ?RecordingProgressReporter $recordingProgressReporter = null,
     ): AuditOrchestrator {
         return new AuditOrchestrator(
             attackerAgent: new AttackerAgent(
@@ -765,6 +818,7 @@ final class AuditOrchestratorTest extends TestCase
             logger: $logger ?? new NullLogger(),
             maxIterations: $maxIterations,
             minConfidence: $minConfidence,
+            progressReporter: $recordingProgressReporter,
         );
     }
 

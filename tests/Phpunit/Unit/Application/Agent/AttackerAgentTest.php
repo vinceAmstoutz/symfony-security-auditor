@@ -54,6 +54,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttacker
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 #[AllowMockObjectsWithoutExpectations]
 final class AttackerAgentTest extends TestCase
@@ -1884,6 +1885,39 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $coverageRecorder);
 
         self::assertSame([['stage' => 'attacker', 'file' => 'src/Controller/UserController.php', 'status' => 'analyzed']], $coverageRecorder->records);
+    }
+
+    public function test_it_reports_chunk_progress_for_each_chunk(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/A.php'),
+            $this->makeFile('src/Controller/B.php'),
+        ];
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'claude', 'end_turn'));
+
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $attackerAgent = new AttackerAgent(
+            llmClient: $llmClient,
+            attackerPromptBuilder: new AttackerPromptBuilder(),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+            attackerCache: new NullAttackerCache(),
+            logger: new NullLogger(),
+            fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+            useStructuredCollection: false,
+            progressReporter: $recordingProgressReporter,
+        );
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+
+        self::assertSame(
+            [
+                ['attacker.chunk.started', ['chunk' => 1, 'total_chunks' => 2]],
+                ['attacker.chunk.started', ['chunk' => 2, 'total_chunks' => 2]],
+            ],
+            $recordingProgressReporter->events,
+        );
     }
 
     private function makeStructuredCollectionAttackerAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null): AttackerAgent

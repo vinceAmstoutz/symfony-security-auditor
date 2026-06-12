@@ -99,6 +99,7 @@ final readonly class AuditCommand
             $this->auditPresenter->runningSection($symfonyStyle);
 
             if (!$auditCommandInput->isMachineReadableToStdout()) {
+                $this->auditPresenter->longRunNotice($symfonyStyle);
                 $this->progressReporterHolder->setDelegate(new ConsoleProgressReporter($symfonyStyle));
             }
 

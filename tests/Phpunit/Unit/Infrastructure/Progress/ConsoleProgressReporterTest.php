@@ -129,6 +129,83 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertNotEmpty($rendered);
     }
 
+    public function test_audit_iteration_event_shows_iteration_in_bar_message(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['ingestion', 'mapping', 'audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('audit.iteration.started', ['iteration' => 1, 'max_iterations' => 3]);
+
+        self::assertStringContainsString('audit · iteration 1/3', $this->bufferedOutput->fetch());
+    }
+
+    public function test_attacker_chunk_event_shows_chunk_progress_in_bar_message(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('audit.iteration.started', ['iteration' => 2, 'max_iterations' => 3]);
+        $this->consoleProgressReporter->report('attacker.chunk.started', ['chunk' => 4, 'total_chunks' => 12]);
+
+        self::assertStringContainsString('audit · iteration 2/3 · attacker chunk 4/12', $this->bufferedOutput->fetch());
+    }
+
+    public function test_review_event_shows_finding_count_in_bar_message(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('audit.iteration.started', ['iteration' => 1, 'max_iterations' => 3]);
+        $this->consoleProgressReporter->report('review.started', ['findings' => 4]);
+
+        self::assertStringContainsString('audit · iteration 1/3 · reviewing 4 finding(s)', $this->bufferedOutput->fetch());
+    }
+
+    public function test_next_stage_clears_stale_iteration_label(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit', 'poc_synthesis']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('audit.iteration.started', ['iteration' => 1, 'max_iterations' => 3]);
+        $this->consoleProgressReporter->report('stage.completed');
+
+        $this->bufferedOutput->fetch();
+
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'poc_synthesis']);
+
+        $rendered = $this->bufferedOutput->fetch();
+        self::assertStringContainsString('poc_synthesis', $rendered);
+        self::assertStringNotContainsString('iteration', $rendered);
+    }
+
+    public function test_chunk_event_without_prior_iteration_omits_iteration_segment(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.chunk.started', ['chunk' => 1, 'total_chunks' => 2]);
+
+        self::assertStringContainsString('audit · attacker chunk 1/2', $this->bufferedOutput->fetch());
+    }
+
+    public function test_detail_events_with_malformed_context_keep_previous_message(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+
+        $this->bufferedOutput->fetch();
+
+        $this->consoleProgressReporter->report('audit.iteration.started', ['iteration' => 'one']);
+        $this->consoleProgressReporter->report('attacker.chunk.started', ['chunk' => 1]);
+        $this->consoleProgressReporter->report('review.started', []);
+
+        self::assertSame('', $this->bufferedOutput->fetch());
+    }
+
+    public function test_detail_events_before_pipeline_started_are_no_ops(): void
+    {
+        $this->consoleProgressReporter->report('audit.iteration.started', ['iteration' => 1, 'max_iterations' => 3]);
+        $this->consoleProgressReporter->report('attacker.chunk.started', ['chunk' => 1, 'total_chunks' => 2]);
+        $this->consoleProgressReporter->report('review.started', ['findings' => 2]);
+
+        self::assertSame('', $this->bufferedOutput->fetch());
+    }
+
     protected function setUp(): void
     {
         $this->bufferedOutput = new BufferedOutput();

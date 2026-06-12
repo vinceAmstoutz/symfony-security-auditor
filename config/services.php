@@ -231,6 +231,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger'),
             param('symfony_security_auditor.audit.max_iterations'),
             param('symfony_security_auditor.audit.min_confidence'),
+            service(ProgressReporterInterface::class),
         ]);
     $defaultsConfigurator->alias(AuditOrchestratorInterface::class, AuditOrchestrator::class);
 
@@ -356,6 +357,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             null,
             service(RecordVulnerabilityToolFactoryInterface::class),
             param('symfony_security_auditor.audit.structured_collection'),
+            service(ProgressReporterInterface::class),
         ]);
 
     $defaultsConfigurator->alias(AttackerAgentInterface::class, AttackerAgent::class);

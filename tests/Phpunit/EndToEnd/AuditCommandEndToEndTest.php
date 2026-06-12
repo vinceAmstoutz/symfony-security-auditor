@@ -351,13 +351,13 @@ final class AuditCommandEndToEndTest extends TestCase
 
     private function makeCommandTesterWithLLM(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, bool $secretScrubbingEnabled = true): CommandTester
     {
+        $progressReporterHolder = new ProgressReporterHolder();
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger()),
+            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger(), progressReporter: $progressReporterHolder),
             new ReviewerAgent($reviewerLLM, new ReviewerPromptBuilder(), new NullLogger()),
             new NullLogger(),
+            progressReporter: $progressReporterHolder,
         );
-
-        $progressReporterHolder = new ProgressReporterHolder();
         $auditPipeline = new AuditPipeline(
             [
                 new IngestionStage(new ProjectFileScanner(new NullLogger()), new NullLogger()),
@@ -489,6 +489,39 @@ final class AuditCommandEndToEndTest extends TestCase
         ]);
 
         self::assertStringNotContainsString('3/3', $commandTester->getDisplay());
+    }
+
+    public function test_command_shows_audit_iteration_progress_in_console_format(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertStringContainsString('audit · iteration 1/3', $commandTester->getDisplay());
+    }
+
+    public function test_command_shows_long_run_notice_in_console_format(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertStringContainsString('20+ minutes', $commandTester->getDisplay());
+    }
+
+    public function test_command_suppresses_long_run_notice_in_machine_readable_stdout(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--format' => 'json',
+        ]);
+
+        self::assertStringNotContainsString('20+ minutes', $commandTester->getDisplay());
     }
 
     public function test_dry_run_with_machine_readable_json_format_suppresses_success_message(): void

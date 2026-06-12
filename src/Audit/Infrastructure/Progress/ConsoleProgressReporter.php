@@ -36,6 +36,10 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
 {
     private ?ProgressBar $progressBar = null;
 
+    private string $stageName = '';
+
+    private string $iterationLabel = '';
+
     public function __construct(private readonly OutputInterface $output) {}
 
     /**
@@ -48,6 +52,9 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
             ProgressEvent::StageStarted => $this->onStageStarted($context),
             ProgressEvent::StageCompleted => $this->onStageCompleted(),
             ProgressEvent::PipelineCompleted => $this->onPipelineCompleted(),
+            ProgressEvent::AuditIterationStarted => $this->onAuditIterationStarted($context),
+            ProgressEvent::AttackerChunkStarted => $this->onAttackerChunkStarted($context),
+            ProgressEvent::ReviewStarted => $this->onReviewStarted($context),
             null => null,
         };
     }
@@ -65,7 +72,58 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
     /** @param array<string, mixed> $context */
     private function onStageStarted(array $context): void
     {
-        $this->progressBar?->setMessage(\is_string($context['stage'] ?? null) ? $context['stage'] : '');
+        $this->stageName = \is_string($context['stage'] ?? null) ? $context['stage'] : '';
+        $this->iterationLabel = '';
+        $this->updateMessage();
+    }
+
+    /** @param array<string, mixed> $context */
+    private function onAuditIterationStarted(array $context): void
+    {
+        $iteration = $context['iteration'] ?? null;
+        $maxIterations = $context['max_iterations'] ?? null;
+
+        if (!\is_int($iteration) || !\is_int($maxIterations)) {
+            return;
+        }
+
+        $this->iterationLabel = \sprintf('iteration %d/%d', $iteration, $maxIterations);
+        $this->updateMessage();
+    }
+
+    /** @param array<string, mixed> $context */
+    private function onAttackerChunkStarted(array $context): void
+    {
+        $chunk = $context['chunk'] ?? null;
+        $totalChunks = $context['total_chunks'] ?? null;
+
+        if (!\is_int($chunk) || !\is_int($totalChunks)) {
+            return;
+        }
+
+        $this->updateMessage(\sprintf('attacker chunk %d/%d', $chunk, $totalChunks));
+    }
+
+    /** @param array<string, mixed> $context */
+    private function onReviewStarted(array $context): void
+    {
+        $findings = $context['findings'] ?? null;
+
+        if (!\is_int($findings)) {
+            return;
+        }
+
+        $this->updateMessage(\sprintf('reviewing %d finding(s)', $findings));
+    }
+
+    private function updateMessage(string $detail = ''): void
+    {
+        $parts = array_filter(
+            [$this->stageName, $this->iterationLabel, $detail],
+            static fn (string $part): bool => '' !== $part,
+        );
+
+        $this->progressBar?->setMessage(implode(' · ', $parts));
         $this->progressBar?->display();
     }
 

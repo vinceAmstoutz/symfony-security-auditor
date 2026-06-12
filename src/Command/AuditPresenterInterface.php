@@ -28,6 +28,8 @@ interface AuditPresenterInterface
 
     public function runningSection(SymfonyStyle $symfonyStyle): void;
 
+    public function longRunNotice(SymfonyStyle $symfonyStyle): void;
+
     public function estimatingSection(SymfonyStyle $symfonyStyle): void;
 
     public function dryRunResult(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void;
