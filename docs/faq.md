@@ -286,6 +286,45 @@ The Attacker has the harder job (discover vulnerabilities). The Reviewer's job
 model. Pairing Opus + Haiku saves ~20× on the Reviewer phase with no accuracy
 loss in practice.
 
+### How should I set reasoning effort / thinking per agent?
+
+The two agents want opposite trade-offs, so tune them independently with the
+split-model setup above plus per-agent model options (see
+[Configuration → Model Options](configuration.md#model-options)):
+
+- **Attacker — favour capability and reasoning depth.** It runs a long-horizon,
+  recall-sensitive search across the whole codebase, so it benefits from a more
+  capable model and higher reasoning effort. On models that expose an `effort`
+  option (e.g. Claude Opus 4.7+/Fable 5, where `high`/`xhigh` are the sweet spot
+  for this kind of work) or an adaptive `thinking` option, set it on the
+  attacker:
+
+  ```yaml
+  symfony_security_auditor:
+      attacker_model:
+          name: 'claude-opus-4-8'
+          options:
+              effort: 'high'
+      reviewer_model:
+          name: 'claude-haiku-4-5-20251001'
+  ```
+
+- **Reviewer — favour speed.** It validates one finding against context you
+  already hand it, so a faster, cheaper model at lower effort is usually enough;
+  spend the budget on the attacker instead.
+
+A note on recall: recent Claude models follow strict instructions literally, so
+at the _finding_ stage you want coverage, not premature filtering — the reviewer
+is where findings are adjudicated and ranked. Forcing the attacker into a very
+low effort or an aggressively terse budget can suppress the multi-step reasoning
+that surfaces business-logic and access-control flaws, which is exactly the
+class of issue this tool exists to find.
+
+> Which option keys are accepted (`effort`, `thinking`, …) depends on the
+> provider and model behind `symfony/ai`. Unknown options are passed straight
+> through to the provider, so check your provider's documentation; this bundle
+> does not validate them.
+
 ### Can I tune model parameters (temperature, max_tokens)?
 
 Yes. For `max_tokens`, use the dedicated bundle key — it defaults to `4096` and
