@@ -52,6 +52,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   listed, and a regression test asserts every `VulnerabilityType` case appears
   in both the attacker and reviewer prompts so the two enumerations cannot drift
   apart again.
+- **`audit:run --dry-run` no longer undercounts tokens for Claude Fable 5 /
+  Mythos 5.** `CharacterBasedTokenEstimator`
+  (`src/Audit/Infrastructure/LLM/CharacterBasedTokenEstimator.php`) matched
+  `claude-fable-5` and `claude-mythos-5` against the generic `claude-` prefix
+  (3.5 characters per token), but those models ship a new tokenizer that emits
+  roughly 30% more tokens for the same text. The estimate was therefore about a
+  third too low, which flows straight into the dry-run cost figure. Two
+  more-specific prefixes (`claude-fable`, `claude-mythos`) are now matched ahead
+  of `claude-` with a denser 2.7-characters-per-token ratio, so the dry-run
+  estimate reflects the real token count. Non-Fable Claude models are unchanged.
 
 ## [1.8.0] — 2026-06-11 — Fable
 
