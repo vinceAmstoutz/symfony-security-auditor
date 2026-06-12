@@ -2532,25 +2532,30 @@ final class ReviewerAgentTest extends TestCase
 
     public function test_structured_concurrent_reviews_serve_cached_verdicts_and_dispatch_only_misses(): void
     {
-        $vulnerability = $this->makeVulnerabilityAt('src/First.php');
+        $first = $this->makeVulnerabilityAt('src/First.php');
         $second = $this->makeVulnerabilityAt('src/Second.php');
+        $third = $this->makeVulnerabilityAt('src/Third.php');
 
         $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
-        $reviewerCache->method('get')->willReturnOnConsecutiveCalls(null, ['accepted' => true]);
-        $reviewerCache->expects(self::once())
-            ->method('store')
-            ->with($vulnerability, '', ['id' => $vulnerability->id(), 'accepted' => true]);
+        $reviewerCache->method('get')->willReturnOnConsecutiveCalls(null, ['accepted' => true], null);
+        $storedFor = [];
+        $reviewerCache->method('store')->willReturnCallback(
+            static function (Vulnerability $vulnerability) use (&$storedFor): void {
+                $storedFor[] = $vulnerability->filePath();
+            },
+        );
 
         $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
         $llmClient
             ->expects(self::once())
             ->method('completeBatchWithTools')
             ->willReturnCallback(
-                static function (array $requests) use ($vulnerability): array {
-                    self::assertCount(1, $requests);
-                    self::registryOf($requests[0])->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
+                static function (array $requests) use ($first, $third): array {
+                    self::assertCount(2, $requests);
+                    self::registryOf($requests[0])->execute('record_review', ['id' => $first->id(), 'accepted' => true]);
+                    self::registryOf($requests[1])->execute('record_review', ['id' => $third->id(), 'accepted' => true]);
 
-                    return [LLMResponse::create('', 1, 1, 'm', 'end_turn')];
+                    return [LLMResponse::create('', 1, 1, 'm', 'end_turn'), LLMResponse::create('', 1, 1, 'm', 'end_turn')];
                 });
 
         $reviewerAgent = new ReviewerAgent(
@@ -2563,12 +2568,16 @@ final class ReviewerAgentTest extends TestCase
             reviewerCache: $reviewerCache,
         );
 
-        $result = $reviewerAgent->review([$vulnerability, $second], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$first, $second, $third], [], new NullCoverageRecorder());
 
-        self::assertCount(2, $result);
+        self::assertCount(3, $result);
         self::assertSame('src/First.php', $result[0]->filePath());
+        self::assertSame('src/Second.php', $result[1]->filePath());
+        self::assertSame('src/Third.php', $result[2]->filePath());
         self::assertTrue($result[0]->isReviewerValidated());
         self::assertTrue($result[1]->isReviewerValidated());
+        self::assertTrue($result[2]->isReviewerValidated());
+        self::assertSame(['src/First.php', 'src/Third.php'], $storedFor);
     }
 
     public function test_structured_concurrent_bypass_cache_skips_both_get_and_store(): void
@@ -2670,23 +2679,30 @@ final class ReviewerAgentTest extends TestCase
 
     public function test_concurrent_json_reviews_serve_cached_verdicts_and_dispatch_only_misses(): void
     {
-        $vulnerability = $this->makeVulnerabilityAt('src/First.php');
+        $first = $this->makeVulnerabilityAt('src/First.php');
         $second = $this->makeVulnerabilityAt('src/Second.php');
+        $third = $this->makeVulnerabilityAt('src/Third.php');
 
         $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
-        $reviewerCache->method('get')->willReturnOnConsecutiveCalls(null, ['accepted' => true]);
-        $reviewerCache->expects(self::once())
-            ->method('store')
-            ->with($vulnerability, '', ['accepted' => true]);
+        $reviewerCache->method('get')->willReturnOnConsecutiveCalls(null, ['accepted' => true], null);
+        $storedFor = [];
+        $reviewerCache->method('store')->willReturnCallback(
+            static function (Vulnerability $vulnerability) use (&$storedFor): void {
+                $storedFor[] = $vulnerability->filePath();
+            },
+        );
 
         $llmClient = $this->createMock(BatchCapableLLMClientInterface::class);
         $llmClient
             ->expects(self::once())
             ->method('completeBatch')
             ->willReturnCallback(static function (array $requests): array {
-                self::assertCount(1, $requests);
+                self::assertCount(2, $requests);
 
-                return [LLMResponse::create('{"accepted": true}', 1, 1, 'm', 'end_turn')];
+                return [
+                    LLMResponse::create('{"accepted": true}', 1, 1, 'm', 'end_turn'),
+                    LLMResponse::create('{"accepted": true}', 1, 1, 'm', 'end_turn'),
+                ];
             });
 
         $reviewerAgent = new ReviewerAgent(
@@ -2697,13 +2713,16 @@ final class ReviewerAgentTest extends TestCase
             reviewerCache: $reviewerCache,
         );
 
-        $result = $reviewerAgent->review([$vulnerability, $second], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$first, $second, $third], [], new NullCoverageRecorder());
 
-        self::assertCount(2, $result);
+        self::assertCount(3, $result);
         self::assertSame('src/First.php', $result[0]->filePath());
-        self::assertTrue($result[0]->isReviewerValidated());
         self::assertSame('src/Second.php', $result[1]->filePath());
+        self::assertSame('src/Third.php', $result[2]->filePath());
+        self::assertTrue($result[0]->isReviewerValidated());
         self::assertTrue($result[1]->isReviewerValidated());
+        self::assertTrue($result[2]->isReviewerValidated());
+        self::assertSame(['src/First.php', 'src/Third.php'], $storedFor);
     }
 
     public function test_concurrent_json_reviews_bypass_cache_skips_both_get_and_store(): void

@@ -268,8 +268,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             ];
         }
 
-        $round = 0;
-        while ($round < $maxToolIterations && $this->hasPendingConversation($states)) {
+        for ($round = 0; $round < $maxToolIterations; ++$round) {
             $deferred = [];
             foreach ($states as $index => $state) {
                 if ($state['response'] instanceof LLMResponse) {
@@ -288,8 +287,6 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             foreach ($deferred as $index => $deferredResult) {
                 $states[$index] = $this->advanceConversation($states[$index], $deferredResult, $window[$index], $maxToolIterations);
             }
-
-            ++$round;
         }
 
         $responses = [];
@@ -347,17 +344,15 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
                     cacheReadTokens: $state['cacheRead'],
                     cacheCreationTokens: $state['cacheCreation'],
                 );
+            } else {
+                $state['bag']->add(new AssistantMessage(...$toolCalls));
+                foreach ($toolCalls as $toolCall) {
+                    $result = $request['tools']->execute($toolCall->getName(), $toolCall->getArguments());
+                    $state['bag']->add(new ToolCallMessage($toolCall, $result));
+                }
 
-                return $state;
+                $state['toolsRan'] = true;
             }
-
-            $state['bag']->add(new AssistantMessage(...$toolCalls));
-            foreach ($toolCalls as $toolCall) {
-                $result = $request['tools']->execute($toolCall->getName(), $toolCall->getArguments());
-                $state['bag']->add(new ToolCallMessage($toolCall, $result));
-            }
-
-            $state['toolsRan'] = true;
 
             return $state;
         } catch (BudgetExceededException $budgetExceededException) {
@@ -396,20 +391,6 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         );
 
         return $state;
-    }
-
-    /**
-     * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}> $states
-     */
-    private function hasPendingConversation(array $states): bool
-    {
-        foreach ($states as $state) {
-            if (!$state['response'] instanceof LLMResponse) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

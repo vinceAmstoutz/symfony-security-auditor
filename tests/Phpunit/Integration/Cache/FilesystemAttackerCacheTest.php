@@ -80,6 +80,28 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertNull($this->filesystemAttackerCache->getForContext($chunk, 'ctx-b'));
     }
 
+    public function test_a_different_chunk_under_the_same_context_is_a_distinct_entry(): void
+    {
+        $chunkA = [ProjectFile::create('src/A.php', '/app/src/A.php', '<?php // a')];
+        $chunkB = [ProjectFile::create('src/B.php', '/app/src/B.php', '<?php // b')];
+
+        $this->filesystemAttackerCache->storeForContext($chunkA, 'ctx', [['title' => 'a']]);
+
+        self::assertNull($this->filesystemAttackerCache->getForContext($chunkB, 'ctx'));
+    }
+
+    public function test_context_entry_is_stored_at_path_derived_from_signature_and_context_key(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+
+        $expectedKey = hash('sha256', 'src/A.php='.hash('sha256', 'X')."\0context:ctx-42");
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
+
+        $this->filesystemAttackerCache->storeForContext([$projectFile], 'ctx-42', [['type' => 'sql_injection']]);
+
+        self::assertFileExists($expectedPath);
+    }
+
     public function test_round_trip_store_and_get_returns_same_payload(): void
     {
         $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
