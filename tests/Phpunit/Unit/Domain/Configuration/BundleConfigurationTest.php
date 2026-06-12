@@ -301,6 +301,20 @@ final class BundleConfigurationTest extends TestCase
         self::assertTrue($bundleConfiguration->audit->staticPreScanLeanMode);
     }
 
+    public function test_from_array_lets_explicit_boolean_keys_override_the_profile(): void
+    {
+        $config = $this->profileShapedConfig('fast');
+        $config['audit']['static_prescan']['lean_mode'] = false;
+        $config['audit']['code_slicing']['enabled'] = false;
+        $config['audit']['poc_synthesis']['enabled'] = true;
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertFalse($bundleConfiguration->audit->staticPreScanLeanMode);
+        self::assertFalse($bundleConfiguration->audit->codeSlicingEnabled);
+        self::assertTrue($bundleConfiguration->audit->poCSynthesisEnabled);
+    }
+
     /**
      * @return array{
      *     profile?: string,
