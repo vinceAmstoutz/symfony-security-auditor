@@ -89,7 +89,8 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         exposed_internal_service, misconfigured_firewall, insecure_redirect, sensitive_data_exposure,
         log_injection, path_traversal, ssrf, xxe, open_redirect, weak_cryptography, insecure_random,
         hardcoded_secret, missing_signature_verification, messenger_handler_unsafe, missing_rate_limiting,
-        cache_poisoning, mailer_header_injection, webhook_replay, authenticator_bypass
+        cache_poisoning, mailer_header_injection, webhook_replay, authenticator_bypass,
+        over_permissive_serializer_group
         SCHEMA;
 
     private const string DECISION_RULES = <<<'RULES'
