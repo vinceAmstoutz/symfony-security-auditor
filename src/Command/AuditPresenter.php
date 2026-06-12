@@ -124,7 +124,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             $symfonyStyle->listing($lines);
         }
 
-        $symfonyStyle->note('Dry run — no LLM calls were made. This is a cost estimate only.');
+        $symfonyStyle->note('Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.');
         $symfonyStyle->success('Dry run complete.');
     }
 

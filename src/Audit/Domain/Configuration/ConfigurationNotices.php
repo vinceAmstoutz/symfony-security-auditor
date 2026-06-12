@@ -24,7 +24,7 @@ final readonly class ConfigurationNotices
     /**
      * @return list<string>
      */
-    public static function of(CacheConfiguration $cacheConfiguration, AuditExecutionConfiguration $auditExecutionConfiguration): array
+    public static function of(CacheConfiguration $cacheConfiguration, AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration): array
     {
         $notices = [];
 
@@ -32,6 +32,15 @@ final readonly class ConfigurationNotices
             $notices[] = 'The reviewer-verdict cache does not apply to batched reviews (audit.reviewer_batch_size > 1): every finding is re-reviewed by the LLM on each run. Set audit.reviewer_batch_size: 1 to reuse cached verdicts.';
         }
 
+        if ($auditExecutionConfiguration->escalationEnabled && self::escalationCheapModel($auditExecutionConfiguration, $lLMConfiguration) === $lLMConfiguration->attackerModel()) {
+            $notices[] = 'Cheap-then-expensive escalation is enabled but its cheap model resolves to the attacker model, so the cheap sweep costs as much as the expensive pass and saves nothing. Set audit.escalation.cheap_model to a genuinely cheaper model (e.g. claude-haiku-4-5-20251001).';
+        }
+
         return $notices;
+    }
+
+    private static function escalationCheapModel(AuditExecutionConfiguration $auditExecutionConfiguration, LLMConfiguration $lLMConfiguration): string
+    {
+        return $auditExecutionConfiguration->escalationCheapModel ?? $lLMConfiguration->reviewerModel();
     }
 }

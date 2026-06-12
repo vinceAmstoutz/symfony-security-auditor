@@ -191,6 +191,7 @@ final class AuditPresenterTest extends TestCase
 
         $display = $bufferedOutput->fetch();
         self::assertStringContainsString('Dry run complete', $display);
+        self::assertStringContainsString('a real run typically costs less', $display);
         self::assertStringContainsString('no LLM calls', $display);
         self::assertStringNotContainsString('Audit complete', $display);
         self::assertStringNotContainsString('RISK LEVEL', $display);

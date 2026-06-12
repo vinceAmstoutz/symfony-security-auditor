@@ -434,7 +434,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.retry.backoff_multiplier', $bundleConfiguration->retry->backoffMultiplier);
         $builder->setParameter('symfony_security_auditor.audit.retry.jitter_ratio', $bundleConfiguration->retry->jitterRatio);
 
-        $builder->setParameter('symfony_security_auditor.config_notices', ConfigurationNotices::of($bundleConfiguration->cache, $bundleConfiguration->audit));
+        $builder->setParameter('symfony_security_auditor.config_notices', ConfigurationNotices::of($bundleConfiguration->cache, $bundleConfiguration->audit, $bundleConfiguration->llm));
         $builder->setParameter('symfony_security_auditor.cache.enabled', $bundleConfiguration->cache->enabled);
         $builder->setParameter('symfony_security_auditor.cache.dir', $bundleConfiguration->cache->dir);
         $builder->setParameter('symfony_security_auditor.cache.advisory_dir', $bundleConfiguration->cache->dir.'/advisory');

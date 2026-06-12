@@ -26,6 +26,17 @@ routes.
 
 ### Added
 
+- **`audit:run` warns when cheap-then-expensive escalation can't save money.**
+  `audit.escalation.cheap_model` falls back to the reviewer model when unset,
+  which on a single-model config resolves to the attacker model — so the cheap
+  sweep costs as much as the expensive pass and escalation saves nothing,
+  silently. `ConfigurationNotices` now emits a pre-flight stderr notice when
+  escalation is enabled and the resolved cheap model equals the attacker model,
+  pointing at `audit.escalation.cheap_model`.
+- **The `--dry-run` note now states that real runs typically cost less.** The
+  estimate excludes provider prompt-cache discounts and warm attacker/reviewer
+  caches; the dry-run output now says so explicitly instead of only the docs
+  mentioning it.
 - **New `audit.attacker_max_concurrent` config key — concurrent attacker chunk
   analysis.** The attacker analysed chunks strictly sequentially, so the longest
   audit phase paid one full LLM round trip per chunk back-to-back. In the
