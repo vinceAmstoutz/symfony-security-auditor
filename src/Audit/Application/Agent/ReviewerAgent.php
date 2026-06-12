@@ -43,6 +43,8 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 
     public const int DEFAULT_MAX_CONCURRENT = 1;
 
+    public const bool DEFAULT_STRUCTURED_COLLECTION = false;
+
     private const int PARSE_FAILURE_PREVIEW_BYTES = 512;
 
     public function __construct(
@@ -54,6 +56,8 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         private bool $toolsEnabled = self::DEFAULT_TOOLS_ENABLED,
         private int $maxToolIterations = self::DEFAULT_MAX_TOOL_ITERATIONS,
         private int $maxConcurrent = self::DEFAULT_MAX_CONCURRENT,
+        private ?RecordReviewToolFactoryInterface $recordReviewToolFactory = null,
+        private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
     ) {}
 
     /**
@@ -68,24 +72,35 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             return [];
         }
 
-        $useTools = $this->toolsEnabled && $this->toolRegistryFactory instanceof ToolRegistryFactoryInterface;
+        $useStructuredCollection = $this->useStructuredCollection && $this->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface;
+        $useTools = !$useStructuredCollection && $this->toolsEnabled && $this->toolRegistryFactory instanceof ToolRegistryFactoryInterface;
         $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($projectFiles) : null;
 
         $this->logger->info('Reviewer agent validating findings', [
             'count' => \count($vulnerabilities),
             'batch_size' => $this->batchSize,
             'tools_enabled' => $useTools,
+            'structured_collection' => $useStructuredCollection,
         ]);
 
         $reviewed = [];
 
         if ($this->batchSize <= 1) {
-            $reviewed = $this->canReviewConcurrently($useTools)
-                ? $this->reviewSinglesConcurrently($vulnerabilities, $projectFiles, $coverageRecorder)
-                : $this->reviewSinglesSequentially($vulnerabilities, $projectFiles, $coverageRecorder, $toolRegistry);
+            if ($useStructuredCollection) {
+                $reviewed = $this->reviewSinglesViaStructuredCollection($vulnerabilities, $projectFiles, $coverageRecorder);
+            } else {
+                $reviewed = $this->canReviewConcurrently($useTools)
+                    ? $this->reviewSinglesConcurrently($vulnerabilities, $projectFiles, $coverageRecorder)
+                    : $this->reviewSinglesSequentially($vulnerabilities, $projectFiles, $coverageRecorder, $toolRegistry);
+            }
         } else {
             foreach (array_chunk($vulnerabilities, $this->batchSize) as $batch) {
-                $reviewed = [...$reviewed, ...$this->reviewBatch($batch, $projectFiles, $coverageRecorder, $toolRegistry)];
+                $reviewed = [
+                    ...$reviewed,
+                    ...$useStructuredCollection
+                        ? $this->reviewBatchViaStructuredCollection($batch, $projectFiles, $coverageRecorder)
+                        : $this->reviewBatch($batch, $projectFiles, $coverageRecorder, $toolRegistry),
+                ];
             }
         }
 
@@ -143,13 +158,27 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 
             return $this->markBatchErrored($batch, $coverageRecorder);
         } catch (Throwable $exception) {
-            $this->logger->error('Reviewer batch LLM call failed', [
-                'batch_size' => \count($batch),
-                'error' => $exception->getMessage(),
-            ]);
-
-            return $this->markBatchErrored($batch, $coverageRecorder);
+            return $this->recordBatchError($batch, $exception, $coverageRecorder);
         }
+    }
+
+    /**
+     * Logs a failed batch LLM call and marks every finding in the batch errored.
+     * Shared by the JSON batch path and the structured `record_review` batch
+     * path so the error log + coverage live in a single tested place.
+     *
+     * @param list<Vulnerability> $batch
+     *
+     * @return list<Vulnerability>
+     */
+    private function recordBatchError(array $batch, Throwable $throwable, CoverageRecorderInterface $coverageRecorder): array
+    {
+        $this->logger->error('Reviewer batch LLM call failed', [
+            'batch_size' => \count($batch),
+            'error' => $throwable->getMessage(),
+        ]);
+
+        return $this->markBatchErrored($batch, $coverageRecorder);
     }
 
     /**
@@ -256,6 +285,83 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
     }
 
     /**
+     * @param list<Vulnerability> $vulnerabilities
+     * @param list<ProjectFile>   $projectFiles
+     *
+     * @return list<Vulnerability>
+     */
+    private function reviewSinglesViaStructuredCollection(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder): array
+    {
+        $reviewed = [];
+        foreach ($vulnerabilities as $vulnerability) {
+            $reviewed[] = $this->reviewSingleViaStructuredCollection($vulnerability, $projectFiles, $coverageRecorder);
+        }
+
+        return $reviewed;
+    }
+
+    /**
+     * @param list<ProjectFile> $projectFiles
+     */
+    private function reviewSingleViaStructuredCollection(Vulnerability $vulnerability, array $projectFiles, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    {
+        \assert($this->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface);
+
+        $codeContext = $this->getFileContext($vulnerability->filePath(), $projectFiles);
+        $systemPrompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+        $userMessage = $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext);
+
+        $reviewCollector = new ReviewCollector();
+        $toolRegistry = new ToolRegistry([$this->recordReviewToolFactory->create($reviewCollector)], $this->logger);
+
+        try {
+            $this->llmClient->completeWithTools($systemPrompt, $userMessage, $toolRegistry, $this->maxToolIterations);
+
+            return $this->recordVerdict($vulnerability, $reviewCollector->drain()[0] ?? null, $coverageRecorder);
+        } catch (BudgetExceededException $budgetExceededException) {
+            throw $budgetExceededException;
+        } catch (LLMProviderException $llmProviderException) {
+            throw $llmProviderException;
+        } catch (Throwable $exception) {
+            return $this->recordReviewError($vulnerability, $exception, $coverageRecorder);
+        }
+    }
+
+    /**
+     * @param list<Vulnerability> $batch
+     * @param list<ProjectFile>   $projectFiles
+     *
+     * @return list<Vulnerability>
+     */
+    private function reviewBatchViaStructuredCollection(array $batch, array $projectFiles, CoverageRecorderInterface $coverageRecorder): array
+    {
+        \assert($this->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface);
+
+        $codeContexts = [];
+        foreach ($batch as $vulnerability) {
+            $codeContexts[$vulnerability->id()] = $this->getFileContext($vulnerability->filePath(), $projectFiles);
+        }
+
+        $systemPrompt = $this->reviewerPromptBuilder->buildBatchSystemPrompt();
+        $userMessage = $this->reviewerPromptBuilder->buildBatchUserMessage($batch, $codeContexts);
+
+        $reviewCollector = new ReviewCollector();
+        $toolRegistry = new ToolRegistry([$this->recordReviewToolFactory->create($reviewCollector)], $this->logger);
+
+        try {
+            $this->llmClient->completeWithTools($systemPrompt, $userMessage, $toolRegistry, $this->maxToolIterations);
+
+            return $this->applyBatchReview($batch, $reviewCollector->drain(), $coverageRecorder);
+        } catch (BudgetExceededException $budgetExceededException) {
+            throw $budgetExceededException;
+        } catch (LLMProviderException $llmProviderException) {
+            throw $llmProviderException;
+        } catch (Throwable $exception) {
+            return $this->recordBatchError($batch, $exception, $coverageRecorder);
+        }
+    }
+
+    /**
      * Resolves every single-finding review in concurrency windows via the
      * batch-capable client, then applies each verdict. Budget and non-transient
      * provider failures propagate (the batch client rethrows them); per-finding
@@ -310,22 +416,14 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         } catch (LLMProviderException $llmProviderException) {
             throw $llmProviderException;
         } catch (Throwable $exception) {
-            $this->logger->error('Reviewer LLM call failed', [
-                'vulnerability_id' => $vulnerability->id(),
-                'error' => $exception->getMessage(),
-            ]);
-            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
-
-            return $vulnerability->withReviewerValidation(false);
+            return $this->recordReviewError($vulnerability, $exception, $coverageRecorder);
         }
     }
 
     private function applyResponse(Vulnerability $vulnerability, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
         if ($llmResponse->isEmpty()) {
-            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
-
-            return $vulnerability->withReviewerValidation(false);
+            return $this->recordVerdict($vulnerability, null, $coverageRecorder);
         }
 
         try {
@@ -342,7 +440,26 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             return $vulnerability->withReviewerValidation(false);
         }
 
-        $reviewed = $this->applyReview($vulnerability, $rawData);
+        return $this->recordVerdict($vulnerability, $rawData, $coverageRecorder);
+    }
+
+    /**
+     * Applies one verdict payload to a finding and records reviewer coverage.
+     * Shared by the JSON path (`applyResponse`) and the structured `record_review`
+     * path so the accept/reject coverage logic lives in a single tested place.
+     * A null payload — empty response or no recorded verdict — rejects the finding.
+     *
+     * @param array<string, mixed>|list<array<string, mixed>>|null $review
+     */
+    private function recordVerdict(Vulnerability $vulnerability, ?array $review, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    {
+        if (null === $review) {
+            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
+
+            return $vulnerability->withReviewerValidation(false);
+        }
+
+        $reviewed = $this->applyReview($vulnerability, $review);
         $coverageRecorder->recordCoverage(
             AgentRole::Reviewer->value,
             $vulnerability->filePath(),
@@ -350,6 +467,17 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         );
 
         return $reviewed;
+    }
+
+    private function recordReviewError(Vulnerability $vulnerability, Throwable $throwable, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    {
+        $this->logger->error('Reviewer LLM call failed', [
+            'vulnerability_id' => $vulnerability->id(),
+            'error' => $throwable->getMessage(),
+        ]);
+        $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
+
+        return $vulnerability->withReviewerValidation(false);
     }
 
     /**

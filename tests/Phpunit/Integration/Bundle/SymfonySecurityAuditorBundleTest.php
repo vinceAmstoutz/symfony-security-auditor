@@ -161,6 +161,23 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertFalse($kernel->getContainer()->getParameter('symfony_security_auditor.audit.structured_collection'));
     }
 
+    public function test_bundle_defaults_reviewer_structured_collection_to_false(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        self::assertFalse($kernel->getContainer()->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'));
+    }
+
+    public function test_bundle_propagates_reviewer_structured_collection_opt_in_to_parameter(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'audit' => ['reviewer_structured_collection' => true],
+        ]);
+
+        self::assertTrue($kernel->getContainer()->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'));
+    }
+
     public function test_bundle_propagates_scan_config_to_parameters(): void
     {
         $kernel = $this->boot([

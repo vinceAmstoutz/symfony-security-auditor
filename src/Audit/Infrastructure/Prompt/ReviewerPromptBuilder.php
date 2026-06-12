@@ -113,8 +113,46 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         - Once you have decided, your response MUST contain ONLY the JSON output — no prose, no further tool calls.
         TOOLS;
 
+    private const string STRUCTURED_OUTPUT_CONTRACT = <<<'CONTRACT'
+        Your verdicts MUST be expressed via `record_review` tool calls — EXACTLY one call per finding under review. The platform validates each call against the tool's input schema, so malformed verdicts cannot be emitted. Do NOT emit JSON arrays, prose listings, or any text-based enumeration of verdicts.
+        Each call accepts these arguments (the input schema is authoritative):
+          id:                      the vulnerability id — must match the input finding
+          accepted:                true | false
+          adjusted_severity:       critical | high | medium | low | info — omit when unchanged
+          corrected_type:          valid vulnerability type value — omit when the attacker's type is correct
+          reviewer_notes:          concise technical justification
+          additional_attack_paths: any additional exploitation paths found — omit when none
+        CONTRACT;
+
+    private const string STRUCTURED_DECISION_RULES = <<<'RULES'
+        Rules:
+        - Be strict: reject any finding where exploitation is not clearly demonstrated
+        - Accept a finding if it represents a REAL risk, even if exploitation is complex
+        - You MAY upgrade severity if context reveals a worse impact
+        - You MAY downgrade if the scanner overstated impact
+        - You MAY set `corrected_type` if the attacker labelled the finding with the wrong vulnerability type but the underlying issue is real
+        - Record every verdict ONLY by calling `record_review` — one call per finding, never twice for the same id, no prose, no JSON arrays
+        - Once every finding has its verdict recorded, stop calling tools and finish your turn
+        RULES;
+
+    public const bool DEFAULT_STRUCTURED_COLLECTION = false;
+
+    public function __construct(
+        private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
+    ) {}
+
     public function buildSystemPrompt(): string
     {
+        if ($this->useStructuredCollection) {
+            return implode("\n\n", [
+                self::CORE_INSTRUCTIONS,
+                self::SEVERITY_RUBRIC,
+                self::FALSE_POSITIVE_PLAYBOOK,
+                self::STRUCTURED_OUTPUT_CONTRACT,
+                self::STRUCTURED_DECISION_RULES,
+            ]);
+        }
+
         return implode("\n\n", [
             self::CORE_INSTRUCTIONS,
             self::SEVERITY_RUBRIC,
@@ -129,6 +167,19 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
     public function buildBatchSystemPrompt(): string
     {
         $batchPreamble = 'You will receive SEVERAL vulnerability reports in a single batch and must validate each one.';
+
+        if ($this->useStructuredCollection) {
+            return implode("\n\n", [
+                self::CORE_INSTRUCTIONS,
+                $batchPreamble,
+                self::SEVERITY_RUBRIC,
+                self::FALSE_POSITIVE_PLAYBOOK,
+                'Record EXACTLY one review per input vulnerability via the `record_review` tool.',
+                self::STRUCTURED_OUTPUT_CONTRACT,
+                'Verdicts are re-keyed by "id" when we collect your calls, so the id argument is the source of truth — call order does not matter as long as every id matches its input finding.',
+                self::STRUCTURED_DECISION_RULES,
+            ]);
+        }
 
         $orderingInstruction = 'Findings are re-keyed by "id" when we parse your response, so the id field is the source of truth — keep the natural order shown above for your scratch reasoning, but a misordered array with correct ids will still be accepted.';
 
@@ -206,8 +257,16 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
             );
         }
 
-        return "## Vulnerability Reports to Review\n\n".implode("\n\n", $sections)
-            ."\n\nReturn a JSON array of reviews — one entry per finding above. Each entry's \"id\" must match the input; we re-key by id on parse, so a misordered array with correct ids will still be accepted.";
+        return "## Vulnerability Reports to Review\n\n".implode("\n\n", $sections).$this->batchClosingInstruction();
+    }
+
+    private function batchClosingInstruction(): string
+    {
+        if ($this->useStructuredCollection) {
+            return "\n\nRecord one review per finding above via the `record_review` tool. Each call's \"id\" must match the input finding; we re-key by id when collecting your calls, so call order does not matter.";
+        }
+
+        return "\n\nReturn a JSON array of reviews — one entry per finding above. Each entry's \"id\" must match the input; we re-key by id on parse, so a misordered array with correct ids will still be accepted.";
     }
 
     public function buildUserMessage(Vulnerability $vulnerability, string $codeContext): string
@@ -249,7 +308,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
                 %s
                 </file>
 
-                Validate this finding and return your review JSON.
+                %s
                 MSG,
             $data['id'],
             $data['type'],
@@ -266,7 +325,17 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
             $data['confidence'],
             $data['file'],
             $this->numberLines($codeContext),
+            $this->singleClosingInstruction(),
         );
+    }
+
+    private function singleClosingInstruction(): string
+    {
+        if ($this->useStructuredCollection) {
+            return 'Validate this finding and record your verdict via the `record_review` tool.';
+        }
+
+        return 'Validate this finding and return your review JSON.';
     }
 
     private function numberLines(string $content): string

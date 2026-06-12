@@ -175,6 +175,10 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->defaultTrue()
                             ->info("When true (default), the attacker emits findings by calling a schema-enforced `record_vulnerability` tool, one call per finding, instead of returning a JSON array. The platform validates each call against the tool's input schema, so malformed shapes (bare strings like \"dev\"/\"test\", wrapper objects like `{\"vulnerabilities\": [...]}` ) become structurally impossible. Works across every provider that supports tool use (Anthropic, OpenAI, Mistral, Ollama with tool-capable models). Set to false to fall back to the tightened JSON-array prompt path.")
                         ->end()
+                        ->booleanNode('reviewer_structured_collection')
+                            ->defaultFalse()
+                            ->info("When true, the reviewer records each verdict by calling a schema-enforced `record_review` tool instead of returning a JSON array, so a malformed verdict never costs a discarded (but fully billed) response. The `record_review` tool replaces the reviewer's cross-file tools (`reviewer_tools_enabled`) and the concurrent fast path (`reviewer_max_concurrent`) in this mode. Default false (JSON-array output, the previous behaviour).")
+                        ->end()
                         ->integerNode('max_tool_iterations')
                             ->defaultValue(AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS)
                             ->min(1)
@@ -364,7 +368,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *     reviewer_max_output_tokens: int|null,
      *     provider_json_mode: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * } $config
      */
@@ -389,6 +393,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.reviewer_batch_size', $bundleConfiguration->audit->reviewerBatchSize);
         $builder->setParameter('symfony_security_auditor.audit.tools_enabled', $bundleConfiguration->audit->toolsEnabled);
         $builder->setParameter('symfony_security_auditor.audit.structured_collection', $bundleConfiguration->audit->structuredCollection);
+        $builder->setParameter('symfony_security_auditor.audit.reviewer_structured_collection', $bundleConfiguration->audit->reviewerStructuredCollection);
         $builder->setParameter('symfony_security_auditor.audit.max_tool_iterations', $bundleConfiguration->audit->maxToolIterations);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_tools_enabled', $bundleConfiguration->audit->reviewerToolsEnabled);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_max_tool_iterations', $bundleConfiguration->audit->reviewerMaxToolIterations);

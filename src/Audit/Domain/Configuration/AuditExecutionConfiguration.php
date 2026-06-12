@@ -34,5 +34,6 @@ final readonly class AuditExecutionConfiguration
         public bool $escalationEnabled = false,
         public ?string $escalationCheapModel = null,
         public bool $structuredCollection = true,
+        public bool $reviewerStructuredCollection = false,
     ) {}
 }

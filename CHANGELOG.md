@@ -26,6 +26,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   to re-report those locations. Chunks carrying rejected-finding context are not
   served from the attacker cache (the same rule already applied to validated
   prior findings), so the new context always reaches the model.
+- **New `audit.reviewer_structured_collection` config key — provider-validated
+  reviewer verdicts.** The reviewer returned its verdicts as a hand-parsed JSON
+  array; a malformed response was discarded (after being fully billed) and every
+  finding in the call degraded to rejected. With
+  `symfony_security_auditor.audit.reviewer_structured_collection: true`, the
+  reviewer instead records each verdict by calling a schema-enforced
+  `record_review` tool (`src/Audit/Infrastructure/Tool/RecordReviewTool.php`) —
+  mirroring the attacker's `record_vulnerability` seam: the provider validates
+  every call against the tool's JSON schema (`id` + `accepted` required,
+  `adjusted_severity` / `corrected_type` constrained to their enums), so a
+  malformed verdict is structurally impossible. Verdicts flow through a new
+  `ReviewCollector` (Application) and are re-keyed by `id` exactly like the JSON
+  batch path. In this mode the `record_review` tool replaces the reviewer's
+  cross-file tools (`reviewer_tools_enabled`) and the concurrent fast path
+  (`reviewer_max_concurrent`). Default `false` (JSON-array output, the previous
+  behaviour).
 
 ### Changed
 
@@ -43,6 +59,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   and records the missing evidence in `reviewer_notes` instead of rejecting. The
   false-positive playbook — which rejects against concrete Symfony mitigations —
   is unchanged, so precision on known-safe patterns is preserved.
+- **The attacker's Route Access-Control Map now flags firewall-covered routes
+  instead of mislabelling them as unprotected.** `AttackerPromptBuilder`
+  (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) rendered every
+  controller action with no `#[IsGranted]` / `denyAccessUnlessGranted()` as
+  `LACKS_ACCESS_CHECK`, even when a `security.yaml` `access_control` rule
+  already gated the route path — so the attacker flagged it as
+  `broken_access_control` and the reviewer then spent tool calls (or, in batch
+  mode, lacked the tools) rediscovering the firewall rule. The map now
+  cross-references each route path against the `access_control` patterns already
+  parsed into `SymfonyMapping::routeAccessMap()` and, on a match, tags the line
+  `COVERED_BY access_control[…]` with the gating roles, telling the model the
+  firewall protects it (unless the role is too permissive). This removes a whole
+  class of false positive at zero extra LLM cost. The attacker `PROMPT_VERSION`
+  is bumped `7` → `8`, invalidating previously cached responses.
 
 ### Fixed
 
@@ -79,20 +109,6 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   more-specific prefixes (`claude-fable`, `claude-mythos`) are now matched ahead
   of `claude-` with a denser 2.7-characters-per-token ratio, so the dry-run
   estimate reflects the real token count. Non-Fable Claude models are unchanged.
-- **The attacker's Route Access-Control Map now flags firewall-covered routes
-  instead of mislabelling them as unprotected.** `AttackerPromptBuilder`
-  (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) rendered every
-  controller action with no `#[IsGranted]` / `denyAccessUnlessGranted()` as
-  `LACKS_ACCESS_CHECK`, even when a `security.yaml` `access_control` rule
-  already gated the route path — so the attacker flagged it as
-  `broken_access_control` and the reviewer then spent tool calls (or, in batch
-  mode, lacked the tools) rediscovering the firewall rule. The map now
-  cross-references each route path against the `access_control` patterns already
-  parsed into `SymfonyMapping::routeAccessMap()` and, on a match, tags the line
-  `COVERED_BY access_control[…]` with the gating roles, telling the model the
-  firewall protects it (unless the role is too permissive). This removes a whole
-  class of false positive at zero extra LLM cost. The attacker `PROMPT_VERSION`
-  is bumped `7` → `8`, invalidating previously cached responses.
 
 ## [1.8.0] — 2026-06-11 — Fable
 
