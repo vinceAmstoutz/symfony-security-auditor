@@ -183,6 +183,41 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringContainsString('authenticator_bypass', $prompt);
     }
 
+    public function test_decision_rules_restrict_rejection_to_a_named_mitigating_control(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString(
+            'Reject a finding ONLY when you can name a specific mitigating control',
+            $prompt,
+        );
+        self::assertStringContainsString(
+            '"Not clearly exploitable" is not, by itself, grounds to reject',
+            $prompt,
+        );
+    }
+
+    public function test_decision_rules_preserve_uncertain_findings_via_downgrade(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString(
+            'do NOT reject: accept it and downgrade the severity',
+            $prompt,
+        );
+        self::assertStringContainsString('state what evidence is missing in `reviewer_notes`', $prompt);
+    }
+
+    public function test_batch_decision_rules_restrict_rejection_to_a_named_mitigating_control(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildBatchSystemPrompt();
+
+        self::assertStringContainsString(
+            'Reject a finding ONLY when you can name a specific mitigating control',
+            $prompt,
+        );
+    }
+
     #[DataProvider('vulnerabilityTypeValues')]
     public function test_system_prompt_lists_every_vulnerability_type_as_corrected_type(string $typeValue): void
     {
@@ -247,7 +282,7 @@ final class ReviewerPromptBuilderTest extends TestCase
         $playbookPos = strpos($prompt, 'false-positive playbook');
         $outputDirectivePos = strpos($prompt, 'one entry per vulnerability reviewed');
         $schemaPos = strpos($prompt, 'Each entry of the JSON array MUST be shaped');
-        $rulesPos = strpos($prompt, 'Be strict: reject any finding');
+        $rulesPos = strpos($prompt, 'Reject a finding ONLY when');
 
         self::assertNotFalse($personaPos);
         self::assertNotFalse($rubricPos);
@@ -274,7 +309,7 @@ final class ReviewerPromptBuilderTest extends TestCase
         $outputDirectivePos = strpos($prompt, 'EXACTLY one entry per input vulnerability');
         $schemaPos = strpos($prompt, 'Each entry of the JSON array MUST be shaped');
         $orderingHintPos = strpos($prompt, 're-keyed by "id" when we parse your response');
-        $rulesPos = strpos($prompt, 'Be strict: reject any finding');
+        $rulesPos = strpos($prompt, 'Reject a finding ONLY when');
 
         self::assertNotFalse($personaPos);
         self::assertNotFalse($batchPreamblePos);
