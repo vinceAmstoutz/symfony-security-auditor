@@ -37,6 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
@@ -600,6 +601,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                     null,
                     service(RecordVulnerabilityToolFactoryInterface::class),
                     $bundleConfiguration->audit->structuredCollection,
+                    service(ProgressReporterInterface::class),
                 ]);
 
             $services->set(EscalatingAttackerAgent::class)

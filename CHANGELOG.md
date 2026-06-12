@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **Live audit-stage progress and an upfront long-run notice in the console.**
+  During the audit stage — by far the longest — the progress bar sat frozen at
+  the same percentage with no sign the run was still alive, sometimes for 20+
+  minutes
+  ([#39](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/39)).
+  `audit:run` (console format only) now prints a note above the progress bar
+  warning that the audit typically takes several minutes, and the bar message
+  updates continuously with the current activity, e.g.
+  `audit · iteration 1/3 · attacker chunk 4/12` and
+  `audit · iteration 1/3 · reviewing 4 finding(s)`. Three new wire-format
+  progress events back this: `audit.iteration.started` and `review.started`
+  (emitted by `AuditOrchestrator`) and `attacker.chunk.started` (emitted by
+  `AttackerAgent`), all flowing through the existing `ProgressReporterInterface`
+  port and rendered by `ConsoleProgressReporter`
+  (`src/Audit/Infrastructure/Progress/ConsoleProgressReporter.php`).
+  Machine-readable stdout (`--format=json|sarif` without `--output`) stays clean
+  — neither the notice nor the bar is emitted there.
 - **The attacker now learns which findings the reviewer already rejected.**
   After the first iteration, `AuditOrchestrator`
   (`src/Audit/Application/Agent/AuditOrchestrator.php`) collected only the

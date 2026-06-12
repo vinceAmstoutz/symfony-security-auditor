@@ -70,6 +70,19 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('Unexpected error: Disk full', $display);
     }
 
+    public function test_long_run_notice_warns_that_the_audit_can_take_a_while(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->longRunNotice($symfonyStyle);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('[NOTE]', $display);
+        self::assertStringContainsString('many LLM calls', $display);
+        self::assertStringContainsString('20+ minutes', $display);
+    }
+
     public function test_header_includes_project_path(): void
     {
         $bufferedOutput = new BufferedOutput();

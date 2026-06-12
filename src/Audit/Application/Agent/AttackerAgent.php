@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileCh
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityHydrationResult;
@@ -28,9 +29,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
 
@@ -55,6 +58,8 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
     private AttackerContextPromptRenderer $attackerContextPromptRenderer;
 
+    private ProgressReporterInterface $progressReporter;
+
     public function __construct(
         private LLMClientInterface $llmClient,
         private AttackerPromptBuilderInterface $attackerPromptBuilder,
@@ -71,11 +76,13 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         ?AttackerContextPromptRenderer $attackerContextPromptRenderer = null,
         private ?RecordVulnerabilityToolFactoryInterface $recordVulnerabilityToolFactory = null,
         private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
+        ?ProgressReporterInterface $progressReporter = null,
     ) {
         $this->staticPreScanner = $staticPreScanner ?? new NullStaticPreScanner();
         $this->fileChunker = $fileChunker ?? new FileChunker();
         $this->codeSlicer = $codeSlicer ?? new NullCodeSlicer();
         $this->attackerContextPromptRenderer = $attackerContextPromptRenderer ?? new AttackerContextPromptRenderer();
+        $this->progressReporter = $progressReporter ?? new NullProgressReporter();
     }
 
     /**
@@ -123,6 +130,10 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
         foreach ($chunks as $index => $chunk) {
             $this->logger->debug(\sprintf('Analyzing chunk %d/%d', $index + 1, \count($chunks)));
+            $this->progressReporter->report(ProgressEvent::AttackerChunkStarted->value, [
+                'chunk' => $index + 1,
+                'total_chunks' => \count($chunks),
+            ]);
 
             $chunkResult = $this->analyzeChunk($chunk, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
             $allVulnerabilities = [...$allVulnerabilities, ...$chunkResult->vulnerabilities()];
