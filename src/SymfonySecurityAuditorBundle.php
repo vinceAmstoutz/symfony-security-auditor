@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ConfigurationNotices;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
@@ -427,12 +428,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.retry.backoff_multiplier', $bundleConfiguration->retry->backoffMultiplier);
         $builder->setParameter('symfony_security_auditor.audit.retry.jitter_ratio', $bundleConfiguration->retry->jitterRatio);
 
-        $configNotices = [];
-        if ($bundleConfiguration->cache->enabled && $bundleConfiguration->audit->reviewerBatchSize > 1) {
-            $configNotices[] = 'The reviewer-verdict cache does not apply to batched reviews (audit.reviewer_batch_size > 1): every finding is re-reviewed by the LLM on each run. Set audit.reviewer_batch_size: 1 to reuse cached verdicts.';
-        }
-
-        $builder->setParameter('symfony_security_auditor.config_notices', $configNotices);
+        $builder->setParameter('symfony_security_auditor.config_notices', ConfigurationNotices::of($bundleConfiguration->cache, $bundleConfiguration->audit));
         $builder->setParameter('symfony_security_auditor.cache.enabled', $bundleConfiguration->cache->enabled);
         $builder->setParameter('symfony_security_auditor.cache.dir', $bundleConfiguration->cache->dir);
         $builder->setParameter('symfony_security_auditor.cache.advisory_dir', $bundleConfiguration->cache->dir.'/advisory');
