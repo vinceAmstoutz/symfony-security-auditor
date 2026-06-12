@@ -208,24 +208,24 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->audit->structuredCollection);
     }
 
-    public function test_from_array_defaults_reviewer_structured_collection_to_false_when_audit_key_omits_it(): void
+    public function test_from_array_defaults_reviewer_structured_collection_to_true_when_audit_key_omits_it(): void
     {
         $config = $this->treeBuilderOutput();
         unset($config['audit']['reviewer_structured_collection']);
 
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
-        self::assertFalse($bundleConfiguration->audit->reviewerStructuredCollection);
+        self::assertTrue($bundleConfiguration->audit->reviewerStructuredCollection);
     }
 
-    public function test_from_array_propagates_reviewer_structured_collection_opt_in(): void
+    public function test_from_array_propagates_reviewer_structured_collection_opt_out(): void
     {
         $config = $this->treeBuilderOutput();
-        $config['audit']['reviewer_structured_collection'] = true;
+        $config['audit']['reviewer_structured_collection'] = false;
 
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
-        self::assertTrue($bundleConfiguration->audit->reviewerStructuredCollection);
+        self::assertFalse($bundleConfiguration->audit->reviewerStructuredCollection);
     }
 
     public function test_from_array_defaults_stable_system_prompt_to_false_when_audit_key_omits_it(): void

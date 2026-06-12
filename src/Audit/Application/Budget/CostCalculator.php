@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 
+use function Symfony\Component\String\u;
+
 /**
  * Converts token counts to USD cost using a pricing provider.
  *
@@ -29,10 +31,12 @@ final readonly class CostCalculator
 {
     private const int TOKENS_PER_MILLION = 1_000_000;
 
-    // Anthropic prices cache reads at 0.1x and cache writes at 1.25x the base input rate.
-    private const float CACHE_READ_PRICE_MULTIPLIER = 0.1;
+    // Anthropic prices 5-minute-cache reads at 0.1x and writes at 1.25x the base input rate.
+    private const float ANTHROPIC_CACHE_READ_PRICE_MULTIPLIER = 0.1;
 
-    private const float CACHE_CREATION_PRICE_MULTIPLIER = 1.25;
+    private const float ANTHROPIC_CACHE_CREATION_PRICE_MULTIPLIER = 1.25;
+
+    private const float PLAIN_INPUT_PRICE_MULTIPLIER = 1.0;
 
     public function __construct(private PricingProviderInterface $pricingProvider) {}
 
@@ -46,9 +50,24 @@ final readonly class CostCalculator
         $inputPrice = $this->pricingProvider->pricePerMillionInputTokens($model);
         $inputCost = ($inputTokens / self::TOKENS_PER_MILLION) * $inputPrice;
         $outputCost = ($outputTokens / self::TOKENS_PER_MILLION) * $this->pricingProvider->pricePerMillionOutputTokens($model);
-        $cacheReadCost = ($cacheReadTokens / self::TOKENS_PER_MILLION) * $inputPrice * self::CACHE_READ_PRICE_MULTIPLIER;
-        $cacheCreationCost = ($cacheCreationTokens / self::TOKENS_PER_MILLION) * $inputPrice * self::CACHE_CREATION_PRICE_MULTIPLIER;
+        $cacheReadCost = ($cacheReadTokens / self::TOKENS_PER_MILLION) * $inputPrice * $this->cacheReadPriceMultiplier($model);
+        $cacheCreationCost = ($cacheCreationTokens / self::TOKENS_PER_MILLION) * $inputPrice * $this->cacheCreationPriceMultiplier($model);
 
         return $inputCost + $outputCost + $cacheReadCost + $cacheCreationCost;
+    }
+
+    private function cacheReadPriceMultiplier(string $model): float
+    {
+        return $this->isClaudeModel($model) ? self::ANTHROPIC_CACHE_READ_PRICE_MULTIPLIER : self::PLAIN_INPUT_PRICE_MULTIPLIER;
+    }
+
+    private function cacheCreationPriceMultiplier(string $model): float
+    {
+        return $this->isClaudeModel($model) ? self::ANTHROPIC_CACHE_CREATION_PRICE_MULTIPLIER : self::PLAIN_INPUT_PRICE_MULTIPLIER;
+    }
+
+    private function isClaudeModel(string $model): bool
+    {
+        return u($model)->containsAny('claude');
     }
 }

@@ -44,7 +44,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 
     public const int DEFAULT_MAX_CONCURRENT = 1;
 
-    public const bool DEFAULT_STRUCTURED_COLLECTION = false;
+    public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
     private const int PARSE_FAILURE_PREVIEW_BYTES = 512;
 
@@ -74,8 +74,11 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             return [];
         }
 
-        $useStructuredCollection = $this->useStructuredCollection && $this->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface;
-        $useTools = !$useStructuredCollection && $this->toolsEnabled && $this->toolRegistryFactory instanceof ToolRegistryFactoryInterface;
+        $useTools = $this->toolsEnabled && $this->toolRegistryFactory instanceof ToolRegistryFactoryInterface;
+        $useStructuredCollection = !$useTools
+            && $this->maxConcurrent <= 1
+            && $this->useStructuredCollection
+            && $this->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface;
         $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($projectFiles) : null;
 
         $this->logger->info('Reviewer agent validating findings', [
@@ -89,7 +92,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 
         if ($this->batchSize <= 1) {
             if ($useStructuredCollection) {
-                $reviewed = $this->reviewSinglesViaStructuredCollection($vulnerabilities, $projectFiles, $coverageRecorder);
+                $reviewed = $this->reviewSinglesViaStructuredCollection($vulnerabilities, $projectFiles, $coverageRecorder, $bypassCache);
             } else {
                 $reviewed = $this->canReviewConcurrently($useTools)
                     ? $this->reviewSinglesConcurrently($vulnerabilities, $projectFiles, $coverageRecorder)
@@ -292,11 +295,11 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
      *
      * @return list<Vulnerability>
      */
-    private function reviewSinglesViaStructuredCollection(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder): array
+    private function reviewSinglesViaStructuredCollection(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): array
     {
         $reviewed = [];
         foreach ($vulnerabilities as $vulnerability) {
-            $reviewed[] = $this->reviewSingleViaStructuredCollection($vulnerability, $projectFiles, $coverageRecorder);
+            $reviewed[] = $this->reviewSingleViaStructuredCollection($vulnerability, $projectFiles, $coverageRecorder, $bypassCache);
         }
 
         return $reviewed;
@@ -305,11 +308,18 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
     /**
      * @param list<ProjectFile> $projectFiles
      */
-    private function reviewSingleViaStructuredCollection(Vulnerability $vulnerability, array $projectFiles, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    private function reviewSingleViaStructuredCollection(Vulnerability $vulnerability, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): Vulnerability
     {
         \assert($this->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface);
 
         $codeContext = $this->getFileContext($vulnerability->filePath(), $projectFiles);
+
+        $useCache = !$bypassCache && $this->reviewerCache instanceof ReviewerCacheInterface;
+        $cached = $this->cachedVerdict($vulnerability, $codeContext, $useCache);
+        if (null !== $cached) {
+            return $this->recordVerdict($vulnerability, $cached, $coverageRecorder);
+        }
+
         $systemPrompt = $this->reviewerPromptBuilder->buildSystemPrompt();
         $userMessage = $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext);
 
@@ -319,7 +329,12 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         try {
             $this->llmClient->completeWithTools($systemPrompt, $userMessage, $toolRegistry, $this->maxToolIterations);
 
-            return $this->recordVerdict($vulnerability, $reviewCollector->drain()[0] ?? null, $coverageRecorder);
+            $verdict = $reviewCollector->drain()[0] ?? null;
+            if ($useCache && null !== $verdict) {
+                $this->reviewerCache->store($vulnerability, $codeContext, $verdict);
+            }
+
+            return $this->recordVerdict($vulnerability, $verdict, $coverageRecorder);
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
@@ -327,6 +342,25 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         } catch (Throwable $exception) {
             return $this->recordReviewError($vulnerability, $exception, $coverageRecorder);
         }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function cachedVerdict(Vulnerability $vulnerability, string $codeContext, bool $useCache): ?array
+    {
+        if (!$useCache || !$this->reviewerCache instanceof ReviewerCacheInterface) {
+            return null;
+        }
+
+        $cached = $this->reviewerCache->get($vulnerability, $codeContext);
+        if (null === $cached) {
+            return null;
+        }
+
+        $this->logger->debug('Reviewer verdict served from cache', ['vulnerability_id' => $vulnerability->id()]);
+
+        return $cached;
     }
 
     /**
@@ -406,13 +440,9 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         $codeContext = $this->getFileContext($vulnerability->filePath(), $projectFiles);
 
         $useCache = !$bypassCache && $this->reviewerCache instanceof ReviewerCacheInterface;
-        if ($useCache) {
-            $cached = $this->reviewerCache->get($vulnerability, $codeContext);
-            if (null !== $cached) {
-                $this->logger->debug('Reviewer verdict served from cache', ['vulnerability_id' => $vulnerability->id()]);
-
-                return $this->recordVerdict($vulnerability, $cached, $coverageRecorder);
-            }
+        $cached = $this->cachedVerdict($vulnerability, $codeContext, $useCache);
+        if (null !== $cached) {
+            return $this->recordVerdict($vulnerability, $cached, $coverageRecorder);
         }
 
         $systemPrompt = $this->reviewerPromptBuilder->buildSystemPrompt();

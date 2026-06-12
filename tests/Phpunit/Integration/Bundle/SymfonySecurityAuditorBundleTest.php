@@ -50,6 +50,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSe
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
@@ -164,21 +165,21 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertFalse($kernel->getContainer()->getParameter('symfony_security_auditor.audit.structured_collection'));
     }
 
-    public function test_bundle_defaults_reviewer_structured_collection_to_false(): void
+    public function test_bundle_defaults_reviewer_structured_collection_to_true(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
 
-        self::assertFalse($kernel->getContainer()->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'));
+        self::assertTrue($kernel->getContainer()->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'));
     }
 
-    public function test_bundle_propagates_reviewer_structured_collection_opt_in_to_parameter(): void
+    public function test_bundle_propagates_reviewer_structured_collection_opt_out_to_parameter(): void
     {
         $kernel = $this->boot([
             'model' => 'gpt-4o',
-            'audit' => ['reviewer_structured_collection' => true],
+            'audit' => ['reviewer_structured_collection' => false],
         ]);
 
-        self::assertTrue($kernel->getContainer()->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'));
+        self::assertFalse($kernel->getContainer()->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'));
     }
 
     public function test_bundle_defaults_stable_system_prompt_to_false(): void
@@ -395,7 +396,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         self::assertSame('/custom/cache/reviewer', $container->getParameter('symfony_security_auditor.cache.reviewer_dir'));
         self::assertSame(
-            \sprintf('claude-haiku-4-5-20251001|reviewer-v%d', FilesystemReviewerCache::CACHE_VERSION),
+            \sprintf('claude-haiku-4-5-20251001|reviewer-v%d|prompt-v%d', FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
             $container->getParameter('symfony_security_auditor.cache.reviewer_key_salt'),
         );
     }
@@ -662,13 +663,31 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         $expectedPatternHash = substr(hash('sha256', json_encode([], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)), 0, 16);
         $expectedKeySalt = \sprintf(
-            'gpt-4o|prompt-v%d|prescan-v%d|patterns-%s',
+            'gpt-4o|prompt-v%d|prescan-v%d|patterns-%s|collect-tool|skills-lean',
             AttackerPromptBuilder::PROMPT_VERSION,
             RegexStaticPreScanner::CACHE_VERSION,
             $expectedPatternHash,
         );
 
         self::assertSame($expectedKeySalt, $kernel->getContainer()->getParameter('symfony_security_auditor.cache.key_salt'));
+    }
+
+    public function test_bundle_cache_key_salt_folds_in_the_structured_collection_mode(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['structured_collection' => false]]);
+
+        $keySalt = $kernel->getContainer()->getParameter('symfony_security_auditor.cache.key_salt');
+        self::assertIsString($keySalt);
+        self::assertStringContainsString('|collect-json|', $keySalt);
+    }
+
+    public function test_bundle_cache_key_salt_folds_in_the_stable_system_prompt_flag(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['stable_system_prompt' => true]]);
+
+        $keySalt = $kernel->getContainer()->getParameter('symfony_security_auditor.cache.key_salt');
+        self::assertIsString($keySalt);
+        self::assertStringEndsWith('|skills-full', $keySalt);
     }
 
     private function getPrivateService(Kernel $kernel, string $id): object

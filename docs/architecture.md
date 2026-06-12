@@ -427,19 +427,19 @@ returns a new `Vulnerability` instance via copy-on-write
 (`withReviewerValidation` / `withElevatedSeverity` / `withCorrectedType`). On
 any error: returns the vulnerability with `reviewerValidated = false`.
 
-With `audit.reviewer_structured_collection: true`, the reviewer instead records
-each verdict by calling a schema-enforced `record_review` tool — mirroring the
-attacker's `record_vulnerability` seam — and verdicts are drained from a
-`ReviewCollector`. In this mode the tool replaces the reviewer's cross-file
-tools (`reviewer_tools_enabled`) and the concurrent fast path
-(`reviewer_max_concurrent`).
+With `audit.reviewer_structured_collection: true` (the default), the reviewer
+instead records each verdict by calling a schema-enforced `record_review` tool —
+mirroring the attacker's `record_vulnerability` seam — and verdicts are drained
+from a `ReviewCollector`. The explicit opt-ins `reviewer_tools_enabled: true`
+and `reviewer_max_concurrent` > 1 take precedence over the structured mode and
+keep the JSON path.
 
-In the sequential one-finding-per-call mode (the default), verdicts for findings
-with identical content against unchanged code are short-circuited by
-`ReviewerCacheInterface` (`FilesystemReviewerCache` by default,
+In the one-finding-per-call modes (the default, structured or JSON), verdicts
+for findings with identical content against unchanged code are short-circuited
+by `ReviewerCacheInterface` (`FilesystemReviewerCache` by default,
 `NullReviewerCache` when `cache.enabled: false`), mirroring the attacker cache.
-Batched, concurrent, and structured-collection reviews always call the LLM.
-`--no-cache` bypasses both caches for the run.
+Batched and concurrent reviews always call the LLM. `--no-cache` bypasses both
+caches for the run.
 
 ### `VulnerabilityFactory`
 
@@ -578,10 +578,10 @@ The reviewer prompt expects each entry of the JSON array to be shaped:
 }
 ```
 
-With `audit.reviewer_structured_collection: true`, the same fields are recorded
-through the schema-enforced `record_review` tool instead (`id` and `accepted`
-required, the enums constrained by the schema), so the provider validates every
-verdict before the agent sees it.
+With `audit.reviewer_structured_collection: true` (the default), the same fields
+are recorded through the schema-enforced `record_review` tool instead (`id` and
+`accepted` required, the enums constrained by the schema), so the provider
+validates every verdict before the agent sees it.
 
 It includes a Symfony-specific false-positive playbook (Doctrine
 `setParameter()`, default CSRF, `mapped: false`, hardcoded-argv `Process`, etc.)

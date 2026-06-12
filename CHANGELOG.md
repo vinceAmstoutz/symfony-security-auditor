@@ -13,12 +13,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 ## [1.9.0] — 2026-06-12 — Verdict
 
 A reviewer-trust and visibility release. The reviewer's verdicts get the
-structured treatment end to end — recorded through a schema-enforced
-`record_review` tool, cached across runs, and fed back to the attacker when
-findings are rejected — and the long audit stage finally shows live progress in
-the console. Prompt-cache tokens are now priced into the reported cost, reports
-lead with their most severe findings, and the attacker's route map stops
-mislabelling firewall-covered routes.
+structured treatment end to end, with zero configuration — recorded through a
+schema-enforced `record_review` tool by default, cached across runs, and fed
+back to the attacker when findings are rejected — and the long audit stage
+finally shows live progress in the console. Prompt-cache tokens are now priced
+into the reported cost, reports lead with their most severe findings, and the
+attacker's route map stops mislabelling firewall-covered routes.
 
 ### Added
 
@@ -54,21 +54,23 @@ mislabelling firewall-covered routes.
   served from the attacker cache (the same rule already applied to validated
   prior findings), so the new context always reaches the model.
 - **New `audit.reviewer_structured_collection` config key — provider-validated
-  reviewer verdicts.** The reviewer returned its verdicts as a hand-parsed JSON
-  array; a malformed response was discarded (after being fully billed) and every
-  finding in the call degraded to rejected. With
-  `symfony_security_auditor.audit.reviewer_structured_collection: true`, the
-  reviewer instead records each verdict by calling a schema-enforced
-  `record_review` tool (`src/Audit/Infrastructure/Tool/RecordReviewTool.php`) —
-  mirroring the attacker's `record_vulnerability` seam: the provider validates
-  every call against the tool's JSON schema (`id` + `accepted` required,
+  reviewer verdicts, on by default.** The reviewer returned its verdicts as a
+  hand-parsed JSON array; a malformed response was discarded (after being fully
+  billed) and every finding in the call degraded to rejected. The reviewer now
+  records each verdict by calling a schema-enforced `record_review` tool
+  (`src/Audit/Infrastructure/Tool/RecordReviewTool.php`) — mirroring the
+  attacker's `record_vulnerability` seam: the provider validates every call
+  against the tool's JSON schema (`id` + `accepted` required,
   `adjusted_severity` / `corrected_type` constrained to their enums), so a
   malformed verdict is structurally impossible. Verdicts flow through a new
   `ReviewCollector` (Application) and are re-keyed by `id` exactly like the JSON
-  batch path. In this mode the `record_review` tool replaces the reviewer's
-  cross-file tools (`reviewer_tools_enabled`) and the concurrent fast path
-  (`reviewer_max_concurrent`). Default `false` (JSON-array output, the previous
-  behaviour).
+  batch path. Defaults to `true` — matching the attacker's
+  `structured_collection` default, so the schema-safe (and cheaper: no
+  billed-but-discarded responses) path needs no configuration. The released
+  explicit opt-ins take precedence and keep the JSON path:
+  `reviewer_tools_enabled: true` and `reviewer_max_concurrent` > 1 behave
+  exactly as before the upgrade. Set `reviewer_structured_collection: false` to
+  force JSON-array output (the safety net for models without tool-use support).
 - **New `audit.stable_system_prompt` config key for cheaper multi-chunk
   audits.** By default the attacker emits only the expert skill blocks matching
   a chunk's file types, so its system prompt differs chunk-to-chunk and provider
@@ -80,26 +82,32 @@ mislabelling firewall-covered routes.
   across chunks: the first chunk pays a cache write and every subsequent chunk
   reads the prefix at the provider's discounted cache-read rate. The trade-off
   is a larger prompt when caching is off, so the key defaults to `false`
-  (relevance-only skills, the previous behaviour).
+  (relevance-only skills, the previous behaviour). Both this flag and
+  `structured_collection` are folded into the attacker cache key salt, so
+  toggling either invalidates cached responses produced under the other prompt
+  shape instead of replaying them.
 - **Reviewer verdicts are now cached across runs, skipping redundant reviewer
   LLM calls.** A new filesystem cache
   (`src/Audit/Infrastructure/Cache/FilesystemReviewerCache.php`, behind the
   Domain port `src/Audit/Domain/Port/ReviewerCacheInterface.php`) stores each
   reviewer verdict keyed by the SHA-256 of the finding's stable content (its
   `Vulnerability::toArray()` minus the non-deterministic `id`) plus the reviewed
-  code context, folded behind a salt of `{reviewer_model}|reviewer-v{N}`. When
-  the attacker re-surfaces a finding with identical content against unchanged
-  code — the common case on repeated CI/PR scans — `ReviewerAgent::review()`
-  reuses the stored verdict instead of calling the LLM again. The cache reuses
-  the existing `cache.enabled` switch (when `false`, a `NullReviewerCache` no-op
-  is wired) and lives in a `reviewer` subdirectory alongside the attacker cache
-  under `cache.dir`. The cache applies in the default one-finding-per-call
-  sequential review mode; batched (`reviewer_batch_size > 1`), concurrent
-  (`reviewer_max_concurrent > 1`), and structured
-  (`reviewer_structured_collection: true`) reviews always call the LLM. The
-  `--no-cache` flag bypasses it for the run (no reads, no writes), mirroring the
-  attacker cache. A reviewer-prompt or verdict-contract change is invalidated by
-  bumping `FilesystemReviewerCache::CACHE_VERSION`.
+  code context, folded behind a salt of
+  `{reviewer_model}|reviewer-v{N}|prompt-v{M}`. When the attacker re-surfaces a
+  finding with identical content against unchanged code — the common case on
+  repeated CI/PR scans — `ReviewerAgent::review()` reuses the stored verdict
+  instead of calling the LLM again. The cache reuses the existing
+  `cache.enabled` switch (when `false`, a `NullReviewerCache` no-op is wired)
+  and lives in a `reviewer` subdirectory alongside the attacker cache under
+  `cache.dir`. The cache applies to one-finding-per-call reviews — the default,
+  in both the structured `record_review` mode and the JSON mode; batched
+  (`reviewer_batch_size > 1`) and concurrent (`reviewer_max_concurrent > 1`)
+  reviews always call the LLM. The `--no-cache` flag bypasses it for the run (no
+  reads, no writes), mirroring the attacker cache. A reviewer-prompt change
+  invalidates the cache automatically via
+  `ReviewerPromptBuilder::PROMPT_VERSION` in the salt; a storage-format or
+  verdict-contract change is invalidated by bumping
+  `FilesystemReviewerCache::CACHE_VERSION`.
 - **Prompt-cache tokens are now priced into the audit cost.** Providers that
   report prompt caching (Anthropic's `cache_read_input_tokens` /
   `cache_creation_input_tokens`) were previously invisible to cost accounting:
@@ -110,11 +118,14 @@ mislabelling firewall-covered routes.
   carries them on `LLMResponse` (new `cacheReadTokens()` /
   `cacheCreationTokens()` accessors, defaulting to `0`) and accumulates them in
   `TokenUsageRecorder` / `TokenUsageSnapshot`. `CostCalculator::costForCall()`
-  prices them against the model's input rate using Anthropic's published
-  multipliers — cache reads at `0.1x`, cache writes at `1.25x` — so both the
-  live budget enforcement (`BudgetTracker`) and the reported
-  `estimated_cost_usd` reflect real cache spend. Runs against providers that do
-  not report cache tokens are unaffected (the new counts default to `0`).
+  prices them against the model's input rate — for Claude models at Anthropic's
+  published multipliers (cache reads at `0.1x`, cache writes at `1.25x` for the
+  default 5-minute cache); for any other model that reports these fields, cache
+  tokens are conservatively priced at the plain input rate rather than asserting
+  Anthropic's economics — so both the live budget enforcement (`BudgetTracker`)
+  and the reported `estimated_cost_usd` reflect real cache spend. Runs against
+  providers that do not report cache tokens are unaffected (the new counts
+  default to `0`).
 
 ### Changed
 

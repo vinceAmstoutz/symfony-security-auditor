@@ -60,6 +60,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
@@ -180,8 +181,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->info("When true (default), the attacker emits findings by calling a schema-enforced `record_vulnerability` tool, one call per finding, instead of returning a JSON array. The platform validates each call against the tool's input schema, so malformed shapes (bare strings like \"dev\"/\"test\", wrapper objects like `{\"vulnerabilities\": [...]}` ) become structurally impossible. Works across every provider that supports tool use (Anthropic, OpenAI, Mistral, Ollama with tool-capable models). Set to false to fall back to the tightened JSON-array prompt path.")
                         ->end()
                         ->booleanNode('reviewer_structured_collection')
-                            ->defaultFalse()
-                            ->info("When true, the reviewer records each verdict by calling a schema-enforced `record_review` tool instead of returning a JSON array, so a malformed verdict never costs a discarded (but fully billed) response. The `record_review` tool replaces the reviewer's cross-file tools (`reviewer_tools_enabled`) and the concurrent fast path (`reviewer_max_concurrent`) in this mode, and the reviewer-verdict cache does not apply. Default false (JSON-array output, the previous behaviour).")
+                            ->defaultTrue()
+                            ->info('When true (the default), the reviewer records each verdict by calling a schema-enforced `record_review` tool instead of returning a JSON array, so a malformed verdict never costs a discarded (but fully billed) response. Verdicts are served from and stored to the reviewer-verdict cache exactly like the JSON path. The explicit opt-ins `reviewer_tools_enabled: true` and `reviewer_max_concurrent` > 1 take precedence and keep the JSON path. Set false to force JSON-array output (for models without tool-use support).')
                         ->end()
                         ->booleanNode('stable_system_prompt')
                             ->defaultFalse()
@@ -426,13 +427,13 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.cache.reviewer_dir', $bundleConfiguration->cache->dir.'/reviewer');
         $builder->setParameter(
             'symfony_security_auditor.cache.reviewer_key_salt',
-            \sprintf('%s|reviewer-v%d', $bundleConfiguration->llm->reviewerModel(), FilesystemReviewerCache::CACHE_VERSION),
+            \sprintf('%s|reviewer-v%d|prompt-v%d', $bundleConfiguration->llm->reviewerModel(), FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
         );
         $builder->setParameter('symfony_security_auditor.cache.prompt_caching', $bundleConfiguration->cache->promptCaching);
         $builder->setParameter(
             'symfony_security_auditor.cache.key_salt',
             \sprintf(
-                '%s|prompt-v%d|prescan-v%d|patterns-%s',
+                '%s|prompt-v%d|prescan-v%d|patterns-%s|collect-%s|skills-%s',
                 $bundleConfiguration->llm->attackerModel(),
                 AttackerPromptBuilder::PROMPT_VERSION,
                 RegexStaticPreScanner::CACHE_VERSION,
@@ -444,6 +445,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                     0,
                     16,
                 ),
+                $bundleConfiguration->audit->structuredCollection ? 'tool' : 'json',
+                $bundleConfiguration->audit->stableSystemPrompt ? 'full' : 'lean',
             ),
         );
 

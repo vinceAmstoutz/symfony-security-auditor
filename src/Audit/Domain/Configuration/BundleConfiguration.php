@@ -88,7 +88,7 @@ final readonly class BundleConfiguration
                 escalationEnabled: $config['audit']['escalation']['enabled'],
                 escalationCheapModel: $config['audit']['escalation']['cheap_model'],
                 structuredCollection: $config['audit']['structured_collection'] ?? true,
-                reviewerStructuredCollection: $config['audit']['reviewer_structured_collection'] ?? false,
+                reviewerStructuredCollection: $config['audit']['reviewer_structured_collection'] ?? true,
                 stableSystemPrompt: $config['audit']['stable_system_prompt'] ?? false,
             ),
             retry: new RetryConfiguration(

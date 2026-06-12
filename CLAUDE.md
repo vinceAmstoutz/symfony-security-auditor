@@ -124,11 +124,11 @@ Command → Application → Domain ← Infrastructure (implements ports)
    the response. Optional `EscalatingAttackerAgent` runs a cheap model first and
    only escalates flagged files to the expensive model.
 3. Filter — confidence ≥ 0.6
-4. `ReviewerAgent` — validates each finding (optionally with tools; optionally
-   concurrently), may adjust severity. With
-   `audit.reviewer_structured_collection: true`, verdicts come in through
-   schema-enforced `record_review` tool calls instead of a parsed JSON array.
-   Verdicts are cached across runs (`FilesystemReviewerCache`) when
+4. `ReviewerAgent` — validates each finding, may adjust severity. By default
+   (`audit.reviewer_structured_collection: true`), verdicts come in through
+   schema-enforced `record_review` tool calls; the explicit opt-ins
+   `reviewer_tools_enabled` and `reviewer_max_concurrent` > 1 keep the JSON
+   path. Verdicts are cached across runs (`FilesystemReviewerCache`) when
    `cache.enabled` is on.
 5. Deduplicate → persist to `AuditContext`
 
