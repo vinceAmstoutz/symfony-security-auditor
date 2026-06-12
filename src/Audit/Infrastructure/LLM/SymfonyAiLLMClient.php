@@ -33,12 +33,12 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
@@ -49,7 +49,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Null
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterface
+final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInterface
 {
     public const ?float DEFAULT_TEMPERATURE = null;
 
@@ -211,6 +211,227 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
         } catch (Throwable) {
             return $this->complete($request['system'], $request['user']);
         }
+    }
+
+    public function completeBatchWithTools(array $requests, int $maxConcurrent, int $maxToolIterations): array
+    {
+        \assert('' !== $this->model, 'Model must be a non-empty string');
+
+        $windowSize = max(1, $maxConcurrent);
+        $responses = [];
+
+        foreach (array_chunk($requests, $windowSize) as $window) {
+            foreach ($this->resolveToolWindow($window, $maxToolIterations) as $llmResponse) {
+                $responses[] = $llmResponse;
+            }
+        }
+
+        return $responses;
+    }
+
+    /**
+     * Runs every tool-using conversation in the window as a wavefront: each
+     * round dispatches the next platform invocation for every still-pending
+     * conversation WITHOUT blocking, then resolves them, executes the requested
+     * tools against that conversation's own registry, and queues the follow-up
+     * round. On an async transport (the symfony/ai DeferredResult contract) the
+     * per-round invocations overlap on the wire. A conversation that fails
+     * before any of its tools ran falls back to the proven sequential
+     * completeWithTools() path (full retry); one that fails after a tool
+     * already produced side effects finalizes as an empty `empty_content`
+     * response so tools are never executed twice.
+     *
+     * @param list<array{system: string, user: string, tools: ToolRegistry}> $window
+     *
+     * @return list<LLMResponse>
+     */
+    private function resolveToolWindow(array $window, int $maxToolIterations): array
+    {
+        \assert('' !== $this->model, 'Model must be a non-empty string');
+
+        $platform = $this->platform();
+
+        /** @var array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}> $states */
+        $states = [];
+        foreach ($window as $index => $request) {
+            $options = $this->baseOptions();
+            $options['tools'] = $this->buildPlatformTools($request['tools']->definitions());
+            $states[$index] = [
+                'bag' => new MessageBag(Message::forSystem($request['system']), Message::ofUser($request['user'])),
+                'options' => $options,
+                'input' => 0,
+                'output' => 0,
+                'cacheRead' => 0,
+                'cacheCreation' => 0,
+                'toolsRan' => false,
+                'response' => null,
+            ];
+        }
+
+        $round = 0;
+        while ($round < $maxToolIterations && $this->hasPendingConversation($states)) {
+            $deferred = [];
+            foreach ($states as $index => $state) {
+                if ($state['response'] instanceof LLMResponse) {
+                    continue;
+                }
+
+                $this->rateLimiter()->acquire($this->estimateInputTokens($window[$index]['system'], $window[$index]['user']));
+
+                try {
+                    $deferred[$index] = $platform->invoke($this->model, $state['bag'], $state['options']);
+                } catch (Throwable) {
+                    $deferred[$index] = null;
+                }
+            }
+
+            foreach ($deferred as $index => $deferredResult) {
+                $states[$index] = $this->advanceConversation($states[$index], $deferredResult, $window[$index], $maxToolIterations);
+            }
+
+            ++$round;
+        }
+
+        $responses = [];
+        foreach ($states as $state) {
+            $responses[] = $state['response'] instanceof LLMResponse
+                ? $state['response']
+                : $this->toolIterationCapResponse($state, $maxToolIterations);
+        }
+
+        return $responses;
+    }
+
+    /**
+     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
+     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
+     *
+     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
+     */
+    private function advanceConversation(array $state, ?DeferredResult $deferredResult, array $request, int $maxToolIterations): array
+    {
+        if (!$deferredResult instanceof DeferredResult) {
+            return $this->abortConversation($state, $request, $maxToolIterations);
+        }
+
+        try {
+            $platformResult = $deferredResult->getResult();
+            [$callInput, $callOutput, $callCacheRead, $callCacheCreation] = $this->extractTokens($deferredResult);
+            $state['input'] += $callInput;
+            $state['output'] += $callOutput;
+            $state['cacheRead'] += $callCacheRead;
+            $state['cacheCreation'] += $callCacheCreation;
+            $this->rateLimiter()->record($callInput, $callOutput);
+            if ($this->budgetTracker instanceof BudgetTracker) {
+                $this->budgetTracker->recordCall(LLMResponse::create(
+                    content: '',
+                    inputTokens: $callInput,
+                    outputTokens: $callOutput,
+                    model: $this->model,
+                    stopReason: 'tool_iteration',
+                    cacheReadTokens: $callCacheRead,
+                    cacheCreationTokens: $callCacheCreation,
+                ));
+                $this->budgetTracker->assertWithinBudget();
+            }
+
+            $toolCalls = $this->extractToolCalls($platformResult);
+
+            if ([] === $toolCalls) {
+                $state['response'] = LLMResponse::create(
+                    content: $this->extractText($platformResult),
+                    inputTokens: $state['input'],
+                    outputTokens: $state['output'],
+                    model: $this->model,
+                    stopReason: 'end_turn',
+                    cacheReadTokens: $state['cacheRead'],
+                    cacheCreationTokens: $state['cacheCreation'],
+                );
+
+                return $state;
+            }
+
+            $state['bag']->add(new AssistantMessage(...$toolCalls));
+            foreach ($toolCalls as $toolCall) {
+                $result = $request['tools']->execute($toolCall->getName(), $toolCall->getArguments());
+                $state['bag']->add(new ToolCallMessage($toolCall, $result));
+            }
+
+            $state['toolsRan'] = true;
+
+            return $state;
+        } catch (BudgetExceededException $budgetExceededException) {
+            throw $budgetExceededException;
+        } catch (Throwable) {
+            return $this->abortConversation($state, $request, $maxToolIterations);
+        }
+    }
+
+    /**
+     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
+     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
+     *
+     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
+     */
+    private function abortConversation(array $state, array $request, int $maxToolIterations): array
+    {
+        if (!$state['toolsRan']) {
+            $state['response'] = $this->completeWithTools($request['system'], $request['user'], $request['tools'], $maxToolIterations);
+
+            return $state;
+        }
+
+        $this->logger->warning('Concurrent tool-using conversation failed after tool execution; keeping recorded tool results', [
+            'input_tokens' => $state['input'],
+            'output_tokens' => $state['output'],
+        ]);
+        $state['response'] = LLMResponse::create(
+            content: '',
+            inputTokens: $state['input'],
+            outputTokens: $state['output'],
+            model: $this->model,
+            stopReason: 'empty_content',
+            cacheReadTokens: $state['cacheRead'],
+            cacheCreationTokens: $state['cacheCreation'],
+        );
+
+        return $state;
+    }
+
+    /**
+     * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}> $states
+     */
+    private function hasPendingConversation(array $states): bool
+    {
+        foreach ($states as $state) {
+            if (!$state['response'] instanceof LLMResponse) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
+     */
+    private function toolIterationCapResponse(array $state, int $maxToolIterations): LLMResponse
+    {
+        $this->logger->warning('Tool-using loop hit iteration cap', [
+            'max_iterations' => $maxToolIterations,
+            'input_tokens' => $state['input'],
+            'output_tokens' => $state['output'],
+        ]);
+
+        return LLMResponse::create(
+            content: '',
+            inputTokens: $state['input'],
+            outputTokens: $state['output'],
+            model: $this->model,
+            stopReason: 'max_tool_iterations',
+            cacheReadTokens: $state['cacheRead'],
+            cacheCreationTokens: $state['cacheCreation'],
+        );
     }
 
     public function completeWithTools(

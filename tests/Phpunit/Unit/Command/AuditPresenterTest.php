@@ -145,6 +145,21 @@ final class AuditPresenterTest extends TestCase
         self::assertSame('', $bufferedOutput->fetch());
     }
 
+    public function test_preflight_warnings_print_each_config_notice(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->preflightWarnings($symfonyStyle, secretScrubbingEnabled: true, configNotices: [
+            'first notice about the cache',
+            'second notice about batching',
+        ]);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('first notice about the cache', $flattened);
+        self::assertStringContainsString('second notice about batching', $flattened);
+    }
+
     public function test_running_section_emits_section_header(): void
     {
         $bufferedOutput = new BufferedOutput();

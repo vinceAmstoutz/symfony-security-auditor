@@ -44,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ContextAwareAttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
@@ -1941,6 +1942,141 @@ final class AttackerAgentTest extends TestCase
                 return new RecordVulnerabilityTool($vulnerabilityCollector);
             }
         };
+    }
+
+    public function test_context_aware_cache_serves_chunks_carrying_previous_findings(): void
+    {
+        $files = [$this->makeFile('src/Controller/A.php')];
+        $previousFindings = [$this->makeVulnerabilityFor('src/Controller/A.php')];
+
+        $cache = $this->createMock(ContextAwareAttackerCacheInterface::class);
+        $cache->expects(self::once())
+            ->method('getForContext')
+            ->with(self::isArray(), self::logicalNot(self::identicalTo('')))
+            ->willReturn([]);
+        $cache->expects(self::never())->method('get');
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('complete');
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+
+        $result = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), previousFindings: $previousFindings);
+
+        self::assertSame([], $result);
+    }
+
+    public function test_context_aware_cache_stores_context_carrying_chunks_after_the_llm_call(): void
+    {
+        $files = [$this->makeFile('src/Controller/A.php')];
+        $previousFindings = [$this->makeVulnerabilityFor('src/Controller/A.php')];
+
+        $cache = $this->createMock(ContextAwareAttackerCacheInterface::class);
+        $cache->method('getForContext')->willReturn(null);
+        $cache->expects(self::once())
+            ->method('storeForContext')
+            ->with(self::isArray(), self::logicalNot(self::identicalTo('')), []);
+        $cache->expects(self::never())->method('store');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), previousFindings: $previousFindings);
+    }
+
+    public function test_context_free_chunks_use_the_empty_context_key_on_a_context_aware_cache(): void
+    {
+        $files = [$this->makeFile('src/Controller/A.php')];
+
+        $cache = $this->createMock(ContextAwareAttackerCacheInterface::class);
+        $cache->expects(self::once())->method('getForContext')->with(self::isArray(), '')->willReturn(null);
+        $cache->expects(self::once())->method('storeForContext')->with(self::isArray(), '', []);
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+    }
+
+    public function test_context_unaware_cache_is_skipped_for_chunks_carrying_previous_findings(): void
+    {
+        $files = [$this->makeFile('src/Controller/A.php')];
+        $previousFindings = [$this->makeVulnerabilityFor('src/Controller/A.php')];
+
+        $cache = $this->createMock(AttackerCacheInterface::class);
+        $cache->expects(self::never())->method('get');
+        $cache->expects(self::never())->method('store');
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->expects(self::once())
+            ->method('complete')
+            ->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), previousFindings: $previousFindings);
+    }
+
+    public function test_context_key_is_the_hash_of_the_rendered_context_preambles(): void
+    {
+        $files = [$this->makeFile('src/Controller/A.php')];
+        $vulnerability = $this->makeVulnerabilityFor('src/Controller/A.php');
+        $rejectedFinding = $this->makeVulnerabilityFor('src/Controller/A.php');
+
+        $contextKeys = [];
+        $cache = self::createStub(ContextAwareAttackerCacheInterface::class);
+        $cache->method('getForContext')->willReturnCallback(
+            static function (array $chunk, string $contextKey) use (&$contextKeys): ?array {
+                $contextKeys[] = $contextKey;
+
+                return null;
+            },
+        );
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), previousFindings: [$vulnerability], rejectedFindings: [$rejectedFinding]);
+
+        $attackerContextPromptRenderer = new AttackerContextPromptRenderer();
+        $expectedKey = hash(
+            'sha256',
+            $attackerContextPromptRenderer->renderRejectedFindings([$rejectedFinding])."\0".$attackerContextPromptRenderer->renderPreviousFindings([$vulnerability]),
+        );
+        self::assertSame([$expectedKey], $contextKeys);
+    }
+
+    public function test_previous_and_rejected_findings_produce_distinct_context_keys(): void
+    {
+        $files = [$this->makeFile('src/Controller/A.php')];
+        $vulnerability = $this->makeVulnerabilityFor('src/Controller/A.php');
+
+        $contextKeys = [];
+        $cache = self::createStub(ContextAwareAttackerCacheInterface::class);
+        $cache->method('getForContext')->willReturnCallback(
+            static function (array $chunk, string $contextKey) use (&$contextKeys): ?array {
+                $contextKeys[] = $contextKey;
+
+                return null;
+            },
+        );
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), previousFindings: [$vulnerability]);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), rejectedFindings: [$vulnerability]);
+
+        self::assertCount(2, $contextKeys);
+        self::assertNotSame($contextKeys[0], $contextKeys[1]);
     }
 
     private function makeAttackerAgent(

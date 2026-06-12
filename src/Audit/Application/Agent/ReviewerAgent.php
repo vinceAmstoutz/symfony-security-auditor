@@ -32,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ReviewerAgent implements ReviewerAgentInterface
@@ -75,10 +76,15 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         }
 
         $useTools = $this->toolsEnabled && $this->toolRegistryFactory instanceof ToolRegistryFactoryInterface;
-        $useStructuredCollection = !$useTools
-            && $this->maxConcurrent <= 1
+        $structuredEligible = !$useTools
             && $this->useStructuredCollection
             && $this->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface;
+        $useStructuredConcurrent = $structuredEligible
+            && $this->batchSize <= 1
+            && $this->maxConcurrent > 1
+            && $this->llmClient instanceof ToolBatchCapableLLMClientInterface;
+        $useStructuredCollection = $structuredEligible
+            && ($this->batchSize > 1 || $this->maxConcurrent <= 1 || $useStructuredConcurrent);
         $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($projectFiles) : null;
 
         $this->logger->info('Reviewer agent validating findings', [
@@ -91,11 +97,13 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         $reviewed = [];
 
         if ($this->batchSize <= 1) {
-            if ($useStructuredCollection) {
+            if ($useStructuredConcurrent) {
+                $reviewed = $this->reviewSinglesViaStructuredCollectionConcurrently($vulnerabilities, $projectFiles, $coverageRecorder, $bypassCache);
+            } elseif ($useStructuredCollection) {
                 $reviewed = $this->reviewSinglesViaStructuredCollection($vulnerabilities, $projectFiles, $coverageRecorder, $bypassCache);
             } else {
                 $reviewed = $this->canReviewConcurrently($useTools)
-                    ? $this->reviewSinglesConcurrently($vulnerabilities, $projectFiles, $coverageRecorder)
+                    ? $this->reviewSinglesConcurrently($vulnerabilities, $projectFiles, $coverageRecorder, $bypassCache)
                     : $this->reviewSinglesSequentially($vulnerabilities, $projectFiles, $coverageRecorder, $toolRegistry, $bypassCache);
             }
         } else {
@@ -345,6 +353,73 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
     }
 
     /**
+     * @param list<Vulnerability> $vulnerabilities
+     * @param list<ProjectFile>   $projectFiles
+     *
+     * @return list<Vulnerability>
+     */
+    private function reviewSinglesViaStructuredCollectionConcurrently(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): array
+    {
+        \assert($this->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface);
+        \assert($this->llmClient instanceof ToolBatchCapableLLMClientInterface);
+
+        $useCache = !$bypassCache && $this->reviewerCache instanceof ReviewerCacheInterface;
+
+        $reviewed = [];
+        $codeContexts = [];
+        $reviewCollectors = [];
+        $pendingIndexes = [];
+        $requests = [];
+        foreach ($vulnerabilities as $index => $vulnerability) {
+            $codeContext = $this->getFileContext($vulnerability->filePath(), $projectFiles);
+            $codeContexts[$index] = $codeContext;
+
+            $cached = $this->cachedVerdict($vulnerability, $codeContext, $useCache);
+            if (null !== $cached) {
+                $reviewed[$index] = $this->recordVerdict($vulnerability, $cached, $coverageRecorder);
+
+                continue;
+            }
+
+            $reviewCollector = new ReviewCollector();
+            $reviewCollectors[$index] = $reviewCollector;
+            $pendingIndexes[] = $index;
+            $requests[] = [
+                'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
+                'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
+                'tools' => new ToolRegistry([$this->recordReviewToolFactory->create($reviewCollector)], $this->logger),
+            ];
+        }
+
+        if ([] !== $requests) {
+            try {
+                $this->llmClient->completeBatchWithTools($requests, $this->maxConcurrent, $this->maxToolIterations);
+
+                foreach ($pendingIndexes as $index) {
+                    $verdict = $reviewCollectors[$index]->drain()[0] ?? null;
+                    if ($useCache && null !== $verdict) {
+                        $this->reviewerCache->store($vulnerabilities[$index], $codeContexts[$index], $verdict);
+                    }
+
+                    $reviewed[$index] = $this->recordVerdict($vulnerabilities[$index], $verdict, $coverageRecorder);
+                }
+            } catch (BudgetExceededException $budgetExceededException) {
+                throw $budgetExceededException;
+            } catch (LLMProviderException $llmProviderException) {
+                throw $llmProviderException;
+            } catch (Throwable $exception) {
+                foreach ($pendingIndexes as $pendingIndex) {
+                    $reviewed[$pendingIndex] = $this->recordReviewError($vulnerabilities[$pendingIndex], $exception, $coverageRecorder);
+                }
+            }
+        }
+
+        ksort($reviewed);
+
+        return array_values($reviewed);
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     private function cachedVerdict(Vulnerability $vulnerability, string $codeContext, bool $useCache): ?array
@@ -409,27 +484,44 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
      *
      * @return list<Vulnerability>
      */
-    private function reviewSinglesConcurrently(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder): array
+    private function reviewSinglesConcurrently(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): array
     {
         \assert($this->llmClient instanceof BatchCapableLLMClientInterface);
 
+        $useCache = !$bypassCache && $this->reviewerCache instanceof ReviewerCacheInterface;
+
+        $reviewed = [];
+        $codeContexts = [];
+        $pendingIndexes = [];
         $requests = [];
-        foreach ($vulnerabilities as $vulnerability) {
+        foreach ($vulnerabilities as $index => $vulnerability) {
             $codeContext = $this->getFileContext($vulnerability->filePath(), $projectFiles);
+            $codeContexts[$index] = $codeContext;
+
+            $cached = $this->cachedVerdict($vulnerability, $codeContext, $useCache);
+            if (null !== $cached) {
+                $reviewed[$index] = $this->recordVerdict($vulnerability, $cached, $coverageRecorder);
+
+                continue;
+            }
+
+            $pendingIndexes[] = $index;
             $requests[] = [
                 'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
                 'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
             ];
         }
 
-        $responses = $this->llmClient->completeBatch($requests, $this->maxConcurrent);
-
-        $reviewed = [];
-        foreach ($vulnerabilities as $index => $vulnerability) {
-            $reviewed[] = $this->applyResponse($vulnerability, $responses[$index], $coverageRecorder);
+        if ([] !== $requests) {
+            $responses = $this->llmClient->completeBatch($requests, $this->maxConcurrent);
+            foreach ($pendingIndexes as $position => $index) {
+                $reviewed[$index] = $this->applyResponse($vulnerabilities[$index], $responses[$position], $coverageRecorder, $useCache ? $codeContexts[$index] : null);
+            }
         }
 
-        return $reviewed;
+        ksort($reviewed);
+
+        return array_values($reviewed);
     }
 
     /**

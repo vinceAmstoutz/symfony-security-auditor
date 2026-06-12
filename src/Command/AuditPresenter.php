@@ -36,8 +36,15 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         ]);
     }
 
-    public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled): void
+    /**
+     * @param list<string> $configNotices
+     */
+    public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled, array $configNotices = []): void
     {
+        foreach ($configNotices as $configNotice) {
+            $symfonyStyle->getErrorStyle()->note($configNotice);
+        }
+
         if ($secretScrubbingEnabled) {
             return;
         }

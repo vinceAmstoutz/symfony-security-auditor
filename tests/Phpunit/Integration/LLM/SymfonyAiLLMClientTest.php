@@ -431,6 +431,206 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([246, 246, 246], $fakeRateLimiter->acquired);
     }
 
+    public function test_complete_batch_with_tools_resolves_each_conversation_against_its_own_registry(): void
+    {
+        $firstToolCalls = 0;
+        $secondToolCalls = 0;
+        $firstRegistry = new ToolRegistry([$this->makeTool('record', 'd', static function (array $arguments) use (&$firstToolCalls): string {
+            ++$firstToolCalls;
+
+            return 'ok';
+        })], new NullLogger());
+        $secondRegistry = new ToolRegistry([$this->makeTool('record', 'd', static function (array $arguments) use (&$secondToolCalls): string {
+            ++$secondToolCalls;
+
+            return 'ok';
+        })], new NullLogger());
+
+        $platform = $this->scriptedPlatform([
+            new MultiPartResult([new ToolCallResult([new ToolCall('1', 'record')])]),
+            new TextResult('answer-1'),
+            new TextResult('answer-0'),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's0', 'user' => 'u0', 'tools' => $firstRegistry],
+            ['system' => 's1', 'user' => 'u1', 'tools' => $secondRegistry],
+        ], 4, 3);
+
+        self::assertCount(2, $responses);
+        self::assertSame('answer-0', $responses[0]->content());
+        self::assertSame('end_turn', $responses[0]->stopReason());
+        self::assertSame('answer-1', $responses[1]->content());
+        self::assertSame(1, $firstToolCalls);
+        self::assertSame(0, $secondToolCalls);
+    }
+
+    public function test_complete_batch_with_tools_returns_empty_list_for_empty_requests(): void
+    {
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform('ok'), 'm', new NullLogger());
+
+        self::assertSame([], $symfonyAiLLMClient->completeBatchWithTools([], 4, 3));
+    }
+
+    public function test_complete_batch_with_tools_caps_iterations_and_warns(): void
+    {
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+
+        /** @var list<array{string, array<string, mixed>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug');
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $platformInvocationLog = new PlatformInvocationLog();
+        $platform = $this->scriptedPlatform([
+            new MultiPartResult([new ToolCallResult([new ToolCall('1', 'record')])]),
+            new MultiPartResult([new ToolCallResult([new ToolCall('2', 'record')])]),
+            new MultiPartResult([new ToolCallResult([new ToolCall('3', 'record')])]),
+        ], $platformInvocationLog);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', $logger);
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 2);
+
+        self::assertSame('max_tool_iterations', $responses[0]->stopReason());
+        self::assertSame('', $responses[0]->content());
+        self::assertSame(2, $platformInvocationLog->invocations);
+
+        $capLogs = array_values(array_filter(
+            $warnings,
+            static fn (array $entry): bool => 'Tool-using loop hit iteration cap' === $entry[0],
+        ));
+        self::assertCount(1, $capLogs);
+        self::assertSame(2, $capLogs[0][1]['max_iterations']);
+    }
+
+    public function test_complete_batch_with_tools_falls_back_to_the_sequential_path_when_dispatch_fails_before_tools_ran(): void
+    {
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new TextResult('recovered'),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            retryPolicy: new RetryPolicy(
+                maxAttempts: 3,
+                initialDelayMs: 10,
+                backoffMultiplier: 2.0,
+                jitterRatio: 0.0,
+                jitterSource: static fn (): float => 0.5,
+            ),
+            transientFailureClassifier: new TransientFailureClassifier(),
+            sleeper: new FakeSleeper(),
+        );
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 3);
+
+        self::assertSame('recovered', $responses[0]->content());
+        self::assertSame('end_turn', $responses[0]->stopReason());
+    }
+
+    public function test_complete_batch_with_tools_finalizes_as_empty_content_when_failing_after_tools_ran(): void
+    {
+        $toolCalls = 0;
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd', static function (array $arguments) use (&$toolCalls): string {
+            ++$toolCalls;
+
+            return 'ok';
+        })], new NullLogger());
+
+        /** @var list<array{string, array<string, mixed>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug');
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $platform = $this->flakyPlatform([
+            new MultiPartResult([new ToolCallResult([new ToolCall('1', 'record')])]),
+            new RuntimeException('HTTP 503 Service Unavailable'),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', $logger);
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 3);
+
+        self::assertSame('empty_content', $responses[0]->stopReason());
+        self::assertSame('', $responses[0]->content());
+        self::assertSame(1, $toolCalls);
+
+        $failureLogs = array_values(array_filter(
+            $warnings,
+            static fn (array $entry): bool => 'Concurrent tool-using conversation failed after tool execution; keeping recorded tool results' === $entry[0],
+        ));
+        self::assertCount(1, $failureLogs);
+    }
+
+    public function test_complete_batch_with_tools_records_budget_and_aborts_when_a_response_exceeds_it(): void
+    {
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('done'),
+            new TokenUsage(promptTokens: 500, completionTokens: 0),
+        );
+        $budgetTracker = new BudgetTracker(
+            AuditBudget::forTokens(100),
+            new CostCalculator($this->stubPricing(0.0, 0.0)),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: new TokenUsageRecorder(),
+            budgetTracker: $budgetTracker,
+        );
+
+        $this->expectException(BudgetExceededException::class);
+
+        $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 3);
+    }
+
+    public function test_complete_batch_with_tools_acquires_rate_limit_for_each_dispatch(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new InMemoryPlatform('ok'),
+            'm',
+            new NullLogger(),
+            rateLimiter: $fakeRateLimiter,
+            tokenEstimator: new FixedTokenEstimator(123),
+        );
+
+        $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's1', 'user' => 'u1', 'tools' => $toolRegistry],
+            ['system' => 's2', 'user' => 'u2', 'tools' => $toolRegistry],
+        ], 4, 3);
+
+        self::assertSame([246, 246], $fakeRateLimiter->acquired);
+    }
+
     public function test_complete_batch_records_budget_and_aborts_when_a_response_exceeds_it(): void
     {
         $platform = $this->scriptedPlatformWithTokenUsage(

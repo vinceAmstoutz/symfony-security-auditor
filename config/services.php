@@ -409,6 +409,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(EstimateAuditCostUseCase::class),
             service(ProgressReporterHolder::class),
             param('symfony_security_auditor.scan.secret_scrubbing.enabled'),
+            param('symfony_security_auditor.config_notices'),
         ])
         ->tag('console.command');
 };

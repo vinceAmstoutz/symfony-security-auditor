@@ -47,8 +47,11 @@ src/
 │   │   ├── Model/       # Value objects and enums
 │   │   ├── Pipeline/    # PipelineInterface, StageInterface, CoverageRecorderInterface, NullCoverageRecorder
 │   │   └── Port/        # Cross-layer ports — LLMClientInterface,
-│   │       │              BatchCapableLLMClientInterface, LLMResponse,
-│   │       │              AttackerCacheInterface, ReviewerCacheInterface,
+│   │       │              BatchCapableLLMClientInterface,
+│   │       │              ToolBatchCapableLLMClientInterface, LLMResponse,
+│   │       │              AttackerCacheInterface,
+│   │       │              ContextAwareAttackerCacheInterface,
+│   │       │              ReviewerCacheInterface,
 │   │       │              AdvisoryDatabaseInterface,
 │   │       │              ProjectFileScannerInterface, SecretScrubberInterface,
 │   │       │              TokenEstimatorInterface, RateLimiterInterface,
@@ -415,7 +418,12 @@ rather than propagating.
 
 Identical chunks (same content hash) are short-circuited by
 `AttackerCacheInterface` (`FilesystemAttackerCache` by default,
-`NullAttackerCache` when `cache.enabled: false`).
+`NullAttackerCache` when `cache.enabled: false`). Chunks carrying
+cross-iteration context (prior validated findings, reviewer-rejected findings)
+are keyed by chunk + a SHA-256 of the rendered context preambles through the
+opt-in `ContextAwareAttackerCacheInterface`, so iterations 2+ are cacheable too;
+a cache that does not implement the context-aware port is simply skipped for
+those chunks.
 
 ### `ReviewerAgent`
 
@@ -430,15 +438,19 @@ any error: returns the vulnerability with `reviewerValidated = false`.
 With `audit.reviewer_structured_collection: true` (the default), the reviewer
 instead records each verdict by calling a schema-enforced `record_review` tool —
 mirroring the attacker's `record_vulnerability` seam — and verdicts are drained
-from a `ReviewCollector`. The explicit opt-ins `reviewer_tools_enabled: true`
-and `reviewer_max_concurrent` > 1 take precedence over the structured mode and
-keep the JSON path.
+from a `ReviewCollector`. The explicit opt-in `reviewer_tools_enabled: true`
+takes precedence over the structured mode and keeps the JSON path.
+`reviewer_max_concurrent` > 1 composes with the structured mode when the client
+implements `ToolBatchCapableLLMClientInterface` (each finding records through
+its own `record_review` registry, resolved concurrently); otherwise it falls
+back to the JSON concurrent path.
 
-In the one-finding-per-call modes (the default, structured or JSON), verdicts
-for findings with identical content against unchanged code are short-circuited
-by `ReviewerCacheInterface` (`FilesystemReviewerCache` by default,
-`NullReviewerCache` when `cache.enabled: false`), mirroring the attacker cache.
-Batched and concurrent reviews always call the LLM. `--no-cache` bypasses both
+In the one-finding-per-call modes (the default — structured, JSON, sequential,
+or concurrent), verdicts for findings with identical content against unchanged
+code are short-circuited by `ReviewerCacheInterface` (`FilesystemReviewerCache`
+by default, `NullReviewerCache` when `cache.enabled: false`), mirroring the
+attacker cache; concurrent reviews serve cached verdicts first and dispatch only
+the misses. Batched reviews always call the LLM. `--no-cache` bypasses both
 caches for the run.
 
 ### `VulnerabilityFactory`

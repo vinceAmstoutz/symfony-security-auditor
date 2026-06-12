@@ -28,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ContextAwareAttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
@@ -168,10 +169,17 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         $hasRejectedFindings = [] !== $attackerAnalysisRequest->rejectedFindings;
         $chunkMarkers = $riskMarkerIndex->forChunk($chunk);
         $hasMarkers = [] !== $chunkMarkers;
-        $cacheable = !$attackerAnalysisRequest->bypassCache && !$hasPreviousFindings && !$hasRejectedFindings;
+
+        $rejectedPreamble = $hasRejectedFindings ? $this->attackerContextPromptRenderer->renderRejectedFindings($attackerAnalysisRequest->rejectedFindings) : '';
+        $previousPreamble = $hasPreviousFindings ? $this->attackerContextPromptRenderer->renderPreviousFindings($attackerAnalysisRequest->previousFindings) : '';
+        $contextKey = '' === $rejectedPreamble && '' === $previousPreamble
+            ? ''
+            : hash('sha256', $rejectedPreamble."\0".$previousPreamble);
+        $cacheable = !$attackerAnalysisRequest->bypassCache
+            && ('' === $contextKey || $this->attackerCache instanceof ContextAwareAttackerCacheInterface);
 
         if ($cacheable) {
-            $cached = $this->attackerCache->get($chunk);
+            $cached = $this->cacheGet($chunk, $contextKey);
 
             if (null !== $cached) {
                 $this->logger->info('Attacker chunk served from cache', ['files' => \count($chunk)]);
@@ -189,17 +197,17 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             $userMessage = $this->attackerContextPromptRenderer->renderRiskMarkers($chunkMarkers)."\n\n".$userMessage;
         }
 
-        if ($hasRejectedFindings) {
-            $userMessage = $this->attackerContextPromptRenderer->renderRejectedFindings($attackerAnalysisRequest->rejectedFindings)."\n\n".$userMessage;
+        if ('' !== $rejectedPreamble) {
+            $userMessage = $rejectedPreamble."\n\n".$userMessage;
         }
 
-        if ($hasPreviousFindings) {
-            $userMessage = $this->attackerContextPromptRenderer->renderPreviousFindings($attackerAnalysisRequest->previousFindings)."\n\n".$userMessage;
+        if ('' !== $previousPreamble) {
+            $userMessage = $previousPreamble."\n\n".$userMessage;
         }
 
         try {
             if ($this->useStructuredCollection && $this->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface) {
-                return $this->analyzeChunkViaStructuredCollection($chunk, $systemPrompt, $userMessage, $cacheable, $coverageRecorder);
+                return $this->analyzeChunkViaStructuredCollection($chunk, $systemPrompt, $userMessage, $cacheable, $contextKey, $coverageRecorder);
             }
 
             $response = $toolRegistry instanceof ToolRegistry
@@ -208,7 +216,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
             if ($response->isEmpty()) {
                 if ($cacheable) {
-                    $this->attackerCache->store($chunk, []);
+                    $this->cacheStore($chunk, $contextKey, []);
                 }
 
                 $this->recordChunkCoverage($chunk, 'analyzed', $coverageRecorder);
@@ -222,7 +230,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             if ($cacheable) {
                 /** @var list<array<string, mixed>> $cacheablePayload */
                 $cacheablePayload = array_values(array_filter($rawData, 'is_array'));
-                $this->attackerCache->store($chunk, $cacheablePayload);
+                $this->cacheStore($chunk, $contextKey, $cacheablePayload);
             }
 
             $this->recordChunkCoverage($chunk, 'analyzed', $coverageRecorder);
@@ -264,6 +272,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         string $systemPrompt,
         string $userMessage,
         bool $cacheable,
+        string $contextKey,
         CoverageRecorderInterface $coverageRecorder,
     ): VulnerabilityHydrationResult {
         \assert($this->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface);
@@ -277,12 +286,39 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         $rawData = $vulnerabilityCollector->drain();
 
         if ($cacheable) {
-            $this->attackerCache->store($chunk, $rawData);
+            $this->cacheStore($chunk, $contextKey, $rawData);
         }
 
         $this->recordChunkCoverage($chunk, 'analyzed', $coverageRecorder);
 
         return $this->vulnerabilityFactory->fromList($rawData);
+    }
+
+    /**
+     * @param list<ProjectFile> $chunk
+     *
+     * @return array<int, array<string, mixed>>|null
+     */
+    private function cacheGet(array $chunk, string $contextKey): ?array
+    {
+        return $this->attackerCache instanceof ContextAwareAttackerCacheInterface
+            ? $this->attackerCache->getForContext($chunk, $contextKey)
+            : $this->attackerCache->get($chunk);
+    }
+
+    /**
+     * @param list<ProjectFile>          $chunk
+     * @param list<array<string, mixed>> $rawVulnerabilities
+     */
+    private function cacheStore(array $chunk, string $contextKey, array $rawVulnerabilities): void
+    {
+        if ($this->attackerCache instanceof ContextAwareAttackerCacheInterface) {
+            $this->attackerCache->storeForContext($chunk, $contextKey, $rawVulnerabilities);
+
+            return;
+        }
+
+        $this->attackerCache->store($chunk, $rawVulnerabilities);
     }
 
     /**

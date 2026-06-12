@@ -62,9 +62,10 @@ Commit messages are validated separately in CI via
 src/
   Audit/
     Domain/          # Pure PHP — no framework, no I/O
+      Configuration/ # Typed config VOs (BundleConfiguration, AuditProfile, LLMConfiguration, …)
       Model/         # Value objects and enums (Vulnerability, AuditReport, ProjectFile, ProjectFileType, RouteAccessControl, VoterCapability, FormBinding, VulnerabilityHydrationResult, VulnerabilityDropReason, …)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)
-      Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, ReviewerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, ProgressReporterInterface, StaticPreScannerInterface, CodeSlicerInterface, ControllerAccessControlParserInterface, VoterCapabilityParserInterface, FormBindingParserInterface, GitChangedFilesResolverInterface)
+      Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, ToolBatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, ContextAwareAttackerCacheInterface, ReviewerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, ProgressReporterInterface, StaticPreScannerInterface, CodeSlicerInterface, ControllerAccessControlParserInterface, VoterCapabilityParserInterface, FormBindingParserInterface, GitChangedFilesResolverInterface)
         Tool/        # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
     Application/     # Orchestration — no I/O, depends only on Domain
       UseCase/       # RunAuditUseCase, EstimateAuditCostUseCase (entry points)
@@ -126,10 +127,12 @@ Command → Application → Domain ← Infrastructure (implements ports)
 3. Filter — confidence ≥ 0.6
 4. `ReviewerAgent` — validates each finding, may adjust severity. By default
    (`audit.reviewer_structured_collection: true`), verdicts come in through
-   schema-enforced `record_review` tool calls; the explicit opt-ins
-   `reviewer_tools_enabled` and `reviewer_max_concurrent` > 1 keep the JSON
-   path. Verdicts are cached across runs (`FilesystemReviewerCache`) when
-   `cache.enabled` is on.
+   schema-enforced `record_review` tool calls; the explicit opt-in
+   `reviewer_tools_enabled` keeps the JSON path, and `reviewer_max_concurrent`
+   > 1 reviews findings concurrently (structured when the client supports tool
+   > batching, JSON otherwise). Verdicts are cached across runs
+   > (`FilesystemReviewerCache`) when `cache.enabled` is on; concurrent reviews
+   > serve cached verdicts first and dispatch only the misses.
 5. Deduplicate → persist to `AuditContext`
 
 After the loop, the optional `PoCSynthesisStage` runs (concrete reproduction
@@ -143,7 +146,14 @@ Minimal:
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-7'
+    model: 'claude-opus-4-8'
+```
+
+One-knob preset (`fast` | `balanced` | `thorough`; explicit keys always win):
+
+```yaml
+symfony_security_auditor:
+    profile: 'fast'
 ```
 
 Split-model (larger attacker, faster reviewer):

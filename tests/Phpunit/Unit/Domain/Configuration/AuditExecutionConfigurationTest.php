@@ -42,6 +42,6 @@ final class AuditExecutionConfigurationTest extends TestCase
         self::assertNull($auditExecutionConfiguration->escalationCheapModel);
         self::assertTrue($auditExecutionConfiguration->structuredCollection);
         self::assertTrue($auditExecutionConfiguration->reviewerStructuredCollection);
-        self::assertFalse($auditExecutionConfiguration->stableSystemPrompt);
+        self::assertTrue($auditExecutionConfiguration->stableSystemPrompt);
     }
 }
