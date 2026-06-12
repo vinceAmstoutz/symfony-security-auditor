@@ -32,7 +32,11 @@ routes.
   sweep costs as much as the expensive pass and escalation saves nothing,
   silently. `ConfigurationNotices` now emits a pre-flight stderr notice when
   escalation is enabled and the resolved cheap model equals the attacker model,
-  pointing at `audit.escalation.cheap_model`.
+  pointing at `audit.escalation.cheap_model`. Two further notices cover the
+  silent no-op cases where a concurrency knob is set but ignored:
+  `reviewer_max_concurrent` > 1 with `reviewer_tools_enabled: true`, and
+  `attacker_max_concurrent` > 1 without the structured-collection-and-no-tools
+  mode it requires.
 - **The `--dry-run` note now states that real runs typically cost less.** The
   estimate excludes provider prompt-cache discounts and warm attacker/reviewer
   caches; the dry-run output now says so explicitly instead of only the docs

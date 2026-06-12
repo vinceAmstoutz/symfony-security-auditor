@@ -97,17 +97,88 @@ final class ConfigurationNoticesTest extends TestCase
         return new CacheConfiguration(enabled: $enabled, dir: '/tmp/cache', promptCaching: true);
     }
 
-    private function audit(int $reviewerBatchSize, bool $escalationEnabled = false, ?string $escalationCheapModel = null): AuditExecutionConfiguration
-    {
+    private function audit(
+        int $reviewerBatchSize,
+        bool $escalationEnabled = false,
+        ?string $escalationCheapModel = null,
+        int $reviewerMaxConcurrent = 1,
+        bool $reviewerToolsEnabled = false,
+        int $attackerMaxConcurrent = 1,
+        bool $toolsEnabled = true,
+        bool $structuredCollection = true,
+    ): AuditExecutionConfiguration {
         return new AuditExecutionConfiguration(
             maxIterations: 3,
             minConfidence: 0.6,
             reviewerBatchSize: $reviewerBatchSize,
-            toolsEnabled: true,
+            toolsEnabled: $toolsEnabled,
             maxToolIterations: 8,
+            reviewerToolsEnabled: $reviewerToolsEnabled,
+            reviewerMaxConcurrent: $reviewerMaxConcurrent,
+            attackerMaxConcurrent: $attackerMaxConcurrent,
             escalationEnabled: $escalationEnabled,
             escalationCheapModel: $escalationCheapModel,
+            structuredCollection: $structuredCollection,
         );
+    }
+
+    public function test_reviewer_concurrency_with_tools_enabled_emits_a_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->cache(enabled: true),
+            $this->audit(reviewerBatchSize: 1, reviewerMaxConcurrent: 4, reviewerToolsEnabled: true),
+            $this->llm(),
+        );
+
+        self::assertCount(1, $notices);
+        self::assertStringContainsString('audit.reviewer_max_concurrent', $notices[0]);
+        self::assertStringContainsString('audit.reviewer_tools_enabled', $notices[0]);
+    }
+
+    public function test_reviewer_concurrency_without_tools_emits_no_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->cache(enabled: true),
+            $this->audit(reviewerBatchSize: 1, reviewerMaxConcurrent: 4, reviewerToolsEnabled: false),
+            $this->llm(),
+        );
+
+        self::assertSame([], $notices);
+    }
+
+    public function test_attacker_concurrency_with_tools_enabled_emits_a_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->cache(enabled: true),
+            $this->audit(reviewerBatchSize: 1, attackerMaxConcurrent: 4, toolsEnabled: true, structuredCollection: true),
+            $this->llm(),
+        );
+
+        self::assertCount(1, $notices);
+        self::assertStringContainsString('audit.attacker_max_concurrent', $notices[0]);
+    }
+
+    public function test_attacker_concurrency_with_structured_collection_off_emits_a_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->cache(enabled: true),
+            $this->audit(reviewerBatchSize: 1, attackerMaxConcurrent: 4, toolsEnabled: false, structuredCollection: false),
+            $this->llm(),
+        );
+
+        self::assertCount(1, $notices);
+        self::assertStringContainsString('audit.structured_collection', $notices[0]);
+    }
+
+    public function test_attacker_concurrency_in_structured_toolless_mode_emits_no_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->cache(enabled: true),
+            $this->audit(reviewerBatchSize: 1, attackerMaxConcurrent: 4, toolsEnabled: false, structuredCollection: true),
+            $this->llm(),
+        );
+
+        self::assertSame([], $notices);
     }
 
     private function llm(string $model = 'claude-opus-4-8'): LLMConfiguration
