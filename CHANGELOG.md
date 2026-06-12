@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.9.0] — 2026-06-12 — Verdict
+
+A reviewer-trust and visibility release. The reviewer's verdicts get the
+structured treatment end to end — recorded through a schema-enforced
+`record_review` tool, cached across runs, and fed back to the attacker when
+findings are rejected — and the long audit stage finally shows live progress in
+the console. Prompt-cache tokens are now priced into the reported cost, reports
+lead with their most severe findings, and the attacker's route map stops
+mislabelling firewall-covered routes.
+
 ### Added
 
 - **Live audit-stage progress and an upfront long-run notice in the console.**
@@ -1294,6 +1304,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.9.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.9.0
 [1.8.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.8.0
 [1.7.2]:
