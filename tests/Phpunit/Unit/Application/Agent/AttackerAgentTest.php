@@ -2049,6 +2049,67 @@ final class AttackerAgentTest extends TestCase
         return $toolRegistry;
     }
 
+    public function test_max_concurrent_of_one_stays_sequential_even_on_a_tool_batch_capable_client(): void
+    {
+        $files = [$this->makeFile('src/A.php')];
+
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient->expects(self::never())->method('completeBatchWithTools');
+        $llmClient
+            ->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
+                $toolRegistry->execute('record_vulnerability', self::recordedFinding('sequential'));
+
+                return LLMResponse::create('', 1, 1, 'm', 'end_turn');
+            });
+
+        $attackerAgent = new AttackerAgent(
+            llmClient: $llmClient,
+            attackerPromptBuilder: new AttackerPromptBuilder(),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+            attackerCache: new NullAttackerCache(),
+            logger: new NullLogger(),
+            recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
+            useStructuredCollection: true,
+            maxConcurrent: 1,
+        );
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+
+        self::assertCount(1, $vulnerabilities);
+        self::assertSame('sequential', $vulnerabilities[0]->title());
+    }
+
+    public function test_concurrency_is_ignored_when_structured_collection_is_off(): void
+    {
+        $files = [$this->makeFile('src/A.php')];
+
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient->expects(self::never())->method('completeBatchWithTools');
+        $llmClient->expects(self::never())->method('completeWithTools');
+        $llmClient
+            ->expects(self::once())
+            ->method('complete')
+            ->willReturn(LLMResponse::create((string) json_encode([self::recordedFinding('json-path')]), 1, 1, 'm', 'end_turn'));
+
+        $attackerAgent = new AttackerAgent(
+            llmClient: $llmClient,
+            attackerPromptBuilder: new AttackerPromptBuilder(),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+            attackerCache: new NullAttackerCache(),
+            logger: new NullLogger(),
+            recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
+            useStructuredCollection: false,
+            maxConcurrent: 4,
+        );
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+
+        self::assertCount(1, $vulnerabilities);
+        self::assertSame('json-path', $vulnerabilities[0]->title());
+    }
+
     /**
      * @return array<string, mixed>
      */
