@@ -358,6 +358,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(RecordVulnerabilityToolFactoryInterface::class),
             param('symfony_security_auditor.audit.structured_collection'),
             service(ProgressReporterInterface::class),
+            param('symfony_security_auditor.audit.attacker_max_concurrent'),
         ]);
 
     $defaultsConfigurator->alias(AttackerAgentInterface::class, AttackerAgent::class);

@@ -34,6 +34,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
@@ -50,6 +51,8 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     public const bool DEFAULT_LEAN_MODE = false;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
+
+    public const int DEFAULT_MAX_CONCURRENT = 1;
 
     private StaticPreScannerInterface $staticPreScanner;
 
@@ -78,6 +81,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         private ?RecordVulnerabilityToolFactoryInterface $recordVulnerabilityToolFactory = null,
         private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
         ?ProgressReporterInterface $progressReporter = null,
+        private int $maxConcurrent = self::DEFAULT_MAX_CONCURRENT,
     ) {
         $this->staticPreScanner = $staticPreScanner ?? new NullStaticPreScanner();
         $this->fileChunker = $fileChunker ?? new FileChunker();
@@ -126,6 +130,32 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($effectiveFiles) : null;
 
         $chunks = $this->chunkFiles($effectiveFiles);
+
+        $useConcurrent = $this->maxConcurrent > 1
+            && $this->useStructuredCollection
+            && $this->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface
+            && $this->llmClient instanceof ToolBatchCapableLLMClientInterface;
+
+        [$allVulnerabilities, $totalDropsByReason] = $useConcurrent
+            ? $this->analyzeChunksConcurrently($chunks, $attackerAnalysisRequest, $coverageRecorder, $riskMarkerIndex)
+            : $this->analyzeChunksSequentially($chunks, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
+
+        $this->logger->info('Attacker agent complete', [
+            'total_vulnerabilities' => \count($allVulnerabilities),
+            'total_dropped_entries' => array_sum($totalDropsByReason),
+            'dropped_by_reason' => $totalDropsByReason,
+        ]);
+
+        return $allVulnerabilities;
+    }
+
+    /**
+     * @param list<list<ProjectFile>> $chunks
+     *
+     * @return array{0: list<Vulnerability>, 1: array<string, int>}
+     */
+    private function analyzeChunksSequentially(array $chunks, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, RiskMarkerIndex $riskMarkerIndex): array
+    {
         $allVulnerabilities = [];
         $totalDropsByReason = [];
 
@@ -151,13 +181,125 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             ]);
         }
 
-        $this->logger->info('Attacker agent complete', [
-            'total_vulnerabilities' => \count($allVulnerabilities),
-            'total_dropped_entries' => array_sum($totalDropsByReason),
-            'dropped_by_reason' => $totalDropsByReason,
-        ]);
+        return [$allVulnerabilities, $totalDropsByReason];
+    }
 
-        return $allVulnerabilities;
+    /**
+     * Resolves every cache-miss chunk's structured `record_vulnerability`
+     * conversation concurrently (one registry + collector per chunk) via the
+     * tool-batch-capable client, while cache hits short-circuit exactly as in
+     * the sequential path. Chunk order, coverage, caching, and drop accounting
+     * match {@see analyzeChunksSequentially()}; only the LLM round trips
+     * overlap on the wire.
+     *
+     * @param list<list<ProjectFile>> $chunks
+     *
+     * @return array{0: list<Vulnerability>, 1: array<string, int>}
+     */
+    private function analyzeChunksConcurrently(array $chunks, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, RiskMarkerIndex $riskMarkerIndex): array
+    {
+        \assert($this->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface);
+        \assert($this->llmClient instanceof ToolBatchCapableLLMClientInterface);
+
+        $totalChunks = \count($chunks);
+
+        /** @var array<int, VulnerabilityHydrationResult> $cachedResults */
+        $cachedResults = [];
+        /** @var array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}> $pending */
+        $pending = [];
+        $requests = [];
+        foreach ($chunks as $index => $chunk) {
+            $this->progressReporter->report(ProgressEvent::AttackerChunkStarted->value, [
+                'chunk' => $index + 1,
+                'total_chunks' => $totalChunks,
+            ]);
+
+            $context = $this->computeChunkContext($chunk, $attackerAnalysisRequest, $riskMarkerIndex);
+
+            if ($context['cacheable']) {
+                $cached = $this->cacheGet($chunk, $context['contextKey']);
+                if (null !== $cached) {
+                    $this->logger->info('Attacker chunk served from cache', ['files' => \count($chunk)]);
+                    $this->recordChunkCoverage($chunk, 'cached', $coverageRecorder);
+                    $cachedResults[$index] = $this->vulnerabilityFactory->fromList(array_values($cached));
+
+                    continue;
+                }
+            }
+
+            $collector = new VulnerabilityCollector();
+            $toolRegistry = new ToolRegistry([$this->recordVulnerabilityToolFactory->create($collector)], $this->logger);
+            $pending[$index] = [
+                'chunk' => $chunk,
+                'contextKey' => $context['contextKey'],
+                'cacheable' => $context['cacheable'],
+                'collector' => $collector,
+            ];
+            $requests[] = ['system' => $context['systemPrompt'], 'user' => $context['userMessage'], 'tools' => $toolRegistry];
+        }
+
+        if ([] !== $requests) {
+            $this->dispatchConcurrentChunks($requests, $pending, $coverageRecorder);
+        }
+
+        $allVulnerabilities = [];
+        $totalDropsByReason = [];
+        foreach (array_keys($chunks) as $index) {
+            $chunkResult = $cachedResults[$index] ?? $this->finalizeConcurrentChunk($pending[$index], $coverageRecorder);
+            $allVulnerabilities = [...$allVulnerabilities, ...$chunkResult->vulnerabilities()];
+            foreach ($chunkResult->dropsByReason() as $reason => $count) {
+                $totalDropsByReason[$reason] = ($totalDropsByReason[$reason] ?? 0) + $count;
+            }
+        }
+
+        return [$allVulnerabilities, $totalDropsByReason];
+    }
+
+    /**
+     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                      $requests
+     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}> $pending
+     */
+    private function dispatchConcurrentChunks(array $requests, array $pending, CoverageRecorderInterface $coverageRecorder): void
+    {
+        \assert($this->llmClient instanceof ToolBatchCapableLLMClientInterface);
+
+        try {
+            $this->llmClient->completeBatchWithTools($requests, $this->maxConcurrent, $this->maxToolIterations);
+        } catch (BudgetExceededException $budgetExceededException) {
+            $this->recordPendingCoverage($pending, 'aborted', $coverageRecorder);
+
+            throw $budgetExceededException;
+        } catch (LLMProviderException $llmProviderException) {
+            $this->recordPendingCoverage($pending, 'errored', $coverageRecorder);
+
+            throw $llmProviderException;
+        }
+    }
+
+    /**
+     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}> $pending
+     */
+    private function recordPendingCoverage(array $pending, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        foreach ($pending as $entry) {
+            $this->recordChunkCoverage($entry['chunk'], $status, $coverageRecorder);
+        }
+    }
+
+    /**
+     * @param array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector} $entry
+     */
+    private function finalizeConcurrentChunk(array $entry, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
+    {
+        $rawData = $entry['collector']->drain();
+
+        if ($entry['cacheable']) {
+            $this->cacheStore($entry['chunk'], $entry['contextKey'], $rawData);
+        }
+
+        $this->recordChunkCoverage($entry['chunk'], 'analyzed', $coverageRecorder);
+
+        return $this->vulnerabilityFactory->fromList($rawData);
     }
 
     /**
@@ -165,18 +307,11 @@ final readonly class AttackerAgent implements AttackerAgentInterface
      */
     private function analyzeChunk(array $chunk, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, RiskMarkerIndex $riskMarkerIndex): VulnerabilityHydrationResult
     {
-        $hasPreviousFindings = [] !== $attackerAnalysisRequest->previousFindings;
-        $hasRejectedFindings = [] !== $attackerAnalysisRequest->rejectedFindings;
-        $chunkMarkers = $riskMarkerIndex->forChunk($chunk);
-        $hasMarkers = [] !== $chunkMarkers;
-
-        $rejectedPreamble = $hasRejectedFindings ? $this->attackerContextPromptRenderer->renderRejectedFindings($attackerAnalysisRequest->rejectedFindings) : '';
-        $previousPreamble = $hasPreviousFindings ? $this->attackerContextPromptRenderer->renderPreviousFindings($attackerAnalysisRequest->previousFindings) : '';
-        $contextKey = '' === $rejectedPreamble && '' === $previousPreamble
-            ? ''
-            : hash('sha256', $rejectedPreamble."\0".$previousPreamble);
-        $cacheable = !$attackerAnalysisRequest->bypassCache
-            && ('' === $contextKey || $this->attackerCache instanceof ContextAwareAttackerCacheInterface);
+        $context = $this->computeChunkContext($chunk, $attackerAnalysisRequest, $riskMarkerIndex);
+        $contextKey = $context['contextKey'];
+        $cacheable = $context['cacheable'];
+        $systemPrompt = $context['systemPrompt'];
+        $userMessage = $context['userMessage'];
 
         if ($cacheable) {
             $cached = $this->cacheGet($chunk, $contextKey);
@@ -187,22 +322,6 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
                 return $this->vulnerabilityFactory->fromList(array_values($cached));
             }
-        }
-
-        $slicedChunk = $this->sliceChunk($chunk);
-        $systemPrompt = $this->attackerPromptBuilder->buildSystemPrompt($slicedChunk);
-        $userMessage = $this->attackerPromptBuilder->buildUserMessage($slicedChunk, $attackerAnalysisRequest->symfonyMapping);
-
-        if ($hasMarkers) {
-            $userMessage = $this->attackerContextPromptRenderer->renderRiskMarkers($chunkMarkers)."\n\n".$userMessage;
-        }
-
-        if ('' !== $rejectedPreamble) {
-            $userMessage = $rejectedPreamble."\n\n".$userMessage;
-        }
-
-        if ('' !== $previousPreamble) {
-            $userMessage = $previousPreamble."\n\n".$userMessage;
         }
 
         try {
@@ -262,6 +381,56 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
             return VulnerabilityHydrationResult::empty();
         }
+    }
+
+    /**
+     * Assembles the per-chunk system/user prompts (markers + cross-iteration
+     * preambles) and derives the cache key and cacheability, shared by the
+     * sequential and concurrent paths.
+     *
+     * @param list<ProjectFile> $chunk
+     *
+     * @return array{systemPrompt: string, userMessage: string, contextKey: string, cacheable: bool}
+     */
+    private function computeChunkContext(array $chunk, AttackerAnalysisRequest $attackerAnalysisRequest, RiskMarkerIndex $riskMarkerIndex): array
+    {
+        $chunkMarkers = $riskMarkerIndex->forChunk($chunk);
+        $hasMarkers = [] !== $chunkMarkers;
+
+        $rejectedPreamble = [] !== $attackerAnalysisRequest->rejectedFindings
+            ? $this->attackerContextPromptRenderer->renderRejectedFindings($attackerAnalysisRequest->rejectedFindings)
+            : '';
+        $previousPreamble = [] !== $attackerAnalysisRequest->previousFindings
+            ? $this->attackerContextPromptRenderer->renderPreviousFindings($attackerAnalysisRequest->previousFindings)
+            : '';
+        $contextKey = '' === $rejectedPreamble && '' === $previousPreamble
+            ? ''
+            : hash('sha256', $rejectedPreamble."\0".$previousPreamble);
+        $cacheable = !$attackerAnalysisRequest->bypassCache
+            && ('' === $contextKey || $this->attackerCache instanceof ContextAwareAttackerCacheInterface);
+
+        $slicedChunk = $this->sliceChunk($chunk);
+        $systemPrompt = $this->attackerPromptBuilder->buildSystemPrompt($slicedChunk);
+        $userMessage = $this->attackerPromptBuilder->buildUserMessage($slicedChunk, $attackerAnalysisRequest->symfonyMapping);
+
+        if ($hasMarkers) {
+            $userMessage = $this->attackerContextPromptRenderer->renderRiskMarkers($chunkMarkers)."\n\n".$userMessage;
+        }
+
+        if ('' !== $rejectedPreamble) {
+            $userMessage = $rejectedPreamble."\n\n".$userMessage;
+        }
+
+        if ('' !== $previousPreamble) {
+            $userMessage = $previousPreamble."\n\n".$userMessage;
+        }
+
+        return [
+            'systemPrompt' => $systemPrompt,
+            'userMessage' => $userMessage,
+            'contextKey' => $contextKey,
+            'cacheable' => $cacheable,
+        ];
     }
 
     /**

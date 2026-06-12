@@ -60,4 +60,12 @@ enum AuditProfile: string
             self::Balanced, self::Thorough => 1,
         };
     }
+
+    public function attackerMaxConcurrent(): int
+    {
+        return match ($this) {
+            self::Fast => 4,
+            self::Balanced, self::Thorough => 1,
+        };
+    }
 }

@@ -259,6 +259,7 @@ final class BundleConfigurationTest extends TestCase
         self::assertTrue($bundleConfiguration->audit->codeSlicingEnabled);
         self::assertFalse($bundleConfiguration->audit->poCSynthesisEnabled);
         self::assertSame(4, $bundleConfiguration->audit->reviewerMaxConcurrent);
+        self::assertSame(4, $bundleConfiguration->audit->attackerMaxConcurrent);
     }
 
     public function test_from_array_resolves_thorough_profile_for_unset_keys(): void
@@ -272,6 +273,7 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->audit->codeSlicingEnabled);
         self::assertTrue($bundleConfiguration->audit->poCSynthesisEnabled);
         self::assertSame(1, $bundleConfiguration->audit->reviewerMaxConcurrent);
+        self::assertSame(1, $bundleConfiguration->audit->attackerMaxConcurrent);
     }
 
     public function test_from_array_defaults_to_the_balanced_profile_when_the_key_is_absent(): void
@@ -326,7 +328,7 @@ final class BundleConfigurationTest extends TestCase
      *     reviewer_max_output_tokens?: int|null,
      *     provider_json_mode?: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * }
      */
@@ -339,6 +341,7 @@ final class BundleConfigurationTest extends TestCase
 
         $config['audit']['max_iterations'] = null;
         $config['audit']['reviewer_max_concurrent'] = null;
+        $config['audit']['attacker_max_concurrent'] = null;
         $config['audit']['static_prescan']['lean_mode'] = null;
         $config['audit']['code_slicing']['enabled'] = null;
         $config['audit']['poc_synthesis']['enabled'] = null;
@@ -357,7 +360,7 @@ final class BundleConfigurationTest extends TestCase
      *     reviewer_max_output_tokens?: int|null,
      *     provider_json_mode?: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * }
      */
@@ -394,6 +397,7 @@ final class BundleConfigurationTest extends TestCase
                 'reviewer_tools_enabled' => false,
                 'reviewer_max_tool_iterations' => 4,
                 'reviewer_max_concurrent' => 1,
+                'attacker_max_concurrent' => 1,
                 'chunking' => [
                     'strategy' => 'feature',
                 ],

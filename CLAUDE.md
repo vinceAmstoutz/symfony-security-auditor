@@ -122,7 +122,9 @@ Command → Application → Domain ← Infrastructure (implements ports)
    default (`audit.structured_collection: true`), findings come in through
    `record_vulnerability` tool calls validated by the provider against the
    tool's JSON schema; with the flag off, the attacker parses a JSON array from
-   the response. Optional `EscalatingAttackerAgent` runs a cheap model first and
+   the response. With `audit.attacker_max_concurrent` > 1 (the `fast` profile
+   sets 4) and a tool-batch-capable client, cache-miss chunks are analyzed
+   concurrently. Optional `EscalatingAttackerAgent` runs a cheap model first and
    only escalates flagged files to the expensive model.
 3. Filter — confidence ≥ 0.6
 4. `ReviewerAgent` — validates each finding, may adjust severity. By default

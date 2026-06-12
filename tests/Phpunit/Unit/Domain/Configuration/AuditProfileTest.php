@@ -27,19 +27,21 @@ final class AuditProfileTest extends TestCase
         bool $codeSlicing,
         bool $poCSynthesis,
         int $reviewerMaxConcurrent,
+        int $attackerMaxConcurrent,
     ): void {
         self::assertSame($maxIterations, $auditProfile->maxIterations());
         self::assertSame($leanMode, $auditProfile->staticPreScanLeanMode());
         self::assertSame($codeSlicing, $auditProfile->codeSlicingEnabled());
         self::assertSame($poCSynthesis, $auditProfile->poCSynthesisEnabled());
         self::assertSame($reviewerMaxConcurrent, $auditProfile->reviewerMaxConcurrent());
+        self::assertSame($attackerMaxConcurrent, $auditProfile->attackerMaxConcurrent());
     }
 
-    /** @return iterable<string, array{AuditProfile, int, bool, bool, bool, int}> */
+    /** @return iterable<string, array{AuditProfile, int, bool, bool, bool, int, int}> */
     public static function profileDefaults(): iterable
     {
-        yield 'fast' => [AuditProfile::Fast, 1, true, true, false, 4];
-        yield 'balanced' => [AuditProfile::Balanced, 3, false, false, false, 1];
-        yield 'thorough' => [AuditProfile::Thorough, 3, false, false, true, 1];
+        yield 'fast' => [AuditProfile::Fast, 1, true, true, false, 4, 4];
+        yield 'balanced' => [AuditProfile::Balanced, 3, false, false, false, 1, 1];
+        yield 'thorough' => [AuditProfile::Thorough, 3, false, false, true, 1, 1];
     }
 }

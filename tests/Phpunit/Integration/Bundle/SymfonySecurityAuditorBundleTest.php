@@ -700,6 +700,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertTrue($container->getParameter('symfony_security_auditor.audit.code_slicing.enabled'));
         self::assertFalse($container->getParameter('symfony_security_auditor.audit.poc_synthesis.enabled'));
         self::assertSame(4, $container->getParameter('symfony_security_auditor.audit.reviewer_max_concurrent'));
+        self::assertSame(4, $container->getParameter('symfony_security_auditor.audit.attacker_max_concurrent'));
     }
 
     public function test_bundle_thorough_profile_enables_poc_synthesis(): void
@@ -733,6 +734,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertFalse($container->getParameter('symfony_security_auditor.audit.code_slicing.enabled'));
         self::assertFalse($container->getParameter('symfony_security_auditor.audit.poc_synthesis.enabled'));
         self::assertSame(1, $container->getParameter('symfony_security_auditor.audit.reviewer_max_concurrent'));
+        self::assertSame(1, $container->getParameter('symfony_security_auditor.audit.attacker_max_concurrent'));
     }
 
     public function test_bundle_config_notices_default_to_an_empty_list(): void

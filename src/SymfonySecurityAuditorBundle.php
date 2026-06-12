@@ -203,6 +203,11 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->defaultFalse()
                             ->info('Give the reviewer access to the same tool registry the attacker uses, so it can verify cross-file context (parent-class guards, access_control rules, upstream sanitizers) instead of guessing from the Full File Context alone. Default false — adds round-trips per finding; opt-in for high-precision audits.')
                         ->end()
+                        ->integerNode('attacker_max_concurrent')
+                            ->defaultNull()
+                            ->min(1)
+                            ->info('Maximum attacker chunk analyses resolved concurrently in the default structured-collection mode (audit.structured_collection: true), when the configured platform exposes an async transport. The attacker phase is usually the longest; setting this to 4-8 (within your provider rate limit) cuts it proportionally. Defaults to the active profile (balanced/thorough: 1 — sequential, fast: 4). Ignored when audit.tools_enabled gives the attacker a cross-file tool registry or structured_collection is off.')
+                        ->end()
                         ->integerNode('reviewer_max_concurrent')
                             ->defaultNull()
                             ->min(1)
@@ -383,7 +388,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *     reviewer_max_output_tokens: int|null,
      *     provider_json_mode: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int, attacker_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * } $config
      */
@@ -414,6 +419,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.reviewer_tools_enabled', $bundleConfiguration->audit->reviewerToolsEnabled);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_max_tool_iterations', $bundleConfiguration->audit->reviewerMaxToolIterations);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_max_concurrent', $bundleConfiguration->audit->reviewerMaxConcurrent);
+        $builder->setParameter('symfony_security_auditor.audit.attacker_max_concurrent', $bundleConfiguration->audit->attackerMaxConcurrent);
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.enabled', $bundleConfiguration->audit->staticPreScanEnabled);
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.lean_mode', $bundleConfiguration->audit->staticPreScanLeanMode);
         $builder->setParameter('symfony_security_auditor.audit.chunking.strategy', $bundleConfiguration->audit->chunkingStrategy);

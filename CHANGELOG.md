@@ -26,6 +26,19 @@ routes.
 
 ### Added
 
+- **New `audit.attacker_max_concurrent` config key — concurrent attacker chunk
+  analysis.** The attacker analysed chunks strictly sequentially, so the longest
+  audit phase paid one full LLM round trip per chunk back-to-back. In the
+  default structured-collection mode, when the configured platform exposes an
+  async transport, cache-miss chunks are now resolved concurrently through the
+  new `ToolBatchCapableLLMClientInterface` wavefront — each chunk keeps its own
+  `record_vulnerability` registry and `VulnerabilityCollector`, so findings
+  never cross-contaminate. Cache hits short-circuit first; chunk order,
+  coverage, caching, and drop accounting are byte-identical to the sequential
+  path. Defaults to the active profile (`fast`: `4`, `balanced`/`thorough`:
+  `1`); ignored when `audit.tools_enabled` gives the attacker a cross-file tool
+  registry or `audit.structured_collection` is off. Public API per
+  `docs/versioning.md`.
 - **Live audit-stage progress and an upfront long-run notice in the console.**
   During the audit stage — by far the longest — the progress bar sat frozen at
   the same percentage with no sign the run was still alive, sometimes for 20+

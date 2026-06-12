@@ -418,12 +418,18 @@ rather than propagating.
 
 Identical chunks (same content hash) are short-circuited by
 `AttackerCacheInterface` (`FilesystemAttackerCache` by default,
-`NullAttackerCache` when `cache.enabled: false`). Chunks carrying
-cross-iteration context (prior validated findings, reviewer-rejected findings)
-are keyed by chunk + a SHA-256 of the rendered context preambles through the
-opt-in `ContextAwareAttackerCacheInterface`, so iterations 2+ are cacheable too;
-a cache that does not implement the context-aware port is simply skipped for
-those chunks.
+`NullAttackerCache` when `cache.enabled: false`). With
+`audit.attacker_max_concurrent` > 1, the default structured-collection mode
+analyses cache-miss chunks concurrently through
+`ToolBatchCapableLLMClientInterface` (each chunk keeps its own
+`record_vulnerability` registry and `VulnerabilityCollector`); cache hits
+short-circuit first and chunk order, coverage, caching, and drop accounting are
+identical to the sequential path. Chunks carrying cross-iteration context (prior
+validated findings, reviewer-rejected findings) are keyed by chunk + a SHA-256
+of the rendered context preambles through the opt-in
+`ContextAwareAttackerCacheInterface`, so iterations 2+ are cacheable too; a
+cache that does not implement the context-aware port is simply skipped for those
+chunks.
 
 ### `ReviewerAgent`
 
