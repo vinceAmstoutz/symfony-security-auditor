@@ -149,6 +149,24 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->assertWithinBudget();
     }
 
+    public function test_cache_read_tokens_contribute_to_cost_at_one_tenth_input_price(): void
+    {
+        $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0);
+
+        $budgetTracker->recordCall(LLMResponse::create('x', 0, 0, 'gpt-4o', 'end_turn', 1_000_000, 0));
+
+        self::assertSame(1.0, $budgetTracker->costUsdUsed());
+    }
+
+    public function test_cache_creation_tokens_contribute_to_cost_at_one_and_a_quarter_input_price(): void
+    {
+        $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0);
+
+        $budgetTracker->recordCall(LLMResponse::create('x', 0, 0, 'gpt-4o', 'end_turn', 0, 1_000_000));
+
+        self::assertSame(12.5, $budgetTracker->costUsdUsed());
+    }
+
     private function budgetTracker(
         AuditBudget $auditBudget,
         float $inputPrice = 0.0,

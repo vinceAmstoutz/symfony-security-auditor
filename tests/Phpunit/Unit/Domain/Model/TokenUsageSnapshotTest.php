@@ -43,6 +43,46 @@ final class TokenUsageSnapshotTest extends TestCase
         self::assertSame(0, $tokenUsageSnapshot->totalTokens());
     }
 
+    public function test_cache_tokens_default_to_zero(): void
+    {
+        $tokenUsageSnapshot = TokenUsageSnapshot::of(100, 50);
+
+        self::assertSame(0, $tokenUsageSnapshot->cacheReadTokens());
+        self::assertSame(0, $tokenUsageSnapshot->cacheCreationTokens());
+    }
+
+    public function test_of_exposes_supplied_cache_tokens(): void
+    {
+        $tokenUsageSnapshot = TokenUsageSnapshot::of(100, 50, 40, 12);
+
+        self::assertSame(40, $tokenUsageSnapshot->cacheReadTokens());
+        self::assertSame(12, $tokenUsageSnapshot->cacheCreationTokens());
+    }
+
+    public function test_zero_factory_has_zero_cache_tokens(): void
+    {
+        $tokenUsageSnapshot = TokenUsageSnapshot::zero();
+
+        self::assertSame(0, $tokenUsageSnapshot->cacheReadTokens());
+        self::assertSame(0, $tokenUsageSnapshot->cacheCreationTokens());
+    }
+
+    public function test_negative_cache_read_tokens_rejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cache read tokens must be >= 0, got -2');
+
+        TokenUsageSnapshot::of(0, 0, -2, 0);
+    }
+
+    public function test_negative_cache_creation_tokens_rejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cache creation tokens must be >= 0, got -4');
+
+        TokenUsageSnapshot::of(0, 0, 0, -4);
+    }
+
     public function test_negative_input_tokens_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);

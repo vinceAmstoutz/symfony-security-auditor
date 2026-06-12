@@ -120,6 +120,21 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         self::assertGreaterThan(0.0, $auditReport->cost()->estimatedCostUsd());
     }
 
+    public function test_execute_includes_cache_tokens_in_the_reported_cost(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php class App {}');
+
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $tokenUsageRecorder->record(0, 0, 0, 1_000_000);
+
+        $auditReport = $this->makeUseCaseWithTelemetry('[]', '{}', $tokenUsageRecorder)->execute($this->tmpDir);
+
+        self::assertSame(0, $auditReport->cost()->inputTokens());
+        self::assertSame(0, $auditReport->cost()->outputTokens());
+        self::assertGreaterThan(0.0, $auditReport->cost()->estimatedCostUsd());
+    }
+
     public function test_execute_wraps_budget_exception_with_partial_report(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);

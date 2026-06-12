@@ -26,9 +26,11 @@ final readonly class TokenUsageSnapshot
     private function __construct(
         private int $inputTokens,
         private int $outputTokens,
+        private int $cacheReadTokens,
+        private int $cacheCreationTokens,
     ) {}
 
-    public static function of(int $inputTokens, int $outputTokens): self
+    public static function of(int $inputTokens, int $outputTokens, int $cacheReadTokens = 0, int $cacheCreationTokens = 0): self
     {
         if ($inputTokens < 0) {
             throw new InvalidArgumentException(\sprintf('Input tokens must be >= 0, got %d', $inputTokens));
@@ -38,12 +40,20 @@ final readonly class TokenUsageSnapshot
             throw new InvalidArgumentException(\sprintf('Output tokens must be >= 0, got %d', $outputTokens));
         }
 
-        return new self($inputTokens, $outputTokens);
+        if ($cacheReadTokens < 0) {
+            throw new InvalidArgumentException(\sprintf('Cache read tokens must be >= 0, got %d', $cacheReadTokens));
+        }
+
+        if ($cacheCreationTokens < 0) {
+            throw new InvalidArgumentException(\sprintf('Cache creation tokens must be >= 0, got %d', $cacheCreationTokens));
+        }
+
+        return new self($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
     }
 
     public static function zero(): self
     {
-        return new self(0, 0);
+        return new self(0, 0, 0, 0);
     }
 
     public function inputTokens(): int
@@ -54,6 +64,16 @@ final readonly class TokenUsageSnapshot
     public function outputTokens(): int
     {
         return $this->outputTokens;
+    }
+
+    public function cacheReadTokens(): int
+    {
+        return $this->cacheReadTokens;
+    }
+
+    public function cacheCreationTokens(): int
+    {
+        return $this->cacheCreationTokens;
     }
 
     public function totalTokens(): int

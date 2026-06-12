@@ -69,6 +69,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   under `cache.dir`. The `--no-cache` flag bypasses it for the run (no reads, no
   writes), mirroring the attacker cache. A reviewer-prompt or verdict-contract
   change is invalidated by bumping `FilesystemReviewerCache::CACHE_VERSION`.
+- **Prompt-cache tokens are now priced into the audit cost.** Providers that
+  report prompt caching (Anthropic's `cache_read_input_tokens` /
+  `cache_creation_input_tokens`) were previously invisible to cost accounting:
+  `SymfonyAiLLMClient` only read `getPromptTokens()` / `getCompletionTokens()`,
+  so cache reads and writes contributed `$0.00` to the budget tracker and the
+  final `AuditCost`. The client now also reads
+  `TokenUsageInterface::getCacheReadTokens()` and `getCacheCreationTokens()`,
+  carries them on `LLMResponse` (new `cacheReadTokens()` /
+  `cacheCreationTokens()` accessors, defaulting to `0`) and accumulates them in
+  `TokenUsageRecorder` / `TokenUsageSnapshot`. `CostCalculator::costForCall()`
+  prices them against the model's input rate using Anthropic's published
+  multipliers — cache reads at `0.1x`, cache writes at `1.25x` — so both the
+  live budget enforcement (`BudgetTracker`) and the reported
+  `estimated_cost_usd` reflect real cache spend. Runs against providers that do
+  not report cache tokens are unaffected (the new counts default to `0`).
 
 ### Changed
 

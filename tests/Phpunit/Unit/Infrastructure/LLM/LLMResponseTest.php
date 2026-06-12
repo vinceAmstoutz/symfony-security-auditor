@@ -32,6 +32,22 @@ final class LLMResponseTest extends TestCase
         self::assertSame(150, $llmResponse->totalTokens());
     }
 
+    public function test_cache_tokens_default_to_zero_when_not_supplied(): void
+    {
+        $llmResponse = LLMResponse::create('Hello world', 100, 50, 'claude-opus', 'end_turn');
+
+        self::assertSame(0, $llmResponse->cacheReadTokens());
+        self::assertSame(0, $llmResponse->cacheCreationTokens());
+    }
+
+    public function test_it_exposes_supplied_cache_tokens(): void
+    {
+        $llmResponse = LLMResponse::create('Hello world', 100, 50, 'claude-opus', 'end_turn', 30, 12);
+
+        self::assertSame(30, $llmResponse->cacheReadTokens());
+        self::assertSame(12, $llmResponse->cacheCreationTokens());
+    }
+
     public function test_it_detects_empty_content(): void
     {
         $llmResponse = LLMResponse::create('  ', 10, 5, 'claude', 'end_turn');

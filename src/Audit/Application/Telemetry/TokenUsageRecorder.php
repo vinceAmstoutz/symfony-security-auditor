@@ -36,7 +36,11 @@ final class TokenUsageRecorder
 
     private int $outputTokens = 0;
 
-    public function record(int $inputTokens, int $outputTokens): void
+    private int $cacheReadTokens = 0;
+
+    private int $cacheCreationTokens = 0;
+
+    public function record(int $inputTokens, int $outputTokens, int $cacheReadTokens = 0, int $cacheCreationTokens = 0): void
     {
         if ($inputTokens < 0) {
             throw new InvalidArgumentException(\sprintf('Input tokens must be >= 0, got %d', $inputTokens));
@@ -46,18 +50,30 @@ final class TokenUsageRecorder
             throw new InvalidArgumentException(\sprintf('Output tokens must be >= 0, got %d', $outputTokens));
         }
 
+        if ($cacheReadTokens < 0) {
+            throw new InvalidArgumentException(\sprintf('Cache read tokens must be >= 0, got %d', $cacheReadTokens));
+        }
+
+        if ($cacheCreationTokens < 0) {
+            throw new InvalidArgumentException(\sprintf('Cache creation tokens must be >= 0, got %d', $cacheCreationTokens));
+        }
+
         $this->inputTokens += $inputTokens;
         $this->outputTokens += $outputTokens;
+        $this->cacheReadTokens += $cacheReadTokens;
+        $this->cacheCreationTokens += $cacheCreationTokens;
     }
 
     public function snapshot(): TokenUsageSnapshot
     {
-        return TokenUsageSnapshot::of($this->inputTokens, $this->outputTokens);
+        return TokenUsageSnapshot::of($this->inputTokens, $this->outputTokens, $this->cacheReadTokens, $this->cacheCreationTokens);
     }
 
     public function reset(): void
     {
         $this->inputTokens = 0;
         $this->outputTokens = 0;
+        $this->cacheReadTokens = 0;
+        $this->cacheCreationTokens = 0;
     }
 }

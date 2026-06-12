@@ -97,7 +97,7 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
         }
 
         $content = $deferredResult->asText();
-        [$inputTokens, $outputTokens] = $this->extractTokens($deferredResult);
+        [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->extractTokens($deferredResult);
 
         $this->rateLimiter()->record($inputTokens, $outputTokens);
 
@@ -113,6 +113,8 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
             outputTokens: $outputTokens,
             model: $this->model,
             stopReason: 'end_turn',
+            cacheReadTokens: $cacheReadTokens,
+            cacheCreationTokens: $cacheCreationTokens,
         );
         $this->budgetTracker?->recordCall($llmResponse);
         $this->budgetTracker?->assertWithinBudget();
@@ -188,7 +190,7 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
 
         try {
             $content = $deferredResult->asText();
-            [$inputTokens, $outputTokens] = $this->extractTokens($deferredResult);
+            [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->extractTokens($deferredResult);
             $this->rateLimiter()->record($inputTokens, $outputTokens);
 
             $llmResponse = LLMResponse::create(
@@ -197,6 +199,8 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
                 outputTokens: $outputTokens,
                 model: $this->model,
                 stopReason: 'end_turn',
+                cacheReadTokens: $cacheReadTokens,
+                cacheCreationTokens: $cacheCreationTokens,
             );
             $this->budgetTracker?->recordCall($llmResponse);
             $this->budgetTracker?->assertWithinBudget();
@@ -230,17 +234,21 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
         $iteration = 0;
         $totalInputTokens = 0;
         $totalOutputTokens = 0;
+        $totalCacheReadTokens = 0;
+        $totalCacheCreationTokens = 0;
         while ($iteration < $maxToolIterations) {
             try {
                 $deferredResult = $this->invokeWithRetry($messageBag, $options, $estimatedInputTokens);
             } catch (EmptyLLMResponseException $emptyllmResponseException) {
-                return $this->emptyToolLoopResponseAndLog($emptyllmResponseException, $iteration, $totalInputTokens, $totalOutputTokens);
+                return $this->emptyToolLoopResponseAndLog($emptyllmResponseException, $iteration, $totalInputTokens, $totalOutputTokens, $totalCacheReadTokens, $totalCacheCreationTokens);
             }
 
             $platformResult = $deferredResult->getResult();
-            [$callInput, $callOutput] = $this->extractTokens($deferredResult);
+            [$callInput, $callOutput, $callCacheRead, $callCacheCreation] = $this->extractTokens($deferredResult);
             $totalInputTokens += $callInput;
             $totalOutputTokens += $callOutput;
+            $totalCacheReadTokens += $callCacheRead;
+            $totalCacheCreationTokens += $callCacheCreation;
             $this->rateLimiter()->record($callInput, $callOutput);
             if ($this->budgetTracker instanceof BudgetTracker) {
                 $this->budgetTracker->recordCall(LLMResponse::create(
@@ -249,6 +257,8 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
                     outputTokens: $callOutput,
                     model: $this->model,
                     stopReason: 'tool_iteration',
+                    cacheReadTokens: $callCacheRead,
+                    cacheCreationTokens: $callCacheCreation,
                 ));
                 $this->budgetTracker->assertWithinBudget();
             }
@@ -270,6 +280,8 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
                     outputTokens: $totalOutputTokens,
                     model: $this->model,
                     stopReason: 'end_turn',
+                    cacheReadTokens: $totalCacheReadTokens,
+                    cacheCreationTokens: $totalCacheCreationTokens,
                 );
             }
 
@@ -299,6 +311,8 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
             outputTokens: $totalOutputTokens,
             model: $this->model,
             stopReason: 'max_tool_iterations',
+            cacheReadTokens: $totalCacheReadTokens,
+            cacheCreationTokens: $totalCacheCreationTokens,
         );
     }
 
@@ -327,6 +341,8 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
         int $iteration,
         int $totalInputTokens,
         int $totalOutputTokens,
+        int $totalCacheReadTokens,
+        int $totalCacheCreationTokens,
     ): LLMResponse {
         $context = [
             'iterations' => $iteration,
@@ -347,6 +363,8 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
             outputTokens: $totalOutputTokens,
             model: $this->model,
             stopReason: 'empty_content',
+            cacheReadTokens: $totalCacheReadTokens,
+            cacheCreationTokens: $totalCacheCreationTokens,
         );
     }
 
@@ -464,20 +482,22 @@ final readonly class SymfonyAiLLMClient implements BatchCapableLLMClientInterfac
         return $total;
     }
 
-    /** @return array{0: int, 1: int} */
+    /** @return array{0: int, 1: int, 2: int, 3: int} */
     private function extractTokens(DeferredResult $deferredResult): array
     {
         $metadata = $deferredResult->getMetadata()->all();
         $tokenUsage = $metadata['token_usage'] ?? null;
         if (!$tokenUsage instanceof TokenUsageInterface) {
-            return [0, 0];
+            return [0, 0, 0, 0];
         }
 
         $inputTokens = $tokenUsage->getPromptTokens() ?? 0;
         $outputTokens = $tokenUsage->getCompletionTokens() ?? 0;
-        $this->tokenUsageRecorder?->record($inputTokens, $outputTokens);
+        $cacheReadTokens = $tokenUsage->getCacheReadTokens() ?? 0;
+        $cacheCreationTokens = $tokenUsage->getCacheCreationTokens() ?? 0;
+        $this->tokenUsageRecorder?->record($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
 
-        return [$inputTokens, $outputTokens];
+        return [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens];
     }
 
     /**

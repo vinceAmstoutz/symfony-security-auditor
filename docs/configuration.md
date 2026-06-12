@@ -162,6 +162,12 @@ ai:
             cache_retention: long   # 1-hour cache window
 ```
 
+When the provider reports cache usage, the auditor prices it into the cost it
+tracks and reports: cache reads at `0.1x` and cache writes at `1.25x` the
+model's input rate (Anthropic's published multipliers), so the budget tracker
+and the `estimated_cost_usd` in the report reflect the real discounted spend
+rather than charging every input token at the full rate.
+
 ### Simple mode — one model for both roles
 
 ```yaml

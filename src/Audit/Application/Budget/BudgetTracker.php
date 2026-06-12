@@ -46,6 +46,8 @@ final class BudgetTracker
             $llmResponse->inputTokens(),
             $llmResponse->outputTokens(),
             $llmResponse->model(),
+            $llmResponse->cacheReadTokens(),
+            $llmResponse->cacheCreationTokens(),
         );
     }
 

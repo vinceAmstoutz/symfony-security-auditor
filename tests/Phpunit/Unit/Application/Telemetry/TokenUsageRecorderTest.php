@@ -84,6 +84,64 @@ final class TokenUsageRecorderTest extends TestCase
         self::assertSame(3, $snapshot->outputTokens());
     }
 
+    public function test_cache_tokens_accumulate_across_record_calls(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+
+        $tokenUsageRecorder->record(10, 5, 40, 12);
+        $tokenUsageRecorder->record(20, 10, 8, 3);
+
+        $snapshot = $tokenUsageRecorder->snapshot();
+
+        self::assertSame(48, $snapshot->cacheReadTokens());
+        self::assertSame(15, $snapshot->cacheCreationTokens());
+    }
+
+    public function test_cache_tokens_default_to_zero_when_omitted(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+
+        $tokenUsageRecorder->record(10, 5);
+
+        $snapshot = $tokenUsageRecorder->snapshot();
+
+        self::assertSame(0, $snapshot->cacheReadTokens());
+        self::assertSame(0, $snapshot->cacheCreationTokens());
+    }
+
+    public function test_reset_clears_accumulated_cache_tokens(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $tokenUsageRecorder->record(10, 5, 40, 12);
+
+        $tokenUsageRecorder->reset();
+
+        $snapshot = $tokenUsageRecorder->snapshot();
+
+        self::assertSame(0, $snapshot->cacheReadTokens());
+        self::assertSame(0, $snapshot->cacheCreationTokens());
+    }
+
+    public function test_recording_negative_cache_read_tokens_throws(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cache read tokens must be >= 0, got -2');
+
+        $tokenUsageRecorder->record(0, 0, -2, 0);
+    }
+
+    public function test_recording_negative_cache_creation_tokens_throws(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cache creation tokens must be >= 0, got -7');
+
+        $tokenUsageRecorder->record(0, 0, 0, -7);
+    }
+
     public function test_recording_negative_input_tokens_throws(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();

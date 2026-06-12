@@ -63,6 +63,34 @@ final class CostCalculatorTest extends TestCase
         self::assertEqualsWithDelta(7.0e-7, $costCalculator->costForCall(7, 0, 'model'), 1e-15);
     }
 
+    public function test_cache_read_tokens_cost_one_tenth_of_the_input_price(): void
+    {
+        $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
+
+        self::assertEqualsWithDelta(0.3, $costCalculator->costForCall(0, 0, 'model', 1_000_000, 0), 1e-12);
+    }
+
+    public function test_cache_creation_tokens_cost_one_and_a_quarter_of_the_input_price(): void
+    {
+        $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
+
+        self::assertEqualsWithDelta(3.75, $costCalculator->costForCall(0, 0, 'model', 0, 1_000_000), 1e-12);
+    }
+
+    public function test_cost_sums_input_output_and_both_cache_components(): void
+    {
+        $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
+
+        self::assertEqualsWithDelta(0.02205, $costCalculator->costForCall(1_000, 1_000, 'model', 1_000, 1_000), 1e-12);
+    }
+
+    public function test_cache_tokens_default_to_zero_cost(): void
+    {
+        $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
+
+        self::assertEqualsWithDelta(0.003, $costCalculator->costForCall(1_000, 0, 'model'), 1e-12);
+    }
+
     private function fixedPricing(float $inputPrice, float $outputPrice): PricingProviderInterface
     {
         return new class($inputPrice, $outputPrice) implements PricingProviderInterface {
