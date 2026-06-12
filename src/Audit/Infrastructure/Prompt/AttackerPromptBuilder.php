@@ -27,7 +27,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 7;
+    public const int PROMPT_VERSION = 8;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
@@ -390,8 +390,10 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             return '';
         }
 
+        $routeAccessMap = $symfonyMapping->routeAccessMap();
+
         $lines = ['## Route Access-Control Map'];
-        $lines[] = 'Each line describes a controller action: HTTP method(s), route path, source location, and the access-control surface (class- and method-level `#[IsGranted]`, `denyAccessUnlessGranted()` body calls). Lines marked at the end with the LACKS marker carry a route but no enforcement — treat them as primary candidates for `broken_access_control` and `missing_voter` findings unless a parent firewall covers them.';
+        $lines[] = 'Each line describes a controller action: HTTP method(s), route path, source location, and the access-control surface (class- and method-level `#[IsGranted]`, `denyAccessUnlessGranted()` body calls). A line whose surface is empty is tagged at the end: routes with no enforcement at all carry the LACKS marker — treat those as primary candidates for `broken_access_control` and `missing_voter`. Routes with no attribute or body check that nonetheless match a `security.yaml` `access_control` rule on their path carry a firewall-covered marker listing the gating roles — the firewall already protects them, so do NOT report `broken_access_control` there unless the gating role is too permissive for the action.';
 
         foreach ($routeAccessControls as $routeAccessControl) {
             $methods = [] === $routeAccessControl->routeMethods() ? 'ANY' : implode(',', $routeAccessControl->routeMethods());
@@ -409,11 +411,54 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
                 $checks[] = 'body:denyAccessUnlessGranted()';
             }
 
-            $checkLabel = [] === $checks ? 'LACKS_ACCESS_CHECK' : implode(' + ', $checks);
+            $checkLabel = $this->checkLabelFor($checks, $routeAccessControl->routePath(), $routeAccessMap);
             $lines[] = \sprintf('- %s %s — %s::%s — %s', $methods, $path, $routeAccessControl->filePath(), $routeAccessControl->methodName(), $checkLabel);
         }
 
         return implode("\n", $lines)."\n\n";
+    }
+
+    /**
+     * @param list<string>                $checks
+     * @param array<string, list<string>> $routeAccessMap
+     */
+    private function checkLabelFor(array $checks, ?string $routePath, array $routeAccessMap): string
+    {
+        if ([] !== $checks) {
+            return implode(' + ', $checks);
+        }
+
+        $firewallRoles = $this->firewallRolesForPath($routePath, $routeAccessMap);
+        if (null !== $firewallRoles) {
+            return 'COVERED_BY access_control['.implode(',', $firewallRoles).']';
+        }
+
+        return 'LACKS_ACCESS_CHECK';
+    }
+
+    /**
+     * Returns the roles of the first `security.yaml` `access_control` rule whose
+     * path pattern matches the route, or null when none matches. Symfony treats
+     * the `access_control` `path` as a regular expression, so it is matched as
+     * one; a malformed pattern simply fails to match rather than throwing.
+     *
+     * @param array<string, list<string>> $routeAccessMap
+     *
+     * @return list<string>|null
+     */
+    private function firewallRolesForPath(?string $routePath, array $routeAccessMap): ?array
+    {
+        if (null === $routePath) {
+            return null;
+        }
+
+        foreach ($routeAccessMap as $pattern => $roles) {
+            if (1 === @preg_match('#'.$pattern.'#', $routePath)) {
+                return $roles;
+            }
+        }
+
+        return null;
     }
 
     private function basePrompt(): string

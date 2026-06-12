@@ -79,6 +79,67 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('LACKS_ACCESS_CHECK', $message);
     }
 
+    public function test_route_without_attribute_check_is_marked_covered_when_a_firewall_access_control_matches(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/AdminController.php',
+            '/app/src/Controller/AdminController.php',
+            '<?php class AdminController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'deleteUser',
+            routePath: '/admin/users/42',
+            routeMethods: ['DELETE'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::create(
+            controllers: [$projectFile],
+            routeAccessMap: ['^/admin' => ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']],
+            routeAccessControls: [$routeAccessControl],
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        // Two roles pin the comma separator in the rendered marker.
+        self::assertStringContainsString('COVERED_BY access_control[ROLE_ADMIN,ROLE_SUPER_ADMIN]', $message);
+        self::assertStringNotContainsString('LACKS_ACCESS_CHECK', $message);
+    }
+
+    public function test_route_without_attribute_check_still_lacks_when_no_firewall_access_control_matches(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/PublicController.php',
+            '/app/src/Controller/PublicController.php',
+            '<?php class PublicController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/PublicController.php',
+            methodName: 'show',
+            routePath: '/blog/42',
+            routeMethods: ['GET'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::create(
+            controllers: [$projectFile],
+            routeAccessMap: ['^/admin' => ['ROLE_ADMIN']],
+            routeAccessControls: [$routeAccessControl],
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('LACKS_ACCESS_CHECK', $message);
+        self::assertStringNotContainsString('COVERED_BY access_control', $message);
+    }
+
     public function test_user_message_renders_access_check_labels_for_protected_action(): void
     {
         $projectFile = ProjectFile::create(
@@ -790,7 +851,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_prompt_version_is_bumped_when_modern_symfony_skill_blocks_are_added(): void
     {
-        self::assertSame(7, AttackerPromptBuilder::PROMPT_VERSION);
+        self::assertSame(8, AttackerPromptBuilder::PROMPT_VERSION);
     }
 
     #[DataProvider('vulnerabilityTypeValues')]
