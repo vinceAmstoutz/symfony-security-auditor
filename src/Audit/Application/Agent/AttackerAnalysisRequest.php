@@ -33,12 +33,17 @@ final readonly class AttackerAnalysisRequest
      *                                              reviewer in earlier iterations, injected
      *                                              into the prompt so the LLM generalizes
      *                                              them to files not yet covered
+     * @param list<Vulnerability> $rejectedFindings findings the reviewer rejected in earlier
+     *                                              iterations, injected so the LLM stops
+     *                                              re-reporting them (saving tool-call and
+     *                                              reviewer budget)
      */
     public function __construct(
         public array $files,
         public SymfonyMapping $symfonyMapping,
         public bool $bypassCache = false,
         public array $previousFindings = [],
+        public array $rejectedFindings = [],
     ) {}
 
     /**
@@ -47,6 +52,6 @@ final readonly class AttackerAnalysisRequest
      */
     public function withFilesAndFindings(array $files, array $previousFindings): self
     {
-        return new self($files, $this->symfonyMapping, $this->bypassCache, $previousFindings);
+        return new self($files, $this->symfonyMapping, $this->bypassCache, $previousFindings, $this->rejectedFindings);
     }
 }

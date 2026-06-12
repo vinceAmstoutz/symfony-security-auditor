@@ -55,12 +55,14 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             $this->logger->info(\sprintf('Audit iteration %d/%d', $iteration, $this->maxIterations));
 
             $previousFindings = array_values($auditContext->validatedVulnerabilities());
+            $rejectedFindings = $this->rejectedFindings($auditContext);
             $rawFindings = $this->attackerAgent->analyze(
                 new AttackerAnalysisRequest(
                     files: $files,
                     symfonyMapping: $mapping,
                     bypassCache: $auditContext->isCacheBypassed(),
                     previousFindings: $previousFindings,
+                    rejectedFindings: $rejectedFindings,
                 ),
                 $auditContext,
             );
@@ -95,6 +97,21 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         $auditContext->setMeta('audit.total_findings', \count($auditContext->vulnerabilities()));
         $auditContext->setMeta('audit.validated', \count($auditContext->validatedVulnerabilities()));
         $auditContext->setMeta('audit.risk_score', $auditContext->riskScore());
+    }
+
+    /**
+     * Findings the reviewer has already rejected in earlier iterations. Fed back
+     * to the attacker so it stops re-reporting them — that would otherwise burn
+     * tool-call and reviewer budget on findings the deduplication step discards.
+     *
+     * @return list<Vulnerability>
+     */
+    private function rejectedFindings(AuditContext $auditContext): array
+    {
+        return array_values(array_filter(
+            $auditContext->vulnerabilities(),
+            static fn (Vulnerability $vulnerability): bool => !$vulnerability->isReviewerValidated(),
+        ));
     }
 
     /**

@@ -74,6 +74,35 @@ final class AttackerContextPromptRendererTest extends TestCase
         self::assertMatchesRegularExpression('/^  - sql_injection: src\/Repo\.php:10-20$/m', $output);
     }
 
+    public function test_it_renders_rejected_findings_grouped_by_type_with_locations(): void
+    {
+        $output = (new AttackerContextPromptRenderer())->renderRejectedFindings([
+            $this->makeVulnerability(VulnerabilityType::MISSING_CSRF_PROTECTION, 'src/Form.php', 12, 12),
+            $this->makeVulnerability(VulnerabilityType::MISSING_CSRF_PROTECTION, 'src/Other.php', 3, 4),
+        ]);
+
+        self::assertStringContainsString('- missing_csrf_protection: src/Form.php:12-12, src/Other.php:3-4', $output);
+    }
+
+    public function test_it_instructs_the_model_not_to_re_report_rejected_findings(): void
+    {
+        $output = (new AttackerContextPromptRenderer())->renderRejectedFindings([
+            $this->makeVulnerability(VulnerabilityType::MISSING_CSRF_PROTECTION, 'src/Form.php', 12, 12),
+        ]);
+
+        self::assertStringContainsString('Findings Already Rejected by the Reviewer', $output);
+        self::assertStringContainsString('Do NOT re-report these', $output);
+    }
+
+    public function test_it_indents_rejected_finding_lines_with_leading_whitespace(): void
+    {
+        $output = (new AttackerContextPromptRenderer())->renderRejectedFindings([
+            $this->makeVulnerability(VulnerabilityType::MISSING_CSRF_PROTECTION, 'src/Form.php', 12, 12),
+        ]);
+
+        self::assertMatchesRegularExpression('/^  - missing_csrf_protection: src\/Form\.php:12-12$/m', $output);
+    }
+
     private function makeVulnerability(VulnerabilityType $vulnerabilityType, string $filePath, int $start, int $end): Vulnerability
     {
         return Vulnerability::create(

@@ -112,6 +112,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             'tools_enabled' => $useTools,
             'cache_bypassed' => $attackerAnalysisRequest->bypassCache,
             'previous_findings' => \count($attackerAnalysisRequest->previousFindings),
+            'rejected_findings' => \count($attackerAnalysisRequest->rejectedFindings),
         ]);
 
         $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($effectiveFiles) : null;
@@ -153,9 +154,10 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     private function analyzeChunk(array $chunk, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, RiskMarkerIndex $riskMarkerIndex): VulnerabilityHydrationResult
     {
         $hasPreviousFindings = [] !== $attackerAnalysisRequest->previousFindings;
+        $hasRejectedFindings = [] !== $attackerAnalysisRequest->rejectedFindings;
         $chunkMarkers = $riskMarkerIndex->forChunk($chunk);
         $hasMarkers = [] !== $chunkMarkers;
-        $cacheable = !$attackerAnalysisRequest->bypassCache && !$hasPreviousFindings;
+        $cacheable = !$attackerAnalysisRequest->bypassCache && !$hasPreviousFindings && !$hasRejectedFindings;
 
         if ($cacheable) {
             $cached = $this->attackerCache->get($chunk);
@@ -174,6 +176,10 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
         if ($hasMarkers) {
             $userMessage = $this->attackerContextPromptRenderer->renderRiskMarkers($chunkMarkers)."\n\n".$userMessage;
+        }
+
+        if ($hasRejectedFindings) {
+            $userMessage = $this->attackerContextPromptRenderer->renderRejectedFindings($attackerAnalysisRequest->rejectedFindings)."\n\n".$userMessage;
         }
 
         if ($hasPreviousFindings) {

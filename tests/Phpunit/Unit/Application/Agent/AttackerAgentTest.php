@@ -65,13 +65,14 @@ final class AttackerAgentTest extends TestCase
     /**
      * @param list<ProjectFile>   $files
      * @param list<Vulnerability> $previousFindings
+     * @param list<Vulnerability> $rejectedFindings
      *
      * @return list<Vulnerability>
      */
-    private function callAnalyze(AttackerAgentInterface $attackerAgent, array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, array $previousFindings = []): array
+    private function callAnalyze(AttackerAgentInterface $attackerAgent, array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, array $previousFindings = [], array $rejectedFindings = []): array
     {
         return $attackerAgent->analyze(
-            new AttackerAnalysisRequest($files, $symfonyMapping, $bypassCache, $previousFindings),
+            new AttackerAnalysisRequest($files, $symfonyMapping, $bypassCache, $previousFindings, $rejectedFindings),
             $coverageRecorder,
         );
     }
@@ -157,6 +158,31 @@ final class AttackerAgentTest extends TestCase
         );
 
         self::assertStringStartsWith((new AttackerContextPromptRenderer())->renderPreviousFindings($previousFindings)."\n\n", $captured);
+        self::assertStringContainsString('## Source Code', $captured);
+    }
+
+    public function test_rejected_findings_are_prepended_before_the_user_message_with_a_blank_line(): void
+    {
+        $rejectedFindings = [$this->makeVulnerabilityFor('src/Controller/Rejected.php')];
+
+        $captured = '';
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
+            $captured = $user;
+
+            return LLMResponse::create('[]', 0, 0, 'claude', 'end_turn');
+        });
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient);
+
+        $attackerAgent->analyze(
+            new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::create(), false, [], $rejectedFindings),
+            new NullCoverageRecorder(),
+        );
+
+        // Pins both the rejected-findings preamble AND the "\n\n" separator
+        // before the rest of the message (no other preamble is present).
+        self::assertStringStartsWith((new AttackerContextPromptRenderer())->renderRejectedFindings($rejectedFindings)."\n\n", $captured);
         self::assertStringContainsString('## Source Code', $captured);
     }
 
@@ -557,7 +583,7 @@ final class AttackerAgentTest extends TestCase
 
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
 
-        self::assertSame(['Attacker agent starting analysis', ['files' => 2, 'files_filtered_lean' => 0, 'markers' => 0, 'tools_enabled' => false, 'cache_bypassed' => false, 'previous_findings' => 0]], $infoLogs[0]);
+        self::assertSame(['Attacker agent starting analysis', ['files' => 2, 'files_filtered_lean' => 0, 'markers' => 0, 'tools_enabled' => false, 'cache_bypassed' => false, 'previous_findings' => 0, 'rejected_findings' => 0]], $infoLogs[0]);
         self::assertSame(['Attacker agent complete', ['total_vulnerabilities' => 0, 'total_dropped_entries' => 0, 'dropped_by_reason' => []]], $infoLogs[1]);
     }
 
@@ -1350,6 +1376,65 @@ final class AttackerAgentTest extends TestCase
 
         $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), false, $previousFindings);
+    }
+
+    public function test_it_injects_rejected_findings_section_into_prompt_when_provided(): void
+    {
+        $sentMessages = [];
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
+                $sentMessages[] = $user;
+
+                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+            });
+
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+        $rejectedFindings = [$this->makeVulnerabilityFor('src/Controller/RejectedController.php')];
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), false, [], $rejectedFindings);
+
+        self::assertCount(1, $sentMessages);
+        self::assertStringContainsString('Findings Already Rejected by the Reviewer', $sentMessages[0]);
+        self::assertStringContainsString('src/Controller/RejectedController.php', $sentMessages[0]);
+    }
+
+    public function test_it_does_not_inject_rejected_findings_section_when_empty(): void
+    {
+        $sentMessages = [];
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
+                $sentMessages[] = $user;
+
+                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+            });
+
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+        $attackerAgent = $this->makeAttackerAgent($llmClient);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+
+        self::assertCount(1, $sentMessages);
+        self::assertStringNotContainsString('Findings Already Rejected by the Reviewer', $sentMessages[0]);
+    }
+
+    public function test_it_skips_cache_when_rejected_findings_present(): void
+    {
+        $cache = self::createMock(AttackerCacheInterface::class);
+        $cache->expects(self::never())->method('get');
+        $cache->expects(self::never())->method('store');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'test', 'end_turn'));
+
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+        $rejectedFindings = [$this->makeVulnerabilityFor('src/Controller/RejectedController.php')];
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), false, [], $rejectedFindings);
     }
 
     public function test_it_reads_cache_when_no_previous_findings(): void

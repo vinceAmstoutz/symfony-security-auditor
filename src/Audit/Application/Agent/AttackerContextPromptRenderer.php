@@ -83,6 +83,34 @@ final readonly class AttackerContextPromptRenderer
             PROMPT;
     }
 
+    /**
+     * @param list<Vulnerability> $rejectedFindings
+     */
+    public function renderRejectedFindings(array $rejectedFindings): string
+    {
+        $byType = [];
+        foreach ($rejectedFindings as $rejectedFinding) {
+            $byType[$rejectedFinding->type()->value][] = \sprintf(
+                '%s:%d-%d',
+                $rejectedFinding->filePath(),
+                $rejectedFinding->lineStart(),
+                $rejectedFinding->lineEnd(),
+            );
+        }
+
+        $lines = [];
+        foreach ($byType as $type => $locations) {
+            $lines[] = \sprintf('- %s: %s', $type, implode(', ', $locations));
+        }
+
+        return <<<PROMPT
+            ## Findings Already Rejected by the Reviewer
+            The reviewer reviewed and REJECTED the findings below in earlier iterations — a mitigating control was found, or the report was a false positive. Do NOT re-report these locations; they only burn the tool-call and reviewer budget. Spend your effort on code these entries do not already cover.
+
+            {$this->indent(implode("\n", $lines))}
+            PROMPT;
+    }
+
     private function indent(string $content): string
     {
         return implode("\n", array_map(static fn (string $line): string => '  '.$line, explode("\n", $content)));
