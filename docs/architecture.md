@@ -400,10 +400,19 @@ Sorts files by security priority before chunking:
 
 `analyze()` takes an immutable `AttackerAnalysisRequest` (files, mapping,
 `bypassCache`, `previousFindings`, `rejectedFindings`) plus a
-`CoverageRecorderInterface`. The chunk-priority ordering above is defined once
-on `FileChunker` over `ProjectFileType` cases. Risk markers are indexed by
-`RiskMarkerIndex`, and the deterministic-marker / prior-findings prompt
-preambles are rendered by `AttackerContextPromptRenderer`.
+`CoverageRecorderInterface`. The agent itself is a thin orchestrator — pre-scan,
+optional lean-mode filtering, chunking, strategy selection, and the
+start/complete logging — delegating the per-chunk work to `Chunk\` collaborators
+it builds at construction time: `ChunkContextFactory` assembles each chunk's
+prompts (markers + cross-iteration preambles, code slicing) and derives the
+cache key/cacheability into a `ChunkContext`; `AttackerChunkCache` adapts
+`AttackerCacheInterface` (context-aware key when supported) and turns a hit into
+a hydrated result; `SequentialChunkAnalyzer` and `ConcurrentChunkAnalyzer` are
+the two analysis strategies; `ChunkCoverageRecorder` records per-file coverage.
+The chunk-priority ordering above is defined once on `FileChunker` over
+`ProjectFileType` cases. Risk markers are indexed by `RiskMarkerIndex`, and the
+deterministic-marker / prior-findings prompt preambles are rendered by
+`AttackerContextPromptRenderer`.
 
 Chunks the files (default `feature` strategy; `type` for the legacy
 priority-window). For each chunk: builds prompts via `AttackerPromptBuilder`,
