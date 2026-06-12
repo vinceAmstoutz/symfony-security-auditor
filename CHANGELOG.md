@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
-## [1.9.0] — 2026-06-12 — Verdict
+## [1.9.0] — 2026-06-12 — Slipstream
 
 A config-less performance and reviewer-trust release. The zero-configuration
 path is now also the cheap and fast one: `claude-opus-4-8` and a byte-stable
