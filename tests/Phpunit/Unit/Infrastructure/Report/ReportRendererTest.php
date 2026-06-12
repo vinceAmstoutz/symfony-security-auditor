@@ -129,6 +129,20 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('VULNERABILITIES', $output);
     }
 
+    public function test_render_console_lists_vulnerabilities_most_severe_first(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::LOW, filePath: 'src/Low.php');
+        $critical = $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::CRITICAL, filePath: 'src/Critical.php');
+
+        $output = $this->reportRenderer->renderConsole($this->makeReport($vulnerability, $critical));
+
+        $criticalPosition = strpos($output, 'src/Critical.php');
+        $lowPosition = strpos($output, 'src/Low.php');
+        self::assertNotFalse($criticalPosition);
+        self::assertNotFalse($lowPosition);
+        self::assertLessThan($lowPosition, $criticalPosition);
+    }
+
     public function test_render_console_with_vulnerabilities_skips_no_findings_message(): void
     {
         $output = $this->reportRenderer->renderConsole($this->makeReport($this->makeValidatedVuln()));

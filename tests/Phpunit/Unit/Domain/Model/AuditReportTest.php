@@ -108,6 +108,56 @@ final class AuditReportTest extends TestCase
         self::assertCount(0, $auditReport->vulnerabilitiesByType(VulnerabilityType::SSRF));
     }
 
+    public function test_vulnerabilities_are_ordered_most_severe_first(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $discoveryOrder = [
+            VulnerabilitySeverity::LOW,
+            VulnerabilitySeverity::INFO,
+            VulnerabilitySeverity::CRITICAL,
+            VulnerabilitySeverity::MEDIUM,
+            VulnerabilitySeverity::HIGH,
+        ];
+        foreach ($discoveryOrder as $index => $severity) {
+            $auditContext->addVulnerability(
+                $this->makeVulnerability('order'.$index, $severity)->withReviewerValidation(true),
+            );
+        }
+
+        $severities = array_map(
+            static fn (Vulnerability $vulnerability): VulnerabilitySeverity => $vulnerability->severity(),
+            AuditReport::fromContext($auditContext)->vulnerabilities(),
+        );
+
+        self::assertSame(
+            [
+                VulnerabilitySeverity::CRITICAL,
+                VulnerabilitySeverity::HIGH,
+                VulnerabilitySeverity::MEDIUM,
+                VulnerabilitySeverity::LOW,
+                VulnerabilitySeverity::INFO,
+            ],
+            $severities,
+        );
+    }
+
+    public function test_vulnerabilities_with_equal_severity_keep_discovery_order(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $auditContext->addVulnerability($this->makeVulnerability('firstHigh', VulnerabilitySeverity::HIGH)->withReviewerValidation(true));
+        $auditContext->addVulnerability($this->makeVulnerability('low', VulnerabilitySeverity::LOW)->withReviewerValidation(true));
+        $auditContext->addVulnerability($this->makeVulnerability('secondHigh', VulnerabilitySeverity::HIGH)->withReviewerValidation(true));
+
+        $filePaths = array_map(
+            static fn (Vulnerability $vulnerability): string => $vulnerability->filePath(),
+            AuditReport::fromContext($auditContext)->vulnerabilities(),
+        );
+
+        self::assertSame(['src/firstHigh.php', 'src/secondHigh.php', 'src/low.php'], $filePaths);
+    }
+
     public function test_it_serializes_to_array(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);

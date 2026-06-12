@@ -72,6 +72,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **Reports now list vulnerabilities most-severe-first.** `AuditReport`
+  (`src/Audit/Domain/Model/AuditReport.php`) kept vulnerabilities in discovery
+  order, so a lone high-severity finding could sit buried between medium and low
+  ones and readers had to scroll the whole list to find it
+  ([#40](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/40)).
+  The report now orders findings by descending `VulnerabilitySeverity::score()`
+  — critical → high → medium → low → info, ties keeping discovery order — so the
+  console listing, the `--format=json` `vulnerabilities` array, and the SARIF
+  `results` array all lead with the most severe findings.
 - **Reviewer no longer drops real-but-hard-to-prove findings.** The reviewer
   decision rules in `ReviewerPromptBuilder`
   (`src/Audit/Infrastructure/Prompt/ReviewerPromptBuilder.php`) opened with
