@@ -2814,6 +2814,31 @@ final class ReviewerAgentTest extends TestCase
         self::assertTrue($result[1]->isReviewerValidated());
     }
 
+    public function test_structured_opt_out_keeps_the_json_path_even_on_a_tool_batch_capable_client(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient->expects(self::never())->method('completeBatchWithTools');
+        $llmClient
+            ->expects(self::once())
+            ->method('completeBatch')
+            ->willReturn([LLMResponse::create('{"accepted": true}', 1, 1, 'm', 'end_turn')]);
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(),
+            new NullLogger(),
+            maxConcurrent: 4,
+            recordReviewToolFactory: new RecordReviewToolFactory(),
+            useStructuredCollection: false,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertTrue($result[0]->isReviewerValidated());
+    }
+
     private static function registryOf(mixed $request): ToolRegistry
     {
         self::assertIsArray($request);

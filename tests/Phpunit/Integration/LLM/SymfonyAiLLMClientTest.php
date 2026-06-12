@@ -544,6 +544,54 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('end_turn', $responses[0]->stopReason());
     }
 
+    public function test_complete_batch_with_tools_falls_back_to_the_sequential_path_when_resolution_fails_before_tools_ran(): void
+    {
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+
+        $platform = new class implements PlatformInterface {
+            private int $invocations = 0;
+
+            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                ++$this->invocations;
+                $converter = 1 === $this->invocations
+                    ? new class implements ResultConverterInterface {
+                        public function supports(Model $model): bool
+                        {
+                            return true;
+                        }
+
+                        public function convert(RawResultInterface $result, array $options = []): ResultInterface
+                        {
+                            throw new RuntimeException('resolution exploded');
+                        }
+
+                        public function getTokenUsageExtractor(): ?TokenUsageExtractorInterface
+                        {
+                            return null;
+                        }
+                    }
+                : new PlainConverter(new TextResult('recovered'));
+
+                return new DeferredResult($converter, new InMemoryRawResult(['text' => ''], [], (object) []), $options);
+            }
+
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 3);
+
+        self::assertSame('recovered', $responses[0]->content());
+        self::assertSame('end_turn', $responses[0]->stopReason());
+    }
+
     public function test_complete_batch_with_tools_finalizes_as_empty_content_when_failing_after_tools_ran(): void
     {
         $toolCalls = 0;
