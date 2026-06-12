@@ -48,29 +48,46 @@ src/
 │   │   ├── Pipeline/    # PipelineInterface, StageInterface, CoverageRecorderInterface, NullCoverageRecorder
 │   │   └── Port/        # Cross-layer ports — LLMClientInterface,
 │   │       │              BatchCapableLLMClientInterface, LLMResponse,
-│   │       │              AttackerCacheInterface, AdvisoryDatabaseInterface,
+│   │       │              AttackerCacheInterface, ReviewerCacheInterface,
+│   │       │              AdvisoryDatabaseInterface,
 │   │       │              ProjectFileScannerInterface, SecretScrubberInterface,
 │   │       │              TokenEstimatorInterface, RateLimiterInterface,
-│   │       │              PricingProviderInterface, StaticPreScannerInterface,
-│   │       │              CodeSlicerInterface, GitChangedFilesResolverInterface,
+│   │       │              PricingProviderInterface, ProgressReporterInterface,
+│   │       │              StaticPreScannerInterface, CodeSlicerInterface,
+│   │       │              ControllerAccessControlParserInterface,
+│   │       │              VoterCapabilityParserInterface,
+│   │       │              FormBindingParserInterface,
+│   │       │              GitChangedFilesResolverInterface,
 │   │       │              Attacker/ReviewerPromptBuilderInterface
 │   │       └── Tool/    # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
 │   ├── Application/     # Orchestration — no I/O, depends only on Domain
 │   │   ├── UseCase/     # Entry points: RunAuditUseCase, EstimateAuditCostUseCase
 │   │   ├── Pipeline/    # AuditPipeline + Stage/{IngestionStage, MappingStage, AuditStage, PoCSynthesisStage}
-│   │   └── Agent/       # AttackerAgent, ReviewerAgent, EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, PoCSynthesizer, Chunking/FileChunker
+│   │   └── Agent/       # AttackerAgent, ReviewerAgent, EscalatingAttackerAgent,
+│   │                      AuditOrchestrator, VulnerabilityFactory,
+│   │                      VulnerabilityCollector + RecordVulnerabilityToolFactoryInterface,
+│   │                      ReviewCollector + RecordReviewToolFactoryInterface,
+│   │                      PoCSynthesizer, Chunking/FileChunker
 │   └── Infrastructure/  # I/O adapters
 │       ├── LLM/         # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier,
 │       │                  CharacterBasedTokenEstimator, Delay/SleeperInterface + UsleepSleeper,
 │       │                  RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
 │       ├── FileSystem/  # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
+│       ├── Scan/        # RegexStaticPreScanner, RegexCodeSlicer,
+│       │                  PhpParser{ControllerAccessControl, VoterCapability, FormBinding}Parser
+│       │                  (+ Null* no-op twins)
+│       ├── Diff/        # ProcessGitChangedFilesResolver (git diff for --since)
 │       ├── Prompt/      # AttackerPromptBuilder, ReviewerPromptBuilder
-│       ├── Cache/       # FilesystemAttackerCache, NullAttackerCache
+│       ├── Cache/       # FilesystemAttackerCache, NullAttackerCache,
+│       │                  FilesystemReviewerCache, NullReviewerCache
 │       ├── Advisory/    # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase,
 │       │                  SymfonyProcessComposerAuditRunner + Exception/*
 │       ├── Pricing/     # StaticPricingProvider
+│       ├── Progress/    # ConsoleProgressReporter, LoggerProgressReporter,
+│       │                  NullProgressReporter, ProgressReporterHolder
 │       ├── Tool/        # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool,
-│       │                  SymfonyToolRegistryFactory
+│       │                  SymfonyToolRegistryFactory, RecordVulnerabilityTool + Factory,
+│       │                  RecordReviewTool + Factory
 │       └── Report/      # ReportRenderer (console / JSON / SARIF + Template/*.txt)
 ├── Command/             # AuditCommand + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, OutputFormat
 └── SymfonySecurityAuditorBundle.php  # Bundle class with configure() + loadExtension()
@@ -95,7 +112,7 @@ graph LR
         LLM["SymfonyAiLLMClient"]
         FS["ProjectFileScanner"]
         PROMPTS["PromptBuilders"]
-        CACHE["FilesystemAttackerCache · NullAttackerCache"]
+        CACHE["FilesystemAttackerCache · FilesystemReviewerCache\n(+ Null* twins)"]
         ADVISORY["ComposerAuditAdvisoryDatabase\nInMemoryAdvisoryDatabase\nSymfonyProcessComposerAuditRunner"]
         TOOLS["ReadFile · Grep · ListFiles · LookupAdvisory tools\nSymfonyToolRegistryFactory"]
         RENDERER["ReportRenderer"]
@@ -379,11 +396,11 @@ Sorts files by security priority before chunking:
 | 5        | Everything else |
 
 `analyze()` takes an immutable `AttackerAnalysisRequest` (files, mapping,
-`bypassCache`, `previousFindings`) plus a `CoverageRecorderInterface`. The
-chunk-priority ordering above is defined once on `FileChunker` over
-`ProjectFileType` cases. Risk markers are indexed by `RiskMarkerIndex`, and the
-deterministic-marker / prior-findings prompt preambles are rendered by
-`AttackerContextPromptRenderer`.
+`bypassCache`, `previousFindings`, `rejectedFindings`) plus a
+`CoverageRecorderInterface`. The chunk-priority ordering above is defined once
+on `FileChunker` over `ProjectFileType` cases. Risk markers are indexed by
+`RiskMarkerIndex`, and the deterministic-marker / prior-findings prompt
+preambles are rendered by `AttackerContextPromptRenderer`.
 
 Chunks the files (default `feature` strategy; `type` for the legacy
 priority-window). For each chunk: builds prompts via `AttackerPromptBuilder`,
@@ -409,6 +426,18 @@ each: builds context from the source file content, calls
 returns a new `Vulnerability` instance via copy-on-write
 (`withReviewerValidation` / `withElevatedSeverity` / `withCorrectedType`). On
 any error: returns the vulnerability with `reviewerValidated = false`.
+
+With `audit.reviewer_structured_collection: true`, the reviewer instead records
+each verdict by calling a schema-enforced `record_review` tool — mirroring the
+attacker's `record_vulnerability` seam — and verdicts are drained from a
+`ReviewCollector`. In this mode the tool replaces the reviewer's cross-file
+tools (`reviewer_tools_enabled`) and the concurrent fast path
+(`reviewer_max_concurrent`).
+
+Verdicts for findings with identical content against unchanged code are
+short-circuited by `ReviewerCacheInterface` (`FilesystemReviewerCache` by
+default, `NullReviewerCache` when `cache.enabled: false`), mirroring the
+attacker cache. `--no-cache` bypasses both caches for the run.
 
 ### `VulnerabilityFactory`
 
@@ -546,6 +575,11 @@ The reviewer prompt expects each entry of the JSON array to be shaped:
   "additional_attack_paths": "string|null"
 }
 ```
+
+With `audit.reviewer_structured_collection: true`, the same fields are recorded
+through the schema-enforced `record_review` tool instead (`id` and `accepted`
+required, the enums constrained by the schema), so the provider validates every
+verdict before the agent sees it.
 
 It includes a Symfony-specific false-positive playbook (Doctrine
 `setParameter()`, default CSRF, `mapped: false`, hardcoded-argv `Process`, etc.)

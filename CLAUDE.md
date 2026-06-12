@@ -64,22 +64,23 @@ src/
     Domain/          # Pure PHP — no framework, no I/O
       Model/         # Value objects and enums (Vulnerability, AuditReport, ProjectFile, ProjectFileType, RouteAccessControl, VoterCapability, FormBinding, VulnerabilityHydrationResult, VulnerabilityDropReason, …)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)
-      Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, StaticPreScannerInterface, CodeSlicerInterface, ControllerAccessControlParserInterface, VoterCapabilityParserInterface, FormBindingParserInterface, GitChangedFilesResolverInterface)
+      Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, ReviewerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, ProgressReporterInterface, StaticPreScannerInterface, CodeSlicerInterface, ControllerAccessControlParserInterface, VoterCapabilityParserInterface, FormBindingParserInterface, GitChangedFilesResolverInterface)
         Tool/        # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
     Application/     # Orchestration — no I/O, depends only on Domain
       UseCase/       # RunAuditUseCase, EstimateAuditCostUseCase (entry points)
       Pipeline/      # AuditPipeline + Stage/{IngestionStage, MappingStage, AuditStage, PoCSynthesisStage}
-      Agent/         # AttackerAgent (+ AttackerAnalysisRequest, RiskMarkerIndex, AttackerContextPromptRenderer), ReviewerAgent, EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, VulnerabilityCollector, RecordVulnerabilityToolFactoryInterface, PoCSynthesizer, Chunking/{ChunkingStrategy, FileChunker}
+      Agent/         # AttackerAgent (+ AttackerAnalysisRequest, RiskMarkerIndex, AttackerContextPromptRenderer), ReviewerAgent, EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, VulnerabilityCollector, RecordVulnerabilityToolFactoryInterface, ReviewCollector, RecordReviewToolFactoryInterface, PoCSynthesizer, Chunking/{ChunkingStrategy, FileChunker}
     Infrastructure/  # I/O adapters
       LLM/           # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier, CharacterBasedTokenEstimator, Delay/, RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
       FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
       Scan/          # RegexStaticPreScanner, NullStaticPreScanner, RegexCodeSlicer, NullCodeSlicer, PhpParserControllerAccessControlParser, NullControllerAccessControlParser, PhpParserVoterCapabilityParser, NullVoterCapabilityParser, PhpParserFormBindingParser, NullFormBindingParser
       Diff/          # ProcessGitChangedFilesResolver (git diff for --since)
       Prompt/        # AttackerPromptBuilder, ReviewerPromptBuilder
-      Cache/         # FilesystemAttackerCache, NullAttackerCache
+      Cache/         # FilesystemAttackerCache, NullAttackerCache, FilesystemReviewerCache, NullReviewerCache
       Advisory/      # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase (fallback), SymfonyProcessComposerAuditRunner
       Pricing/       # StaticPricingProvider
-      Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory
+      Progress/      # ConsoleProgressReporter, LoggerProgressReporter, NullProgressReporter, ProgressReporterHolder
+      Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory, RecordReviewTool, RecordReviewToolFactory
       Report/        # ReportRenderer (+ Template/*.txt stubs)
   Command/           # AuditCommand (Symfony Console: audit:run) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, OutputFormat enum
   SymfonySecurityAuditorBundle.php  # Bundle class (configure + loadExtension)
@@ -124,7 +125,11 @@ Command → Application → Domain ← Infrastructure (implements ports)
    only escalates flagged files to the expensive model.
 3. Filter — confidence ≥ 0.6
 4. `ReviewerAgent` — validates each finding (optionally with tools; optionally
-   concurrently), may adjust severity
+   concurrently), may adjust severity. With
+   `audit.reviewer_structured_collection: true`, verdicts come in through
+   schema-enforced `record_review` tool calls instead of a parsed JSON array.
+   Verdicts are cached across runs (`FilesystemReviewerCache`) when
+   `cache.enabled` is on.
 5. Deduplicate → persist to `AuditContext`
 
 After the loop, the optional `PoCSynthesisStage` runs (concrete reproduction
