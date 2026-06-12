@@ -36,8 +36,23 @@ final readonly class AuditReport
         ?AuditCost $auditCost,
         Vulnerability ...$vulnerabilities,
     ) {
-        $this->vulnerabilities = array_values($vulnerabilities);
+        $this->vulnerabilities = $this->orderedMostSevereFirst(array_values($vulnerabilities));
         $this->auditCost = $auditCost ?? AuditCost::zero('');
+    }
+
+    /**
+     * @param list<Vulnerability> $vulnerabilities
+     *
+     * @return list<Vulnerability>
+     */
+    private function orderedMostSevereFirst(array $vulnerabilities): array
+    {
+        usort(
+            $vulnerabilities,
+            static fn (Vulnerability $left, Vulnerability $right): int => $right->severity()->score() <=> $left->severity()->score(),
+        );
+
+        return $vulnerabilities;
     }
 
     public static function fromContext(AuditContext $auditContext, ?AuditCost $auditCost = null): self
