@@ -29,13 +29,26 @@ final readonly class CostCalculator
 {
     private const int TOKENS_PER_MILLION = 1_000_000;
 
+    // Anthropic prices cache reads at 0.1x and cache writes at 1.25x the base input rate.
+    private const float CACHE_READ_PRICE_MULTIPLIER = 0.1;
+
+    private const float CACHE_CREATION_PRICE_MULTIPLIER = 1.25;
+
     public function __construct(private PricingProviderInterface $pricingProvider) {}
 
-    public function costForCall(int $inputTokens, int $outputTokens, string $model): float
-    {
-        $inputCost = ($inputTokens / self::TOKENS_PER_MILLION) * $this->pricingProvider->pricePerMillionInputTokens($model);
+    public function costForCall(
+        int $inputTokens,
+        int $outputTokens,
+        string $model,
+        int $cacheReadTokens = 0,
+        int $cacheCreationTokens = 0,
+    ): float {
+        $inputPrice = $this->pricingProvider->pricePerMillionInputTokens($model);
+        $inputCost = ($inputTokens / self::TOKENS_PER_MILLION) * $inputPrice;
         $outputCost = ($outputTokens / self::TOKENS_PER_MILLION) * $this->pricingProvider->pricePerMillionOutputTokens($model);
+        $cacheReadCost = ($cacheReadTokens / self::TOKENS_PER_MILLION) * $inputPrice * self::CACHE_READ_PRICE_MULTIPLIER;
+        $cacheCreationCost = ($cacheCreationTokens / self::TOKENS_PER_MILLION) * $inputPrice * self::CACHE_CREATION_PRICE_MULTIPLIER;
 
-        return $inputCost + $outputCost;
+        return $inputCost + $outputCost + $cacheReadCost + $cacheCreationCost;
     }
 }

@@ -86,7 +86,7 @@ final readonly class RunAuditUseCase
 
         $snapshot = $this->tokenUsageRecorder->snapshot();
         $estimatedCost = $this->costCalculator instanceof CostCalculator
-            ? $this->costCalculator->costForCall($snapshot->inputTokens(), $snapshot->outputTokens(), $this->primaryModel)
+            ? $this->costCalculator->costForCall($snapshot->inputTokens(), $snapshot->outputTokens(), $this->primaryModel, $snapshot->cacheReadTokens(), $snapshot->cacheCreationTokens())
             : 0.0;
 
         return AuditCost::of($snapshot->inputTokens(), $snapshot->outputTokens(), $estimatedCost, $this->primaryModel);

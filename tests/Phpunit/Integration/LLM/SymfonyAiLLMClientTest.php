@@ -913,6 +913,42 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(30, $tokenUsageRecorder->snapshot()->outputTokens());
     }
 
+    public function test_complete_populates_cache_tokens_from_platform_metadata(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('done'),
+            new TokenUsage(promptTokens: 120, completionTokens: 30, cacheCreationTokens: 40, cacheReadTokens: 200),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            $platform,
+            'm',
+            new NullLogger(),
+            tokenUsageRecorder: $tokenUsageRecorder,
+        );
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame(200, $llmResponse->cacheReadTokens());
+        self::assertSame(40, $llmResponse->cacheCreationTokens());
+        self::assertSame(200, $tokenUsageRecorder->snapshot()->cacheReadTokens());
+        self::assertSame(40, $tokenUsageRecorder->snapshot()->cacheCreationTokens());
+    }
+
+    public function test_complete_defaults_cache_tokens_to_zero_when_token_usage_omits_them(): void
+    {
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            new TextResult('done'),
+            new TokenUsage(promptTokens: 120, completionTokens: 30),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame(0, $llmResponse->cacheReadTokens());
+        self::assertSame(0, $llmResponse->cacheCreationTokens());
+    }
+
     public function test_complete_returns_zero_tokens_when_platform_metadata_omits_token_usage(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();

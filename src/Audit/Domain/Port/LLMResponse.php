@@ -26,6 +26,8 @@ final readonly class LLMResponse
         private int $outputTokens,
         private string $model,
         private string $stopReason,
+        private int $cacheReadTokens,
+        private int $cacheCreationTokens,
     ) {}
 
     public static function create(
@@ -34,8 +36,10 @@ final readonly class LLMResponse
         int $outputTokens,
         string $model,
         string $stopReason,
+        int $cacheReadTokens = 0,
+        int $cacheCreationTokens = 0,
     ): self {
-        return new self($content, $inputTokens, $outputTokens, $model, $stopReason);
+        return new self($content, $inputTokens, $outputTokens, $model, $stopReason, $cacheReadTokens, $cacheCreationTokens);
     }
 
     public function content(): string
@@ -51,6 +55,16 @@ final readonly class LLMResponse
     public function outputTokens(): int
     {
         return $this->outputTokens;
+    }
+
+    public function cacheReadTokens(): int
+    {
+        return $this->cacheReadTokens;
+    }
+
+    public function cacheCreationTokens(): int
+    {
+        return $this->cacheCreationTokens;
     }
 
     public function model(): string
