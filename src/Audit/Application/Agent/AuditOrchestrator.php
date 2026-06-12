@@ -73,7 +73,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
                 break;
             }
 
-            $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext);
+            $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed());
             $newFindings = $this->persistReviewedFindings(array_values($reviewed), $auditContext);
 
             $this->logger->info('Iteration complete', [

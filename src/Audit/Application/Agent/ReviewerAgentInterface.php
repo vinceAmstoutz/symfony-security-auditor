@@ -26,5 +26,5 @@ interface ReviewerAgentInterface
      *
      * @return Vulnerability[]
      */
-    public function review(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder): array;
+    public function review(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false): array;
 }

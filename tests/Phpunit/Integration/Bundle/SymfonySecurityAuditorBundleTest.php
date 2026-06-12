@@ -37,11 +37,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
@@ -365,6 +368,36 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => false]]);
 
         self::assertInstanceOf(NullAttackerCache::class, $this->getPrivateService($kernel, AttackerCacheInterface::class));
+    }
+
+    public function test_bundle_wires_filesystem_reviewer_cache_when_cache_enabled(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => true]]);
+
+        self::assertInstanceOf(FilesystemReviewerCache::class, $this->getPrivateService($kernel, ReviewerCacheInterface::class));
+    }
+
+    public function test_bundle_wires_null_reviewer_cache_when_cache_disabled(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => false]]);
+
+        self::assertInstanceOf(NullReviewerCache::class, $this->getPrivateService($kernel, ReviewerCacheInterface::class));
+    }
+
+    public function test_bundle_reviewer_cache_dir_and_salt_derive_from_cache_dir_and_reviewer_model(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'reviewer_model' => 'claude-haiku-4-5-20251001',
+            'cache' => ['dir' => '/custom/cache'],
+        ]);
+        $container = $kernel->getContainer();
+
+        self::assertSame('/custom/cache/reviewer', $container->getParameter('symfony_security_auditor.cache.reviewer_dir'));
+        self::assertSame(
+            \sprintf('claude-haiku-4-5-20251001|reviewer-v%d', FilesystemReviewerCache::CACHE_VERSION),
+            $container->getParameter('symfony_security_auditor.cache.reviewer_key_salt'),
+        );
     }
 
     public function test_bundle_propagates_secret_scrubbing_config_to_parameters(): void

@@ -38,13 +38,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilder
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
@@ -419,6 +422,11 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.cache.enabled', $bundleConfiguration->cache->enabled);
         $builder->setParameter('symfony_security_auditor.cache.dir', $bundleConfiguration->cache->dir);
         $builder->setParameter('symfony_security_auditor.cache.advisory_dir', $bundleConfiguration->cache->dir.'/advisory');
+        $builder->setParameter('symfony_security_auditor.cache.reviewer_dir', $bundleConfiguration->cache->dir.'/reviewer');
+        $builder->setParameter(
+            'symfony_security_auditor.cache.reviewer_key_salt',
+            \sprintf('%s|reviewer-v%d', $bundleConfiguration->llm->reviewerModel(), FilesystemReviewerCache::CACHE_VERSION),
+        );
         $builder->setParameter('symfony_security_auditor.cache.prompt_caching', $bundleConfiguration->cache->promptCaching);
         $builder->setParameter(
             'symfony_security_auditor.cache.key_salt',
@@ -529,6 +537,11 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ? FilesystemAttackerCache::class
             : NullAttackerCache::class;
         $services->alias(AttackerCacheInterface::class, $cacheServiceId);
+
+        $reviewerCacheServiceId = $bundleConfiguration->cache->enabled
+            ? FilesystemReviewerCache::class
+            : NullReviewerCache::class;
+        $services->alias(ReviewerCacheInterface::class, $reviewerCacheServiceId);
 
         $scrubberServiceId = $bundleConfiguration->scan->secretScrubbingEnabled
             ? RegexSecretScrubber::class
