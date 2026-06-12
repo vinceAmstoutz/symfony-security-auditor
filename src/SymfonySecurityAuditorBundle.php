@@ -615,7 +615,6 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                     $bundleConfiguration->audit->staticPreScanLeanMode,
                     service(FileChunker::class),
                     service(CodeSlicerInterface::class),
-                    null,
                     service(RecordVulnerabilityToolFactoryInterface::class),
                     $bundleConfiguration->audit->structuredCollection,
                     service(ProgressReporterInterface::class),

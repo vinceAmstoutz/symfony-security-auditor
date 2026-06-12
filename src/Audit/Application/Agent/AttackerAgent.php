@@ -77,7 +77,6 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         private bool $leanMode = self::DEFAULT_LEAN_MODE,
         ?FileChunker $fileChunker = null,
         ?CodeSlicerInterface $codeSlicer = null,
-        ?AttackerContextPromptRenderer $attackerContextPromptRenderer = null,
         ?RecordVulnerabilityToolFactoryInterface $recordVulnerabilityToolFactory = null,
         private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
         ?ProgressReporterInterface $progressReporter = null,
@@ -90,7 +89,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         $chunkContextFactory = new ChunkContextFactory(
             $attackerPromptBuilder,
             $codeSlicer ?? new NullCodeSlicer(),
-            $attackerContextPromptRenderer ?? new AttackerContextPromptRenderer(),
+            new AttackerContextPromptRenderer(),
         );
         $attackerChunkCache = new AttackerChunkCache($attackerCache, $vulnerabilityFactory, $logger);
 

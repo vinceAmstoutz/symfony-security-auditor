@@ -354,7 +354,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.audit.static_prescan.lean_mode'),
             service(FileChunker::class),
             service(CodeSlicerInterface::class),
-            null,
             service(RecordVulnerabilityToolFactoryInterface::class),
             param('symfony_security_auditor.audit.structured_collection'),
             service(ProgressReporterInterface::class),
