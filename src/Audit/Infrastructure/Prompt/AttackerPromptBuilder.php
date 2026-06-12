@@ -31,8 +31,11 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
+    public const bool DEFAULT_EMIT_ALL_SKILLS = false;
+
     public function __construct(
         private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
+        private bool $emitAllSkills = self::DEFAULT_EMIT_ALL_SKILLS,
     ) {}
 
     /**
@@ -694,7 +697,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
 
         $blocks = [];
         foreach (self::SKILL_PRIORITY as $type) {
-            if (\in_array($type, $presentTypes, true)) {
+            if ($this->emitAllSkills || \in_array($type, $presentTypes, true)) {
                 $blocks[] = self::SKILLS[$type->value];
             }
         }

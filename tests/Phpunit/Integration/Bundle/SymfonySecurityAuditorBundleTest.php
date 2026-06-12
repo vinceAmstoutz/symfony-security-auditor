@@ -178,6 +178,23 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertTrue($kernel->getContainer()->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'));
     }
 
+    public function test_bundle_defaults_stable_system_prompt_to_false(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        self::assertFalse($kernel->getContainer()->getParameter('symfony_security_auditor.audit.stable_system_prompt'));
+    }
+
+    public function test_bundle_propagates_stable_system_prompt_opt_in_to_parameter(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'audit' => ['stable_system_prompt' => true],
+        ]);
+
+        self::assertTrue($kernel->getContainer()->getParameter('symfony_security_auditor.audit.stable_system_prompt'));
+    }
+
     public function test_bundle_propagates_scan_config_to_parameters(): void
     {
         $kernel = $this->boot([

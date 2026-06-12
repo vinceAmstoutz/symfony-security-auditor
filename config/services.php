@@ -173,7 +173,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             inline_service(ValidatorInterface::class)->factory([Validation::class, 'createValidator']),
         ]);
     $defaultsConfigurator->set(AttackerPromptBuilder::class)
-        ->args([param('symfony_security_auditor.audit.structured_collection')]);
+        ->args([
+            param('symfony_security_auditor.audit.structured_collection'),
+            param('symfony_security_auditor.audit.stable_system_prompt'),
+        ]);
     $defaultsConfigurator->alias(AttackerPromptBuilderInterface::class, AttackerPromptBuilder::class);
 
     $defaultsConfigurator->set(ReviewerPromptBuilder::class)

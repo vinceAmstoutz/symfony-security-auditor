@@ -179,6 +179,10 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->defaultFalse()
                             ->info("When true, the reviewer records each verdict by calling a schema-enforced `record_review` tool instead of returning a JSON array, so a malformed verdict never costs a discarded (but fully billed) response. The `record_review` tool replaces the reviewer's cross-file tools (`reviewer_tools_enabled`) and the concurrent fast path (`reviewer_max_concurrent`) in this mode. Default false (JSON-array output, the previous behaviour).")
                         ->end()
+                        ->booleanNode('stable_system_prompt')
+                            ->defaultFalse()
+                            ->info('When true, the attacker emits the full expert skill set in its system prompt for every chunk, instead of only the skills matching the chunk\'s file types. This makes the system-prompt prefix byte-identical across chunks so provider prompt caching (`cache_retention` in `ai.yaml`) reads it on every call after the first — a large input-token saving on multi-chunk audits. The trade-off is a larger prompt when caching is off, so it is opt-in. Default false (relevance-only skills).')
+                        ->end()
                         ->integerNode('max_tool_iterations')
                             ->defaultValue(AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS)
                             ->min(1)
@@ -394,6 +398,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.tools_enabled', $bundleConfiguration->audit->toolsEnabled);
         $builder->setParameter('symfony_security_auditor.audit.structured_collection', $bundleConfiguration->audit->structuredCollection);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_structured_collection', $bundleConfiguration->audit->reviewerStructuredCollection);
+        $builder->setParameter('symfony_security_auditor.audit.stable_system_prompt', $bundleConfiguration->audit->stableSystemPrompt);
         $builder->setParameter('symfony_security_auditor.audit.max_tool_iterations', $bundleConfiguration->audit->maxToolIterations);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_tools_enabled', $bundleConfiguration->audit->reviewerToolsEnabled);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_max_tool_iterations', $bundleConfiguration->audit->reviewerMaxToolIterations);

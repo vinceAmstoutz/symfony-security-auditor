@@ -40,6 +40,7 @@ Every key under `symfony_security_auditor:` documented in
 - `audit.max_iterations`, `audit.min_confidence`, `audit.reviewer_batch_size`,
   `audit.tools_enabled`, `audit.structured_collection`,
   `audit.reviewer_structured_collection`, `audit.max_tool_iterations`,
+  `audit.stable_system_prompt`, `audit.max_tool_iterations`,
   `audit.reviewer_tools_enabled`, `audit.reviewer_max_tool_iterations`,
   `audit.reviewer_max_concurrent`, `audit.static_prescan.enabled`,
   `audit.static_prescan.lean_mode`, `audit.chunking.strategy`,

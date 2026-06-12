@@ -418,6 +418,44 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('<skills role="', $prompt);
     }
 
+    public function test_stable_mode_emits_every_skill_block_regardless_of_chunk_contents(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: true);
+        $projectFile = ProjectFile::create(
+            'src/Service/Mailer.php',
+            '/app/src/Service/Mailer.php',
+            '<?php class Mailer {}',
+        );
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        // All 14 skill roles are present even though only a generic PHP file is in the chunk.
+        self::assertSame(14, substr_count($prompt, '<skills role="'));
+    }
+
+    public function test_stable_mode_system_prompt_is_byte_identical_across_chunk_types(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: true);
+
+        // The whole point of stable mode: the system prompt prefix is identical
+        // regardless of the chunk, so provider prompt caching reads it every call.
+        self::assertSame(
+            $attackerPromptBuilder->buildSystemPrompt([ProjectFile::create('src/Controller/UserController.php', '/app/c', '<?php class UserController {}')]),
+            $attackerPromptBuilder->buildSystemPrompt([ProjectFile::create('src/Security/PostVoter.php', '/app/v', '<?php class PostVoter {}')]),
+        );
+    }
+
+    public function test_default_mode_emits_only_skills_matching_the_chunk(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: false);
+        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/v', '<?php class PostVoter {}');
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('<skills role="voter">', $prompt);
+        self::assertStringNotContainsString('<skills role="controller">', $prompt);
+    }
+
     public function test_it_injects_controller_skills_when_controller_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
