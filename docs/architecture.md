@@ -434,10 +434,12 @@ attacker's `record_vulnerability` seam — and verdicts are drained from a
 tools (`reviewer_tools_enabled`) and the concurrent fast path
 (`reviewer_max_concurrent`).
 
-Verdicts for findings with identical content against unchanged code are
-short-circuited by `ReviewerCacheInterface` (`FilesystemReviewerCache` by
-default, `NullReviewerCache` when `cache.enabled: false`), mirroring the
-attacker cache. `--no-cache` bypasses both caches for the run.
+In the sequential one-finding-per-call mode (the default), verdicts for findings
+with identical content against unchanged code are short-circuited by
+`ReviewerCacheInterface` (`FilesystemReviewerCache` by default,
+`NullReviewerCache` when `cache.enabled: false`), mirroring the attacker cache.
+Batched, concurrent, and structured-collection reviews always call the LLM.
+`--no-cache` bypasses both caches for the run.
 
 ### `VulnerabilityFactory`
 

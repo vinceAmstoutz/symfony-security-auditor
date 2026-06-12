@@ -93,9 +93,13 @@ mislabelling firewall-covered routes.
   reuses the stored verdict instead of calling the LLM again. The cache reuses
   the existing `cache.enabled` switch (when `false`, a `NullReviewerCache` no-op
   is wired) and lives in a `reviewer` subdirectory alongside the attacker cache
-  under `cache.dir`. The `--no-cache` flag bypasses it for the run (no reads, no
-  writes), mirroring the attacker cache. A reviewer-prompt or verdict-contract
-  change is invalidated by bumping `FilesystemReviewerCache::CACHE_VERSION`.
+  under `cache.dir`. The cache applies in the default one-finding-per-call
+  sequential review mode; batched (`reviewer_batch_size > 1`), concurrent
+  (`reviewer_max_concurrent > 1`), and structured
+  (`reviewer_structured_collection: true`) reviews always call the LLM. The
+  `--no-cache` flag bypasses it for the run (no reads, no writes), mirroring the
+  attacker cache. A reviewer-prompt or verdict-contract change is invalidated by
+  bumping `FilesystemReviewerCache::CACHE_VERSION`.
 - **Prompt-cache tokens are now priced into the audit cost.** Providers that
   report prompt caching (Anthropic's `cache_read_input_tokens` /
   `cache_creation_input_tokens`) were previously invisible to cost accounting:

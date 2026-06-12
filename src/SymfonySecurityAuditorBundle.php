@@ -181,7 +181,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                         ->end()
                         ->booleanNode('reviewer_structured_collection')
                             ->defaultFalse()
-                            ->info("When true, the reviewer records each verdict by calling a schema-enforced `record_review` tool instead of returning a JSON array, so a malformed verdict never costs a discarded (but fully billed) response. The `record_review` tool replaces the reviewer's cross-file tools (`reviewer_tools_enabled`) and the concurrent fast path (`reviewer_max_concurrent`) in this mode. Default false (JSON-array output, the previous behaviour).")
+                            ->info("When true, the reviewer records each verdict by calling a schema-enforced `record_review` tool instead of returning a JSON array, so a malformed verdict never costs a discarded (but fully billed) response. The `record_review` tool replaces the reviewer's cross-file tools (`reviewer_tools_enabled`) and the concurrent fast path (`reviewer_max_concurrent`) in this mode, and the reviewer-verdict cache does not apply. Default false (JSON-array output, the previous behaviour).")
                         ->end()
                         ->booleanNode('stable_system_prompt')
                             ->defaultFalse()
