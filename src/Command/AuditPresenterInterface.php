@@ -22,7 +22,10 @@ interface AuditPresenterInterface
 {
     public function header(SymfonyStyle $symfonyStyle, string $projectPath): void;
 
-    public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled): void;
+    /**
+     * @param list<string> $configNotices
+     */
+    public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled, array $configNotices = []): void;
 
     public function unsupportedModelWarnings(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void;
 

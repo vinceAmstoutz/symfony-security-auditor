@@ -445,6 +445,11 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('record_review', $prompt);
     }
 
+    public function test_prompt_version_starts_at_one(): void
+    {
+        self::assertSame(1, ReviewerPromptBuilder::PROMPT_VERSION);
+    }
+
     private function makeVulnerability(string $filePath): Vulnerability
     {
         return Vulnerability::create(

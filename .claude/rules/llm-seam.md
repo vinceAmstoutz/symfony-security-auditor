@@ -13,8 +13,12 @@ Application and LLM I/O.
 - `AttackerAgent` and `ReviewerAgent` must **never** import any `symfony/ai`
   type. Only `LLMClientInterface` and `LLMResponse` (both in
   `Audit\Domain\Port\`).
-- `SymfonyAiLLMClient` is the only class that may import `symfony/ai`. It lives
-  in Infrastructure and implements the Domain port.
+- `Audit\Infrastructure\LLM` is the only namespace that may import `symfony/ai`:
+  `SymfonyAiLLMClient` implements the Domain ports and builds the
+  platform-facing collaborators (`RetryingPlatformInvoker`,
+  `SequentialToolLoop`, `BatchWindowResolver`, `ToolConversationWavefront`,
+  `PlatformResultExtractor`, `PlatformOptionsFactory`, `PlatformToolsMapper`)
+  that share the imports. Nothing outside that namespace touches `symfony/ai`.
 - Swapping providers (Anthropic → OpenAI → Ollama) must require **zero code
   changes** — only `config/packages/ai.yaml`.
 - `LLMResponse::parseJson()` strips markdown fences before decoding — always use

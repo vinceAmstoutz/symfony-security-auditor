@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ConfigurationNotices;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
@@ -60,6 +61,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
@@ -74,8 +76,13 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $definition->rootNode()
             ->children()
                 ->scalarNode('model')
-                    ->defaultValue('claude-opus-4-7')
+                    ->defaultValue('claude-opus-4-8')
                     ->info('Model name for both Attacker and Reviewer. Must be supported by the configured platform.')
+                ->end()
+                ->enumNode('profile')
+                    ->values(['fast', 'balanced', 'thorough'])
+                    ->defaultValue('balanced')
+                    ->info('One-knob preset bundling the cost/speed/depth levers; any explicitly configured key always wins over the profile. `fast`: one attacker iteration, lean pre-scan (marker-bearing files only), code slicing on, up to 4 concurrent reviewer calls. `balanced` (default): identical to configuring nothing. `thorough`: balanced plus PoC synthesis for high-severity validated findings.')
                 ->end()
                 ->scalarNode('attacker_model')
                     ->defaultNull()
@@ -156,9 +163,9 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                     ->addDefaultsIfNotSet()
                     ->children()
                         ->integerNode('max_iterations')
-                            ->defaultValue(AuditOrchestrator::DEFAULT_MAX_ITERATIONS)
+                            ->defaultNull()
                             ->min(1)
-                            ->info('Maximum number of attacker/reviewer iterations per audit.')
+                            ->info('Maximum number of attacker/reviewer iterations per audit. Defaults to the active profile (balanced/thorough: 3, fast: 1).')
                         ->end()
                         ->floatNode('min_confidence')
                             ->defaultValue(AuditOrchestrator::DEFAULT_MIN_CONFIDENCE)
@@ -180,12 +187,12 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->info("When true (default), the attacker emits findings by calling a schema-enforced `record_vulnerability` tool, one call per finding, instead of returning a JSON array. The platform validates each call against the tool's input schema, so malformed shapes (bare strings like \"dev\"/\"test\", wrapper objects like `{\"vulnerabilities\": [...]}` ) become structurally impossible. Works across every provider that supports tool use (Anthropic, OpenAI, Mistral, Ollama with tool-capable models). Set to false to fall back to the tightened JSON-array prompt path.")
                         ->end()
                         ->booleanNode('reviewer_structured_collection')
-                            ->defaultFalse()
-                            ->info("When true, the reviewer records each verdict by calling a schema-enforced `record_review` tool instead of returning a JSON array, so a malformed verdict never costs a discarded (but fully billed) response. The `record_review` tool replaces the reviewer's cross-file tools (`reviewer_tools_enabled`) and the concurrent fast path (`reviewer_max_concurrent`) in this mode. Default false (JSON-array output, the previous behaviour).")
+                            ->defaultTrue()
+                            ->info('When true (the default), the reviewer records each verdict by calling a schema-enforced `record_review` tool instead of returning a JSON array, so a malformed verdict never costs a discarded (but fully billed) response. Verdicts are served from and stored to the reviewer-verdict cache exactly like the JSON path. The explicit opt-ins `reviewer_tools_enabled: true` and `reviewer_max_concurrent` > 1 take precedence and keep the JSON path. Set false to force JSON-array output (for models without tool-use support).')
                         ->end()
                         ->booleanNode('stable_system_prompt')
-                            ->defaultFalse()
-                            ->info('When true, the attacker emits the full expert skill set in its system prompt for every chunk, instead of only the skills matching the chunk\'s file types. This makes the system-prompt prefix byte-identical across chunks so provider prompt caching (`cache_retention` in `ai.yaml`) reads it on every call after the first — a large input-token saving on multi-chunk audits. The trade-off is a larger prompt when caching is off, so it is opt-in. Default false (relevance-only skills).')
+                            ->defaultTrue()
+                            ->info('When true (the default), the attacker emits the full expert skill set in its system prompt for every chunk, instead of only the skills matching the chunk\'s file types. This makes the system-prompt prefix byte-identical across chunks so provider prompt caching reads it on every call after the first — Anthropic (`cache_retention` in `ai.yaml`, default `short`), OpenAI, Gemini, and DeepSeek all cache prompt prefixes; a large input-token saving on multi-chunk audits. Set false (relevance-only skills, smaller prompt) for providers without prompt caching.')
                         ->end()
                         ->integerNode('max_tool_iterations')
                             ->defaultValue(AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS)
@@ -196,10 +203,15 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->defaultFalse()
                             ->info('Give the reviewer access to the same tool registry the attacker uses, so it can verify cross-file context (parent-class guards, access_control rules, upstream sanitizers) instead of guessing from the Full File Context alone. Default false — adds round-trips per finding; opt-in for high-precision audits.')
                         ->end()
-                        ->integerNode('reviewer_max_concurrent')
-                            ->defaultValue(1)
+                        ->integerNode('attacker_max_concurrent')
+                            ->defaultNull()
                             ->min(1)
-                            ->info('Maximum reviewer LLM calls resolved concurrently when reviewing one finding per call (reviewer_batch_size <= 1) with reviewer tools off. The reviewer phase is often half the audit wall-clock; setting this to 4-8 (within your provider rate limit) cuts it proportionally. Default 1 (sequential). Ignored when reviewer tools are enabled or the configured platform has no async transport.')
+                            ->info('Maximum attacker chunk analyses resolved concurrently in the default structured-collection mode (audit.structured_collection: true), when the configured platform exposes an async transport. The attacker phase is usually the longest; setting this to 4-8 (within your provider rate limit) cuts it proportionally. Defaults to the active profile (balanced/thorough: 1 — sequential, fast: 4). Ignored when audit.tools_enabled gives the attacker a cross-file tool registry or structured_collection is off.')
+                        ->end()
+                        ->integerNode('reviewer_max_concurrent')
+                            ->defaultNull()
+                            ->min(1)
+                            ->info('Maximum reviewer LLM calls resolved concurrently when reviewing one finding per call (reviewer_batch_size <= 1) with reviewer tools off. The reviewer phase is often half the audit wall-clock; setting this to 4-8 (within your provider rate limit) cuts it proportionally. Defaults to the active profile (balanced/thorough: 1 — sequential, fast: 4). Ignored when reviewer tools are enabled or the configured platform has no async transport.')
                         ->end()
                         ->integerNode('reviewer_max_tool_iterations')
                             ->defaultValue(ReviewerAgent::DEFAULT_MAX_TOOL_ITERATIONS)
@@ -215,8 +227,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                                     ->info('When true, every chunk is preceded by a "Pre-Scan Risk Markers" section in the user message. Default true — pure win on detection quality, zero token cost for the scan itself.')
                                 ->end()
                                 ->booleanNode('lean_mode')
-                                    ->defaultFalse()
-                                    ->info('When true, files with zero markers are dropped before the LLM ever sees them. Slashes token spend on real codebases (often 40-70%) at the cost of missing patterns the regex pre-scanner doesn\'t know about. Default false — opt-in for cost-sensitive runs.')
+                                    ->defaultNull()
+                                    ->info("When true, files with zero markers are dropped before the LLM ever sees them. Slashes token spend on real codebases (often 40-70%) at the cost of missing patterns the regex pre-scanner doesn't know about. Defaults to the active profile (balanced/thorough: false, fast: true).")
                                 ->end()
                             ->end()
                         ->end()
@@ -250,7 +262,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->info('Trim large PHP files down to security-relevant slices before they reach the LLM. The slicer keeps imports, attributes, class signatures, properties, and the FULL body of methods that touch security-relevant tokens (Request, Doctrine query builder, unserialize, shell exec, mailer, HttpClient, …). All other lines are replaced one-for-one with a `// elided` placeholder so line numbers stay accurate. Typical saving: 50-70% input tokens on controllers / services over 100 lines.')
                             ->children()
                                 ->booleanNode('enabled')
-                                    ->defaultFalse()
+                                    ->defaultNull()
                                     ->info('When true, the configured CodeSlicerInterface runs over every chunked file. Default false — opt-in for cost-sensitive audits; smaller files and unfamiliar idioms keep more signal when sent unsliced.')
                                 ->end()
                                 ->integerNode('min_lines_before_slicing')
@@ -265,7 +277,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->info('Optional follow-up stage that generates a concrete, copy-pasteable proof-of-concept (curl command, console invocation, payload body) for every validated finding at or above the configured severity floor. Spends extra LLM tokens per finding; off by default. Turn on when shipping reports to engineers who need actionable reproduction steps.')
                             ->children()
                                 ->booleanNode('enabled')
-                                    ->defaultFalse()
+                                    ->defaultNull()
                                     ->info('When true, the PoCSynthesisStage runs after the audit and attaches a `synthesized_poc` field to qualifying findings. Default false.')
                                 ->end()
                                 ->enumNode('severity_floor')
@@ -376,7 +388,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *     reviewer_max_output_tokens: int|null,
      *     provider_json_mode: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int, attacker_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * } $config
      */
@@ -407,6 +419,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.reviewer_tools_enabled', $bundleConfiguration->audit->reviewerToolsEnabled);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_max_tool_iterations', $bundleConfiguration->audit->reviewerMaxToolIterations);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_max_concurrent', $bundleConfiguration->audit->reviewerMaxConcurrent);
+        $builder->setParameter('symfony_security_auditor.audit.attacker_max_concurrent', $bundleConfiguration->audit->attackerMaxConcurrent);
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.enabled', $bundleConfiguration->audit->staticPreScanEnabled);
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.lean_mode', $bundleConfiguration->audit->staticPreScanLeanMode);
         $builder->setParameter('symfony_security_auditor.audit.chunking.strategy', $bundleConfiguration->audit->chunkingStrategy);
@@ -420,19 +433,21 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.retry.initial_delay_ms', $bundleConfiguration->retry->initialDelayMs);
         $builder->setParameter('symfony_security_auditor.audit.retry.backoff_multiplier', $bundleConfiguration->retry->backoffMultiplier);
         $builder->setParameter('symfony_security_auditor.audit.retry.jitter_ratio', $bundleConfiguration->retry->jitterRatio);
+
+        $builder->setParameter('symfony_security_auditor.config_notices', ConfigurationNotices::of($bundleConfiguration->cache, $bundleConfiguration->audit, $bundleConfiguration->llm));
         $builder->setParameter('symfony_security_auditor.cache.enabled', $bundleConfiguration->cache->enabled);
         $builder->setParameter('symfony_security_auditor.cache.dir', $bundleConfiguration->cache->dir);
         $builder->setParameter('symfony_security_auditor.cache.advisory_dir', $bundleConfiguration->cache->dir.'/advisory');
         $builder->setParameter('symfony_security_auditor.cache.reviewer_dir', $bundleConfiguration->cache->dir.'/reviewer');
         $builder->setParameter(
             'symfony_security_auditor.cache.reviewer_key_salt',
-            \sprintf('%s|reviewer-v%d', $bundleConfiguration->llm->reviewerModel(), FilesystemReviewerCache::CACHE_VERSION),
+            \sprintf('%s|reviewer-v%d|prompt-v%d', $bundleConfiguration->llm->reviewerModel(), FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
         );
         $builder->setParameter('symfony_security_auditor.cache.prompt_caching', $bundleConfiguration->cache->promptCaching);
         $builder->setParameter(
             'symfony_security_auditor.cache.key_salt',
             \sprintf(
-                '%s|prompt-v%d|prescan-v%d|patterns-%s',
+                '%s|prompt-v%d|prescan-v%d|patterns-%s|collect-%s|skills-%s',
                 $bundleConfiguration->llm->attackerModel(),
                 AttackerPromptBuilder::PROMPT_VERSION,
                 RegexStaticPreScanner::CACHE_VERSION,
@@ -444,6 +459,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                     0,
                     16,
                 ),
+                $bundleConfiguration->audit->structuredCollection ? 'tool' : 'json',
+                $bundleConfiguration->audit->stableSystemPrompt ? 'full' : 'lean',
             ),
         );
 
@@ -598,7 +615,6 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                     $bundleConfiguration->audit->staticPreScanLeanMode,
                     service(FileChunker::class),
                     service(CodeSlicerInterface::class),
-                    null,
                     service(RecordVulnerabilityToolFactoryInterface::class),
                     $bundleConfiguration->audit->structuredCollection,
                     service(ProgressReporterInterface::class),

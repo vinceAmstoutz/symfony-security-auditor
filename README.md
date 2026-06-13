@@ -106,7 +106,15 @@ The Flex recipe already created this file — pick your model:
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-7'
+    model: 'claude-opus-4-8'
+```
+
+Optionally pick a one-knob preset — `fast`, `balanced` (default), or `thorough`;
+any explicitly configured key always wins:
+
+```yaml
+symfony_security_auditor:
+    profile: 'fast'
 ```
 
 ### 5. Run
@@ -324,7 +332,7 @@ bin/console audit:run --dry-run
  Estimating audit cost (dry run)...
  ───────────────────────────────────
 
- * Model : claude-opus-4-7
+ * Model : claude-opus-4-8
  * Tokens: 52,400 in / 4,200 out (total: 56,600)
  * Cost  : $0.3670 (estimate)
 

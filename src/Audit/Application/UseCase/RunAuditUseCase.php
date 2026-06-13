@@ -37,8 +37,9 @@ final readonly class RunAuditUseCase
      * @param list<string> $scanPaths    optional project-relative subdirectories
      *                                   to restrict the scan to; empty list (the
      *                                   default) audits the whole project
-     * @param bool         $bypassCache  when true, agents skip the attacker
-     *                                   cache entirely (no reads, no writes)
+     * @param bool         $bypassCache  when true, agents skip the attacker and
+     *                                   reviewer caches entirely (no reads, no
+     *                                   writes)
      * @param ?string      $diffSinceRef when set, only files changed against
      *                                   this git ref are audited; null audits
      *                                   every file in scope

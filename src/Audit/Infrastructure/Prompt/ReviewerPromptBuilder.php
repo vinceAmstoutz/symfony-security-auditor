@@ -19,6 +19,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilder
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInterface
 {
+    public const int PROMPT_VERSION = 1;
+
     private const string SEVERITY_RUBRIC = <<<'RUBRIC'
         Severity rubric (apply this scale when accepting OR when setting adjusted_severity — do not inflate):
         - critical: unauthenticated RCE, full authentication bypass, mass data exfiltration without auth, hardcoded production secret in a committed file.

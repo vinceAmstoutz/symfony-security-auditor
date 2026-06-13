@@ -19,13 +19,13 @@ use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ContextAwareAttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 
 use function Symfony\Component\String\u;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class FilesystemAttackerCache implements AttackerCacheInterface
+final readonly class FilesystemAttackerCache implements ContextAwareAttackerCacheInterface
 {
     public function __construct(
         private string $cacheDir,
@@ -40,7 +40,17 @@ final readonly class FilesystemAttackerCache implements AttackerCacheInterface
 
     public function get(array $chunk): ?array
     {
-        $path = $this->pathForChunk($chunk);
+        return $this->getForContext($chunk, '');
+    }
+
+    public function store(array $chunk, array $rawVulnerabilities): void
+    {
+        $this->storeForContext($chunk, '', $rawVulnerabilities);
+    }
+
+    public function getForContext(array $chunk, string $contextKey): ?array
+    {
+        $path = $this->pathForChunk($chunk, $contextKey);
 
         if (!$this->filesystem->exists($path)) {
             return null;
@@ -74,9 +84,9 @@ final readonly class FilesystemAttackerCache implements AttackerCacheInterface
         }
     }
 
-    public function store(array $chunk, array $rawVulnerabilities): void
+    public function storeForContext(array $chunk, string $contextKey, array $rawVulnerabilities): void
     {
-        $path = $this->pathForChunk($chunk);
+        $path = $this->pathForChunk($chunk, $contextKey);
 
         try {
             $encoded = json_encode($rawVulnerabilities, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
@@ -118,9 +128,9 @@ final readonly class FilesystemAttackerCache implements AttackerCacheInterface
     /**
      * @param list<ProjectFile> $chunk
      */
-    private function pathForChunk(array $chunk): string
+    private function pathForChunk(array $chunk, string $contextKey): string
     {
-        $key = $this->keyForChunk($chunk);
+        $key = $this->keyForChunk($chunk, $contextKey);
 
         return \sprintf('%s/%s/%s.json', u($this->cacheDir)->trimEnd('/')->toString(), u($key)->slice(0, 2)->toString(), $key);
     }
@@ -128,7 +138,7 @@ final readonly class FilesystemAttackerCache implements AttackerCacheInterface
     /**
      * @param list<ProjectFile> $chunk
      */
-    private function keyForChunk(array $chunk): string
+    private function keyForChunk(array $chunk, string $contextKey): string
     {
         $signatures = [];
         foreach ($chunk as $file) {
@@ -140,6 +150,10 @@ final readonly class FilesystemAttackerCache implements AttackerCacheInterface
         $payload = implode("\n", $signatures);
         if ('' !== $this->keySalt) {
             $payload = $this->keySalt."\0".$payload;
+        }
+
+        if ('' !== $contextKey) {
+            $payload .= "\0context:".$contextKey;
         }
 
         return hash('sha256', $payload);

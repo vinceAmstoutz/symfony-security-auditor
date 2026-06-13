@@ -47,30 +47,56 @@ src/
 │   │   ├── Model/       # Value objects and enums
 │   │   ├── Pipeline/    # PipelineInterface, StageInterface, CoverageRecorderInterface, NullCoverageRecorder
 │   │   └── Port/        # Cross-layer ports — LLMClientInterface,
-│   │       │              BatchCapableLLMClientInterface, LLMResponse,
-│   │       │              AttackerCacheInterface, AdvisoryDatabaseInterface,
+│   │       │              BatchCapableLLMClientInterface,
+│   │       │              ToolBatchCapableLLMClientInterface, LLMResponse,
+│   │       │              AttackerCacheInterface,
+│   │       │              ContextAwareAttackerCacheInterface,
+│   │       │              ReviewerCacheInterface,
+│   │       │              AdvisoryDatabaseInterface,
 │   │       │              ProjectFileScannerInterface, SecretScrubberInterface,
 │   │       │              TokenEstimatorInterface, RateLimiterInterface,
-│   │       │              PricingProviderInterface, StaticPreScannerInterface,
-│   │       │              CodeSlicerInterface, GitChangedFilesResolverInterface,
+│   │       │              PricingProviderInterface, ProgressReporterInterface,
+│   │       │              StaticPreScannerInterface, CodeSlicerInterface,
+│   │       │              ControllerAccessControlParserInterface,
+│   │       │              VoterCapabilityParserInterface,
+│   │       │              FormBindingParserInterface,
+│   │       │              GitChangedFilesResolverInterface,
 │   │       │              Attacker/ReviewerPromptBuilderInterface
 │   │       └── Tool/    # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
 │   ├── Application/     # Orchestration — no I/O, depends only on Domain
 │   │   ├── UseCase/     # Entry points: RunAuditUseCase, EstimateAuditCostUseCase
 │   │   ├── Pipeline/    # AuditPipeline + Stage/{IngestionStage, MappingStage, AuditStage, PoCSynthesisStage}
-│   │   └── Agent/       # AttackerAgent, ReviewerAgent, EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, PoCSynthesizer, Chunking/FileChunker
+│   │   └── Agent/       # AttackerAgent (+ Chunk/* collaborators),
+│   │                      ReviewerAgent (+ Review/* collaborators),
+│   │                      EscalatingAttackerAgent,
+│   │                      AuditOrchestrator, VulnerabilityFactory,
+│   │                      VulnerabilityCollector + RecordVulnerabilityToolFactoryInterface,
+│   │                      ReviewCollector + RecordReviewToolFactoryInterface,
+│   │                      PoCSynthesizer, Chunking/FileChunker
 │   └── Infrastructure/  # I/O adapters
-│       ├── LLM/         # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier,
+│       ├── LLM/         # SymfonyAiLLMClient (+ RetryingPlatformInvoker, SequentialToolLoop,
+│       │                  BatchWindowResolver, ToolConversationWavefront, PlatformResultExtractor,
+│       │                  PlatformOptionsFactory, PlatformToolsMapper, PromptTokenEstimator),
+│       │                  RetryPolicy, TransientFailureClassifier,
 │       │                  CharacterBasedTokenEstimator, Delay/SleeperInterface + UsleepSleeper,
 │       │                  RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
 │       ├── FileSystem/  # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
-│       ├── Prompt/      # AttackerPromptBuilder, ReviewerPromptBuilder
-│       ├── Cache/       # FilesystemAttackerCache, NullAttackerCache
+│       ├── Scan/        # RegexStaticPreScanner, RegexCodeSlicer,
+│       │                  PhpParser{ControllerAccessControl, VoterCapability, FormBinding}Parser
+│       │                  (+ Null* no-op twins)
+│       ├── Diff/        # ProcessGitChangedFilesResolver (git diff for --since)
+│       ├── Prompt/      # AttackerPromptBuilder (+ SymfonyMappingContextRenderer,
+│       │                  NumberedFileContextRenderer), ReviewerPromptBuilder
+│       ├── Cache/       # FilesystemAttackerCache, NullAttackerCache,
+│       │                  FilesystemReviewerCache, NullReviewerCache
 │       ├── Advisory/    # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase,
 │       │                  SymfonyProcessComposerAuditRunner + Exception/*
 │       ├── Pricing/     # StaticPricingProvider
+│       ├── Progress/    # ConsoleProgressReporter, LoggerProgressReporter,
+│       │                  NullProgressReporter, ProgressReporterHolder
 │       ├── Tool/        # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool,
-│       │                  SymfonyToolRegistryFactory
+│       │                  SymfonyToolRegistryFactory, RecordVulnerabilityTool + Factory,
+│       │                  RecordReviewTool + Factory
 │       └── Report/      # ReportRenderer (console / JSON / SARIF + Template/*.txt)
 ├── Command/             # AuditCommand + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, OutputFormat
 └── SymfonySecurityAuditorBundle.php  # Bundle class with configure() + loadExtension()
@@ -95,7 +121,7 @@ graph LR
         LLM["SymfonyAiLLMClient"]
         FS["ProjectFileScanner"]
         PROMPTS["PromptBuilders"]
-        CACHE["FilesystemAttackerCache · NullAttackerCache"]
+        CACHE["FilesystemAttackerCache · FilesystemReviewerCache\n(+ Null* twins)"]
         ADVISORY["ComposerAuditAdvisoryDatabase\nInMemoryAdvisoryDatabase\nSymfonyProcessComposerAuditRunner"]
         TOOLS["ReadFile · Grep · ListFiles · LookupAdvisory tools\nSymfonyToolRegistryFactory"]
         RENDERER["ReportRenderer"]
@@ -379,8 +405,17 @@ Sorts files by security priority before chunking:
 | 5        | Everything else |
 
 `analyze()` takes an immutable `AttackerAnalysisRequest` (files, mapping,
-`bypassCache`, `previousFindings`) plus a `CoverageRecorderInterface`. The
-chunk-priority ordering above is defined once on `FileChunker` over
+`bypassCache`, `previousFindings`, `rejectedFindings`) plus a
+`CoverageRecorderInterface`. The agent itself is a thin orchestrator — pre-scan,
+optional lean-mode filtering, chunking, strategy selection, and the
+start/complete logging — delegating the per-chunk work to `Chunk\` collaborators
+it builds at construction time: `ChunkContextFactory` assembles each chunk's
+prompts (markers + cross-iteration preambles, code slicing) and derives the
+cache key/cacheability into a `ChunkContext`; `AttackerChunkCache` adapts
+`AttackerCacheInterface` (context-aware key when supported) and turns a hit into
+a hydrated result; `SequentialChunkAnalyzer` and `ConcurrentChunkAnalyzer` are
+the two analysis strategies; `ChunkCoverageRecorder` records per-file coverage.
+The chunk-priority ordering above is defined once on `FileChunker` over
 `ProjectFileType` cases. Risk markers are indexed by `RiskMarkerIndex`, and the
 deterministic-marker / prior-findings prompt preambles are rendered by
 `AttackerContextPromptRenderer`.
@@ -398,7 +433,18 @@ rather than propagating.
 
 Identical chunks (same content hash) are short-circuited by
 `AttackerCacheInterface` (`FilesystemAttackerCache` by default,
-`NullAttackerCache` when `cache.enabled: false`).
+`NullAttackerCache` when `cache.enabled: false`). With
+`audit.attacker_max_concurrent` > 1, the default structured-collection mode
+analyses cache-miss chunks concurrently through
+`ToolBatchCapableLLMClientInterface` (each chunk keeps its own
+`record_vulnerability` registry and `VulnerabilityCollector`); cache hits
+short-circuit first and chunk order, coverage, caching, and drop accounting are
+identical to the sequential path. Chunks carrying cross-iteration context (prior
+validated findings, reviewer-rejected findings) are keyed by chunk + a SHA-256
+of the rendered context preambles through the opt-in
+`ContextAwareAttackerCacheInterface`, so iterations 2+ are cacheable too; a
+cache that does not implement the context-aware port is simply skipped for those
+chunks.
 
 ### `ReviewerAgent`
 
@@ -409,6 +455,35 @@ each: builds context from the source file content, calls
 returns a new `Vulnerability` instance via copy-on-write
 (`withReviewerValidation` / `withElevatedSeverity` / `withCorrectedType`). On
 any error: returns the vulnerability with `reviewerValidated = false`.
+
+With `audit.reviewer_structured_collection: true` (the default), the reviewer
+instead records each verdict by calling a schema-enforced `record_review` tool —
+mirroring the attacker's `record_vulnerability` seam — and verdicts are drained
+from a `ReviewCollector`. The explicit opt-in `reviewer_tools_enabled: true`
+takes precedence over the structured mode and keeps the JSON path.
+`reviewer_max_concurrent` > 1 composes with the structured mode when the client
+implements `ToolBatchCapableLLMClientInterface` (each finding records through
+its own `record_review` registry, resolved concurrently); otherwise it falls
+back to the JSON concurrent path.
+
+In the one-finding-per-call modes (the default — structured, JSON, sequential,
+or concurrent), verdicts for findings with identical content against unchanged
+code are short-circuited by `ReviewerCacheInterface` (`FilesystemReviewerCache`
+by default, `NullReviewerCache` when `cache.enabled: false`), mirroring the
+attacker cache; concurrent reviews serve cached verdicts first and dispatch only
+the misses. Batched reviews always call the LLM. `--no-cache` bypasses both
+caches for the run.
+
+Like the attacker, the agent itself is a thin orchestrator — mode resolution and
+the start/complete logging — delegating to `Review\` collaborators it builds at
+construction time: `SequentialReviewAnalyzer`, `StructuredReviewAnalyzer`,
+`ConcurrentReviewAnalyzer`, `ConcurrentStructuredReviewAnalyzer`, and
+`BatchReviewAnalyzer` are the five analysis strategies; `VerdictApplier` applies
+one verdict payload to a finding; `BatchVerdictApplier` matches batch verdicts
+to findings by id; `ReviewOutcomeRecorder` turns verdicts, raw responses, and
+failures into the reviewed finding plus its coverage entry;
+`ReviewerVerdictCache` adapts the optional cache port; `CodeContextResolver`
+resolves a finding's source content.
 
 ### `VulnerabilityFactory`
 
@@ -489,6 +564,16 @@ concurrent chunks share the freeze instead of stampeding the provider.
 Swapping LLM providers (Anthropic → OpenAI → Mistral → Ollama → …) requires no
 code changes — only `ai.yaml` configuration.
 
+The client itself is a facade over collaborators it builds at construction time,
+all inside `Infrastructure\LLM`: `RetryingPlatformInvoker` (the retry loop
+above), `SequentialToolLoop` (the autonomous tool-using conversation behind
+`completeWithTools()`), `BatchWindowResolver` and `ToolConversationWavefront`
+(the `completeBatch()` / `completeBatchWithTools()` concurrency windows, falling
+back to the sequential paths on failure), `PlatformResultExtractor` (token
+usage, tool calls, text), `PlatformOptionsFactory` (temperature +
+Anthropic-dialect options), and `PlatformToolsMapper` (Domain `ToolDefinition` →
+platform `Tool` schema mapping).
+
 ### `LLMResponse`
 
 Thin value object wrapping the raw string content. Key method: `parseJson()`
@@ -505,7 +590,11 @@ root).
 ### `AttackerPromptBuilder` / `ReviewerPromptBuilder`
 
 Build system and user prompts fed to `LLMClientInterface::complete()`. Both are
-pure string builders with no network or I/O dependencies.
+pure string builders with no network or I/O dependencies. The attacker's
+`SymfonyMapping` sections (route access-control map, voter coverage, form
+bindings) are rendered by `SymfonyMappingContextRenderer`, and its numbered
+`<file>` source blocks by `NumberedFileContextRenderer`; the builders themselves
+hold the prompt copy and the skill blocks.
 
 The attacker prompt has two modes selected by `audit.structured_collection`:
 
@@ -546,6 +635,11 @@ The reviewer prompt expects each entry of the JSON array to be shaped:
   "additional_attack_paths": "string|null"
 }
 ```
+
+With `audit.reviewer_structured_collection: true` (the default), the same fields
+are recorded through the schema-enforced `record_review` tool instead (`id` and
+`accepted` required, the enums constrained by the schema), so the provider
+validates every verdict before the agent sees it.
 
 It includes a Symfony-specific false-positive playbook (Doctrine
 `setParameter()`, default CSRF, `mapped: false`, hardcoded-argv `Process`, etc.)

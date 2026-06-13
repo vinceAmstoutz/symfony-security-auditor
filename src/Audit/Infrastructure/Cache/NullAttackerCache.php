@@ -13,10 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ContextAwareAttackerCacheInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class NullAttackerCache implements AttackerCacheInterface
+final readonly class NullAttackerCache implements ContextAwareAttackerCacheInterface
 {
     public function get(array $chunk): ?array
     {
@@ -24,6 +24,16 @@ final readonly class NullAttackerCache implements AttackerCacheInterface
     }
 
     public function store(array $chunk, array $rawVulnerabilities): void
+    {
+        // intentionally noop
+    }
+
+    public function getForContext(array $chunk, string $contextKey): ?array
+    {
+        return null;
+    }
+
+    public function storeForContext(array $chunk, string $contextKey, array $rawVulnerabilities): void
     {
         // intentionally noop
     }

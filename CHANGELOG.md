@@ -10,8 +10,50 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.9.0] — 2026-06-12 — Slipstream
+
+A config-less performance and reviewer-trust release. The zero-configuration
+path is now also the cheap and fast one: `claude-opus-4-8` and a byte-stable
+attacker system prompt (provider prompt-cache friendly on Anthropic, OpenAI,
+Gemini, and DeepSeek) by default, a one-knob `profile` preset for everything
+else, caches that finally cover iterations 2+ and concurrent reviews, and
+reviewer verdicts recorded through a schema-enforced `record_review` tool by
+default — cached across runs and fed back to the attacker when findings are
+rejected. The long audit stage shows live progress in the console, prompt-cache
+tokens are priced into the reported cost, reports lead with their most severe
+findings, and the attacker's route map stops mislabelling firewall-covered
+routes.
+
 ### Added
 
+- **`audit:run` warns when cheap-then-expensive escalation can't save money.**
+  `audit.escalation.cheap_model` falls back to the reviewer model when unset,
+  which on a single-model config resolves to the attacker model — so the cheap
+  sweep costs as much as the expensive pass and escalation saves nothing,
+  silently. `ConfigurationNotices` now emits a pre-flight stderr notice when
+  escalation is enabled and the resolved cheap model equals the attacker model,
+  pointing at `audit.escalation.cheap_model`. Two further notices cover the
+  silent no-op cases where a concurrency knob is set but ignored:
+  `reviewer_max_concurrent` > 1 with `reviewer_tools_enabled: true`, and
+  `attacker_max_concurrent` > 1 without the structured-collection-and-no-tools
+  mode it requires.
+- **The `--dry-run` note now states that real runs typically cost less.** The
+  estimate excludes provider prompt-cache discounts and warm attacker/reviewer
+  caches; the dry-run output now says so explicitly instead of only the docs
+  mentioning it.
+- **New `audit.attacker_max_concurrent` config key — concurrent attacker chunk
+  analysis.** The attacker analysed chunks strictly sequentially, so the longest
+  audit phase paid one full LLM round trip per chunk back-to-back. In the
+  default structured-collection mode, when the configured platform exposes an
+  async transport, cache-miss chunks are now resolved concurrently through the
+  new `ToolBatchCapableLLMClientInterface` wavefront — each chunk keeps its own
+  `record_vulnerability` registry and `VulnerabilityCollector`, so findings
+  never cross-contaminate. Cache hits short-circuit first; chunk order,
+  coverage, caching, and drop accounting are byte-identical to the sequential
+  path. Defaults to the active profile (`fast`: `4`, `balanced`/`thorough`:
+  `1`); ignored when `audit.tools_enabled` gives the attacker a cross-file tool
+  registry or `audit.structured_collection` is off. Public API per
+  `docs/versioning.md`.
 - **Live audit-stage progress and an upfront long-run notice in the console.**
   During the audit stage — by far the longest — the progress bar sat frozen at
   the same percentage with no sign the run was still alive, sometimes for 20+
@@ -44,48 +86,65 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   served from the attacker cache (the same rule already applied to validated
   prior findings), so the new context always reaches the model.
 - **New `audit.reviewer_structured_collection` config key — provider-validated
-  reviewer verdicts.** The reviewer returned its verdicts as a hand-parsed JSON
-  array; a malformed response was discarded (after being fully billed) and every
-  finding in the call degraded to rejected. With
-  `symfony_security_auditor.audit.reviewer_structured_collection: true`, the
-  reviewer instead records each verdict by calling a schema-enforced
-  `record_review` tool (`src/Audit/Infrastructure/Tool/RecordReviewTool.php`) —
-  mirroring the attacker's `record_vulnerability` seam: the provider validates
-  every call against the tool's JSON schema (`id` + `accepted` required,
+  reviewer verdicts, on by default.** The reviewer returned its verdicts as a
+  hand-parsed JSON array; a malformed response was discarded (after being fully
+  billed) and every finding in the call degraded to rejected. The reviewer now
+  records each verdict by calling a schema-enforced `record_review` tool
+  (`src/Audit/Infrastructure/Tool/RecordReviewTool.php`) — mirroring the
+  attacker's `record_vulnerability` seam: the provider validates every call
+  against the tool's JSON schema (`id` + `accepted` required,
   `adjusted_severity` / `corrected_type` constrained to their enums), so a
   malformed verdict is structurally impossible. Verdicts flow through a new
   `ReviewCollector` (Application) and are re-keyed by `id` exactly like the JSON
-  batch path. In this mode the `record_review` tool replaces the reviewer's
-  cross-file tools (`reviewer_tools_enabled`) and the concurrent fast path
-  (`reviewer_max_concurrent`). Default `false` (JSON-array output, the previous
-  behaviour).
-- **New `audit.stable_system_prompt` config key for cheaper multi-chunk
-  audits.** By default the attacker emits only the expert skill blocks matching
-  a chunk's file types, so its system prompt differs chunk-to-chunk and provider
-  prompt caching (Anthropic `cache_retention` in `ai.yaml`) rarely gets a hit on
-  it. Setting `symfony_security_auditor.audit.stable_system_prompt: true` makes
-  `AttackerPromptBuilder`
+  batch path. Defaults to `true` — matching the attacker's
+  `structured_collection` default, so the schema-safe (and cheaper: no
+  billed-but-discarded responses) path needs no configuration. The released
+  explicit opt-in `reviewer_tools_enabled: true` takes precedence and keeps the
+  JSON path; `reviewer_max_concurrent` > 1 composes with the structured mode on
+  platforms with an async transport and falls back to the JSON path otherwise —
+  in both cases behaving at least as well as before the upgrade. Set
+  `reviewer_structured_collection: false` to force JSON-array output (the safety
+  net for models without tool-use support).
+- **New `audit.stable_system_prompt` config key — a byte-stable attacker system
+  prompt for provider cache reuse, on by default.** The attacker used to emit
+  only the expert skill blocks matching a chunk's file types, so its system
+  prompt differed chunk-to-chunk and provider prompt caching rarely got a hit on
+  it — Anthropic (`cache_retention` in `ai.yaml`, default `short`), OpenAI,
+  Gemini, and DeepSeek all cache prompt prefixes that this defeated. With
+  `stable_system_prompt: true` (the default), `AttackerPromptBuilder`
   (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) emit the full
   skill set for every chunk, so the system-prompt prefix is byte-identical
   across chunks: the first chunk pays a cache write and every subsequent chunk
   reads the prefix at the provider's discounted cache-read rate. The trade-off
   is a larger prompt when caching is off, so the key defaults to `false`
-  (relevance-only skills, the previous behaviour).
+  (relevance-only skills, the previous behaviour). Both this flag and
+  `structured_collection` are folded into the attacker cache key salt, so
+  toggling either invalidates cached responses produced under the other prompt
+  shape instead of replaying them.
 - **Reviewer verdicts are now cached across runs, skipping redundant reviewer
   LLM calls.** A new filesystem cache
   (`src/Audit/Infrastructure/Cache/FilesystemReviewerCache.php`, behind the
   Domain port `src/Audit/Domain/Port/ReviewerCacheInterface.php`) stores each
   reviewer verdict keyed by the SHA-256 of the finding's stable content (its
   `Vulnerability::toArray()` minus the non-deterministic `id`) plus the reviewed
-  code context, folded behind a salt of `{reviewer_model}|reviewer-v{N}`. When
-  the attacker re-surfaces a finding with identical content against unchanged
-  code — the common case on repeated CI/PR scans — `ReviewerAgent::review()`
-  reuses the stored verdict instead of calling the LLM again. The cache reuses
-  the existing `cache.enabled` switch (when `false`, a `NullReviewerCache` no-op
-  is wired) and lives in a `reviewer` subdirectory alongside the attacker cache
-  under `cache.dir`. The `--no-cache` flag bypasses it for the run (no reads, no
-  writes), mirroring the attacker cache. A reviewer-prompt or verdict-contract
-  change is invalidated by bumping `FilesystemReviewerCache::CACHE_VERSION`.
+  code context, folded behind a salt of
+  `{reviewer_model}|reviewer-v{N}|prompt-v{M}`. When the attacker re-surfaces a
+  finding with identical content against unchanged code — the common case on
+  repeated CI/PR scans — `ReviewerAgent::review()` reuses the stored verdict
+  instead of calling the LLM again. The cache reuses the existing
+  `cache.enabled` switch (when `false`, a `NullReviewerCache` no-op is wired)
+  and lives in a `reviewer` subdirectory alongside the attacker cache under
+  `cache.dir`. The cache applies to one-finding-per-call reviews — the default,
+  in the structured `record_review` mode, the JSON mode, and the concurrent
+  paths (cached verdicts are served first and only the misses are dispatched);
+  batched (`reviewer_batch_size > 1`) reviews always call the LLM, and
+  `audit:run` prints a one-shot stderr notice when that combination is
+  configured so the disabled cache is never silent. The `--no-cache` flag
+  bypasses it for the run (no reads, no writes), mirroring the attacker cache. A
+  reviewer-prompt change invalidates the cache automatically via
+  `ReviewerPromptBuilder::PROMPT_VERSION` in the salt; a storage-format or
+  verdict-contract change is invalidated by bumping
+  `FilesystemReviewerCache::CACHE_VERSION`.
 - **Prompt-cache tokens are now priced into the audit cost.** Providers that
   report prompt caching (Anthropic's `cache_read_input_tokens` /
   `cache_creation_input_tokens`) were previously invisible to cost accounting:
@@ -96,14 +155,66 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   carries them on `LLMResponse` (new `cacheReadTokens()` /
   `cacheCreationTokens()` accessors, defaulting to `0`) and accumulates them in
   `TokenUsageRecorder` / `TokenUsageSnapshot`. `CostCalculator::costForCall()`
-  prices them against the model's input rate using Anthropic's published
-  multipliers — cache reads at `0.1x`, cache writes at `1.25x` — so both the
-  live budget enforcement (`BudgetTracker`) and the reported
-  `estimated_cost_usd` reflect real cache spend. Runs against providers that do
-  not report cache tokens are unaffected (the new counts default to `0`).
+  prices them against the model's input rate — for Claude models at Anthropic's
+  published multipliers (cache reads at `0.1x`, cache writes at `1.25x` for the
+  default 5-minute cache); for any other model that reports these fields, cache
+  tokens are conservatively priced at the plain input rate rather than asserting
+  Anthropic's economics — so both the live budget enforcement (`BudgetTracker`)
+  and the reported `estimated_cost_usd` reflect real cache spend. Runs against
+  providers that do not report cache tokens are unaffected (the new counts
+  default to `0`).
+
+- **New top-level `profile` config key — one knob instead of ten.**
+  `symfony_security_auditor.profile` accepts `fast`, `balanced` (default), or
+  `thorough` and pre-sets the cost/speed/depth levers (`audit.max_iterations`,
+  `audit.static_prescan.lean_mode`, `audit.code_slicing.enabled`,
+  `audit.poc_synthesis.enabled`, `audit.reviewer_max_concurrent`) through the
+  new Domain enum `src/Audit/Domain/Configuration/AuditProfile.php`. A profile
+  only fills the keys you left unset — any explicitly configured key always
+  wins. `fast` runs a single attacker iteration over marker-bearing files with
+  code slicing and four concurrent reviewer calls; `balanced` is byte-identical
+  to configuring nothing; `thorough` adds PoC synthesis. Public API per
+  `docs/versioning.md`.
+- **Concurrent structured reviews — `reviewer_max_concurrent` now composes with
+  `record_review` instead of disabling it.** A new opt-in Domain port
+  (`src/Audit/Domain/Port/ToolBatchCapableLLMClientInterface.php`) lets a client
+  resolve several independent tool-using conversations concurrently;
+  `SymfonyAiLLMClient` implements it as a wavefront — each round dispatches the
+  next platform invocation for every still-pending conversation without
+  blocking, then executes the requested tools against that conversation's own
+  registry, so on an async transport the rounds overlap on the wire. A
+  conversation that fails before any tool ran falls back to the proven
+  sequential path; one that fails after a tool produced side effects finalizes
+  as an empty response so tools never execute twice. With
+  `reviewer_max_concurrent` > 1 the reviewer now reviews findings concurrently
+  in the structured mode (each finding records through its own `record_review`
+  tool) and only falls back to the JSON concurrent path on clients without the
+  capability.
+- **The attacker cache now covers iterations 2+.** Chunks carrying
+  cross-iteration context (prior validated findings, reviewer-rejected findings)
+  used to bypass the attacker cache entirely, so every multi-pass audit re-paid
+  for those chunks even on unchanged code. A new opt-in Domain port
+  (`src/Audit/Domain/Port/ContextAwareAttackerCacheInterface.php`) keys an entry
+  by chunk + a SHA-256 of the rendered context preambles;
+  `FilesystemAttackerCache` and `NullAttackerCache` implement it, and an empty
+  context key addresses the same entry as the context-free `get()`/`store()`
+  pair so existing on-disk entries stay readable. A cache that does not
+  implement the port keeps the previous skip-on-context behaviour.
+- **`audit:run` now surfaces configuration combinations that silently disable a
+  cost saver.** The bundle computes a list of config notices at compile time
+  (currently: the reviewer-verdict cache not applying when
+  `audit.reviewer_batch_size > 1` while `cache.enabled` is on) and
+  `AuditPresenter` prints each one to stderr before the run, alongside the
+  existing secret-scrubbing warning — visible in every output format without
+  polluting machine-readable stdout.
 
 ### Changed
 
+- **The default model is now `claude-opus-4-8`.** The `model` key defaulted to
+  `claude-opus-4-7`; Anthropic lists Opus 4.8 at the same `$5/$25` per-MTok
+  price with higher capability, and the FAQ already recommended it — so a
+  zero-config install now gets the better model at unchanged cost. Pin
+  `model: 'claude-opus-4-7'` to keep the previous default.
 - **Reports now list vulnerabilities most-severe-first.** `AuditReport`
   (`src/Audit/Domain/Model/AuditReport.php`) kept vulnerabilities in discovery
   order, so a lone high-severity finding could sit buried between medium and low
@@ -1294,6 +1405,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.9.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.9.0
 [1.8.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.8.0
 [1.7.2]:

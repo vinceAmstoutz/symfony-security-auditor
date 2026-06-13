@@ -56,6 +56,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
 /** @internal not part of the BC promise — the command *name* (`audit:run`) and its CLI surface are public, but the PHP class itself is for internal use only. */
 final readonly class AuditCommand
 {
+    /**
+     * @param list<string> $configNotices
+     */
     public function __construct(
         private RunAuditUseCase $runAuditUseCase,
         private ReportWriterInterface $reportWriter,
@@ -64,6 +67,7 @@ final readonly class AuditCommand
         private EstimateAuditCostUseCase $estimateAuditCostUseCase,
         private ProgressReporterHolder $progressReporterHolder,
         private bool $secretScrubbingEnabled,
+        private array $configNotices = [],
     ) {}
 
     public function __invoke(
@@ -74,7 +78,7 @@ final readonly class AuditCommand
 
         $this->auditPresenter->header($symfonyStyle, $projectPath);
 
-        $this->auditPresenter->preflightWarnings($symfonyStyle, $this->secretScrubbingEnabled);
+        $this->auditPresenter->preflightWarnings($symfonyStyle, $this->secretScrubbingEnabled, $this->configNotices);
 
         $scanPaths = $auditCommandInput->scanPaths();
 

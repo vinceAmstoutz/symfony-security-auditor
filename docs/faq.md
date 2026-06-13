@@ -187,9 +187,10 @@ prompt caching enabled (default):
 | GPT-4o only                         | $2 – $6              |
 | DeepSeek / Mistral / Ollama (local) | ~$0 / $0             |
 
-Tips: enable Anthropic prompt caching (`cache_retention` in `ai.yaml`; default
-`short` already on), use `cache.enabled` for repeated CI runs, use split-model
-in CI, run nightly not per-PR. See
+Tips: set `profile: fast` (one attacker iteration, lean pre-scan, code slicing,
+concurrent reviews), enable Anthropic prompt caching (`cache_retention` in
+`ai.yaml`; default `short` already on), use `cache.enabled` for repeated CI
+runs, use split-model in CI, run nightly not per-PR. See
 [CI → Managing LLM Costs](ci.md#managing-llm-costs).
 
 ### How long does an audit take?

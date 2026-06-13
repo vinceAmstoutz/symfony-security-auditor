@@ -354,10 +354,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.audit.static_prescan.lean_mode'),
             service(FileChunker::class),
             service(CodeSlicerInterface::class),
-            null,
             service(RecordVulnerabilityToolFactoryInterface::class),
             param('symfony_security_auditor.audit.structured_collection'),
             service(ProgressReporterInterface::class),
+            param('symfony_security_auditor.audit.attacker_max_concurrent'),
         ]);
 
     $defaultsConfigurator->alias(AttackerAgentInterface::class, AttackerAgent::class);
@@ -409,6 +409,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(EstimateAuditCostUseCase::class),
             service(ProgressReporterHolder::class),
             param('symfony_security_auditor.scan.secret_scrubbing.enabled'),
+            param('symfony_security_auditor.config_notices'),
         ])
         ->tag('console.command');
 };

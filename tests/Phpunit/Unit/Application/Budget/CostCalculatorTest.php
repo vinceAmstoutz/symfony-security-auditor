@@ -63,25 +63,39 @@ final class CostCalculatorTest extends TestCase
         self::assertEqualsWithDelta(7.0e-7, $costCalculator->costForCall(7, 0, 'model'), 1e-15);
     }
 
-    public function test_cache_read_tokens_cost_one_tenth_of_the_input_price(): void
+    public function test_cache_read_tokens_on_claude_models_cost_one_tenth_of_the_input_price(): void
     {
         $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
 
-        self::assertEqualsWithDelta(0.3, $costCalculator->costForCall(0, 0, 'model', 1_000_000, 0), 1e-12);
+        self::assertEqualsWithDelta(0.3, $costCalculator->costForCall(0, 0, 'claude-opus-4-7', 1_000_000, 0), 1e-12);
     }
 
-    public function test_cache_creation_tokens_cost_one_and_a_quarter_of_the_input_price(): void
+    public function test_cache_creation_tokens_on_claude_models_cost_one_and_a_quarter_of_the_input_price(): void
     {
         $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
 
-        self::assertEqualsWithDelta(3.75, $costCalculator->costForCall(0, 0, 'model', 0, 1_000_000), 1e-12);
+        self::assertEqualsWithDelta(3.75, $costCalculator->costForCall(0, 0, 'claude-opus-4-7', 0, 1_000_000), 1e-12);
+    }
+
+    public function test_cache_read_tokens_on_non_claude_models_cost_the_plain_input_price(): void
+    {
+        $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
+
+        self::assertEqualsWithDelta(3.0, $costCalculator->costForCall(0, 0, 'gpt-5', 1_000_000, 0), 1e-12);
+    }
+
+    public function test_cache_creation_tokens_on_non_claude_models_cost_the_plain_input_price(): void
+    {
+        $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
+
+        self::assertEqualsWithDelta(3.0, $costCalculator->costForCall(0, 0, 'gpt-5', 0, 1_000_000), 1e-12);
     }
 
     public function test_cost_sums_input_output_and_both_cache_components(): void
     {
         $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
 
-        self::assertEqualsWithDelta(0.02205, $costCalculator->costForCall(1_000, 1_000, 'model', 1_000, 1_000), 1e-12);
+        self::assertEqualsWithDelta(0.02205, $costCalculator->costForCall(1_000, 1_000, 'claude-opus-4-7', 1_000, 1_000), 1e-12);
     }
 
     public function test_cache_tokens_default_to_zero_cost(): void

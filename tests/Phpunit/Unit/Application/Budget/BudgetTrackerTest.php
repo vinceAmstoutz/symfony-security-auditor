@@ -153,7 +153,7 @@ final class BudgetTrackerTest extends TestCase
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0);
 
-        $budgetTracker->recordCall(LLMResponse::create('x', 0, 0, 'gpt-4o', 'end_turn', 1_000_000, 0));
+        $budgetTracker->recordCall(LLMResponse::create('x', 0, 0, 'claude-opus-4-7', 'end_turn', 1_000_000, 0));
 
         self::assertSame(1.0, $budgetTracker->costUsdUsed());
     }
@@ -162,7 +162,7 @@ final class BudgetTrackerTest extends TestCase
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0);
 
-        $budgetTracker->recordCall(LLMResponse::create('x', 0, 0, 'gpt-4o', 'end_turn', 0, 1_000_000));
+        $budgetTracker->recordCall(LLMResponse::create('x', 0, 0, 'claude-opus-4-7', 'end_turn', 0, 1_000_000));
 
         self::assertSame(12.5, $budgetTracker->costUsdUsed());
     }

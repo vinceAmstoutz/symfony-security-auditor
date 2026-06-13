@@ -62,24 +62,26 @@ Commit messages are validated separately in CI via
 src/
   Audit/
     Domain/          # Pure PHP — no framework, no I/O
+      Configuration/ # Typed config VOs (BundleConfiguration, AuditProfile, LLMConfiguration, …)
       Model/         # Value objects and enums (Vulnerability, AuditReport, ProjectFile, ProjectFileType, RouteAccessControl, VoterCapability, FormBinding, VulnerabilityHydrationResult, VulnerabilityDropReason, …)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)
-      Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, StaticPreScannerInterface, CodeSlicerInterface, ControllerAccessControlParserInterface, VoterCapabilityParserInterface, FormBindingParserInterface, GitChangedFilesResolverInterface)
+      Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, ToolBatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, ContextAwareAttackerCacheInterface, ReviewerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, ProgressReporterInterface, StaticPreScannerInterface, CodeSlicerInterface, ControllerAccessControlParserInterface, VoterCapabilityParserInterface, FormBindingParserInterface, GitChangedFilesResolverInterface)
         Tool/        # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
     Application/     # Orchestration — no I/O, depends only on Domain
       UseCase/       # RunAuditUseCase, EstimateAuditCostUseCase (entry points)
       Pipeline/      # AuditPipeline + Stage/{IngestionStage, MappingStage, AuditStage, PoCSynthesisStage}
-      Agent/         # AttackerAgent (+ AttackerAnalysisRequest, RiskMarkerIndex, AttackerContextPromptRenderer), ReviewerAgent, EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, VulnerabilityCollector, RecordVulnerabilityToolFactoryInterface, PoCSynthesizer, Chunking/{ChunkingStrategy, FileChunker}
+      Agent/         # AttackerAgent (+ AttackerAnalysisRequest, RiskMarkerIndex, AttackerContextPromptRenderer, Chunk/{ChunkContext, ChunkContextFactory, AttackerChunkCache, ChunkCoverageRecorder, SequentialChunkAnalyzer, ConcurrentChunkAnalyzer}), ReviewerAgent (+ Review/{VerdictApplier, BatchVerdictApplier, ReviewOutcomeRecorder, ReviewerVerdictCache, CodeContextResolver, SequentialReviewAnalyzer, StructuredReviewAnalyzer, ConcurrentReviewAnalyzer, ConcurrentStructuredReviewAnalyzer, BatchReviewAnalyzer}), EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, VulnerabilityCollector, RecordVulnerabilityToolFactoryInterface, ReviewCollector, RecordReviewToolFactoryInterface, PoCSynthesizer, Chunking/{ChunkingStrategy, FileChunker}
     Infrastructure/  # I/O adapters
-      LLM/           # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier, CharacterBasedTokenEstimator, Delay/, RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
+      LLM/           # SymfonyAiLLMClient (+ RetryingPlatformInvoker, SequentialToolLoop, BatchWindowResolver, ToolConversationWavefront, PlatformResultExtractor, PlatformOptionsFactory, PlatformToolsMapper, PromptTokenEstimator), RetryPolicy, TransientFailureClassifier, CharacterBasedTokenEstimator, Delay/, RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
       FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
       Scan/          # RegexStaticPreScanner, NullStaticPreScanner, RegexCodeSlicer, NullCodeSlicer, PhpParserControllerAccessControlParser, NullControllerAccessControlParser, PhpParserVoterCapabilityParser, NullVoterCapabilityParser, PhpParserFormBindingParser, NullFormBindingParser
       Diff/          # ProcessGitChangedFilesResolver (git diff for --since)
-      Prompt/        # AttackerPromptBuilder, ReviewerPromptBuilder
-      Cache/         # FilesystemAttackerCache, NullAttackerCache
+      Prompt/        # AttackerPromptBuilder (+ SymfonyMappingContextRenderer, NumberedFileContextRenderer), ReviewerPromptBuilder
+      Cache/         # FilesystemAttackerCache, NullAttackerCache, FilesystemReviewerCache, NullReviewerCache
       Advisory/      # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase (fallback), SymfonyProcessComposerAuditRunner
       Pricing/       # StaticPricingProvider
-      Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory
+      Progress/      # ConsoleProgressReporter, LoggerProgressReporter, NullProgressReporter, ProgressReporterHolder
+      Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory, RecordReviewTool, RecordReviewToolFactory
       Report/        # ReportRenderer (+ Template/*.txt stubs)
   Command/           # AuditCommand (Symfony Console: audit:run) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, OutputFormat enum
   SymfonySecurityAuditorBundle.php  # Bundle class (configure + loadExtension)
@@ -120,11 +122,19 @@ Command → Application → Domain ← Infrastructure (implements ports)
    default (`audit.structured_collection: true`), findings come in through
    `record_vulnerability` tool calls validated by the provider against the
    tool's JSON schema; with the flag off, the attacker parses a JSON array from
-   the response. Optional `EscalatingAttackerAgent` runs a cheap model first and
+   the response. With `audit.attacker_max_concurrent` > 1 (the `fast` profile
+   sets 4) and a tool-batch-capable client, cache-miss chunks are analyzed
+   concurrently. Optional `EscalatingAttackerAgent` runs a cheap model first and
    only escalates flagged files to the expensive model.
 3. Filter — confidence ≥ 0.6
-4. `ReviewerAgent` — validates each finding (optionally with tools; optionally
-   concurrently), may adjust severity
+4. `ReviewerAgent` — validates each finding, may adjust severity. By default
+   (`audit.reviewer_structured_collection: true`), verdicts come in through
+   schema-enforced `record_review` tool calls; the explicit opt-in
+   `reviewer_tools_enabled` keeps the JSON path, and `reviewer_max_concurrent`
+   > 1 reviews findings concurrently (structured when the client supports tool
+   > batching, JSON otherwise). Verdicts are cached across runs
+   > (`FilesystemReviewerCache`) when `cache.enabled` is on; concurrent reviews
+   > serve cached verdicts first and dispatch only the misses.
 5. Deduplicate → persist to `AuditContext`
 
 After the loop, the optional `PoCSynthesisStage` runs (concrete reproduction
@@ -138,7 +148,14 @@ Minimal:
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-7'
+    model: 'claude-opus-4-8'
+```
+
+One-knob preset (`fast` | `balanced` | `thorough`; explicit keys always win):
+
+```yaml
+symfony_security_auditor:
+    profile: 'fast'
 ```
 
 Split-model (larger attacker, faster reviewer):
