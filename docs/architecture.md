@@ -468,6 +468,17 @@ attacker cache; concurrent reviews serve cached verdicts first and dispatch only
 the misses. Batched reviews always call the LLM. `--no-cache` bypasses both
 caches for the run.
 
+Like the attacker, the agent itself is a thin orchestrator — mode resolution and
+the start/complete logging — delegating to `Review\` collaborators it builds at
+construction time: `SequentialReviewAnalyzer`, `StructuredReviewAnalyzer`,
+`ConcurrentReviewAnalyzer`, `ConcurrentStructuredReviewAnalyzer`, and
+`BatchReviewAnalyzer` are the five analysis strategies; `VerdictApplier` applies
+one verdict payload to a finding; `BatchVerdictApplier` matches batch verdicts
+to findings by id; `ReviewOutcomeRecorder` turns verdicts, raw responses, and
+failures into the reviewed finding plus its coverage entry;
+`ReviewerVerdictCache` adapts the optional cache port; `CodeContextResolver`
+resolves a finding's source content.
+
 ### `VulnerabilityFactory`
 
 Parses raw `array<string, mixed>` from LLM JSON output into `Vulnerability`
