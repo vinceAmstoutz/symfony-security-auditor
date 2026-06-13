@@ -85,7 +85,8 @@ src/
 │       │                  PhpParser{ControllerAccessControl, VoterCapability, FormBinding}Parser
 │       │                  (+ Null* no-op twins)
 │       ├── Diff/        # ProcessGitChangedFilesResolver (git diff for --since)
-│       ├── Prompt/      # AttackerPromptBuilder, ReviewerPromptBuilder
+│       ├── Prompt/      # AttackerPromptBuilder (+ SymfonyMappingContextRenderer,
+│       │                  NumberedFileContextRenderer), ReviewerPromptBuilder
 │       ├── Cache/       # FilesystemAttackerCache, NullAttackerCache,
 │       │                  FilesystemReviewerCache, NullReviewerCache
 │       ├── Advisory/    # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase,
