@@ -66,13 +66,18 @@ src/
 │   ├── Application/     # Orchestration — no I/O, depends only on Domain
 │   │   ├── UseCase/     # Entry points: RunAuditUseCase, EstimateAuditCostUseCase
 │   │   ├── Pipeline/    # AuditPipeline + Stage/{IngestionStage, MappingStage, AuditStage, PoCSynthesisStage}
-│   │   └── Agent/       # AttackerAgent, ReviewerAgent, EscalatingAttackerAgent,
+│   │   └── Agent/       # AttackerAgent (+ Chunk/* collaborators),
+│   │                      ReviewerAgent (+ Review/* collaborators),
+│   │                      EscalatingAttackerAgent,
 │   │                      AuditOrchestrator, VulnerabilityFactory,
 │   │                      VulnerabilityCollector + RecordVulnerabilityToolFactoryInterface,
 │   │                      ReviewCollector + RecordReviewToolFactoryInterface,
 │   │                      PoCSynthesizer, Chunking/FileChunker
 │   └── Infrastructure/  # I/O adapters
-│       ├── LLM/         # SymfonyAiLLMClient, RetryPolicy, TransientFailureClassifier,
+│       ├── LLM/         # SymfonyAiLLMClient (+ RetryingPlatformInvoker, SequentialToolLoop,
+│       │                  BatchWindowResolver, ToolConversationWavefront, PlatformResultExtractor,
+│       │                  PlatformOptionsFactory, PlatformToolsMapper, PromptTokenEstimator),
+│       │                  RetryPolicy, TransientFailureClassifier,
 │       │                  CharacterBasedTokenEstimator, Delay/SleeperInterface + UsleepSleeper,
 │       │                  RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
 │       ├── FileSystem/  # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
@@ -557,6 +562,16 @@ concurrent chunks share the freeze instead of stampeding the provider.
 
 Swapping LLM providers (Anthropic → OpenAI → Mistral → Ollama → …) requires no
 code changes — only `ai.yaml` configuration.
+
+The client itself is a facade over collaborators it builds at construction time,
+all inside `Infrastructure\LLM`: `RetryingPlatformInvoker` (the retry loop
+above), `SequentialToolLoop` (the autonomous tool-using conversation behind
+`completeWithTools()`), `BatchWindowResolver` and `ToolConversationWavefront`
+(the `completeBatch()` / `completeBatchWithTools()` concurrency windows, falling
+back to the sequential paths on failure), `PlatformResultExtractor` (token
+usage, tool calls, text), `PlatformOptionsFactory` (temperature +
+Anthropic-dialect options), and `PlatformToolsMapper` (Domain `ToolDefinition` →
+platform `Tool` schema mapping).
 
 ### `LLMResponse`
 
