@@ -24,16 +24,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterfa
 final readonly class PromptTokenEstimator
 {
     public function __construct(
-        private ?TokenEstimatorInterface $tokenEstimator,
+        private TokenEstimatorInterface $tokenEstimator,
         private string $model,
     ) {}
 
     public function estimate(string ...$prompts): int
     {
-        $tokenEstimator = $this->tokenEstimator ?? new CharacterBasedTokenEstimator();
         $total = 0;
         foreach ($prompts as $prompt) {
-            $total += $tokenEstimator->estimateTokens($prompt, $this->model);
+            $total += $this->tokenEstimator->estimateTokens($prompt, $this->model);
         }
 
         return $total;

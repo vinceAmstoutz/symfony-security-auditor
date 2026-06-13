@@ -25,6 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterfa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
@@ -67,17 +68,17 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         private LoggerInterface $logger,
         private ?float $temperature = self::DEFAULT_TEMPERATURE,
         ?TokenUsageRecorder $tokenUsageRecorder = null,
-        ?RetryPolicy $retryPolicy = null,
-        ?TransientFailureClassifier $transientFailureClassifier = null,
-        ?SleeperInterface $sleeper = null,
+        RetryPolicy $retryPolicy = new RetryPolicy(),
+        TransientFailureClassifier $transientFailureClassifier = new TransientFailureClassifier(),
+        SleeperInterface $sleeper = new UsleepSleeper(),
         private ?BudgetTracker $budgetTracker = null,
         bool $providerJsonMode = self::DEFAULT_PROVIDER_JSON_MODE,
-        ?RateLimiterInterface $rateLimiter = null,
-        ?TokenEstimatorInterface $tokenEstimator = null,
-        ?RetryAfterHeaderParser $retryAfterHeaderParser = null,
+        RateLimiterInterface $rateLimiter = new NullRateLimiter(),
+        TokenEstimatorInterface $tokenEstimator = new CharacterBasedTokenEstimator(),
+        RetryAfterHeaderParser $retryAfterHeaderParser = new RetryAfterHeaderParser(),
         ?int $maxOutputTokens = self::DEFAULT_MAX_OUTPUT_TOKENS,
     ) {
-        $this->rateLimiter = $rateLimiter ?? new NullRateLimiter();
+        $this->rateLimiter = $rateLimiter;
         $this->promptTokenEstimator = new PromptTokenEstimator($tokenEstimator, $model);
         $this->platformResultExtractor = new PlatformResultExtractor($tokenUsageRecorder);
         $platformOptionsFactory = new PlatformOptionsFactory($model, $temperature, $providerJsonMode, $maxOutputTokens);

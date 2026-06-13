@@ -21,7 +21,6 @@ use Symfony\AI\Platform\Result\DeferredResult;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
@@ -43,24 +42,20 @@ final readonly class RetryingPlatformInvoker
         private string $model,
         private LoggerInterface $logger,
         private RateLimiterInterface $rateLimiter,
-        private ?RetryPolicy $retryPolicy,
-        private ?TransientFailureClassifier $transientFailureClassifier,
-        private ?SleeperInterface $sleeper,
-        private ?RetryAfterHeaderParser $retryAfterHeaderParser,
+        private RetryPolicy $retryPolicy,
+        private TransientFailureClassifier $transientFailureClassifier,
+        private SleeperInterface $sleeper,
+        private RetryAfterHeaderParser $retryAfterHeaderParser,
     ) {}
 
     /** @param array<string, mixed> $options */
     public function invoke(MessageBag $messageBag, array $options, int $estimatedInputTokens): DeferredResult
     {
         $platform = $this->platform ?? throw MissingAiPlatformException::create();
-        $retryPolicy = $this->retryPolicy ?? new RetryPolicy();
-        $classifier = $this->transientFailureClassifier ?? new TransientFailureClassifier();
-        $sleeper = $this->sleeper ?? new UsleepSleeper();
-        $retryAfterParser = $this->retryAfterHeaderParser ?? new RetryAfterHeaderParser();
 
         \assert('' !== $this->model, 'Model must be a non-empty string');
 
-        $maxAttempts = $retryPolicy->maxAttempts();
+        $maxAttempts = $this->retryPolicy->maxAttempts();
         $attempt = 1;
         while (true) {
             $this->rateLimiter->acquire($estimatedInputTokens);
@@ -71,11 +66,11 @@ final readonly class RetryingPlatformInvoker
 
                 return $deferredResult;
             } catch (Throwable $throwable) {
-                if ($classifier->isEmptyContent($throwable)) {
+                if ($this->transientFailureClassifier->isEmptyContent($throwable)) {
                     throw EmptyLLMResponseException::from($throwable);
                 }
 
-                if (!$classifier->isTransient($throwable)) {
+                if (!$this->transientFailureClassifier->isTransient($throwable)) {
                     throw NonTransientLLMFailureException::from($throwable);
                 }
 
@@ -84,8 +79,8 @@ final readonly class RetryingPlatformInvoker
                 }
 
                 $serverHintSeconds = null;
-                if ($classifier->isRateLimit($throwable)) {
-                    $serverHintSeconds = $retryAfterParser->parse($throwable);
+                if ($this->transientFailureClassifier->isRateLimit($throwable)) {
+                    $serverHintSeconds = $this->retryAfterHeaderParser->parse($throwable);
                     if (null !== $serverHintSeconds) {
                         $this->rateLimiter->pauseUntil(
                             (new DateTimeImmutable())->modify(\sprintf('+%d seconds', $serverHintSeconds)),
@@ -93,16 +88,16 @@ final readonly class RetryingPlatformInvoker
                     }
                 }
 
-                $delay = $classifier->isRateLimit($throwable)
-                    ? $retryPolicy->rateLimitDelayMs($attempt, $serverHintSeconds)
-                    : $retryPolicy->delayMs($attempt);
+                $delay = $this->transientFailureClassifier->isRateLimit($throwable)
+                    ? $this->retryPolicy->rateLimitDelayMs($attempt, $serverHintSeconds)
+                    : $this->retryPolicy->delayMs($attempt);
                 $this->logger->warning('LLM call failed, retrying after backoff', [
                     'attempt' => $attempt,
                     'max_attempts' => $maxAttempts,
                     'delay_ms' => $delay,
                     'error' => $throwable->getMessage(),
                 ]);
-                $sleeper->sleep($delay);
+                $this->sleeper->sleep($delay);
                 ++$attempt;
             }
         }
