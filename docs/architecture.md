@@ -589,7 +589,11 @@ root).
 ### `AttackerPromptBuilder` / `ReviewerPromptBuilder`
 
 Build system and user prompts fed to `LLMClientInterface::complete()`. Both are
-pure string builders with no network or I/O dependencies.
+pure string builders with no network or I/O dependencies. The attacker's
+`SymfonyMapping` sections (route access-control map, voter coverage, form
+bindings) are rendered by `SymfonyMappingContextRenderer`, and its numbered
+`<file>` source blocks by `NumberedFileContextRenderer`; the builders themselves
+hold the prompt copy and the skill blocks.
 
 The attacker prompt has two modes selected by `audit.structured_collection`:
 
