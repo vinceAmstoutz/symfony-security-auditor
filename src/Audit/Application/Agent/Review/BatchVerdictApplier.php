@@ -30,16 +30,22 @@ final readonly class BatchVerdictApplier
 {
     public function __construct(
         private VerdictApplier $verdictApplier,
+        private ReviewerVerdictCache $reviewerVerdictCache,
         private LoggerInterface $logger,
     ) {}
 
     /**
+     * A finding whose id appears in `$codeContexts` has its matched verdict
+     * persisted to the reviewer cache, so a subsequent batched run reuses it
+     * instead of calling the LLM again. Bypassed runs pass no contexts.
+     *
      * @param list<Vulnerability>      $batch
      * @param array<int|string, mixed> $rawData
+     * @param array<string, string>    $codeContexts
      *
      * @return list<Vulnerability>
      */
-    public function applyBatchReview(array $batch, array $rawData, CoverageRecorderInterface $coverageRecorder): array
+    public function applyBatchReview(array $batch, array $rawData, CoverageRecorderInterface $coverageRecorder, array $codeContexts = []): array
     {
         $reviewsById = [];
         foreach ($rawData as $entry) {
@@ -67,6 +73,10 @@ final readonly class BatchVerdictApplier
                 $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
 
                 continue;
+            }
+
+            if (\array_key_exists($vulnerability->id(), $codeContexts)) {
+                $this->reviewerVerdictCache->store($vulnerability, $codeContexts[$vulnerability->id()], $review);
             }
 
             $applied = $this->verdictApplier->apply($vulnerability, $review);
