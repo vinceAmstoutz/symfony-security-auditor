@@ -44,7 +44,7 @@ Use a powerful model for discovery and a cheap/fast model for validation:
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-7'   # deep reasoning for vulnerability discovery
+    attacker_model: 'claude-opus-4-8'   # deep reasoning for vulnerability discovery
     reviewer_model: 'claude-haiku-4-5-20251001'  # ~20× cheaper for false-positive filtering
 ```
 

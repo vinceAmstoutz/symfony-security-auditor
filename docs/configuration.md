@@ -196,7 +196,7 @@ rather than charging every input token at the full rate.
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-7'
+    model: 'claude-opus-4-8'
 ```
 
 ### Split mode — separate models per role
@@ -204,7 +204,7 @@ symfony_security_auditor:
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-7'   # powerful model for discovery
+    attacker_model: 'claude-opus-4-8'   # powerful model for discovery
     reviewer_model: 'claude-haiku-4-5-20251001'  # faster model for validation
 ```
 
@@ -213,7 +213,7 @@ symfony_security_auditor:
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-7'
+    attacker_model: 'claude-opus-4-8'
     reviewer_model: 'claude-haiku-4-5-20251001'
     scan:
         included_paths:
@@ -350,7 +350,7 @@ through the model name using either of the two syntaxes supported by
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-7?temperature=0.2'
+    model: 'claude-opus-4-8?temperature=0.2'
 ```
 
 ### Expanded syntax
@@ -358,7 +358,7 @@ symfony_security_auditor:
 ```yaml
 symfony_security_auditor:
     model:
-        name: 'claude-opus-4-7'
+        name: 'claude-opus-4-8'
         options:
             temperature: 0.2
 ```
@@ -390,7 +390,7 @@ ai:
 
 ```yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-7'   # deep reasoning for vuln discovery
+    attacker_model: 'claude-opus-4-8'   # deep reasoning for vuln discovery
     reviewer_model: 'claude-haiku-4-5-20251001'  # fast + cheap for false-positive filtering
 ```
 
