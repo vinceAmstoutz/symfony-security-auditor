@@ -82,6 +82,22 @@ finally covers batched reviews, and the stale model hints in the Composer
   writes nothing. The now-obsolete "batching disables the reviewer-verdict
   cache" notice is removed from `ConfigurationNotices` (whose unused
   `CacheConfiguration` parameter is dropped).
+- **The pre-flight token estimator is now one implementation per LLM provider.**
+  The monolithic `CharacterBasedTokenEstimator` (a single class holding a prefix
+  → chars-per-token lookup table for every vendor) is replaced by a
+  `ResolvingTokenEstimator` that dispatches each model to a dedicated
+  `ProviderTokenEstimatorInterface` implementation — `AnthropicTokenEstimator`,
+  `OpenAiTokenEstimator`, `GeminiTokenEstimator`, `MistralTokenEstimator`,
+  `LlamaTokenEstimator`, `DeepSeekTokenEstimator` — each owning its own
+  model-name matching and character-to-token ratio, with a shared
+  `CharacterRatioCounter` doing the arithmetic
+  (`src/Audit/Infrastructure/LLM/TokenEstimator/`). The estimates are unchanged
+  (identical ratios, prefixes, and unknown-model fallback), so reported
+  `--dry-run` costs stay the same; the win is that adding or tuning a provider
+  is now a small, isolated class tagged
+  `symfony_security_auditor.token_estimator` rather than an edit to a shared
+  table. `CharacterBasedTokenEstimator` was `@internal`, so this is not a BC
+  break (the public `TokenEstimatorInterface` port is untouched).
 
 ### Fixed
 
