@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/1.10.0/resources/schema.json",
+  "$id": "https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/1.10.1/resources/schema.json",
   "title": "symfony-security-auditor bundle configuration",
   "description": "Configuration for the symfony_security_auditor bundle (config/packages/symfony_security_auditor.yaml).",
   "type": "object",
