@@ -234,8 +234,10 @@ the recipe automates:
 - **Baseline suppression** — accept known findings with `--generate-baseline`,
   then `--baseline` drops them from the report and the exit code so only new
   findings fail CI.
-- **CI-ready** — drop-in GitHub Actions and GitLab CI templates with SARIF
-  upload included.
+- **CI-ready** — a reusable
+  [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor)
+  (`uses: vinceamstoutz/symfony-security-auditor@v1`) plus GitLab CI templates,
+  with SARIF upload to Code Scanning. See [CI Integration](docs/ci.md).
 - **Zero-config CVE feed** — `lookup_advisory` is backed by `composer audit`
   (Packagist + GitHub Security Advisories) out of the box.
 - **DDD architecture** — strict layering, sole `LLMClientInterface` seam means

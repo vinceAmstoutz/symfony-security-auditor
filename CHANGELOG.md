@@ -39,13 +39,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (Domain) and the `Baseline` file gateway (`src/Command/Baseline.php`); a
   malformed baseline file raises `MalformedBaselineFileException`. Public API
   per `docs/versioning.md`.
-- **A ready-to-copy pull-request GitHub Actions recipe.**
-  `examples/github-actions/pull-request-audit.yml` audits only the files a PR
-  changed (`--since`), suppresses baselined findings (`--baseline`), uploads
-  SARIF to GitHub Code Scanning, and attaches an HTML report artifact — tying
-  the diff-mode, baseline, and HTML-report features into one workflow.
-  Documented in `docs/ci.md` (Pull-request diff audit) and
-  `examples/github-actions/README.md`.
+- **A reusable, Marketplace-publishable GitHub Action.** The repository now
+  ships a composite action (`action.yml` at the repo root) so consumers can run
+  an audit with `uses: vinceamstoutz/symfony-security-auditor@v1` instead of
+  scripting the steps. It sets up PHP, installs Composer dependencies, and runs
+  `audit:run`, exposing inputs for `project-path`, `format`, `output`,
+  `baseline`, `generate-baseline`, `since`, `extra-args`, `php-version`,
+  `setup-php`, `install-dependencies`, and `working-directory` (the provider key
+  is passed via `env:`). Documented in `docs/ci.md` (Reusable GitHub Action).
 
 ### Changed
 

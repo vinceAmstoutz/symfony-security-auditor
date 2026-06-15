@@ -9,7 +9,7 @@ GitHub Code Scanning or the GitLab Security Dashboard.
 - [Managing LLM Costs](#managing-llm-costs)
 - [Report Visibility on Public Repositories](#report-visibility-on-public-repositories)
 - [GitHub Actions](#github-actions)
-  - [Pull-request diff audit (with baseline)](#pull-request-diff-audit-with-baseline)
+  - [Reusable GitHub Action](#reusable-github-action)
 - [GitLab CI](#gitlab-ci)
 - [Output Formats Reference](#output-formats-reference)
 
@@ -196,14 +196,56 @@ jobs:
           sarif_file: report.sarif
 ```
 
-### Pull-request diff audit (with baseline)
+### Reusable GitHub Action
 
-For per-PR scanning, audit only the files the pull request changed (`--since`)
-and suppress findings you have already accepted in a committed baseline
-(`--baseline`). A ready-to-copy workflow ships in
-[`examples/github-actions/pull-request-audit.yml`](../examples/github-actions/pull-request-audit.yml):
-it diffs against the base branch, uploads SARIF to Code Scanning, and attaches a
-shareable HTML report as an artifact.
+This repository **is** a GitHub Action (published to the
+[GitHub Marketplace](https://github.com/marketplace/actions/symfony-security-auditor)),
+so you can run an audit with `uses:` instead of scripting the steps yourself. It
+sets up PHP, installs Composer dependencies, and runs `audit:run` with the
+inputs you pass.
+
+```yaml
+# .github/workflows/security-audit.yaml
+name: Security Audit
+
+on:
+  pull_request: ~
+
+permissions:
+  contents: read
+  security-events: write # required for the Code Scanning upload
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so `since` can diff against the base branch
+
+      - name: Symfony Security Audit
+        uses: vinceamstoutz/symfony-security-auditor@v1
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          since: origin/${{ github.base_ref }}
+          baseline: .security-baseline.json
+          format: sarif
+          output: report.sarif
+
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: report.sarif
+```
+
+Inputs (all optional): `project-path` (default `.`), `format`
+(`console`/`json`/`sarif`/`html`, default `sarif`), `output` (default
+`report.sarif`), `baseline`, `generate-baseline`, `since`, `extra-args`,
+`php-version` (default `8.3`), `setup-php` (default `true`),
+`install-dependencies` (default `true`), and `working-directory` (default `.`).
+Set `setup-php: false` / `install-dependencies: false` when your job has already
+done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
 
 Accept the current findings as a baseline once (locally), then commit it so
 future PRs only report new findings:

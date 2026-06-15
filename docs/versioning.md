@@ -75,6 +75,15 @@ is a `MAJOR` change.
   - `2` — audit aborted because the configured token or cost budget was exceeded
     (partial report still emitted).
 
+### GitHub Action
+
+- The composite action defined by `action.yml` at the repository root and its
+  input names: `project-path`, `format`, `output`, `baseline`,
+  `generate-baseline`, `since`, `extra-args`, `php-version`, `setup-php`,
+  `install-dependencies`, `working-directory`. New inputs may be added in a
+  `MINOR`; renaming or removing one is a `MAJOR`. The Marketplace `name`
+  (`Symfony Security Auditor`) is also stable.
+
 ### Output schemas
 
 - The **JSON report schema** produced by `--format=json`. Keys present today
