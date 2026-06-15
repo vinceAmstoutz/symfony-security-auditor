@@ -1,0 +1,252 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/main/resources/schema.json",
+  "title": "symfony-security-auditor bundle configuration",
+  "description": "Configuration for the symfony_security_auditor bundle (config/packages/symfony_security_auditor.yaml).",
+  "type": "object",
+  "properties": {
+    "symfony_security_auditor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": ["fast", "balanced", "thorough"],
+          "description": "One-knob preset for the cost/speed/depth levers. Explicitly set keys always win over the profile. Default: balanced."
+        },
+        "model": {
+          "type": "string",
+          "description": "Model id used for both the attacker and reviewer roles, e.g. claude-opus-4-8."
+        },
+        "attacker_model": {
+          "type": ["string", "null"],
+          "description": "Override the model for the attacker role only. Falls back to `model` when null."
+        },
+        "reviewer_model": {
+          "type": ["string", "null"],
+          "description": "Override the model for the reviewer role only. Falls back to `model` when null."
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum output tokens per LLM call (max_tokens). Default: 4096."
+        },
+        "attacker_max_output_tokens": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "Override max output tokens for the attacker. Falls back to max_output_tokens when null."
+        },
+        "reviewer_max_output_tokens": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "Override max output tokens for the reviewer. Falls back to max_output_tokens when null."
+        },
+        "provider_json_mode": {
+          "type": "boolean",
+          "description": "Send response_format: {type: json_object} on every call (honored by OpenAI/Mistral/Ollama). Default: false."
+        },
+        "scan": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "File-discovery settings.",
+          "properties": {
+            "included_paths": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Paths scanned relative to the project root."
+            },
+            "respect_gitignore": {
+              "type": "boolean",
+              "description": "Skip files ignored by .gitignore."
+            },
+            "max_file_size_kb": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Skip files larger than this many kilobytes."
+            },
+            "custom_risk_patterns": {
+              "type": "object",
+              "description": "Project-specific regex risk markers, keyed by file-type bucket then marker name.",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "regex": { "type": "string", "description": "PCRE pattern with delimiters, matched per line." },
+                    "description": { "type": "string", "description": "Short description rendered in the prompt." }
+                  },
+                  "required": ["regex", "description"]
+                }
+              }
+            },
+            "secret_scrubbing": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Redact secrets before file contents are sent to the LLM.",
+              "properties": {
+                "enabled": { "type": "boolean", "description": "Enable secret scrubbing. Default: true." },
+                "additional_patterns": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Extra PCRE patterns whose matches are redacted."
+                }
+              }
+            }
+          }
+        },
+        "audit": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Orchestrator knobs for the attacker/reviewer loop.",
+          "properties": {
+            "max_iterations": {
+              "type": ["integer", "null"],
+              "minimum": 1,
+              "description": "Maximum attacker/reviewer iterations. Defaults to the active profile."
+            },
+            "min_confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Minimum attacker confidence to forward a finding to the reviewer. Default: 0.6."
+            },
+            "reviewer_batch_size": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Findings reviewed per LLM call. Default: 1."
+            },
+            "tools_enabled": {
+              "type": "boolean",
+              "description": "Give the attacker cross-file investigation tools. Default: true."
+            },
+            "structured_collection": {
+              "type": "boolean",
+              "description": "Attacker records findings via the schema-enforced record_vulnerability tool. Default: true."
+            },
+            "reviewer_structured_collection": {
+              "type": "boolean",
+              "description": "Reviewer records verdicts via the schema-enforced record_review tool. Default: true."
+            },
+            "stable_system_prompt": {
+              "type": "boolean",
+              "description": "Emit a byte-stable attacker system prompt for provider prompt-cache reuse. Default: true."
+            },
+            "max_tool_iterations": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum tool-call rounds per attacker chunk. Default: 8."
+            },
+            "reviewer_tools_enabled": {
+              "type": "boolean",
+              "description": "Give the reviewer the attacker's tool registry. Default: false."
+            },
+            "reviewer_max_tool_iterations": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum tool-call rounds per reviewed finding. Default: 4."
+            },
+            "reviewer_max_concurrent": {
+              "type": ["integer", "null"],
+              "minimum": 1,
+              "description": "Concurrent reviewer calls (one finding per call). Defaults to the active profile."
+            },
+            "attacker_max_concurrent": {
+              "type": ["integer", "null"],
+              "minimum": 1,
+              "description": "Concurrent attacker chunk analyses in structured-collection mode. Defaults to the active profile."
+            },
+            "baseline": {
+              "type": ["string", "null"],
+              "description": "Default path to a baseline file of accepted-finding fingerprints to suppress. The --baseline CLI option overrides this."
+            },
+            "static_prescan": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean", "description": "Run the deterministic risk-marker pre-scan. Default: true." },
+                "lean_mode": { "type": ["boolean", "null"], "description": "Drop marker-free files before the LLM. Defaults to the active profile." }
+              }
+            },
+            "chunking": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "strategy": {
+                  "type": "string",
+                  "enum": ["feature", "type"],
+                  "description": "How files are grouped into LLM calls. Default: feature."
+                }
+              }
+            },
+            "escalation": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean", "description": "Run a cheap-model sweep first, escalating only flagged files. Default: false." },
+                "cheap_model": { "type": ["string", "null"], "description": "Model id for the cheap first pass. Falls back to the reviewer model when null." }
+              }
+            },
+            "code_slicing": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": ["boolean", "null"], "description": "Trim large PHP files to security-relevant slices. Defaults to the active profile." },
+                "min_lines_before_slicing": { "type": "integer", "minimum": 10, "description": "Skip slicing for files shorter than this. Default: 80." }
+              }
+            },
+            "poc_synthesis": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": ["boolean", "null"], "description": "Generate concrete PoC artifacts for qualifying findings. Defaults to the active profile." },
+                "severity_floor": {
+                  "type": "string",
+                  "enum": ["critical", "high", "medium", "low", "info"],
+                  "description": "Minimum severity that triggers PoC synthesis. Default: high."
+                }
+              }
+            },
+            "budget": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "max_tokens": { "type": ["integer", "null"], "minimum": 1, "description": "Abort the audit past this many total tokens. null = unlimited." },
+                "max_cost_usd": { "type": ["number", "null"], "description": "Abort the audit past this estimated USD cost. null = unlimited." }
+              }
+            },
+            "retry": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "max_attempts": { "type": "integer", "minimum": 1, "description": "Attempts per LLM call including the first. 1 disables retries." },
+                "initial_delay_ms": { "type": "integer", "minimum": 0, "description": "Base delay before the first retry, in milliseconds." },
+                "backoff_multiplier": { "type": "number", "minimum": 1, "description": "Exponential growth factor between retries." },
+                "jitter_ratio": { "type": "number", "minimum": 0, "maximum": 1, "description": "Jitter fraction applied to each delay." }
+              }
+            },
+            "rate_limit": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "requests_per_minute": { "type": ["integer", "null"], "minimum": 1, "description": "Max LLM requests per minute. null disables this dimension." },
+                "input_tokens_per_minute": { "type": ["integer", "null"], "minimum": 1, "description": "Max input tokens per minute. null disables this dimension." },
+                "output_tokens_per_minute": { "type": ["integer", "null"], "minimum": 1, "description": "Max output tokens per minute. null disables this dimension." }
+              }
+            }
+          }
+        },
+        "cache": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Caching layers.",
+          "properties": {
+            "enabled": { "type": "boolean", "description": "Enable the attacker-chunk and reviewer-verdict filesystem caches. Default: true." },
+            "dir": { "type": "string", "description": "Cache storage path. Default: %kernel.cache_dir%/symfony_security_auditor/attacker." },
+            "prompt_caching": { "type": "boolean", "description": "Deprecated since 1.7 and ignored. Configure prompt caching on the AI platform in ai.yaml instead." }
+          }
+        }
+      }
+    }
+  }
+}

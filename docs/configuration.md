@@ -48,6 +48,22 @@ return [
 Create `config/packages/symfony_security_auditor.yaml`. The bundle exposes the
 following keys:
 
+> **Editor autocompletion.** A JSON Schema for this configuration ships at
+> [`resources/schema.json`](../resources/schema.json). Editors backed by the
+> [YAML Language Server](https://github.com/redhat-developer/yaml-language-server)
+> (VS Code, Neovim, …) pick it up from a modeline on the first line of your
+> config file:
+>
+> ```yaml
+> # yaml-language-server: $schema=https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/main/resources/schema.json
+> symfony_security_auditor:
+>     model: "claude-opus-4-8"
+> ```
+>
+> This gives key completion, type checking, and inline docs as you edit. The
+> example files under [`examples/configs/`](../examples/configs/) include the
+> modeline.
+
 ### Top-level
 
 | Key                          | Type        | Default             | Description                                                                                                                                                                                                                                                                                                                                                                              |

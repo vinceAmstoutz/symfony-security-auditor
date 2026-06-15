@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **JSON Schema for editor autocompletion of the bundle configuration.** A
+  schema describing every `symfony_security_auditor:` key ships at
+  `resources/schema.json`. Editors backed by the YAML Language Server pick it up
+  from a `# yaml-language-server: $schema=…` modeline (added to the
+  `examples/configs/*.yaml` samples and documented in `docs/configuration.md`),
+  giving key completion, type checking, and inline docs while editing
+  `config/packages/symfony_security_auditor.yaml`.
 - **New `--format=html` output — a self-contained, HTML-escaped audit report.**
   `audit:run` previously emitted only `console`, `json`, and `sarif`. The new
   `html` value renders a standalone HTML document (inline CSS, severity-colored

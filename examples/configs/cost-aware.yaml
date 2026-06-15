@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/main/resources/schema.json
 # Triage scan — single small model, single iteration, tools disabled.
 #
 # Target: smallest possible bill for an initial pass on a large monorepo.

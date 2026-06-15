@@ -259,7 +259,8 @@ Internal classes (`@internal` PHPDoc tag) — concrete agents, pipeline stages,
 infrastructure adapters, Command collaborators — may be refactored freely in a
 `MINOR`. When you add a class that is **not** an extension point, add the
 `@internal` tag. When you add a public configuration key, list it in
-`docs/versioning.md`.
+`docs/versioning.md` and add it to `resources/schema.json` (the JSON Schema that
+powers editor autocompletion for `symfony_security_auditor.yaml`).
 
 Canonical policy: [`docs/versioning.md`](docs/versioning.md).
 
