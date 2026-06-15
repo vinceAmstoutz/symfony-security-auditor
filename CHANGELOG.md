@@ -69,6 +69,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `ReportWriter` a `markdown` arm. Public API per `docs/versioning.md` (the
   `--format` value `markdown`).
 
+### Fixed
+
+- **Corrected two OWASP Top 10 categorizations surfaced by the new per-rule
+  `helpUri`.** `VulnerabilityType::owaspReference()` (and the new
+  `owaspReferenceUrl()`) mis-filed two types: `authenticator_bypass` was under
+  `A01:2021 - Broken Access Control` and `missing_signature_verification` under
+  `A02:2021 - Cryptographic Failures`. They now map to the canonical categories
+  — **`authenticator_bypass` →
+  `A07:2021 - Identification and Authentication Failures`** (the textbook A07
+  case) and **`missing_signature_verification` →
+  `A08:2021 - Software and Data Integrity Failures`** (accepting unverified
+  payloads is an integrity failure, not a cryptographic one). This changes the
+  SARIF `ruleId` and `helpUri` for findings of those two types. The internal
+  `category()` grouping is unchanged (it has no auth/integrity bucket).
+
 ## [1.10.1] — 2026-06-15 — Encore
 
 A packaging-only republish of **1.10.0 — Lookout**. The `1.10.0` tag was first
