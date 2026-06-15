@@ -13,8 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
 
-use JsonException;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Serializer\Encoder\JsonDecode;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
@@ -44,6 +46,7 @@ final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseIn
         ComposerAuditRunnerInterface $composerAuditRunner,
         string $projectPath,
         LoggerInterface $logger,
+        private JsonEncoder $jsonEncoder = new JsonEncoder(),
     ) {
         $this->entriesByPackage = $this->load($composerAuditRunner, $projectPath, $logger);
     }
@@ -96,9 +99,9 @@ final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseIn
     {
         try {
             /** @var array<string, mixed> $decoded */
-            $decoded = json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
-        } catch (JsonException $jsonException) {
-            throw MalformedAdvisoryPayloadException::forInvalidJson($jsonException);
+            $decoded = $this->jsonEncoder->decode($json, JsonEncoder::FORMAT, [JsonDecode::ASSOCIATIVE => true]);
+        } catch (NotEncodableValueException $notEncodableValueException) {
+            throw MalformedAdvisoryPayloadException::forInvalidJson($notEncodableValueException);
         }
 
         if (!\array_key_exists('advisories', $decoded) || !\is_array($decoded['advisories'])) {

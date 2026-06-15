@@ -13,10 +13,13 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache;
 
-use JsonException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Serializer\Encoder\JsonDecode;
+use Symfony\Component\Serializer\Encoder\JsonEncode;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
@@ -47,6 +50,7 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
         private Filesystem $filesystem,
         private LoggerInterface $logger,
         private string $keySalt = '',
+        private JsonEncoder $jsonEncoder = new JsonEncoder(),
     ) {
         if (u($cacheDir)->trim()->isEmpty()) {
             throw InvalidCacheConfigurationException::forEmptyCacheDir();
@@ -62,7 +66,7 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
         }
 
         try {
-            $decoded = json_decode($this->filesystem->readFile($path), true, flags: \JSON_THROW_ON_ERROR);
+            $decoded = $this->jsonEncoder->decode($this->filesystem->readFile($path), JsonEncoder::FORMAT, [JsonDecode::ASSOCIATIVE => true]);
             if (!\is_array($decoded)) {
                 return null;
             }
@@ -77,10 +81,10 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
             ]);
 
             return null;
-        } catch (JsonException $jsonException) {
+        } catch (NotEncodableValueException $notEncodableValueException) {
             $this->logger->warning('Reviewer cache entry was unreadable, ignoring', [
                 'path' => $path,
-                'error' => $jsonException->getMessage(),
+                'error' => $notEncodableValueException->getMessage(),
             ]);
 
             return null;
@@ -92,7 +96,7 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
         $path = $this->pathFor($vulnerability, $codeContext);
 
         try {
-            $encoded = json_encode($review, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
+            $encoded = $this->jsonEncoder->encode($review, JsonEncoder::FORMAT, [JsonEncode::OPTIONS => \JSON_UNESCAPED_SLASHES]);
             $this->filesystem->mkdir(\dirname($path));
             $this->filesystem->dumpFile($path, $encoded);
             $this->logger->debug('Reviewer cache stored', ['path' => $path]);
@@ -131,7 +135,7 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
         $finding = $vulnerability->toArray();
         unset($finding['id']);
 
-        $signature = json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext;
+        $signature = $this->jsonEncoder->encode($finding, JsonEncoder::FORMAT)."\0".$codeContext;
         if ('' !== $this->keySalt) {
             $signature = $this->keySalt."\0".$signature;
         }

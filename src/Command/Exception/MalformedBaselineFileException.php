@@ -24,7 +24,7 @@ final class MalformedBaselineFileException extends RuntimeException
         return new self(\sprintf('Baseline file "%s" must contain a JSON array of fingerprint strings.', $path));
     }
 
-    public static function fromJsonException(string $path, Throwable $throwable): self
+    public static function fromDecodingFailure(string $path, Throwable $throwable): self
     {
         return new self(\sprintf('Baseline file "%s" is not valid JSON: %s', $path, $throwable->getMessage()), previous: $throwable);
     }
