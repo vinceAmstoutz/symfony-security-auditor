@@ -54,4 +54,22 @@ final class RiskLevelTest extends TestCase
         self::assertSame('critical', RiskLevel::Critical->value);
         self::assertSame('safe', RiskLevel::Safe->value);
     }
+
+    #[DataProvider('rankCases')]
+    public function test_rank_returns_an_ascending_ordinal(RiskLevel $riskLevel, int $expectedRank): void
+    {
+        self::assertSame($expectedRank, $riskLevel->rank());
+    }
+
+    /**
+     * @return iterable<string, array{RiskLevel, int}>
+     */
+    public static function rankCases(): iterable
+    {
+        yield 'safe is 0' => [RiskLevel::Safe, 0];
+        yield 'low is 1' => [RiskLevel::Low, 1];
+        yield 'medium is 2' => [RiskLevel::Medium, 2];
+        yield 'high is 3' => [RiskLevel::High, 3];
+        yield 'critical is 4' => [RiskLevel::Critical, 4];
+    }
 }
