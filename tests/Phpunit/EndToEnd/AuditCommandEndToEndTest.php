@@ -37,7 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CharacterBasedTokenEstimator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\StaticPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
@@ -496,7 +496,7 @@ final class AuditCommandEndToEndTest extends TestCase
         $projectFileScanner = new ProjectFileScanner(new NullLogger());
         $estimateAuditCostUseCase = new EstimateAuditCostUseCase(
             $projectFileScanner,
-            new CharacterBasedTokenEstimator(),
+            new ResolvingTokenEstimator(),
             new CostCalculator(new StaticPricingProvider(new NullLogger())),
             new NullLogger(),
             'stub',
