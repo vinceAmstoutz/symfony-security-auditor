@@ -236,8 +236,9 @@ the recipe automates:
   findings fail CI.
 - **CI-ready** — a reusable
   [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor)
-  (`uses: vinceamstoutz/symfony-security-auditor@v1`) plus GitLab CI templates,
-  with SARIF upload to Code Scanning. See [CI Integration](docs/ci.md).
+  (`uses: vinceamstoutz/symfony-security-auditor@1.10.0`) plus GitLab CI
+  templates, with SARIF upload to Code Scanning. See
+  [CI Integration](docs/ci.md).
 - **Zero-config CVE feed** — `lookup_advisory` is backed by `composer audit`
   (Packagist + GitHub Security Advisories) out of the box.
 - **DDD architecture** — strict layering, sole `LLMClientInterface` seam means

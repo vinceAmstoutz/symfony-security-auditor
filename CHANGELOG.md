@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.10.0] — 2026-06-15 — Lookout
+
+A reporting-and-CI release. Audits gain a self-contained, HTML-escaped report
+(`--format=html`) and baseline suppression of accepted findings (`--baseline` /
+`--generate-baseline` / `audit.baseline`) so only new findings fail CI. The
+bundle now ships as a reusable, Marketplace-publishable GitHub Action and a JSON
+Schema that drives editor autocompletion for
+`config/packages/symfony_security_auditor.yaml`. The reviewer-verdict cache
+finally covers batched reviews, and the stale model hints in the Composer
+`suggest` block are refreshed.
+
 ### Added
 
 - **JSON Schema for editor autocompletion of the bundle configuration.** A
@@ -1467,6 +1478,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.10.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.10.0
 [1.9.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.9.0
 [1.8.0]:

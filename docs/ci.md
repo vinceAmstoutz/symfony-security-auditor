@@ -224,7 +224,7 @@ jobs:
           fetch-depth: 0 # full history so `since` can diff against the base branch
 
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@v1
+        uses: vinceamstoutz/symfony-security-auditor@1.10.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:

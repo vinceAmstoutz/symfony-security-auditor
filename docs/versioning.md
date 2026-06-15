@@ -83,12 +83,11 @@ is a `MAJOR` change.
   `install-dependencies`, `working-directory`. New inputs may be added in a
   `MINOR`; renaming or removing one is a `MAJOR`. The Marketplace `name`
   (`Symfony Security Auditor`) is also stable.
-- **Floating major tag.** Consumers pin the action with
-  `uses: vinceamstoutz/symfony-security-auditor@v1`. A `v1` tag is maintained to
-  point at the latest `1.x.x` release: each new `1.x.x` release moves `v1`
-  forward (e.g. `git tag -f v1 <release> && git push -f origin v1`), so pinning
-  `@v1` always tracks the newest backward-compatible action. The next `MAJOR`
-  introduces a `v2` tag; `@v1` keeps resolving to the final `1.x` release.
+- **Version pinning.** Consumers pin the action to an exact release tag —
+  `uses: vinceamstoutz/symfony-security-auditor@1.10.0` — matching the tag
+  format used on Packagist. Bump the pin when upgrading. There is intentionally
+  no floating `v1` tag: the `uses:` ref and the config-schema URL both point at
+  the same release tag, so a given pin always resolves to one immutable release.
 
 ### Output schemas
 
