@@ -113,6 +113,46 @@ final readonly class AuditReport
         return $this->vulnerabilities;
     }
 
+    /**
+     * Stable fingerprints of every finding in the report, de-duplicated — the
+     * payload written to a baseline file.
+     *
+     * @return list<string>
+     */
+    public function fingerprints(): array
+    {
+        return array_values(array_unique(array_map(
+            static fn (Vulnerability $vulnerability): string => $vulnerability->fingerprint(),
+            $this->vulnerabilities,
+        )));
+    }
+
+    /**
+     * Copy of the report with every finding whose fingerprint appears in
+     * `$fingerprints` removed — used to suppress baselined (accepted) findings
+     * before rendering and exit-code resolution.
+     *
+     * @param list<string> $fingerprints
+     */
+    public function withoutFingerprints(array $fingerprints): self
+    {
+        $kept = array_values(array_filter(
+            $this->vulnerabilities,
+            static fn (Vulnerability $vulnerability): bool => !\in_array($vulnerability->fingerprint(), $fingerprints, true),
+        ));
+
+        return new self(
+            $this->auditId,
+            $this->projectPath,
+            $this->startedAt,
+            $this->completedAt,
+            $this->filesScanned,
+            $this->coverage,
+            $this->auditCost,
+            ...$kept,
+        );
+    }
+
     public function durationSeconds(): float
     {
         return (float) ($this->completedAt->getTimestamp() - $this->startedAt->getTimestamp());

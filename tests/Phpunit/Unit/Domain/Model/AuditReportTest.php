@@ -320,6 +320,87 @@ final class AuditReportTest extends TestCase
         return AuditReport::fromContext($auditContext);
     }
 
+    public function test_fingerprints_lists_each_distinct_finding(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $vulnerability = $this->makeVulnerability('a', VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
+        $second = $this->makeVulnerability('b', VulnerabilitySeverity::LOW)->withReviewerValidation(true);
+        $auditContext->addVulnerability($vulnerability);
+        $auditContext->addVulnerability($second);
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertEqualsCanonicalizing([$vulnerability->fingerprint(), $second->fingerprint()], $auditReport->fingerprints());
+    }
+
+    public function test_fingerprints_deduplicates_findings_that_share_a_fingerprint(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability($this->sameFingerprintVuln(1)->withReviewerValidation(true));
+        $auditContext->addVulnerability($this->sameFingerprintVuln(2)->withReviewerValidation(true));
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertCount(1, $auditReport->fingerprints());
+    }
+
+    public function test_without_fingerprints_removes_only_matching_findings(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $vulnerability = $this->makeVulnerability('keep', VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
+        $dropped = $this->makeVulnerability('drop', VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
+        $auditContext->addVulnerability($vulnerability);
+        $auditContext->addVulnerability($dropped);
+
+        $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$dropped->fingerprint()]);
+
+        self::assertSame(1, $auditReport->totalVulnerabilities());
+        self::assertSame($vulnerability->fingerprint(), $auditReport->vulnerabilities()[0]->fingerprint());
+    }
+
+    public function test_without_fingerprints_keeps_findings_absent_from_the_list(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability($this->makeVulnerability('a', VulnerabilitySeverity::HIGH)->withReviewerValidation(true));
+        $auditContext->addVulnerability($this->makeVulnerability('b', VulnerabilitySeverity::HIGH)->withReviewerValidation(true));
+
+        $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints(['SSA-DOESNOTEXIST']);
+
+        self::assertSame(2, $auditReport->totalVulnerabilities());
+    }
+
+    public function test_without_fingerprints_preserves_report_metadata(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability($this->makeVulnerability('a', VulnerabilitySeverity::HIGH)->withReviewerValidation(true));
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        $filtered = $auditReport->withoutFingerprints($auditReport->fingerprints());
+
+        self::assertSame(0, $filtered->totalVulnerabilities());
+        self::assertSame($auditReport->auditId(), $filtered->auditId());
+        self::assertSame($auditReport->projectPath(), $filtered->projectPath());
+    }
+
+    private function sameFingerprintVuln(int $lineStart): Vulnerability
+    {
+        return Vulnerability::create(
+            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
+            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
+            title: 'Shared title',
+            description: 'desc',
+            filePath: 'src/Shared.php',
+            lineStart: $lineStart,
+            lineEnd: $lineStart + 1,
+            vulnerableCode: 'code',
+            attackVector: 'vec',
+            proof: 'proof',
+            remediation: 'fix',
+            confidence: 0.9,
+        );
+    }
+
     private function makeVulnerability(
         string $discriminator,
         VulnerabilitySeverity $vulnerabilitySeverity,

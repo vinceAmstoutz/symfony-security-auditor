@@ -47,7 +47,7 @@ Every key under `symfony_security_auditor:` documented in
   `audit.static_prescan.lean_mode`, `audit.chunking.strategy`,
   `audit.code_slicing.enabled`, `audit.code_slicing.min_lines_before_slicing`,
   `audit.poc_synthesis.enabled`, `audit.poc_synthesis.severity_floor`,
-  `audit.escalation.enabled`, `audit.escalation.cheap_model`,
+  `audit.escalation.enabled`, `audit.escalation.cheap_model`, `audit.baseline`,
   `audit.retry.max_attempts`, `audit.retry.initial_delay_ms`,
   `audit.retry.backoff_multiplier`, `audit.retry.jitter_ratio`,
   `audit.budget.max_tokens`, `audit.budget.max_cost_usd`,
@@ -66,7 +66,9 @@ is a `MAJOR` change.
 - The command name `audit:run`.
 - The `project-path` argument.
 - The `--format` (`-f`) and `--output` (`-o`) options, including the values
-  accepted by `--format` (`console`, `json`, `sarif`).
+  accepted by `--format` (`console`, `json`, `sarif`, `html`).
+- The `--baseline` and `--generate-baseline` options (baseline suppression of
+  accepted findings).
 - Exit codes (see [CLI Reference → Exit codes](configuration.md#exit-codes)):
   - `0` — audit completed; risk level is `SAFE`, `LOW`, `MEDIUM`, or `HIGH`.
   - `1` — risk level is `CRITICAL`, or the audit itself failed.

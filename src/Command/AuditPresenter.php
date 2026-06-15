@@ -154,4 +154,25 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             $auditReport->totalVulnerabilities(),
         ));
     }
+
+    public function baselineGenerated(SymfonyStyle $symfonyStyle, string $path, int $fingerprintCount): void
+    {
+        $symfonyStyle->success(\sprintf(
+            'Baseline written to %s with %d finding fingerprint(s). Future runs will suppress these unless you pass a different --baseline.',
+            $path,
+            $fingerprintCount,
+        ));
+    }
+
+    public function baselineApplied(SymfonyStyle $symfonyStyle, int $suppressedCount): void
+    {
+        if ($suppressedCount < 1) {
+            return;
+        }
+
+        $symfonyStyle->note(\sprintf(
+            '%d finding(s) suppressed by the baseline.',
+            $suppressedCount,
+        ));
+    }
 }

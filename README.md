@@ -127,9 +127,9 @@ bin/console audit:run
 bin/console audit:run /path/to/your/symfony/project
 ```
 
-Want JSON or SARIF instead? Add `--format json --output report.json` or
-`--format sarif --output report.sarif`. See
-[CLI reference](docs/configuration.md#cli-reference).
+Want JSON, SARIF, or HTML instead? Add `--format json --output report.json`,
+`--format sarif --output report.sarif`, or `--format html --output report.html`.
+See [CLI reference](docs/configuration.md#cli-reference).
 
 Estimate cost before running:
 
@@ -228,9 +228,12 @@ the recipe automates:
   input-token discount), silently ignored elsewhere.
 - **Content-hash cache** — identical chunks skip the LLM entirely. Massive
   savings on repeated CI runs.
-- **Three output formats** — `console` (human-readable), `json`
+- **Four output formats** — `console` (human-readable), `json`
   (machine-readable), `sarif` (GitHub Code Scanning / GitLab Security
-  Dashboard).
+  Dashboard), and `html` (self-contained, shareable report).
+- **Baseline suppression** — accept known findings with `--generate-baseline`,
+  then `--baseline` drops them from the report and the exit code so only new
+  findings fail CI.
 - **CI-ready** — drop-in GitHub Actions and GitLab CI templates with SARIF
   upload included.
 - **Zero-config CVE feed** — `lookup_advisory` is backed by `composer audit`

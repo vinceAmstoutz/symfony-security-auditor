@@ -9,6 +9,7 @@ GitHub Code Scanning or the GitLab Security Dashboard.
 - [Managing LLM Costs](#managing-llm-costs)
 - [Report Visibility on Public Repositories](#report-visibility-on-public-repositories)
 - [GitHub Actions](#github-actions)
+  - [Pull-request diff audit (with baseline)](#pull-request-diff-audit-with-baseline)
 - [GitLab CI](#gitlab-ci)
 - [Output Formats Reference](#output-formats-reference)
 
@@ -195,6 +196,26 @@ jobs:
           sarif_file: report.sarif
 ```
 
+### Pull-request diff audit (with baseline)
+
+For per-PR scanning, audit only the files the pull request changed (`--since`)
+and suppress findings you have already accepted in a committed baseline
+(`--baseline`). A ready-to-copy workflow ships in
+[`examples/github-actions/pull-request-audit.yml`](../examples/github-actions/pull-request-audit.yml):
+it diffs against the base branch, uploads SARIF to Code Scanning, and attaches a
+shareable HTML report as an artifact.
+
+Accept the current findings as a baseline once (locally), then commit it so
+future PRs only report new findings:
+
+```bash
+php bin/console audit:run . --generate-baseline=.security-baseline.json
+git add .security-baseline.json
+```
+
+Baselined findings are dropped from the report and do **not** affect the exit
+code, so a green PR check means "no new findings since the baseline".
+
 ### JSON report as artifact
 
 ```yaml
@@ -287,4 +308,7 @@ php bin/console audit:run /path/to/project --format json --output report.json
 
 # SARIF — GitHub Code Scanning / GitLab Security Dashboard
 php bin/console audit:run /path/to/project --format sarif --output report.sarif
+
+# HTML — self-contained, HTML-escaped report to share or attach as an artifact
+php bin/console audit:run /path/to/project --format html --output report.html
 ```

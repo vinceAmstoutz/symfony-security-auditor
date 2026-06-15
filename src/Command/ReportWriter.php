@@ -31,6 +31,7 @@ final readonly class ReportWriter implements ReportWriterInterface
         $content = match ($outputFormat) {
             OutputFormat::Json => $this->reportRenderer->renderJson($auditReport),
             OutputFormat::Sarif => $this->reportRenderer->renderSarif($auditReport),
+            OutputFormat::Html => $this->reportRenderer->renderHtml($auditReport),
             OutputFormat::Console => $this->reportRenderer->renderConsole($auditReport),
         };
 

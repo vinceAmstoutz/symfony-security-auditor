@@ -31,10 +31,10 @@ final class AuditCommandInput
     #[Argument(description: 'Path to the Symfony project to audit. Defaults to the current working directory.')]
     public ?string $projectPath = null;
 
-    #[Option(description: 'Output format: console, json or sarif', shortcut: 'f')]
+    #[Option(description: 'Output format: console, json, sarif or html', shortcut: 'f')]
     public OutputFormat $format = OutputFormat::Console;
 
-    #[Option(description: 'Output file path (for json or sarif format)', shortcut: 'o')]
+    #[Option(description: 'Output file path (for json, sarif or html format)', shortcut: 'o')]
     public ?string $output = null;
 
     #[Option(description: 'Estimate token usage and cost without invoking the LLM; emits a report with zero vulnerabilities and an estimated cost block.')]
@@ -51,6 +51,12 @@ final class AuditCommandInput
 
     #[Option(description: 'Diff mode: audit only files changed against the given git ref (e.g. main, origin/main, abc1234). Honors both committed changes (ref...HEAD) and uncommitted working-tree changes. Designed for CI on pull requests; the cache stays warm for unchanged files.', name: 'since')]
     public ?string $since = null;
+
+    #[Option(description: 'Baseline file of accepted-finding fingerprints. Findings whose fingerprint is listed are suppressed from the report and excluded from the exit code. Overrides the audit.baseline config key. A missing file suppresses nothing.', name: 'baseline')]
+    public ?string $baseline = null;
+
+    #[Option(description: 'Run the audit, then write every current finding fingerprint to the given file as a baseline and exit 0 without failing on findings. Use this to accept the current findings so future runs only report new ones.', name: 'generate-baseline')]
+    public ?string $generateBaseline = null;
 
     /**
      * @param ?callable(): (string|false) $cwdResolver defaults to PHP's getcwd; tests inject a stub

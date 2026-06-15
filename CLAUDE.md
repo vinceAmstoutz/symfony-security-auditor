@@ -82,8 +82,8 @@ src/
       Pricing/       # StaticPricingProvider
       Progress/      # ConsoleProgressReporter, LoggerProgressReporter, NullProgressReporter, ProgressReporterHolder
       Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory, RecordReviewTool, RecordReviewToolFactory
-      Report/        # ReportRenderer (+ Template/*.txt stubs)
-  Command/           # AuditCommand (Symfony Console: audit:run) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, OutputFormat enum
+      Report/        # ReportRenderer (console/json/sarif/html; + Template/*.txt + *.html stubs)
+  Command/           # AuditCommand (Symfony Console: audit:run) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, OutputFormat enum (console|json|sarif|html), Baseline (accepted-finding suppression)
   SymfonySecurityAuditorBundle.php  # Bundle class (configure + loadExtension)
 tests/Phpunit/
   Unit/              # Isolated class tests (stub/mock collaborators)

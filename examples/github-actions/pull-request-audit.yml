@@ -1,0 +1,73 @@
+# Pull-request security audit recipe for symfony-security-auditor.
+#
+# Audits only the files changed in the pull request (--since), suppresses
+# findings already accepted in a committed baseline (--baseline), uploads SARIF
+# to GitHub Code Scanning, and attaches a shareable HTML report as an artifact.
+#
+# Copy this file to .github/workflows/security-audit-pr.yaml in your project and
+# add your provider key (e.g. ANTHROPIC_API_KEY) under
+# Settings → Secrets → Actions.
+#
+# To accept the current findings as a baseline (so future PRs only report new
+# ones), run locally and commit the file:
+#   php bin/console audit:run . --generate-baseline=.security-baseline.json
+name: Security Audit (PR)
+
+on:
+  pull_request: ~
+
+permissions:
+  contents: read
+  security-events: write # required for the Code Scanning upload
+
+jobs:
+  audit:
+    name: Symfony Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so --since can diff against the base branch
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3" # or 8.4 / 8.5
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run security audit on changed files
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          php bin/console audit:run . \
+            --since="origin/${{ github.base_ref }}" \
+            --baseline=.security-baseline.json \
+            --format=sarif \
+            --output=report.sarif
+
+      - name: Render shareable HTML report
+        if: always()
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          php bin/console audit:run . \
+            --since="origin/${{ github.base_ref }}" \
+            --baseline=.security-baseline.json \
+            --format=html \
+            --output=report.html
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: report.sarif
+
+      - name: Attach HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-audit-report
+          path: report.html
+          retention-days: 30

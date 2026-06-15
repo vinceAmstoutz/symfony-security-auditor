@@ -46,6 +46,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRende
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 
 final class AuditCommandEndToEndTest extends TestCase
@@ -154,6 +155,60 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertArrayHasKey('version', $decoded);
         self::assertSame('2.1.0', $decoded['version']);
         self::assertArrayHasKey('runs', $decoded);
+    }
+
+    public function test_command_html_format_outputs_an_html_document(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--format' => 'html',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        $output = $commandTester->getDisplay();
+        self::assertStringContainsString('<!doctype html>', $output);
+        self::assertStringContainsString('Security Audit Report', $output);
+    }
+
+    public function test_generate_baseline_writes_fingerprints_and_exits_zero_despite_critical_findings(): void
+    {
+        $this->createProjectDir();
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $baselineFile,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertFileExists($baselineFile);
+        $fingerprints = json_decode((string) file_get_contents($baselineFile), true);
+        self::assertIsArray($fingerprints);
+        self::assertCount(5, $fingerprints);
+    }
+
+    public function test_baseline_suppresses_matching_findings_and_clears_the_exit_code(): void
+    {
+        $this->createProjectDir();
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+
+        $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}')->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $baselineFile,
+        ]);
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertStringContainsString('5 finding(s) suppressed by the baseline.', $commandTester->getDisplay());
     }
 
     public function test_command_json_output_written_to_file(): void
@@ -384,6 +439,7 @@ final class AuditCommandEndToEndTest extends TestCase
             new AuditPresenter(new StaticPricingProvider(new NullLogger())),
             $estimateAuditCostUseCase,
             $progressReporterHolder,
+            new Baseline(),
             secretScrubbingEnabled: $secretScrubbingEnabled,
         );
 

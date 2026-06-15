@@ -746,6 +746,20 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame([], $kernel->getContainer()->getParameter('symfony_security_auditor.config_notices'));
     }
 
+    public function test_bundle_baseline_parameter_defaults_to_null(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        self::assertNull($kernel->getContainer()->getParameter('symfony_security_auditor.audit.baseline'));
+    }
+
+    public function test_bundle_baseline_parameter_reflects_the_configured_path(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['baseline' => '.security-baseline.json']]);
+
+        self::assertSame('.security-baseline.json', $kernel->getContainer()->getParameter('symfony_security_auditor.audit.baseline'));
+    }
+
     public function test_bundle_emits_a_notice_when_batching_disables_the_reviewer_verdict_cache(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['reviewer_batch_size' => 5]]);

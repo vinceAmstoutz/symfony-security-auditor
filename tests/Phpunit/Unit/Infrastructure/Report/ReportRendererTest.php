@@ -742,6 +742,78 @@ final class ReportRendererTest extends TestCase
         self::assertIsArray($value);
     }
 
+    public function test_render_html_is_a_complete_document(): void
+    {
+        $output = $this->reportRenderer->renderHtml($this->makeReport());
+
+        self::assertStringContainsString('<!doctype html>', $output);
+        self::assertStringContainsString('</html>', $output);
+    }
+
+    public function test_render_html_shows_safe_message_when_no_vulnerabilities(): void
+    {
+        $output = $this->reportRenderer->renderHtml($this->makeReport());
+
+        self::assertStringContainsString('No validated vulnerabilities found.', $output);
+        self::assertStringNotContainsString('<h2>Vulnerabilities', $output);
+    }
+
+    public function test_render_html_renders_risk_level_with_its_css_class(): void
+    {
+        $output = $this->reportRenderer->renderHtml($this->makeReport());
+
+        self::assertStringContainsString('risk-safe', $output);
+        self::assertStringContainsString('>SAFE</span>', $output);
+    }
+
+    public function test_render_html_lists_a_validated_vulnerability(): void
+    {
+        $output = $this->reportRenderer->renderHtml($this->makeReport($this->makeValidatedVuln(filePath: 'src/Admin/UserController.php')));
+
+        self::assertStringContainsString('<h2>Vulnerabilities (1 total)</h2>', $output);
+        self::assertStringContainsString('src/Admin/UserController.php', $output);
+        self::assertStringContainsString('class="finding severity-high"', $output);
+    }
+
+    public function test_render_html_summary_counts_only_present_severities(): void
+    {
+        $output = $this->reportRenderer->renderHtml($this->makeReport($this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::HIGH)));
+
+        self::assertStringContainsString('<tr class="severity-high">', $output);
+        self::assertStringContainsString('<td>1</td></tr>', $output);
+        self::assertStringNotContainsString('<tr class="severity-critical">', $output);
+    }
+
+    public function test_render_html_escapes_finding_content_to_prevent_report_xss(): void
+    {
+        $vulnerability = Vulnerability::create(
+            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
+            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
+            title: '<script>alert(1)</script>',
+            description: 'desc',
+            filePath: 'src/Foo.php',
+            lineStart: 1,
+            lineEnd: 2,
+            vulnerableCode: 'code',
+            attackVector: 'vec',
+            proof: 'proof',
+            remediation: 'fix',
+            confidence: 0.9,
+        )->withReviewerValidation(true);
+
+        $output = $this->reportRenderer->renderHtml($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $output);
+        self::assertStringNotContainsString('<script>alert(1)</script>', $output);
+    }
+
+    public function test_render_html_renders_confidence_as_a_percentage(): void
+    {
+        $output = $this->reportRenderer->renderHtml($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringContainsString('90%', $output);
+    }
+
     private function makeReport(Vulnerability ...$vulnerabilities): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
