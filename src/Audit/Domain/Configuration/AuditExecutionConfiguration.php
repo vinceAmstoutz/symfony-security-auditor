@@ -37,5 +37,6 @@ final readonly class AuditExecutionConfiguration
         public bool $structuredCollection = true,
         public bool $reviewerStructuredCollection = true,
         public bool $stableSystemPrompt = true,
+        public ?string $baseline = null,
     ) {}
 }

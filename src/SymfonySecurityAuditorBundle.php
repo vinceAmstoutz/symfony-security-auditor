@@ -218,6 +218,10 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->min(1)
                             ->info("Maximum tool-call rounds per finding before forcing the reviewer to commit to a verdict. Lower default than the attacker because the reviewer's job is verification, not exploration.")
                         ->end()
+                        ->scalarNode('baseline')
+                            ->defaultNull()
+                            ->info('Default path to a baseline file of accepted-finding fingerprints. Findings whose fingerprint is listed are suppressed from the report and excluded from the exit code, so previously-accepted findings no longer fail CI. The --baseline CLI option overrides this path; --generate-baseline writes the file. Null (default) disables baselining.')
+                        ->end()
                         ->arrayNode('static_prescan')
                             ->addDefaultsIfNotSet()
                             ->info('Deterministic zero-token risk-marker scan that runs before the LLM. Flags concrete locations (unserialize, |raw, csrf_protection: false, hardcoded secrets, Doctrine string concatenation, etc.) so the attacker prompt can focus on them. In lean mode, files with zero markers are skipped entirely — biggest token saver on large codebases.')
@@ -418,6 +422,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.max_tool_iterations', $bundleConfiguration->audit->maxToolIterations);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_tools_enabled', $bundleConfiguration->audit->reviewerToolsEnabled);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_max_tool_iterations', $bundleConfiguration->audit->reviewerMaxToolIterations);
+        $builder->setParameter('symfony_security_auditor.audit.baseline', $bundleConfiguration->audit->baseline);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_max_concurrent', $bundleConfiguration->audit->reviewerMaxConcurrent);
         $builder->setParameter('symfony_security_auditor.audit.attacker_max_concurrent', $bundleConfiguration->audit->attackerMaxConcurrent);
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.enabled', $bundleConfiguration->audit->staticPreScanEnabled);

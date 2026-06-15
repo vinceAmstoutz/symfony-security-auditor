@@ -99,6 +99,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
 
@@ -196,6 +200,16 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(AuditPresenter::class);
     $defaultsConfigurator->alias(AuditPresenterInterface::class, AuditPresenter::class);
+
+    $defaultsConfigurator->set(Baseline::class);
+    $defaultsConfigurator->alias(BaselineInterface::class, Baseline::class);
+
+    $defaultsConfigurator->set(BaselineProcessor::class)
+        ->args([
+            service(BaselineInterface::class),
+            param('symfony_security_auditor.audit.baseline'),
+        ]);
+    $defaultsConfigurator->alias(BaselineProcessorInterface::class, BaselineProcessor::class);
 
     $defaultsConfigurator->set(ProcessGitChangedFilesResolver::class);
     $defaultsConfigurator->alias(GitChangedFilesResolverInterface::class, ProcessGitChangedFilesResolver::class);
@@ -408,6 +422,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(AuditPresenterInterface::class),
             service(EstimateAuditCostUseCase::class),
             service(ProgressReporterHolder::class),
+            service(BaselineProcessorInterface::class),
             param('symfony_security_auditor.scan.secret_scrubbing.enabled'),
             param('symfony_security_auditor.config_notices'),
         ])

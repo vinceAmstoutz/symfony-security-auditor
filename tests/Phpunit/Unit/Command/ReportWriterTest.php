@@ -84,6 +84,18 @@ final class ReportWriterTest extends TestCase
         self::assertStringNotContainsString('Report saved to', $display);
     }
 
+    public function test_writing_html_format_streams_an_html_document(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->reportWriter->write($this->makeReport(), OutputFormat::Html, null, $symfonyStyle);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('<!doctype html>', $display);
+        self::assertStringContainsString('Security Audit Report', $display);
+    }
+
     public function test_writing_to_file_creates_missing_parent_directories(): void
     {
         $symfonyStyle = new SymfonyStyle(new StringInput(''), new BufferedOutput());

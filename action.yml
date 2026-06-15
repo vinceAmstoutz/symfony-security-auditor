@@ -1,0 +1,91 @@
+name: Symfony Security Auditor
+description: AI-powered multi-agent security audit for Symfony applications — provider-agnostic via symfony/ai.
+author: Vincent Amstoutz
+
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  project-path:
+    description: Path to the Symfony project to audit.
+    required: false
+    default: "."
+  format:
+    description: "Output format: console, json, sarif, or html."
+    required: false
+    default: sarif
+  output:
+    description: File path to write the report to. Leave empty to print to stdout.
+    required: false
+    default: report.sarif
+  baseline:
+    description: Path to a baseline file of accepted-finding fingerprints to suppress.
+    required: false
+    default: ""
+  generate-baseline:
+    description: If set to a path, run the audit, write the current findings to that baseline file, and exit 0.
+    required: false
+    default: ""
+  since:
+    description: Diff mode — audit only files changed against this git ref (e.g. origin/main).
+    required: false
+    default: ""
+  extra-args:
+    description: Additional raw arguments appended verbatim to the audit:run invocation (e.g. "--path=src --no-cache").
+    required: false
+    default: ""
+  php-version:
+    description: PHP version to install (ignored when setup-php is false).
+    required: false
+    default: "8.3"
+  setup-php:
+    description: Whether this action installs PHP via shivammathur/setup-php. Set to false if your workflow already set PHP up.
+    required: false
+    default: "true"
+  install-dependencies:
+    description: Whether this action runs `composer install` before auditing. Set to false if your workflow already installed dependencies.
+    required: false
+    default: "true"
+  working-directory:
+    description: Directory to run composer and the console command from.
+    required: false
+    default: "."
+
+runs:
+  using: composite
+  steps:
+    - name: Set up PHP
+      if: ${{ inputs.setup-php == 'true' }}
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ inputs.php-version }}
+        coverage: none
+
+    - name: Install Composer dependencies
+      if: ${{ inputs.install-dependencies == 'true' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: composer install --no-interaction --prefer-dist --no-progress
+
+    - name: Run security audit
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        SSA_PROJECT_PATH: ${{ inputs.project-path }}
+        SSA_FORMAT: ${{ inputs.format }}
+        SSA_OUTPUT: ${{ inputs.output }}
+        SSA_BASELINE: ${{ inputs.baseline }}
+        SSA_GENERATE_BASELINE: ${{ inputs.generate-baseline }}
+        SSA_SINCE: ${{ inputs.since }}
+        SSA_EXTRA_ARGS: ${{ inputs.extra-args }}
+      run: |
+        set -euo pipefail
+        args=("$SSA_PROJECT_PATH" "--format=$SSA_FORMAT")
+        if [ -n "$SSA_OUTPUT" ]; then args+=("--output=$SSA_OUTPUT"); fi
+        if [ -n "$SSA_BASELINE" ]; then args+=("--baseline=$SSA_BASELINE"); fi
+        if [ -n "$SSA_GENERATE_BASELINE" ]; then args+=("--generate-baseline=$SSA_GENERATE_BASELINE"); fi
+        if [ -n "$SSA_SINCE" ]; then args+=("--since=$SSA_SINCE"); fi
+        # shellcheck disable=SC2206 -- intentional word-splitting of caller-supplied extra args
+        if [ -n "$SSA_EXTRA_ARGS" ]; then args+=($SSA_EXTRA_ARGS); fi
+        php bin/console audit:run "${args[@]}"

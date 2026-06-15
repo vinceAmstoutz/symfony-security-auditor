@@ -160,6 +160,48 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('second notice about batching', $flattened);
     }
 
+    public function test_baseline_generated_reports_the_path_and_count(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->baselineGenerated($symfonyStyle, '.security-baseline.json', 3);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('Baseline written to .security-baseline.json', $flattened);
+        self::assertStringContainsString('3 finding fingerprint(s)', $flattened);
+    }
+
+    public function test_baseline_applied_reports_the_suppressed_count(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->baselineApplied($symfonyStyle, 2);
+
+        self::assertStringContainsString('2 finding(s) suppressed by the baseline.', $bufferedOutput->fetch());
+    }
+
+    public function test_baseline_applied_reports_a_single_suppression(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->baselineApplied($symfonyStyle, 1);
+
+        self::assertStringContainsString('1 finding(s) suppressed by the baseline.', $bufferedOutput->fetch());
+    }
+
+    public function test_baseline_applied_is_silent_when_nothing_suppressed(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->baselineApplied($symfonyStyle, 0);
+
+        self::assertSame('', $bufferedOutput->fetch());
+    }
+
     public function test_running_section_emits_section_header(): void
     {
         $bufferedOutput = new BufferedOutput();

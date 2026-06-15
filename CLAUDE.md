@@ -82,8 +82,8 @@ src/
       Pricing/       # StaticPricingProvider
       Progress/      # ConsoleProgressReporter, LoggerProgressReporter, NullProgressReporter, ProgressReporterHolder
       Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory, RecordReviewTool, RecordReviewToolFactory
-      Report/        # ReportRenderer (+ Template/*.txt stubs)
-  Command/           # AuditCommand (Symfony Console: audit:run) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, OutputFormat enum
+      Report/        # ReportRenderer (console/json/sarif/html; + Template/*.txt + *.html stubs)
+  Command/           # AuditCommand (Symfony Console: audit:run) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, OutputFormat enum (console|json|sarif|html), Baseline (accepted-finding suppression)
   SymfonySecurityAuditorBundle.php  # Bundle class (configure + loadExtension)
 tests/Phpunit/
   Unit/              # Isolated class tests (stub/mock collaborators)
@@ -259,7 +259,8 @@ Internal classes (`@internal` PHPDoc tag) — concrete agents, pipeline stages,
 infrastructure adapters, Command collaborators — may be refactored freely in a
 `MINOR`. When you add a class that is **not** an extension point, add the
 `@internal` tag. When you add a public configuration key, list it in
-`docs/versioning.md`.
+`docs/versioning.md` and add it to `resources/schema.json` (the JSON Schema that
+powers editor autocompletion for `symfony_security_auditor.yaml`).
 
 Canonical policy: [`docs/versioning.md`](docs/versioning.md).
 

@@ -47,7 +47,7 @@ Every key under `symfony_security_auditor:` documented in
   `audit.static_prescan.lean_mode`, `audit.chunking.strategy`,
   `audit.code_slicing.enabled`, `audit.code_slicing.min_lines_before_slicing`,
   `audit.poc_synthesis.enabled`, `audit.poc_synthesis.severity_floor`,
-  `audit.escalation.enabled`, `audit.escalation.cheap_model`,
+  `audit.escalation.enabled`, `audit.escalation.cheap_model`, `audit.baseline`,
   `audit.retry.max_attempts`, `audit.retry.initial_delay_ms`,
   `audit.retry.backoff_multiplier`, `audit.retry.jitter_ratio`,
   `audit.budget.max_tokens`, `audit.budget.max_cost_usd`,
@@ -66,12 +66,29 @@ is a `MAJOR` change.
 - The command name `audit:run`.
 - The `project-path` argument.
 - The `--format` (`-f`) and `--output` (`-o`) options, including the values
-  accepted by `--format` (`console`, `json`, `sarif`).
+  accepted by `--format` (`console`, `json`, `sarif`, `html`).
+- The `--baseline` and `--generate-baseline` options (baseline suppression of
+  accepted findings).
 - Exit codes (see [CLI Reference → Exit codes](configuration.md#exit-codes)):
   - `0` — audit completed; risk level is `SAFE`, `LOW`, `MEDIUM`, or `HIGH`.
   - `1` — risk level is `CRITICAL`, or the audit itself failed.
   - `2` — audit aborted because the configured token or cost budget was exceeded
     (partial report still emitted).
+
+### GitHub Action
+
+- The composite action defined by `action.yml` at the repository root and its
+  input names: `project-path`, `format`, `output`, `baseline`,
+  `generate-baseline`, `since`, `extra-args`, `php-version`, `setup-php`,
+  `install-dependencies`, `working-directory`. New inputs may be added in a
+  `MINOR`; renaming or removing one is a `MAJOR`. The Marketplace `name`
+  (`Symfony Security Auditor`) is also stable.
+- **Floating major tag.** Consumers pin the action with
+  `uses: vinceamstoutz/symfony-security-auditor@v1`. A `v1` tag is maintained to
+  point at the latest `1.x.x` release: each new `1.x.x` release moves `v1`
+  forward (e.g. `git tag -f v1 <release> && git push -f origin v1`), so pinning
+  `@v1` always tracks the newest backward-compatible action. The next `MAJOR`
+  introduces a `v2` tag; `@v1` keeps resolving to the final `1.x` release.
 
 ### Output schemas
 

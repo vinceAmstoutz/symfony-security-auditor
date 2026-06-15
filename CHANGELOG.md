@@ -10,6 +10,68 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **JSON Schema for editor autocompletion of the bundle configuration.** A
+  schema describing every `symfony_security_auditor:` key ships at
+  `resources/schema.json`. Editors backed by the YAML Language Server pick it up
+  from a `# yaml-language-server: $schema=…` modeline (added to the
+  `examples/configs/*.yaml` samples and documented in `docs/configuration.md`),
+  giving key completion, type checking, and inline docs while editing
+  `config/packages/symfony_security_auditor.yaml`.
+- **New `--format=html` output — a self-contained, HTML-escaped audit report.**
+  `audit:run` previously emitted only `console`, `json`, and `sarif`. The new
+  `html` value renders a standalone HTML document (inline CSS, severity-colored
+  summary table, one card per finding) suitable for sharing or archiving as a CI
+  artifact — `bin/console audit:run . --format=html --output=report.html`.
+  Implemented by `ReportRenderer::renderHtml()`
+  (`src/Audit/Infrastructure/Report/ReportRenderer.php`) against new
+  `Template/report.html` + `Template/vulnerability.html` stubs; every dynamic
+  value (titles, descriptions, code, file paths) is escaped with
+  `htmlspecialchars(…, ENT_QUOTES | ENT_SUBSTITUTE)` so a finding containing
+  `<script>` cannot inject markup into the report itself. `OutputFormat` gains a
+  `Html` case and `ReportWriter` an `html` arm. Public API per
+  `docs/versioning.md` (the `--format` value `html`).
+- **Baseline suppression of accepted findings — `--baseline`,
+  `--generate-baseline`, and the `audit.baseline` config key.** There was no way
+  to accept a known finding so it stopped failing CI. A finding now has a stable
+  `Vulnerability::fingerprint()` (`SSA-` + SHA-1 of type + file path + title —
+  deliberately independent of line numbers and the non-deterministic `id`).
+  `audit:run --generate-baseline=<file>` runs the audit, writes every current
+  finding's fingerprint to a JSON file, and exits `0`;
+  `audit:run --baseline=<file>` (or the `audit.baseline` default path) drops
+  findings whose fingerprint is listed from the report **and** from the
+  exit-code calculation, so previously-accepted findings no longer fail CI.
+  Backed by `AuditReport::fingerprints()` / `AuditReport::withoutFingerprints()`
+  (Domain) and the `Baseline` file gateway (`src/Command/Baseline.php`); a
+  malformed baseline file raises `MalformedBaselineFileException`. Public API
+  per `docs/versioning.md`.
+- **A reusable, Marketplace-publishable GitHub Action.** The repository now
+  ships a composite action (`action.yml` at the repo root) so consumers can run
+  an audit with `uses: vinceamstoutz/symfony-security-auditor@v1` instead of
+  scripting the steps. It sets up PHP, installs Composer dependencies, and runs
+  `audit:run`, exposing inputs for `project-path`, `format`, `output`,
+  `baseline`, `generate-baseline`, `since`, `extra-args`, `php-version`,
+  `setup-php`, `install-dependencies`, and `working-directory` (the provider key
+  is passed via `env:`). Documented in `docs/ci.md` (Reusable GitHub Action).
+
+### Changed
+
+- **The reviewer-verdict cache now covers batched reviews
+  (`audit.reviewer_batch_size > 1`).** Batched reviews used to always call the
+  LLM — the cache only applied to one-finding-per-call modes — and `audit:run`
+  printed a pre-flight stderr notice whenever batching ran with the cache
+  enabled. `BatchReviewAnalyzer`
+  (`src/Audit/Application/Agent/Review/BatchReviewAnalyzer.php`) now mirrors
+  `ConcurrentReviewAnalyzer`: it resolves each finding's code context, serves
+  cache hits through `ReviewOutcomeRecorder::recordVerdict()`, and batches only
+  the cache-miss findings to the LLM (preserving the original finding order).
+  Matched verdicts from a miss batch are persisted via `BatchVerdictApplier`,
+  keyed by the finding's code context; a `--no-cache`/bypassed run reads and
+  writes nothing. The now-obsolete "batching disables the reviewer-verdict
+  cache" notice is removed from `ConfigurationNotices` (whose unused
+  `CacheConfiguration` parameter is dropped).
+
 ## [1.9.0] — 2026-06-12 — Slipstream
 
 A config-less performance and reviewer-trust release. The zero-configuration

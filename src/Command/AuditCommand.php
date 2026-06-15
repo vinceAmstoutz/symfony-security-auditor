@@ -34,9 +34,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
           <info>console</info>  human-readable summary (default)
           <info>json</info>     machine-readable report
           <info>sarif</info>    SARIF 2.1.0 for GitHub Code Scanning / GitLab Security Dashboard
+          <info>html</info>     self-contained HTML report for sharing or archiving
 
         Use <info>--output</info> (<info>-o</info>) to write the report to a file:
           <info>%command.full_name% . --format=sarif --output=report.sarif</info>
+          <info>%command.full_name% . --format=html --output=report.html</info>
+
+        Baseline (suppress accepted findings):
+          <info>%command.full_name% . --generate-baseline=.security-baseline.json</info>  accept current findings
+          <info>%command.full_name% . --baseline=.security-baseline.json</info>           suppress them on later runs
+        Baselined findings are dropped from the report and do not affect the exit code.
 
         Exit codes:
           <info>0</info>  audit completed; risk level is SAFE, LOW, MEDIUM, or HIGH
@@ -66,6 +73,7 @@ final readonly class AuditCommand
         private AuditPresenterInterface $auditPresenter,
         private EstimateAuditCostUseCase $estimateAuditCostUseCase,
         private ProgressReporterHolder $progressReporterHolder,
+        private BaselineProcessorInterface $baselineProcessor,
         private bool $secretScrubbingEnabled,
         private array $configNotices = [],
     ) {}
@@ -108,6 +116,25 @@ final readonly class AuditCommand
             }
 
             $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache, $auditCommandInput->since);
+
+            if (null !== $auditCommandInput->generateBaseline) {
+                $fingerprintCount = $this->baselineProcessor->generate($report, $auditCommandInput->generateBaseline);
+                $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+
+                if (!$auditCommandInput->isMachineReadableToStdout()) {
+                    $this->auditPresenter->baselineGenerated($symfonyStyle, $auditCommandInput->generateBaseline, $fingerprintCount);
+                }
+
+                return Command::SUCCESS;
+            }
+
+            $baselineResult = $this->baselineProcessor->apply($report, $auditCommandInput->baseline);
+            $report = $baselineResult->report;
+
+            if (!$auditCommandInput->isMachineReadableToStdout()) {
+                $this->auditPresenter->baselineApplied($symfonyStyle, $baselineResult->suppressedCount);
+            }
+
             $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
 
             $exitCode = $this->auditExitCodeResolver->resolve($report);
