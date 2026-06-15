@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.11.0] — 2026-06-15 — Tracer
+
+A gating, suppression, reporting, and detection release. Audits can now fail CI
+at a chosen severity (`audit.fail_on` / `--fail-on`, default `critical`) and
+mute whole finding classes without per-finding baselines (`audit.excluded_types`
+/ `audit.included_types`). SARIF output gained stable `partialFingerprints` so
+GitHub Code Scanning tracks findings across runs, plus per-rule OWASP `helpUri`s
+(with `authenticator_bypass` and `missing_signature_verification` re-mapped to
+A07/A08), and a new `--format=markdown` renders a report for pull-request
+comments and job summaries. The attacker prompt now traces each finding
+source→sink, sweeps the STRIDE categories per entry point, and weights severity
+by exposure.
+
 ### Added
 
 - **Type-level finding suppression — the `audit.excluded_types` and
@@ -1615,6 +1628,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.11.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.11.0
 [1.10.1]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.10.1
 [1.10.0]:
