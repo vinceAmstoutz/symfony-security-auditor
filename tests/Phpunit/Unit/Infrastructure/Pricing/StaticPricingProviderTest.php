@@ -83,16 +83,16 @@ final class StaticPricingProviderTest extends TestCase
         // Mistral AI
         yield 'mistral-large-latest' => ['mistral-large-latest', 0.50, 1.50];
         yield 'mistral-large-2512' => ['mistral-large-2512', 0.50, 1.50];
-        yield 'mistral-medium-latest' => ['mistral-medium-latest', 1.50, 7.50];
-        yield 'mistral-medium-2604' => ['mistral-medium-2604', 1.50, 7.50];
-        yield 'mistral-small-latest' => ['mistral-small-latest', 0.10, 0.30];
-        yield 'mistral-small-2603' => ['mistral-small-2603', 0.10, 0.30];
+        yield 'mistral-medium-latest' => ['mistral-medium-latest', 0.40, 2.00];
+        yield 'mistral-medium-2604' => ['mistral-medium-2604', 0.40, 2.00];
+        yield 'mistral-small-latest' => ['mistral-small-latest', 0.15, 0.60];
+        yield 'mistral-small-2603' => ['mistral-small-2603', 0.15, 0.60];
         yield 'codestral-latest' => ['codestral-latest', 0.30, 0.90];
         yield 'codestral-2508' => ['codestral-2508', 0.30, 0.90];
         yield 'devstral-medium-2512' => ['devstral-medium-2512', 0.40, 2.00];
         yield 'devstral-small-2512' => ['devstral-small-2512', 0.10, 0.30];
-        yield 'ministral-3b-2512' => ['ministral-3b-2512', 0.10, 0.10];
-        yield 'ministral-8b-2512' => ['ministral-8b-2512', 0.15, 0.15];
+        yield 'ministral-3b-2512' => ['ministral-3b-2512', 0.04, 0.04];
+        yield 'ministral-8b-2512' => ['ministral-8b-2512', 0.10, 0.10];
         yield 'ministral-14b-2512' => ['ministral-14b-2512', 0.20, 0.20];
         // Cohere
         yield 'command-a-03-2025' => ['command-a-03-2025', 2.50, 10.00];

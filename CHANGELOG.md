@@ -83,6 +83,20 @@ finally covers batched reviews, and the stale model hints in the Composer
   cache" notice is removed from `ConfigurationNotices` (whose unused
   `CacheConfiguration` parameter is dropped).
 
+### Fixed
+
+- **Corrected stale Mistral list prices in the built-in cost table.** Six
+  entries in `StaticPricingProvider::PRICES`
+  (`src/Audit/Infrastructure/Pricing/StaticPricingProvider.php`) overstated
+  Mistral's current per-million-token rates, inflating the estimated/actual cost
+  reported for those models. Reconciled against
+  [models.dev](https://models.dev):
+  `mistral-medium-latest`/`mistral-medium-2604` `$1.50/$7.50` → `$0.40/$2.00`,
+  `mistral-small-latest`/`mistral-small-2603` `$0.10/$0.30` → `$0.15/$0.60`,
+  `ministral-3b-2512` `$0.10/$0.10` → `$0.04/$0.04`, and `ministral-8b-2512`
+  `$0.15/$0.15` → `$0.10/$0.10`. All other providers were spot-checked and left
+  unchanged; cost reporting for the affected Mistral models is now accurate.
+
 ## [1.9.0] — 2026-06-12 — Slipstream
 
 A config-less performance and reviewer-trust release. The zero-configuration

@@ -57,7 +57,8 @@ final class StaticPricingProvider implements PricingProviderInterface
      * cost more. Unknown models resolve to 0.0 (cost reporting disabled), never
      * an error.
      *
-     * Sources, last updated 2026-06-11:
+     * Sources, last updated 2026-06-15 (Mistral entries reconciled against
+     * https://models.dev):
      * - Anthropic: https://platform.claude.com/docs/en/about-claude/models/overview
      * - OpenAI:    https://platform.openai.com/docs/pricing
      * - Google:    https://ai.google.dev/gemini-api/docs/pricing
@@ -117,16 +118,16 @@ final class StaticPricingProvider implements PricingProviderInterface
         // Mistral AI
         'mistral-large-latest' => [0.50, 1.50],
         'mistral-large-2512' => [0.50, 1.50],
-        'mistral-medium-latest' => [1.50, 7.50],
-        'mistral-medium-2604' => [1.50, 7.50],
-        'mistral-small-latest' => [0.10, 0.30],
-        'mistral-small-2603' => [0.10, 0.30],
+        'mistral-medium-latest' => [0.40, 2.00],
+        'mistral-medium-2604' => [0.40, 2.00],
+        'mistral-small-latest' => [0.15, 0.60],
+        'mistral-small-2603' => [0.15, 0.60],
         'codestral-latest' => [0.30, 0.90],
         'codestral-2508' => [0.30, 0.90],
         'devstral-medium-2512' => [0.40, 2.00],
         'devstral-small-2512' => [0.10, 0.30],
-        'ministral-3b-2512' => [0.10, 0.10],
-        'ministral-8b-2512' => [0.15, 0.15],
+        'ministral-3b-2512' => [0.04, 0.04],
+        'ministral-8b-2512' => [0.10, 0.10],
         'ministral-14b-2512' => [0.20, 0.20],
         // Cohere
         'command-a-03-2025' => [2.50, 10.00],
