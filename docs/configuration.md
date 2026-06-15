@@ -55,14 +55,16 @@ following keys:
 > config file:
 >
 > ```yaml
-> # yaml-language-server: $schema=https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/main/resources/schema.json
+> # yaml-language-server: $schema=https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/v1/resources/schema.json
 > symfony_security_auditor:
 >     model: "claude-opus-4-8"
 > ```
 >
 > This gives key completion, type checking, and inline docs as you edit. The
 > example files under [`examples/configs/`](../examples/configs/) include the
-> modeline.
+> modeline. The `v1` tag tracks the latest `1.x` schema; pin an exact release
+> tag (e.g. `…/1.10.0/resources/schema.json`) to match the version you have
+> installed.
 
 ### Top-level
 
