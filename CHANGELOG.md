@@ -57,16 +57,6 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
-- **JSON encoding/decoding outside the Domain layer now goes through
-  `symfony/serializer`'s `JsonEncoder`.** `ReportRenderer`,
-  `FilesystemAttackerCache`, `FilesystemReviewerCache`,
-  `ComposerAuditAdvisoryDatabase`, the new `Baseline`, and the bundle's
-  cache-salt hash now use `JsonEncoder` instead of raw `json_encode` /
-  `json_decode`, adding `symfony/serializer` (`^7.4 || ^8.0`) as a runtime
-  dependency. Output is byte-identical (same flags via `JsonEncode::OPTIONS`),
-  so existing on-disk caches stay valid. The Domain `LLMResponse::parseJson()`
-  deliberately keeps native `json_decode` — the Domain layer is pure PHP and
-  must not depend on Symfony components (see `.claude/rules/ddd-layers.md`).
 - **The reviewer-verdict cache now covers batched reviews
   (`audit.reviewer_batch_size > 1`).** Batched reviews used to always call the
   LLM — the cache only applied to one-finding-per-call modes — and `audit:run`

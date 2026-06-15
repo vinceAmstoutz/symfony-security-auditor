@@ -13,13 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache;
 
+use JsonException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Serializer\Encoder\JsonDecode;
-use Symfony\Component\Serializer\Encoder\JsonEncode;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
-use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ContextAwareAttackerCacheInterface;
@@ -35,7 +32,6 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
         private Filesystem $filesystem,
         private LoggerInterface $logger,
         private string $keySalt = '',
-        private JsonEncoder $jsonEncoder = new JsonEncoder(),
     ) {
         if (u($cacheDir)->trim()->isEmpty()) {
             throw InvalidCacheConfigurationException::forEmptyCacheDir();
@@ -63,7 +59,7 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
         try {
             $raw = $this->filesystem->readFile($path);
 
-            $decoded = $this->jsonEncoder->decode($raw, JsonEncoder::FORMAT, [JsonDecode::ASSOCIATIVE => true]);
+            $decoded = json_decode($raw, true, flags: \JSON_THROW_ON_ERROR);
             if (!\is_array($decoded)) {
                 return null;
             }
@@ -78,10 +74,10 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
             ]);
 
             return null;
-        } catch (NotEncodableValueException $notEncodableValueException) {
+        } catch (JsonException $jsonException) {
             $this->logger->warning('Attacker cache entry was unreadable, ignoring', [
                 'path' => $path,
-                'error' => $notEncodableValueException->getMessage(),
+                'error' => $jsonException->getMessage(),
             ]);
 
             return null;
@@ -93,7 +89,7 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
         $path = $this->pathForChunk($chunk, $contextKey);
 
         try {
-            $encoded = $this->jsonEncoder->encode($rawVulnerabilities, JsonEncoder::FORMAT, [JsonEncode::OPTIONS => \JSON_UNESCAPED_SLASHES]);
+            $encoded = json_encode($rawVulnerabilities, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
             $this->filesystem->mkdir(\dirname($path));
             $this->filesystem->dumpFile($path, $encoded);
             $this->logger->debug('Attacker cache stored', ['path' => $path]);

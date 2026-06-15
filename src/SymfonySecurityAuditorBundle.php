@@ -19,8 +19,6 @@ use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
-use Symfony\Component\Serializer\Encoder\JsonEncode;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
@@ -461,7 +459,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 substr(
                     hash(
                         'sha256',
-                        (new JsonEncoder())->encode($bundleConfiguration->scan->customRiskPatterns, JsonEncoder::FORMAT, [JsonEncode::OPTIONS => \JSON_UNESCAPED_SLASHES]),
+                        json_encode($bundleConfiguration->scan->customRiskPatterns, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES),
                     ),
                     0,
                     16,

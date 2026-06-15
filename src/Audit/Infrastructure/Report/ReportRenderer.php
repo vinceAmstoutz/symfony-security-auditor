@@ -15,8 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
 use Composer\InstalledVersions;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Serializer\Encoder\JsonEncode;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
@@ -35,7 +33,6 @@ final readonly class ReportRenderer
 
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
-        private JsonEncoder $jsonEncoder = new JsonEncoder(),
     ) {}
 
     public function renderConsole(AuditReport $auditReport): string
@@ -59,7 +56,7 @@ final readonly class ReportRenderer
 
     public function renderJson(AuditReport $auditReport): string
     {
-        return $this->jsonEncoder->encode($auditReport->toArray(), JsonEncoder::FORMAT, [JsonEncode::OPTIONS => \JSON_PRETTY_PRINT]);
+        return json_encode($auditReport->toArray(), \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR);
     }
 
     public function renderHtml(AuditReport $auditReport): string
@@ -149,7 +146,7 @@ final readonly class ReportRenderer
             ],
         ];
 
-        return $this->jsonEncoder->encode($sarif, JsonEncoder::FORMAT, [JsonEncode::OPTIONS => \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES]);
+        return json_encode($sarif, \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
     }
 
     private function htmlSummary(AuditReport $auditReport): string

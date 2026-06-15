@@ -13,10 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use JsonException;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Serializer\Encoder\JsonEncode;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
-use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 
 /**
@@ -28,7 +26,6 @@ final readonly class Baseline implements BaselineInterface
 {
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
-        private JsonEncoder $jsonEncoder = new JsonEncoder(),
     ) {}
 
     public function load(string $path): array
@@ -38,12 +35,9 @@ final readonly class Baseline implements BaselineInterface
         }
 
         try {
-            $decoded = $this->jsonEncoder->decode(
-                $this->filesystem->readFile($path),
-                JsonEncoder::FORMAT,
-            );
-        } catch (NotEncodableValueException $notEncodableValueException) {
-            throw MalformedBaselineFileException::fromDecodingFailure($path, $notEncodableValueException);
+            $decoded = json_decode($this->filesystem->readFile($path), true, flags: \JSON_THROW_ON_ERROR);
+        } catch (JsonException $jsonException) {
+            throw MalformedBaselineFileException::fromJsonException($path, $jsonException);
         }
 
         if (!\is_array($decoded)) {
@@ -66,11 +60,7 @@ final readonly class Baseline implements BaselineInterface
     {
         $this->filesystem->dumpFile(
             $path,
-            $this->jsonEncoder->encode(
-                $fingerprints,
-                JsonEncoder::FORMAT,
-                [JsonEncode::OPTIONS => \JSON_PRETTY_PRINT],
-            ).\PHP_EOL,
+            json_encode($fingerprints, \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR).\PHP_EOL,
         );
     }
 }
