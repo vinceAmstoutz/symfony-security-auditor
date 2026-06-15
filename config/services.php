@@ -39,6 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
@@ -111,6 +112,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessorInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
 
@@ -230,6 +233,13 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.audit.baseline'),
         ]);
     $defaultsConfigurator->alias(BaselineProcessorInterface::class, BaselineProcessor::class);
+
+    $defaultsConfigurator->set(FindingTypeFilter::class)
+        ->args([
+            param('symfony_security_auditor.audit.included_types'),
+            param('symfony_security_auditor.audit.excluded_types'),
+        ]);
+    $defaultsConfigurator->alias(FindingTypeFilterInterface::class, FindingTypeFilter::class);
 
     $defaultsConfigurator->set(ProcessGitChangedFilesResolver::class);
     $defaultsConfigurator->alias(GitChangedFilesResolverInterface::class, ProcessGitChangedFilesResolver::class);
@@ -444,7 +454,11 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(ProgressReporterHolder::class),
             service(BaselineProcessorInterface::class),
             param('symfony_security_auditor.scan.secret_scrubbing.enabled'),
+            service(FindingTypeFilterInterface::class),
             param('symfony_security_auditor.config_notices'),
+            inline_service(RiskLevel::class)
+                ->factory([RiskLevel::class, 'from'])
+                ->args([param('symfony_security_auditor.audit.fail_on')]),
         ])
         ->tag('console.command');
 };

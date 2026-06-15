@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Configuration;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
 final class BundleConfigurationTest extends TestCase
 {
@@ -49,6 +50,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(80, $bundleConfiguration->audit->codeSlicingMinLines);
         self::assertFalse($bundleConfiguration->audit->escalationEnabled);
         self::assertNull($bundleConfiguration->audit->escalationCheapModel);
+        self::assertSame(RiskLevel::Critical, $bundleConfiguration->audit->failOn);
+        self::assertSame([], $bundleConfiguration->audit->excludedTypes);
+        self::assertSame([], $bundleConfiguration->audit->includedTypes);
 
         self::assertSame(3, $bundleConfiguration->retry->maxAttempts);
         self::assertSame(500, $bundleConfiguration->retry->initialDelayMs);
@@ -67,6 +71,38 @@ final class BundleConfigurationTest extends TestCase
         self::assertNull($bundleConfiguration->rateLimit->inputTokensPerMinute);
         self::assertNull($bundleConfiguration->rateLimit->outputTokensPerMinute);
         self::assertFalse($bundleConfiguration->rateLimit->isEnabled());
+    }
+
+    public function test_from_array_maps_explicit_fail_on_level(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['audit']['fail_on'] = 'high';
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertSame(RiskLevel::High, $bundleConfiguration->audit->failOn);
+    }
+
+    public function test_from_array_defaults_fail_on_to_critical_when_key_omitted_for_bc(): void
+    {
+        $config = $this->treeBuilderOutput();
+        unset($config['audit']['fail_on']);
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertSame(RiskLevel::Critical, $bundleConfiguration->audit->failOn);
+    }
+
+    public function test_from_array_maps_excluded_and_included_types(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['audit']['excluded_types'] = ['missing_rate_limiting', 'log_injection'];
+        $config['audit']['included_types'] = ['sql_injection'];
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertSame(['missing_rate_limiting', 'log_injection'], $bundleConfiguration->audit->excludedTypes);
+        self::assertSame(['sql_injection'], $bundleConfiguration->audit->includedTypes);
     }
 
     public function test_rate_limit_dimensions_flow_through_when_set(): void
@@ -328,7 +364,7 @@ final class BundleConfigurationTest extends TestCase
      *     reviewer_max_output_tokens?: int|null,
      *     provider_json_mode?: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, fail_on?: string, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * }
      */
@@ -360,7 +396,7 @@ final class BundleConfigurationTest extends TestCase
      *     reviewer_max_output_tokens?: int|null,
      *     provider_json_mode?: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, fail_on?: string, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * }
      */

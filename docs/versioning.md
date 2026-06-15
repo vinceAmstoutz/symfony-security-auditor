@@ -48,6 +48,7 @@ Every key under `symfony_security_auditor:` documented in
   `audit.code_slicing.enabled`, `audit.code_slicing.min_lines_before_slicing`,
   `audit.poc_synthesis.enabled`, `audit.poc_synthesis.severity_floor`,
   `audit.escalation.enabled`, `audit.escalation.cheap_model`, `audit.baseline`,
+  `audit.fail_on`, `audit.excluded_types`, `audit.included_types`,
   `audit.retry.max_attempts`, `audit.retry.initial_delay_ms`,
   `audit.retry.backoff_multiplier`, `audit.retry.jitter_ratio`,
   `audit.budget.max_tokens`, `audit.budget.max_cost_usd`,
@@ -61,6 +62,13 @@ Every key under `symfony_security_auditor:` documented in
 Default values for these keys are also part of the contract. Changing a default
 is a `MAJOR` change.
 
+> **Planned default change.** `audit.fail_on` ships with the default `critical`
+> (only a `CRITICAL` aggregate risk level fails the build), which preserves the
+> historical exit-code behaviour. The default is **planned to become `high`** in
+> the next `MAJOR` release so a HIGH-risk audit fails CI by default. Pin
+> `audit.fail_on: critical` (or `high`) explicitly now to make your intent
+> immune to that change.
+
 ### CLI surface
 
 - The command name `audit:run`.
@@ -69,9 +77,13 @@ is a `MAJOR` change.
   accepted by `--format` (`console`, `json`, `sarif`, `html`).
 - The `--baseline` and `--generate-baseline` options (baseline suppression of
   accepted findings).
+- The `--fail-on` option (CI gate threshold; overrides `audit.fail_on`),
+  including its accepted values (`safe`, `low`, `medium`, `high`, `critical`).
 - Exit codes (see [CLI Reference → Exit codes](configuration.md#exit-codes)):
-  - `0` — audit completed; risk level is `SAFE`, `LOW`, `MEDIUM`, or `HIGH`.
-  - `1` — risk level is `CRITICAL`, or the audit itself failed.
+  - `0` — audit completed; aggregate risk level is below the `fail_on` threshold
+    (default `critical`, so `SAFE`/`LOW`/`MEDIUM`/`HIGH` by default).
+  - `1` — aggregate risk level is at or above the `fail_on` threshold (default
+    `critical`), or the audit itself failed.
   - `2` — audit aborted because the configured token or cost budget was exceeded
     (partial report still emitted).
 

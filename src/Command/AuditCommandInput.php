@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\Option;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
 use function Symfony\Component\String\u;
@@ -57,6 +58,9 @@ final class AuditCommandInput
 
     #[Option(description: 'Run the audit, then write every current finding fingerprint to the given file as a baseline and exit 0 without failing on findings. Use this to accept the current findings so future runs only report new ones.', name: 'generate-baseline')]
     public ?string $generateBaseline = null;
+
+    #[Option(description: 'Minimum aggregate risk level (safe|low|medium|high|critical) that makes the command exit 1. Overrides the audit.fail_on config key for this run. Defaults to the configured value (critical) when omitted.', name: 'fail-on')]
+    public ?RiskLevel $failOn = null;
 
     /**
      * @param ?callable(): (string|false) $cwdResolver defaults to PHP's getcwd; tests inject a stub

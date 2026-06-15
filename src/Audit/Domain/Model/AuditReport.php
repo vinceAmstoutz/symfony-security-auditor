@@ -153,6 +153,35 @@ final readonly class AuditReport
         );
     }
 
+    /**
+     * Copy of the report keeping only findings whose type passes the configured
+     * filters: when `$includedTypes` is non-empty it acts as an allowlist, and
+     * `$excludedTypes` always wins over it. Applied before rendering and
+     * exit-code resolution so muted types neither appear nor fail CI.
+     *
+     * @param list<VulnerabilityType> $includedTypes
+     * @param list<VulnerabilityType> $excludedTypes
+     */
+    public function filteredByTypes(array $includedTypes, array $excludedTypes): self
+    {
+        $kept = array_filter(
+            $this->vulnerabilities,
+            static fn (Vulnerability $vulnerability): bool => ([] === $includedTypes || \in_array($vulnerability->type(), $includedTypes, true))
+                && !\in_array($vulnerability->type(), $excludedTypes, true),
+        );
+
+        return new self(
+            $this->auditId,
+            $this->projectPath,
+            $this->startedAt,
+            $this->completedAt,
+            $this->filesScanned,
+            $this->coverage,
+            $this->auditCost,
+            ...$kept,
+        );
+    }
+
     public function durationSeconds(): float
     {
         return (float) ($this->completedAt->getTimestamp() - $this->startedAt->getTimestamp());
@@ -193,14 +222,19 @@ final readonly class AuditReport
 
     public function riskLevel(): string
     {
+        return strtoupper($this->riskLevelEnum()->value);
+    }
+
+    public function riskLevelEnum(): RiskLevel
+    {
         $score = $this->riskScore();
 
         return match (true) {
-            $score >= 50 => 'CRITICAL',
-            $score >= 30 => 'HIGH',
-            $score >= 15 => 'MEDIUM',
-            $score >= 5 => 'LOW',
-            default => 'SAFE',
+            $score >= 50 => RiskLevel::Critical,
+            $score >= 30 => RiskLevel::High,
+            $score >= 15 => RiskLevel::Medium,
+            $score >= 5 => RiskLevel::Low,
+            default => RiskLevel::Safe,
         };
     }
 

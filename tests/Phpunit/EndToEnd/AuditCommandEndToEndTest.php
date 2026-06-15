@@ -32,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\Ingest
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
@@ -48,6 +49,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 
 final class AuditCommandEndToEndTest extends TestCase
@@ -417,6 +419,103 @@ final class AuditCommandEndToEndTest extends TestCase
         }
     }
 
+    public function test_fail_on_default_critical_does_not_fail_high_risk_project(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->highAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+    }
+
+    public function test_cli_fail_on_high_fails_a_high_risk_project(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->highAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--fail-on' => 'high',
+        ]);
+
+        self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
+    }
+
+    public function test_configured_fail_on_high_fails_a_high_risk_project_without_a_cli_option(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->highAttackerPayload(), '{"accepted": true}', riskLevel: RiskLevel::High);
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
+    }
+
+    public function test_cli_fail_on_overrides_a_stricter_configured_fail_on(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->highAttackerPayload(), '{"accepted": true}', riskLevel: RiskLevel::High);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--fail-on' => 'critical',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+    }
+
+    public function test_excluded_type_is_dropped_from_report_and_clears_the_exit_code(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}', excludedTypes: ['sql_injection']);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--format' => 'json',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        $output = $commandTester->getDisplay();
+        preg_match('/(\{.*\})/s', $output, $matches);
+        $decoded = json_decode($matches[1] ?? '', true);
+        self::assertIsArray($decoded);
+        self::assertSame(0, $decoded['total_vulnerabilities']);
+    }
+
+    public function test_included_types_allowlist_drops_unlisted_types(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}', includedTypes: ['ssrf']);
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+    }
+
+    private function highAttackerPayload(): string
+    {
+        $vulns = [];
+        for ($i = 1; $i <= 5; ++$i) {
+            $vulns[] = [
+                'type' => 'sql_injection',
+                'severity' => 'high',
+                'title' => \sprintf('High SQL Injection #%d', $i),
+                'description' => 'Raw query with user input',
+                'file_path' => \sprintf('src/Repo%d.php', $i),
+                'line_start' => 1,
+                'line_end' => 5,
+                'vulnerable_code' => '$q',
+                'attack_vector' => 'SQL injection via query param',
+                'proof' => "' OR 1=1--",
+                'remediation' => 'Use prepared statements',
+                'confidence' => 0.95,
+            ];
+        }
+
+        return (string) json_encode($vulns);
+    }
+
     private function criticalAttackerPayload(): string
     {
         $vulns = [];
@@ -459,7 +558,11 @@ final class AuditCommandEndToEndTest extends TestCase
         );
     }
 
-    private function makeCommandTester(string $attackerResponse, string $reviewerResponse, bool $secretScrubbingEnabled = true, ?string $configuredBaseline = null): CommandTester
+    /**
+     * @param list<string> $excludedTypes
+     * @param list<string> $includedTypes
+     */
+    private function makeCommandTester(string $attackerResponse, string $reviewerResponse, bool $secretScrubbingEnabled = true, ?string $configuredBaseline = null, RiskLevel $riskLevel = RiskLevel::Critical, array $excludedTypes = [], array $includedTypes = []): CommandTester
     {
         $attackerLLM = self::createStub(LLMClientInterface::class);
         $attackerLLM->method('complete')->willReturn(
@@ -471,10 +574,14 @@ final class AuditCommandEndToEndTest extends TestCase
             LLMResponse::create($reviewerResponse, 0, 0, 'stub', 'end_turn'),
         );
 
-        return $this->makeCommandTesterWithLLM($attackerLLM, $reviewerLLM, $secretScrubbingEnabled, $configuredBaseline);
+        return $this->makeCommandTesterWithLLM($attackerLLM, $reviewerLLM, $secretScrubbingEnabled, $configuredBaseline, $riskLevel, $excludedTypes, $includedTypes);
     }
 
-    private function makeCommandTesterWithLLM(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, bool $secretScrubbingEnabled = true, ?string $configuredBaseline = null): CommandTester
+    /**
+     * @param list<string> $excludedTypes
+     * @param list<string> $includedTypes
+     */
+    private function makeCommandTesterWithLLM(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, bool $secretScrubbingEnabled = true, ?string $configuredBaseline = null, RiskLevel $riskLevel = RiskLevel::Critical, array $excludedTypes = [], array $includedTypes = []): CommandTester
     {
         $progressReporterHolder = new ProgressReporterHolder();
         $auditOrchestrator = new AuditOrchestrator(
@@ -511,6 +618,8 @@ final class AuditCommandEndToEndTest extends TestCase
             $progressReporterHolder,
             new BaselineProcessor(new Baseline(), $configuredBaseline),
             secretScrubbingEnabled: $secretScrubbingEnabled,
+            findingTypeFilter: new FindingTypeFilter($includedTypes, $excludedTypes),
+            riskLevel: $riskLevel,
         );
 
         return new CommandTester($auditCommand);

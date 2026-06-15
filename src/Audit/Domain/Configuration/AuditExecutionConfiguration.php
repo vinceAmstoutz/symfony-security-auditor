@@ -13,8 +13,14 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
+
 final readonly class AuditExecutionConfiguration
 {
+    /**
+     * @param list<string> $excludedTypes vulnerability-type values dropped from the report and exit code
+     * @param list<string> $includedTypes when non-empty, the only vulnerability-type values kept
+     */
     public function __construct(
         public int $maxIterations,
         public float $minConfidence,
@@ -38,5 +44,8 @@ final readonly class AuditExecutionConfiguration
         public bool $reviewerStructuredCollection = true,
         public bool $stableSystemPrompt = true,
         public ?string $baseline = null,
+        public RiskLevel $failOn = RiskLevel::Critical,
+        public array $excludedTypes = [],
+        public array $includedTypes = [],
     ) {}
 }
