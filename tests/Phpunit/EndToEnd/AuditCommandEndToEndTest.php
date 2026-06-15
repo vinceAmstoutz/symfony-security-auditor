@@ -47,6 +47,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 
 final class AuditCommandEndToEndTest extends TestCase
@@ -508,9 +509,8 @@ final class AuditCommandEndToEndTest extends TestCase
             new AuditPresenter(new StaticPricingProvider(new NullLogger())),
             $estimateAuditCostUseCase,
             $progressReporterHolder,
-            new Baseline(),
+            new BaselineProcessor(new Baseline(), $configuredBaseline),
             secretScrubbingEnabled: $secretScrubbingEnabled,
-            configuredBaseline: $configuredBaseline,
         );
 
         return new CommandTester($auditCommand);

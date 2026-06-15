@@ -21,7 +21,6 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 
@@ -74,10 +73,9 @@ final readonly class AuditCommand
         private AuditPresenterInterface $auditPresenter,
         private EstimateAuditCostUseCase $estimateAuditCostUseCase,
         private ProgressReporterHolder $progressReporterHolder,
-        private BaselineInterface $baseline,
+        private BaselineProcessorInterface $baselineProcessor,
         private bool $secretScrubbingEnabled,
         private array $configNotices = [],
-        private ?string $configuredBaseline = null,
     ) {}
 
     public function __invoke(
@@ -120,17 +118,22 @@ final readonly class AuditCommand
             $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache, $auditCommandInput->since);
 
             if (null !== $auditCommandInput->generateBaseline) {
-                $this->baseline->save($auditCommandInput->generateBaseline, $report->fingerprints());
+                $fingerprintCount = $this->baselineProcessor->generate($report, $auditCommandInput->generateBaseline);
                 $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
 
                 if (!$auditCommandInput->isMachineReadableToStdout()) {
-                    $this->auditPresenter->baselineGenerated($symfonyStyle, $auditCommandInput->generateBaseline, \count($report->fingerprints()));
+                    $this->auditPresenter->baselineGenerated($symfonyStyle, $auditCommandInput->generateBaseline, $fingerprintCount);
                 }
 
                 return Command::SUCCESS;
             }
 
-            $report = $this->applyBaseline($report, $auditCommandInput, $symfonyStyle);
+            $baselineResult = $this->baselineProcessor->apply($report, $auditCommandInput->baseline);
+            $report = $baselineResult->report;
+
+            if (!$auditCommandInput->isMachineReadableToStdout()) {
+                $this->auditPresenter->baselineApplied($symfonyStyle, $baselineResult->suppressedCount);
+            }
 
             $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
 
@@ -152,23 +155,6 @@ final readonly class AuditCommand
 
             return Command::FAILURE;
         }
-    }
-
-    private function applyBaseline(AuditReport $auditReport, AuditCommandInput $auditCommandInput, SymfonyStyle $symfonyStyle): AuditReport
-    {
-        $baselinePath = $auditCommandInput->baseline ?? $this->configuredBaseline;
-        if (null === $baselinePath) {
-            return $auditReport;
-        }
-
-        $before = $auditReport->totalVulnerabilities();
-        $filtered = $auditReport->withoutFingerprints($this->baseline->load($baselinePath));
-
-        if (!$auditCommandInput->isMachineReadableToStdout()) {
-            $this->auditPresenter->baselineApplied($symfonyStyle, $before - $filtered->totalVulnerabilities());
-        }
-
-        return $filtered;
     }
 
     private const int EXIT_CODE_BUDGET_ABORTED = 2;
