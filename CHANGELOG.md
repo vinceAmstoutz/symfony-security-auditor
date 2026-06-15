@@ -47,6 +47,42 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   to be immune to that change — `high` is recommended for CI gating. Public API
   per `docs/versioning.md` (new config key, new CLI option, and the `RiskLevel`
   Domain model).
+- **SARIF results now carry a stable `partialFingerprints` value, and each rule
+  links to its specific OWASP Top 10 page.** GitHub Code Scanning correlates
+  findings across runs by `partialFingerprints`; without one it could not track
+  a finding's fixed/reopened state and re-surfaced duplicates. Each SARIF result
+  emitted by `ReportRenderer::renderSarif()`
+  (`src/Audit/Infrastructure/Report/ReportRenderer.php`) now includes
+  `partialFingerprints: { "symfonySecurityAuditor/v1": "<fingerprint>" }` using
+  the same stable `Vulnerability::fingerprint()` that backs baselines. Each
+  rule's `helpUri` — previously the generic `https://owasp.org/Top10/` for every
+  rule — now points at the finding's actual OWASP 2021 category page via the new
+  `VulnerabilityType::owaspReferenceUrl()`. Both are additive to the SARIF 2.1.0
+  output (public API per `docs/versioning.md`).
+- **New `--format=markdown` output — a GitHub-flavored report for PR comments
+  and job summaries.** `audit:run` emitted `console`, `json`, `sarif`, and
+  `html`; teams not using Code Scanning had no concise report to post to a pull
+  request or write to `$GITHUB_STEP_SUMMARY`. The new `markdown` value renders a
+  heading, a severity summary table, and one section per finding (type + OWASP,
+  location, confidence, description, attack vector, proof, remediation), via
+  `ReportRenderer::renderMarkdown()`. `OutputFormat` gains a `Markdown` case and
+  `ReportWriter` a `markdown` arm. Public API per `docs/versioning.md` (the
+  `--format` value `markdown`).
+
+### Fixed
+
+- **Corrected two OWASP Top 10 categorizations surfaced by the new per-rule
+  `helpUri`.** `VulnerabilityType::owaspReference()` (and the new
+  `owaspReferenceUrl()`) mis-filed two types: `authenticator_bypass` was under
+  `A01:2021 - Broken Access Control` and `missing_signature_verification` under
+  `A02:2021 - Cryptographic Failures`. They now map to the canonical categories
+  — **`authenticator_bypass` →
+  `A07:2021 - Identification and Authentication Failures`** (the textbook A07
+  case) and **`missing_signature_verification` →
+  `A08:2021 - Software and Data Integrity Failures`** (accepting unverified
+  payloads is an integrity failure, not a cryptographic one). This changes the
+  SARIF `ruleId` and `helpUri` for findings of those two types. The internal
+  `category()` grouping is unchanged (it has no auth/integrity bucket).
 
 ## [1.10.1] — 2026-06-15 — Encore
 

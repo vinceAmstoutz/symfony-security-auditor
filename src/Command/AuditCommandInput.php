@@ -32,10 +32,10 @@ final class AuditCommandInput
     #[Argument(description: 'Path to the Symfony project to audit. Defaults to the current working directory.')]
     public ?string $projectPath = null;
 
-    #[Option(description: 'Output format: console, json, sarif or html', shortcut: 'f')]
+    #[Option(description: 'Output format: console, json, sarif, html or markdown', shortcut: 'f')]
     public OutputFormat $format = OutputFormat::Console;
 
-    #[Option(description: 'Output file path (for json, sarif or html format)', shortcut: 'o')]
+    #[Option(description: 'Output file path (for json, sarif, html or markdown format)', shortcut: 'o')]
     public ?string $output = null;
 
     #[Option(description: 'Estimate token usage and cost without invoking the LLM; emits a report with zero vulnerabilities and an estimated cost block.')]

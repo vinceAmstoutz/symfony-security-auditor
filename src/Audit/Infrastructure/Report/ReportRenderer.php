@@ -96,6 +96,7 @@ final readonly class ReportRenderer
                 'ruleId' => $type->owaspReference(),
                 'level' => $this->sarifLevel($vulnerability->severity()),
                 'message' => ['text' => $vulnerability->title()],
+                'partialFingerprints' => ['symfonySecurityAuditor/v1' => $vulnerability->fingerprint()],
                 'locations' => [
                     [
                         'physicalLocation' => [
@@ -115,7 +116,7 @@ final readonly class ReportRenderer
                 'id' => $vulnerabilityType->owaspReference(),
                 'name' => $vulnerabilityType->value,
                 'shortDescription' => ['text' => $vulnerabilityType->category()],
-                'helpUri' => 'https://owasp.org/Top10/',
+                'helpUri' => $vulnerabilityType->owaspReferenceUrl(),
             ],
             $types,
         ));
@@ -147,6 +148,78 @@ final readonly class ReportRenderer
         ];
 
         return json_encode($sarif, \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
+    }
+
+    public function renderMarkdown(AuditReport $auditReport): string
+    {
+        return implode("\n", [
+            '# Security Audit Report',
+            '',
+            \sprintf(
+                '**Risk level:** %s (score %d) · **Findings:** %d · **Files scanned:** %d',
+                $auditReport->riskLevel(),
+                $auditReport->riskScore(),
+                $auditReport->totalVulnerabilities(),
+                $auditReport->filesScanned(),
+            ),
+            '',
+            $this->markdownBody($auditReport),
+        ]);
+    }
+
+    private function markdownBody(AuditReport $auditReport): string
+    {
+        if (0 === $auditReport->totalVulnerabilities()) {
+            return '✅ No validated vulnerabilities found.';
+        }
+
+        $lines = ['## Summary by severity', '', '| Severity | Count |', '| --- | --- |'];
+
+        foreach (VulnerabilitySeverity::cases() as $severity) {
+            $count = \count($auditReport->vulnerabilitiesBySeverity($severity));
+            if ($count > 0) {
+                $lines[] = \sprintf('| %s | %d |', $severity->label(), $count);
+            }
+        }
+
+        $lines[] = '';
+        $lines[] = \sprintf('## Findings (%d)', $auditReport->totalVulnerabilities());
+
+        foreach ($auditReport->vulnerabilities() as $vulnerability) {
+            $lines[] = '';
+            $lines[] = $this->markdownVulnerability($vulnerability);
+        }
+
+        return implode("\n", $lines);
+    }
+
+    private function markdownVulnerability(Vulnerability $vulnerability): string
+    {
+        return implode("\n", [
+            \sprintf('### %s — %s', $vulnerability->severity()->label(), $vulnerability->title()),
+            '',
+            \sprintf('- **Type:** `%s` (%s)', $vulnerability->type()->value, $vulnerability->type()->owaspReference()),
+            \sprintf('- **Location:** `%s:%d-%d`', $vulnerability->filePath(), $vulnerability->lineStart(), $vulnerability->lineEnd()),
+            \sprintf('- **Confidence:** %s%%', \sprintf('%.0f', $vulnerability->confidence() * 100)),
+            '',
+            $vulnerability->description(),
+            '',
+            \sprintf('**Attack vector:** %s', $vulnerability->attackVector()),
+            '',
+            '**Proof:**',
+            '',
+            $this->markdownCodeBlock($vulnerability->proof()),
+            '',
+            \sprintf('**Remediation:** %s', $vulnerability->remediation()),
+        ]);
+    }
+
+    private function markdownCodeBlock(string $text): string
+    {
+        return implode("\n", array_map(
+            static fn (string $line): string => '    '.$line,
+            explode("\n", $text),
+        ));
     }
 
     private function htmlSummary(AuditReport $auditReport): string

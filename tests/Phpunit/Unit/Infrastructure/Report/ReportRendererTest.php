@@ -374,7 +374,27 @@ final class ReportRendererTest extends TestCase
         $firstRule = array_values($rules)[0];
         self::assertSame(VulnerabilityType::SQL_INJECTION->owaspReference(), $firstRule['id']);
         self::assertSame(VulnerabilityType::SQL_INJECTION->value, $firstRule['name']);
-        self::assertSame('https://owasp.org/Top10/', $firstRule['helpUri']);
+        self::assertSame(VulnerabilityType::SQL_INJECTION->owaspReferenceUrl(), $firstRule['helpUri']);
+    }
+
+    public function test_render_sarif_rule_help_uri_points_to_the_specific_owasp_category(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION);
+        $decoded = $this->decodeSarif($this->makeReport($vulnerability));
+
+        $firstRule = array_values($decoded['runs'][0]['tool']['driver']['rules'])[0];
+        self::assertSame('https://owasp.org/Top10/A03_2021-Injection/', $firstRule['helpUri']);
+    }
+
+    public function test_render_sarif_result_carries_the_vulnerability_partial_fingerprint(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $decoded = $this->decodeSarif($this->makeReport($vulnerability));
+
+        self::assertSame(
+            $vulnerability->fingerprint(),
+            $decoded['runs'][0]['results'][0]['partialFingerprints']['symfonySecurityAuditor/v1'],
+        );
     }
 
     public function test_render_sarif_rule_is_not_overwritten_when_same_type_appears_twice(): void
@@ -714,7 +734,7 @@ final class ReportRendererTest extends TestCase
      *     version: string,
      *     runs: list<array{
      *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array<string, mixed>>}},
-     *         results: list<array{ruleId: string, level: string, message: array{text: string}, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>}>,
+     *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>}>,
      *         properties?: array<string, mixed>
      *     }>
      * }
@@ -733,7 +753,7 @@ final class ReportRendererTest extends TestCase
      *     version: string,
      *     runs: list<array{
      *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array<string, mixed>>}},
-     *         results: list<array{ruleId: string, level: string, message: array{text: string}, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>}>
+     *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>}>
      *     }>
      * } $value
      */
@@ -866,6 +886,72 @@ final class ReportRendererTest extends TestCase
             .'</table>';
 
         self::assertStringContainsString($expectedTable, $output);
+    }
+
+    public function test_render_markdown_starts_with_the_report_heading(): void
+    {
+        $output = $this->reportRenderer->renderMarkdown($this->makeReport());
+
+        self::assertStringContainsString('# Security Audit Report', $output);
+    }
+
+    public function test_render_markdown_shows_safe_message_when_no_vulnerabilities(): void
+    {
+        $output = $this->reportRenderer->renderMarkdown($this->makeReport());
+
+        self::assertStringContainsString('No validated vulnerabilities found.', $output);
+        self::assertStringNotContainsString('## Findings', $output);
+    }
+
+    public function test_render_markdown_includes_the_risk_level(): void
+    {
+        $output = $this->reportRenderer->renderMarkdown($this->makeReport());
+
+        self::assertStringContainsString('SAFE', $output);
+    }
+
+    public function test_render_markdown_lists_a_validated_finding_with_its_location(): void
+    {
+        $output = $this->reportRenderer->renderMarkdown($this->makeReport(
+            $this->makeValidatedVuln(filePath: 'src/Admin/UserController.php', lineStart: 10),
+        ));
+
+        self::assertStringContainsString('## Findings', $output);
+        self::assertStringContainsString('Test Vuln', $output);
+        self::assertStringContainsString('`src/Admin/UserController.php:10-14`', $output);
+    }
+
+    public function test_render_markdown_finding_shows_confidence_percent_and_indented_proof(): void
+    {
+        $output = $this->reportRenderer->renderMarkdown($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringContainsString('**Confidence:** 90%', $output);
+        self::assertStringContainsString("\n    ' OR 1=1", $output);
+    }
+
+    public function test_render_markdown_renders_a_severity_summary_table(): void
+    {
+        $output = $this->reportRenderer->renderMarkdown($this->makeReport(
+            $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::HIGH),
+        ));
+
+        self::assertStringContainsString("## Summary by severity\n\n| Severity | Count |\n| --- | --- |", $output);
+        self::assertStringContainsString(\sprintf('| %s | 1 |', VulnerabilitySeverity::HIGH->label()), $output);
+        self::assertStringNotContainsString(VulnerabilitySeverity::CRITICAL->label(), $output);
+    }
+
+    public function test_render_markdown_orders_findings_most_severe_first(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::LOW, filePath: 'src/Low.php');
+        $critical = $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::CRITICAL, filePath: 'src/Critical.php');
+
+        $output = $this->reportRenderer->renderMarkdown($this->makeReport($vulnerability, $critical));
+
+        $criticalPosition = strpos($output, 'src/Critical.php');
+        $lowPosition = strpos($output, 'src/Low.php');
+        self::assertNotFalse($criticalPosition);
+        self::assertNotFalse($lowPosition);
+        self::assertLessThan($lowPosition, $criticalPosition);
     }
 
     private function makeReport(Vulnerability ...$vulnerabilities): AuditReport
