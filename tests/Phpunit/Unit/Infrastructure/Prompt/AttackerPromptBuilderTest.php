@@ -915,6 +915,21 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('Exposure weighting', $prompt);
     }
 
+    public function test_analysis_methodology_appears_after_the_scope_and_before_the_example(): void
+    {
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+
+        $scopePosition = strpos($prompt, 'File-numbering protocol');
+        $methodologyPosition = strpos($prompt, 'Analysis methodology');
+        $examplePosition = strpos($prompt, 'Example finding');
+
+        self::assertIsInt($scopePosition);
+        self::assertIsInt($methodologyPosition);
+        self::assertIsInt($examplePosition);
+        self::assertGreaterThan($scopePosition, $methodologyPosition);
+        self::assertLessThan($examplePosition, $methodologyPosition);
+    }
+
     #[DataProvider('vulnerabilityTypeValues')]
     public function test_base_prompt_lists_every_vulnerability_type_as_valid(string $typeValue): void
     {
