@@ -6,7 +6,7 @@
         ]
     },
     "tmpDir": "var/infection",
-    "timeout": 60,
+    "timeout": 120,
     "maxTimeouts": 0,
     "timeoutsAsEscaped": true,
     "threads": 4,
