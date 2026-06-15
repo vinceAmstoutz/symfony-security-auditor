@@ -127,8 +127,9 @@ bin/console audit:run
 bin/console audit:run /path/to/your/symfony/project
 ```
 
-Want JSON, SARIF, or HTML instead? Add `--format json --output report.json`,
-`--format sarif --output report.sarif`, or `--format html --output report.html`.
+Want JSON, SARIF, HTML, or Markdown instead? Add
+`--format json --output report.json`, `--format sarif --output report.sarif`,
+`--format html --output report.html`, or `--format markdown --output report.md`.
 See [CLI reference](docs/configuration.md#cli-reference).
 
 Estimate cost before running:
@@ -209,10 +210,11 @@ the recipe automates:
   escalation, code slicing, and concurrent reviewer calls.
 - **PoC synthesis** — optionally attach a concrete, copy-pasteable reproduction
   (curl/console/payload) to every high-severity finding.
-- **Four output formats** — `console`, `json`, `sarif` (GitHub Code Scanning /
-  GitLab Security Dashboard), and `html` (self-contained, shareable). Baseline
-  suppression: `--generate-baseline` accepts known findings, `--baseline` drops
-  them from the report and exit code so only new findings fail CI.
+- **Five output formats** — `console`, `json`, `sarif` (GitHub Code Scanning /
+  GitLab Security Dashboard), `html` (self-contained, shareable), and `markdown`
+  (PR-friendly). Baseline suppression: `--generate-baseline` accepts known
+  findings, `--baseline` drops them from the report and exit code so only new
+  findings fail CI.
 - **CI-ready** — a reusable
   [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor)
   (`uses: vinceamstoutz/symfony-security-auditor@1.11.0`) plus GitLab CI
@@ -296,8 +298,8 @@ Full output after the pipeline completes:
   ... (3 more findings)
 ```
 
-`--dry-run` estimates token usage and cost without calling the LLM. JSON, SARIF,
-and HTML formats are documented in
+`--dry-run` estimates token usage and cost without calling the LLM. The JSON,
+SARIF, HTML, and Markdown formats are documented in
 [CLI Reference](docs/configuration.md#cli-reference) and
 [Output Formats Reference](docs/ci.md#output-formats-reference).
 
