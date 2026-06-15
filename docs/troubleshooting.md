@@ -229,7 +229,7 @@ on the model:
 ```yaml
 symfony_security_auditor:
     model:
-        name: 'claude-opus-4-7'
+        name: 'claude-opus-4-8'
         options:
             temperature: 0.0
 ```

@@ -135,10 +135,10 @@ No. We recommend the layered approach:
 
 ### How accurate is it?
 
-Accuracy depends on the LLM model. Stronger models (Claude Opus, GPT-4o, Gemini
-2.5 Pro) produce fewer false positives and catch deeper flaws. The Reviewer
-agent filters Attacker output — only `reviewer_validated` findings appear in the
-final report.
+Accuracy depends on the LLM model. Stronger models (Claude Opus, GPT-5.4, Gemini
+3 Pro) produce fewer false positives and catch deeper flaws. The Reviewer agent
+filters Attacker output — only `reviewer_validated` findings appear in the final
+report.
 
 Tune `audit.min_confidence` (default `0.6`) to trade precision for recall. CI
 gating: try `0.8`. Discovery scan: try `0.3`.
@@ -184,7 +184,7 @@ prompt caching enabled (default):
 | Claude Fable 5 only                 | $6 – $16             |
 | Claude Opus only                    | $3 – $8              |
 | Claude Opus + Haiku (split-model)   | $0.50 – $2           |
-| GPT-4o only                         | $2 – $6              |
+| GPT-5.4 only                        | $3 – $8              |
 | DeepSeek / Mistral / Ollama (local) | ~$0 / $0             |
 
 Tips: set `profile: fast` (one attacker iteration, lean pre-scan, code slicing,

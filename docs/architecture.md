@@ -675,7 +675,7 @@ root key `symfony_security_auditor`. Top-level scalars:
 
 | Key              | Default             | Purpose                                         |
 | ---------------- | ------------------- | ----------------------------------------------- |
-| `model`          | `'claude-opus-4-7'` | Model name for both Attacker and Reviewer roles |
+| `model`          | `'claude-opus-4-8'` | Model name for both Attacker and Reviewer roles |
 | `attacker_model` | `null`              | Override: dedicated model for the Attacker role |
 | `reviewer_model` | `null`              | Override: dedicated model for the Reviewer role |
 
@@ -702,14 +702,14 @@ Minimal configuration:
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-7'
+    model: 'claude-opus-4-8'
 ```
 
 Split-model configuration (larger model for attacking, faster for reviewing):
 
 ```yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-7'
+    attacker_model: 'claude-opus-4-8'
     reviewer_model: 'claude-haiku-4-5-20251001'
 ```
 

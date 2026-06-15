@@ -6,7 +6,7 @@
 # Drop in as: config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
     # Heavyweight model finds the bugs; lightweight model filters false positives.
-    attacker_model: 'claude-opus-4-7'
+    attacker_model: 'claude-opus-4-8'
     reviewer_model: 'claude-haiku-4-5-20251001'
 
     scan:
