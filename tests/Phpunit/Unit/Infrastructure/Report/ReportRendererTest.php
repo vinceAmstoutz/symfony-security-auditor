@@ -935,7 +935,7 @@ final class ReportRendererTest extends TestCase
             $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::HIGH),
         ));
 
-        self::assertStringContainsString('| Severity | Count |', $output);
+        self::assertStringContainsString("## Summary by severity\n\n| Severity | Count |\n| --- | --- |", $output);
         self::assertStringContainsString(\sprintf('| %s | 1 |', VulnerabilitySeverity::HIGH->label()), $output);
         self::assertStringNotContainsString(VulnerabilitySeverity::CRITICAL->label(), $output);
     }
