@@ -69,15 +69,15 @@
         "symfony/var-dumper": "^7.4 || ^8.0"
     },
     "suggest": {
-        "symfony/ai-anthropic-platform": "Anthropic (Claude) platform bridge — claude-opus-4-7, claude-sonnet-4-5",
-        "symfony/ai-azure-platform": "Azure OpenAI platform bridge — enterprise GPT-4o, o3",
+        "symfony/ai-anthropic-platform": "Anthropic (Claude) platform bridge — claude-opus-4-8, claude-sonnet-4-6, claude-haiku-4-5-20251001",
+        "symfony/ai-azure-platform": "Azure OpenAI platform bridge — enterprise GPT-5.4, o4-mini",
         "symfony/ai-bedrock-platform": "AWS Bedrock platform bridge — Claude, Nova, Llama on AWS",
         "symfony/ai-deep-seek-platform": "DeepSeek platform bridge — deepseek-chat, deepseek-reasoner",
-        "symfony/ai-gemini-platform": "Google Gemini platform bridge — gemini-2.5-pro, gemini-2.0-flash",
+        "symfony/ai-gemini-platform": "Google Gemini platform bridge — gemini-3.1-pro-preview, gemini-3.5-flash",
         "symfony/ai-meta-platform": "Meta (Llama) platform bridge — Llama-4-Scout, Llama-3.3",
         "symfony/ai-mistral-platform": "Mistral platform bridge — mistral-large, codestral",
         "symfony/ai-ollama-platform": "Ollama local inference bridge — llama3.3, deepseek-r1, qwen3, phi4 (no API key)",
-        "symfony/ai-open-ai-platform": "OpenAI platform bridge — gpt-4o, gpt-4.1, o3, o4-mini",
+        "symfony/ai-open-ai-platform": "OpenAI platform bridge — gpt-5.4, gpt-4.1, o4-mini",
         "symfony/ai-open-responses-platform": "OpenAI Responses API platform bridge",
         "symfony/ai-vertex-ai-platform": "Google Vertex AI platform bridge — Gemini + Claude on GCP"
     },

@@ -125,7 +125,9 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         $this->batchReviewAnalyzer = new BatchReviewAnalyzer(
             $llmClient,
             $reviewerPromptBuilder,
-            new BatchVerdictApplier($verdictApplier, $logger),
+            new BatchVerdictApplier($verdictApplier, $reviewerVerdictCache, $logger),
+            $reviewerVerdictCache,
+            $reviewOutcomeRecorder,
             $logger,
             $maxToolIterations,
             $recordReviewToolFactory,
@@ -177,7 +179,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
                     : $this->sequentialReviewAnalyzer->analyze($vulnerabilities, $projectFiles, $coverageRecorder, $toolRegistry, $bypassCache);
             }
         } else {
-            $reviewed = $this->batchReviewAnalyzer->analyze($vulnerabilities, $projectFiles, $this->batchSize, $coverageRecorder, $toolRegistry, $useStructuredCollection);
+            $reviewed = $this->batchReviewAnalyzer->analyze($vulnerabilities, $projectFiles, $this->batchSize, $coverageRecorder, $toolRegistry, $useStructuredCollection, $bypassCache);
         }
 
         $accepted = array_filter($reviewed, static fn (Vulnerability $vulnerability): bool => $vulnerability->isReviewerValidated());

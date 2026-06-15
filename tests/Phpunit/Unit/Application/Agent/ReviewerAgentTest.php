@@ -2751,6 +2751,159 @@ final class ReviewerAgentTest extends TestCase
         self::assertTrue($result[0]->isReviewerValidated());
     }
 
+    public function test_batched_reviews_serve_cached_verdicts_and_batch_only_misses(): void
+    {
+        $first = $this->makeVulnerabilityAt('src/First.php');
+        $second = $this->makeVulnerabilityAt('src/Second.php');
+        $third = $this->makeVulnerabilityAt('src/Third.php');
+
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->method('get')->willReturnOnConsecutiveCalls(null, ['accepted' => true, 'adjusted_severity' => 'critical'], null);
+        $storedFor = [];
+        $reviewerCache->method('store')->willReturnCallback(
+            static function (Vulnerability $vulnerability) use (&$storedFor): void {
+                $storedFor[] = $vulnerability->filePath();
+            },
+        );
+
+        $capturedUserMessage = null;
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('complete')
+            ->willReturnCallback(static function (string $system, string $user) use ($first, $third, &$capturedUserMessage): LLMResponse {
+                $capturedUserMessage = $user;
+
+                return LLMResponse::create(
+                    (string) json_encode([
+                        ['id' => $first->id(), 'accepted' => true],
+                        ['id' => $third->id(), 'accepted' => true],
+                    ]),
+                    10, 10, 'claude', 'end_turn',
+                );
+            });
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(),
+            new NullLogger(),
+            batchSize: 5,
+            reviewerCache: $reviewerCache,
+        );
+
+        $result = $reviewerAgent->review([$first, $second, $third], [], new NullCoverageRecorder());
+
+        self::assertCount(3, $result);
+        self::assertSame('src/First.php', $result[0]->filePath());
+        self::assertSame('src/Second.php', $result[1]->filePath());
+        self::assertSame('src/Third.php', $result[2]->filePath());
+        self::assertTrue($result[0]->isReviewerValidated());
+        self::assertTrue($result[1]->isReviewerValidated());
+        self::assertSame(VulnerabilitySeverity::CRITICAL, $result[1]->severity());
+        self::assertTrue($result[2]->isReviewerValidated());
+        self::assertStringContainsString('src/First.php', (string) $capturedUserMessage);
+        self::assertStringContainsString('src/Third.php', (string) $capturedUserMessage);
+        self::assertStringNotContainsString('src/Second.php', (string) $capturedUserMessage);
+        self::assertSame(['src/First.php', 'src/Third.php'], $storedFor);
+    }
+
+    public function test_batched_review_cache_miss_stores_the_matched_verdict(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(
+            LLMResponse::create(
+                (string) json_encode([['id' => $vulnerability->id(), 'accepted' => true]]),
+                0, 0, 'test', 'end_turn',
+            ),
+        );
+
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->method('get')->willReturn(null);
+        $reviewerCache->expects(self::once())
+            ->method('store')
+            ->with($vulnerability, '', ['id' => $vulnerability->id(), 'accepted' => true]);
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(),
+            new NullLogger(),
+            batchSize: 5,
+            reviewerCache: $reviewerCache,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertTrue($result[0]->isReviewerValidated());
+    }
+
+    public function test_batched_review_bypass_cache_skips_both_get_and_store(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(
+            LLMResponse::create(
+                (string) json_encode([['id' => $vulnerability->id(), 'accepted' => true]]),
+                0, 0, 'test', 'end_turn',
+            ),
+        );
+
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->expects(self::never())->method('get');
+        $reviewerCache->expects(self::never())->method('store');
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(),
+            new NullLogger(),
+            batchSize: 5,
+            reviewerCache: $reviewerCache,
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder(), bypassCache: true);
+
+        self::assertTrue($result[0]->isReviewerValidated());
+    }
+
+    public function test_batched_review_cache_miss_does_not_store_an_unmatched_finding(): void
+    {
+        $matched = $this->makeVulnerabilityAt('src/Matched.php');
+        $unmatched = $this->makeVulnerabilityAt('src/Unmatched.php');
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(
+            LLMResponse::create(
+                (string) json_encode([['id' => $matched->id(), 'accepted' => true]]),
+                0, 0, 'test', 'end_turn',
+            ),
+        );
+
+        $storedFor = [];
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->method('get')->willReturn(null);
+        $reviewerCache->method('store')->willReturnCallback(
+            static function (Vulnerability $vulnerability) use (&$storedFor): void {
+                $storedFor[] = $vulnerability->filePath();
+            },
+        );
+
+        $reviewerAgent = new ReviewerAgent(
+            $llmClient,
+            new ReviewerPromptBuilder(),
+            new NullLogger(),
+            batchSize: 5,
+            reviewerCache: $reviewerCache,
+        );
+
+        $result = $reviewerAgent->review([$matched, $unmatched], [], new NullCoverageRecorder());
+
+        self::assertTrue($result[0]->isReviewerValidated());
+        self::assertFalse($result[1]->isReviewerValidated());
+        self::assertSame(['src/Matched.php'], $storedFor);
+    }
+
     public function test_structured_reviews_stay_sequential_when_concurrency_is_not_requested(): void
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
