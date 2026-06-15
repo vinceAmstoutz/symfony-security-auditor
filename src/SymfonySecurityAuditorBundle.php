@@ -222,6 +222,11 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                             ->defaultNull()
                             ->info('Default path to a baseline file of accepted-finding fingerprints. Findings whose fingerprint is listed are suppressed from the report and excluded from the exit code, so previously-accepted findings no longer fail CI. The --baseline CLI option overrides this path; --generate-baseline writes the file. Null (default) disables baselining.')
                         ->end()
+                        ->enumNode('fail_on')
+                            ->values(['safe', 'low', 'medium', 'high', 'critical'])
+                            ->defaultValue('critical')
+                            ->info("Minimum aggregate risk level that makes `audit:run` exit 1 (the CI gate). The audit exits 1 when the report's risk level is at or above this threshold, 0 otherwise (a budget abort still exits 2). Default `critical` preserves the historical behaviour (only a CRITICAL risk level fails). Set `high`/`medium`/`low` to fail PRs earlier. `safe` fails on every completed audit. The --fail-on CLI option overrides this per run.")
+                        ->end()
                         ->arrayNode('static_prescan')
                             ->addDefaultsIfNotSet()
                             ->info('Deterministic zero-token risk-marker scan that runs before the LLM. Flags concrete locations (unserialize, |raw, csrf_protection: false, hardcoded secrets, Doctrine string concatenation, etc.) so the attacker prompt can focus on them. In lean mode, files with zero markers are skipped entirely — biggest token saver on large codebases.')
@@ -392,7 +397,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *     reviewer_max_output_tokens: int|null,
      *     provider_json_mode: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, reviewer_max_concurrent: int, attacker_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     audit: array{max_iterations: int, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, baseline?: string|null, fail_on: string, reviewer_max_concurrent: int, attacker_max_concurrent: int, static_prescan: array{enabled: bool, lean_mode: bool}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * } $config
      */
@@ -423,6 +428,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $builder->setParameter('symfony_security_auditor.audit.reviewer_tools_enabled', $bundleConfiguration->audit->reviewerToolsEnabled);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_max_tool_iterations', $bundleConfiguration->audit->reviewerMaxToolIterations);
         $builder->setParameter('symfony_security_auditor.audit.baseline', $bundleConfiguration->audit->baseline);
+        $builder->setParameter('symfony_security_auditor.audit.fail_on', $bundleConfiguration->audit->failOn->value);
         $builder->setParameter('symfony_security_auditor.audit.reviewer_max_concurrent', $bundleConfiguration->audit->reviewerMaxConcurrent);
         $builder->setParameter('symfony_security_auditor.audit.attacker_max_concurrent', $bundleConfiguration->audit->attackerMaxConcurrent);
         $builder->setParameter('symfony_security_auditor.audit.static_prescan.enabled', $bundleConfiguration->audit->staticPreScanEnabled);

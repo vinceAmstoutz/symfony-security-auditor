@@ -193,14 +193,19 @@ final readonly class AuditReport
 
     public function riskLevel(): string
     {
+        return strtoupper($this->riskLevelEnum()->value);
+    }
+
+    public function riskLevelEnum(): RiskLevel
+    {
         $score = $this->riskScore();
 
         return match (true) {
-            $score >= 50 => 'CRITICAL',
-            $score >= 30 => 'HIGH',
-            $score >= 15 => 'MEDIUM',
-            $score >= 5 => 'LOW',
-            default => 'SAFE',
+            $score >= 50 => RiskLevel::Critical,
+            $score >= 30 => RiskLevel::High,
+            $score >= 15 => RiskLevel::Medium,
+            $score >= 5 => RiskLevel::Low,
+            default => RiskLevel::Safe,
         };
     }
 

@@ -21,6 +21,7 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 
@@ -45,9 +46,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
           <info>%command.full_name% . --baseline=.security-baseline.json</info>           suppress them on later runs
         Baselined findings are dropped from the report and do not affect the exit code.
 
-        Exit codes:
-          <info>0</info>  audit completed; risk level is SAFE, LOW, MEDIUM, or HIGH
-          <info>1</info>  audit completed with CRITICAL risk level, or the audit itself failed
+        Exit codes (the failure threshold is configurable via <info>audit.fail_on</info> / <info>--fail-on</info>, default <info>critical</info>):
+          <info>0</info>  audit completed; risk level is below the fail-on threshold
+          <info>1</info>  audit completed with risk level at or above the fail-on threshold, or the audit itself failed
           <info>2</info>  audit aborted because the configured token or cost budget was exceeded (partial report still emitted)
 
         Cost & duration: a typical Symfony project (~150 files) takes minutes, not seconds,
@@ -76,6 +77,7 @@ final readonly class AuditCommand
         private BaselineProcessorInterface $baselineProcessor,
         private bool $secretScrubbingEnabled,
         private array $configNotices = [],
+        private RiskLevel $riskLevel = RiskLevel::Critical,
     ) {}
 
     public function __invoke(
@@ -137,7 +139,7 @@ final readonly class AuditCommand
 
             $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
 
-            $exitCode = $this->auditExitCodeResolver->resolve($report);
+            $exitCode = $this->auditExitCodeResolver->resolve($report, $auditCommandInput->failOn ?? $this->riskLevel);
 
             if (!$auditCommandInput->isMachineReadableToStdout()) {
                 $this->auditPresenter->result($symfonyStyle, $report, $exitCode);

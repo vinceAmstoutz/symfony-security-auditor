@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
@@ -175,5 +176,20 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput = new AuditCommandInput();
 
         self::assertFalse($auditCommandInput->noCache);
+    }
+
+    public function test_default_fail_on_is_null(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+
+        self::assertNull($auditCommandInput->failOn);
+    }
+
+    public function test_fail_on_accepts_a_risk_level(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->failOn = RiskLevel::High;
+
+        self::assertSame(RiskLevel::High, $auditCommandInput->failOn);
     }
 }

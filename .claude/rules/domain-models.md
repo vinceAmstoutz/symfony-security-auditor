@@ -19,4 +19,7 @@ paths:
 - Adding a `VulnerabilityType` case requires updating `category()` and
   `owaspReference()` — nothing else changes.
 - Adding a `VulnerabilitySeverity` case requires updating `score()`, `label()`,
-  `isExploitable()`, and the `riskLevel()` thresholds in `AuditReport`.
+  `isExploitable()`, and the `riskLevelEnum()` thresholds in `AuditReport`
+  (`riskLevel()` derives its string from that enum).
+- `RiskLevel` is the ordered aggregate-risk scale (`safe` … `critical`) used by
+  the `audit.fail_on` CI gate; `RiskLevel::isAtLeast()` is the comparison.

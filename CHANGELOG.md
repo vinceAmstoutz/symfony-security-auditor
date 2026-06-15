@@ -10,6 +10,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **Configurable CI gate severity — the `audit.fail_on` config key and the
+  `--fail-on` CLI option.** `audit:run` hardcoded its failing exit code to a
+  `CRITICAL` aggregate risk level: `AuditExitCodeResolver::resolve()`
+  (`src/Command/AuditExitCodeResolver.php`) returned `1` only when
+  `AuditReport::riskLevel()` was exactly `CRITICAL`, so a HIGH-risk audit always
+  exited `0` and there was no way to fail a pull request on HIGH/MEDIUM/LOW
+  findings. A new ordered `RiskLevel` value object
+  (`src/Audit/Domain/Model/RiskLevel.php`, `safe` < `low` < `medium` < `high` <
+  `critical`, with `RiskLevel::isAtLeast()`) now backs the comparison:
+  `AuditReport::riskLevelEnum()` exposes the report's aggregate level and the
+  resolver exits `1` when it is **at or above** the configured threshold. The
+  threshold is set with `audit.fail_on` (`safe`|`low`|`medium`|`high`|
+  `critical`) and overridden per run with `audit:run --fail-on=<level>` (a
+  budget abort still exits `2`). The default is `critical`, so existing exit
+  codes are byte-identical on upgrade. **The default is planned to become `high`
+  in the next major** (see `docs/versioning.md`); pin `audit.fail_on` explicitly
+  to be immune to that change — `high` is recommended for CI gating. Public API
+  per `docs/versioning.md` (new config key, new CLI option, and the `RiskLevel`
+  Domain model).
+
 ## [1.10.1] — 2026-06-15 — Encore
 
 A packaging-only republish of **1.10.0 — Lookout**. The `1.10.0` tag was first

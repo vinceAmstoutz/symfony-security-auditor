@@ -15,13 +15,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Command\Command;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditExitCodeResolver implements AuditExitCodeResolverInterface
 {
-    public function resolve(AuditReport $auditReport): int
+    public function resolve(AuditReport $auditReport, RiskLevel $riskLevel): int
     {
-        return 'CRITICAL' === $auditReport->riskLevel()
+        return $auditReport->riskLevelEnum()->isAtLeast($riskLevel)
             ? Command::FAILURE
             : Command::SUCCESS;
     }

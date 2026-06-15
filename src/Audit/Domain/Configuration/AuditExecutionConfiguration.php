@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
+
 final readonly class AuditExecutionConfiguration
 {
     public function __construct(
@@ -38,5 +40,6 @@ final readonly class AuditExecutionConfiguration
         public bool $reviewerStructuredCollection = true,
         public bool $stableSystemPrompt = true,
         public ?string $baseline = null,
+        public RiskLevel $failOn = RiskLevel::Critical,
     ) {}
 }

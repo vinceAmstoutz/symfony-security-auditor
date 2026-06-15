@@ -13,9 +13,11 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
@@ -203,6 +205,34 @@ final class AuditReportTest extends TestCase
         self::assertSame('LOW', $this->reportWithExactScore(14)->riskLevel());
         self::assertSame('LOW', $this->reportWithExactScore(5)->riskLevel());
         self::assertSame('SAFE', $this->reportWithExactScore(4)->riskLevel());
+    }
+
+    #[DataProvider('riskLevelEnumCases')]
+    public function test_risk_level_enum_classifies_by_aggregate_score(int $score, RiskLevel $riskLevel): void
+    {
+        self::assertSame($riskLevel, $this->reportWithExactScore($score)->riskLevelEnum());
+    }
+
+    /**
+     * @return iterable<string, array{int, RiskLevel}>
+     */
+    public static function riskLevelEnumCases(): iterable
+    {
+        yield 'critical at 50' => [50, RiskLevel::Critical];
+        yield 'high at 49' => [49, RiskLevel::High];
+        yield 'high at 30' => [30, RiskLevel::High];
+        yield 'medium at 29' => [29, RiskLevel::Medium];
+        yield 'medium at 15' => [15, RiskLevel::Medium];
+        yield 'low at 14' => [14, RiskLevel::Low];
+        yield 'low at 5' => [5, RiskLevel::Low];
+        yield 'safe at 4' => [4, RiskLevel::Safe];
+        yield 'safe at 0' => [0, RiskLevel::Safe];
+    }
+
+    public function test_risk_level_string_is_the_uppercased_enum_value(): void
+    {
+        self::assertSame('CRITICAL', $this->reportWithExactScore(50)->riskLevel());
+        self::assertSame('SAFE', $this->reportWithExactScore(0)->riskLevel());
     }
 
     public function test_toarray_vulnerabilities_is_array_of_arrays(): void

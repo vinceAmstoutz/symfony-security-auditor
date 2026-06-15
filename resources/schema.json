@@ -160,6 +160,10 @@
               "type": ["string", "null"],
               "description": "Default path to a baseline file of accepted-finding fingerprints to suppress. The --baseline CLI option overrides this."
             },
+            "fail_on": {
+              "enum": ["safe", "low", "medium", "high", "critical"],
+              "description": "Minimum aggregate risk level that makes audit:run exit 1 (the CI gate). Default: critical (only a CRITICAL risk level fails; planned to become high in the next major). The --fail-on CLI option overrides this."
+            },
             "static_prescan": {
               "type": "object",
               "additionalProperties": false,

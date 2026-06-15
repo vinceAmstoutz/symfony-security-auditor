@@ -39,6 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
@@ -445,6 +446,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(BaselineProcessorInterface::class),
             param('symfony_security_auditor.scan.secret_scrubbing.enabled'),
             param('symfony_security_auditor.config_notices'),
+            inline_service(RiskLevel::class)
+                ->factory([RiskLevel::class, 'from'])
+                ->args([param('symfony_security_auditor.audit.fail_on')]),
         ])
         ->tag('console.command');
 };

@@ -13,10 +13,12 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
@@ -40,47 +42,43 @@ final class AuditExitCodeResolverTest extends TestCase
         rmdir($this->tmpDir);
     }
 
-    public function test_it_returns_failure_for_critical_risk_level(): void
+    #[DataProvider('thresholdCases')]
+    public function test_it_fails_only_when_risk_level_meets_the_threshold(int $criticalFindings, RiskLevel $riskLevel, int $expectedExitCode): void
     {
-        $auditReport = AuditReport::fromContext($this->criticalContext());
+        $auditReport = $this->reportWith($criticalFindings);
 
-        self::assertSame(Command::FAILURE, $this->auditExitCodeResolver->resolve($auditReport));
+        self::assertSame($expectedExitCode, $this->auditExitCodeResolver->resolve($auditReport, $riskLevel));
     }
 
-    public function test_it_returns_success_for_safe_risk_level(): void
+    /**
+     * Each critical finding scores 10, so the count maps to a risk level:
+     * 0 → SAFE, 1 → LOW (10), 2 → MEDIUM (20), 4 → HIGH (40), 5 → CRITICAL (50).
+     *
+     * @return iterable<string, array{int, RiskLevel, int}>
+     */
+    public static function thresholdCases(): iterable
     {
-        $auditReport = AuditReport::fromContext(AuditContext::forProject($this->tmpDir));
+        yield 'critical risk fails the default critical gate' => [5, RiskLevel::Critical, Command::FAILURE];
+        yield 'high risk passes the default critical gate' => [4, RiskLevel::Critical, Command::SUCCESS];
+        yield 'safe risk passes the default critical gate' => [0, RiskLevel::Critical, Command::SUCCESS];
 
-        self::assertSame(Command::SUCCESS, $this->auditExitCodeResolver->resolve($auditReport));
+        yield 'high risk fails the high gate' => [4, RiskLevel::High, Command::FAILURE];
+        yield 'critical risk fails the high gate' => [5, RiskLevel::High, Command::FAILURE];
+        yield 'medium risk passes the high gate' => [2, RiskLevel::High, Command::SUCCESS];
+
+        yield 'medium risk fails the medium gate' => [2, RiskLevel::Medium, Command::FAILURE];
+        yield 'low risk passes the medium gate' => [1, RiskLevel::Medium, Command::SUCCESS];
+
+        yield 'low risk fails the low gate' => [1, RiskLevel::Low, Command::FAILURE];
+        yield 'safe risk passes the low gate' => [0, RiskLevel::Low, Command::SUCCESS];
+
+        yield 'safe risk fails the safe gate' => [0, RiskLevel::Safe, Command::FAILURE];
     }
 
-    public function test_it_returns_success_for_high_risk_level(): void
-    {
-        // HIGH = score >= 30 and < 50; 5 HIGH vulns = 35
-        $auditContext = AuditContext::forProject($this->tmpDir);
-        for ($i = 1; $i <= 5; ++$i) {
-            $auditContext->addVulnerability(
-                Vulnerability::create(
-                    VulnerabilityType::SQL_INJECTION,
-                    VulnerabilitySeverity::HIGH,
-                    'High vuln '.$i,
-                    'desc',
-                    'src/File'.$i.'.php',
-                    1, 5, '$q', 'inject', "' OR 1", 'fix', 0.9,
-                )->withReviewerValidation(true),
-            );
-        }
-
-        $auditReport = AuditReport::fromContext($auditContext);
-
-        self::assertSame('HIGH', $auditReport->riskLevel());
-        self::assertSame(Command::SUCCESS, $this->auditExitCodeResolver->resolve($auditReport));
-    }
-
-    private function criticalContext(): AuditContext
+    private function reportWith(int $criticalFindings): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
-        for ($i = 1; $i <= 5; ++$i) {
+        for ($i = 1; $i <= $criticalFindings; ++$i) {
             $auditContext->addVulnerability(
                 Vulnerability::create(
                     VulnerabilityType::SQL_INJECTION,
@@ -93,6 +91,6 @@ final class AuditExitCodeResolverTest extends TestCase
             );
         }
 
-        return $auditContext;
+        return AuditReport::fromContext($auditContext);
     }
 }

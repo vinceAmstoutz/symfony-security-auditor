@@ -14,9 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 interface AuditExitCodeResolverInterface
 {
-    public function resolve(AuditReport $auditReport): int;
+    public function resolve(AuditReport $auditReport, RiskLevel $riskLevel): int;
 }
