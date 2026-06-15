@@ -61,6 +61,8 @@ final class BaselineTest extends TestCase
         self::assertIsString($contents);
         self::assertStringContainsString("[\n", $contents);
         self::assertStringContainsString('"SSA-AAA"', $contents);
+        self::assertStringStartsWith('[', $contents);
+        self::assertStringEndsWith(']'.\PHP_EOL, $contents);
     }
 
     public function test_load_throws_when_the_file_is_not_valid_json(): void

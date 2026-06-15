@@ -35,7 +35,7 @@ final readonly class Baseline implements BaselineInterface
         }
 
         try {
-            $decoded = json_decode($this->filesystem->readFile($path), true, 512, \JSON_THROW_ON_ERROR);
+            $decoded = json_decode($this->filesystem->readFile($path), true, flags: \JSON_THROW_ON_ERROR);
         } catch (JsonException $jsonException) {
             throw MalformedBaselineFileException::fromJsonException($path, $jsonException);
         }

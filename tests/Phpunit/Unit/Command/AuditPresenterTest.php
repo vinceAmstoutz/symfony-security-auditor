@@ -182,6 +182,16 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('2 finding(s) suppressed by the baseline.', $bufferedOutput->fetch());
     }
 
+    public function test_baseline_applied_reports_a_single_suppression(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->baselineApplied($symfonyStyle, 1);
+
+        self::assertStringContainsString('1 finding(s) suppressed by the baseline.', $bufferedOutput->fetch());
+    }
+
     public function test_baseline_applied_is_silent_when_nothing_suppressed(): void
     {
         $bufferedOutput = new BufferedOutput();
