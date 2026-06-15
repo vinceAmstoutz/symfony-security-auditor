@@ -139,16 +139,11 @@ bin/console audit:run --dry-run
 
 > [!WARNING]
 >
-> **Security audit reports contain a list of vulnerabilities in your
-> application.** On a **public repository**, GitHub Actions artifacts and GitLab
-> CI artifacts are publicly downloadable — storing the report as an artifact
-> exposes your attack surface to anyone.
->
-> Safe options: **GitHub Code Scanning** (SARIF upload — restricted to
-> collaborators even on public repos), **external private storage** (S3, GCS
-> with IAM), or **notification-only** (Slack/email, no stored file). See
-> [Report Visibility on Public Repositories](docs/ci.md#report-visibility-on-public-repositories)
-> for details.
+> **Audit reports list your application's vulnerabilities.** On a **public
+> repository**, CI artifacts are publicly downloadable — storing the report
+> exposes your attack surface. Prefer GitHub Code Scanning (SARIF, restricted to
+> collaborators), private storage (S3/GCS with IAM), or notification-only. See
+> [Report Visibility on Public Repositories](docs/ci.md#report-visibility-on-public-repositories).
 
 ### Manual setup (without Flex)
 
@@ -174,27 +169,18 @@ the recipe automates:
 > [!TIP]
 >
 > Schedule the audit as a nightly CI job — the multi-agent LLM loop can take
-> minutes, so blocking PRs on it hurts productivity. See
-> [CI Integration](docs/ci.md) for ready-to-copy GitHub Actions and GitLab CI
-> schedules (SARIF → Code Scanning / Security Dashboard). Use a split-model
-> config (large attacker, cheap reviewer) to
-> [control API costs](docs/ci.md#managing-llm-costs).
->
-> For **dependency CVEs**, use
-> [Dependabot](https://docs.github.com/en/code-security/dependabot) or
-> [Renovate](https://docs.renovatebot.com/) — they automate `composer audit`
-> checks and open PRs automatically. This auditor targets **application-level**
-> logic flaws (broken access control, injection chains, missing Voters) that
-> static dependency scanners cannot see.
+> minutes, so blocking PRs on it hurts productivity.
+> [CI Integration](docs/ci.md) has ready-to-copy GitHub Actions and GitLab CI
+> schedules and a split-model config to
+> [control API costs](docs/ci.md#managing-llm-costs). For **dependency CVEs**,
+> pair it with [Dependabot](https://docs.github.com/en/code-security/dependabot)
+> or [Renovate](https://docs.renovatebot.com/) — this auditor targets the
+> application-level logic flaws those scanners cannot see.
 
 ---
 
 ## Features
 
-- **Symfony Flex recipe** — one `composer require` registers the bundle and
-  ships a pre-configured `symfony_security_auditor.yaml`
-  ([official recipe](https://github.com/symfony/recipes-contrib/tree/main/vinceamstoutz/symfony-security-auditor)
-  in `symfony/recipes-contrib`).
 - **Multi-agent loop** — adversarial Attacker + skeptical Reviewer cut false
   positives across up to 3 iterations, with confirmed findings fed back so later
   iterations generalize patterns instead of re-finding the same bugs.
@@ -213,36 +199,27 @@ the recipe automates:
   focus the LLM; optional **lean mode** drops marker-free files to cut tokens.
 - **Diff mode** — `audit:run --since=main` audits only changed files for fast
   pull-request CI.
-- **Cost levers** — opt-in cheap→expensive escalation, code slicing, concurrent
-  reviewer calls, and lean pre-scan to dial token spend up or down.
-- **Provider-agnostic** — swap Claude / GPT / Gemini / Mistral / Llama /
-  DeepSeek / Ollama with a 2-line YAML change. No code edits.
 - **Cross-file investigation tools** — Attacker (and optionally Reviewer) can
-  `read_file`, `grep`, `list_files`, and `lookup_advisory` (live CVE lookups via
-  `composer audit`).
+  `read_file`, `grep`, `list_files`, and `lookup_advisory` (zero-config live CVE
+  lookups via `composer audit`, backed by Packagist + GitHub Security
+  Advisories).
+- **Cost levers** — split-model (powerful Attacker + cheap Reviewer, ~20×
+  cheaper), Anthropic prompt caching on by default (~90% input-token discount),
+  content-hash caching that skips identical chunks entirely, cheap→expensive
+  escalation, code slicing, and concurrent reviewer calls.
 - **PoC synthesis** — optionally attach a concrete, copy-pasteable reproduction
   (curl/console/payload) to every high-severity finding.
-- **Split-model support** — pair a powerful Attacker (e.g. Claude Opus) with a
-  fast Reviewer (e.g. Claude Haiku) to cut cost ~20×.
-- **Prompt caching** — Anthropic prompt caching enabled by default (~90%
-  input-token discount), silently ignored elsewhere.
-- **Content-hash cache** — identical chunks skip the LLM entirely. Massive
-  savings on repeated CI runs.
-- **Four output formats** — `console` (human-readable), `json`
-  (machine-readable), `sarif` (GitHub Code Scanning / GitLab Security
-  Dashboard), and `html` (self-contained, shareable report).
-- **Baseline suppression** — accept known findings with `--generate-baseline`,
-  then `--baseline` drops them from the report and the exit code so only new
-  findings fail CI.
+- **Four output formats** — `console`, `json`, `sarif` (GitHub Code Scanning /
+  GitLab Security Dashboard), and `html` (self-contained, shareable). Baseline
+  suppression: `--generate-baseline` accepts known findings, `--baseline` drops
+  them from the report and exit code so only new findings fail CI.
 - **CI-ready** — a reusable
   [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor)
   (`uses: vinceamstoutz/symfony-security-auditor@1.11.0`) plus GitLab CI
   templates, with SARIF upload to Code Scanning. See
   [CI Integration](docs/ci.md).
-- **Zero-config CVE feed** — `lookup_advisory` is backed by `composer audit`
-  (Packagist + GitHub Security Advisories) out of the box.
-- **DDD architecture** — strict layering, sole `LLMClientInterface` seam means
-  you can plug in custom providers, agents, stages, advisory feeds, or report
+- **DDD architecture** — strict layering and a sole `LLMClientInterface` seam
+  let you plug in custom providers, agents, stages, advisory feeds, or report
   formats.
 
 ---
@@ -319,37 +296,8 @@ Full output after the pipeline completes:
   ... (3 more findings)
 ```
 
-### `--dry-run` mode
-
-Scans files and estimates token usage and cost without calling the LLM. Use this
-to gauge cost before committing to a full audit.
-
-```bash
-bin/console audit:run --dry-run
-```
-
-```text
- Symfony LLM Security Auditor
- =============================
-
- Project: /var/www/my-app
- Pipeline: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer)
-
- Estimating audit cost (dry run)...
- ───────────────────────────────────
-
- * Model : claude-opus-4-8
- * Tokens: 52,400 in / 4,200 out (total: 56,600)
- * Cost  : $0.3670 (estimate)
-
- ! [NOTE] Dry run — no LLM calls were made. This is a cost estimate only.
-
- [OK] Dry run complete.
-```
-
-No LLM calls are made; exit code is always `0`.
-
-JSON / SARIF formats are documented in
+`--dry-run` estimates token usage and cost without calling the LLM. JSON, SARIF,
+and HTML formats are documented in
 [CLI Reference](docs/configuration.md#cli-reference) and
 [Output Formats Reference](docs/ci.md#output-formats-reference).
 
@@ -395,10 +343,6 @@ edits.
 
 ## FAQ
 
-**Is this a replacement for PHPStan or Psalm?** No. PHPStan/Psalm catch type
-errors; this auditor catches application-level logic flaws (missing
-authorization, mass assignment, business logic bugs). Use both.
-
 **How much does an audit cost?** Depends on project size and model. A medium
 Symfony app (~150 files) on Claude Opus + Haiku split-model with prompt caching
 enabled costs roughly $0.50 per nightly run. See
@@ -406,20 +350,10 @@ enabled costs roughly $0.50 per nightly run. See
 
 **Does it send my code to the cloud?** Only to the LLM provider you configure.
 For zero-cloud operation, use the
-[Ollama local platform](docs/configuration.md#supported-platforms). See
-[FAQ → Privacy](docs/faq.md#does-this-send-my-source-code-to-a-third-party).
+[Ollama local platform](docs/configuration.md#supported-platforms).
 
-**Are false positives a problem?** The Reviewer agent filters them out — only
-`reviewer_validated` findings appear in the final report. Tune
-`audit.min_confidence` (default `0.6`) up for stricter precision, down for
-higher recall.
-
-**Which model should I pick?** For accuracy: Claude Opus / GPT-4o / Gemini 2.5
-Pro. For speed/cost: Claude Haiku / DeepSeek / Mistral Large. For zero-cost
-local: Ollama (`llama3.3`, `deepseek-r1`). See
-[FAQ → Model picks](docs/faq.md#which-llm-model-should-i-use).
-
-Full FAQ: [docs/faq.md](docs/faq.md).
+Full FAQ — privacy, false positives, model picks, comparisons:
+[docs/faq.md](docs/faq.md).
 
 ---
 
