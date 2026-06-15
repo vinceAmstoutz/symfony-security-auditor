@@ -27,7 +27,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 8;
+    public const int PROMPT_VERSION = 9;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
@@ -358,6 +358,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             .$this->outputFormatSection()
             .$this->severityAndConfidenceRubrics()
             .$this->fileNumberingAndScope()
+            .$this->analysisMethodology()
             .$this->exampleFinding()
             .$this->rulesAndToolDiscipline();
     }
@@ -455,6 +456,8 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - low: reflected XSS in low-impact contexts, information disclosure of non-sensitive metadata, weak crypto on already-public data, missing security headers.
             - info: defense-in-depth opportunities, hardening suggestions, deprecated patterns with no current exploit path.
 
+            Exposure weighting: severity is risk (roughly likelihood times impact), not bug class alone. Raise severity when the vulnerable path is reachable by an unauthenticated or low-privilege actor (public route, anonymous firewall, pre-auth handler, webhook); lower it when reachable only behind strong authentication or by trusted/admin roles. Weigh exploitability and the sensitivity of the affected data rather than a generic CVSS guess.
+
             Confidence rubric (filtered downstream — entries below 0.6 are dropped before reviewer):
             - 0.9-1.0: tainted source traced to dangerous sink with concrete payload.
             - 0.7-0.89: clear vulnerable pattern matched, exploitation plausible without a full PoC.
@@ -474,6 +477,27 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             Scope:
             - Only report findings in the source files provided below. Ignore code under `vendor/`, `var/cache/`, `var/log/`, any path containing `.generated.` or `.cache.`, and obvious build artifacts.
             - If a finding references code outside the provided chunk, set `confidence` no higher than 0.7 and explain the cross-file dependency in `attack_vector`.
+
+
+            PROMPT;
+    }
+
+    private function analysisMethodology(): string
+    {
+        return <<<'PROMPT'
+            Analysis methodology — apply to every candidate before recording it:
+            - Source (trust boundary): identify the attacker-controlled entry point the value crosses from — route/path parameter, query string, request body, header, cookie, uploaded file, or webhook/queue payload (and anything derived from them).
+            - Flow: trace that value through each assignment, transformation, and cross-file call to the sink, noting any sanitizer, validator, parameterized query, escaping, or access-control check on the path.
+            - Sink: confirm it reaches a dangerous operation (SQL/DQL, shell/process, file path, Twig, redirect, deserialization, reflected/stored output, or a privileged state change) with no mitigating control in between.
+            - Verify before recording: record ONLY when the value is genuinely attacker-controlled, reaches the sink on a reachable path, and nothing on the path (guard clause, validator, parameterization, escaping, `access_control`, voter) neutralizes it. Otherwise do not record — or lower `confidence` and state the missing link in `attack_vector`. Always name the concrete source, sink, and path.
+
+            For each entry point, sweep the STRIDE categories so no class is skipped:
+            - Spoofing: authentication or identity-check bypass (authenticator flaws, forgeable or replayable tokens).
+            - Tampering: mass assignment, unvalidated writes, parameter binding to privileged fields.
+            - Repudiation: privileged or balance-affecting actions with no audit trail or idempotency key.
+            - Information disclosure: IDOR, over-permissive serializer groups, verbose errors, sensitive data in logs.
+            - Denial of service: unbounded loops/uploads/recursion, missing rate limiting on costly or auth endpoints.
+            - Elevation of privilege: missing `#[IsGranted]` / `denyAccessUnlessGranted()`, broken voter, role escalation.
 
 
             PROMPT;

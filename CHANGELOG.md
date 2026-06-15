@@ -69,6 +69,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `ReportWriter` a `markdown` arm. Public API per `docs/versioning.md` (the
   `--format` value `markdown`).
 
+### Changed
+
+- **The attacker prompt now applies an explicit source→sink methodology, a
+  STRIDE sweep, and exposure-weighted severity.** `AttackerPromptBuilder`
+  (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) gained an
+  "Analysis methodology" section that tells the model to trace each
+  attacker-controlled value from its trust-boundary source through to a
+  dangerous sink and to verify that no guard, validator, parameterization,
+  escaping, `access_control`, or voter neutralizes the path before recording a
+  finding; to sweep the STRIDE categories (Spoofing, Tampering, Repudiation,
+  Information disclosure, Denial of service, Elevation of privilege) per entry
+  point so no class is skipped; and to calibrate severity by reachability and
+  exposure (risk ≈ likelihood × impact) rather than bug class alone. Informed by
+  standard threat-modeling practice (STRIDE, trust boundaries, risk-based
+  prioritization). `PROMPT_VERSION` is bumped `8` → `9`, invalidating
+  previously-cached attacker responses so the new guidance takes effect.
+
 ### Fixed
 
 - **Corrected two OWASP Top 10 categorizations surfaced by the new per-rule

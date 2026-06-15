@@ -889,7 +889,30 @@ final class AttackerPromptBuilderTest extends TestCase
 
     public function test_prompt_version_is_bumped_when_modern_symfony_skill_blocks_are_added(): void
     {
-        self::assertSame(8, AttackerPromptBuilder::PROMPT_VERSION);
+        self::assertSame(9, AttackerPromptBuilder::PROMPT_VERSION);
+    }
+
+    public function test_base_prompt_includes_the_source_to_sink_analysis_methodology(): void
+    {
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('Analysis methodology', $prompt);
+        self::assertStringContainsString('Verify before recording', $prompt);
+    }
+
+    public function test_base_prompt_includes_the_stride_category_sweep(): void
+    {
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('sweep the STRIDE categories', $prompt);
+        self::assertStringContainsString('Elevation of privilege', $prompt);
+    }
+
+    public function test_base_prompt_calibrates_severity_by_exposure(): void
+    {
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('Exposure weighting', $prompt);
     }
 
     #[DataProvider('vulnerabilityTypeValues')]
