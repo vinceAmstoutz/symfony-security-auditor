@@ -29,6 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
 
 /**
  * Implements the Domain LLM ports on top of the symfony/ai platform. The
@@ -74,7 +75,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         private ?BudgetTracker $budgetTracker = null,
         bool $providerJsonMode = self::DEFAULT_PROVIDER_JSON_MODE,
         RateLimiterInterface $rateLimiter = new NullRateLimiter(),
-        TokenEstimatorInterface $tokenEstimator = new CharacterBasedTokenEstimator(),
+        TokenEstimatorInterface $tokenEstimator = new ResolvingTokenEstimator(),
         RetryAfterHeaderParser $retryAfterHeaderParser = new RetryAfterHeaderParser(),
         ?int $maxOutputTokens = self::DEFAULT_MAX_OUTPUT_TOKENS,
     ) {

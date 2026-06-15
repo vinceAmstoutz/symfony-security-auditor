@@ -72,10 +72,18 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff\ProcessGitCha
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CharacterBasedTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\AnthropicTokenEstimator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\CharacterRatioCounter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\DeepSeekTokenEstimator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\GeminiTokenEstimator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\LlamaTokenEstimator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\MistralTokenEstimator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\OpenAiTokenEstimator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ProviderTokenEstimatorInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\StaticPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
@@ -122,6 +130,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->instanceof(StageInterface::class)
         ->tag('symfony_security_auditor.pipeline_stage');
 
+    $defaultsConfigurator
+        ->instanceof(ProviderTokenEstimatorInterface::class)
+        ->tag('symfony_security_auditor.token_estimator');
+
     $defaultsConfigurator->set(TokenUsageRecorder::class);
 
     $defaultsConfigurator->set(StaticPricingProvider::class)
@@ -150,8 +162,16 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(TransientFailureClassifier::class);
 
-    $defaultsConfigurator->set(CharacterBasedTokenEstimator::class);
-    $defaultsConfigurator->alias(TokenEstimatorInterface::class, CharacterBasedTokenEstimator::class);
+    $defaultsConfigurator->set(CharacterRatioCounter::class);
+    $defaultsConfigurator->set(AnthropicTokenEstimator::class);
+    $defaultsConfigurator->set(OpenAiTokenEstimator::class);
+    $defaultsConfigurator->set(GeminiTokenEstimator::class);
+    $defaultsConfigurator->set(MistralTokenEstimator::class);
+    $defaultsConfigurator->set(LlamaTokenEstimator::class);
+    $defaultsConfigurator->set(DeepSeekTokenEstimator::class);
+    $defaultsConfigurator->set(ResolvingTokenEstimator::class)
+        ->args([tagged_iterator('symfony_security_auditor.token_estimator')]);
+    $defaultsConfigurator->alias(TokenEstimatorInterface::class, ResolvingTokenEstimator::class);
 
     $defaultsConfigurator->set(UsleepSleeper::class);
     $defaultsConfigurator->alias(SleeperInterface::class, UsleepSleeper::class);

@@ -78,7 +78,10 @@ src/
 │       │                  BatchWindowResolver, ToolConversationWavefront, PlatformResultExtractor,
 │       │                  PlatformOptionsFactory, PlatformToolsMapper, PromptTokenEstimator),
 │       │                  RetryPolicy, TransientFailureClassifier,
-│       │                  CharacterBasedTokenEstimator, Delay/SleeperInterface + UsleepSleeper,
+│       │                  TokenEstimator/{ProviderTokenEstimatorInterface, ResolvingTokenEstimator,
+│       │                  CharacterRatioCounter, AnthropicTokenEstimator, OpenAiTokenEstimator,
+│       │                  GeminiTokenEstimator, MistralTokenEstimator, LlamaTokenEstimator,
+│       │                  DeepSeekTokenEstimator}, Delay/SleeperInterface + UsleepSleeper,
 │       │                  RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
 │       ├── FileSystem/  # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
 │       ├── Scan/        # RegexStaticPreScanner, RegexCodeSlicer,
@@ -799,8 +802,14 @@ into `SymfonyToolRegistryFactory` so the attacker can call it when
 
 **Replace token estimator** — implement
 `Audit\Domain\Port\TokenEstimatorInterface` to plug in a provider-specific token
-counter. Default: `CharacterBasedTokenEstimator` (character ÷ 4 heuristic via
-`mb_strlen`).
+counter. Default: `ResolvingTokenEstimator`, which dispatches each model to a
+per-provider `ProviderTokenEstimatorInterface` implementation
+(`AnthropicTokenEstimator`, `OpenAiTokenEstimator`, `GeminiTokenEstimator`,
+`MistralTokenEstimator`, `LlamaTokenEstimator`, `DeepSeekTokenEstimator`) and
+falls back to a default character-to-token ratio for unknown models — each a
+`mb_strlen ÷ ratio` heuristic via the shared `CharacterRatioCounter`. Register
+your own implementation tagged `symfony_security_auditor.token_estimator` to add
+a provider, or alias `TokenEstimatorInterface` to replace the whole strategy.
 
 **Replace pricing provider** — implement
 `Audit\Domain\Port\PricingProviderInterface` to supply custom per-token prices.
