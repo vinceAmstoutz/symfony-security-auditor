@@ -136,10 +136,10 @@ final readonly class AuditReport
      */
     public function withoutFingerprints(array $fingerprints): self
     {
-        $kept = array_values(array_filter(
+        $kept = array_filter(
             $this->vulnerabilities,
             static fn (Vulnerability $vulnerability): bool => !\in_array($vulnerability->fingerprint(), $fingerprints, true),
-        ));
+        );
 
         return new self(
             $this->auditId,

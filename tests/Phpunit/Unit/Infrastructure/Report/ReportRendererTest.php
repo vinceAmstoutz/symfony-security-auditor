@@ -758,12 +758,27 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('<h2>Vulnerabilities', $output);
     }
 
-    public function test_render_html_renders_risk_level_with_its_css_class(): void
+    public function test_render_html_renders_risk_level_with_its_lowercased_css_class(): void
     {
         $output = $this->reportRenderer->renderHtml($this->makeReport());
 
-        self::assertStringContainsString('risk-safe', $output);
+        self::assertStringContainsString('class="risk risk-safe"', $output);
         self::assertStringContainsString('>SAFE</span>', $output);
+    }
+
+    public function test_render_html_shows_the_primary_model(): void
+    {
+        $output = $this->reportRenderer->renderHtml($this->makeReportWithCost(AuditCost::zero('claude-test-model')));
+
+        self::assertStringContainsString('claude-test-model', $output);
+        self::assertStringNotContainsString('unknown model', $output);
+    }
+
+    public function test_render_html_shows_unknown_model_when_the_primary_model_is_blank(): void
+    {
+        $output = $this->reportRenderer->renderHtml($this->makeReportWithCost(AuditCost::zero('')));
+
+        self::assertStringContainsString('unknown model', $output);
     }
 
     public function test_render_html_lists_a_validated_vulnerability(): void
