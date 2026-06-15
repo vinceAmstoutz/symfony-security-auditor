@@ -10,6 +10,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.10.1] — 2026-06-15 — Encore
+
+A packaging-only republish of **1.10.0 — Lookout**. The `1.10.0` tag was first
+pushed to an incomplete commit and indexed by Packagist; moving the tag to the
+finished release commit was then refused by
+[Packagist's stable-version immutability rule](https://packagist.org/about#version-immutability)
+("Upstream re-tag blocked — Packagist's stored snapshot may no longer match what
+is currently in git"), which locks a published version's source/dist reference
+forever. This release republishes the full, intended Lookout contents under a
+fresh, unblocked version so
+`composer require vinceamstoutz/symfony-security-auditor` resolves the complete
+release. **There are no source changes relative to the intended 1.10.0** — see
+the [1.10.0](#1100--2026-06-15--lookout) entry below for the actual features and
+fixes. The config-schema URL and GitHub Action `uses:` pins move from `1.10.0`
+to `1.10.1` accordingly.
+
 ## [1.10.0] — 2026-06-15 — Lookout
 
 A reporting-and-CI release. Audits gain a self-contained, HTML-escaped report
@@ -1508,6 +1524,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.10.1]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.10.1
 [1.10.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.10.0
 [1.9.0]:
