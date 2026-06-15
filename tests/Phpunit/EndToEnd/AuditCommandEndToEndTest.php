@@ -176,6 +176,20 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('Security Audit Report', $output);
     }
 
+    public function test_command_markdown_format_outputs_a_markdown_report(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--format' => 'markdown',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertStringContainsString('# Security Audit Report', $commandTester->getDisplay());
+    }
+
     public function test_generate_baseline_writes_fingerprints_and_exits_zero_despite_critical_findings(): void
     {
         $this->createProjectDir();

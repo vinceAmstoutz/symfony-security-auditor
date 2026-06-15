@@ -36,6 +36,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
           <info>json</info>     machine-readable report
           <info>sarif</info>    SARIF 2.1.0 for GitHub Code Scanning / GitLab Security Dashboard
           <info>html</info>     self-contained HTML report for sharing or archiving
+          <info>markdown</info> Markdown report for a PR comment or GitHub step summary
 
         Use <info>--output</info> (<info>-o</info>) to write the report to a file:
           <info>%command.full_name% . --format=sarif --output=report.sarif</info>

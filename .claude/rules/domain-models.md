@@ -16,8 +16,8 @@ paths:
 - Vulnerability `id` is deterministic:
   `VULN-{sha1(type+filePath+lineStart+microtime)[0..7]}` — do not change this
   scheme.
-- Adding a `VulnerabilityType` case requires updating `category()` and
-  `owaspReference()` — nothing else changes.
+- Adding a `VulnerabilityType` case requires updating `category()`,
+  `owaspReference()`, and `owaspReferenceUrl()` — nothing else changes.
 - Adding a `VulnerabilitySeverity` case requires updating `score()`, `label()`,
   `isExploitable()`, and the `riskLevelEnum()` thresholds in `AuditReport`
   (`riskLevel()` derives its string from that enum).
