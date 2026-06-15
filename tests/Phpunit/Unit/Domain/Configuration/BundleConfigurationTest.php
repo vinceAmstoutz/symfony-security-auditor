@@ -51,6 +51,8 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->audit->escalationEnabled);
         self::assertNull($bundleConfiguration->audit->escalationCheapModel);
         self::assertSame(RiskLevel::Critical, $bundleConfiguration->audit->failOn);
+        self::assertSame([], $bundleConfiguration->audit->excludedTypes);
+        self::assertSame([], $bundleConfiguration->audit->includedTypes);
 
         self::assertSame(3, $bundleConfiguration->retry->maxAttempts);
         self::assertSame(500, $bundleConfiguration->retry->initialDelayMs);
@@ -89,6 +91,18 @@ final class BundleConfigurationTest extends TestCase
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
         self::assertSame(RiskLevel::Critical, $bundleConfiguration->audit->failOn);
+    }
+
+    public function test_from_array_maps_excluded_and_included_types(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['audit']['excluded_types'] = ['missing_rate_limiting', 'log_injection'];
+        $config['audit']['included_types'] = ['sql_injection'];
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertSame(['missing_rate_limiting', 'log_injection'], $bundleConfiguration->audit->excludedTypes);
+        self::assertSame(['sql_injection'], $bundleConfiguration->audit->includedTypes);
     }
 
     public function test_rate_limit_dimensions_flow_through_when_set(): void

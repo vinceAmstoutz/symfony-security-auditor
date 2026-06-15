@@ -76,6 +76,7 @@ final readonly class AuditCommand
         private ProgressReporterHolder $progressReporterHolder,
         private BaselineProcessorInterface $baselineProcessor,
         private bool $secretScrubbingEnabled,
+        private FindingTypeFilterInterface $findingTypeFilter,
         private array $configNotices = [],
         private RiskLevel $riskLevel = RiskLevel::Critical,
     ) {}
@@ -118,6 +119,7 @@ final readonly class AuditCommand
             }
 
             $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache, $auditCommandInput->since);
+            $report = $this->findingTypeFilter->apply($report);
 
             if (null !== $auditCommandInput->generateBaseline) {
                 $fingerprintCount = $this->baselineProcessor->generate($report, $auditCommandInput->generateBaseline);

@@ -413,6 +413,77 @@ final class AuditReportTest extends TestCase
         self::assertSame($auditReport->projectPath(), $filtered->projectPath());
     }
 
+    public function test_filtered_by_types_with_no_filters_keeps_all_findings(): void
+    {
+        $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION, VulnerabilityType::SSRF);
+
+        self::assertSame(2, $auditReport->filteredByTypes([], [])->totalVulnerabilities());
+    }
+
+    public function test_filtered_by_types_drops_excluded_types(): void
+    {
+        $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION, VulnerabilityType::SSRF);
+
+        $filtered = $auditReport->filteredByTypes([], [VulnerabilityType::SQL_INJECTION]);
+
+        self::assertSame([VulnerabilityType::SSRF], $this->typesOf($filtered));
+    }
+
+    public function test_filtered_by_types_with_an_allowlist_keeps_only_included_types(): void
+    {
+        $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION, VulnerabilityType::SSRF, VulnerabilityType::MISSING_RATE_LIMITING);
+
+        $filtered = $auditReport->filteredByTypes([VulnerabilityType::SSRF], []);
+
+        self::assertSame([VulnerabilityType::SSRF], $this->typesOf($filtered));
+    }
+
+    public function test_filtered_by_types_lets_exclusions_win_over_the_allowlist(): void
+    {
+        $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION, VulnerabilityType::SSRF);
+
+        $filtered = $auditReport->filteredByTypes(
+            [VulnerabilityType::SQL_INJECTION, VulnerabilityType::SSRF],
+            [VulnerabilityType::SQL_INJECTION],
+        );
+
+        self::assertSame([VulnerabilityType::SSRF], $this->typesOf($filtered));
+    }
+
+    public function test_filtered_by_types_preserves_report_metadata(): void
+    {
+        $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION);
+
+        $filtered = $auditReport->filteredByTypes([], [VulnerabilityType::SQL_INJECTION]);
+
+        self::assertSame(0, $filtered->totalVulnerabilities());
+        self::assertSame($auditReport->auditId(), $filtered->auditId());
+        self::assertSame($auditReport->projectPath(), $filtered->projectPath());
+    }
+
+    private function reportWithTypes(VulnerabilityType ...$types): AuditReport
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        foreach ($types as $index => $type) {
+            $auditContext->addVulnerability(
+                $this->makeVulnerability('t'.$index, VulnerabilitySeverity::HIGH, $type)->withReviewerValidation(true),
+            );
+        }
+
+        return AuditReport::fromContext($auditContext);
+    }
+
+    /**
+     * @return list<VulnerabilityType>
+     */
+    private function typesOf(AuditReport $auditReport): array
+    {
+        return array_map(
+            static fn (Vulnerability $vulnerability): VulnerabilityType => $vulnerability->type(),
+            $auditReport->vulnerabilities(),
+        );
+    }
+
     private function sameFingerprintVuln(int $lineStart): Vulnerability
     {
         return Vulnerability::create(

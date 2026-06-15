@@ -49,6 +49,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 
 final class AuditCommandEndToEndTest extends TestCase
@@ -464,6 +465,34 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
     }
 
+    public function test_excluded_type_is_dropped_from_report_and_clears_the_exit_code(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}', excludedTypes: ['sql_injection']);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--format' => 'json',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        $output = $commandTester->getDisplay();
+        preg_match('/(\{.*\})/s', $output, $matches);
+        $decoded = json_decode($matches[1] ?? '', true);
+        self::assertIsArray($decoded);
+        self::assertSame(0, $decoded['total_vulnerabilities']);
+    }
+
+    public function test_included_types_allowlist_drops_unlisted_types(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}', includedTypes: ['ssrf']);
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+    }
+
     private function highAttackerPayload(): string
     {
         $vulns = [];
@@ -529,7 +558,11 @@ final class AuditCommandEndToEndTest extends TestCase
         );
     }
 
-    private function makeCommandTester(string $attackerResponse, string $reviewerResponse, bool $secretScrubbingEnabled = true, ?string $configuredBaseline = null, RiskLevel $riskLevel = RiskLevel::Critical): CommandTester
+    /**
+     * @param list<string> $excludedTypes
+     * @param list<string> $includedTypes
+     */
+    private function makeCommandTester(string $attackerResponse, string $reviewerResponse, bool $secretScrubbingEnabled = true, ?string $configuredBaseline = null, RiskLevel $riskLevel = RiskLevel::Critical, array $excludedTypes = [], array $includedTypes = []): CommandTester
     {
         $attackerLLM = self::createStub(LLMClientInterface::class);
         $attackerLLM->method('complete')->willReturn(
@@ -541,10 +574,14 @@ final class AuditCommandEndToEndTest extends TestCase
             LLMResponse::create($reviewerResponse, 0, 0, 'stub', 'end_turn'),
         );
 
-        return $this->makeCommandTesterWithLLM($attackerLLM, $reviewerLLM, $secretScrubbingEnabled, $configuredBaseline, $riskLevel);
+        return $this->makeCommandTesterWithLLM($attackerLLM, $reviewerLLM, $secretScrubbingEnabled, $configuredBaseline, $riskLevel, $excludedTypes, $includedTypes);
     }
 
-    private function makeCommandTesterWithLLM(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, bool $secretScrubbingEnabled = true, ?string $configuredBaseline = null, RiskLevel $riskLevel = RiskLevel::Critical): CommandTester
+    /**
+     * @param list<string> $excludedTypes
+     * @param list<string> $includedTypes
+     */
+    private function makeCommandTesterWithLLM(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, bool $secretScrubbingEnabled = true, ?string $configuredBaseline = null, RiskLevel $riskLevel = RiskLevel::Critical, array $excludedTypes = [], array $includedTypes = []): CommandTester
     {
         $progressReporterHolder = new ProgressReporterHolder();
         $auditOrchestrator = new AuditOrchestrator(
@@ -581,6 +618,7 @@ final class AuditCommandEndToEndTest extends TestCase
             $progressReporterHolder,
             new BaselineProcessor(new Baseline(), $configuredBaseline),
             secretScrubbingEnabled: $secretScrubbingEnabled,
+            findingTypeFilter: new FindingTypeFilter($includedTypes, $excludedTypes),
             riskLevel: $riskLevel,
         );
 

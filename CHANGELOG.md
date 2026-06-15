@@ -12,6 +12,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **Type-level finding suppression — the `audit.excluded_types` and
+  `audit.included_types` config keys.** Muting a whole noisy class of finding
+  (e.g. `missing_rate_limiting`) previously required enumerating every finding's
+  baseline fingerprint; there was no way to say "never report this type."
+  `audit.excluded_types` now drops findings of the listed `VulnerabilityType`
+  values from the report **and** the exit code, and `audit.included_types` is an
+  allowlist that, when non-empty, keeps only the listed types (exclusions still
+  win). Both are validated against the `VulnerabilityType` enum at
+  config-compile time. A new `AuditReport::filteredByTypes()` (Domain,
+  copy-on-write like `withoutFingerprints()`) does the filtering and a
+  `FindingTypeFilter` (`src/Command/FindingTypeFilter.php`, behind
+  `FindingTypeFilterInterface`) applies the configured lists in `AuditCommand`
+  right after the audit runs — before baseline suppression, rendering, and
+  exit-code resolution — so muted types never appear, never fail CI, and are
+  absent from a generated baseline. Both default to `[]` (no filtering), so
+  existing runs are unchanged. Public API per `docs/versioning.md`.
 - **Configurable CI gate severity — the `audit.fail_on` config key and the
   `--fail-on` CLI option.** `audit:run` hardcoded its failing exit code to a
   `CRITICAL` aggregate risk level: `AuditExitCodeResolver::resolve()`

@@ -792,6 +792,35 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $this->boot(['model' => 'gpt-4o', 'audit' => ['fail_on' => 'severe']]);
     }
 
+    public function test_bundle_excluded_and_included_types_default_to_empty_lists(): void
+    {
+        $container = $this->boot(['model' => 'gpt-4o'])->getContainer();
+
+        self::assertSame([], $container->getParameter('symfony_security_auditor.audit.excluded_types'));
+        self::assertSame([], $container->getParameter('symfony_security_auditor.audit.included_types'));
+    }
+
+    public function test_bundle_propagates_excluded_and_included_types(): void
+    {
+        $container = $this->boot([
+            'model' => 'gpt-4o',
+            'audit' => [
+                'excluded_types' => ['missing_rate_limiting', 'log_injection'],
+                'included_types' => ['sql_injection'],
+            ],
+        ])->getContainer();
+
+        self::assertSame(['missing_rate_limiting', 'log_injection'], $container->getParameter('symfony_security_auditor.audit.excluded_types'));
+        self::assertSame(['sql_injection'], $container->getParameter('symfony_security_auditor.audit.included_types'));
+    }
+
+    public function test_bundle_rejects_an_unknown_excluded_type(): void
+    {
+        $this->expectException(Throwable::class);
+
+        $this->boot(['model' => 'gpt-4o', 'audit' => ['excluded_types' => ['not_a_real_type']]]);
+    }
+
     public function test_bundle_emits_no_notice_for_batched_reviews_now_that_the_cache_covers_them(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['reviewer_batch_size' => 5]]);
