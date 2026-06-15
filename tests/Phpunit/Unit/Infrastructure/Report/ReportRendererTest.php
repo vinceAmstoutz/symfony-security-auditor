@@ -921,6 +921,14 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString('`src/Admin/UserController.php:10-14`', $output);
     }
 
+    public function test_render_markdown_finding_shows_confidence_percent_and_indented_proof(): void
+    {
+        $output = $this->reportRenderer->renderMarkdown($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringContainsString('**Confidence:** 90%', $output);
+        self::assertStringContainsString("\n    ' OR 1=1", $output);
+    }
+
     public function test_render_markdown_renders_a_severity_summary_table(): void
     {
         $output = $this->reportRenderer->renderMarkdown($this->makeReport(
