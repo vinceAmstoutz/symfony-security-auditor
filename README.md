@@ -39,8 +39,8 @@ SAST tools miss: broken access control, complex injection chains, business logic
 flaws, missing Voters, and mass assignment vulnerabilities. An adversarial
 **Attacker** agent hunts for issues; a skeptical **Reviewer** agent eliminates
 false positives over up to three iterations. Output is a validated vulnerability
-report in your console, as JSON, or as SARIF for GitHub Code Scanning / GitLab
-Security Dashboard.
+report in your console, as JSON, as SARIF for GitHub Code Scanning / GitLab
+Security Dashboard, as a self-contained HTML report, or as PR-friendly Markdown.
 
 ```text
   Project files
@@ -55,7 +55,7 @@ Security Dashboard.
   3. Audit — Attacker ⚔ Reviewer multi-agent loop (up to 3 iterations)
        │
        ▼
-  Validated vulnerability report: console, JSON, or SARIF
+  Validated vulnerability report: console, JSON, SARIF, HTML, or Markdown
 ```
 
 ---
@@ -298,8 +298,37 @@ Full output after the pipeline completes:
   ... (3 more findings)
 ```
 
-`--dry-run` estimates token usage and cost without calling the LLM. The JSON,
-SARIF, HTML, and Markdown formats are documented in
+### `--dry-run` mode
+
+Scans files and estimates token usage and cost without calling the LLM. Use this
+to gauge cost before committing to a full audit.
+
+```bash
+bin/console audit:run --dry-run
+```
+
+```text
+ Symfony LLM Security Auditor
+ =============================
+
+ Project: /var/www/my-app
+ Pipeline: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer)
+
+ Estimating audit cost (dry run)...
+ ───────────────────────────────────
+
+ * Model : claude-opus-4-8
+ * Tokens: 52,400 in / 4,200 out (total: 56,600)
+ * Cost  : $0.3670 (estimate)
+
+ ! [NOTE] Dry run — no LLM calls were made. This is a cost estimate only.
+
+ [OK] Dry run complete.
+```
+
+No LLM calls are made; exit code is always `0`.
+
+The JSON, SARIF, HTML, and Markdown formats are documented in
 [CLI Reference](docs/configuration.md#cli-reference) and
 [Output Formats Reference](docs/ci.md#output-formats-reference).
 
