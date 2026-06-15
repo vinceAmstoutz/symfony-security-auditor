@@ -746,25 +746,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame([], $kernel->getContainer()->getParameter('symfony_security_auditor.config_notices'));
     }
 
-    public function test_bundle_emits_a_notice_when_batching_disables_the_reviewer_verdict_cache(): void
+    public function test_bundle_emits_no_notice_for_batched_reviews_now_that_the_cache_covers_them(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['reviewer_batch_size' => 5]]);
-
-        $configNotices = $kernel->getContainer()->getParameter('symfony_security_auditor.config_notices');
-        self::assertIsArray($configNotices);
-        self::assertCount(1, $configNotices);
-        self::assertIsString($configNotices[0]);
-        self::assertStringContainsString('reviewer-verdict cache', $configNotices[0]);
-        self::assertStringContainsString('audit.reviewer_batch_size', $configNotices[0]);
-    }
-
-    public function test_bundle_emits_no_batching_notice_when_the_cache_is_disabled(): void
-    {
-        $kernel = $this->boot([
-            'model' => 'gpt-4o',
-            'audit' => ['reviewer_batch_size' => 5],
-            'cache' => ['enabled' => false],
-        ]);
 
         self::assertSame([], $kernel->getContainer()->getParameter('symfony_security_auditor.config_notices'));
     }

@@ -133,8 +133,9 @@ Command → Application → Domain ← Infrastructure (implements ports)
    `reviewer_tools_enabled` keeps the JSON path, and `reviewer_max_concurrent`
    > 1 reviews findings concurrently (structured when the client supports tool
    > batching, JSON otherwise). Verdicts are cached across runs
-   > (`FilesystemReviewerCache`) when `cache.enabled` is on; concurrent reviews
-   > serve cached verdicts first and dispatch only the misses.
+   > (`FilesystemReviewerCache`) when `cache.enabled` is on; every review mode —
+   > concurrent and batched (`reviewer_batch_size > 1`) alike — serves cached
+   > verdicts first and dispatches/batches only the misses.
 5. Deduplicate → persist to `AuditContext`
 
 After the loop, the optional `PoCSynthesisStage` runs (concrete reproduction

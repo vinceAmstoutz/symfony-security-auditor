@@ -31,7 +31,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  * Reviews findings in batches of `batchSize`: one LLM call per batch, verdicts
  * matched back to findings by id. The structured mode collects verdicts
  * through a `record_review` tool; the JSON mode parses the model's array
- * response, optionally with the investigation tool registry.
+ * response, optionally with the investigation tool registry. Cached verdicts
+ * are served first; only the cache-miss findings are batched and dispatched to
+ * the LLM.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -43,6 +45,8 @@ final readonly class BatchReviewAnalyzer
         private LLMClientInterface $llmClient,
         private ReviewerPromptBuilderInterface $reviewerPromptBuilder,
         private BatchVerdictApplier $batchVerdictApplier,
+        private ReviewerVerdictCache $reviewerVerdictCache,
+        private ReviewOutcomeRecorder $reviewOutcomeRecorder,
         private LoggerInterface $logger,
         private int $maxToolIterations,
         private ?RecordReviewToolFactoryInterface $recordReviewToolFactory,
@@ -55,30 +59,56 @@ final readonly class BatchReviewAnalyzer
      *
      * @return list<Vulnerability>
      */
-    public function analyze(array $vulnerabilities, array $projectFiles, int $batchSize, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, bool $structured): array
+    public function analyze(array $vulnerabilities, array $projectFiles, int $batchSize, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, bool $structured, bool $bypassCache): array
     {
         $reviewed = [];
-        foreach (array_chunk($vulnerabilities, $batchSize) as $batch) {
-            $reviewed = [
-                ...$reviewed,
-                ...$structured
-                    ? $this->reviewBatchViaStructuredCollection($batch, $projectFiles, $coverageRecorder)
-                    : $this->reviewBatch($batch, $projectFiles, $coverageRecorder, $toolRegistry),
-            ];
+        $codeContexts = [];
+        $missIndexes = [];
+        $misses = [];
+        foreach ($vulnerabilities as $index => $vulnerability) {
+            $codeContext = CodeContextResolver::resolve($vulnerability->filePath(), $projectFiles);
+            $codeContexts[$vulnerability->id()] = $codeContext;
+
+            $cached = $this->reviewerVerdictCache->get($vulnerability, $codeContext, $bypassCache);
+            if (null !== $cached) {
+                $reviewed[$index] = $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $cached, $coverageRecorder);
+
+                continue;
+            }
+
+            $missIndexes[] = $index;
+            $misses[] = $vulnerability;
         }
 
-        return $reviewed;
+        $cacheContexts = $bypassCache ? [] : $codeContexts;
+
+        $position = 0;
+        foreach (array_chunk($misses, $batchSize) as $batch) {
+            $batchReviewed = $structured
+                ? $this->reviewBatchViaStructuredCollection($batch, $codeContexts, $cacheContexts, $coverageRecorder)
+                : $this->reviewBatch($batch, $codeContexts, $cacheContexts, $coverageRecorder, $toolRegistry);
+
+            foreach ($batchReviewed as $reviewedVulnerability) {
+                $reviewed[$missIndexes[$position]] = $reviewedVulnerability;
+                ++$position;
+            }
+        }
+
+        ksort($reviewed);
+
+        return array_values($reviewed);
     }
 
     /**
-     * @param list<Vulnerability> $batch
-     * @param list<ProjectFile>   $projectFiles
+     * @param list<Vulnerability>   $batch
+     * @param array<string, string> $codeContexts
+     * @param array<string, string> $cacheContexts
      *
      * @return list<Vulnerability>
      */
-    private function reviewBatch(array $batch, array $projectFiles, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry): array
+    private function reviewBatch(array $batch, array $codeContexts, array $cacheContexts, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry): array
     {
-        [$systemPrompt, $userMessage] = $this->buildBatchPrompts($batch, $projectFiles);
+        [$systemPrompt, $userMessage] = $this->buildBatchPrompts($batch, $codeContexts);
 
         try {
             $response = $toolRegistry instanceof ToolRegistry
@@ -92,7 +122,7 @@ final readonly class BatchReviewAnalyzer
             /** @var array<int|string, mixed> $rawData */
             $rawData = $response->parseJson();
 
-            return $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder);
+            return $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, $cacheContexts);
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
@@ -111,16 +141,17 @@ final readonly class BatchReviewAnalyzer
     }
 
     /**
-     * @param list<Vulnerability> $batch
-     * @param list<ProjectFile>   $projectFiles
+     * @param list<Vulnerability>   $batch
+     * @param array<string, string> $codeContexts
+     * @param array<string, string> $cacheContexts
      *
      * @return list<Vulnerability>
      */
-    private function reviewBatchViaStructuredCollection(array $batch, array $projectFiles, CoverageRecorderInterface $coverageRecorder): array
+    private function reviewBatchViaStructuredCollection(array $batch, array $codeContexts, array $cacheContexts, CoverageRecorderInterface $coverageRecorder): array
     {
         \assert($this->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface);
 
-        [$systemPrompt, $userMessage] = $this->buildBatchPrompts($batch, $projectFiles);
+        [$systemPrompt, $userMessage] = $this->buildBatchPrompts($batch, $codeContexts);
 
         $reviewCollector = new ReviewCollector();
         $toolRegistry = new ToolRegistry([$this->recordReviewToolFactory->create($reviewCollector)], $this->logger);
@@ -128,7 +159,7 @@ final readonly class BatchReviewAnalyzer
         try {
             $this->llmClient->completeWithTools($systemPrompt, $userMessage, $toolRegistry, $this->maxToolIterations);
 
-            return $this->batchVerdictApplier->applyBatchReview($batch, $reviewCollector->drain(), $coverageRecorder);
+            return $this->batchVerdictApplier->applyBatchReview($batch, $reviewCollector->drain(), $coverageRecorder, $cacheContexts);
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
@@ -139,18 +170,13 @@ final readonly class BatchReviewAnalyzer
     }
 
     /**
-     * @param list<Vulnerability> $batch
-     * @param list<ProjectFile>   $projectFiles
+     * @param list<Vulnerability>   $batch
+     * @param array<string, string> $codeContexts
      *
      * @return array{0: string, 1: string}
      */
-    private function buildBatchPrompts(array $batch, array $projectFiles): array
+    private function buildBatchPrompts(array $batch, array $codeContexts): array
     {
-        $codeContexts = [];
-        foreach ($batch as $vulnerability) {
-            $codeContexts[$vulnerability->id()] = CodeContextResolver::resolve($vulnerability->filePath(), $projectFiles);
-        }
-
         return [
             $this->reviewerPromptBuilder->buildBatchSystemPrompt(),
             $this->reviewerPromptBuilder->buildBatchUserMessage($batch, $codeContexts),

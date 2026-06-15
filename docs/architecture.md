@@ -471,8 +471,9 @@ or concurrent), verdicts for findings with identical content against unchanged
 code are short-circuited by `ReviewerCacheInterface` (`FilesystemReviewerCache`
 by default, `NullReviewerCache` when `cache.enabled: false`), mirroring the
 attacker cache; concurrent reviews serve cached verdicts first and dispatch only
-the misses. Batched reviews always call the LLM. `--no-cache` bypasses both
-caches for the run.
+the misses. Batched reviews (`reviewer_batch_size > 1`) likewise serve cached
+verdicts first and batch only the cache-miss findings to the LLM. `--no-cache`
+bypasses both caches for the run.
 
 Like the attacker, the agent itself is a thin orchestrator — mode resolution and
 the start/complete logging — delegating to `Review\` collaborators it builds at
