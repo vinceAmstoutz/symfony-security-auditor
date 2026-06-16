@@ -96,7 +96,7 @@ src/
 │       │                  SymfonyProcessComposerAuditRunner + Exception/*
 │       ├── Pricing/     # StaticPricingProvider
 │       ├── Progress/    # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY),
-│       │                  LoggerProgressReporter, NullProgressReporter, ProgressReporterHolder, ProgressContext
+│       │                  LoggerProgressReporter, NullProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
 │       ├── Tool/        # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool,
 │       │                  SymfonyToolRegistryFactory, RecordVulnerabilityTool + Factory,
 │       │                  RecordReviewTool + Factory

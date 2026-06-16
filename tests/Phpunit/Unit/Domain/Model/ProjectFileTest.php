@@ -89,11 +89,123 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->{$checkerMethod}());
     }
 
+    public function test_it_detects_controller_in_controller_directory_without_suffix(): void
+    {
+        $projectFile = ProjectFile::create('src/Controller/Homepage.php', '/app/src/Controller/Homepage.php', '<?php');
+
+        self::assertSame('controller', $projectFile->type());
+        self::assertTrue($projectFile->isController());
+    }
+
+    public function test_it_detects_controller_by_route_attribute_outside_controller_directory(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Action/ShowProfile.php',
+            '/app/src/Action/ShowProfile.php',
+            "<?php\nfinal class ShowProfile\n{\n    #[Route('/profile')]\n    public function __invoke() {}\n}",
+        );
+
+        self::assertSame('controller', $projectFile->type());
+        self::assertTrue($projectFile->isController());
+    }
+
+    public function test_it_detects_controller_by_abstract_controller_parent(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Web/Dashboard.php',
+            '/app/src/Web/Dashboard.php',
+            '<?php class Dashboard extends AbstractController {}',
+        );
+
+        self::assertTrue($projectFile->isController());
+    }
+
+    public function test_it_does_not_treat_non_php_in_controller_directory_as_controller(): void
+    {
+        $projectFile = ProjectFile::create('src/Controller/config.yaml', '/app/src/Controller/config.yaml', 'foo: bar');
+
+        self::assertFalse($projectFile->isController());
+    }
+
+    public function test_plain_service_without_route_signals_is_not_a_controller(): void
+    {
+        $projectFile = ProjectFile::create('src/Service/PaymentService.php', '/app/src/Service/PaymentService.php', '<?php class PaymentService { public function charge() {} }');
+
+        self::assertFalse($projectFile->isController());
+        self::assertTrue($projectFile->isService());
+    }
+
     public function test_it_detects_form_files(): void
     {
         $projectFile = ProjectFile::create('src/Form/UserType.php', '/app/src/Form/UserType.php', '<?php');
         self::assertSame('form', $projectFile->type());
         self::assertTrue($projectFile->isForm());
+    }
+
+    public function test_it_detects_voter_by_interface_implementation_without_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/AccessPolicy.php',
+            '/app/src/Security/AccessPolicy.php',
+            '<?php class AccessPolicy implements VoterInterface {}',
+        );
+
+        self::assertSame('voter', $projectFile->type());
+        self::assertTrue($projectFile->isVoter());
+    }
+
+    public function test_it_detects_voter_in_voter_directory_without_suffix(): void
+    {
+        $projectFile = ProjectFile::create('src/Security/Voter/Access.php', '/app/src/Security/Voter/Access.php', '<?php');
+
+        self::assertTrue($projectFile->isVoter());
+    }
+
+    public function test_it_detects_form_type_by_abstract_type_parent_outside_form_directory(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Ui/RegistrationForm.php',
+            '/app/src/Ui/RegistrationForm.php',
+            '<?php class RegistrationForm extends AbstractType {}',
+        );
+
+        self::assertSame('form', $projectFile->type());
+        self::assertTrue($projectFile->isForm());
+    }
+
+    public function test_it_detects_entity_by_orm_attribute_outside_entity_directory(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Model/User.php',
+            '/app/src/Model/User.php',
+            "<?php\n#[ORM\\Entity]\nclass User {}",
+        );
+
+        self::assertSame('entity', $projectFile->type());
+        self::assertTrue($projectFile->isEntity());
+    }
+
+    public function test_it_detects_repository_by_service_entity_repository_parent_without_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Persistence/UserStore.php',
+            '/app/src/Persistence/UserStore.php',
+            '<?php class UserStore extends ServiceEntityRepository {}',
+        );
+
+        self::assertSame('repository', $projectFile->type());
+        self::assertTrue($projectFile->isRepository());
+    }
+
+    public function test_plain_service_is_not_misdetected_as_voter_form_entity_or_repository(): void
+    {
+        $projectFile = ProjectFile::create('src/Service/Mailer.php', '/app/src/Service/Mailer.php', '<?php class Mailer { public function send() {} }');
+
+        self::assertFalse($projectFile->isVoter());
+        self::assertFalse($projectFile->isForm());
+        self::assertFalse($projectFile->isEntity());
+        self::assertFalse($projectFile->isRepository());
+        self::assertTrue($projectFile->isService());
     }
 
     public function test_it_detects_template_files(): void

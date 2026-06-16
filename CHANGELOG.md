@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   happens: each vulnerability the attacker flags streams out the instant it is
   recorded (e.g.
   `⚔ 🟠 HIGH sql_injection — src/Controller/UserController.php:42`), the audit
-  opens with an attack-surface overview
+  opens with an attack-surface overview that lists only non-empty categories
   (`🔍 Auditing 152 file(s) — 24 controller(s), 5 voter(s), 8 form(s)`), and
   each iteration closes with a reviewer tally
   (`✓ Reviewed: 5 validated, 1 rejected`). Three new wire-format progress events
@@ -67,6 +67,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   human-readable console output is not part of the BC promise (see
   `docs/versioning.md`); the JSON, SARIF, HTML, and Markdown reports are
   unchanged.
+
+### Fixed
+
+- **Symfony component detection now recognizes controllers, voters, forms,
+  entities, and repositories by directory and content — not just by filename
+  suffix.** `ProjectFile` (`src/Audit/Domain/Model/ProjectFile.php`) classified
+  a controller only when its path ended in `Controller.php`, so a project of
+  invokable/action-style controllers under `src/Controller/` (e.g.
+  `src/Controller/Homepage.php`) reported a single controller in the audit
+  overview — and, worse, only that one received controller-aware analysis:
+  `MappingStage` parses route/access-control and form bindings exclusively from
+  recognized controllers, and the feature chunker groups context around them.
+  Detection now also matches the canonical directories (`/Controller/`,
+  `/Voter/`, `/Repository/`, `/Entity/`, `/Entities/`, and `/Form/` with a
+  `Type.php` suffix) and telltale content (`extends AbstractController` or
+  `#[Route]`; `implements VoterInterface` or `extends Voter`;
+  `extends AbstractType`; `#[ORM\Entity]`; `extends ServiceEntityRepository` or
+  `EntityRepository`) — for both the `is*()` predicates and the
+  `ProjectFileType` classification, so the mapping counts, feature chunking, and
+  route/form analysis all see the full set. Plain `.php` services without these
+  signals stay classified as services.
 
 ## [1.11.0] — 2026-06-15 — Tracer
 

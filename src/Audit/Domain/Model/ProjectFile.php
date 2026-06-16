@@ -38,7 +38,7 @@ final readonly class ProjectFile
             relativePath: $relativePath,
             absolutePath: $absolutePath,
             content: $content,
-            projectFileType: self::detectType($relativePath),
+            projectFileType: self::detectType($relativePath, $content),
             linesCount: substr_count($content, "\n") + 1,
         );
     }
@@ -80,29 +80,47 @@ final readonly class ProjectFile
 
     public function isController(): bool
     {
-        return str_ends_with($this->relativePath, 'Controller.php');
+        if (self::isControllerPath($this->relativePath)) {
+            return true;
+        }
+
+        return self::looksLikeController($this->relativePath, $this->content);
     }
 
     public function isEntity(): bool
     {
-        return str_contains($this->relativePath, '/Entity/')
-            || str_contains($this->relativePath, '/Entities/');
+        if (self::isEntityPath($this->relativePath)) {
+            return true;
+        }
+
+        return self::looksLikeEntity($this->relativePath, $this->content);
     }
 
     public function isVoter(): bool
     {
-        return str_ends_with($this->relativePath, 'Voter.php');
+        if (self::isVoterPath($this->relativePath)) {
+            return true;
+        }
+
+        return self::looksLikeVoter($this->relativePath, $this->content);
     }
 
     public function isRepository(): bool
     {
-        return str_ends_with($this->relativePath, 'Repository.php');
+        if (self::isRepositoryPath($this->relativePath)) {
+            return true;
+        }
+
+        return self::looksLikeRepository($this->relativePath, $this->content);
     }
 
     public function isForm(): bool
     {
-        return str_contains($this->relativePath, '/Form/')
-            && str_ends_with($this->relativePath, 'Type.php');
+        if (self::isFormPath($this->relativePath)) {
+            return true;
+        }
+
+        return self::looksLikeForm($this->relativePath, $this->content);
     }
 
     public function isMessengerHandler(): bool
@@ -210,14 +228,78 @@ final readonly class ProjectFile
         ];
     }
 
-    private static function detectType(string $path): ProjectFileType
+    private static function isControllerPath(string $path): bool
+    {
+        return str_ends_with($path, 'Controller.php')
+            || (str_contains($path, '/Controller/') && str_ends_with($path, '.php'));
+    }
+
+    private static function looksLikeController(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && (str_contains($content, 'extends AbstractController')
+                || str_contains($content, '#[Route'));
+    }
+
+    private static function isEntityPath(string $path): bool
+    {
+        return str_contains($path, '/Entity/')
+            || str_contains($path, '/Entities/');
+    }
+
+    private static function looksLikeEntity(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && (str_contains($content, '#[ORM\\Entity')
+                || str_contains($content, '@ORM\\Entity'));
+    }
+
+    private static function isVoterPath(string $path): bool
+    {
+        return str_ends_with($path, 'Voter.php')
+            || (str_contains($path, '/Voter/') && str_ends_with($path, '.php'));
+    }
+
+    private static function looksLikeVoter(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && (str_contains($content, 'implements VoterInterface')
+                || str_contains($content, 'extends Voter'));
+    }
+
+    private static function isRepositoryPath(string $path): bool
+    {
+        return str_ends_with($path, 'Repository.php')
+            || (str_contains($path, '/Repository/') && str_ends_with($path, '.php'));
+    }
+
+    private static function looksLikeRepository(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && (str_contains($content, 'extends ServiceEntityRepository')
+                || str_contains($content, 'extends EntityRepository'));
+    }
+
+    private static function isFormPath(string $path): bool
+    {
+        return str_contains($path, '/Form/')
+            && str_ends_with($path, 'Type.php');
+    }
+
+    private static function looksLikeForm(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && str_contains($content, 'extends AbstractType');
+    }
+
+    private static function detectType(string $path, string $content): ProjectFileType
     {
         return match (true) {
-            str_ends_with($path, 'Controller.php') => ProjectFileType::CONTROLLER,
-            str_contains($path, '/Entity/') => ProjectFileType::ENTITY,
-            str_ends_with($path, 'Voter.php') => ProjectFileType::VOTER,
-            str_ends_with($path, 'Repository.php') => ProjectFileType::REPOSITORY,
-            str_contains($path, '/Form/') => ProjectFileType::FORM,
+            self::isControllerPath($path), self::looksLikeController($path, $content) => ProjectFileType::CONTROLLER,
+            self::isEntityPath($path), self::looksLikeEntity($path, $content) => ProjectFileType::ENTITY,
+            self::isVoterPath($path), self::looksLikeVoter($path, $content) => ProjectFileType::VOTER,
+            self::isRepositoryPath($path), self::looksLikeRepository($path, $content) => ProjectFileType::REPOSITORY,
+            self::isFormPath($path), self::looksLikeForm($path, $content) => ProjectFileType::FORM,
             str_ends_with($path, 'Authenticator.php') => ProjectFileType::AUTHENTICATOR,
             str_ends_with($path, 'MessageHandler.php') || str_contains($path, '/MessageHandler/') => ProjectFileType::MESSENGER_HANDLER,
             str_ends_with($path, 'WebhookConsumer.php') || str_ends_with($path, 'WebhookParser.php') || str_contains($path, '/Webhook/') => ProjectFileType::WEBHOOK_CONSUMER,

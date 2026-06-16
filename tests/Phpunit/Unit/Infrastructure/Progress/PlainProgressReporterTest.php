@@ -33,14 +33,11 @@ final class PlainProgressReporterTest extends TestCase
         );
     }
 
-    public function test_it_defaults_missing_numeric_context_to_zero(): void
+    public function test_it_omits_zero_count_categories_from_the_overview(): void
     {
-        $this->plainProgressReporter->report('audit.started', []);
+        $this->plainProgressReporter->report('audit.started', ['files' => 21, 'controllers' => 15, 'voters' => 0, 'forms' => 0]);
 
-        self::assertSame(
-            "Auditing 0 file(s) — 0 controller(s), 0 voter(s), 0 form(s)\n",
-            $this->bufferedOutput->fetch(),
-        );
+        self::assertSame("Auditing 21 file(s) — 15 controller(s)\n", $this->bufferedOutput->fetch());
     }
 
     public function test_it_prints_an_iteration_header(): void

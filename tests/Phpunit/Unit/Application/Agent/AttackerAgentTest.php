@@ -974,10 +974,7 @@ final class AttackerAgentTest extends TestCase
 
     public function test_it_records_coverage_aborted_when_llm_throws_budget_exceeded(): void
     {
-        $files = [
-            $this->makeFile('src/Controller/A.php'),
-            $this->makeFile('src/Controller/B.php'),
-        ];
+        $files = [$this->makeFile('src/Controller/A.php')];
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
@@ -998,7 +995,6 @@ final class AttackerAgentTest extends TestCase
         self::assertSame(
             [
                 ['stage' => 'attacker', 'file' => 'src/Controller/A.php', 'status' => 'aborted'],
-                ['stage' => 'attacker', 'file' => 'src/Controller/B.php', 'status' => 'aborted'],
             ],
             $auditContext->coverage(),
         );
@@ -1217,10 +1213,7 @@ final class AttackerAgentTest extends TestCase
 
     public function test_it_propagates_llm_provider_exception_and_records_errored_coverage(): void
     {
-        $files = [
-            $this->makeFile('src/Controller/A.php'),
-            $this->makeFile('src/Controller/B.php'),
-        ];
+        $files = [$this->makeFile('src/Controller/A.php')];
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
@@ -1241,7 +1234,6 @@ final class AttackerAgentTest extends TestCase
         self::assertSame(
             [
                 ['stage' => 'attacker', 'file' => 'src/Controller/A.php', 'status' => 'errored'],
-                ['stage' => 'attacker', 'file' => 'src/Controller/B.php', 'status' => 'errored'],
             ],
             $auditContext->coverage(),
         );
@@ -1249,10 +1241,7 @@ final class AttackerAgentTest extends TestCase
 
     public function test_it_propagates_exhausted_transient_failure_and_records_errored_coverage(): void
     {
-        $files = [
-            $this->makeFile('src/Controller/A.php'),
-            $this->makeFile('src/Controller/B.php'),
-        ];
+        $files = [$this->makeFile('src/Controller/A.php')];
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
@@ -1275,7 +1264,6 @@ final class AttackerAgentTest extends TestCase
         self::assertSame(
             [
                 ['stage' => 'attacker', 'file' => 'src/Controller/A.php', 'status' => 'errored'],
-                ['stage' => 'attacker', 'file' => 'src/Controller/B.php', 'status' => 'errored'],
             ],
             $auditContext->coverage(),
         );

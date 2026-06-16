@@ -37,7 +37,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     public function report(string $event, array $context = []): void
     {
         match (ProgressEvent::tryFrom($event)) {
-            ProgressEvent::AuditStarted => $this->output->writeln($this->auditOverviewLine($context)),
+            ProgressEvent::AuditStarted => $this->output->writeln(AuditOverviewLine::from($context)),
             ProgressEvent::AuditIterationStarted => $this->output->writeln($this->iterationLine($context)),
             ProgressEvent::AttackerChunkStarted => $this->output->writeln($this->chunkLine($context)),
             ProgressEvent::AttackerFindingRecorded => $this->output->writeln($this->findingLine($context)),
@@ -45,18 +45,6 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
             ProgressEvent::ReviewCompleted => $this->output->writeln($this->reviewSummaryLine($context)),
             default => null,
         };
-    }
-
-    /** @param array<string, mixed> $context */
-    private function auditOverviewLine(array $context): string
-    {
-        return \sprintf(
-            'Auditing %d file(s) — %d controller(s), %d voter(s), %d form(s)',
-            ProgressContext::int($context, 'files'),
-            ProgressContext::int($context, 'controllers'),
-            ProgressContext::int($context, 'voters'),
-            ProgressContext::int($context, 'forms'),
-        );
     }
 
     /** @param array<string, mixed> $context */

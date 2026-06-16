@@ -80,7 +80,7 @@ src/
       Cache/         # FilesystemAttackerCache, NullAttackerCache, FilesystemReviewerCache, NullReviewerCache
       Advisory/      # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase (fallback), SymfonyProcessComposerAuditRunner
       Pricing/       # StaticPricingProvider
-      Progress/      # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY), LoggerProgressReporter, NullProgressReporter, ProgressReporterHolder, ProgressContext
+      Progress/      # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY), LoggerProgressReporter, NullProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
       Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory, RecordReviewTool, RecordReviewToolFactory
       Report/        # ReportRenderer (console/json/sarif/html; + Template/*.txt + *.html stubs)
   Command/           # AuditCommand (Symfony Console: audit:run) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, OutputFormat enum (console|json|sarif|html), Baseline (accepted-finding suppression)
