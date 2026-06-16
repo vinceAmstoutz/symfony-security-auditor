@@ -255,43 +255,20 @@ third-party packages.
 
 ### Console mode (truncated)
 
-While the pipeline runs, the audit **narrates itself live**: an attack-surface
-overview, each finding streamed the moment the Attacker flags it, per-chunk
-timing, and a reviewer tally. In a real terminal you get an animated progress
-bar (with an elapsed timer) and the findings feed is **color-coded by severity**
-(🔴 critical, 🟠 high, 🟡 medium, 🟢 low, 🔵 info); while a model call is in
-flight the line reads `⏳ querying model …`, so slow or local models never look
-hung. Progress is suppressed for `--format=json/sarif` to stdout and for
+While the pipeline runs, the audit narrates itself live — an attack-surface
+overview, each finding streamed (color-coded by severity in a terminal) the
+moment the Attacker flags it, per-chunk timing, and a reviewer tally. In CI or
+any non-TTY output it degrades to clean, append-only lines (no bar, no ANSI
+codes). Progress is suppressed for `--format=json/sarif` to stdout and for
 `--dry-run`.
 
 ```text
- Running audit pipeline...
- ─────────────────────────
-
 🔍 Auditing 152 file(s) — 24 controller(s), 5 voter(s), 8 form(s)
   ⚔ 🔴 CRITICAL sql_injection — src/Controller/UserController.php:42
   ⚔ 🟠 HIGH broken_access_control — src/Controller/AdminController.php:88
   ✓ chunk 1/12 analyzed (47s)
-  ⚔ 🟡 MEDIUM open_redirect — src/Controller/RedirectController.php:18
-  ✓ chunk 2/12 analyzed (39s)
   ✓ Reviewed: 2 validated, 1 rejected
- 2/3 [===============>          ]  67% 1 min — audit · iteration 1/3 · ⏳ querying model · chunk 3/12
-```
-
-In CI (or any non-TTY output) the same narrative degrades to clean, append-only
-lines — no progress bar, no carriage returns, no ANSI codes — so logs stay
-greppable and the job never looks stalled:
-
-```text
-Auditing 152 file(s) — 24 controller(s), 5 voter(s), 8 form(s)
-Iteration 1/3
-  Analyzing chunk 1/12
-  [CRITICAL] sql_injection — src/Controller/UserController.php:42
-  ✓ chunk 1/12 done (47s)
-  Analyzing chunk 2/12
-  ✓ chunk 2/12 done (39s)
-Reviewing 3 finding(s)…
-  2 validated, 1 rejected
+ 2/3 [===============>          ]  67% — audit · iteration 1/3 · ⏳ querying model
 ```
 
 Full output after the pipeline completes:
