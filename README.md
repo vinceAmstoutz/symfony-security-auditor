@@ -16,22 +16,6 @@
 
 ---
 
-## Table of Contents
-
-- [What it does](#what-it-does)
-- [Getting Started](#getting-started)
-- [Features](#features)
-- [Why this auditor?](#why-this-auditor)
-- [Example Output](#example-output)
-- [Supported Platforms](#supported-platforms)
-- [Documentation](#documentation)
-- [FAQ](#faq)
-- [Contributing](#contributing)
-- [Security](#security)
-- [License](#license)
-
----
-
 ## What it does
 
 Feeds your Symfony project through a three-stage AI pipeline that catches what
