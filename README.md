@@ -64,31 +64,35 @@ automatically:
   a default model and commented split-model and rate-limit examples ready to
   uncomment.
 
-Not using Flex? See [Manual setup](#manual-setup-without-flex).
+Not using Flex? See
+[Manual setup](docs/configuration.md#manual-setup-without-flex).
 
-### 2. Install a platform bridge (Anthropic shown)
+### 2. Install a platform bridge
 
 ```bash
+# Anthropic shown
 composer require symfony/ai-anthropic-platform
 ```
 
 Full list of supported providers:
 [Configuration → Supported platforms](docs/configuration.md#supported-platforms).
 
-### 3. Configure the platform (`config/packages/ai.yaml`)
+### 3. Configure the platform
 
 ```yaml
+# config/packages/ai.yaml
 ai:
   platform:
     anthropic:
       api_key: '%env(ANTHROPIC_API_KEY)%'
 ```
 
-### 4. Adjust the auditor config (`config/packages/symfony_security_auditor.yaml`)
+### 4. Adjust the auditor config
 
 The Flex recipe already created this file — pick your model:
 
 ```yaml
+# config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
     model: 'claude-opus-4-8'
 ```
@@ -97,6 +101,7 @@ Optionally pick a one-knob preset — `fast`, `balanced` (default), or `thorough
 any explicitly configured key always wins:
 
 ```yaml
+# config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
     profile: 'fast'
 ```
@@ -129,25 +134,6 @@ bin/console audit:run --dry-run
 > exposes your attack surface. Prefer GitHub Code Scanning (SARIF, restricted to
 > collaborators), private storage (S3/GCS with IAM), or notification-only. See
 > [Report Visibility on Public Repositories](docs/ci.md#report-visibility-on-public-repositories).
-
-### Manual setup (without Flex)
-
-Without Symfony Flex (or with `composer require --no-scripts`), do by hand what
-the recipe automates:
-
-1. Register the bundles in `config/bundles.php`:
-
-   ```php
-   return [
-       // ...
-       Symfony\AI\AiBundle\AiBundle::class => ['all' => true],
-       VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['dev' => true, 'test' => true],
-   ];
-   ```
-
-2. Create `config/packages/symfony_security_auditor.yaml` yourself (step 4
-   above), or copy the
-   [recipe's template](https://github.com/symfony/recipes-contrib/blob/main/vinceamstoutz/symfony-security-auditor/1.0/config/packages/symfony_security_auditor.yaml).
 
 ---
 

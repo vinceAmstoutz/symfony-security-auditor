@@ -7,6 +7,7 @@ bundle registration, bundle-level configuration, platform wiring via
 ## Table of Contents
 
 - [Bundle Registration](#bundle-registration)
+- [Manual Setup (without Flex)](#manual-setup-without-flex)
 - [Bundle Configuration](#bundle-configuration)
   - [Top-level](#top-level)
   - [`scan.*` — file discovery](#scan--file-discovery)
@@ -40,6 +41,19 @@ return [
     VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['dev' => true, 'test' => true],
 ];
 ```
+
+---
+
+## Manual Setup (without Flex)
+
+Without Symfony Flex (or with `composer require --no-scripts`), do by hand what
+the recipe automates:
+
+1. Register both bundles in `config/bundles.php` — see
+   [Bundle Registration](#bundle-registration).
+2. Create `config/packages/symfony_security_auditor.yaml` — see
+   [Bundle Configuration](#bundle-configuration) — or copy the
+   [recipe's template](https://github.com/symfony/recipes-contrib/blob/main/vinceamstoutz/symfony-security-auditor/1.0/config/packages/symfony_security_auditor.yaml).
 
 ---
 
