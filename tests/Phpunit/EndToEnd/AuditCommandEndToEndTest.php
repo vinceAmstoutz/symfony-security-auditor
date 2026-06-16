@@ -696,7 +696,7 @@ final class AuditCommandEndToEndTest extends TestCase
             '--dry-run' => true,
         ]);
 
-        self::assertStringContainsString('No pricing data', $commandTester->getDisplay());
+        self::assertStringContainsString('No published pricing', $commandTester->getDisplay());
     }
 
     public function test_dry_run_model_warning_is_emitted_on_stderr_for_machine_readable_output(): void
@@ -713,8 +713,8 @@ final class AuditCommandEndToEndTest extends TestCase
             ['capture_stderr_separately' => true],
         );
 
-        self::assertStringContainsString('No pricing data', $commandTester->getErrorOutput());
-        self::assertStringNotContainsString('No pricing data', $commandTester->getDisplay());
+        self::assertStringContainsString('No published pricing', $commandTester->getErrorOutput());
+        self::assertStringNotContainsString('No published pricing', $commandTester->getDisplay());
     }
 
     public function test_command_renders_progress_bar_in_console_format(): void

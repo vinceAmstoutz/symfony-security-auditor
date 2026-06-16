@@ -10,6 +10,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Changed
+
+- **The `--dry-run` "no pricing data" warning no longer reads like an error for
+  local models.** When a configured model is absent from the bundled
+  `StaticPricingProvider` price table,
+  `AuditPresenter::unsupportedModelWarnings()`
+  (`src/Command/AuditPresenter.php`) prints a stderr notice and the estimate
+  shows `$0.00`. The previous copy — _"No pricing data for the configured
+  model(s): … and may be inaccurate. Check the model name(s) …"_ — framed the
+  legitimate local/self-hosted case (Ollama, LM Studio), where `$0.00` is the
+  correct estimate, as a likely misconfiguration. The notice now states that
+  `$0.00` is correct for a local or self-hosted model and can be ignored, and
+  only flags a typo or an unlisted model as the problem case. Unchanged: the
+  notice stays stderr-only (so `--format=json` / `--format=sarif` stdout is
+  untouched) and token counts remain accurate.
+
 ## [1.11.0] — 2026-06-15 — Tracer
 
 A gating, suppression, reporting, and detection release. Audits can now fail CI
