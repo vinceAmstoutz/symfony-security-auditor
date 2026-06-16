@@ -551,7 +551,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $platform = new class implements PlatformInterface {
             private int $invocations = 0;
 
-            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 ++$this->invocations;
                 $converter = 1 === $this->invocations
@@ -886,7 +886,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $platform = new class implements PlatformInterface {
             private int $calls = 0;
 
-            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 if ($this->calls >= 2) {
                     throw new RuntimeException('batch-fallback platform invoked more than twice — invokeWithRetry never returned (a mutation removed a loop-exit branch).');
@@ -918,7 +918,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $platform = new class($platformInvocationLog) implements PlatformInterface {
             public function __construct(private readonly PlatformInvocationLog $platformInvocationLog) {}
 
-            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 ++$this->platformInvocationLog->invocations;
                 $deferredResult = new DeferredResult(
@@ -1544,7 +1544,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 private array $tokenUsages,
             ) {}
 
-            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 $result = array_shift($this->results);
                 if (!$result instanceof ResultInterface) {
@@ -2132,7 +2132,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 $this->remaining = $scriptedResultsOrErrors;
             }
 
-            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 $next = array_shift($this->remaining);
                 if (null === $next) {
@@ -2165,7 +2165,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 private readonly ?PlatformInvocationLog $platformInvocationLog,
             ) {}
 
-            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 if ($this->platformInvocationLog instanceof PlatformInvocationLog) {
                     ++$this->platformInvocationLog->invocations;
@@ -2200,7 +2200,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 $this->remaining = $scriptedResultsOrErrors;
             }
 
-            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 $next = array_shift($this->remaining);
                 if ($next instanceof RuntimeException) {
@@ -2246,7 +2246,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 $this->remaining = $scriptedResults;
             }
 
-            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 if ($this->platformInvocationLog instanceof PlatformInvocationLog) {
                     ++$this->platformInvocationLog->invocations;
@@ -2286,7 +2286,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 private readonly InvocationOptionsCapture $invocationOptionsCapture,
             ) {}
 
-            public function invoke(string $model, array|string|object $input, array $options = []): DeferredResult
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 if (++$this->invocations > 1) {
                     throw new RuntimeException('scriptedPlatformCapturingOptions invoked more than once — invokeWithRetry never returned (a mutation removed a loop-exit branch).');
