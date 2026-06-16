@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.12.0] — 2026-06-16 — Spotlight
+
+An observability release. The long audit stage is no longer a black box:
+`audit:run` now streams each finding the instant the attacker records it, opens
+with an attack-surface overview, closes every iteration with a reviewer tally,
+and prints per-chunk timing — so slow local-model runs read as working, not
+frozen. A new CI-safe `PlainProgressReporter` renders the same narrative as
+clean, append-only lines for non-TTY output, and a decorated terminal gets a
+severity-colored findings feed above the bar. Reports now link back to the
+project across the HTML, Markdown, and console formats; the `--dry-run` "no
+pricing data" notice no longer reads like an error for local/self-hosted models;
+Symfony component detection recognizes controllers, voters, forms, entities, and
+repositories by directory and content, not just filename suffix; and the
+`symfony/ai-bundle` requirement moves to `^0.10`.
+
 ### Added
 
 - **Live findings feed and a CI-safe progress renderer for `audit:run`.** Early
@@ -103,6 +118,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   now resolves `.` and relative paths to an absolute directory (via
   `Path::makeAbsolute`, trimming surrounding whitespace). The long-run heads-up
   is now a dim one-line message instead of a boxed `[NOTE]` block.
+- **Minimum `symfony/ai-bundle` requirement raised from `^0.9` to `^0.10`.**
+  `composer.json` now requires `symfony/ai-bundle: ^0.10`. `symfony/ai-platform`
+  0.10 widened `PlatformInterface::invoke()`'s first parameter from
+  `string $model` to `Model|string $model`; the bundle's production code is
+  unaffected (it calls `invoke()` with a string, still valid under the widened
+  signature), so existing runs behave identically. Consumers pinning
+  `symfony/ai-bundle: ^0.9` must allow `^0.10` to upgrade.
 
 ### Fixed
 
@@ -1743,6 +1765,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.12.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.12.0
 [1.11.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.11.0
 [1.10.1]:

@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/1.11.0/resources/schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/1.12.0/resources/schema.json
 symfony_security_auditor:
     attacker_model: 'claude-opus-4-8'
     reviewer_model: 'claude-haiku-4-5-20251001'
