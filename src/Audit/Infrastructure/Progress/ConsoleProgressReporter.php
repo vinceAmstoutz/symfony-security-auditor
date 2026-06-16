@@ -24,10 +24,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
  *
  * The pipeline events drive the bar itself: pipeline.started creates a bar
  * sized to the stage count, stage.started/audit.iteration.started/
- * attacker.chunk.started/review.started refresh its message, stage.completed
- * advances it, and pipeline.completed finishes it. The audit narrative is
- * printed as lines above the bar: audit.started (attack-surface overview),
- * attacker.finding.recorded (each finding as it is flagged), and
+ * attacker.chunk.started/review.started refresh its message (the chunk message
+ * reads "⏳ querying model …" so a slow model call reads as waiting, not hung),
+ * stage.completed advances it, and pipeline.completed finishes it. The audit
+ * narrative is printed as lines above the bar: audit.started (attack-surface
+ * overview), attacker.finding.recorded (each finding as it is flagged),
+ * attacker.chunk.completed (each chunk with its elapsed time), and
  * review.completed (the reviewer tally). Unhandled events are ignored. The
  * non-decorated counterpart is PlainProgressReporter.
  *
@@ -59,6 +61,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
             ProgressEvent::AuditStarted => $this->onAuditStarted($context),
             ProgressEvent::AuditIterationStarted => $this->onAuditIterationStarted($context),
             ProgressEvent::AttackerChunkStarted => $this->onAttackerChunkStarted($context),
+            ProgressEvent::AttackerChunkCompleted => $this->onAttackerChunkCompleted($context),
             ProgressEvent::AttackerFindingRecorded => $this->onAttackerFindingRecorded($context),
             ProgressEvent::ReviewStarted => $this->onReviewStarted($context),
             ProgressEvent::ReviewCompleted => $this->onReviewCompleted($context),
@@ -150,7 +153,25 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
             return;
         }
 
-        $this->updateMessage(\sprintf('attacker chunk %d/%d', $chunk, $totalChunks));
+        $this->updateMessage(\sprintf('⏳ querying model · chunk %d/%d', $chunk, $totalChunks));
+    }
+
+    /** @param array<string, mixed> $context */
+    private function onAttackerChunkCompleted(array $context): void
+    {
+        $chunk = $context['chunk'] ?? null;
+        $totalChunks = $context['total_chunks'] ?? null;
+
+        if (!\is_int($chunk) || !\is_int($totalChunks)) {
+            return;
+        }
+
+        $this->writeAboveBar(\sprintf(
+            '  ✓ chunk %d/%d analyzed%s',
+            $chunk,
+            $totalChunks,
+            ProgressContext::durationSuffix($context, 'elapsed_seconds'),
+        ));
     }
 
     /** @param array<string, mixed> $context */

@@ -40,6 +40,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
             ProgressEvent::AuditStarted => $this->output->writeln(AuditOverviewLine::from($context)),
             ProgressEvent::AuditIterationStarted => $this->output->writeln($this->iterationLine($context)),
             ProgressEvent::AttackerChunkStarted => $this->output->writeln($this->chunkLine($context)),
+            ProgressEvent::AttackerChunkCompleted => $this->output->writeln($this->chunkDoneLine($context)),
             ProgressEvent::AttackerFindingRecorded => $this->output->writeln($this->findingLine($context)),
             ProgressEvent::ReviewStarted => $this->output->writeln($this->reviewStartLine($context)),
             ProgressEvent::ReviewCompleted => $this->output->writeln($this->reviewSummaryLine($context)),
@@ -57,6 +58,17 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     private function chunkLine(array $context): string
     {
         return \sprintf('  Analyzing chunk %d/%d', ProgressContext::int($context, 'chunk'), ProgressContext::int($context, 'total_chunks'));
+    }
+
+    /** @param array<string, mixed> $context */
+    private function chunkDoneLine(array $context): string
+    {
+        return \sprintf(
+            '  ✓ chunk %d/%d done%s',
+            ProgressContext::int($context, 'chunk'),
+            ProgressContext::int($context, 'total_chunks'),
+            ProgressContext::durationSuffix($context, 'elapsed_seconds'),
+        );
     }
 
     /** @param array<string, mixed> $context */

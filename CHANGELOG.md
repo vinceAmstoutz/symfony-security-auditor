@@ -41,6 +41,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`--format=json|sarif` without `--output`) stays silent as before. Progress
   reporting adds no measurable runtime cost — events are O(findings)/O(chunks)
   and rendering is local I/O, dwarfed by the LLM calls.
+- **Slow and local-model runs no longer look frozen mid-chunk.** A synchronous
+  LLM call blocks for its whole duration — minutes at a time on a local model —
+  with no chance to repaint, so the line appeared hung. The bar message now
+  reads `⏳ querying model · chunk 2/5` while a call is in flight (so the pause
+  reads as waiting, not a crash), and each chunk prints a completion line with
+  its wall time as it returns (`✓ chunk 2/5 analyzed (47s)`), making progress
+  and per-chunk timing visible between calls. Backed by a new
+  `attacker.chunk.completed` wire event (chunk index, total, elapsed seconds)
+  emitted by the sequential and concurrent chunk analyzers and rendered by both
+  `ConsoleProgressReporter` and `PlainProgressReporter`. (A true mid-call
+  animation would require streaming the model response — a larger change to the
+  LLM seam — because the global audit total, iterations × chunks, is not known
+  ahead of time.)
 
 ### Changed
 

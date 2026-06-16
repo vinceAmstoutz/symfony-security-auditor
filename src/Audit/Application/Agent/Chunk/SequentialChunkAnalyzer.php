@@ -72,8 +72,14 @@ final readonly class SequentialChunkAnalyzer
                 'total_chunks' => \count($chunks),
             ]);
 
+            $start = microtime(true);
             $chunkResult = $this->analyzeChunk($chunk, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
             ChunkFindingProgress::report($this->progressReporter, $chunkResult->vulnerabilities());
+            $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, [
+                'chunk' => $index + 1,
+                'total_chunks' => \count($chunks),
+                'elapsed_seconds' => microtime(true) - $start,
+            ]);
             $allVulnerabilities = [...$allVulnerabilities, ...$chunkResult->vulnerabilities()];
 
             foreach ($chunkResult->dropsByReason() as $reason => $count) {

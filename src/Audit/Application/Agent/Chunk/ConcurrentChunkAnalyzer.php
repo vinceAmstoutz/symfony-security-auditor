@@ -103,6 +103,11 @@ final readonly class ConcurrentChunkAnalyzer
         foreach (array_keys($chunks) as $index) {
             $chunkResult = $cachedResults[$index] ?? $this->finalize($pending[$index], $coverageRecorder);
             ChunkFindingProgress::report($this->progressReporter, $chunkResult->vulnerabilities());
+            $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, [
+                'chunk' => $index + 1,
+                'total_chunks' => $totalChunks,
+                'elapsed_seconds' => 0.0,
+            ]);
             $allVulnerabilities = [...$allVulnerabilities, ...$chunkResult->vulnerabilities()];
             foreach ($chunkResult->dropsByReason() as $reason => $count) {
                 $totalDropsByReason[$reason] = ($totalDropsByReason[$reason] ?? 0) + $count;

@@ -37,4 +37,20 @@ final readonly class ProgressContext
 
         return \is_string($value) ? $value : '';
     }
+
+    /**
+     * Renders an elapsed duration as a trailing " (Ns)" suffix in whole seconds,
+     * or an empty string when the value is missing, not a float, or rounds below
+     * one second (e.g. cache hits and concurrently-dispatched chunks, which have
+     * no meaningful per-chunk wall time).
+     *
+     * @param array<string, mixed> $context
+     */
+    public static function durationSuffix(array $context, string $key): string
+    {
+        $value = $context[$key] ?? null;
+        $seconds = \is_float($value) ? (int) round($value) : 0;
+
+        return $seconds >= 1 ? \sprintf(' (%ds)', $seconds) : '';
+    }
 }

@@ -145,7 +145,27 @@ final class ConsoleProgressReporterTest extends TestCase
         $this->consoleProgressReporter->report('audit.iteration.started', ['iteration' => 2, 'max_iterations' => 3]);
         $this->consoleProgressReporter->report('attacker.chunk.started', ['chunk' => 4, 'total_chunks' => 12]);
 
-        self::assertStringContainsString('audit · iteration 2/3 · attacker chunk 4/12', $this->bufferedOutput->fetch());
+        self::assertStringContainsString('audit · iteration 2/3 · ⏳ querying model · chunk 4/12', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_prints_chunk_completion_with_its_duration(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.chunk.completed', ['chunk' => 1, 'total_chunks' => 3, 'elapsed_seconds' => 47.0]);
+
+        self::assertStringContainsString('✓ chunk 1/3 analyzed (47s)', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_omits_the_duration_for_a_sub_second_chunk_completion(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.chunk.completed', ['chunk' => 1, 'total_chunks' => 3, 'elapsed_seconds' => 0.0]);
+
+        $rendered = $this->bufferedOutput->fetch();
+        self::assertStringContainsString('✓ chunk 1/3 analyzed', $rendered);
+        self::assertStringNotContainsString('(0s)', $rendered);
     }
 
     public function test_review_event_shows_finding_count_in_bar_message(): void
@@ -180,7 +200,7 @@ final class ConsoleProgressReporterTest extends TestCase
         $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
         $this->consoleProgressReporter->report('attacker.chunk.started', ['chunk' => 1, 'total_chunks' => 2]);
 
-        self::assertStringContainsString('audit · attacker chunk 1/2', $this->bufferedOutput->fetch());
+        self::assertStringContainsString('audit · ⏳ querying model · chunk 1/2', $this->bufferedOutput->fetch());
     }
 
     public function test_detail_events_with_malformed_context_keep_previous_message(): void
@@ -192,6 +212,7 @@ final class ConsoleProgressReporterTest extends TestCase
 
         $this->consoleProgressReporter->report('audit.iteration.started', ['iteration' => 'one']);
         $this->consoleProgressReporter->report('attacker.chunk.started', ['chunk' => 1]);
+        $this->consoleProgressReporter->report('attacker.chunk.completed', ['chunk' => 1]);
         $this->consoleProgressReporter->report('review.started', []);
 
         self::assertSame('', $this->bufferedOutput->fetch());

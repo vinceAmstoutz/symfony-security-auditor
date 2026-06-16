@@ -1944,6 +1944,44 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    public function test_it_reports_each_chunk_completion_with_a_bounded_elapsed_time(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/A.php'),
+            $this->makeFile('src/Controller/B.php'),
+        ];
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'claude', 'end_turn'));
+
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $attackerAgent = new AttackerAgent(
+            llmClient: $llmClient,
+            attackerPromptBuilder: new AttackerPromptBuilder(),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+            attackerCache: new NullAttackerCache(),
+            logger: new NullLogger(),
+            fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+            useStructuredCollection: false,
+            progressReporter: $recordingProgressReporter,
+        );
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+
+        $completed = array_values(array_filter(
+            $recordingProgressReporter->events,
+            static fn (array $event): bool => 'attacker.chunk.completed' === $event[0],
+        ));
+
+        self::assertSame(
+            [[1, 2], [2, 2]],
+            array_map(static fn (array $event): array => [$event[1]['chunk'], $event[1]['total_chunks']], $completed),
+        );
+        self::assertIsFloat($completed[0][1]['elapsed_seconds']);
+        self::assertGreaterThanOrEqual(0.0, $completed[0][1]['elapsed_seconds']);
+        self::assertLessThan(60.0, $completed[0][1]['elapsed_seconds']);
+    }
+
     private function makeStructuredCollectionAttackerAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null): AttackerAgent
     {
         return new AttackerAgent(

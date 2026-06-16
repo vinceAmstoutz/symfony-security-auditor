@@ -54,6 +54,20 @@ final class PlainProgressReporterTest extends TestCase
         self::assertSame("  Analyzing chunk 2/5\n", $this->bufferedOutput->fetch());
     }
 
+    public function test_it_prints_a_chunk_completion_with_duration(): void
+    {
+        $this->plainProgressReporter->report('attacker.chunk.completed', ['chunk' => 1, 'total_chunks' => 3, 'elapsed_seconds' => 47.0]);
+
+        self::assertSame("  ✓ chunk 1/3 done (47s)\n", $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_omits_duration_for_a_sub_second_chunk_completion(): void
+    {
+        $this->plainProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 0.0]);
+
+        self::assertSame("  ✓ chunk 2/3 done\n", $this->bufferedOutput->fetch());
+    }
+
     public function test_it_streams_each_recorded_finding(): void
     {
         $this->plainProgressReporter->report('attacker.finding.recorded', ['severity' => 'high', 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 42]);
