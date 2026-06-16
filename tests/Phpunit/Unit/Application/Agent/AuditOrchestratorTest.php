@@ -794,6 +794,74 @@ final class AuditOrchestratorTest extends TestCase
         );
     }
 
+    public function test_it_reports_audit_started_with_file_and_mapping_counts(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn($this->emptyResponse());
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, recordingProgressReporter: $recordingProgressReporter);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('src/Controller/A.php', '/a', '<?php'),
+            ProjectFile::create('src/Controller/B.php', '/b', '<?php'),
+            ProjectFile::create('src/Entity/E.php', '/e', '<?php'),
+            ProjectFile::create('src/Form/F.php', '/f', '<?php'),
+        ]);
+        $auditContext->setMapping(SymfonyMapping::create(
+            controllers: [
+                ProjectFile::create('src/Controller/A.php', '/a', '<?php'),
+                ProjectFile::create('src/Controller/B.php', '/b', '<?php'),
+            ],
+            voters: [ProjectFile::create('src/Security/V.php', '/v', '<?php')],
+            forms: [
+                ProjectFile::create('src/Form/F1.php', '/f1', '<?php'),
+                ProjectFile::create('src/Form/F2.php', '/f2', '<?php'),
+                ProjectFile::create('src/Form/F3.php', '/f3', '<?php'),
+            ],
+        ));
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertSame(
+            [['audit.started', ['files' => 4, 'controllers' => 2, 'voters' => 1, 'forms' => 3]]],
+            array_values(array_filter(
+                $recordingProgressReporter->events,
+                static fn (array $event): bool => 'audit.started' === $event[0],
+            )),
+        );
+    }
+
+    public function test_it_reports_review_completed_with_accepted_and_rejected_counts(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([
+                $this->vulnPayload(title: 'v1', lineStart: 10, lineEnd: 15),
+                $this->vulnPayload(title: 'v2', lineStart: 30, lineEnd: 40),
+            ]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->reviewerAcceptResponse(),
+            $this->reviewerRejectResponse(),
+        );
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, recordingProgressReporter: $recordingProgressReporter);
+
+        $auditOrchestrator->orchestrate($this->makeContextWithMapping());
+
+        self::assertSame(
+            [['review.completed', ['accepted' => 1, 'rejected' => 1]]],
+            array_values(array_filter(
+                $recordingProgressReporter->events,
+                static fn (array $event): bool => 'review.completed' === $event[0],
+            )),
+        );
+    }
+
     private function makeOrchestrator(
         LLMClientInterface $attackerLlm,
         LLMClientInterface $reviewerLlm,

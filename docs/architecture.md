@@ -95,8 +95,8 @@ src/
 │       ├── Advisory/    # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase,
 │       │                  SymfonyProcessComposerAuditRunner + Exception/*
 │       ├── Pricing/     # StaticPricingProvider
-│       ├── Progress/    # ConsoleProgressReporter, LoggerProgressReporter,
-│       │                  NullProgressReporter, ProgressReporterHolder
+│       ├── Progress/    # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY),
+│       │                  LoggerProgressReporter, NullProgressReporter, ProgressReporterHolder, ProgressContext
 │       ├── Tool/        # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool,
 │       │                  SymfonyToolRegistryFactory, RecordVulnerabilityTool + Factory,
 │       │                  RecordReviewTool + Factory

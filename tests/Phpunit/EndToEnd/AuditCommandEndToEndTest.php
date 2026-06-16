@@ -717,14 +717,34 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('No published pricing', $commandTester->getDisplay());
     }
 
-    public function test_command_renders_progress_bar_in_console_format(): void
+    public function test_command_renders_progress_bar_in_decorated_console_output(): void
     {
         $this->createProjectDir();
 
         $commandTester = $this->makeCommandTester('[]', '{}');
-        $commandTester->execute(['project-path' => $this->fixtureDir]);
+        $commandTester->execute(['project-path' => $this->fixtureDir], ['decorated' => true]);
 
         self::assertStringContainsString('3/3', $commandTester->getDisplay());
+    }
+
+    public function test_command_renders_plain_progress_without_a_bar_in_non_decorated_output(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(['project-path' => $this->fixtureDir], ['decorated' => false]);
+
+        self::assertStringNotContainsString('3/3', $commandTester->getDisplay());
+    }
+
+    public function test_command_streams_findings_in_non_decorated_output(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute(['project-path' => $this->fixtureDir], ['decorated' => false]);
+
+        self::assertStringContainsString('[CRITICAL] sql_injection', $commandTester->getDisplay());
     }
 
     public function test_command_suppresses_progress_bar_in_machine_readable_stdout(): void
@@ -740,14 +760,24 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('3/3', $commandTester->getDisplay());
     }
 
-    public function test_command_shows_audit_iteration_progress_in_console_format(): void
+    public function test_command_shows_audit_iteration_progress_in_decorated_console_output(): void
     {
         $this->createProjectDir();
 
         $commandTester = $this->makeCommandTester('[]', '{}');
-        $commandTester->execute(['project-path' => $this->fixtureDir]);
+        $commandTester->execute(['project-path' => $this->fixtureDir], ['decorated' => true]);
 
         self::assertStringContainsString('audit · iteration 1/3', $commandTester->getDisplay());
+    }
+
+    public function test_command_shows_audit_iteration_progress_in_non_decorated_output(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(['project-path' => $this->fixtureDir], ['decorated' => false]);
+
+        self::assertStringContainsString('Iteration 1/3', $commandTester->getDisplay());
     }
 
     public function test_command_shows_long_run_notice_in_console_format(): void

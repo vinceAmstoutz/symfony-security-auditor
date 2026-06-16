@@ -206,6 +206,51 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertSame('', $this->bufferedOutput->fetch());
     }
 
+    public function test_it_streams_recorded_findings_above_the_bar(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.finding.recorded', ['severity' => 'high', 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 42]);
+
+        self::assertStringContainsString('🟠 HIGH sql_injection — src/X.php:42', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_falls_back_to_raw_severity_when_the_severity_is_unknown(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.finding.recorded', ['severity' => 'weird', 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
+
+        self::assertStringContainsString('WEIRD xss — a.php:1', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_shows_an_audit_overview_when_the_audit_starts(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('audit.started', ['files' => 10, 'controllers' => 4, 'voters' => 2, 'forms' => 3]);
+
+        self::assertStringContainsString('Auditing 10 file(s) — 4 controller(s), 2 voter(s), 3 form(s)', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_shows_a_review_summary_on_review_completed(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('review.completed', ['accepted' => 3, 'rejected' => 1]);
+
+        self::assertStringContainsString('3 validated, 1 rejected', $this->bufferedOutput->fetch());
+    }
+
+    public function test_finding_events_before_pipeline_started_are_no_ops(): void
+    {
+        $this->consoleProgressReporter->report('audit.started', ['files' => 1, 'controllers' => 1, 'voters' => 0, 'forms' => 0]);
+        $this->consoleProgressReporter->report('attacker.finding.recorded', ['severity' => 'high', 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
+        $this->consoleProgressReporter->report('review.completed', ['accepted' => 1, 'rejected' => 0]);
+
+        self::assertSame('', $this->bufferedOutput->fetch());
+    }
+
     protected function setUp(): void
     {
         $this->bufferedOutput = new BufferedOutput();

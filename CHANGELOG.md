@@ -10,6 +10,38 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **Live findings feed and a CI-safe progress renderer for `audit:run`.** Early
+  users praised the accuracy and remediation quality but reported having "no
+  visibility into what the audit is doing" during the long audit stage — the run
+  streamed nothing as findings were discovered, and in CI the animated progress
+  bar was the wrong tool entirely. The console now narrates the audit as it
+  happens: each vulnerability the attacker flags streams out the instant it is
+  recorded (e.g.
+  `⚔ 🟠 HIGH sql_injection — src/Controller/UserController.php:42`), the audit
+  opens with an attack-surface overview
+  (`🔍 Auditing 152 file(s) — 24 controller(s), 5 voter(s), 8 form(s)`), and
+  each iteration closes with a reviewer tally
+  (`✓ Reviewed: 5 validated, 1 rejected`). Three new wire-format progress events
+  back this — `audit.started` and `review.completed` (emitted by
+  `AuditOrchestrator`, `src/Audit/Application/Agent/AuditOrchestrator.php`) and
+  `attacker.finding.recorded` (emitted per finding by the sequential and
+  concurrent chunk analyzers via `ChunkFindingProgress`,
+  `src/Audit/Application/Agent/Chunk/ChunkFindingProgress.php`) — all flowing
+  through the existing `ProgressReporterInterface` port, additive to the events
+  shipped in 1.11.0. A new `PlainProgressReporter`
+  (`src/Audit/Infrastructure/Progress/PlainProgressReporter.php`) renders the
+  same narrative as plain, append-only lines — no carriage returns, no cursor
+  control, no progress bar — for non-interactive output (CI logs, pipes,
+  redirected files), keeping the feed clean and greppable and the log alive on
+  long runs. `audit:run` selects the renderer automatically from
+  `OutputInterface::isDecorated()`: the animated `ConsoleProgressReporter` for a
+  TTY, `PlainProgressReporter` otherwise. Machine-readable stdout
+  (`--format=json|sarif` without `--output`) stays silent as before. Progress
+  reporting adds no measurable runtime cost — events are O(findings)/O(chunks)
+  and rendering is local I/O, dwarfed by the LLM calls.
+
 ### Changed
 
 - **The `--dry-run` "no pricing data" warning no longer reads like an error for
@@ -25,6 +57,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   only flags a typo or an unlisted model as the problem case. Unchanged: the
   notice stays stderr-only (so `--format=json` / `--format=sarif` stdout is
   untouched) and token counts remain accurate.
+
+- **The console progress bar no longer renders in non-interactive output.**
+  `audit:run` previously drove a Symfony `ProgressBar` regardless of whether the
+  output was a terminal, so CI logs and redirected files accumulated bar redraws
+  that read as noise. Non-decorated runs now use the new `PlainProgressReporter`
+  (one clean line per event); decorated terminals keep the animated bar — now
+  with an elapsed-time counter and the live findings feed printed above it. The
+  human-readable console output is not part of the BC promise (see
+  `docs/versioning.md`); the JSON, SARIF, HTML, and Markdown reports are
+  unchanged.
 
 ## [1.11.0] — 2026-06-15 — Tracer
 

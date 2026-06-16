@@ -73,6 +73,7 @@ final readonly class SequentialChunkAnalyzer
             ]);
 
             $chunkResult = $this->analyzeChunk($chunk, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
+            ChunkFindingProgress::report($this->progressReporter, $chunkResult->vulnerabilities());
             $allVulnerabilities = [...$allVulnerabilities, ...$chunkResult->vulnerabilities()];
 
             foreach ($chunkResult->dropsByReason() as $reason => $count) {
