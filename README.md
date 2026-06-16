@@ -187,7 +187,7 @@ bin/console audit:run --dry-run
   findings fail CI.
 - **CI-ready** — a reusable
   [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor)
-  (`uses: vinceamstoutz/symfony-security-auditor@1.11.0`) plus GitLab CI
+  (`uses: vinceamstoutz/symfony-security-auditor@1.12.0`) plus GitLab CI
   templates, with SARIF upload to Code Scanning. See
   [CI Integration](docs/ci.md).
 - **DDD architecture** — strict layering and a sole `LLMClientInterface` seam
