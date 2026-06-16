@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
     description: 'Run AI-powered multi-agent security audit on a Symfony project',
     help: <<<'HELP'
         The <info>%command.name%</info> command runs a multi-agent LLM security audit against a Symfony project.
+        By default it audits the current working directory; pass a path to audit a different project (e.g. <info>%command.full_name% /path/to/project</info>).
 
         Output formats (<info>--format</info>, <info>-f</info>):
           <info>console</info>  human-readable summary (default)
@@ -39,12 +40,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
           <info>markdown</info> Markdown report for a PR comment or GitHub step summary
 
         Use <info>--output</info> (<info>-o</info>) to write the report to a file:
-          <info>%command.full_name% . --format=sarif --output=report.sarif</info>
-          <info>%command.full_name% . --format=html --output=report.html</info>
+          <info>%command.full_name% --format=sarif --output=report.sarif</info>
+          <info>%command.full_name% --format=html --output=report.html</info>
 
         Baseline (suppress accepted findings):
-          <info>%command.full_name% . --generate-baseline=.security-baseline.json</info>  accept current findings
-          <info>%command.full_name% . --baseline=.security-baseline.json</info>           suppress them on later runs
+          <info>%command.full_name% --generate-baseline=.security-baseline.json</info>  accept current findings
+          <info>%command.full_name% --baseline=.security-baseline.json</info>           suppress them on later runs
         Baselined findings are dropped from the report and do not affect the exit code.
 
         Exit codes (the failure threshold is configurable via <info>audit.fail_on</info> / <info>--fail-on</info>, default <info>critical</info>):

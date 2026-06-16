@@ -119,7 +119,7 @@ echo $ANTHROPIC_API_KEY    # should not be empty
 In Docker, pass it through:
 
 ```bash
-docker compose exec -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" php bin/console audit:run .
+docker compose exec -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" php bin/console audit:run
 ```
 
 ### `Rate limit exceeded` / `429`

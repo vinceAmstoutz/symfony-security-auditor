@@ -406,7 +406,7 @@ finding individually and decides whether to accept or escalate it.
 The bundle registers a single console command.
 
 ```bash
-bin/console audit:run <project-path> [options]
+bin/console audit:run [<project-path>] [options]
 ```
 
 ### Arguments
@@ -440,21 +440,21 @@ bin/console audit:run /path/to/project --format=json --output=report.json
 ```
 
 ```bash
-bin/console audit:run . --format=sarif --output=report.sarif
+bin/console audit:run --format=sarif --output=report.sarif
 ```
 
 ```bash
-bin/console audit:run . --dry-run --format=json
+bin/console audit:run --dry-run --format=json
 ```
 
 ```bash
-bin/console audit:run . --format=html --output=report.html
+bin/console audit:run --format=html --output=report.html
 ```
 
 ```bash
 # Accept the current findings, then suppress them on later runs
-bin/console audit:run . --generate-baseline=.security-baseline.json
-bin/console audit:run . --baseline=.security-baseline.json
+bin/console audit:run --generate-baseline=.security-baseline.json
+bin/console audit:run --baseline=.security-baseline.json
 ```
 
 ### Exit codes
