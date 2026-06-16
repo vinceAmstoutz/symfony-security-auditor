@@ -197,6 +197,14 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isRepository());
     }
 
+    public function test_it_detects_repository_in_repository_directory_without_suffix(): void
+    {
+        $projectFile = ProjectFile::create('src/Repository/UserStore.php', '/app/src/Repository/UserStore.php', '<?php');
+
+        self::assertSame('repository', $projectFile->type());
+        self::assertTrue($projectFile->isRepository());
+    }
+
     public function test_plain_service_is_not_misdetected_as_voter_form_entity_or_repository(): void
     {
         $projectFile = ProjectFile::create('src/Service/Mailer.php', '/app/src/Service/Mailer.php', '<?php class Mailer { public function send() {} }');

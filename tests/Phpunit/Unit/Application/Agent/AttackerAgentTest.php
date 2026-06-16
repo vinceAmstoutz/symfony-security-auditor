@@ -2048,6 +2048,16 @@ final class AttackerAgentTest extends TestCase
                 static fn (array $event): bool => 'attacker.finding.recorded' === $event[0],
             )),
         );
+        self::assertSame(
+            [
+                ['attacker.chunk.completed', ['chunk' => 1, 'total_chunks' => 2, 'elapsed_seconds' => 0.0]],
+                ['attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 2, 'elapsed_seconds' => 0.0]],
+            ],
+            array_values(array_filter(
+                $recordingProgressReporter->events,
+                static fn (array $event): bool => 'attacker.chunk.completed' === $event[0],
+            )),
+        );
     }
 
     public function test_concurrent_structured_analysis_serves_cache_hits_and_dispatches_only_misses(): void
