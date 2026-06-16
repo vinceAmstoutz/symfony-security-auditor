@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\Option;
+use Symfony\Component\Filesystem\Path;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
@@ -67,16 +68,12 @@ final class AuditCommandInput
      */
     public function resolvedProjectPath(?callable $cwdResolver = null): string
     {
-        if (null !== $this->projectPath && !u($this->projectPath)->trim()->isEmpty()) {
-            return $this->projectPath;
-        }
-
         $cwd = ($cwdResolver ?? \getcwd(...))();
         if (false === $cwd) {
             throw WorkingDirectoryUnavailableException::fromGetcwdFailure();
         }
 
-        return $cwd;
+        return Path::makeAbsolute(u($this->projectPath ?? '')->trim()->toString(), $cwd);
     }
 
     /**

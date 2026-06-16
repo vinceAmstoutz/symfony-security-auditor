@@ -16,22 +16,6 @@
 
 ---
 
-## Table of Contents
-
-- [What it does](#what-it-does)
-- [Getting Started](#getting-started)
-- [Features](#features)
-- [Why this auditor?](#why-this-auditor)
-- [Example Output](#example-output)
-- [Supported Platforms](#supported-platforms)
-- [Documentation](#documentation)
-- [FAQ](#faq)
-- [Contributing](#contributing)
-- [Security](#security)
-- [License](#license)
-
----
-
 ## What it does
 
 Feeds your Symfony project through a three-stage AI pipeline that catches what
@@ -255,15 +239,20 @@ third-party packages.
 
 ### Console mode (truncated)
 
-The command renders a live progress bar while the pipeline runs (suppressed for
-`--format=json/sarif` to stdout and for `--dry-run`):
+While the pipeline runs, the audit narrates itself live — an attack-surface
+overview, each finding streamed (color-coded by severity in a terminal) the
+moment the Attacker flags it, per-chunk timing, and a reviewer tally. In CI or
+any non-TTY output it degrades to clean, append-only lines (no bar, no ANSI
+codes). Progress is suppressed for `--format=json/sarif` to stdout and for
+`--dry-run`.
 
 ```text
- Running audit pipeline...
- ─────────────────────────
- 1/3 [=======>                  ]  33% — ingestion
- 2/3 [===============>          ]  67% — mapping
- 3/3 [==========================] 100% — audit
+🔍 Auditing 152 file(s) — 24 controller(s), 5 voter(s), 8 form(s)
+  ⚔ 🔴 CRITICAL sql_injection — src/Controller/UserController.php:42
+  ⚔ 🟠 HIGH broken_access_control — src/Controller/AdminController.php:88
+  ✓ chunk 1/12 analyzed (47s)
+  ✓ Reviewed: 2 validated, 1 rejected
+ 2/3 [===============>          ]  67% — audit · iteration 1/3 · ⏳ querying model
 ```
 
 Full output after the pipeline completes:

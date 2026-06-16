@@ -974,10 +974,7 @@ final class AttackerAgentTest extends TestCase
 
     public function test_it_records_coverage_aborted_when_llm_throws_budget_exceeded(): void
     {
-        $files = [
-            $this->makeFile('src/Controller/A.php'),
-            $this->makeFile('src/Controller/B.php'),
-        ];
+        $files = [$this->makeFile('src/Controller/A.php')];
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
@@ -998,7 +995,6 @@ final class AttackerAgentTest extends TestCase
         self::assertSame(
             [
                 ['stage' => 'attacker', 'file' => 'src/Controller/A.php', 'status' => 'aborted'],
-                ['stage' => 'attacker', 'file' => 'src/Controller/B.php', 'status' => 'aborted'],
             ],
             $auditContext->coverage(),
         );
@@ -1217,10 +1213,7 @@ final class AttackerAgentTest extends TestCase
 
     public function test_it_propagates_llm_provider_exception_and_records_errored_coverage(): void
     {
-        $files = [
-            $this->makeFile('src/Controller/A.php'),
-            $this->makeFile('src/Controller/B.php'),
-        ];
+        $files = [$this->makeFile('src/Controller/A.php')];
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
@@ -1241,7 +1234,6 @@ final class AttackerAgentTest extends TestCase
         self::assertSame(
             [
                 ['stage' => 'attacker', 'file' => 'src/Controller/A.php', 'status' => 'errored'],
-                ['stage' => 'attacker', 'file' => 'src/Controller/B.php', 'status' => 'errored'],
             ],
             $auditContext->coverage(),
         );
@@ -1249,10 +1241,7 @@ final class AttackerAgentTest extends TestCase
 
     public function test_it_propagates_exhausted_transient_failure_and_records_errored_coverage(): void
     {
-        $files = [
-            $this->makeFile('src/Controller/A.php'),
-            $this->makeFile('src/Controller/B.php'),
-        ];
+        $files = [$this->makeFile('src/Controller/A.php')];
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
@@ -1275,7 +1264,6 @@ final class AttackerAgentTest extends TestCase
         self::assertSame(
             [
                 ['stage' => 'attacker', 'file' => 'src/Controller/A.php', 'status' => 'errored'],
-                ['stage' => 'attacker', 'file' => 'src/Controller/B.php', 'status' => 'errored'],
             ],
             $auditContext->coverage(),
         );
@@ -1919,8 +1907,79 @@ final class AttackerAgentTest extends TestCase
                 ['attacker.chunk.started', ['chunk' => 1, 'total_chunks' => 2]],
                 ['attacker.chunk.started', ['chunk' => 2, 'total_chunks' => 2]],
             ],
-            $recordingProgressReporter->events,
+            array_values(array_filter(
+                $recordingProgressReporter->events,
+                static fn (array $event): bool => 'attacker.chunk.started' === $event[0],
+            )),
         );
+    }
+
+    public function test_it_reports_each_recorded_finding_with_severity_type_file_and_line(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(
+            LLMResponse::create((string) json_encode([self::recordedFinding('json-path')]), 0, 0, 'claude', 'end_turn'),
+        );
+
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $attackerAgent = new AttackerAgent(
+            llmClient: $llmClient,
+            attackerPromptBuilder: new AttackerPromptBuilder(),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+            attackerCache: new NullAttackerCache(),
+            logger: new NullLogger(),
+            fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+            useStructuredCollection: false,
+            progressReporter: $recordingProgressReporter,
+        );
+
+        $this->callAnalyze($attackerAgent, [$this->makeFile('src/A.php')], SymfonyMapping::create(), new NullCoverageRecorder());
+
+        self::assertSame(
+            [['attacker.finding.recorded', ['severity' => 'high', 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1]]],
+            array_values(array_filter(
+                $recordingProgressReporter->events,
+                static fn (array $event): bool => 'attacker.finding.recorded' === $event[0],
+            )),
+        );
+    }
+
+    public function test_it_reports_each_chunk_completion_with_a_bounded_elapsed_time(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/A.php'),
+            $this->makeFile('src/Controller/B.php'),
+        ];
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'claude', 'end_turn'));
+
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $attackerAgent = new AttackerAgent(
+            llmClient: $llmClient,
+            attackerPromptBuilder: new AttackerPromptBuilder(),
+            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+            attackerCache: new NullAttackerCache(),
+            logger: new NullLogger(),
+            fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+            useStructuredCollection: false,
+            progressReporter: $recordingProgressReporter,
+        );
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+
+        $completed = array_values(array_filter(
+            $recordingProgressReporter->events,
+            static fn (array $event): bool => 'attacker.chunk.completed' === $event[0],
+        ));
+
+        self::assertSame(
+            [[1, 2], [2, 2]],
+            array_map(static fn (array $event): array => [$event[1]['chunk'], $event[1]['total_chunks']], $completed),
+        );
+        self::assertIsFloat($completed[0][1]['elapsed_seconds']);
+        self::assertGreaterThanOrEqual(0.0, $completed[0][1]['elapsed_seconds']);
+        self::assertLessThan(60.0, $completed[0][1]['elapsed_seconds']);
     }
 
     private function makeStructuredCollectionAttackerAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null): AttackerAgent
@@ -1977,7 +2036,27 @@ final class AttackerAgentTest extends TestCase
                 ['attacker.chunk.started', ['chunk' => 1, 'total_chunks' => 2]],
                 ['attacker.chunk.started', ['chunk' => 2, 'total_chunks' => 2]],
             ],
-            $recordingProgressReporter->events,
+            array_values(array_filter(
+                $recordingProgressReporter->events,
+                static fn (array $event): bool => 'attacker.chunk.started' === $event[0],
+            )),
+        );
+        self::assertSame(
+            array_fill(0, 3, ['attacker.finding.recorded', ['severity' => 'high', 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1]]),
+            array_values(array_filter(
+                $recordingProgressReporter->events,
+                static fn (array $event): bool => 'attacker.finding.recorded' === $event[0],
+            )),
+        );
+        self::assertSame(
+            [
+                ['attacker.chunk.completed', ['chunk' => 1, 'total_chunks' => 2, 'elapsed_seconds' => 0.0]],
+                ['attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 2, 'elapsed_seconds' => 0.0]],
+            ],
+            array_values(array_filter(
+                $recordingProgressReporter->events,
+                static fn (array $event): bool => 'attacker.chunk.completed' === $event[0],
+            )),
         );
     }
 

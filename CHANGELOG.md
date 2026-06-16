@@ -10,6 +10,55 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **Live findings feed and a CI-safe progress renderer for `audit:run`.** Early
+  users praised the accuracy and remediation quality but reported having "no
+  visibility into what the audit is doing" during the long audit stage — the run
+  streamed nothing as findings were discovered, and in CI the animated progress
+  bar was the wrong tool entirely. The console now narrates the audit as it
+  happens: each vulnerability the attacker flags streams out the instant it is
+  recorded (e.g.
+  `⚔ 🟠 HIGH sql_injection — src/Controller/UserController.php:42`), the audit
+  opens with an attack-surface overview that lists only non-empty categories
+  (`🔍 Auditing 152 file(s) — 24 controller(s), 5 voter(s), 8 form(s)`), and
+  each iteration closes with a reviewer tally
+  (`✓ Reviewed: 5 validated, 1 rejected`). Three new wire-format progress events
+  back this — `audit.started` and `review.completed` (emitted by
+  `AuditOrchestrator`, `src/Audit/Application/Agent/AuditOrchestrator.php`) and
+  `attacker.finding.recorded` (emitted per finding by the sequential and
+  concurrent chunk analyzers via `ChunkFindingProgress`,
+  `src/Audit/Application/Agent/Chunk/ChunkFindingProgress.php`) — all flowing
+  through the existing `ProgressReporterInterface` port, additive to the events
+  shipped in 1.11.0. A new `PlainProgressReporter`
+  (`src/Audit/Infrastructure/Progress/PlainProgressReporter.php`) renders the
+  same narrative as plain, append-only lines — no carriage returns, no cursor
+  control, no progress bar — for non-interactive output (CI logs, pipes,
+  redirected files), keeping the feed clean and greppable and the log alive on
+  long runs. `audit:run` selects the renderer automatically from
+  `OutputInterface::isDecorated()`: the animated `ConsoleProgressReporter` for a
+  TTY, `PlainProgressReporter` otherwise. Machine-readable stdout
+  (`--format=json|sarif` without `--output`) stays silent as before. Progress
+  reporting adds no measurable runtime cost — events are O(findings)/O(chunks)
+  and rendering is local I/O, dwarfed by the LLM calls.
+- **Slow and local-model runs no longer look frozen mid-chunk.** A synchronous
+  LLM call blocks for its whole duration — minutes at a time on a local model —
+  with no chance to repaint, so the line appeared hung. The bar message now
+  reads `⏳ querying model · chunk 2/5` while a call is in flight (so the pause
+  reads as waiting, not a crash), and each chunk prints a completion line with
+  its wall time as it returns (`✓ chunk 2/5 analyzed (47s)`). In a decorated
+  terminal the findings feed is now color-coded by severity (red critical,
+  bright-red high, yellow medium, green low, blue info — via the new
+  `SeverityColor` map), the overview is cyan and the review/chunk lines green;
+  these are stripped automatically in non-interactive output. This makes
+  progress and per-chunk timing visible between calls. Backed by a new
+  `attacker.chunk.completed` wire event (chunk index, total, elapsed seconds)
+  emitted by the sequential and concurrent chunk analyzers and rendered by both
+  `ConsoleProgressReporter` and `PlainProgressReporter`. (A true mid-call
+  animation would require streaming the model response — a larger change to the
+  LLM seam — because the global audit total, iterations × chunks, is not known
+  ahead of time.)
+
 ### Changed
 
 - **The `--dry-run` "no pricing data" warning no longer reads like an error for
@@ -38,6 +87,43 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   as the tool driver's `informationUri`; it is now sourced from the shared
   `ReportRenderer::HOMEPAGE_URL` constant (value unchanged), and the JSON report
   is untouched.
+
+- **The console progress bar no longer renders in non-interactive output.**
+  `audit:run` previously drove a Symfony `ProgressBar` regardless of whether the
+  output was a terminal, so CI logs and redirected files accumulated bar redraws
+  that read as noise. Non-decorated runs now use the new `PlainProgressReporter`
+  (one clean line per event); decorated terminals keep the animated bar — now
+  with an elapsed-time counter and the live findings feed printed above it. The
+  human-readable console output is not part of the BC promise (see
+  `docs/versioning.md`); the JSON, SARIF, HTML, and Markdown reports are
+  unchanged.
+- **`audit:run` prints the resolved project directory and a lighter heads-up.**
+  The header and report showed the path exactly as given — `.` when run from the
+  project root — which read poorly; `AuditCommandInput::resolvedProjectPath()`
+  now resolves `.` and relative paths to an absolute directory (via
+  `Path::makeAbsolute`, trimming surrounding whitespace). The long-run heads-up
+  is now a dim one-line message instead of a boxed `[NOTE]` block.
+
+### Fixed
+
+- **Symfony component detection now recognizes controllers, voters, forms,
+  entities, and repositories by directory and content — not just by filename
+  suffix.** `ProjectFile` (`src/Audit/Domain/Model/ProjectFile.php`) classified
+  a controller only when its path ended in `Controller.php`, so a project of
+  invokable/action-style controllers under `src/Controller/` (e.g.
+  `src/Controller/Homepage.php`) reported a single controller in the audit
+  overview — and, worse, only that one received controller-aware analysis:
+  `MappingStage` parses route/access-control and form bindings exclusively from
+  recognized controllers, and the feature chunker groups context around them.
+  Detection now also matches the canonical directories (`/Controller/`,
+  `/Voter/`, `/Repository/`, `/Entity/`, `/Entities/`, and `/Form/` with a
+  `Type.php` suffix) and telltale content (`extends AbstractController` or
+  `#[Route]`; `implements VoterInterface` or `extends Voter`;
+  `extends AbstractType`; `#[ORM\Entity]`; `extends ServiceEntityRepository` or
+  `EntityRepository`) — for both the `is*()` predicates and the
+  `ProjectFileType` classification, so the mapping counts, feature chunking, and
+  route/form analysis all see the full set. Plain `.php` services without these
+  signals stay classified as services.
 
 ## [1.11.0] — 2026-06-15 — Tracer
 

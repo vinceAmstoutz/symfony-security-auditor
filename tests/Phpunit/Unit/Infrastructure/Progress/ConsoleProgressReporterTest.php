@@ -145,7 +145,27 @@ final class ConsoleProgressReporterTest extends TestCase
         $this->consoleProgressReporter->report('audit.iteration.started', ['iteration' => 2, 'max_iterations' => 3]);
         $this->consoleProgressReporter->report('attacker.chunk.started', ['chunk' => 4, 'total_chunks' => 12]);
 
-        self::assertStringContainsString('audit · iteration 2/3 · attacker chunk 4/12', $this->bufferedOutput->fetch());
+        self::assertStringContainsString('audit · iteration 2/3 · ⏳ querying model · chunk 4/12', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_prints_chunk_completion_with_its_duration(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.chunk.completed', ['chunk' => 1, 'total_chunks' => 3, 'elapsed_seconds' => 47.0]);
+
+        self::assertStringContainsString('✓ chunk 1/3 analyzed (47s)', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_omits_the_duration_for_a_sub_second_chunk_completion(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.chunk.completed', ['chunk' => 1, 'total_chunks' => 3, 'elapsed_seconds' => 0.0]);
+
+        $rendered = $this->bufferedOutput->fetch();
+        self::assertStringContainsString('✓ chunk 1/3 analyzed', $rendered);
+        self::assertStringNotContainsString('(0s)', $rendered);
     }
 
     public function test_review_event_shows_finding_count_in_bar_message(): void
@@ -180,7 +200,7 @@ final class ConsoleProgressReporterTest extends TestCase
         $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
         $this->consoleProgressReporter->report('attacker.chunk.started', ['chunk' => 1, 'total_chunks' => 2]);
 
-        self::assertStringContainsString('audit · attacker chunk 1/2', $this->bufferedOutput->fetch());
+        self::assertStringContainsString('audit · ⏳ querying model · chunk 1/2', $this->bufferedOutput->fetch());
     }
 
     public function test_detail_events_with_malformed_context_keep_previous_message(): void
@@ -192,6 +212,7 @@ final class ConsoleProgressReporterTest extends TestCase
 
         $this->consoleProgressReporter->report('audit.iteration.started', ['iteration' => 'one']);
         $this->consoleProgressReporter->report('attacker.chunk.started', ['chunk' => 1]);
+        $this->consoleProgressReporter->report('attacker.chunk.completed', ['chunk' => 1]);
         $this->consoleProgressReporter->report('review.started', []);
 
         self::assertSame('', $this->bufferedOutput->fetch());
@@ -204,6 +225,88 @@ final class ConsoleProgressReporterTest extends TestCase
         $this->consoleProgressReporter->report('review.started', ['findings' => 2]);
 
         self::assertSame('', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_streams_recorded_findings_above_the_bar(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.finding.recorded', ['severity' => 'high', 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 42]);
+
+        self::assertStringContainsString('🟠 HIGH sql_injection — src/X.php:42', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_falls_back_to_raw_severity_when_the_severity_is_unknown(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.finding.recorded', ['severity' => 'weird', 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
+
+        self::assertStringContainsString('WEIRD xss — a.php:1', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_shows_an_audit_overview_when_the_audit_starts(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('audit.started', ['files' => 10, 'controllers' => 4, 'voters' => 2, 'forms' => 3]);
+
+        self::assertStringContainsString('Auditing 10 file(s) — 4 controller(s), 2 voter(s), 3 form(s)', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_shows_a_review_summary_on_review_completed(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('review.completed', ['accepted' => 3, 'rejected' => 1]);
+
+        self::assertStringContainsString('3 validated, 1 rejected', $this->bufferedOutput->fetch());
+    }
+
+    public function test_finding_events_before_pipeline_started_are_no_ops(): void
+    {
+        $this->consoleProgressReporter->report('audit.started', ['files' => 1, 'controllers' => 1, 'voters' => 0, 'forms' => 0]);
+        $this->consoleProgressReporter->report('attacker.finding.recorded', ['severity' => 'high', 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
+        $this->consoleProgressReporter->report('review.completed', ['accepted' => 1, 'rejected' => 0]);
+
+        self::assertSame('', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_colors_a_finding_by_its_severity_in_a_decorated_terminal(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $consoleProgressReporter = new ConsoleProgressReporter($bufferedOutput);
+        $consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $consoleProgressReporter->report('attacker.finding.recorded', ['severity' => 'critical', 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 42]);
+
+        self::assertStringContainsString("\033[31m", $bufferedOutput->fetch());
+    }
+
+    public function test_it_does_not_color_a_finding_with_an_unknown_severity(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $consoleProgressReporter = new ConsoleProgressReporter($bufferedOutput);
+        $consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $consoleProgressReporter->report('attacker.finding.recorded', ['severity' => 'weird', 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
+
+        self::assertStringContainsString('WEIRD xss — a.php:1', $bufferedOutput->fetch());
+    }
+
+    public function test_it_clears_and_redraws_the_bar_around_each_streamed_line(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $consoleProgressReporter = new ConsoleProgressReporter($bufferedOutput);
+        $consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+
+        $bufferedOutput->fetch();
+
+        $consoleProgressReporter->report('attacker.finding.recorded', ['severity' => 'high', 'type' => 'xss', 'file' => 'a.php', 'line' => 7]);
+
+        $eraseLineSequencesFromClearThenRedraw = substr_count($bufferedOutput->fetch(), "\033[2K");
+        self::assertSame(2, $eraseLineSequencesFromClearThenRedraw);
     }
 
     protected function setUp(): void

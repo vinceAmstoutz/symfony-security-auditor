@@ -113,14 +113,28 @@ final class AuditCommandInputTest extends TestCase
         self::assertSame('/tmp/project', $auditCommandInput->resolvedProjectPath());
     }
 
-    public function test_resolved_project_path_preserves_leading_whitespace_when_path_contains_real_content(): void
+    public function test_resolved_project_path_trims_surrounding_whitespace_and_returns_absolute(): void
     {
-        // Mutation guard: ensures the property is returned as-is when non-empty after trim,
-        // rather than being trimmed itself.
         $auditCommandInput = new AuditCommandInput();
         $auditCommandInput->projectPath = ' /tmp/project ';
 
-        self::assertSame(' /tmp/project ', $auditCommandInput->resolvedProjectPath());
+        self::assertSame('/tmp/project', $auditCommandInput->resolvedProjectPath());
+    }
+
+    public function test_resolved_project_path_resolves_dot_to_the_working_directory(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->projectPath = '.';
+
+        self::assertSame('/custom/cwd', $auditCommandInput->resolvedProjectPath(static fn (): string => '/custom/cwd'));
+    }
+
+    public function test_resolved_project_path_resolves_a_relative_path_against_the_working_directory(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->projectPath = 'app';
+
+        self::assertSame('/custom/cwd/app', $auditCommandInput->resolvedProjectPath(static fn (): string => '/custom/cwd'));
     }
 
     public function test_resolved_project_path_throws_when_cwd_lookup_returns_false(): void

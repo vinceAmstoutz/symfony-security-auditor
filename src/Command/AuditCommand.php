@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAudit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\PlainProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 
 #[AsCommand(
@@ -117,7 +118,11 @@ final readonly class AuditCommand
 
             if (!$auditCommandInput->isMachineReadableToStdout()) {
                 $this->auditPresenter->longRunNotice($symfonyStyle);
-                $this->progressReporterHolder->setDelegate(new ConsoleProgressReporter($symfonyStyle));
+                $this->progressReporterHolder->setDelegate(
+                    $symfonyStyle->isDecorated()
+                        ? new ConsoleProgressReporter($symfonyStyle)
+                        : new PlainProgressReporter($symfonyStyle),
+                );
             }
 
             $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache, $auditCommandInput->since);

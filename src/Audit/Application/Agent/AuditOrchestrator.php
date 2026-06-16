@@ -58,6 +58,13 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             'max_iterations' => $this->maxIterations,
         ]);
 
+        $this->progressReporter->report(ProgressEvent::AuditStarted->value, [
+            'files' => \count($files),
+            'controllers' => \count($mapping->controllers()),
+            'voters' => \count($mapping->voters()),
+            'forms' => \count($mapping->forms()),
+        ]);
+
         do {
             ++$iteration;
             $this->logger->info(\sprintf('Audit iteration %d/%d', $iteration, $this->maxIterations));
@@ -91,13 +98,19 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed());
             $newFindings = $this->persistReviewedFindings(array_values($reviewed), $auditContext);
 
+            $acceptedCount = \count(array_filter(
+                $reviewed,
+                static fn (Vulnerability $vulnerability): bool => $vulnerability->isReviewerValidated(),
+            ));
+            $this->progressReporter->report(ProgressEvent::ReviewCompleted->value, [
+                'accepted' => $acceptedCount,
+                'rejected' => \count($reviewed) - $acceptedCount,
+            ]);
+
             $this->logger->info('Iteration complete', [
                 'iteration' => $iteration,
                 'attacker_found' => \count($rawFindings),
-                'reviewer_accepted' => \count(array_filter(
-                    $reviewed,
-                    static fn (Vulnerability $vulnerability): bool => $vulnerability->isReviewerValidated(),
-                )),
+                'reviewer_accepted' => $acceptedCount,
                 'new_unique' => $newFindings,
                 'total' => \count($auditContext->vulnerabilities()),
                 'previous_validated_passed_back' => \count($previousFindings),
