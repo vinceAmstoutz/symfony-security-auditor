@@ -87,7 +87,9 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
     public function longRunNotice(SymfonyStyle $symfonyStyle): void
     {
-        $symfonyStyle->note('The audit stage makes many LLM calls and typically takes several minutes — 20+ minutes on large projects. Live progress and findings stream below as they are discovered.');
+        $symfonyStyle->writeln(' <fg=gray>The audit makes many LLM calls — typically several minutes, 20+ minutes on large projects.</>');
+        $symfonyStyle->writeln(' <fg=gray>Live progress and findings stream below as they happen.</>');
+        $symfonyStyle->newLine();
     }
 
     public function estimatingSection(SymfonyStyle $symfonyStyle): void

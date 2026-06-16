@@ -84,6 +84,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   human-readable console output is not part of the BC promise (see
   `docs/versioning.md`); the JSON, SARIF, HTML, and Markdown reports are
   unchanged.
+- **`audit:run` prints the resolved project directory and a lighter heads-up.**
+  The header and report showed the path exactly as given — `.` when run from the
+  project root — which read poorly; `AuditCommandInput::resolvedProjectPath()`
+  now resolves `.` and relative paths to an absolute directory (via
+  `Path::makeAbsolute`, trimming surrounding whitespace). The long-run heads-up
+  is now a dim one-line message instead of a boxed `[NOTE]` block.
 
 ### Fixed
 
