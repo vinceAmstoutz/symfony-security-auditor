@@ -287,8 +287,10 @@ model `symfony/ai` supports but the table does not yet list — its price resolv
 to `0.0` and the dry run now prints a stderr warning:
 
 ```text
-No pricing data for the configured model(s): <model>. The dry-run cost estimate
-shows $0.00 for these and may be inaccurate. Check the model name(s) in your
+No published pricing for the configured model(s): <model>. The dry-run cost
+estimate shows $0.00 for these. If you are running a local or self-hosted model
+(e.g. Ollama, LM Studio), $0.00 is correct — you can ignore this notice.
+Otherwise the name is likely a typo or an unlisted model: check it in your
 symfony_security_auditor configuration against the models supported by your
 symfony/ai platform.
 ```
