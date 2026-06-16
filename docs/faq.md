@@ -424,7 +424,7 @@ but the cost-vs-value usually favors nightly scheduled runs.
 ### How do I get findings into GitHub Code Scanning?
 
 ```bash
-php bin/console audit:run . --format sarif --output report.sarif
+php bin/console audit:run --format sarif --output report.sarif
 ```
 
 Then upload via `github/codeql-action/upload-sarif@v4`. Findings appear in the

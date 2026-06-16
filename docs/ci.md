@@ -129,7 +129,7 @@ exposure:
 
 ```yaml
       - name: Run security audit
-        run: php bin/console audit:run . > audit-output.txt 2>&1 || true
+        run: php bin/console audit:run > audit-output.txt 2>&1 || true
 
       - name: Notify Slack
         run: |
@@ -187,7 +187,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          php bin/console audit:run . --format sarif --output report.sarif
+          php bin/console audit:run --format sarif --output report.sarif
 
       - name: Upload to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v4
@@ -251,7 +251,7 @@ Accept the current findings as a baseline once (locally), then commit it so
 future PRs only report new findings:
 
 ```bash
-php bin/console audit:run . --generate-baseline=.security-baseline.json
+php bin/console audit:run --generate-baseline=.security-baseline.json
 git add .security-baseline.json
 ```
 
@@ -265,7 +265,7 @@ code, so a green PR check means "no new findings since the baseline".
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          php bin/console audit:run . --format json --output report.json
+          php bin/console audit:run --format json --output report.json
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -303,7 +303,7 @@ symfony-security-audit:
     - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
     - composer install --no-interaction --prefer-dist --no-progress
   script:
-    - php bin/console audit:run . --format sarif --output gl-sast-report.sarif
+    - php bin/console audit:run --format sarif --output gl-sast-report.sarif
   artifacts:
     when: always
     reports:
@@ -329,7 +329,7 @@ symfony-security-audit:
     - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
     - composer install --no-interaction --prefer-dist --no-progress
   script:
-    - php bin/console audit:run . --format json --output report.json
+    - php bin/console audit:run --format json --output report.json
   artifacts:
     when: always
     paths:
