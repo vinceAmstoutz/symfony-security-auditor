@@ -49,8 +49,11 @@ final readonly class ProgressContext
     public static function durationSuffix(array $context, string $key): string
     {
         $value = $context[$key] ?? null;
-        $seconds = \is_float($value) ? (int) round($value) : 0;
 
-        return $seconds >= 1 ? \sprintf(' (%ds)', $seconds) : '';
+        if (!\is_float($value) || $value < 1.0) {
+            return '';
+        }
+
+        return \sprintf(' (%ds)', round($value));
     }
 }
