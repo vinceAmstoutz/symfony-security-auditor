@@ -82,7 +82,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
     /** @param array<string, mixed> $context */
     private function onAuditStarted(array $context): void
     {
-        $this->writeAboveBar('<fg=cyan>🔍 '.AuditOverviewLine::from($context).'</>');
+        $this->writeAboveBar(\sprintf('<fg=cyan>🔍 %s</>', AuditOverviewLine::from($context)));
     }
 
     /** @param array<string, mixed> $context */

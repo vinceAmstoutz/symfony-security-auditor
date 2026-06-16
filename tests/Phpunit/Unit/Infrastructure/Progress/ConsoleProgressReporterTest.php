@@ -294,6 +294,21 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertStringContainsString('WEIRD xss — a.php:1', $bufferedOutput->fetch());
     }
 
+    public function test_it_clears_and_redraws_the_bar_around_each_streamed_line(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $consoleProgressReporter = new ConsoleProgressReporter($bufferedOutput);
+        $consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+
+        $bufferedOutput->fetch();
+
+        $consoleProgressReporter->report('attacker.finding.recorded', ['severity' => 'high', 'type' => 'xss', 'file' => 'a.php', 'line' => 7]);
+
+        $eraseLineSequencesFromClearThenRedraw = substr_count($bufferedOutput->fetch(), "\033[2K");
+        self::assertSame(2, $eraseLineSequencesFromClearThenRedraw);
+    }
+
     protected function setUp(): void
     {
         $this->bufferedOutput = new BufferedOutput();

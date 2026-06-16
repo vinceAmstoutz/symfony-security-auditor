@@ -29,7 +29,8 @@ final class ProgressContextTest extends TestCase
     public static function durationCases(): iterable
     {
         yield 'whole seconds' => [47.0, ' (47s)'];
-        yield 'rounds to nearest second' => [46.6, ' (47s)'];
+        yield 'rounds up at the half second' => [46.6, ' (47s)'];
+        yield 'rounds down below the half second' => [46.4, ' (46s)'];
         yield 'exactly one second' => [1.0, ' (1s)'];
         yield 'sub-second is omitted' => [0.4, ''];
         yield 'zero is omitted' => [0.0, ''];

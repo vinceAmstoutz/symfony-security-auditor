@@ -73,12 +73,7 @@ final class AuditCommandInput
             throw WorkingDirectoryUnavailableException::fromGetcwdFailure();
         }
 
-        $trimmed = u($this->projectPath ?? '')->trim();
-        if ($trimmed->isEmpty()) {
-            return $cwd;
-        }
-
-        return Path::makeAbsolute($trimmed->toString(), $cwd);
+        return Path::makeAbsolute(u($this->projectPath ?? '')->trim()->toString(), $cwd);
     }
 
     /**

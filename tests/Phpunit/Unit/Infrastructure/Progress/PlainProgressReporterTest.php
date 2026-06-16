@@ -40,6 +40,13 @@ final class PlainProgressReporterTest extends TestCase
         self::assertSame("Auditing 21 file(s) — 15 controller(s)\n", $this->bufferedOutput->fetch());
     }
 
+    public function test_it_defaults_missing_overview_counts_to_zero(): void
+    {
+        $this->plainProgressReporter->report('audit.started', []);
+
+        self::assertSame("Auditing 0 file(s)\n", $this->bufferedOutput->fetch());
+    }
+
     public function test_it_prints_an_iteration_header(): void
     {
         $this->plainProgressReporter->report('audit.iteration.started', ['iteration' => 1, 'max_iterations' => 3]);
