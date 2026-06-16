@@ -272,6 +272,28 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertSame('', $this->bufferedOutput->fetch());
     }
 
+    public function test_it_colors_a_finding_by_its_severity_in_a_decorated_terminal(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $consoleProgressReporter = new ConsoleProgressReporter($bufferedOutput);
+        $consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $consoleProgressReporter->report('attacker.finding.recorded', ['severity' => 'critical', 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 42]);
+
+        self::assertStringContainsString("\033[31m", $bufferedOutput->fetch());
+    }
+
+    public function test_it_does_not_color_a_finding_with_an_unknown_severity(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $consoleProgressReporter = new ConsoleProgressReporter($bufferedOutput);
+        $consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $consoleProgressReporter->report('attacker.finding.recorded', ['severity' => 'weird', 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
+
+        self::assertStringContainsString('WEIRD xss — a.php:1', $bufferedOutput->fetch());
+    }
+
     protected function setUp(): void
     {
         $this->bufferedOutput = new BufferedOutput();

@@ -46,8 +46,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   with no chance to repaint, so the line appeared hung. The bar message now
   reads `⏳ querying model · chunk 2/5` while a call is in flight (so the pause
   reads as waiting, not a crash), and each chunk prints a completion line with
-  its wall time as it returns (`✓ chunk 2/5 analyzed (47s)`), making progress
-  and per-chunk timing visible between calls. Backed by a new
+  its wall time as it returns (`✓ chunk 2/5 analyzed (47s)`). In a decorated
+  terminal the findings feed is now color-coded by severity (red critical,
+  bright-red high, yellow medium, green low, blue info — via the new
+  `SeverityColor` map), the overview is cyan and the review/chunk lines green;
+  these are stripped automatically in non-interactive output. This makes
+  progress and per-chunk timing visible between calls. Backed by a new
   `attacker.chunk.completed` wire event (chunk index, total, elapsed seconds)
   emitted by the sequential and concurrent chunk analyzers and rendered by both
   `ConsoleProgressReporter` and `PlainProgressReporter`. (A true mid-call

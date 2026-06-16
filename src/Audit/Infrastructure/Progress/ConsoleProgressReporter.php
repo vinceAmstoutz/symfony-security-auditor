@@ -82,29 +82,36 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
     /** @param array<string, mixed> $context */
     private function onAuditStarted(array $context): void
     {
-        $this->writeAboveBar('🔍 '.AuditOverviewLine::from($context));
+        $this->writeAboveBar('<fg=cyan>🔍 '.AuditOverviewLine::from($context).'</>');
     }
 
     /** @param array<string, mixed> $context */
     private function onAttackerFindingRecorded(array $context): void
     {
         $severity = ProgressContext::string($context, 'severity');
-        $label = VulnerabilitySeverity::tryFrom($severity)?->label() ?? strtoupper($severity);
+        $severityEnum = VulnerabilitySeverity::tryFrom($severity);
+        $label = $severityEnum?->label() ?? strtoupper($severity);
 
-        $this->writeAboveBar(\sprintf(
+        $line = \sprintf(
             '  ⚔ %s %s — %s:%d',
             $label,
             ProgressContext::string($context, 'type'),
             ProgressContext::string($context, 'file'),
             ProgressContext::int($context, 'line'),
-        ));
+        );
+
+        if ($severityEnum instanceof VulnerabilitySeverity) {
+            $line = \sprintf('<fg=%s>%s</>', SeverityColor::for($severityEnum), $line);
+        }
+
+        $this->writeAboveBar($line);
     }
 
     /** @param array<string, mixed> $context */
     private function onReviewCompleted(array $context): void
     {
         $this->writeAboveBar(\sprintf(
-            '  ✓ Reviewed: %d validated, %d rejected',
+            '<fg=green>  ✓ Reviewed: %d validated, %d rejected</>',
             ProgressContext::int($context, 'accepted'),
             ProgressContext::int($context, 'rejected'),
         ));
@@ -167,7 +174,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
         }
 
         $this->writeAboveBar(\sprintf(
-            '  ✓ chunk %d/%d analyzed%s',
+            '<fg=green>  ✓ chunk %d/%d analyzed%s</>',
             $chunk,
             $totalChunks,
             ProgressContext::durationSuffix($context, 'elapsed_seconds'),
