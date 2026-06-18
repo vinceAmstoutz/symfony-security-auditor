@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question / discussion
+    url: https://github.com/vinceAmstoutz/symfony-security-auditor/discussions
+    about: Ask questions, propose ideas, or discuss usage. Not for bug reports.
+  - name: Report a security vulnerability
+    url: https://github.com/vinceAmstoutz/symfony-security-auditor/security/advisories/new
+    about: Privately report a security issue. Do NOT open a public issue.

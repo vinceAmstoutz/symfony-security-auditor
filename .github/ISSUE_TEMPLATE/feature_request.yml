@@ -1,0 +1,55 @@
+name: Feature request
+description: Propose a new feature, enhancement, or architectural change.
+title: "feat: <short description>"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing an improvement. Please fill in the sections below so
+        the proposal can be discussed and scoped.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two paragraphs describing the change at a high level.
+      placeholder: What should change, and why does it matter?
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What problem does this solve? What is painful or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the proposed UX/API. Include commands, config, or code samples where useful.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives & open questions
+      description: Other approaches considered, and decisions still open for discussion.
+    validations:
+      required: false
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What this issue explicitly does NOT cover.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: This change respects the project's SemVer / BC policy (see `docs/versioning.md`).
+          required: false
