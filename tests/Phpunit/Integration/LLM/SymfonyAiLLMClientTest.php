@@ -644,8 +644,8 @@ final class SymfonyAiLLMClientTest extends TestCase
                 new TextResult('done'),
             ],
             [
-                new TokenUsage(promptTokens: 10, completionTokens: 5, cachedTokens: null, cacheCreationTokens: 2, cacheReadTokens: 3),
-                new TokenUsage(promptTokens: 20, completionTokens: 7, cachedTokens: null, cacheCreationTokens: 1, cacheReadTokens: 4),
+                new TokenUsage(promptTokens: 10, completionTokens: 5, cacheCreationTokens: 2, cacheReadTokens: 3),
+                new TokenUsage(promptTokens: 20, completionTokens: 7, cacheCreationTokens: 1, cacheReadTokens: 4),
             ],
         );
 
