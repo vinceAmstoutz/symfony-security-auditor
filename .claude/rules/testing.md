@@ -230,3 +230,10 @@ distinct edge-case behavior — those stay as separate test methods.
   assert on **return values**, not just _"no exception thrown"_.
 - Never silence Infection / PHPStan / CS Fixer / Rector via annotations or
   config opt-outs — see `CLAUDE.md` → _Never Silence Quality Gates_.
+- Symplify PHPUnit rules enforce test hygiene at PHPStan level: data providers
+  must be `public static` (`PublicStaticDataProviderRule`), assertions go
+  through `$this->`/`self::` (`NoAssertFuncCallInTestsRule`, no global
+  `assert()`), a test may not consist only of mock setup with no behavioral
+  assertion (`NoMockOnlyTestRule`), and repeated consecutive identical mock
+  expectations (`NoDoubleConsecutiveTestMockRule`) signal a missing
+  `#[DataProvider]`.

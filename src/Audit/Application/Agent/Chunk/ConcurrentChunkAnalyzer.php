@@ -72,13 +72,15 @@ final readonly class ConcurrentChunkAnalyzer
             $chunkContext = $this->chunkContextFactory->create($chunk, $attackerAnalysisRequest, $riskMarkerIndex, $this->attackerChunkCache->isContextAware());
 
             $cached = $this->servedCachedResult($chunk, $chunkContext, $coverageRecorder);
-            if (null !== $cached) {
+            if ($cached instanceof VulnerabilityHydrationResult) {
                 $cachedResults[$index] = $cached;
 
                 continue;
             }
 
-            $this->registerPendingRequest($index, $chunk, $chunkContext, $pending, $requests);
+            $registered = $this->buildPendingRequest($chunk, $chunkContext);
+            $pending[$index] = $registered['pending'];
+            $requests[] = $registered['request'];
         }
 
         if ([] !== $requests) {
@@ -114,26 +116,29 @@ final readonly class ConcurrentChunkAnalyzer
     }
 
     /**
-     * @param list<ProjectFile>                                                                                            $chunk
-     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}> $pending
-     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                              $requests
+     * @param list<ProjectFile> $chunk
+     *
+     * @return array{pending: array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}, request: array{system: string, user: string, tools: ToolRegistry}}
      */
-    private function registerPendingRequest(int $index, array $chunk, ChunkContext $chunkContext, array &$pending, array &$requests): void
+    private function buildPendingRequest(array $chunk, ChunkContext $chunkContext): array
     {
-        $collector = new VulnerabilityCollector();
-        $toolRegistry = new ToolRegistry([$this->recordVulnerabilityToolFactory->create($collector)], $this->logger);
-        $pending[$index] = [
-            'chunk' => $chunk,
-            'contextKey' => $chunkContext->contextKey,
-            'cacheable' => $chunkContext->cacheable,
-            'collector' => $collector,
+        $vulnerabilityCollector = new VulnerabilityCollector();
+        $toolRegistry = new ToolRegistry([$this->recordVulnerabilityToolFactory->create($vulnerabilityCollector)], $this->logger);
+
+        return [
+            'pending' => [
+                'chunk' => $chunk,
+                'contextKey' => $chunkContext->contextKey,
+                'cacheable' => $chunkContext->cacheable,
+                'collector' => $vulnerabilityCollector,
+            ],
+            'request' => ['system' => $chunkContext->systemPrompt, 'user' => $chunkContext->userMessage, 'tools' => $toolRegistry],
         ];
-        $requests[] = ['system' => $chunkContext->systemPrompt, 'user' => $chunkContext->userMessage, 'tools' => $toolRegistry];
     }
 
     /**
-     * @param list<list<ProjectFile>>                                                                                      $chunks
-     * @param array<int, VulnerabilityHydrationResult>                                                                     $cachedResults
+     * @param list<list<ProjectFile>>                                                                                             $chunks
+     * @param array<int, VulnerabilityHydrationResult>                                                                            $cachedResults
      * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}> $pending
      *
      * @return array{0: list<Vulnerability>, 1: array<string, int>}

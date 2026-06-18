@@ -16,21 +16,29 @@ parameters:
         class: 40
         function: 7
 
-    disallowedFunctionCalls:
-        -
-            function: 'compact()'
-            message: 'build an explicit array instead of compact()'
-        -
-            function: 'extract()'
-            message: 'assign variables explicitly instead of extract()'
-
 rules:
     - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\MaxParameterCountRule
     - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\NoEmptyCatchRule
     - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\NoSilencingErrorHandlerRule
     - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\FinalRule
     - Symplify\PHPStanRules\Rules\NoDynamicNameRule
+    - Symplify\PHPStanRules\Rules\NoReferenceRule
+    - Symplify\PHPStanRules\Rules\NoGlobalConstRule
+    - Symplify\PHPStanRules\Rules\NoReturnSetterMethodRule
+    - Symplify\PHPStanRules\Rules\ForbiddenMultipleClassLikeInOneFileRule
     - Symplify\PHPStanRules\Rules\Complexity\ForeachCeptionRule
+    - Symplify\PHPStanRules\Rules\Complexity\NoConstructorOverrideRule
+    - Symplify\PHPStanRules\Rules\Complexity\NoJustPropertyAssignRule
+    - Symplify\PHPStanRules\Rules\Enum\RequireUniqueEnumConstantRule
+    - Symplify\PHPStanRules\Rules\Explicit\ExplicitClassPrefixSuffixRule
+    - Symplify\PHPStanRules\Rules\Domain\RequireExceptionNamespaceRule
+    - Symplify\PHPStanRules\Rules\Domain\RequireAttributeNamespaceRule
+    - Symplify\PHPStanRules\Rules\Symfony\NoGetInCommandRule
+    - Symplify\PHPStanRules\Rules\PHPUnit\PublicStaticDataProviderRule
+    - Symplify\PHPStanRules\Rules\PHPUnit\NoAssertFuncCallInTestsRule
+    - Symplify\PHPStanRules\Rules\PHPUnit\NoMockOnlyTestRule
+    - Symplify\PHPStanRules\Rules\PHPUnit\NoMockObjectAndRealObjectPropertyRule
+    - Symplify\PHPStanRules\Rules\PHPUnit\NoDoubleConsecutiveTestMockRule
 
 services:
     -

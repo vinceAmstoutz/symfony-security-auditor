@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\MeasuringTokenEstimator;
 
 final class EstimateAuditCostUseCaseTest extends TestCase
 {
@@ -527,22 +528,5 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         if (is_dir($this->tmpDir)) {
             rmdir($this->tmpDir);
         }
-    }
-}
-
-/**
- * Recording estimator — returns 0 but captures the length of the last input seen.
- *
- * @internal scoped to EstimateAuditCostUseCaseTest
- */
-final class MeasuringTokenEstimator implements TokenEstimatorInterface
-{
-    public int $lastInputLength = -1;
-
-    public function estimateTokens(string $text, string $model): int
-    {
-        $this->lastInputLength = mb_strlen($text);
-
-        return 0;
     }
 }

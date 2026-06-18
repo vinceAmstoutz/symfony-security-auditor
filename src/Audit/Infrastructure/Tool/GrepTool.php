@@ -93,9 +93,9 @@ final readonly class GrepTool implements ToolInterface
                 continue;
             }
 
-            $this->appendFileMatches($matches, $file, $pattern);
+            $matches = [...$matches, ...$this->matchesInFile($file, $pattern)];
             if (\count($matches) >= self::MAX_MATCHES) {
-                break;
+                return \array_slice($matches, 0, self::MAX_MATCHES);
             }
         }
 
@@ -103,20 +103,20 @@ final readonly class GrepTool implements ToolInterface
     }
 
     /**
-     * @param list<string> $matches
+     * @return list<string>
      */
-    private function appendFileMatches(array &$matches, ProjectFile $file, string $pattern): void
+    private function matchesInFile(ProjectFile $projectFile, string $pattern): array
     {
-        $lines = explode("\n", $file->content());
+        $matches = [];
+        $lines = explode("\n", $projectFile->content());
         foreach ($lines as $lineIndex => $line) {
             if (!u($line)->containsAny($pattern)) {
                 continue;
             }
 
-            $matches[] = \sprintf('%s:%d:%s', $file->relativePath(), $lineIndex + 1, u($line)->trim()->toString());
-            if (\count($matches) >= self::MAX_MATCHES) {
-                return;
-            }
+            $matches[] = \sprintf('%s:%d:%s', $projectFile->relativePath(), $lineIndex + 1, u($line)->trim()->toString());
         }
+
+        return $matches;
     }
 }

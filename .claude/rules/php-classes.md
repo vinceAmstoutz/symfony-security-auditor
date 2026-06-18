@@ -17,7 +17,8 @@ are documented **context carriers**:
 
 Each opt-out site declares the reason in a leading code comment and cites this
 rule. Anything outside that list must be `final readonly`. If inheritance feels
-needed, introduce an interface instead.
+needed, introduce an interface instead. The `final`-or-`abstract` requirement is
+enforced by the custom `FinalRule` (`tools/PHPStan/FinalRule.php`).
 
 ## Interfaces & SOLID
 
@@ -46,7 +47,10 @@ input mapping/validation goes to `AuditCommandInput`, user-facing messaging to
 collaborators, each behind an interface.
 
 When you touch a file that bundles responsibilities, extract them into new
-classes rather than adding more.
+classes rather than adding more. One class/interface/trait per file is enforced
+by Symplify's `ForbiddenMultipleClassLikeInOneFileRule`; test doubles and
+fixtures live in their own files under a sibling `Fixture/` namespace, never
+inlined after the test class.
 
 ## Constructor & Method Parameters
 

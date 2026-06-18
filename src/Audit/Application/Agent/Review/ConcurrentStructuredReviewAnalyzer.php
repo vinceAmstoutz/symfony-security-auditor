@@ -78,8 +78,8 @@ final readonly class ConcurrentStructuredReviewAnalyzer
         }
 
         if ([] !== $requests) {
-            $batch = new ConcurrentReviewBatch($requests, $pendingIndexes, $reviewCollectors, $vulnerabilities, $codeContexts);
-            $this->dispatchPending($batch, $coverageRecorder, $bypassCache, $reviewed);
+            $concurrentReviewBatch = new ConcurrentReviewBatch($requests, $pendingIndexes, $reviewCollectors, $vulnerabilities, $codeContexts);
+            $reviewed = $this->dispatchPending($concurrentReviewBatch, $coverageRecorder, $bypassCache, $reviewed);
         }
 
         ksort($reviewed);
@@ -102,44 +102,50 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     /**
      * @param array<int, Vulnerability> $reviewed
      *
-     * @param-out array<int, Vulnerability> $reviewed
+     * @return array<int, Vulnerability>
      */
-    private function dispatchPending(ConcurrentReviewBatch $batch, CoverageRecorderInterface $coverageRecorder, bool $bypassCache, array &$reviewed): void
+    private function dispatchPending(ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, bool $bypassCache, array $reviewed): array
     {
         try {
-            $this->toolBatchCapableLLMClient->completeBatchWithTools($batch->requests, $this->maxConcurrent, $this->maxToolIterations);
+            $this->toolBatchCapableLLMClient->completeBatchWithTools($concurrentReviewBatch->requests, $this->maxConcurrent, $this->maxToolIterations);
 
-            foreach ($batch->pendingIndexes as $index) {
-                $reviewed[$index] = $this->recordPendingVerdict($index, $batch, $coverageRecorder, $bypassCache);
+            foreach ($concurrentReviewBatch->pendingIndexes as $index) {
+                $reviewed[$index] = $this->recordPendingVerdict($index, $concurrentReviewBatch, $coverageRecorder, $bypassCache);
             }
+
+            return $reviewed;
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
             throw $llmProviderException;
         } catch (Throwable $exception) {
-            $this->recordPendingErrors($batch->pendingIndexes, $batch->vulnerabilities, $exception, $coverageRecorder, $reviewed);
+            return $this->recordPendingErrors($concurrentReviewBatch->pendingIndexes, $concurrentReviewBatch->vulnerabilities, $exception, $coverageRecorder, $reviewed);
         }
     }
 
-    private function recordPendingVerdict(int $index, ConcurrentReviewBatch $batch, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): Vulnerability
+    private function recordPendingVerdict(int $index, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): Vulnerability
     {
-        $verdict = $batch->reviewCollectors[$index]->drain()[0] ?? null;
+        $verdict = $concurrentReviewBatch->reviewCollectors[$index]->drain()[0] ?? null;
         if (!$bypassCache) {
-            $this->reviewerVerdictCache->store($batch->vulnerabilities[$index], $batch->codeContexts[$index], $verdict);
+            $this->reviewerVerdictCache->store($concurrentReviewBatch->vulnerabilities[$index], $concurrentReviewBatch->codeContexts[$index], $verdict);
         }
 
-        return $this->reviewOutcomeRecorder->recordVerdict($batch->vulnerabilities[$index], $verdict, $coverageRecorder);
+        return $this->reviewOutcomeRecorder->recordVerdict($concurrentReviewBatch->vulnerabilities[$index], $verdict, $coverageRecorder);
     }
 
     /**
      * @param list<int>                 $pendingIndexes
      * @param list<Vulnerability>       $vulnerabilities
      * @param array<int, Vulnerability> $reviewed
+     *
+     * @return array<int, Vulnerability>
      */
-    private function recordPendingErrors(array $pendingIndexes, array $vulnerabilities, Throwable $exception, CoverageRecorderInterface $coverageRecorder, array &$reviewed): void
+    private function recordPendingErrors(array $pendingIndexes, array $vulnerabilities, Throwable $throwable, CoverageRecorderInterface $coverageRecorder, array $reviewed): array
     {
         foreach ($pendingIndexes as $pendingIndex) {
-            $reviewed[$pendingIndex] = $this->reviewOutcomeRecorder->recordReviewError($vulnerabilities[$pendingIndex], $exception, $coverageRecorder);
+            $reviewed[$pendingIndex] = $this->reviewOutcomeRecorder->recordReviewError($vulnerabilities[$pendingIndex], $throwable, $coverageRecorder);
         }
+
+        return $reviewed;
     }
 }

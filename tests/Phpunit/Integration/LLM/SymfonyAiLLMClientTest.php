@@ -22,7 +22,6 @@ use RuntimeException;
 use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\MessageBag;
-use Symfony\AI\Platform\Message\MessageInterface;
 use Symfony\AI\Platform\Message\ToolCallMessage;
 use Symfony\AI\Platform\Model;
 use Symfony\AI\Platform\ModelCatalog\FallbackModelCatalog;
@@ -50,12 +49,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\BackoffSchedule;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
@@ -67,6 +64,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimitBacko
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeRateLimiter;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeSleeper;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FixedTokenEstimator;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\InvocationOptionsCapture;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\PlatformInvocationLog;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingConverter;
 
 final class SymfonyAiLLMClientTest extends TestCase
 {
@@ -2173,87 +2176,5 @@ final class SymfonyAiLLMClientTest extends TestCase
                 return $this->executor instanceof Closure ? ($this->executor)($arguments) : 'ok';
             }
         };
-    }
-}
-
-final class InvocationOptionsCapture
-{
-    /** @var ?array<int|string, mixed> */
-    public ?array $options = null;
-}
-
-final class PlatformInvocationLog
-{
-    public int $invocations = 0;
-
-    /** @var list<list<MessageInterface>> */
-    public array $messageSnapshots = [];
-}
-
-final class FakeSleeper implements SleeperInterface
-{
-    /** @var list<int> */
-    public array $durations = [];
-
-    public function sleep(int $milliseconds): void
-    {
-        $this->durations[] = $milliseconds;
-    }
-}
-
-final class FakeRateLimiter implements RateLimiterInterface
-{
-    /** @var list<int> */
-    public array $acquired = [];
-
-    /** @var list<array{int, int}> */
-    public array $recorded = [];
-
-    /** @var list<DateTimeImmutable> */
-    public array $paused = [];
-
-    public function acquire(int $estimatedInputTokens): void
-    {
-        $this->acquired[] = $estimatedInputTokens;
-    }
-
-    public function record(int $inputTokens, int $outputTokens): void
-    {
-        $this->recorded[] = [$inputTokens, $outputTokens];
-    }
-
-    public function pauseUntil(DateTimeImmutable $until): void
-    {
-        $this->paused[] = $until;
-    }
-}
-
-final class FixedTokenEstimator implements TokenEstimatorInterface
-{
-    public function __construct(private readonly int $tokensPerCall) {}
-
-    public function estimateTokens(string $text, string $model): int
-    {
-        return $this->tokensPerCall;
-    }
-}
-
-final class ThrowingConverter implements ResultConverterInterface
-{
-    public function __construct(private readonly RuntimeException $runtimeException) {}
-
-    public function supports(Model $model): bool
-    {
-        return true;
-    }
-
-    public function convert(RawResultInterface $result, array $options = []): ResultInterface
-    {
-        throw $this->runtimeException;
-    }
-
-    public function getTokenUsageExtractor(): ?TokenUsageExtractorInterface
-    {
-        return null;
     }
 }
