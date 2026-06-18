@@ -92,7 +92,8 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
             throw GitChangedFilesUnavailableException::fromProcessFailure($argv[\count($argv) - 1] ?? '', $process->getErrorOutput(), $processFailedException);
         }
 
-        $lines = preg_split('/\R/', u($process->getOutput())->trim()->toString()) ?: [];
+        $split = preg_split('/\R/', u($process->getOutput())->trim()->toString());
+        $lines = false !== $split ? $split : [];
 
         return array_values(array_filter(
             $lines,

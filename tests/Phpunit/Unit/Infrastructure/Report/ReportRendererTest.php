@@ -18,7 +18,10 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
@@ -85,7 +88,7 @@ final class ReportRendererTest extends TestCase
         $output = $this->reportRenderer->renderConsole($this->makeReport());
         $frame = str_repeat('═', 70);
         $firstFrame = strpos($output, $frame);
-        $secondFrame = strpos($output, $frame, ($firstFrame ?: 0) + 1);
+        $secondFrame = strpos($output, $frame, (false === $firstFrame ? 0 : $firstFrame) + 1);
         $packagePosition = strpos($output, ReportRenderer::PACKAGE_NAME);
 
         self::assertNotFalse($firstFrame);
@@ -107,7 +110,7 @@ final class ReportRendererTest extends TestCase
         $output = $this->reportRenderer->renderConsole($this->makeReport());
         $frame = str_repeat('═', 70);
         $firstFrame = strpos($output, $frame);
-        $secondFrame = strpos($output, $frame, ($firstFrame ?: 0) + 1);
+        $secondFrame = strpos($output, $frame, (false === $firstFrame ? 0 : $firstFrame) + 1);
         $urlPosition = strpos($output, 'https://github.com/vinceamstoutz/symfony-security-auditor');
 
         self::assertNotFalse($firstFrame);
@@ -217,9 +220,9 @@ final class ReportRendererTest extends TestCase
     {
         $decoded = $this->decodeSarif($this->makeReport());
 
-        self::assertArrayHasKey('$schema', $decoded);
-        self::assertArrayHasKey('version', $decoded);
-        self::assertArrayHasKey('runs', $decoded);
+        self::assertSame('https://json.schemastore.org/sarif-2.1.0.json', $decoded['$schema']);
+        self::assertSame('2.1.0', $decoded['version']);
+        self::assertCount(1, $decoded['runs']);
     }
 
     public function test_render_sarif_version_is_2_1_0(): void
@@ -262,7 +265,7 @@ final class ReportRendererTest extends TestCase
     {
         $decoded = $this->decodeSarif($this->makeReport());
 
-        self::assertArrayHasKey('tool', $decoded['runs'][0]);
+        self::assertSame('Symfony Security Auditor', $decoded['runs'][0]['tool']['driver']['name']);
         self::assertArrayHasKey('results', $decoded['runs'][0]);
     }
 
@@ -342,8 +345,7 @@ final class ReportRendererTest extends TestCase
         $decoded = $this->decodeSarif($this->makeReport($vulnerability));
 
         $location = $decoded['runs'][0]['results'][0]['locations'][0]['physicalLocation'];
-        self::assertArrayHasKey('artifactLocation', $location);
-        self::assertArrayHasKey('region', $location);
+        self::assertSame('src/Foo.php', $location['artifactLocation']['uri']);
         self::assertSame(1, $location['region']['startLine']);
         self::assertSame(5, $location['region']['endLine']);
     }
@@ -353,8 +355,8 @@ final class ReportRendererTest extends TestCase
         $decoded = $this->decodeSarif($this->makeReport());
         $schema = $decoded['$schema'];
 
-        self::assertStringContainsString('/', (string) $schema);
-        self::assertStringNotContainsString('\/', (string) $schema);
+        self::assertStringContainsString('/', $schema);
+        self::assertStringNotContainsString('\/', $schema);
     }
 
     public function test_render_sarif_result_message_text_is_vulnerability_title(): void
@@ -444,19 +446,11 @@ final class ReportRendererTest extends TestCase
     public function test_render_console_description_chunks_at_exactly_65_chars(): void
     {
         $longDescription = str_repeat('a', 70);
-        $vulnerability = Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'Test Vuln',
-            description: $longDescription,
-            filePath: 'src/Foo.php',
-            lineStart: 1,
-            lineEnd: 5,
-            vulnerableCode: '$q',
-            attackVector: 'short',
-            proof: 'p',
-            remediation: 'r',
-            confidence: 0.7,
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Test Vuln', 0.7),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative($longDescription, 'short', 'p', 'r'),
+            '$q',
         )->withReviewerValidation(true);
 
         $output = $this->reportRenderer->renderConsole($this->makeReport($vulnerability));
@@ -467,19 +461,11 @@ final class ReportRendererTest extends TestCase
     public function test_render_console_attack_vector_chunks_at_exactly_65_chars(): void
     {
         $longVector = str_repeat('b', 70);
-        $vulnerability = Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'Test Vuln',
-            description: 'short',
-            filePath: 'src/Foo.php',
-            lineStart: 1,
-            lineEnd: 5,
-            vulnerableCode: '$q',
-            attackVector: $longVector,
-            proof: 'p',
-            remediation: 'r',
-            confidence: 0.7,
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Test Vuln', 0.7),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('short', $longVector, 'p', 'r'),
+            '$q',
         )->withReviewerValidation(true);
 
         $output = $this->reportRenderer->renderConsole($this->makeReport($vulnerability));
@@ -490,19 +476,11 @@ final class ReportRendererTest extends TestCase
     public function test_render_console_remediation_chunks_at_exactly_65_chars(): void
     {
         $longRemediation = str_repeat('c', 70);
-        $vulnerability = Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'Test Vuln',
-            description: 'short',
-            filePath: 'src/Foo.php',
-            lineStart: 1,
-            lineEnd: 5,
-            vulnerableCode: '$q',
-            attackVector: 'short',
-            proof: 'p',
-            remediation: $longRemediation,
-            confidence: 0.7,
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Test Vuln', 0.7),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('short', 'short', 'p', $longRemediation),
+            '$q',
         )->withReviewerValidation(true);
 
         $output = $this->reportRenderer->renderConsole($this->makeReport($vulnerability));
@@ -711,19 +689,11 @@ final class ReportRendererTest extends TestCase
 
     public function test_render_console_confidence_renders_as_exact_percent_value(): void
     {
-        $vulnerability = Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'Test Vuln',
-            description: 'short',
-            filePath: 'src/Foo.php',
-            lineStart: 1,
-            lineEnd: 5,
-            vulnerableCode: '$q',
-            attackVector: 'short',
-            proof: 'p',
-            remediation: 'r',
-            confidence: 0.7,
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Test Vuln', 0.7),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('short', 'short', 'p', 'r'),
+            '$q',
         )->withReviewerValidation(true);
 
         $output = $this->reportRenderer->renderConsole($this->makeReport($vulnerability));
@@ -860,19 +830,11 @@ final class ReportRendererTest extends TestCase
 
     public function test_render_html_escapes_finding_content_to_prevent_report_xss(): void
     {
-        $vulnerability = Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: '<script>alert(1)</script>',
-            description: 'desc',
-            filePath: 'src/Foo.php',
-            lineStart: 1,
-            lineEnd: 2,
-            vulnerableCode: 'code',
-            attackVector: 'vec',
-            proof: 'proof',
-            remediation: 'fix',
-            confidence: 0.9,
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, '<script>alert(1)</script>', 0.9),
+            new CodeLocation('src/Foo.php', 1, 2),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
         )->withReviewerValidation(true);
 
         $output = $this->reportRenderer->renderHtml($this->makeReport($vulnerability));
@@ -1029,19 +991,11 @@ final class ReportRendererTest extends TestCase
         string $filePath = 'src/Foo.php',
         int $lineStart = 1,
     ): Vulnerability {
-        return Vulnerability::create(
-            vulnerabilityType: $vulnerabilityType,
-            vulnerabilitySeverity: $vulnerabilitySeverity,
-            title: 'Test Vuln',
-            description: 'Test description',
-            filePath: $filePath,
-            lineStart: $lineStart,
-            lineEnd: $lineStart + 4,
-            vulnerableCode: '$q',
-            attackVector: 'inject',
-            proof: "' OR 1=1",
-            remediation: 'fix',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification($vulnerabilityType, $vulnerabilitySeverity, 'Test Vuln', 0.9),
+            new CodeLocation($filePath, $lineStart, $lineStart + 4),
+            new VulnerabilityNarrative('Test description', 'inject', "' OR 1=1", 'fix'),
+            '$q',
         )->withReviewerValidation(true);
     }
 }

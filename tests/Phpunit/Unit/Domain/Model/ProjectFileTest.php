@@ -86,7 +86,15 @@ final class ProjectFileTest extends TestCase
     ): void {
         $projectFile = ProjectFile::create($path, '/app/'.$path, '<?php');
         self::assertSame($expectedType, $projectFile->type());
-        self::assertTrue($projectFile->{$checkerMethod}());
+
+        $checkerResult = match ($checkerMethod) {
+            'isController' => $projectFile->isController(),
+            'isEntity' => $projectFile->isEntity(),
+            'isVoter' => $projectFile->isVoter(),
+            'isRepository' => $projectFile->isRepository(),
+            default => self::fail(\sprintf('Unexpected checker method: %s', $checkerMethod)),
+        };
+        self::assertTrue($checkerResult);
     }
 
     public function test_it_detects_controller_in_controller_directory_without_suffix(): void

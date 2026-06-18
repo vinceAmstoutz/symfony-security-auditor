@@ -51,42 +51,67 @@ final readonly class PlatformToolsMapper
      */
     private static function normalizeSchema(array $schema): array
     {
-        $rawProperties = $schema['properties'] ?? [];
-        $properties = [];
-        if (\is_array($rawProperties)) {
-            foreach ($rawProperties as $name => $spec) {
-                if (!\is_string($name)) {
-                    continue;
-                }
-
-                if (!\is_array($spec)) {
-                    continue;
-                }
-
-                $type = $spec['type'] ?? 'string';
-                $description = $spec['description'] ?? '';
-                $properties[$name] = [
-                    'type' => \is_string($type) ? $type : 'string',
-                    'description' => \is_string($description) ? $description : '',
-                ];
-            }
-        }
-
-        $rawRequired = $schema['required'] ?? [];
-        $required = [];
-        if (\is_array($rawRequired)) {
-            foreach ($rawRequired as $name) {
-                if (\is_string($name)) {
-                    $required[] = $name;
-                }
-            }
-        }
-
         return [
             'type' => 'object',
-            'properties' => $properties,
-            'required' => $required,
+            'properties' => self::normalizeProperties($schema['properties'] ?? []),
+            'required' => self::normalizeRequired($schema['required'] ?? []),
             'additionalProperties' => false,
         ];
+    }
+
+    /**
+     * @return array<string, array{type: string, description: string}>
+     */
+    private static function normalizeProperties(mixed $rawProperties): array
+    {
+        if (!\is_array($rawProperties)) {
+            return [];
+        }
+
+        $properties = [];
+        foreach ($rawProperties as $name => $spec) {
+            if (!\is_string($name) || !\is_array($spec)) {
+                continue;
+            }
+
+            $properties[$name] = self::normalizePropertySpec($spec);
+        }
+
+        return $properties;
+    }
+
+    /**
+     * @param array<array-key, mixed> $spec
+     *
+     * @return array{type: string, description: string}
+     */
+    private static function normalizePropertySpec(array $spec): array
+    {
+        $type = $spec['type'] ?? 'string';
+        $description = $spec['description'] ?? '';
+
+        return [
+            'type' => \is_string($type) ? $type : 'string',
+            'description' => \is_string($description) ? $description : '',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function normalizeRequired(mixed $rawRequired): array
+    {
+        if (!\is_array($rawRequired)) {
+            return [];
+        }
+
+        $required = [];
+        foreach ($rawRequired as $name) {
+            if (\is_string($name)) {
+                $required[] = $name;
+            }
+        }
+
+        return $required;
     }
 }

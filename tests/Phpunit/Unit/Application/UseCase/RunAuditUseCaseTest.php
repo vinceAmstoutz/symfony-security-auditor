@@ -18,7 +18,6 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\RecordingStage;
 
@@ -35,15 +34,6 @@ final class RunAuditUseCaseTest extends TestCase
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
-    }
-
-    public function test_it_returns_audit_report(): void
-    {
-        $runAuditUseCase = new RunAuditUseCase($this->makePipeline(), new NullLogger());
-
-        $auditReport = $runAuditUseCase->execute($this->tmpDir);
-
-        self::assertInstanceOf(AuditReport::class, $auditReport);
     }
 
     public function test_it_runs_pipeline_against_the_audit_context(): void

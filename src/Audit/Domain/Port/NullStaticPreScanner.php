@@ -11,15 +11,14 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class NullControllerAccessControlParser implements ControllerAccessControlParserInterface
+final readonly class NullStaticPreScanner implements StaticPreScannerInterface
 {
-    public function parse(ProjectFile $projectFile): array
+    public function scan(array $files): array
     {
         return [];
     }

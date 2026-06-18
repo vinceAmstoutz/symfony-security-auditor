@@ -77,8 +77,8 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     {
         foreach ($this->patterns as $label => $pattern) {
             $result = SecretPatternLabel::InlineAssignment->value === $label
-                ? @preg_replace_callback($pattern, $this->redactInlineAssignment(...), $content)
-                : @preg_replace($pattern, $this->replacementFor($label), $content);
+                ? preg_replace_callback($pattern, $this->redactInlineAssignment(...), $content)
+                : preg_replace($pattern, $this->replacementFor($label), $content);
 
             if (null === $result) {
                 continue;
@@ -130,11 +130,19 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             return 'empty pattern';
         }
 
-        $result = @preg_match($pattern, '');
-        if (false === $result) {
-            return preg_last_error_msg();
+        $error = null;
+        set_error_handler(static function (int $severity, string $message) use (&$error): bool {
+            $error = $message;
+
+            return true;
+        });
+
+        try {
+            $isValidPattern = false !== preg_match($pattern, '');
+        } finally {
+            restore_error_handler();
         }
 
-        return null;
+        return $isValidPattern ? null : ($error ?? preg_last_error_msg());
     }
 }

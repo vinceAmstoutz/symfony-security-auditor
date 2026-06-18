@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 use JsonException;
 use RuntimeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 
 final readonly class LLMResponse
 {
@@ -30,6 +31,26 @@ final readonly class LLMResponse
         private int $cacheCreationTokens,
     ) {}
 
+    public static function of(
+        string $content,
+        string $model,
+        string $stopReason,
+        TokenUsageSnapshot $usage,
+    ): self {
+        return new self(
+            $content,
+            $usage->inputTokens(),
+            $usage->outputTokens(),
+            $model,
+            $stopReason,
+            $usage->cacheReadTokens(),
+            $usage->cacheCreationTokens(),
+        );
+    }
+
+    /**
+     * @deprecated since 1.13, use {@see self::of()} with a TokenUsageSnapshot instead.
+     */
     public static function create(
         string $content,
         int $inputTokens,
@@ -140,40 +161,62 @@ final readonly class LLMResponse
         for ($i = 0; $i < $length; ++$i) {
             $char = $content[$i];
 
-            if ($escape) {
-                $escape = false;
+            $next = $this->advanceStringLiteralState($char, $inString, $escape);
+            $inString = $next['inString'];
+            $escape = $next['escape'];
+
+            if ($next['consumed']) {
                 continue;
             }
 
-            if ($inString) {
-                if ('\\' === $char) {
-                    $escape = true;
-                } elseif ('"' === $char) {
-                    $inString = false;
-                }
-
+            $candidate = $this->decodeOpenerCandidate($content, $i, $char);
+            if (null === $candidate) {
                 continue;
             }
 
-            if ('"' === $char) {
-                $inString = true;
-                continue;
-            }
-
-            if ('[' === $char) {
-                $candidate = $this->tryDecodeBalancedBlock($content, $i, '[', ']');
-            } elseif ('{' === $char) {
-                $candidate = $this->tryDecodeBalancedBlock($content, $i, '{', '}');
-            } else {
-                continue;
-            }
-
-            if (null !== $candidate) {
-                return $candidate;
-            }
+            return $candidate;
         }
 
         return null;
+    }
+
+    private function decodeOpenerCandidate(string $content, int $start, string $char): mixed
+    {
+        return match ($char) {
+            '[' => $this->tryDecodeBalancedBlock($content, $start, '[', ']'),
+            '{' => $this->tryDecodeBalancedBlock($content, $start, '{', '}'),
+            default => null,
+        };
+    }
+
+    /**
+     * Advances the string-literal scanning state for a single character.
+     *
+     * `consumed` is true when the character belongs to string-literal handling
+     * (an escape, a quote, or any character inside a string) and the caller must
+     * skip its own structural handling for it.
+     *
+     * @return array{inString: bool, escape: bool, consumed: bool}
+     */
+    private function advanceStringLiteralState(string $char, bool $inString, bool $escape): array
+    {
+        if ($escape) {
+            return ['inString' => $inString, 'escape' => false, 'consumed' => true];
+        }
+
+        if ($inString) {
+            return [
+                'inString' => '"' !== $char,
+                'escape' => '\\' === $char,
+                'consumed' => true,
+            ];
+        }
+
+        if ('"' === $char) {
+            return ['inString' => true, 'escape' => false, 'consumed' => true];
+        }
+
+        return ['inString' => false, 'escape' => false, 'consumed' => false];
     }
 
     /**
@@ -188,15 +231,17 @@ final readonly class LLMResponse
         }
 
         $first = $content[0];
-        if ('[' === $first) {
-            $block = $this->scanBalancedBlockFrom($content, 0, '[', ']');
-        } elseif ('{' === $first) {
-            $block = $this->scanBalancedBlockFrom($content, 0, '{', '}');
-        } else {
+        $block = match ($first) {
+            '[' => $this->scanBalancedBlockFrom($content, 0, '[', ']'),
+            '{' => $this->scanBalancedBlockFrom($content, 0, '{', '}'),
+            default => null,
+        };
+
+        if (null === $block) {
             return false;
         }
 
-        return null !== $block && \strlen($block) === \strlen($content);
+        return \strlen($block) === \strlen($content);
     }
 
     /**
@@ -228,34 +273,35 @@ final readonly class LLMResponse
         for ($i = $start; $i < $length; ++$i) {
             $char = $content[$i];
 
-            if ($escape) {
-                $escape = false;
+            $next = $this->advanceStringLiteralState($char, $inString, $escape);
+            $inString = $next['inString'];
+            $escape = $next['escape'];
+
+            if ($next['consumed']) {
                 continue;
             }
 
-            if ($inString) {
-                if ('\\' === $char) {
-                    $escape = true;
-                } elseif ('"' === $char) {
-                    $inString = false;
-                }
+            $depth = $this->adjustDepth($depth, $char, $open, $close);
 
-                continue;
-            }
-
-            if ('"' === $char) {
-                $inString = true;
-            } elseif ($char === $open) {
-                ++$depth;
-            } elseif ($char === $close) {
-                --$depth;
-                if (0 === $depth) {
-                    return substr($content, $start, $i - $start + 1);
-                }
+            if ($char === $close && 0 === $depth) {
+                return substr($content, $start, $i - $start + 1);
             }
         }
 
         return null;
+    }
+
+    private function adjustDepth(int $depth, string $char, string $open, string $close): int
+    {
+        if ($char === $open) {
+            return $depth + 1;
+        }
+
+        if ($char === $close) {
+            return $depth - 1;
+        }
+
+        return $depth;
     }
 
     public function isEmpty(): bool

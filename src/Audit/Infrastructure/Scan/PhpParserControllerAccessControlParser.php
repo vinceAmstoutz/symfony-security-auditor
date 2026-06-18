@@ -13,11 +13,14 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
+use PhpParser\Node\Arg;
+use PhpParser\Node\Attribute;
 use PhpParser\Node\AttributeGroup;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Scalar\String_;
+use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
@@ -46,15 +49,8 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
             return [];
         }
 
-        try {
-            $parserFactory = new ParserFactory();
-            $parser = $parserFactory->createForNewestSupportedVersion();
-            $ast = $parser->parse($projectFile->content());
-
-            if (null === $ast) {
-                return [];
-            }
-        } catch (Throwable) {
+        $ast = $this->parseToAst($projectFile->content());
+        if (null === $ast) {
             return [];
         }
 
@@ -63,15 +59,43 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
 
         $entries = [];
         foreach ($classes as $class) {
-            $classHasIsGranted = $this->hasIsGrantedAttribute($class->attrGroups);
-
-            foreach ($class->getMethods() as $methodNode) {
-                if (!$methodNode->isPublic()) {
-                    continue;
-                }
-
-                $entries[] = $this->buildEntry($projectFile->relativePath(), $methodNode, $classHasIsGranted, $nodeFinder);
+            foreach ($this->entriesForClass($projectFile->relativePath(), $class, $nodeFinder) as $entry) {
+                $entries[] = $entry;
             }
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @return Stmt[]|null
+     */
+    private function parseToAst(string $content): ?array
+    {
+        try {
+            $parserFactory = new ParserFactory();
+            $parser = $parserFactory->createForNewestSupportedVersion();
+
+            return $parser->parse($content);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @return list<RouteAccessControl>
+     */
+    private function entriesForClass(string $filePath, Class_ $class, NodeFinder $nodeFinder): array
+    {
+        $classHasIsGranted = $this->hasIsGrantedAttribute($class->attrGroups);
+
+        $entries = [];
+        foreach ($class->getMethods() as $methodNode) {
+            if (!$methodNode->isPublic()) {
+                continue;
+            }
+
+            $entries[] = $this->buildEntry($filePath, $methodNode, $classHasIsGranted, $nodeFinder);
         }
 
         return $entries;
@@ -108,30 +132,62 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
                     continue;
                 }
 
-                $path = null;
-                $methods = [];
-                $firstPositionalConsumed = false;
-                foreach ($attribute->args as $arg) {
-                    $argName = $arg->name?->toString();
-                    if (null === $argName && !$firstPositionalConsumed) {
-                        $argName = 'path';
-                        $firstPositionalConsumed = true;
-                    }
-
-                    if ('path' === $argName && $arg->value instanceof String_) {
-                        $path = $arg->value->value;
-                    }
-
-                    if ('methods' === $argName && $arg->value instanceof Array_) {
-                        $methods = $this->stringValuesFromArray($arg->value);
-                    }
-                }
-
-                return ['present' => true, 'path' => $path, 'methods' => $methods];
+                return $this->routeDataFromArgs($attribute->args);
             }
         }
 
         return ['present' => false, 'path' => null, 'methods' => []];
+    }
+
+    /**
+     * @param array<Arg> $args
+     *
+     * @return array{present: bool, path: ?string, methods: list<string>}
+     */
+    private function routeDataFromArgs(array $args): array
+    {
+        $path = null;
+        $methods = [];
+        $firstPositionalConsumed = false;
+        foreach ($args as $arg) {
+            $argName = $this->resolveRouteArgName($arg->name?->toString(), $firstPositionalConsumed);
+            $firstPositionalConsumed = $firstPositionalConsumed || null === $arg->name;
+
+            $path = $this->routePathFromArg($argName, $arg) ?? $path;
+            $methods = $this->routeMethodsFromArg($argName, $arg) ?? $methods;
+        }
+
+        return ['present' => true, 'path' => $path, 'methods' => $methods];
+    }
+
+    private function routePathFromArg(?string $argName, Arg $arg): ?string
+    {
+        if ('path' === $argName && $arg->value instanceof String_) {
+            return $arg->value->value;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function routeMethodsFromArg(?string $argName, Arg $arg): ?array
+    {
+        if ('methods' === $argName && $arg->value instanceof Array_) {
+            return $this->stringValuesFromArray($arg->value);
+        }
+
+        return null;
+    }
+
+    private function resolveRouteArgName(?string $argName, bool $firstPositionalConsumed): ?string
+    {
+        if (null === $argName && !$firstPositionalConsumed) {
+            return 'path';
+        }
+
+        return $argName;
     }
 
     /**
@@ -143,21 +199,48 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     {
         $values = [];
         foreach ($attributeGroups as $attributeGroup) {
-            foreach ($attributeGroup->attrs as $attribute) {
-                if (!$this->attributeShortNameMatches($attribute->name->toString(), 'IsGranted')) {
-                    continue;
-                }
-
-                foreach ($attribute->args as $arg) {
-                    if ($arg->value instanceof String_) {
-                        $values[] = $arg->value->value;
-                        break;
-                    }
-                }
+            foreach ($this->isGrantedValuesFromAttributes($attributeGroup->attrs) as $value) {
+                $values[] = $value;
             }
         }
 
         return $values;
+    }
+
+    /**
+     * @param array<Attribute> $attributes
+     *
+     * @return list<string>
+     */
+    private function isGrantedValuesFromAttributes(array $attributes): array
+    {
+        $values = [];
+        foreach ($attributes as $attribute) {
+            if (!$this->attributeShortNameMatches($attribute->name->toString(), 'IsGranted')) {
+                continue;
+            }
+
+            $firstStringArg = $this->firstStringArgValue($attribute->args);
+            if (null !== $firstStringArg) {
+                $values[] = $firstStringArg;
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * @param array<Arg> $args
+     */
+    private function firstStringArgValue(array $args): ?string
+    {
+        foreach ($args as $arg) {
+            if ($arg->value instanceof String_) {
+                return $arg->value->value;
+            }
+        }
+
+        return null;
     }
 
     /**

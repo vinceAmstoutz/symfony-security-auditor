@@ -65,7 +65,9 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
 
         $stdout = $process->getOutput();
         if (u($stdout)->trim()->isEmpty()) {
-            throw AdvisorySourceUnavailableException::forFailedProcess($projectPath, $process->getErrorOutput() ?: 'empty stdout', $process->isSuccessful() ? null : new ProcessFailedException($process));
+            $errorOutput = $process->getErrorOutput();
+
+            throw AdvisorySourceUnavailableException::forFailedProcess($projectPath, '' !== $errorOutput ? $errorOutput : 'empty stdout', $process->isSuccessful() ? null : new ProcessFailedException($process));
         }
 
         return $stdout;

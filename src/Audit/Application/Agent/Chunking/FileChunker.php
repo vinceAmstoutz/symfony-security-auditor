@@ -140,7 +140,7 @@ final readonly class FileChunker
     {
         return array_values(array_filter(
             $files,
-            static fn (ProjectFile $projectFile): bool => !isset($assignedPaths[$projectFile->relativePath()]),
+            static fn (ProjectFile $projectFile): bool => !\array_key_exists($projectFile->relativePath(), $assignedPaths),
         ));
     }
 

@@ -31,10 +31,10 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     {
         // Pins: `$totalInputChars = 0` (vs -1), `mb_strlen` invocation,
         // `str_repeat('x', 0)` returning empty string → estimator gets ''.
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 99),
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 99),
+        ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -49,13 +49,13 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     {
         // Pins: `+=` (vs `=`) — last file's length would otherwise override prior files.
         $measuringTokenEstimator = $this->measuringEstimator();
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [
                 $this->makeProjectFile('a.php', '<?php // ten ch'),     // 15 chars
                 $this->makeProjectFile('b.php', '<?php /* 1 */'),       // 13 chars
             ],
-            tokenEstimator: $measuringTokenEstimator,
-        );
+            'tokenEstimator' => $measuringTokenEstimator,
+        ]);
 
         $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -67,12 +67,12 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         // Pins: `mb_strlen` (vs `strlen`). One 3-byte UTF-8 character has
         // mb_strlen=1 but strlen=3 — different scrub-down token counts.
         $measuringTokenEstimator = $this->measuringEstimator();
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [
                 $this->makeProjectFile('m.php', '€€€'), // mb_strlen=3, strlen=9
             ],
-            tokenEstimator: $measuringTokenEstimator,
-        );
+            'tokenEstimator' => $measuringTokenEstimator,
+        ]);
 
         $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -83,11 +83,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     {
         // Pins: `* maxIterations` (vs `/`). With perRoundTokens=10 and maxIterations=5,
         // expected attacker = 50; with division mutation, would be 2.
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [$this->makeProjectFile('a.php', 'aaa')],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 10),
-            maxIterations: 5,
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 10),
+            'maxIterations' => 5,
+        ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -96,12 +96,12 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_output_token_estimate_uses_ceil_of_output_ratio(): void
     {
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [$this->makeProjectFile('a.php', 'aaa')],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
-            maxIterations: 1,
-            outputRatio: 0.155,
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'maxIterations' => 1,
+            'outputRatio' => 0.155,
+        ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -114,12 +114,12 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     {
         // 100 * 0.21 = 21.0 exactly — floor=21, ceil=21, round=21. Useless to distinguish.
         // Try 100 * 0.234 = 23.4 → ceil=24, floor=23, round=23. Picks ceil distinctly.
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [$this->makeProjectFile('a.php', 'aaa')],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
-            maxIterations: 1,
-            outputRatio: 0.234,
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'maxIterations' => 1,
+            'outputRatio' => 0.234,
+        ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -131,10 +131,10 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         // Pins: `str_repeat('x', $totalInputChars)` — if mutator unwraps to just 'x',
         // the estimator receives a single character and produces a much smaller estimate.
         $measuringTokenEstimator = $this->measuringEstimator();
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [$this->makeProjectFile('a.php', str_repeat('a', 1000))],
-            tokenEstimator: $measuringTokenEstimator,
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', str_repeat('a', 1000))],
+            'tokenEstimator' => $measuringTokenEstimator,
+        ]);
 
         $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -151,11 +151,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
             },
         );
 
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [$this->makeProjectFile('a.php', 'aaa')],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 1),
-            logger: $logger,
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 1),
+            'logger' => $logger,
+        ]);
 
         $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -177,16 +177,16 @@ final class EstimateAuditCostUseCaseTest extends TestCase
             },
         );
 
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [
                 $this->makeProjectFile('a.php', 'aaa'),
                 $this->makeProjectFile('b.php', 'bbb'),
             ],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
-            logger: $logger,
-            maxIterations: 2,
-            outputRatio: 0.5,
-        );
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'logger' => $logger,
+            'maxIterations' => 2,
+            'outputRatio' => 0.5,
+        ]);
 
         $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -208,15 +208,15 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_dry_run_emits_attacker_and_reviewer_breakdown(): void
     {
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [$this->makeProjectFile('a.php', 'aaa')],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
-            primaryModel: 'claude-opus-4-7',
-            maxIterations: 1,
-            outputRatio: 0.5,
-            reviewerModel: 'claude-haiku-4-5',
-            reviewerInputRatio: 0.25,
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'primaryModel' => 'claude-opus-4-7',
+            'maxIterations' => 1,
+            'outputRatio' => 0.5,
+            'reviewerModel' => 'claude-haiku-4-5',
+            'reviewerInputRatio' => 0.25,
+        ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -230,14 +230,14 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_attacker_cost_in_breakdown_is_rounded_to_six_decimals(): void
     {
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [$this->makeProjectFile('a.php', 'aaa')],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
-            maxIterations: 1,
-            outputRatio: 0.0,
-            reviewerInputRatio: 0.0,
-            pricingProvider: $this->nonZeroPricing(1.234567, 0.0),
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'maxIterations' => 1,
+            'outputRatio' => 0.0,
+            'reviewerInputRatio' => 0.0,
+            'pricingProvider' => $this->nonZeroPricing(1.234567, 0.0),
+        ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -246,14 +246,14 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_reviewer_cost_in_breakdown_is_rounded_to_six_decimals(): void
     {
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [$this->makeProjectFile('a.php', 'aaa')],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
-            maxIterations: 1,
-            outputRatio: 0.0,
-            reviewerInputRatio: 0.5,
-            pricingProvider: $this->nonZeroPricing(1.234567, 0.0),
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'maxIterations' => 1,
+            'outputRatio' => 0.0,
+            'reviewerInputRatio' => 0.5,
+            'pricingProvider' => $this->nonZeroPricing(1.234567, 0.0),
+        ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -262,14 +262,14 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_estimated_cost_sums_attacker_and_reviewer_contributions(): void
     {
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [$this->makeProjectFile('a.php', 'aaa')],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
-            maxIterations: 1,
-            outputRatio: 0.0,
-            reviewerInputRatio: 0.5,
-            pricingProvider: $this->nonZeroPricing(1.234567, 0.0),
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'maxIterations' => 1,
+            'outputRatio' => 0.0,
+            'reviewerInputRatio' => 0.5,
+            'pricingProvider' => $this->nonZeroPricing(1.234567, 0.0),
+        ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -278,13 +278,13 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_reviewer_input_token_estimate_uses_ceil_not_floor_or_round(): void
     {
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [$this->makeProjectFile('a.php', 'aaa')],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
-            maxIterations: 1,
-            outputRatio: 0.5,
-            reviewerInputRatio: 0.234,
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'maxIterations' => 1,
+            'outputRatio' => 0.5,
+            'reviewerInputRatio' => 0.234,
+        ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -293,13 +293,13 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_reviewer_output_token_estimate_uses_ceil_not_floor_or_round(): void
     {
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [$this->makeProjectFile('a.php', 'aaa')],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 100),
-            maxIterations: 1,
-            outputRatio: 0.146,
-            reviewerInputRatio: 0.5,
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
+            'maxIterations' => 1,
+            'outputRatio' => 0.146,
+            'reviewerInputRatio' => 0.5,
+        ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -308,14 +308,14 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_dry_run_falls_back_to_attacker_model_when_reviewer_model_blank(): void
     {
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [$this->makeProjectFile('a.php', 'aaa')],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 10),
-            primaryModel: 'gpt-4o',
-            maxIterations: 1,
-            outputRatio: 0.5,
-            reviewerModel: '',
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 10),
+            'primaryModel' => 'gpt-4o',
+            'maxIterations' => 1,
+            'outputRatio' => 0.5,
+            'reviewerModel' => '',
+        ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -328,14 +328,14 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     {
         // Pins: `$auditContext->setProjectFiles($files)` — if removed, the resulting
         // AuditReport's `filesScanned` would be 0 instead of the actual count.
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [
                 $this->makeProjectFile('a.php', 'a'),
                 $this->makeProjectFile('b.php', 'b'),
                 $this->makeProjectFile('c.php', 'c'),
             ],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 1),
-        );
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 1),
+        ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -347,14 +347,14 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         // Pins ScanPathFilter integration: without filter, all three files are
         // estimated; with `apps/api`, only the matching one contributes.
         $measuringTokenEstimator = $this->measuringEstimator();
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [
                 $this->makeProjectFile('apps/api/src/A.php', 'aa'),     // 2 chars
                 $this->makeProjectFile('apps/web/src/B.php', 'bbbbbb'), // 6 chars
                 $this->makeProjectFile('libs/shared/C.php', 'cccc'),    // 4 chars
             ],
-            tokenEstimator: $measuringTokenEstimator,
-        );
+            'tokenEstimator' => $measuringTokenEstimator,
+        ]);
 
         $estimateAuditCostUseCase->execute($this->tmpDir, ['apps/api']);
 
@@ -363,11 +363,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_primary_model_flows_through_to_audit_cost(): void
     {
-        $estimateAuditCostUseCase = $this->makeUseCase(
-            files: [$this->makeProjectFile('a.php', 'aaa')],
-            tokenEstimator: $this->fixedEstimator(perRoundTokens: 1),
-            primaryModel: 'claude-opus-4-7',
-        );
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [$this->makeProjectFile('a.php', 'aaa')],
+            'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 1),
+            'primaryModel' => 'claude-opus-4-7',
+        ]);
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
@@ -390,26 +390,35 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     }
 
     /**
-     * @param list<ProjectFile> $files
+     * @param array{
+     *     files?: list<ProjectFile>,
+     *     tokenEstimator?: TokenEstimatorInterface,
+     *     logger?: LoggerInterface,
+     *     primaryModel?: string,
+     *     maxIterations?: int,
+     *     outputRatio?: float,
+     *     reviewerModel?: string,
+     *     reviewerInputRatio?: float,
+     *     pricingProvider?: PricingProviderInterface,
+     * } $overrides
      */
-    private function makeUseCase(
-        array $files,
-        TokenEstimatorInterface $tokenEstimator,
-        ?LoggerInterface $logger = null,
-        string $primaryModel = 'gpt-4o',
-        int $maxIterations = 3,
-        float $outputRatio = EstimateAuditCostUseCase::DEFAULT_OUTPUT_RATIO,
-        string $reviewerModel = '',
-        float $reviewerInputRatio = EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO,
-        ?PricingProviderInterface $pricingProvider = null,
-    ): EstimateAuditCostUseCase {
-        $projectFileScanner = $this->fixedScanner($files);
+    private function makeUseCase(array $overrides = []): EstimateAuditCostUseCase
+    {
+        $files = $overrides['files'] ?? [];
+        $tokenEstimator = $overrides['tokenEstimator'] ?? $this->fixedEstimator(perRoundTokens: 0);
+        $logger = $overrides['logger'] ?? new NullLogger();
+        $primaryModel = $overrides['primaryModel'] ?? 'gpt-4o';
+        $maxIterations = $overrides['maxIterations'] ?? 3;
+        $outputRatio = $overrides['outputRatio'] ?? EstimateAuditCostUseCase::DEFAULT_OUTPUT_RATIO;
+        $reviewerModel = $overrides['reviewerModel'] ?? '';
+        $reviewerInputRatio = $overrides['reviewerInputRatio'] ?? EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO;
+        $pricingProvider = $overrides['pricingProvider'] ?? $this->zeroPricing();
 
         return new EstimateAuditCostUseCase(
-            $projectFileScanner,
+            $this->fixedScanner($files),
             $tokenEstimator,
-            new CostCalculator($pricingProvider ?? $this->zeroPricing()),
-            $logger ?? new NullLogger(),
+            new CostCalculator($pricingProvider),
+            $logger,
             $primaryModel,
             $maxIterations,
             $outputRatio,

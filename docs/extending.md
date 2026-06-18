@@ -48,17 +48,21 @@ The default implementation (`SymfonyAiLLMClient`) delegates to `symfony/ai`'s
 `AgentInterface`. Replace it when you need direct HTTP calls, custom retry
 logic, token tracking, or a provider that `symfony/ai` does not support.
 
-`LLMResponse` is an immutable value object constructed with named arguments:
+`LLMResponse` is an immutable value object built via its `of()` factory, with
+the token counts grouped into a `TokenUsageSnapshot`:
 
 ```php
-LLMResponse::create(
+LLMResponse::of(
     content: string,      // raw text from the model
-    inputTokens: int,
-    outputTokens: int,
     model: string,
     stopReason: string,
+    usage: TokenUsageSnapshot::of(inputTokens: int, outputTokens: int),
 );
 ```
+
+> The legacy `LLMResponse::create(content, inputTokens, outputTokens, model,
+> stopReason)` factory is **deprecated since 1.13** and removed in the next
+> `MAJOR`; use `of()` in new code.
 
 Key read methods: `content()`, `parseJson(): array` (strips markdown fences then
 JSON-decodes), `isEmpty(): bool`, `totalTokens(): int`.
@@ -69,6 +73,7 @@ JSON-decodes), `isEmpty(): bool`, `totalTokens(): int`.
 // src/Llm/AcmeLlmClient.php
 namespace App\Llm;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
@@ -91,12 +96,14 @@ final class AcmeLlmClient implements LLMClientInterface
             ],
         ])->toArray();
 
-        return LLMResponse::create(
-            content:      $response['choices'][0]['text'],
-            inputTokens:  $response['usage']['prompt_tokens'],
-            outputTokens: $response['usage']['completion_tokens'],
-            model:        $this->model(),
-            stopReason:   $response['choices'][0]['finish_reason'],
+        return LLMResponse::of(
+            content:    $response['choices'][0]['text'],
+            model:      $this->model(),
+            stopReason: $response['choices'][0]['finish_reason'],
+            usage:      TokenUsageSnapshot::of(
+                inputTokens:  $response['usage']['prompt_tokens'],
+                outputTokens: $response['usage']['completion_tokens'],
+            ),
         );
     }
 
@@ -202,7 +209,7 @@ final class DeduplicationStage implements StageInterface
         foreach ($context->vulnerabilities() as $id => $vuln) {
             $key = $vuln->filePath() . ':' . $vuln->lineStart() . ':' . $vuln->type()->value;
 
-            if (isset($seen[$key])) {
+            if (array_key_exists($key, $seen)) {
                 // Keep the one with higher confidence; replace lower-confidence duplicate.
                 $existing = $context->vulnerabilities()[$seen[$key]];
                 if ($vuln->confidence() > $existing->confidence()) {

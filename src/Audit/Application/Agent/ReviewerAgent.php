@@ -18,6 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchRev
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchVerdictApplier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ConcurrentReviewAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ConcurrentStructuredReviewAnalyzer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewBatchSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewerVerdictCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewOutcomeRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\SequentialReviewAnalyzer;
@@ -27,9 +28,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 
@@ -62,75 +60,83 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 
     private BatchReviewAnalyzer $batchReviewAnalyzer;
 
+    private LoggerInterface $logger;
+
+    private int $batchSize;
+
+    private bool $toolsEnabled;
+
+    private int $maxConcurrent;
+
+    private bool $useStructuredCollection;
+
     public function __construct(
-        LLMClientInterface $llmClient,
-        ReviewerPromptBuilderInterface $reviewerPromptBuilder,
-        private LoggerInterface $logger,
-        private int $batchSize = self::DEFAULT_BATCH_SIZE,
+        ReviewerAgentCollaborators $collaborators,
+        ReviewerModeConfiguration $mode,
         private ?ToolRegistryFactoryInterface $toolRegistryFactory = null,
-        private bool $toolsEnabled = self::DEFAULT_TOOLS_ENABLED,
-        int $maxToolIterations = self::DEFAULT_MAX_TOOL_ITERATIONS,
-        private int $maxConcurrent = self::DEFAULT_MAX_CONCURRENT,
-        ?RecordReviewToolFactoryInterface $recordReviewToolFactory = null,
-        private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
-        ?ReviewerCacheInterface $reviewerCache = null,
     ) {
-        $verdictApplier = new VerdictApplier($logger);
-        $reviewerVerdictCache = new ReviewerVerdictCache($reviewerCache, $logger);
-        $reviewOutcomeRecorder = new ReviewOutcomeRecorder($verdictApplier, $reviewerVerdictCache, $logger);
+        $this->logger = $collaborators->logger;
+        $this->batchSize = $mode->batchSize;
+        $this->toolsEnabled = $mode->toolsEnabled;
+        $this->maxConcurrent = $mode->maxConcurrent;
+        $this->useStructuredCollection = $mode->useStructuredCollection;
+
+        $verdictApplier = new VerdictApplier($collaborators->logger);
+        $reviewerVerdictCache = new ReviewerVerdictCache($collaborators->reviewerCache, $collaborators->logger);
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder($verdictApplier, $reviewerVerdictCache, $collaborators->logger);
 
         $this->sequentialReviewAnalyzer = new SequentialReviewAnalyzer(
-            $llmClient,
-            $reviewerPromptBuilder,
+            $collaborators->llmClient,
+            $collaborators->reviewerPromptBuilder,
             $reviewerVerdictCache,
             $reviewOutcomeRecorder,
-            $maxToolIterations,
+            $mode->maxToolIterations,
         );
 
-        $this->structuredReviewAnalyzer = $recordReviewToolFactory instanceof RecordReviewToolFactoryInterface
+        $this->structuredReviewAnalyzer = $collaborators->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface
             ? new StructuredReviewAnalyzer(
-                $llmClient,
-                $reviewerPromptBuilder,
+                $collaborators->llmClient,
+                $collaborators->reviewerPromptBuilder,
                 $reviewerVerdictCache,
                 $reviewOutcomeRecorder,
-                $recordReviewToolFactory,
-                $logger,
-                $maxToolIterations,
+                $collaborators->recordReviewToolFactory,
+                $collaborators->logger,
+                $mode->maxToolIterations,
             )
             : null;
 
-        $this->concurrentReviewAnalyzer = $llmClient instanceof BatchCapableLLMClientInterface
+        $this->concurrentReviewAnalyzer = $collaborators->llmClient instanceof BatchCapableLLMClientInterface
             ? new ConcurrentReviewAnalyzer(
-                $llmClient,
-                $reviewerPromptBuilder,
+                $collaborators->llmClient,
+                $collaborators->reviewerPromptBuilder,
                 $reviewerVerdictCache,
                 $reviewOutcomeRecorder,
-                $this->maxConcurrent,
+                $mode->maxConcurrent,
             )
             : null;
 
-        $this->concurrentStructuredReviewAnalyzer = $llmClient instanceof ToolBatchCapableLLMClientInterface && $recordReviewToolFactory instanceof RecordReviewToolFactoryInterface
+        $this->concurrentStructuredReviewAnalyzer = $collaborators->llmClient instanceof ToolBatchCapableLLMClientInterface && $collaborators->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface
             ? new ConcurrentStructuredReviewAnalyzer(
-                $llmClient,
-                $reviewerPromptBuilder,
+                $collaborators->llmClient,
+                $collaborators->reviewerPromptBuilder,
                 $reviewerVerdictCache,
                 $reviewOutcomeRecorder,
-                $recordReviewToolFactory,
-                $logger,
-                $this->maxConcurrent,
-                $maxToolIterations,
+                $collaborators->recordReviewToolFactory,
+                $collaborators->logger,
+                $mode->maxConcurrent,
+                $mode->maxToolIterations,
             )
             : null;
 
         $this->batchReviewAnalyzer = new BatchReviewAnalyzer(
-            $llmClient,
-            $reviewerPromptBuilder,
-            new BatchVerdictApplier($verdictApplier, $reviewerVerdictCache, $logger),
+            $collaborators->llmClient,
+            $collaborators->reviewerPromptBuilder,
+            new BatchVerdictApplier($verdictApplier, $reviewerVerdictCache, $collaborators->logger),
             $reviewerVerdictCache,
             $reviewOutcomeRecorder,
-            $logger,
-            $maxToolIterations,
-            $recordReviewToolFactory,
+            $collaborators->logger,
+            $mode->maxToolIterations,
+            $collaborators->recordReviewToolFactory,
         );
     }
 
@@ -147,16 +153,12 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         }
 
         $useTools = $this->toolsEnabled && $this->toolRegistryFactory instanceof ToolRegistryFactoryInterface;
-        $structuredEligible = !$useTools
-            && $this->useStructuredCollection
-            && $this->structuredReviewAnalyzer instanceof StructuredReviewAnalyzer;
-        $useStructuredConcurrent = $structuredEligible
-            && $this->batchSize <= 1
-            && $this->maxConcurrent > 1
-            && $this->concurrentStructuredReviewAnalyzer instanceof ConcurrentStructuredReviewAnalyzer;
-        $useStructuredCollection = $structuredEligible
-            && ($this->batchSize > 1 || $this->maxConcurrent <= 1 || $useStructuredConcurrent);
         $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($projectFiles) : null;
+        $structuredEligible = $this->isStructuredEligible($useTools);
+        $structuredConcurrent = $this->structuredConcurrentAnalyzer($structuredEligible);
+        $useStructuredCollection = $this->shouldUseStructuredCollection($structuredEligible, $structuredConcurrent instanceof ConcurrentStructuredReviewAnalyzer);
+        $structured = $useStructuredCollection ? $this->structuredReviewAnalyzer : null;
+        $concurrent = $this->concurrentAnalyzer($useTools);
 
         $this->logger->info('Reviewer agent validating findings', [
             'count' => \count($vulnerabilities),
@@ -165,22 +167,13 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             'structured_collection' => $useStructuredCollection,
         ]);
 
-        if ($this->batchSize <= 1) {
-            if ($useStructuredConcurrent) {
-                $reviewed = $this->concurrentStructuredReviewAnalyzer->analyze($vulnerabilities, $projectFiles, $coverageRecorder, $bypassCache);
-            } elseif ($useStructuredCollection) {
-                $reviewed = $this->structuredReviewAnalyzer->analyze($vulnerabilities, $projectFiles, $coverageRecorder, $bypassCache);
-            } else {
-                $useConcurrent = !$useTools
-                    && $this->maxConcurrent > 1
-                    && $this->concurrentReviewAnalyzer instanceof ConcurrentReviewAnalyzer;
-                $reviewed = $useConcurrent
-                    ? $this->concurrentReviewAnalyzer->analyze($vulnerabilities, $projectFiles, $coverageRecorder, $bypassCache)
-                    : $this->sequentialReviewAnalyzer->analyze($vulnerabilities, $projectFiles, $coverageRecorder, $toolRegistry, $bypassCache);
-            }
-        } else {
-            $reviewed = $this->batchReviewAnalyzer->analyze($vulnerabilities, $projectFiles, $this->batchSize, $coverageRecorder, $toolRegistry, $useStructuredCollection, $bypassCache);
-        }
+        $reviewed = match (true) {
+            $this->batchSize > 1 => $this->batchReviewAnalyzer->analyze($vulnerabilities, $projectFiles, new ReviewBatchSettings($this->batchSize, $useStructuredCollection, $bypassCache, $coverageRecorder, $toolRegistry)),
+            $structuredConcurrent instanceof ConcurrentStructuredReviewAnalyzer => $structuredConcurrent->analyze($vulnerabilities, $projectFiles, $coverageRecorder, $bypassCache),
+            $structured instanceof StructuredReviewAnalyzer => $structured->analyze($vulnerabilities, $projectFiles, $coverageRecorder, $bypassCache),
+            $concurrent instanceof ConcurrentReviewAnalyzer => $concurrent->analyze($vulnerabilities, $projectFiles, $coverageRecorder, $bypassCache),
+            default => $this->sequentialReviewAnalyzer->analyze($vulnerabilities, $projectFiles, $coverageRecorder, $toolRegistry, $bypassCache),
+        };
 
         $accepted = array_filter($reviewed, static fn (Vulnerability $vulnerability): bool => $vulnerability->isReviewerValidated());
         $rejected = \count($reviewed) - \count($accepted);
@@ -192,5 +185,36 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         ]);
 
         return $reviewed;
+    }
+
+    private function isStructuredEligible(bool $useTools): bool
+    {
+        return !$useTools
+            && $this->useStructuredCollection
+            && $this->structuredReviewAnalyzer instanceof StructuredReviewAnalyzer;
+    }
+
+    private function shouldUseStructuredCollection(bool $structuredEligible, bool $useStructuredConcurrent): bool
+    {
+        return $structuredEligible
+            && ($this->batchSize > 1 || $this->maxConcurrent <= 1 || $useStructuredConcurrent);
+    }
+
+    private function structuredConcurrentAnalyzer(bool $structuredEligible): ?ConcurrentStructuredReviewAnalyzer
+    {
+        if (!$structuredEligible || $this->batchSize > 1 || $this->maxConcurrent <= 1) {
+            return null;
+        }
+
+        return $this->concurrentStructuredReviewAnalyzer;
+    }
+
+    private function concurrentAnalyzer(bool $useTools): ?ConcurrentReviewAnalyzer
+    {
+        if ($useTools || $this->maxConcurrent <= 1) {
+            return null;
+        }
+
+        return $this->concurrentReviewAnalyzer;
     }
 }

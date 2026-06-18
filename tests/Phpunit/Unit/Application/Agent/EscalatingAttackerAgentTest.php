@@ -19,9 +19,14 @@ use Symfony\Component\ErrorHandler\BufferingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
@@ -39,7 +44,7 @@ final class EscalatingAttackerAgentTest extends TestCase
 
         $result = $this->callAnalyze($escalatingAttackerAgent,
             [$this->makeFile('src/Controller/A.php')],
-            SymfonyMapping::create(),
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
             new NullCoverageRecorder(),
         );
 
@@ -63,7 +68,7 @@ final class EscalatingAttackerAgentTest extends TestCase
 
         $escalatingAttackerAgent = new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger());
 
-        $this->callAnalyze($escalatingAttackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($escalatingAttackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertSame(1, $expensive->callCount);
         self::assertCount(1, $expensive->lastFiles);
@@ -90,7 +95,7 @@ final class EscalatingAttackerAgentTest extends TestCase
 
         $result = $this->callAnalyze($escalatingAttackerAgent,
             [$this->makeFile('src/Controller/A.php')],
-            SymfonyMapping::create(),
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
             new NullCoverageRecorder(),
         );
 
@@ -111,7 +116,7 @@ final class EscalatingAttackerAgentTest extends TestCase
 
         $result = $this->callAnalyze($escalatingAttackerAgent,
             [$this->makeFile('src/Controller/A.php'), $this->makeFile('src/Controller/B.php')],
-            SymfonyMapping::create(),
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
             new NullCoverageRecorder(),
         );
 
@@ -131,7 +136,7 @@ final class EscalatingAttackerAgentTest extends TestCase
 
         $this->callAnalyze($escalatingAttackerAgent,
             [$this->makeFile('src/Controller/A.php')],
-            SymfonyMapping::create(),
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
             new NullCoverageRecorder(),
         );
 
@@ -150,7 +155,7 @@ final class EscalatingAttackerAgentTest extends TestCase
         $bufferingLogger = new BufferingLogger();
 
         (new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, $bufferingLogger))
-            ->analyze(new AttackerAnalysisRequest($files, SymfonyMapping::create()), new NullCoverageRecorder());
+            ->analyze(new AttackerAnalysisRequest($files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())), new NullCoverageRecorder());
 
         $logs = $bufferingLogger->cleanLogs();
         self::assertSame(['files' => 3], $this->contextOf($logs, 'Escalation: running cheap-model first pass'));
@@ -165,7 +170,7 @@ final class EscalatingAttackerAgentTest extends TestCase
         $bufferingLogger = new BufferingLogger();
 
         (new EscalatingAttackerAgent($this->makeRecordingAttacker([]), $this->makeRecordingAttacker([]), $bufferingLogger))
-            ->analyze(new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::create()), new NullCoverageRecorder());
+            ->analyze(new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())), new NullCoverageRecorder());
 
         self::assertSame([], $this->contextOf($bufferingLogger->cleanLogs(), 'Escalation: cheap pass found nothing, skipping expensive pass'));
     }
@@ -182,7 +187,7 @@ final class EscalatingAttackerAgentTest extends TestCase
         (new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger()))->analyze(
             new AttackerAnalysisRequest(
                 [$this->makeFile('src/Controller/A.php'), $this->makeFile('src/Controller/B.php')],
-                SymfonyMapping::create(),
+                SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
                 false,
                 $previous,
             ),
@@ -236,19 +241,11 @@ final class EscalatingAttackerAgentTest extends TestCase
         VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,
         string $title = 'v',
     ): Vulnerability {
-        return Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: $vulnerabilitySeverity,
-            title: $title,
-            description: 'd',
-            filePath: $filePath,
-            lineStart: 10,
-            lineEnd: 15,
-            vulnerableCode: 'c',
-            attackVector: 'a',
-            proof: 'p',
-            remediation: 'r',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, $vulnerabilitySeverity, $title, 0.9),
+            new CodeLocation($filePath, 10, 15),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            'c',
         );
     }
 

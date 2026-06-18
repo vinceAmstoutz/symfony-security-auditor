@@ -23,7 +23,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
@@ -345,13 +348,11 @@ final class AuditPresenterTest extends TestCase
         $auditContext = AuditContext::forProject($this->tmpDir);
         for ($i = 1; $i <= 5; ++$i) {
             $auditContext->addVulnerability(
-                Vulnerability::create(
-                    VulnerabilityType::SQL_INJECTION,
-                    VulnerabilitySeverity::CRITICAL,
-                    'Critical vuln '.$i,
-                    'desc',
-                    'src/File'.$i.'.php',
-                    1, 5, '$q', 'inject', "' OR 1", 'fix', 0.9,
+                Vulnerability::of(
+                    new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'Critical vuln '.$i, 0.9),
+                    new CodeLocation('src/File'.$i.'.php', 1, 5),
+                    new VulnerabilityNarrative('desc', 'inject', "' OR 1", 'fix'),
+                    '$q',
                 )->withReviewerValidation(true),
             );
         }

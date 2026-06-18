@@ -37,7 +37,7 @@ final readonly class ToolRegistry
         $byName = [];
         foreach ($tools as $tool) {
             $name = $tool->definition()->name;
-            if (isset($byName[$name])) {
+            if (array_key_exists($name, $byName)) {
                 throw new InvalidArgumentException(\sprintf('Duplicate tool registered: %s', $name));
             }
 
@@ -60,7 +60,7 @@ final readonly class ToolRegistry
 
     public function has(string $name): bool
     {
-        return isset($this->tools[$name]);
+        return array_key_exists($name, $this->tools);
     }
 
     /**
@@ -68,7 +68,7 @@ final readonly class ToolRegistry
      */
     public function execute(string $name, array $arguments): string
     {
-        if (!isset($this->tools[$name])) {
+        if (!array_key_exists($name, $this->tools)) {
             $this->logger->warning('Tool not found, returning error to LLM', ['tool' => $name]);
 
             return \sprintf('Error: tool "%s" is not registered. Pick from the provided tool list.', $name);

@@ -41,7 +41,8 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
 
         self::assertSame('{"advisories": {"foo/bar": []}}', $json);
         self::assertSame(1, $recordingComposerAuditRunner->callCount);
-        self::assertGreaterThan(0, \count(glob($this->cacheDir.'/*/*.json') ?: []));
+        $cacheFiles = glob($this->cacheDir.'/*/*.json');
+        self::assertGreaterThan(0, \count(false !== $cacheFiles ? $cacheFiles : []));
     }
 
     public function test_missing_lockfile_does_not_emit_an_unreadable_warning(): void
@@ -144,7 +145,8 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame('{"advisories": {}}', $first);
         self::assertSame('{"advisories": {}}', $second);
         self::assertSame(2, $recordingComposerAuditRunner->callCount, 'without a lockfile, every call must hit the inner runner');
-        self::assertSame([], glob($this->cacheDir.'/*/*.json') ?: []);
+        $cacheFiles = glob($this->cacheDir.'/*/*.json');
+        self::assertSame([], false !== $cacheFiles ? $cacheFiles : []);
     }
 
     public function test_does_not_persist_when_inner_throws(): void
@@ -159,7 +161,8 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         try {
             $lockfileHashedAdvisoryCache->run($this->projectDir);
         } finally {
-            self::assertSame([], glob($this->cacheDir.'/*/*.json') ?: []);
+            $cacheFiles = glob($this->cacheDir.'/*/*.json');
+            self::assertSame([], false !== $cacheFiles ? $cacheFiles : []);
         }
     }
 
@@ -268,7 +271,8 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         $lockfileHashedAdvisoryCache = $this->makeCache($this->recordingRunner('{"advisories": {}}'));
         $lockfileHashedAdvisoryCache->run($this->projectDir);
 
-        $files = glob($this->cacheDir.'/*/*.json') ?: [];
+        $globResult = glob($this->cacheDir.'/*/*.json');
+        $files = false !== $globResult ? $globResult : [];
         self::assertCount(1, $files);
 
         $expectedPath = \sprintf(

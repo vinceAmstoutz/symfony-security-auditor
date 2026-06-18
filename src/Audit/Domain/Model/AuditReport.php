@@ -27,11 +27,7 @@ final readonly class AuditReport
      * @param list<array{stage: string, file: string, status: string}> $coverage
      */
     private function __construct(
-        private string $auditId,
-        private string $projectPath,
-        private DateTimeImmutable $startedAt,
-        private DateTimeImmutable $completedAt,
-        private int $filesScanned,
+        private ReportIdentity $identity,
         private array $coverage,
         ?AuditCost $auditCost,
         Vulnerability ...$vulnerabilities,
@@ -58,11 +54,13 @@ final readonly class AuditReport
     public static function fromContext(AuditContext $auditContext, ?AuditCost $auditCost = null): self
     {
         return new self(
-            $auditContext->auditId(),
-            $auditContext->projectPath(),
-            $auditContext->startedAt(),
-            new DateTimeImmutable(),
-            \count($auditContext->projectFiles()),
+            new ReportIdentity(
+                $auditContext->auditId(),
+                $auditContext->projectPath(),
+                $auditContext->startedAt(),
+                new DateTimeImmutable(),
+                \count($auditContext->projectFiles()),
+            ),
             $auditContext->coverage(),
             $auditCost,
             ...$auditContext->validatedVulnerabilities(),
@@ -71,27 +69,27 @@ final readonly class AuditReport
 
     public function auditId(): string
     {
-        return $this->auditId;
+        return $this->identity->auditId;
     }
 
     public function projectPath(): string
     {
-        return $this->projectPath;
+        return $this->identity->projectPath;
     }
 
     public function startedAt(): DateTimeImmutable
     {
-        return $this->startedAt;
+        return $this->identity->startedAt;
     }
 
     public function completedAt(): DateTimeImmutable
     {
-        return $this->completedAt;
+        return $this->identity->completedAt;
     }
 
     public function filesScanned(): int
     {
-        return $this->filesScanned;
+        return $this->identity->filesScanned;
     }
 
     public function cost(): AuditCost
@@ -142,11 +140,7 @@ final readonly class AuditReport
         );
 
         return new self(
-            $this->auditId,
-            $this->projectPath,
-            $this->startedAt,
-            $this->completedAt,
-            $this->filesScanned,
+            $this->identity,
             $this->coverage,
             $this->auditCost,
             ...$kept,
@@ -171,11 +165,7 @@ final readonly class AuditReport
         );
 
         return new self(
-            $this->auditId,
-            $this->projectPath,
-            $this->startedAt,
-            $this->completedAt,
-            $this->filesScanned,
+            $this->identity,
             $this->coverage,
             $this->auditCost,
             ...$kept,
@@ -184,7 +174,7 @@ final readonly class AuditReport
 
     public function durationSeconds(): float
     {
-        return (float) ($this->completedAt->getTimestamp() - $this->startedAt->getTimestamp());
+        return (float) ($this->identity->completedAt->getTimestamp() - $this->identity->startedAt->getTimestamp());
     }
 
     public function totalVulnerabilities(): int
@@ -249,12 +239,12 @@ final readonly class AuditReport
         }
 
         return [
-            'audit_id' => $this->auditId,
-            'project' => $this->projectPath,
-            'started_at' => $this->startedAt->format(DateTimeInterface::ATOM),
-            'completed_at' => $this->completedAt->format(DateTimeInterface::ATOM),
+            'audit_id' => $this->identity->auditId,
+            'project' => $this->identity->projectPath,
+            'started_at' => $this->identity->startedAt->format(DateTimeInterface::ATOM),
+            'completed_at' => $this->identity->completedAt->format(DateTimeInterface::ATOM),
             'duration_seconds' => $this->durationSeconds(),
-            'files_scanned' => $this->filesScanned,
+            'files_scanned' => $this->identity->filesScanned,
             'risk_score' => $this->riskScore(),
             'risk_level' => $this->riskLevel(),
             'total_vulnerabilities' => $this->totalVulnerabilities(),

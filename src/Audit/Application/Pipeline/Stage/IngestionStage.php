@@ -82,7 +82,7 @@ final readonly class IngestionStage implements StageInterface
 
         $filtered = array_values(array_filter(
             $files,
-            static fn (ProjectFile $projectFile): bool => isset($changedSet[$projectFile->relativePath()]),
+            static fn (ProjectFile $projectFile): bool => array_key_exists($projectFile->relativePath(), $changedSet),
         ));
 
         $this->logger->info('Diff filter applied', [

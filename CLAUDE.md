@@ -28,7 +28,10 @@ to detect vulnerabilities and produce structured reports.
 | Packaging       | symfony-bundle + Flex recipe                                          |
 | Tests           | PHPUnit (Unit / Integration / EndToEnd)                               |
 | Mutation        | Infection (100% MSI required)                                         |
-| Static analysis | PHPStan max + Rector                                                  |
+| Static analysis | PHPStan max + phpstan-strict-rules + custom + symplify/spaze rules + Rector |
+| Layer conformance | deptrac (DDD layer rules — `deptrac.yaml`)                          |
+| Complexity      | tomasvotruba/cognitive-complexity (function ≤ 7, class ≤ 40)          |
+| Dead code       | rector/swiss-knife (`check-commented-code`, `check-conflicts`)        |
 | Style           | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets)                          |
 
 ## Build, Test & Lint Commands
@@ -49,8 +52,9 @@ bin/castor up
 
 `bin/castor lint` runs sequentially: Prettier (check) → Markdown lint
 (markdownlint-cli2) → Composer Normalize → PHP CS Fixer → Rector → PHPStan (max,
-500M) → PHPUnit → Infection. `bin/castor lint:fix` auto-fixes Prettier +
-Markdown lint + steps 1–3; remaining steps are check-only.
+500M) → Deptrac (DDD layers) → Swiss Knife (commented-code + merge-conflict scan)
+→ PHPUnit → Infection. `bin/castor lint:fix` auto-fixes Prettier + Markdown lint
++ steps 1–3; remaining steps are check-only.
 
 Commit messages are validated separately in CI via
 [commitlint](https://commitlint.js.org/) (`commitlint.config.js`) — see
@@ -63,16 +67,17 @@ src/
   Audit/
     Domain/          # Pure PHP — no framework, no I/O
       Configuration/ # Typed config VOs (BundleConfiguration, AuditProfile, LLMConfiguration, …)
-      Model/         # Value objects and enums (Vulnerability, AuditReport, ProjectFile, ProjectFileType, RouteAccessControl, VoterCapability, FormBinding, VulnerabilityHydrationResult, VulnerabilityDropReason, …)
+      Model/         # Value objects and enums (Vulnerability [+ `of()` factory + CodeLocation/VulnerabilityClassification/VulnerabilityNarrative], SymfonyMapping [+ `of()` + ProjectFileInventory/AccessControlMap], AuditReport [+ ReportIdentity], ProjectFile, ProjectFileType, RouteAccessControl, VoterCapability, FormBinding, TokenUsageSnapshot, VulnerabilityHydrationResult, VulnerabilityDropReason, …) — public factories use `of()`; the wide `create()` is `@deprecated`
+      Exception/     # Domain exceptions (LLMProviderException, GitChangedFilesUnavailableException, InvalidCodeLocationException, InvalidVulnerabilityClassificationException)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)
       Port/          # Cross-layer ports (LLMClientInterface, BatchCapableLLMClientInterface, ToolBatchCapableLLMClientInterface, LLMResponse, *PromptBuilderInterface, ProjectFileScannerInterface, AttackerCacheInterface, ContextAwareAttackerCacheInterface, ReviewerCacheInterface, AdvisoryDatabaseInterface, SecretScrubberInterface, TokenEstimatorInterface, PricingProviderInterface, RateLimiterInterface, ProgressReporterInterface, StaticPreScannerInterface, CodeSlicerInterface, ControllerAccessControlParserInterface, VoterCapabilityParserInterface, FormBindingParserInterface, GitChangedFilesResolverInterface)
         Tool/        # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
     Application/     # Orchestration — no I/O, depends only on Domain
       UseCase/       # RunAuditUseCase, EstimateAuditCostUseCase (entry points)
       Pipeline/      # AuditPipeline + Stage/{IngestionStage, MappingStage, AuditStage, PoCSynthesisStage}
-      Agent/         # AttackerAgent (+ AttackerAnalysisRequest, RiskMarkerIndex, AttackerContextPromptRenderer, Chunk/{ChunkContext, ChunkContextFactory, AttackerChunkCache, ChunkCoverageRecorder, ChunkFindingProgress, SequentialChunkAnalyzer, ConcurrentChunkAnalyzer}), ReviewerAgent (+ Review/{VerdictApplier, BatchVerdictApplier, ReviewOutcomeRecorder, ReviewerVerdictCache, CodeContextResolver, SequentialReviewAnalyzer, StructuredReviewAnalyzer, ConcurrentReviewAnalyzer, ConcurrentStructuredReviewAnalyzer, BatchReviewAnalyzer}), EscalatingAttackerAgent, AuditOrchestrator, VulnerabilityFactory, VulnerabilityCollector, RecordVulnerabilityToolFactoryInterface, ReviewCollector, RecordReviewToolFactoryInterface, PoCSynthesizer, Chunking/{ChunkingStrategy, FileChunker}
+      Agent/         # AttackerAgent (+ AttackerLlmCollaborators, AttackerScanCollaborators, AttackerAnalysisSettings, AttackerAnalysisRequest, RiskMarkerIndex, AttackerContextPromptRenderer, Chunk/{ChunkContext, ChunkContextFactory, AttackerChunkCache, ChunkCoverageRecorder, ChunkFindingProgress, SequentialChunkAnalyzer, ConcurrentChunkAnalyzer}), ReviewerAgent (+ ReviewerAgentCollaborators, ReviewerModeConfiguration, Review/{VerdictApplier, BatchVerdictApplier, ReviewOutcomeRecorder, ReviewerVerdictCache, CodeContextResolver, SequentialReviewAnalyzer, StructuredReviewAnalyzer, ConcurrentReviewAnalyzer, ConcurrentStructuredReviewAnalyzer, BatchReviewAnalyzer, ReviewBatchSettings, ReviewCacheBuckets, CachePartition, ConcurrentReviewBatch}), EscalatingAttackerAgent, AuditOrchestrator (+ AuditLoopSettings), VulnerabilityFactory, VulnerabilityCollector, RecordVulnerabilityToolFactoryInterface, ReviewCollector, RecordReviewToolFactoryInterface, PoCSynthesizer, Chunking/{ChunkingStrategy, FileChunker}
     Infrastructure/  # I/O adapters
-      LLM/           # SymfonyAiLLMClient (+ RetryingPlatformInvoker, SequentialToolLoop, BatchWindowResolver, ToolConversationWavefront, PlatformResultExtractor, PlatformOptionsFactory, PlatformToolsMapper, PromptTokenEstimator), RetryPolicy, TransientFailureClassifier, TokenEstimator/{ProviderTokenEstimatorInterface, ResolvingTokenEstimator, CharacterRatioCounter, AnthropicTokenEstimator, OpenAiTokenEstimator, GeminiTokenEstimator, MistralTokenEstimator, LlamaTokenEstimator, DeepSeekTokenEstimator}, Delay/, RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
+      LLM/           # SymfonyAiLLMClient (ctor takes PlatformBinding + PlatformRequestConfig + PlatformResilienceConfig + PlatformAccountingConfig; builds RetryingPlatformInvoker, SequentialToolLoop, BatchWindowResolver, ToolConversationWavefront, PlatformResultExtractor, PlatformOptionsFactory, PlatformToolsMapper, PromptTokenEstimator), RetryPolicy (+ BackoffSchedule, RateLimitBackoff, Exception/InvalidRetryConfigurationException), TransientFailureClassifier, TokenEstimator/{ProviderTokenEstimatorInterface, ResolvingTokenEstimator, CharacterRatioCounter, AnthropicTokenEstimator, OpenAiTokenEstimator, GeminiTokenEstimator, MistralTokenEstimator, LlamaTokenEstimator, DeepSeekTokenEstimator}, Delay/, RateLimit/{NullRateLimiter, TokenBucketRateLimiter, RetryAfterHeaderParser}
       FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
       Scan/          # RegexStaticPreScanner, NullStaticPreScanner, RegexCodeSlicer, NullCodeSlicer, PhpParserControllerAccessControlParser, NullControllerAccessControlParser, PhpParserVoterCapabilityParser, NullVoterCapabilityParser, PhpParserFormBindingParser, NullFormBindingParser
       Diff/          # ProcessGitChangedFilesResolver (git diff for --since)
@@ -83,7 +88,7 @@ src/
       Progress/      # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY), LoggerProgressReporter, NullProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
       Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory, RecordReviewTool, RecordReviewToolFactory
       Report/        # ReportRenderer (console/json/sarif/html; + Template/*.txt + *.html stubs)
-  Command/           # AuditCommand (Symfony Console: audit:run) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, OutputFormat enum (console|json|sarif|html), Baseline (accepted-finding suppression)
+  Command/           # AuditCommand (Symfony Console: audit:run) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, ExitCode enum, AuditCommandHelp, OutputFormat enum (console|json|sarif|html), Baseline (accepted-finding suppression)
   SymfonySecurityAuditorBundle.php  # Bundle class (configure + loadExtension)
 tests/Phpunit/
   Unit/              # Isolated class tests (stub/mock collaborators)
@@ -198,8 +203,10 @@ Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`,
 Six jobs must all pass before merging: **Prettier Check** (markdown formatting)
 → **Markdown Lint** (markdownlint-cli2 semantics) → **Commit Lint** (commitlint,
 conventional commits) → **Lint** (Composer Normalize, PHP CS Fixer, Rector,
-PHPStan max) → **Tests** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony
-7.4/8.0/8.1) → **Mutation** (Infection, 100% MSI).
+PHPStan max, Deptrac, Swiss Knife, `composer audit`) → **Tests + Mutation**
+(PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1 with 100% coverage, then
+Infection 100% MSI; coverage uploads to Codecov and the MSI to the Stryker
+dashboard on `main`).
 
 Details: [`docs/ci.md`](docs/ci.md)
 
@@ -247,7 +254,10 @@ linked issue tracking removal — never silent suppression.
 
 ### 6. Backward Compatibility
 
-The project follows [Semantic Versioning 2.0.0](https://semver.org). Treat every
+The project follows [Semantic Versioning 2.0.0](https://semver.org) and, for its
+PHP API surface, the
+[Symfony Backward Compatibility promise](https://symfony.com/doc/current/contributing/code/bc.html)
+(`@internal` code is exempt). Treat every
 public-API element as load-bearing: configuration keys (and their defaults),
 `audit:run` arguments/options/exit codes, JSON and SARIF output schemas, Domain
 ports under `src/Audit/Domain/Port/` (including `AdvisoryDatabaseInterface`),

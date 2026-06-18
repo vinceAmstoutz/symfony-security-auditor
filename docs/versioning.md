@@ -3,6 +3,12 @@
 `symfony-security-auditor` follows
 [Semantic Versioning 2.0.0](https://semver.org) from `1.0.0` onward.
 
+For its PHP API surface it additionally adheres to the
+[Symfony Backward Compatibility promise](https://symfony.com/doc/current/contributing/code/bc.html):
+code tagged `@internal` is exempt, and any breaking change to covered API goes
+through the [deprecation cycle](#deprecation-policy) below — a deprecated
+element keeps working until at least the next `MAJOR`.
+
 > See also: [Configuration](configuration.md) · [Extending](extending.md) ·
 > [Architecture](architecture.md) · [CHANGELOG](../CHANGELOG.md)
 
@@ -212,7 +218,7 @@ When a public-API element needs to be removed:
 3. Removal happens in the next `MAJOR` release at the earliest, listed under
    `### Removed` in the changelog.
 
-Triggering `@trigger_error(..., E_USER_DEPRECATED)` at runtime is reserved for
+Emitting a runtime deprecation via `trigger_deprecation()` is reserved for
 behavior changes that callers may notice; pure naming or signature deprecations
 are documented in the changelog only.
 
@@ -225,6 +231,13 @@ are documented in the changelog only.
   still accepted and emits a Symfony deprecation when set; it has no effect.
   Remove it from your config and, if you want a longer Anthropic cache window,
   set `cache_retention: long` on the `anthropic` platform in `ai.yaml`.
+  Scheduled for removal in the next `MAJOR`.
+- **`Vulnerability::create()`, `SymfonyMapping::create()`, and
+  `LLMResponse::create()`** (since 1.13) — superseded by the value-object
+  factories `Vulnerability::of()`, `SymfonyMapping::of()`, and
+  `LLMResponse::of()` (taking `VulnerabilityClassification`/`CodeLocation`/`VulnerabilityNarrative`,
+  `ProjectFileInventory`/`AccessControlMap`, and `TokenUsageSnapshot`
+  respectively). The old methods still work and delegate to the new factories.
   Scheduled for removal in the next `MAJOR`.
 
 ---

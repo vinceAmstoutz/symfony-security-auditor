@@ -18,8 +18,14 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
@@ -30,7 +36,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\Ingest
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
@@ -42,16 +48,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPro
 final class RunAuditUseCaseIntegrationTest extends TestCase
 {
     private string $tmpDir;
-
-    public function test_execute_returns_audit_report_instance(): void
-    {
-        mkdir($this->tmpDir.'/src', 0o777, true);
-        file_put_contents($this->tmpDir.'/src/Service.php', '<?php class Service {}');
-
-        $auditReport = $this->makeUseCase('[]', '{}')->execute($this->tmpDir);
-
-        self::assertInstanceOf(AuditReport::class, $auditReport);
-    }
 
     public function test_execute_report_contains_correct_project_path(): void
     {
@@ -144,7 +140,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         $abortingAttacker->method('complete')->willThrowException(BudgetExceededException::forTokens(5_000, 100));
         $abortingAttacker->method('completeWithTools')->willThrowException(BudgetExceededException::forTokens(5_000, 100));
         $reviewerLLM = self::createStub(LLMClientInterface::class);
-        $reviewerLLM->method('complete')->willReturn(LLMResponse::create('{}', 0, 0, 'stub', 'end_turn'));
+        $reviewerLLM->method('complete')->willReturn(LLMResponse::of('{}', 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $runAuditUseCase = $this->makeUseCaseWithLLM($abortingAttacker, $reviewerLLM);
 
@@ -164,14 +160,27 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         file_put_contents($this->tmpDir.'/src/App.php', '<?php');
 
         $attackerLLM = self::createStub(LLMClientInterface::class);
-        $attackerLLM->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'gpt-4o', 'end_turn'));
+        $attackerLLM->method('complete')->willReturn(LLMResponse::of('[]', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0)));
         $reviewerLLM = self::createStub(LLMClientInterface::class);
-        $reviewerLLM->method('complete')->willReturn(LLMResponse::create('{}', 0, 0, 'gpt-4o', 'end_turn'));
+        $reviewerLLM->method('complete')->willReturn(LLMResponse::of('{}', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger()),
-            new ReviewerAgent($reviewerLLM, new ReviewerPromptBuilder(), new NullLogger()),
+            new AttackerAgent(
+                new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator())),
+                new AttackerScanCollaborators(new NullAttackerCache()),
+                new AttackerAnalysisSettings(),
+                new NullLogger(),
+            ),
+            new ReviewerAgent(
+                new ReviewerAgentCollaborators(
+                    $reviewerLLM,
+                    new ReviewerPromptBuilder(),
+                    new NullLogger(),
+                ),
+                new ReviewerModeConfiguration(),
+            ),
             new NullLogger(),
+            new AuditLoopSettings(),
         );
         $auditPipeline = new AuditPipeline(
             [
@@ -209,12 +218,11 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         );
 
         $attackerLLM = self::createStub(LLMClientInterface::class);
-        $attackerLLM->method('complete')->willReturn(LLMResponse::create(
+        $attackerLLM->method('complete')->willReturn(LLMResponse::of(
             $this->makeVulnerabilityJson('src/Controller/AdminController.php'),
-            0,
-            0,
             'stub',
             'end_turn',
+            TokenUsageSnapshot::of(0, 0),
         ));
         $reviewerLLM = self::createStub(LLMClientInterface::class);
         $reviewerLLM->method('complete')->willThrowException(BudgetExceededException::forCost(2.0, 1.0));
@@ -234,21 +242,33 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         );
 
         $attackerLLM = self::createStub(LLMClientInterface::class);
-        $attackerLLM->method('complete')->willReturn(LLMResponse::create(
+        $attackerLLM->method('complete')->willReturn(LLMResponse::of(
             $this->makeVulnerabilityJson('src/Controller/AdminController.php'),
-            0,
-            0,
             'stub',
             'end_turn',
+            TokenUsageSnapshot::of(0, 0),
         ));
         $reviewerLLM = self::createStub(LLMClientInterface::class);
         $reviewerLLM->method('complete')->willThrowException(BudgetExceededException::forCost(2.0, 1.0));
 
         // batchSize > 1 routes through reviewBatch instead of reviewSingle.
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger()),
-            new ReviewerAgent($reviewerLLM, new ReviewerPromptBuilder(), new NullLogger(), batchSize: 5),
+            new AttackerAgent(
+                new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator())),
+                new AttackerScanCollaborators(new NullAttackerCache()),
+                new AttackerAnalysisSettings(),
+                new NullLogger(),
+            ),
+            new ReviewerAgent(
+                new ReviewerAgentCollaborators(
+                    $reviewerLLM,
+                    new ReviewerPromptBuilder(),
+                    new NullLogger(),
+                ),
+                new ReviewerModeConfiguration(batchSize: 5),
+            ),
             new NullLogger(),
+            new AuditLoopSettings(),
         );
         $auditPipeline = new AuditPipeline(
             [
@@ -274,7 +294,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         $abortingAttacker->method('complete')->willThrowException(BudgetExceededException::forCost(2.5, 1.0));
         $abortingAttacker->method('completeWithTools')->willThrowException(BudgetExceededException::forCost(2.5, 1.0));
         $reviewerLLM = self::createStub(LLMClientInterface::class);
-        $reviewerLLM->method('complete')->willReturn(LLMResponse::create('{}', 0, 0, 'stub', 'end_turn'));
+        $reviewerLLM->method('complete')->willReturn(LLMResponse::of('{}', 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         /** @var list<array{string, array<string, mixed>}> $warnings */
         $warnings = [];
@@ -288,11 +308,14 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
         $runAuditUseCase = $this->makeUseCaseWithLLMAndLogger($abortingAttacker, $reviewerLLM, $logger);
 
+        $budgetAborted = false;
         try {
             $runAuditUseCase->execute($this->tmpDir);
         } catch (AuditAbortedByBudgetException) {
-            // expected
+            $budgetAborted = true;
         }
+
+        self::assertTrue($budgetAborted, 'Expected AuditAbortedByBudgetException');
 
         $abortLogs = array_values(array_filter(
             $warnings,
@@ -329,12 +352,12 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
     {
         $attackerLLM = self::createStub(LLMClientInterface::class);
         $attackerLLM->method('complete')->willReturn(
-            LLMResponse::create($attackerResponse, 0, 0, 'stub', 'end_turn'),
+            LLMResponse::of($attackerResponse, 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $reviewerLLM = self::createStub(LLMClientInterface::class);
         $reviewerLLM->method('complete')->willReturn(
-            LLMResponse::create($reviewerResponse, 0, 0, 'stub', 'end_turn'),
+            LLMResponse::of($reviewerResponse, 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         return $this->makeUseCaseWithLLM($attackerLLM, $reviewerLLM);
@@ -351,9 +374,22 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         LoggerInterface $logger,
     ): RunAuditUseCase {
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger()),
-            new ReviewerAgent($reviewerLLM, new ReviewerPromptBuilder(), new NullLogger()),
+            new AttackerAgent(
+                new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator())),
+                new AttackerScanCollaborators(new NullAttackerCache()),
+                new AttackerAnalysisSettings(),
+                new NullLogger(),
+            ),
+            new ReviewerAgent(
+                new ReviewerAgentCollaborators(
+                    $reviewerLLM,
+                    new ReviewerPromptBuilder(),
+                    new NullLogger(),
+                ),
+                new ReviewerModeConfiguration(),
+            ),
             new NullLogger(),
+            new AuditLoopSettings(),
         );
 
         $auditPipeline = new AuditPipeline(
@@ -375,18 +411,31 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
     ): RunAuditUseCase {
         $attackerLLM = self::createStub(LLMClientInterface::class);
         $attackerLLM->method('complete')->willReturn(
-            LLMResponse::create($attackerResponse, 0, 0, 'gpt-4o', 'end_turn'),
+            LLMResponse::of($attackerResponse, 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $reviewerLLM = self::createStub(LLMClientInterface::class);
         $reviewerLLM->method('complete')->willReturn(
-            LLMResponse::create($reviewerResponse, 0, 0, 'gpt-4o', 'end_turn'),
+            LLMResponse::of($reviewerResponse, 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger()),
-            new ReviewerAgent($reviewerLLM, new ReviewerPromptBuilder(), new NullLogger()),
+            new AttackerAgent(
+                new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator())),
+                new AttackerScanCollaborators(new NullAttackerCache()),
+                new AttackerAnalysisSettings(),
+                new NullLogger(),
+            ),
+            new ReviewerAgent(
+                new ReviewerAgentCollaborators(
+                    $reviewerLLM,
+                    new ReviewerPromptBuilder(),
+                    new NullLogger(),
+                ),
+                new ReviewerModeConfiguration(),
+            ),
             new NullLogger(),
+            new AuditLoopSettings(),
         );
 
         $auditPipeline = new AuditPipeline(

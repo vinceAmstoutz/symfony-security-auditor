@@ -161,18 +161,33 @@ final readonly class ProjectFile
 
     public function isService(): bool
     {
-        return !$this->isController()
-            && !$this->isEntity()
-            && !$this->isVoter()
-            && !$this->isRepository()
-            && !$this->isForm()
-            && !$this->isMessengerHandler()
-            && !$this->isAuthenticator()
-            && !$this->isEventSubscriber()
-            && !$this->isNormalizer()
-            && !$this->isWebhookConsumer()
-            && !$this->isScheduler()
+        return !$this->matchesKnownComponentType()
             && str_ends_with($this->relativePath, '.php');
+    }
+
+    private function matchesKnownComponentType(): bool
+    {
+        return $this->matchesDomainComponentType()
+            || $this->matchesMessagingComponentType();
+    }
+
+    private function matchesDomainComponentType(): bool
+    {
+        return $this->isController()
+            || $this->isEntity()
+            || $this->isVoter()
+            || $this->isRepository()
+            || $this->isForm();
+    }
+
+    private function matchesMessagingComponentType(): bool
+    {
+        return $this->isMessengerHandler()
+            || $this->isAuthenticator()
+            || $this->isEventSubscriber()
+            || $this->isNormalizer()
+            || $this->isWebhookConsumer()
+            || $this->isScheduler();
     }
 
     public function isTemplate(): bool

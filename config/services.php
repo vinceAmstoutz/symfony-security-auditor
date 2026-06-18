@@ -17,6 +17,10 @@ use Symfony\Component\Validator\Validation;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestratorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
@@ -26,7 +30,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizerI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
@@ -74,6 +80,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSec
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\BackoffSchedule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\AnthropicTokenEstimator;
@@ -88,13 +95,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\StaticPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVoterCapabilityParser;
@@ -157,10 +164,12 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(RetryPolicy::class)
         ->args([
-            param('symfony_security_auditor.audit.retry.max_attempts'),
-            param('symfony_security_auditor.audit.retry.initial_delay_ms'),
-            param('symfony_security_auditor.audit.retry.backoff_multiplier'),
-            param('symfony_security_auditor.audit.retry.jitter_ratio'),
+            inline_service(BackoffSchedule::class)->args([
+                param('symfony_security_auditor.audit.retry.max_attempts'),
+                param('symfony_security_auditor.audit.retry.initial_delay_ms'),
+                param('symfony_security_auditor.audit.retry.backoff_multiplier'),
+                param('symfony_security_auditor.audit.retry.jitter_ratio'),
+            ]),
         ]);
 
     $defaultsConfigurator->set(TransientFailureClassifier::class);
@@ -273,8 +282,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(AttackerAgentInterface::class),
             service(ReviewerAgentInterface::class),
             service('logger'),
-            param('symfony_security_auditor.audit.max_iterations'),
-            param('symfony_security_auditor.audit.min_confidence'),
+            inline_service(AuditLoopSettings::class)->args([
+                param('symfony_security_auditor.audit.max_iterations'),
+                param('symfony_security_auditor.audit.min_confidence'),
+            ]),
             service(ProgressReporterInterface::class),
         ]);
     $defaultsConfigurator->alias(AuditOrchestratorInterface::class, AuditOrchestrator::class);
@@ -302,7 +313,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(NullProgressReporter::class);
     $defaultsConfigurator->set(LoggerProgressReporter::class)
         ->args([service('logger')]);
-    $defaultsConfigurator->set(ProgressReporterHolder::class);
+    $defaultsConfigurator->set(ProgressReporterHolder::class)
+        ->args([service('logger')]);
     $defaultsConfigurator->alias(ProgressReporterInterface::class, ProgressReporterHolder::class);
 
     $defaultsConfigurator->set(AuditPipeline::class)
@@ -386,39 +398,49 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(AttackerAgent::class)
         ->args([
-            service('security_auditor.attacker_client'),
-            service(AttackerPromptBuilderInterface::class),
-            service(VulnerabilityFactory::class),
-            service(AttackerCacheInterface::class),
+            inline_service(AttackerLlmCollaborators::class)->args([
+                service('security_auditor.attacker_client'),
+                service(AttackerPromptBuilderInterface::class),
+                service(VulnerabilityFactory::class),
+                service(CodeSlicerInterface::class),
+                service(RecordVulnerabilityToolFactoryInterface::class),
+            ]),
+            inline_service(AttackerScanCollaborators::class)->args([
+                service(AttackerCacheInterface::class),
+                service(StaticPreScannerInterface::class),
+                service(FileChunker::class),
+                service(ToolRegistryFactoryInterface::class),
+                service(ProgressReporterInterface::class),
+            ]),
+            inline_service(AttackerAnalysisSettings::class)->args([
+                param('symfony_security_auditor.audit.tools_enabled'),
+                param('symfony_security_auditor.audit.max_tool_iterations'),
+                param('symfony_security_auditor.audit.static_prescan.lean_mode'),
+                param('symfony_security_auditor.audit.structured_collection'),
+                param('symfony_security_auditor.audit.attacker_max_concurrent'),
+            ]),
             service('logger'),
-            service(ToolRegistryFactoryInterface::class),
-            param('symfony_security_auditor.audit.tools_enabled'),
-            param('symfony_security_auditor.audit.max_tool_iterations'),
-            service(StaticPreScannerInterface::class),
-            param('symfony_security_auditor.audit.static_prescan.lean_mode'),
-            service(FileChunker::class),
-            service(CodeSlicerInterface::class),
-            service(RecordVulnerabilityToolFactoryInterface::class),
-            param('symfony_security_auditor.audit.structured_collection'),
-            service(ProgressReporterInterface::class),
-            param('symfony_security_auditor.audit.attacker_max_concurrent'),
         ]);
 
     $defaultsConfigurator->alias(AttackerAgentInterface::class, AttackerAgent::class);
 
     $defaultsConfigurator->set(ReviewerAgent::class)
         ->args([
-            service('security_auditor.reviewer_client'),
-            service(ReviewerPromptBuilderInterface::class),
-            service('logger'),
-            param('symfony_security_auditor.audit.reviewer_batch_size'),
+            inline_service(ReviewerAgentCollaborators::class)->args([
+                service('security_auditor.reviewer_client'),
+                service(ReviewerPromptBuilderInterface::class),
+                service('logger'),
+                service(RecordReviewToolFactoryInterface::class),
+                service(ReviewerCacheInterface::class),
+            ]),
+            inline_service(ReviewerModeConfiguration::class)->args([
+                param('symfony_security_auditor.audit.reviewer_batch_size'),
+                param('symfony_security_auditor.audit.reviewer_tools_enabled'),
+                param('symfony_security_auditor.audit.reviewer_max_tool_iterations'),
+                param('symfony_security_auditor.audit.reviewer_max_concurrent'),
+                param('symfony_security_auditor.audit.reviewer_structured_collection'),
+            ]),
             service(ToolRegistryFactoryInterface::class),
-            param('symfony_security_auditor.audit.reviewer_tools_enabled'),
-            param('symfony_security_auditor.audit.reviewer_max_tool_iterations'),
-            param('symfony_security_auditor.audit.reviewer_max_concurrent'),
-            service(RecordReviewToolFactoryInterface::class),
-            param('symfony_security_auditor.audit.reviewer_structured_collection'),
-            service(ReviewerCacheInterface::class),
         ]);
 
     $defaultsConfigurator->alias(ReviewerAgentInterface::class, ReviewerAgent::class);

@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 

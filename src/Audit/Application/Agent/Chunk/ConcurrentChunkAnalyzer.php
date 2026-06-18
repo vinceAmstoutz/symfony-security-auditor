@@ -67,54 +67,114 @@ final readonly class ConcurrentChunkAnalyzer
         $pending = [];
         $requests = [];
         foreach ($chunks as $index => $chunk) {
-            $this->progressReporter->report(ProgressEvent::AttackerChunkStarted->value, [
-                'chunk' => $index + 1,
-                'total_chunks' => $totalChunks,
-            ]);
+            $this->reportChunkStarted($index, $totalChunks);
 
             $chunkContext = $this->chunkContextFactory->create($chunk, $attackerAnalysisRequest, $riskMarkerIndex, $this->attackerChunkCache->isContextAware());
 
-            if ($chunkContext->cacheable) {
-                $cached = $this->attackerChunkCache->get($chunk, $chunkContext->contextKey);
-                if (null !== $cached) {
-                    $cachedResults[$index] = $this->attackerChunkCache->served($chunk, $cached, $coverageRecorder);
+            $cached = $this->servedCachedResult($chunk, $chunkContext, $coverageRecorder);
+            if (null !== $cached) {
+                $cachedResults[$index] = $cached;
 
-                    continue;
-                }
+                continue;
             }
 
-            $collector = new VulnerabilityCollector();
-            $toolRegistry = new ToolRegistry([$this->recordVulnerabilityToolFactory->create($collector)], $this->logger);
-            $pending[$index] = [
-                'chunk' => $chunk,
-                'contextKey' => $chunkContext->contextKey,
-                'cacheable' => $chunkContext->cacheable,
-                'collector' => $collector,
-            ];
-            $requests[] = ['system' => $chunkContext->systemPrompt, 'user' => $chunkContext->userMessage, 'tools' => $toolRegistry];
+            $this->registerPendingRequest($index, $chunk, $chunkContext, $pending, $requests);
         }
 
         if ([] !== $requests) {
             $this->dispatch($requests, $pending, $coverageRecorder);
         }
 
+        return $this->aggregate($chunks, $cachedResults, $pending, $coverageRecorder, $totalChunks);
+    }
+
+    private function reportChunkStarted(int $index, int $totalChunks): void
+    {
+        $this->progressReporter->report(ProgressEvent::AttackerChunkStarted->value, [
+            'chunk' => $index + 1,
+            'total_chunks' => $totalChunks,
+        ]);
+    }
+
+    /**
+     * @param list<ProjectFile> $chunk
+     */
+    private function servedCachedResult(array $chunk, ChunkContext $chunkContext, CoverageRecorderInterface $coverageRecorder): ?VulnerabilityHydrationResult
+    {
+        if (!$chunkContext->cacheable) {
+            return null;
+        }
+
+        $cached = $this->attackerChunkCache->get($chunk, $chunkContext->contextKey);
+        if (null === $cached) {
+            return null;
+        }
+
+        return $this->attackerChunkCache->served($chunk, $cached, $coverageRecorder);
+    }
+
+    /**
+     * @param list<ProjectFile>                                                                                            $chunk
+     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}> $pending
+     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                              $requests
+     */
+    private function registerPendingRequest(int $index, array $chunk, ChunkContext $chunkContext, array &$pending, array &$requests): void
+    {
+        $collector = new VulnerabilityCollector();
+        $toolRegistry = new ToolRegistry([$this->recordVulnerabilityToolFactory->create($collector)], $this->logger);
+        $pending[$index] = [
+            'chunk' => $chunk,
+            'contextKey' => $chunkContext->contextKey,
+            'cacheable' => $chunkContext->cacheable,
+            'collector' => $collector,
+        ];
+        $requests[] = ['system' => $chunkContext->systemPrompt, 'user' => $chunkContext->userMessage, 'tools' => $toolRegistry];
+    }
+
+    /**
+     * @param list<list<ProjectFile>>                                                                                      $chunks
+     * @param array<int, VulnerabilityHydrationResult>                                                                     $cachedResults
+     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}> $pending
+     *
+     * @return array{0: list<Vulnerability>, 1: array<string, int>}
+     */
+    private function aggregate(array $chunks, array $cachedResults, array $pending, CoverageRecorderInterface $coverageRecorder, int $totalChunks): array
+    {
         $allVulnerabilities = [];
         $totalDropsByReason = [];
         foreach (array_keys($chunks) as $index) {
             $chunkResult = $cachedResults[$index] ?? $this->finalize($pending[$index], $coverageRecorder);
             ChunkFindingProgress::report($this->progressReporter, $chunkResult->vulnerabilities());
-            $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, [
-                'chunk' => $index + 1,
-                'total_chunks' => $totalChunks,
-                'elapsed_seconds' => 0.0,
-            ]);
+            $this->reportChunkCompleted($index, $totalChunks);
             $allVulnerabilities = [...$allVulnerabilities, ...$chunkResult->vulnerabilities()];
-            foreach ($chunkResult->dropsByReason() as $reason => $count) {
-                $totalDropsByReason[$reason] = ($totalDropsByReason[$reason] ?? 0) + $count;
-            }
+            $totalDropsByReason = $this->mergeDrops($totalDropsByReason, $chunkResult->dropsByReason());
         }
 
         return [$allVulnerabilities, $totalDropsByReason];
+    }
+
+    private function reportChunkCompleted(int $index, int $totalChunks): void
+    {
+        $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, [
+            'chunk' => $index + 1,
+            'total_chunks' => $totalChunks,
+            'elapsed_seconds' => 0.0,
+        ]);
+    }
+
+    /**
+     * @param array<string, int> $totalDropsByReason
+     * @param array<string, int> $dropsByReason
+     *
+     * @return array<string, int>
+     */
+    private function mergeDrops(array $totalDropsByReason, array $dropsByReason): array
+    {
+        foreach ($dropsByReason as $reason => $count) {
+            $totalDropsByReason[$reason] = ($totalDropsByReason[$reason] ?? 0) + $count;
+        }
+
+        return $totalDropsByReason;
     }
 
     /**

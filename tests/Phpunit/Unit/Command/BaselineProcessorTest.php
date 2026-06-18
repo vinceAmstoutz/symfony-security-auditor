@@ -14,9 +14,13 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineInterface;
@@ -34,7 +38,7 @@ final class BaselineProcessorTest extends TestCase
 
     protected function tearDown(): void
     {
-        @rmdir($this->tmpDir);
+        (new Filesystem())->remove($this->tmpDir);
     }
 
     public function test_generate_writes_the_report_fingerprints_and_returns_their_count(): void
@@ -122,19 +126,11 @@ final class BaselineProcessorTest extends TestCase
 
     private function makeVuln(string $filePath): Vulnerability
     {
-        return Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'Finding '.$filePath,
-            description: 'desc',
-            filePath: $filePath,
-            lineStart: 1,
-            lineEnd: 5,
-            vulnerableCode: 'code',
-            attackVector: 'vec',
-            proof: 'proof',
-            remediation: 'fix',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Finding '.$filePath, 0.9),
+            new CodeLocation($filePath, 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
         )->withReviewerValidation(true);
     }
 }

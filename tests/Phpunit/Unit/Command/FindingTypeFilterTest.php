@@ -16,7 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
@@ -66,13 +69,11 @@ final class FindingTypeFilterTest extends TestCase
         $auditContext = AuditContext::forProject($this->tmpDir);
         foreach ($types as $index => $type) {
             $auditContext->addVulnerability(
-                Vulnerability::create(
-                    $type,
-                    VulnerabilitySeverity::HIGH,
-                    'Vuln '.$index,
-                    'desc',
-                    'src/File'.$index.'.php',
-                    1, 5, '$q', 'inject', "' OR 1", 'fix', 0.9,
+                Vulnerability::of(
+                    new VulnerabilityClassification($type, VulnerabilitySeverity::HIGH, 'Vuln '.$index, 0.9),
+                    new CodeLocation('src/File'.$index.'.php', 1, 5),
+                    new VulnerabilityNarrative('desc', 'inject', "' OR 1", 'fix'),
+                    '$q',
                 )->withReviewerValidation(true),
             );
         }

@@ -18,6 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 
@@ -27,7 +28,7 @@ final class BudgetTrackerTest extends TestCase
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited());
 
-        $budgetTracker->recordCall(LLMResponse::create('x', 1_000_000, 1_000_000, 'gpt-4o', 'end_turn'));
+        $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(1_000_000, 1_000_000)));
         $budgetTracker->assertWithinBudget();
 
         self::expectNotToPerformAssertions();
@@ -37,7 +38,7 @@ final class BudgetTrackerTest extends TestCase
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forTokens(150));
 
-        $budgetTracker->recordCall(LLMResponse::create('x', 100, 50, 'gpt-4o', 'end_turn'));
+        $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(100, 50)));
         $budgetTracker->assertWithinBudget();
 
         self::assertSame(150, $budgetTracker->tokensUsed());
@@ -47,7 +48,7 @@ final class BudgetTrackerTest extends TestCase
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forTokens(100));
 
-        $budgetTracker->recordCall(LLMResponse::create('x', 80, 30, 'gpt-4o', 'end_turn'));
+        $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(80, 30)));
 
         $this->expectException(BudgetExceededException::class);
         $this->expectExceptionMessage('token budget exceeded (110 / 100 tokens)');
@@ -59,7 +60,7 @@ final class BudgetTrackerTest extends TestCase
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forCost(0.01), inputPrice: 100.0, outputPrice: 100.0);
 
-        $budgetTracker->recordCall(LLMResponse::create('x', 1_000, 0, 'gpt-4o', 'end_turn'));
+        $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(1_000, 0)));
 
         $this->expectException(BudgetExceededException::class);
         $this->expectExceptionMessage('cost budget exceeded');
@@ -71,7 +72,7 @@ final class BudgetTrackerTest extends TestCase
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forBoth(maxTokens: 1_000_000, maxCostUsd: 0.001), inputPrice: 100.0, outputPrice: 0.0);
 
-        $budgetTracker->recordCall(LLMResponse::create('x', 100, 0, 'gpt-4o', 'end_turn'));
+        $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(100, 0)));
 
         $this->expectException(BudgetExceededException::class);
         $this->expectExceptionMessage('cost budget exceeded');
@@ -83,8 +84,8 @@ final class BudgetTrackerTest extends TestCase
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forTokens(500));
 
-        $budgetTracker->recordCall(LLMResponse::create('a', 100, 50, 'gpt-4o', 'end_turn'));
-        $budgetTracker->recordCall(LLMResponse::create('b', 100, 50, 'gpt-4o', 'end_turn'));
+        $budgetTracker->recordCall(LLMResponse::of('a', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(100, 50)));
+        $budgetTracker->recordCall(LLMResponse::of('b', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(100, 50)));
 
         self::assertSame(300, $budgetTracker->tokensUsed());
         $budgetTracker->assertWithinBudget();
@@ -95,7 +96,7 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0, outputPrice: 20.0);
 
         // 1M input @ $10 = $10; 0 output @ $20 = $0; total $10
-        $budgetTracker->recordCall(LLMResponse::create('x', 1_000_000, 0, 'gpt-4o', 'end_turn'));
+        $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(1_000_000, 0)));
 
         self::assertSame(10.0, $budgetTracker->costUsdUsed());
     }
@@ -106,8 +107,8 @@ final class BudgetTrackerTest extends TestCase
         // would overwrite the first, and the total would be $5 (not $15).
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0);
 
-        $budgetTracker->recordCall(LLMResponse::create('a', 1_000_000, 0, 'gpt-4o', 'end_turn'));
-        $budgetTracker->recordCall(LLMResponse::create('b', 500_000, 0, 'gpt-4o', 'end_turn'));
+        $budgetTracker->recordCall(LLMResponse::of('a', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(1_000_000, 0)));
+        $budgetTracker->recordCall(LLMResponse::of('b', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(500_000, 0)));
 
         self::assertSame(15.0, $budgetTracker->costUsdUsed());
     }
@@ -116,11 +117,11 @@ final class BudgetTrackerTest extends TestCase
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forCost(5.0), inputPrice: 10.0);
 
-        $budgetTracker->recordCall(LLMResponse::create('a', 500_000, 0, 'gpt-4o', 'end_turn')); // $5.00
+        $budgetTracker->recordCall(LLMResponse::of('a', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(500_000, 0))); // $5.00
         $budgetTracker->assertWithinBudget();
         self::assertSame(5.0, $budgetTracker->costUsdUsed());
 
-        $budgetTracker->recordCall(LLMResponse::create('b', 1_000, 0, 'gpt-4o', 'end_turn')); // +$0.01 → $5.01
+        $budgetTracker->recordCall(LLMResponse::of('b', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(1_000, 0))); // +$0.01 → $5.01
 
         $this->expectException(BudgetExceededException::class);
         $budgetTracker->assertWithinBudget();
@@ -130,7 +131,7 @@ final class BudgetTrackerTest extends TestCase
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 0.7);
 
-        $budgetTracker->recordCall(LLMResponse::create('x', 1, 0, 'gpt-4o', 'end_turn'));
+        $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(1, 0)));
 
         self::assertSame(0.000001, $budgetTracker->costUsdUsed());
     }
@@ -139,10 +140,10 @@ final class BudgetTrackerTest extends TestCase
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forTokens(100));
 
-        $budgetTracker->recordCall(LLMResponse::create('a', 60, 40, 'gpt-4o', 'end_turn'));
+        $budgetTracker->recordCall(LLMResponse::of('a', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(60, 40)));
         $budgetTracker->assertWithinBudget();
 
-        $budgetTracker->recordCall(LLMResponse::create('b', 1, 0, 'gpt-4o', 'end_turn'));
+        $budgetTracker->recordCall(LLMResponse::of('b', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(1, 0)));
 
         $this->expectException(BudgetExceededException::class);
 
@@ -153,7 +154,7 @@ final class BudgetTrackerTest extends TestCase
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0);
 
-        $budgetTracker->recordCall(LLMResponse::create('x', 0, 0, 'claude-opus-4-7', 'end_turn', 1_000_000, 0));
+        $budgetTracker->recordCall(LLMResponse::of('x', 'claude-opus-4-7', 'end_turn', TokenUsageSnapshot::of(0, 0, 1_000_000, 0)));
 
         self::assertSame(1.0, $budgetTracker->costUsdUsed());
     }
@@ -162,7 +163,7 @@ final class BudgetTrackerTest extends TestCase
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0);
 
-        $budgetTracker->recordCall(LLMResponse::create('x', 0, 0, 'claude-opus-4-7', 'end_turn', 0, 1_000_000));
+        $budgetTracker->recordCall(LLMResponse::of('x', 'claude-opus-4-7', 'end_turn', TokenUsageSnapshot::of(0, 0, 0, 1_000_000)));
 
         self::assertSame(12.5, $budgetTracker->costUsdUsed());
     }

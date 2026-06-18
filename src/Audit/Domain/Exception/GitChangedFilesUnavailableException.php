@@ -30,6 +30,8 @@ final class GitChangedFilesUnavailableException extends RuntimeException
 
     public static function fromProcessFailure(string $ref, string $stderr, Throwable $throwable): self
     {
-        return new self(\sprintf('git diff against "%s" failed: %s', $ref, trim($stderr) ?: 'unknown error'), 0, $throwable);
+        $stderr = trim($stderr);
+
+        return new self(\sprintf('git diff against "%s" failed: %s', $ref, '' !== $stderr ? $stderr : 'unknown error'), 0, $throwable);
     }
 }

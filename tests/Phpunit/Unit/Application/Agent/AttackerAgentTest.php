@@ -24,7 +24,10 @@ use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
@@ -32,12 +35,18 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityCo
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityDropReason;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
@@ -67,16 +76,21 @@ final class AttackerAgentTest extends TestCase
     private string $tmpDir;
 
     /**
-     * @param list<ProjectFile>   $files
-     * @param list<Vulnerability> $previousFindings
-     * @param list<Vulnerability> $rejectedFindings
+     * @param list<ProjectFile>                                                                                          $files
+     * @param array{bypassCache?: bool, previousFindings?: list<Vulnerability>, rejectedFindings?: list<Vulnerability>} $overrides
      *
      * @return list<Vulnerability>
      */
-    private function callAnalyze(AttackerAgentInterface $attackerAgent, array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, array $previousFindings = [], array $rejectedFindings = []): array
+    private function callAnalyze(AttackerAgentInterface $attackerAgent, array $files, SymfonyMapping $symfonyMapping, CoverageRecorderInterface $coverageRecorder, array $overrides = []): array
     {
         return $attackerAgent->analyze(
-            new AttackerAnalysisRequest($files, $symfonyMapping, $bypassCache, $previousFindings, $rejectedFindings),
+            new AttackerAnalysisRequest(
+                $files,
+                $symfonyMapping,
+                $overrides['bypassCache'] ?? false,
+                $overrides['previousFindings'] ?? [],
+                $overrides['rejectedFindings'] ?? [],
+            ),
             $coverageRecorder,
         );
     }
@@ -90,7 +104,7 @@ final class AttackerAgentTest extends TestCase
         $staticPreScanner->method('scan')->willReturn([]);
 
         $bufferingLogger = new BufferingLogger();
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $bufferingLogger, null, false, AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS, $staticPreScanner, true);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['logger' => $bufferingLogger, 'toolsEnabled' => false, 'staticPreScanner' => $staticPreScanner, 'leanMode' => true]);
 
         $coverageRecorder = new class implements CoverageRecorderInterface {
             /** @var list<string> */
@@ -103,7 +117,7 @@ final class AttackerAgentTest extends TestCase
         };
 
         $result = $attackerAgent->analyze(
-            new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php'), $this->makeFile('src/Controller/B.php')], SymfonyMapping::create()),
+            new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php'), $this->makeFile('src/Controller/B.php')], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())),
             $coverageRecorder,
         );
 
@@ -131,12 +145,12 @@ final class AttackerAgentTest extends TestCase
         $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
             $captured = $user;
 
-            return LLMResponse::create('[]', 0, 0, 'claude', 'end_turn');
+            return LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0));
         });
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, new NullLogger(), null, false, AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS, $staticPreScanner);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['logger' => new NullLogger(), 'toolsEnabled' => false, 'staticPreScanner' => $staticPreScanner]);
 
-        $attackerAgent->analyze(new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::create()), new NullCoverageRecorder());
+        $attackerAgent->analyze(new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())), new NullCoverageRecorder());
 
         self::assertStringStartsWith((new AttackerContextPromptRenderer())->renderRiskMarkers($markers)."\n\n", $captured);
         self::assertStringContainsString('## Source Code', $captured);
@@ -151,13 +165,13 @@ final class AttackerAgentTest extends TestCase
         $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
             $captured = $user;
 
-            return LLMResponse::create('[]', 0, 0, 'claude', 'end_turn');
+            return LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0));
         });
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
 
         $attackerAgent->analyze(
-            new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::create(), false, $previousFindings),
+            new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), false, $previousFindings),
             new NullCoverageRecorder(),
         );
 
@@ -174,13 +188,13 @@ final class AttackerAgentTest extends TestCase
         $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
             $captured = $user;
 
-            return LLMResponse::create('[]', 0, 0, 'claude', 'end_turn');
+            return LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0));
         });
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
 
         $attackerAgent->analyze(
-            new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::create(), false, [], $rejectedFindings),
+            new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), false, [], $rejectedFindings),
             new NullCoverageRecorder(),
         );
 
@@ -200,19 +214,24 @@ final class AttackerAgentTest extends TestCase
         $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
             $captured = $user;
 
-            return LLMResponse::create('[]', 0, 0, 'claude', 'end_turn');
+            return LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0));
         });
 
         $attackerAgent = new AttackerAgent(
-            llmClient: $llmClient,
-            attackerPromptBuilder: new AttackerPromptBuilder(),
-            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-            attackerCache: new NullAttackerCache(),
-            logger: new NullLogger(),
-            codeSlicer: $codeSlicer,
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                codeSlicer: $codeSlicer,
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: new NullAttackerCache(),
+            ),
+            new AttackerAnalysisSettings(),
+            new NullLogger(),
         );
 
-        $attackerAgent->analyze(new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::create()), new NullCoverageRecorder());
+        $attackerAgent->analyze(new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())), new NullCoverageRecorder());
 
         self::assertStringContainsString('SLICED-MARKER', $captured);
     }
@@ -224,7 +243,7 @@ final class AttackerAgentTest extends TestCase
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
 
-        $symfonyMapping = SymfonyMapping::create();
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
         $result = $this->callAnalyze($attackerAgent, [], $symfonyMapping, new NullCoverageRecorder());
 
         self::assertEmpty($result);
@@ -233,7 +252,10 @@ final class AttackerAgentTest extends TestCase
     public function test_it_calls_llm_with_files_and_returns_vulnerabilities(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
-        $symfonyMapping = SymfonyMapping::create(controllers: $files);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => $files]),
+            new AccessControlMap(),
+        );
 
         $llmPayload = (string) json_encode([[
             'type' => 'broken_access_control',
@@ -250,7 +272,7 @@ final class AttackerAgentTest extends TestCase
             'confidence' => 0.9,
         ]]);
 
-        $llmResponse = LLMResponse::create($llmPayload, 100, 200, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($llmPayload, 'claude', 'end_turn', TokenUsageSnapshot::of(100, 200));
 
         $llmClient = $this->createMock(LLMClientInterface::class);
         $llmClient
@@ -269,9 +291,9 @@ final class AttackerAgentTest extends TestCase
     public function test_it_handles_llm_json_parse_error_gracefully(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
-        $symfonyMapping = SymfonyMapping::create();
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
 
-        $llmResponse = LLMResponse::create('not valid json {{{', 100, 10, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of('not valid json {{{', 'claude', 'end_turn', TokenUsageSnapshot::of(100, 10));
 
         $llmClient = $this->createMock(LLMClientInterface::class);
         $llmClient
@@ -289,7 +311,7 @@ final class AttackerAgentTest extends TestCase
     public function test_it_handles_llm_exception_gracefully(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
-        $symfonyMapping = SymfonyMapping::create();
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
 
         $llmClient = $this->createMock(LLMClientInterface::class);
         $llmClient
@@ -307,9 +329,9 @@ final class AttackerAgentTest extends TestCase
     public function test_it_handles_empty_llm_response(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
-        $symfonyMapping = SymfonyMapping::create();
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
 
-        $llmResponse = LLMResponse::create('', 100, 0, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(100, 0));
 
         $llmClient = $this->createMock(LLMClientInterface::class);
         $llmClient
@@ -332,8 +354,8 @@ final class AttackerAgentTest extends TestCase
             $files[] = $this->makeFile(\sprintf('src/Service/Service%d.php', $i));
         }
 
-        $symfonyMapping = SymfonyMapping::create();
-        $llmResponse = LLMResponse::create('[]', 100, 10, 'claude', 'end_turn');
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
+        $llmResponse = LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(100, 10));
 
         $llmClient = $this->createMock(LLMClientInterface::class);
         // Should be called twice (ceil(15/10) = 2 chunks)
@@ -354,7 +376,7 @@ final class AttackerAgentTest extends TestCase
             $files[] = $this->makeFile(\sprintf('src/Service/Service%d.php', $i));
         }
 
-        $symfonyMapping = SymfonyMapping::create();
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
 
         $chunk1Json = (string) json_encode([[
             'type' => 'sql_injection',
@@ -391,8 +413,8 @@ final class AttackerAgentTest extends TestCase
             ->expects(self::exactly(2))
             ->method('complete')
             ->willReturnOnConsecutiveCalls(
-                LLMResponse::create($chunk1Json, 100, 100, 'claude', 'end_turn'),
-                LLMResponse::create($chunk2Json, 100, 100, 'claude', 'end_turn'),
+                LLMResponse::of($chunk1Json, 'claude', 'end_turn', TokenUsageSnapshot::of(100, 100)),
+                LLMResponse::of($chunk2Json, 'claude', 'end_turn', TokenUsageSnapshot::of(100, 100)),
             );
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
@@ -414,14 +436,14 @@ final class AttackerAgentTest extends TestCase
             ->willReturnCallback(static function (string $sys, string $user) use (&$capturedUserMessages): LLMResponse {
                 $capturedUserMessages[] = $user;
 
-                return LLMResponse::create('[]', 100, 10, 'claude', 'end_turn');
+                return LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(100, 10));
             });
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
 
         $this->callAnalyze($attackerAgent,
             [$this->makeFile($lowerPriorityPath), $this->makeFile($higherPriorityPath)],
-            SymfonyMapping::create(),
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
             new NullCoverageRecorder(),
         );
 
@@ -454,9 +476,9 @@ final class AttackerAgentTest extends TestCase
         $llmClient = $this->createMock(LLMClientInterface::class);
         $llmClient->expects(self::never())->method('complete');
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $logger);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['logger' => $logger]);
 
-        $result = $this->callAnalyze($attackerAgent, [], SymfonyMapping::create(), new NullCoverageRecorder());
+        $result = $this->callAnalyze($attackerAgent, [], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertSame([], $result);
     }
@@ -476,11 +498,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $logger);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['logger' => $logger]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertContains('Attacker agent starting analysis', $loggedMessages);
     }
@@ -500,11 +522,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('invalid json {{{', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('invalid json {{{', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $logger);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['logger' => $logger]);
 
-        $result = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $result = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertSame([], $result);
     }
@@ -526,13 +548,13 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create($longInvalidContent, 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($longInvalidContent, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $logger);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['logger' => $logger]);
 
         $this->callAnalyze($attackerAgent,
             [$this->makeFile('src/Controller/UserController.php')],
-            SymfonyMapping::create(),
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
             new NullCoverageRecorder(),
         );
 
@@ -558,9 +580,9 @@ final class AttackerAgentTest extends TestCase
             ->method('complete')
             ->willThrowException(new RuntimeException('Network error'));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $logger);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['logger' => $logger]);
 
-        $result = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $result = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertSame([], $result);
     }
@@ -581,11 +603,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $logger);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['logger' => $logger]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertSame(['Attacker agent starting analysis', ['files' => 2, 'files_filtered_lean' => 0, 'markers' => 0, 'tools_enabled' => false, 'cache_bypassed' => false, 'previous_findings' => 0, 'rejected_findings' => 0]], $infoLogs[0]);
         self::assertSame(['Attacker agent complete', ['total_vulnerabilities' => 0, 'total_dropped_entries' => 0, 'dropped_by_reason' => []]], $infoLogs[1]);
@@ -611,11 +633,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('["not-an-array-entry", "another-bad-one"]', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('["not-an-array-entry", "another-bad-one"]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $logger);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['logger' => $logger]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         $completeLog = $infoLogs[\count($infoLogs) - 1];
         self::assertSame('Attacker agent complete', $completeLog[0]);
@@ -640,11 +662,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $logger);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['logger' => $logger]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertCount(2, $debugLogs);
         self::assertSame('Analyzing chunk 1/1', $debugLogs[0][0]);
@@ -671,11 +693,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $logger);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['logger' => $logger]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         $analyzingMessages = array_values(array_filter(
             $debugLogs,
@@ -699,11 +721,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('', 10, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 0)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $logger);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['logger' => $logger]);
 
-        $result = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $result = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertSame([], $result);
     }
@@ -734,9 +756,9 @@ final class AttackerAgentTest extends TestCase
         $llmClient = $this->createMock(LLMClientInterface::class);
         $llmClient->expects(self::never())->method('complete');
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $result = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $result = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertCount(1, $result);
         self::assertSame('Cached finding', $result[0]->title());
@@ -770,11 +792,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create((string) json_encode($rawPayload), 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of((string) json_encode($rawPayload), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
     public function test_it_filters_non_array_entries_out_of_cached_payload_as_a_list(): void
@@ -809,11 +831,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create((string) json_encode($mixedPayload), 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of((string) json_encode($mixedPayload), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
     public function test_it_stores_empty_array_in_cache_when_llm_returns_empty_response(): void
@@ -829,11 +851,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('', 10, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 0)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
     public function test_bypass_cache_skips_cache_get_and_calls_llm(): void
@@ -848,11 +870,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), true);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['bypassCache' => true]);
     }
 
     public function test_bypass_cache_skips_cache_store_after_successful_llm_call(): void
@@ -881,11 +903,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create((string) json_encode($rawPayload), 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of((string) json_encode($rawPayload), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $result = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), true);
+        $result = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['bypassCache' => true]);
 
         self::assertCount(1, $result);
     }
@@ -900,13 +922,13 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $auditContext);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
 
         self::assertSame(
             [
@@ -932,9 +954,9 @@ final class AttackerAgentTest extends TestCase
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $auditContext);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
 
         self::assertSame(
             [
@@ -961,7 +983,7 @@ final class AttackerAgentTest extends TestCase
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $auditContext);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
 
         self::assertSame(
             [
@@ -985,12 +1007,14 @@ final class AttackerAgentTest extends TestCase
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
 
+        $budgetExceeded = false;
         try {
-            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $auditContext);
-            self::fail('Expected BudgetExceededException to propagate');
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
         } catch (BudgetExceededException) {
-            // expected — the agent rethrows; coverage should still be recorded.
+            $budgetExceeded = true;
         }
+
+        self::assertTrue($budgetExceeded, 'The agent must rethrow BudgetExceededException.');
 
         self::assertSame(
             [
@@ -1007,13 +1031,13 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('', 10, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 0)));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $auditContext);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
 
         self::assertSame(
             [['stage' => 'attacker', 'file' => 'src/Controller/A.php', 'status' => 'analyzed']],
@@ -1028,13 +1052,13 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('garbage {{{', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('garbage {{{', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $auditContext);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
 
         self::assertSame(
             [['stage' => 'attacker', 'file' => 'src/Controller/A.php', 'status' => 'errored']],
@@ -1056,11 +1080,11 @@ final class AttackerAgentTest extends TestCase
             ->expects(self::once())
             ->method('completeWithTools')
             ->with(self::anything(), self::anything(), $toolRegistry, 8)
-            ->willReturn(LLMResponse::create('[]', 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, null, $factory, true);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['toolRegistryFactory' => $factory, 'toolsEnabled' => true]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
     public function test_it_does_not_dispatch_to_tool_loop_when_tools_disabled(): void
@@ -1076,11 +1100,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create('[]', 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, null, $factory, false);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['toolRegistryFactory' => $factory, 'toolsEnabled' => false]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
     public function test_it_uses_non_tool_path_when_factory_is_null_even_if_enabled(): void
@@ -1092,11 +1116,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create('[]', 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, null, null, true);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['toolsEnabled' => true]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
     public function test_it_passes_custom_max_tool_iterations_through_to_llm_client(): void
@@ -1111,11 +1135,11 @@ final class AttackerAgentTest extends TestCase
             ->expects(self::once())
             ->method('completeWithTools')
             ->with(self::anything(), self::anything(), self::anything(), 13)
-            ->willReturn(LLMResponse::create('[]', 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, null, $factory, true, 13);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['toolRegistryFactory' => $factory, 'toolsEnabled' => true, 'maxToolIterations' => 13]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
     public function test_it_logs_tools_enabled_true_when_tools_active(): void
@@ -1135,11 +1159,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('completeWithTools')
-            ->willReturn(LLMResponse::create('[]', 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, null, $logger, $factory, true);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['logger' => $logger, 'toolRegistryFactory' => $factory, 'toolsEnabled' => true]);
 
-        $this->callAnalyze($attackerAgent, [$this->makeFile('src/A.php')], SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, [$this->makeFile('src/A.php')], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         $startingLogs = array_values(array_filter(
             $infoLogs,
@@ -1180,9 +1204,9 @@ final class AttackerAgentTest extends TestCase
 
         $llmClient = self::createStub(LLMClientInterface::class);
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache, $logger);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache, 'logger' => $logger]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         $cacheHitLogs = array_values(array_filter(
             $infoLogs,
@@ -1204,11 +1228,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('garbage {{{', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('garbage {{{', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
     public function test_it_propagates_llm_provider_exception_and_records_errored_coverage(): void
@@ -1224,12 +1248,14 @@ final class AttackerAgentTest extends TestCase
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
 
+        $providerFailed = false;
         try {
-            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $auditContext);
-            self::fail('Expected LLMProviderException to propagate');
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
         } catch (LLMProviderException) {
-            // expected — the agent rethrows; coverage must still be recorded.
+            $providerFailed = true;
         }
+
+        self::assertTrue($providerFailed, 'The agent must rethrow LLMProviderException.');
 
         self::assertSame(
             [
@@ -1254,12 +1280,14 @@ final class AttackerAgentTest extends TestCase
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
 
+        $providerFailed = false;
         try {
-            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $auditContext);
-            self::fail('Expected LLMProviderException to propagate');
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
         } catch (LLMProviderException) {
-            // TransientLLMFailureException extends LLMProviderException — expected.
+            $providerFailed = true;
         }
+
+        self::assertTrue($providerFailed, 'TransientLLMFailureException (a LLMProviderException) must propagate.');
 
         self::assertSame(
             [
@@ -1289,29 +1317,21 @@ final class AttackerAgentTest extends TestCase
             ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
                 $sentMessages[] = $user;
 
-                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+                return LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
         $files = [$this->makeFile('src/Controller/UserController.php')];
         $previousFindings = [
-            Vulnerability::create(
-                vulnerabilityType: VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE,
-                vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-                title: 'IDOR earlier',
-                description: 'desc',
-                filePath: 'src/Controller/EarlierController.php',
-                lineStart: 42,
-                lineEnd: 46,
-                vulnerableCode: 'code',
-                attackVector: 'av',
-                proof: 'proof',
-                remediation: 'fix',
-                confidence: 0.95,
+            Vulnerability::of(
+                new VulnerabilityClassification(VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE, VulnerabilitySeverity::HIGH, 'IDOR earlier', 0.95),
+                new CodeLocation('src/Controller/EarlierController.php', 42, 46),
+                new VulnerabilityNarrative('desc', 'av', 'proof', 'fix'),
+                'code',
             ),
         ];
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), false, $previousFindings);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['previousFindings' => $previousFindings]);
 
         self::assertCount(1, $sentMessages);
         self::assertStringContainsString('Patterns Already Confirmed', $sentMessages[0]);
@@ -1328,12 +1348,12 @@ final class AttackerAgentTest extends TestCase
             ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
                 $sentMessages[] = $user;
 
-                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+                return LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
         $files = [$this->makeFile('src/Controller/UserController.php')];
         $attackerAgent = $this->makeAttackerAgent($llmClient);
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), false, []);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['previousFindings' => []]);
 
         self::assertCount(1, $sentMessages);
         self::assertStringNotContainsString('Patterns Already Confirmed', $sentMessages[0]);
@@ -1346,28 +1366,20 @@ final class AttackerAgentTest extends TestCase
         $cache->expects(self::never())->method('store');
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'test', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $files = [$this->makeFile('src/Controller/UserController.php')];
         $previousFindings = [
-            Vulnerability::create(
-                vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-                vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-                title: 'SQLi',
-                description: 'd',
-                filePath: 'src/Repo.php',
-                lineStart: 1,
-                lineEnd: 2,
-                vulnerableCode: 'c',
-                attackVector: 'a',
-                proof: 'p',
-                remediation: 'r',
-                confidence: 0.9,
+            Vulnerability::of(
+                new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'SQLi', 0.9),
+                new CodeLocation('src/Repo.php', 1, 2),
+                new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+                'c',
             ),
         ];
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), false, $previousFindings);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['previousFindings' => $previousFindings]);
     }
 
     public function test_it_injects_rejected_findings_section_into_prompt_when_provided(): void
@@ -1379,14 +1391,14 @@ final class AttackerAgentTest extends TestCase
             ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
                 $sentMessages[] = $user;
 
-                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+                return LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
         $files = [$this->makeFile('src/Controller/UserController.php')];
         $rejectedFindings = [$this->makeVulnerabilityFor('src/Controller/RejectedController.php')];
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), false, [], $rejectedFindings);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['rejectedFindings' => $rejectedFindings]);
 
         self::assertCount(1, $sentMessages);
         self::assertStringContainsString('Findings Already Rejected by the Reviewer', $sentMessages[0]);
@@ -1402,12 +1414,12 @@ final class AttackerAgentTest extends TestCase
             ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
                 $sentMessages[] = $user;
 
-                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+                return LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
         $files = [$this->makeFile('src/Controller/UserController.php')];
         $attackerAgent = $this->makeAttackerAgent($llmClient);
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertCount(1, $sentMessages);
         self::assertStringNotContainsString('Findings Already Rejected by the Reviewer', $sentMessages[0]);
@@ -1420,13 +1432,13 @@ final class AttackerAgentTest extends TestCase
         $cache->expects(self::never())->method('store');
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'test', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $files = [$this->makeFile('src/Controller/UserController.php')];
         $rejectedFindings = [$this->makeVulnerabilityFor('src/Controller/RejectedController.php')];
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), false, [], $rejectedFindings);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['rejectedFindings' => $rejectedFindings]);
     }
 
     public function test_it_reads_cache_when_no_previous_findings(): void
@@ -1436,11 +1448,11 @@ final class AttackerAgentTest extends TestCase
         $cache->expects(self::once())->method('store');
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'test', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $files = [$this->makeFile('src/Controller/UserController.php')];
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
     public function test_previous_findings_section_groups_locations_by_vulnerability_type(): void
@@ -1452,43 +1464,27 @@ final class AttackerAgentTest extends TestCase
             ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
                 $sentMessages[] = $user;
 
-                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+                return LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
         $files = [$this->makeFile('src/Controller/UserController.php')];
         $previousFindings = [
-            Vulnerability::create(
-                vulnerabilityType: VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE,
-                vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-                title: 'IDOR 1',
-                description: 'd',
-                filePath: 'src/Controller/A.php',
-                lineStart: 10,
-                lineEnd: 15,
-                vulnerableCode: 'c',
-                attackVector: 'a',
-                proof: 'p',
-                remediation: 'r',
-                confidence: 0.95,
+            Vulnerability::of(
+                new VulnerabilityClassification(VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE, VulnerabilitySeverity::HIGH, 'IDOR 1', 0.95),
+                new CodeLocation('src/Controller/A.php', 10, 15),
+                new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+                'c',
             ),
-            Vulnerability::create(
-                vulnerabilityType: VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE,
-                vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-                title: 'IDOR 2',
-                description: 'd',
-                filePath: 'src/Controller/B.php',
-                lineStart: 20,
-                lineEnd: 25,
-                vulnerableCode: 'c',
-                attackVector: 'a',
-                proof: 'p',
-                remediation: 'r',
-                confidence: 0.95,
+            Vulnerability::of(
+                new VulnerabilityClassification(VulnerabilityType::INSECURE_DIRECT_OBJECT_REFERENCE, VulnerabilitySeverity::HIGH, 'IDOR 2', 0.95),
+                new CodeLocation('src/Controller/B.php', 20, 25),
+                new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+                'c',
             ),
         ];
 
         $attackerAgent = $this->makeAttackerAgent($llmClient);
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), false, $previousFindings);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['previousFindings' => $previousFindings]);
 
         self::assertStringContainsString('src/Controller/A.php:10-15', $sentMessages[0]);
         self::assertStringContainsString('src/Controller/B.php:20-25', $sentMessages[0]);
@@ -1503,7 +1499,7 @@ final class AttackerAgentTest extends TestCase
             ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
                 $sentMessages[] = $user;
 
-                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+                return LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
         $scanner = new class implements StaticPreScannerInterface {
@@ -1521,8 +1517,8 @@ final class AttackerAgentTest extends TestCase
         };
 
         $projectFile = ProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
-        $attackerAgent = $this->makeAttackerAgent($llmClient, staticPreScanner: $scanner);
-        $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::create(), new NullCoverageRecorder());
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['staticPreScanner' => $scanner]);
+        $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertCount(1, $sentMessages);
         self::assertStringContainsString('Pre-Scan Risk Markers', $sentMessages[0]);
@@ -1539,12 +1535,12 @@ final class AttackerAgentTest extends TestCase
             ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
                 $sentMessages[] = $user;
 
-                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+                return LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
         $projectFile = ProjectFile::create('src/Service/Foo.php', '/app/src/Service/Foo.php', '<?php');
         $attackerAgent = $this->makeAttackerAgent($llmClient);
-        $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertCount(1, $sentMessages);
         self::assertStringNotContainsString('Pre-Scan Risk Markers', $sentMessages[0]);
@@ -1556,9 +1552,9 @@ final class AttackerAgentTest extends TestCase
         $llmClient->expects(self::never())->method('complete');
 
         $projectFile = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php class Clean {}');
-        $attackerAgent = $this->makeAttackerAgent($llmClient, leanMode: true);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['leanMode' => true]);
 
-        $result = $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::create(), new NullCoverageRecorder());
+        $result = $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertSame([], $result);
     }
@@ -1572,7 +1568,7 @@ final class AttackerAgentTest extends TestCase
             ->willReturnCallback(static function (string $system, string $user) use (&$sentMessages): LLMResponse {
                 $sentMessages[] = $user;
 
-                return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+                return LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
         $scanner = new class implements StaticPreScannerInterface {
@@ -1591,9 +1587,9 @@ final class AttackerAgentTest extends TestCase
 
         $projectFile = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
         $clean = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
-        $attackerAgent = $this->makeAttackerAgent($llmClient, staticPreScanner: $scanner, leanMode: true);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['staticPreScanner' => $scanner, 'leanMode' => true]);
 
-        $this->callAnalyze($attackerAgent, [$projectFile, $clean], SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, [$projectFile, $clean], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertCount(1, $sentMessages);
         self::assertStringContainsString('src/Service/Risky.php', $sentMessages[0]);
@@ -1621,11 +1617,11 @@ final class AttackerAgentTest extends TestCase
         };
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'test', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $projectFile = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache, staticPreScanner: $scanner);
-        $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::create(), new NullCoverageRecorder());
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache, 'staticPreScanner' => $scanner]);
+        $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
     public function test_empty_llm_response_is_persisted_as_negative_cache_entry(): void
@@ -1637,11 +1633,11 @@ final class AttackerAgentTest extends TestCase
             ->with(self::isArray(), []);
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('', 0, 0, 'test', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $projectFile = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
-        $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::create(), new NullCoverageRecorder());
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
+        $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
     private function makeFile(string $path): ProjectFile
@@ -1651,19 +1647,11 @@ final class AttackerAgentTest extends TestCase
 
     private function makeVulnerabilityFor(string $filePath): Vulnerability
     {
-        return Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'T',
-            description: 'd',
-            filePath: $filePath,
-            lineStart: 1,
-            lineEnd: 2,
-            vulnerableCode: 'c',
-            attackVector: 'a',
-            proof: 'p',
-            remediation: 'r',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'T', 0.9),
+            new CodeLocation($filePath, 1, 2),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            'c',
         );
     }
 
@@ -1713,12 +1701,12 @@ final class AttackerAgentTest extends TestCase
                     'confidence' => 0.9,
                 ]);
 
-                return LLMResponse::create('', 100, 50, 'claude', 'end_turn');
+                return LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(100, 50));
             });
 
         $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient);
 
-        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertCount(1, $vulnerabilities);
         self::assertSame('IDOR on user show', $vulnerabilities[0]->title());
@@ -1732,11 +1720,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('completeWithTools')
-            ->willReturn(LLMResponse::create('', 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient);
 
-        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertSame([], $vulnerabilities);
     }
@@ -1769,22 +1757,28 @@ final class AttackerAgentTest extends TestCase
                     'confidence' => 0.9,
                 ]);
 
-                return LLMResponse::create('', 0, 0, 'claude', 'end_turn');
+                return LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
         $attackerPromptBuilder = new AttackerPromptBuilder();
         $attackerAgent = new AttackerAgent(
-            llmClient: $llmClient,
-            attackerPromptBuilder: $attackerPromptBuilder,
-            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-            attackerCache: new NullAttackerCache(),
-            logger: new NullLogger(),
-            fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
-            recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
-            useStructuredCollection: true,
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: $attackerPromptBuilder,
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: new NullAttackerCache(),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+            ),
+            new AttackerAnalysisSettings(
+                useStructuredCollection: true,
+            ),
+            new NullLogger(),
         );
 
-        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertCount(2, $vulnerabilities);
         self::assertSame(['finding-1', 'finding-2'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
@@ -1813,7 +1807,7 @@ final class AttackerAgentTest extends TestCase
                     'confidence' => 0.9,
                 ]);
 
-                return LLMResponse::create('', 0, 0, 'claude', 'end_turn');
+                return LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
         $attackerCache = $this->createMock(AttackerCacheInterface::class);
@@ -1832,7 +1826,7 @@ final class AttackerAgentTest extends TestCase
 
         $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient, $attackerCache);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
     public function test_structured_collection_skips_cache_store_when_bypass_cache_is_requested(): void
@@ -1842,14 +1836,14 @@ final class AttackerAgentTest extends TestCase
         $llmClient = $this->createMock(LLMClientInterface::class);
         $llmClient
             ->method('completeWithTools')
-            ->willReturn(LLMResponse::create('', 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $attackerCache = $this->createMock(AttackerCacheInterface::class);
         $attackerCache->expects(self::never())->method('store');
 
         $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient, $attackerCache);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), bypassCache: true);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['bypassCache' => true]);
     }
 
     public function test_structured_collection_records_chunk_coverage_as_analyzed(): void
@@ -1859,7 +1853,7 @@ final class AttackerAgentTest extends TestCase
         $llmClient = $this->createMock(LLMClientInterface::class);
         $llmClient
             ->method('completeWithTools')
-            ->willReturn(LLMResponse::create('', 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $coverageRecorder = new class implements CoverageRecorderInterface {
             /** @var list<array{stage: string, file: string, status: string}> */
@@ -1873,7 +1867,7 @@ final class AttackerAgentTest extends TestCase
 
         $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $coverageRecorder);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $coverageRecorder);
 
         self::assertSame([['stage' => 'attacker', 'file' => 'src/Controller/UserController.php', 'status' => 'analyzed']], $coverageRecorder->records);
     }
@@ -1886,21 +1880,27 @@ final class AttackerAgentTest extends TestCase
         ];
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'claude', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $recordingProgressReporter = new RecordingProgressReporter();
         $attackerAgent = new AttackerAgent(
-            llmClient: $llmClient,
-            attackerPromptBuilder: new AttackerPromptBuilder(),
-            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-            attackerCache: new NullAttackerCache(),
-            logger: new NullLogger(),
-            fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
-            useStructuredCollection: false,
-            progressReporter: $recordingProgressReporter,
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: new NullAttackerCache(),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                progressReporter: $recordingProgressReporter,
+            ),
+            new AttackerAnalysisSettings(
+                useStructuredCollection: false,
+            ),
+            new NullLogger(),
         );
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertSame(
             [
@@ -1918,22 +1918,28 @@ final class AttackerAgentTest extends TestCase
     {
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(
-            LLMResponse::create((string) json_encode([self::recordedFinding('json-path')]), 0, 0, 'claude', 'end_turn'),
+            LLMResponse::of((string) json_encode([self::recordedFinding('json-path')]), 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $recordingProgressReporter = new RecordingProgressReporter();
         $attackerAgent = new AttackerAgent(
-            llmClient: $llmClient,
-            attackerPromptBuilder: new AttackerPromptBuilder(),
-            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-            attackerCache: new NullAttackerCache(),
-            logger: new NullLogger(),
-            fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
-            useStructuredCollection: false,
-            progressReporter: $recordingProgressReporter,
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: new NullAttackerCache(),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                progressReporter: $recordingProgressReporter,
+            ),
+            new AttackerAnalysisSettings(
+                useStructuredCollection: false,
+            ),
+            new NullLogger(),
         );
 
-        $this->callAnalyze($attackerAgent, [$this->makeFile('src/A.php')], SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, [$this->makeFile('src/A.php')], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertSame(
             [['attacker.finding.recorded', ['severity' => 'high', 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1]]],
@@ -1952,21 +1958,27 @@ final class AttackerAgentTest extends TestCase
         ];
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'claude', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $recordingProgressReporter = new RecordingProgressReporter();
         $attackerAgent = new AttackerAgent(
-            llmClient: $llmClient,
-            attackerPromptBuilder: new AttackerPromptBuilder(),
-            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-            attackerCache: new NullAttackerCache(),
-            logger: new NullLogger(),
-            fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
-            useStructuredCollection: false,
-            progressReporter: $recordingProgressReporter,
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: new NullAttackerCache(),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                progressReporter: $recordingProgressReporter,
+            ),
+            new AttackerAnalysisSettings(
+                useStructuredCollection: false,
+            ),
+            new NullLogger(),
         );
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         $completed = array_values(array_filter(
             $recordingProgressReporter->events,
@@ -1985,13 +1997,19 @@ final class AttackerAgentTest extends TestCase
     private function makeStructuredCollectionAttackerAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null): AttackerAgent
     {
         return new AttackerAgent(
-            llmClient: $llmClient,
-            attackerPromptBuilder: new AttackerPromptBuilder(),
-            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-            attackerCache: $attackerCache ?? new NullAttackerCache(),
-            logger: new NullLogger(),
-            recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
-            useStructuredCollection: true,
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: $attackerCache ?? new NullAttackerCache(),
+            ),
+            new AttackerAnalysisSettings(
+                useStructuredCollection: true,
+            ),
+            new NullLogger(),
         );
     }
 
@@ -2012,13 +2030,13 @@ final class AttackerAgentTest extends TestCase
                 self::registryOf($requests[0])->execute('record_vulnerability', self::recordedFinding('finding-0b'));
                 self::registryOf($requests[1])->execute('record_vulnerability', self::recordedFinding('finding-1'));
 
-                return [LLMResponse::create('', 1, 1, 'm', 'end_turn'), LLMResponse::create('', 1, 1, 'm', 'end_turn')];
+                return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
             });
 
         $auditContext = AuditContext::forProject($this->tmpDir);
         $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient, null, $recordingProgressReporter);
 
-        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $auditContext);
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
 
         self::assertSame(
             ['finding-0a', 'finding-0b', 'finding-1'],
@@ -2076,13 +2094,13 @@ final class AttackerAgentTest extends TestCase
                 self::assertCount(1, $requests);
                 self::registryOf($requests[0])->execute('record_vulnerability', self::recordedFinding('fresh-b'));
 
-                return [LLMResponse::create('', 1, 1, 'm', 'end_turn')];
+                return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
             });
 
         $auditContext = AuditContext::forProject($this->tmpDir);
         $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient, $cache);
 
-        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $auditContext);
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
 
         self::assertSame(['cached-a', 'fresh-b'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
         self::assertSame(
@@ -2105,7 +2123,7 @@ final class AttackerAgentTest extends TestCase
         $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient);
 
         try {
-            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $auditContext);
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
             self::fail('expected BudgetExceededException');
         } catch (BudgetExceededException) {
             self::assertSame(
@@ -2126,7 +2144,7 @@ final class AttackerAgentTest extends TestCase
         $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient);
 
         try {
-            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), $auditContext);
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
             self::fail('expected LLMProviderException');
         } catch (LLMProviderException) {
             self::assertSame(
@@ -2147,12 +2165,12 @@ final class AttackerAgentTest extends TestCase
             ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
                 $toolRegistry->execute('record_vulnerability', self::recordedFinding('sequential'));
 
-                return LLMResponse::create('', 1, 1, 'm', 'end_turn');
+                return LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1));
             });
 
         $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient);
 
-        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertCount(1, $vulnerabilities);
         self::assertSame('sequential', $vulnerabilities[0]->title());
@@ -2179,21 +2197,27 @@ final class AttackerAgentTest extends TestCase
             ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
                 $toolRegistry->execute('record_vulnerability', self::recordedFinding('sequential'));
 
-                return LLMResponse::create('', 1, 1, 'm', 'end_turn');
+                return LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1));
             });
 
         $attackerAgent = new AttackerAgent(
-            llmClient: $llmClient,
-            attackerPromptBuilder: new AttackerPromptBuilder(),
-            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-            attackerCache: new NullAttackerCache(),
-            logger: new NullLogger(),
-            recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
-            useStructuredCollection: true,
-            maxConcurrent: 1,
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: new NullAttackerCache(),
+            ),
+            new AttackerAnalysisSettings(
+                useStructuredCollection: true,
+                maxConcurrent: 1,
+            ),
+            new NullLogger(),
         );
 
-        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertCount(1, $vulnerabilities);
         self::assertSame('sequential', $vulnerabilities[0]->title());
@@ -2209,20 +2233,26 @@ final class AttackerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create((string) json_encode([self::recordedFinding('json-path')]), 1, 1, 'm', 'end_turn'));
+            ->willReturn(LLMResponse::of((string) json_encode([self::recordedFinding('json-path')]), 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
 
         $attackerAgent = new AttackerAgent(
-            llmClient: $llmClient,
-            attackerPromptBuilder: new AttackerPromptBuilder(),
-            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-            attackerCache: new NullAttackerCache(),
-            logger: new NullLogger(),
-            recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
-            useStructuredCollection: false,
-            maxConcurrent: 4,
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: new NullAttackerCache(),
+            ),
+            new AttackerAnalysisSettings(
+                useStructuredCollection: false,
+                maxConcurrent: 4,
+            ),
+            new NullLogger(),
         );
 
-        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
 
         self::assertCount(1, $vulnerabilities);
         self::assertSame('json-path', $vulnerabilities[0]->title());
@@ -2252,16 +2282,22 @@ final class AttackerAgentTest extends TestCase
     private function makeConcurrentStructuredAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null, ?ProgressReporterInterface $progressReporter = null): AttackerAgent
     {
         return new AttackerAgent(
-            llmClient: $llmClient,
-            attackerPromptBuilder: new AttackerPromptBuilder(),
-            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-            attackerCache: $attackerCache ?? new NullAttackerCache(),
-            logger: new NullLogger(),
-            fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
-            recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
-            useStructuredCollection: true,
-            progressReporter: $progressReporter,
-            maxConcurrent: 4,
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: $attackerCache ?? new NullAttackerCache(),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                progressReporter: $progressReporter,
+            ),
+            new AttackerAnalysisSettings(
+                useStructuredCollection: true,
+                maxConcurrent: 4,
+            ),
+            new NullLogger(),
         );
     }
 
@@ -2290,9 +2326,9 @@ final class AttackerAgentTest extends TestCase
         $llmClient = $this->createMock(LLMClientInterface::class);
         $llmClient->expects(self::never())->method('complete');
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $result = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), previousFindings: $previousFindings);
+        $result = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['previousFindings' => $previousFindings]);
 
         self::assertSame([], $result);
     }
@@ -2310,11 +2346,11 @@ final class AttackerAgentTest extends TestCase
         $cache->expects(self::never())->method('store');
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), previousFindings: $previousFindings);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['previousFindings' => $previousFindings]);
     }
 
     public function test_context_free_chunks_use_the_empty_context_key_on_a_context_aware_cache(): void
@@ -2326,11 +2362,11 @@ final class AttackerAgentTest extends TestCase
         $cache->expects(self::once())->method('storeForContext')->with(self::isArray(), '', []);
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder());
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
     public function test_context_unaware_cache_is_skipped_for_chunks_carrying_previous_findings(): void
@@ -2345,11 +2381,11 @@ final class AttackerAgentTest extends TestCase
         $llmClient = $this->createMock(LLMClientInterface::class);
         $llmClient->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), previousFindings: $previousFindings);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['previousFindings' => $previousFindings]);
     }
 
     public function test_context_key_is_the_hash_of_the_rendered_context_preambles(): void
@@ -2369,11 +2405,11 @@ final class AttackerAgentTest extends TestCase
         );
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), previousFindings: [$vulnerability], rejectedFindings: [$rejectedFinding]);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['previousFindings' => [$vulnerability], 'rejectedFindings' => [$rejectedFinding]]);
 
         $attackerContextPromptRenderer = new AttackerContextPromptRenderer();
         $expectedKey = hash(
@@ -2399,38 +2435,47 @@ final class AttackerAgentTest extends TestCase
         );
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('[]', 10, 10, 'claude', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
-        $attackerAgent = $this->makeAttackerAgent($llmClient, $cache);
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['attackerCache' => $cache]);
 
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), previousFindings: [$vulnerability]);
-        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::create(), new NullCoverageRecorder(), rejectedFindings: [$vulnerability]);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['previousFindings' => [$vulnerability]]);
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['rejectedFindings' => [$vulnerability]]);
 
         self::assertCount(2, $contextKeys);
         self::assertNotSame($contextKeys[0], $contextKeys[1]);
     }
 
-    private function makeAttackerAgent(
-        LLMClientInterface $llmClient,
-        ?AttackerCacheInterface $attackerCache = null,
-        ?LoggerInterface $logger = null,
-        ?ToolRegistryFactoryInterface $toolRegistryFactory = null,
-        bool $toolsEnabled = AttackerAgent::DEFAULT_TOOLS_ENABLED,
-        int $maxToolIterations = AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS,
-        ?StaticPreScannerInterface $staticPreScanner = null,
-        bool $leanMode = AttackerAgent::DEFAULT_LEAN_MODE,
-    ): AttackerAgent {
+    /**
+     * @param array{
+     *     attackerCache?: AttackerCacheInterface|null,
+     *     logger?: LoggerInterface|null,
+     *     toolRegistryFactory?: ToolRegistryFactoryInterface|null,
+     *     toolsEnabled?: bool,
+     *     maxToolIterations?: int,
+     *     staticPreScanner?: StaticPreScannerInterface|null,
+     *     leanMode?: bool,
+     * } $overrides
+     */
+    private function makeAttackerAgent(LLMClientInterface $llmClient, array $overrides = []): AttackerAgent
+    {
         return new AttackerAgent(
-            llmClient: $llmClient,
-            attackerPromptBuilder: new AttackerPromptBuilder(),
-            vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-            attackerCache: $attackerCache ?? new NullAttackerCache(),
-            logger: $logger ?? new NullLogger(),
-            toolRegistryFactory: $toolRegistryFactory,
-            toolsEnabled: $toolsEnabled,
-            maxToolIterations: $maxToolIterations,
-            staticPreScanner: $staticPreScanner,
-            leanMode: $leanMode,
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: $overrides['attackerCache'] ?? new NullAttackerCache(),
+                staticPreScanner: $overrides['staticPreScanner'] ?? null,
+                toolRegistryFactory: $overrides['toolRegistryFactory'] ?? null,
+            ),
+            new AttackerAnalysisSettings(
+                toolsEnabled: $overrides['toolsEnabled'] ?? AttackerAgent::DEFAULT_TOOLS_ENABLED,
+                maxToolIterations: $overrides['maxToolIterations'] ?? AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS,
+                leanMode: $overrides['leanMode'] ?? AttackerAgent::DEFAULT_LEAN_MODE,
+            ),
+            $overrides['logger'] ?? new NullLogger(),
         );
     }
 }

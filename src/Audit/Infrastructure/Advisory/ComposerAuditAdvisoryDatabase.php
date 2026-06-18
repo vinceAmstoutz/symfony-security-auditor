@@ -129,28 +129,42 @@ final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseIn
     {
         $mapped = [];
         foreach ($advisories as $advisory) {
-            if (!\is_array($advisory)) {
-                continue;
+            $entry = $this->mapAdvisory($advisory);
+            if (null !== $entry) {
+                $mapped[] = $entry;
             }
-
-            $title = \is_string($advisory['title'] ?? null) ? $advisory['title'] : '';
-            if ('' === $title) {
-                continue;
-            }
-
-            $cveValue = $advisory['cve'] ?? null;
-            $linkValue = $advisory['link'] ?? null;
-            $affected = $advisory['affectedVersions'] ?? '';
-
-            $mapped[] = [
-                'cve' => \is_string($cveValue) && '' !== $cveValue ? $cveValue : null,
-                'title' => $title,
-                'summary' => \is_string($advisory['summary'] ?? null) ? $advisory['summary'] : $title,
-                'affected_versions' => \is_string($affected) ? $affected : '',
-                'link' => \is_string($linkValue) && '' !== $linkValue ? $linkValue : null,
-            ];
         }
 
         return $mapped;
+    }
+
+    /**
+     * @return array{cve: ?string, title: string, summary: string, affected_versions: string, link: ?string}|null
+     */
+    private function mapAdvisory(mixed $advisory): ?array
+    {
+        if (!\is_array($advisory)) {
+            return null;
+        }
+
+        $title = \is_string($advisory['title'] ?? null) ? $advisory['title'] : '';
+        if ('' === $title) {
+            return null;
+        }
+
+        $affected = $advisory['affectedVersions'] ?? '';
+
+        return [
+            'cve' => $this->nonEmptyStringOrNull($advisory['cve'] ?? null),
+            'title' => $title,
+            'summary' => \is_string($advisory['summary'] ?? null) ? $advisory['summary'] : $title,
+            'affected_versions' => \is_string($affected) ? $affected : '',
+            'link' => $this->nonEmptyStringOrNull($advisory['link'] ?? null),
+        ];
+    }
+
+    private function nonEmptyStringOrNull(mixed $value): ?string
+    {
+        return \is_string($value) && '' !== $value ? $value : null;
     }
 }

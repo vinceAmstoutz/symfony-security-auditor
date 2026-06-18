@@ -11,17 +11,16 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class NullVoterCapabilityParser implements VoterCapabilityParserInterface
+final readonly class NullFormBindingParser implements FormBindingParserInterface
 {
-    public function parse(ProjectFile $projectFile): ?VoterCapability
+    public function parse(ProjectFile $projectFile): array
     {
-        return null;
+        return [];
     }
 }

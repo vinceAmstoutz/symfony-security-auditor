@@ -11,13 +11,13 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class NullFormBindingParser implements FormBindingParserInterface
+final readonly class NullControllerAccessControlParser implements ControllerAccessControlParserInterface
 {
     public function parse(ProjectFile $projectFile): array
     {

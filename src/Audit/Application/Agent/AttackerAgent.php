@@ -20,19 +20,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkCove
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ConcurrentChunkAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\SequentialChunkAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\NullProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 
 /**
  * Orchestrates the attacker pass: deterministic pre-scan, optional lean-mode
@@ -64,57 +62,63 @@ final readonly class AttackerAgent implements AttackerAgentInterface
 
     private ?ConcurrentChunkAnalyzer $concurrentChunkAnalyzer;
 
+    private LoggerInterface $logger;
+
+    private ?ToolRegistryFactoryInterface $toolRegistryFactory;
+
+    private bool $toolsEnabled;
+
+    private bool $leanMode;
+
+    private bool $useStructuredCollection;
+
+    private int $maxConcurrent;
+
     public function __construct(
-        LLMClientInterface $llmClient,
-        AttackerPromptBuilderInterface $attackerPromptBuilder,
-        VulnerabilityFactory $vulnerabilityFactory,
-        AttackerCacheInterface $attackerCache,
-        private LoggerInterface $logger,
-        private ?ToolRegistryFactoryInterface $toolRegistryFactory = null,
-        private bool $toolsEnabled = self::DEFAULT_TOOLS_ENABLED,
-        int $maxToolIterations = self::DEFAULT_MAX_TOOL_ITERATIONS,
-        ?StaticPreScannerInterface $staticPreScanner = null,
-        private bool $leanMode = self::DEFAULT_LEAN_MODE,
-        ?FileChunker $fileChunker = null,
-        ?CodeSlicerInterface $codeSlicer = null,
-        ?RecordVulnerabilityToolFactoryInterface $recordVulnerabilityToolFactory = null,
-        private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
-        ?ProgressReporterInterface $progressReporter = null,
-        private int $maxConcurrent = self::DEFAULT_MAX_CONCURRENT,
+        AttackerLlmCollaborators $llm,
+        AttackerScanCollaborators $scan,
+        AttackerAnalysisSettings $settings,
+        LoggerInterface $logger,
     ) {
-        $this->staticPreScanner = $staticPreScanner ?? new NullStaticPreScanner();
-        $this->fileChunker = $fileChunker ?? new FileChunker();
-        $this->progressReporter = $progressReporter ?? new NullProgressReporter();
+        $this->logger = $logger;
+        $this->toolRegistryFactory = $scan->toolRegistryFactory;
+        $this->toolsEnabled = $settings->toolsEnabled;
+        $this->leanMode = $settings->leanMode;
+        $this->useStructuredCollection = $settings->useStructuredCollection;
+        $this->maxConcurrent = $settings->maxConcurrent;
+        $this->staticPreScanner = $scan->staticPreScanner ?? new NullStaticPreScanner();
+        $this->fileChunker = $scan->fileChunker ?? new FileChunker();
+        $this->progressReporter = $scan->progressReporter ?? new NullProgressReporter();
 
         $chunkContextFactory = new ChunkContextFactory(
-            $attackerPromptBuilder,
-            $codeSlicer ?? new NullCodeSlicer(),
+            $llm->attackerPromptBuilder,
+            $llm->codeSlicer ?? new NullCodeSlicer(),
             new AttackerContextPromptRenderer(),
         );
-        $attackerChunkCache = new AttackerChunkCache($attackerCache, $vulnerabilityFactory, $logger);
+        $attackerChunkCache = new AttackerChunkCache($scan->attackerCache, $llm->vulnerabilityFactory, $logger);
 
         $this->sequentialChunkAnalyzer = new SequentialChunkAnalyzer(
-            $llmClient,
+            $llm->llmClient,
             $chunkContextFactory,
             $attackerChunkCache,
-            $vulnerabilityFactory,
+            $llm->vulnerabilityFactory,
             $logger,
             $this->progressReporter,
-            $maxToolIterations,
+            $settings->maxToolIterations,
             $this->useStructuredCollection,
-            $recordVulnerabilityToolFactory,
+            $llm->recordVulnerabilityToolFactory,
         );
 
-        $this->concurrentChunkAnalyzer = $llmClient instanceof ToolBatchCapableLLMClientInterface && $recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface
+        $this->concurrentChunkAnalyzer = $llm->llmClient instanceof ToolBatchCapableLLMClientInterface && $llm->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface
             ? new ConcurrentChunkAnalyzer(
-                $llmClient,
+                $llm->llmClient,
                 $chunkContextFactory,
                 $attackerChunkCache,
-                $vulnerabilityFactory,
+                $llm->vulnerabilityFactory,
                 $logger,
                 $this->progressReporter,
-                $maxToolIterations,
-                $recordVulnerabilityToolFactory,
+                $settings->maxToolIterations,
+                $llm->recordVulnerabilityToolFactory,
                 $this->maxConcurrent,
             )
             : null;
@@ -138,35 +142,19 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         $effectiveFiles = $this->leanMode ? $riskMarkerIndex->filesWithMarkers($files) : $files;
 
         if ([] === $effectiveFiles) {
-            $this->logger->info('Attacker agent skipped — lean mode filtered all files', [
-                'files' => \count($files),
-                'markers' => 0,
-            ]);
-            ChunkCoverageRecorder::record($files, 'skipped', $coverageRecorder);
-
-            return [];
+            return $this->skipLeanFilteredAnalysis($files, $coverageRecorder);
         }
 
-        $this->logger->info('Attacker agent starting analysis', [
-            'files' => \count($effectiveFiles),
-            'files_filtered_lean' => \count($files) - \count($effectiveFiles),
-            'markers' => \count($markers),
-            'tools_enabled' => $useTools,
-            'cache_bypassed' => $attackerAnalysisRequest->bypassCache,
-            'previous_findings' => \count($attackerAnalysisRequest->previousFindings),
-            'rejected_findings' => \count($attackerAnalysisRequest->rejectedFindings),
-        ]);
+        $this->logStartingAnalysis($files, $effectiveFiles, $markers, $useTools, $attackerAnalysisRequest);
 
         $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($effectiveFiles) : null;
 
         $chunks = $this->fileChunker->chunk($effectiveFiles);
 
-        $useConcurrent = $this->maxConcurrent > 1
-            && $this->useStructuredCollection
-            && $this->concurrentChunkAnalyzer instanceof ConcurrentChunkAnalyzer;
+        $concurrentChunkAnalyzer = $this->concurrentChunkAnalyzerForConcurrentAnalysis();
 
-        [$allVulnerabilities, $totalDropsByReason] = $useConcurrent
-            ? $this->concurrentChunkAnalyzer->analyze($chunks, $attackerAnalysisRequest, $coverageRecorder, $riskMarkerIndex)
+        [$allVulnerabilities, $totalDropsByReason] = $concurrentChunkAnalyzer instanceof ConcurrentChunkAnalyzer
+            ? $concurrentChunkAnalyzer->analyze($chunks, $attackerAnalysisRequest, $coverageRecorder, $riskMarkerIndex)
             : $this->sequentialChunkAnalyzer->analyze($chunks, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
 
         $this->logger->info('Attacker agent complete', [
@@ -176,5 +164,57 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         ]);
 
         return $allVulnerabilities;
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     *
+     * @return list<Vulnerability>
+     */
+    private function skipLeanFilteredAnalysis(array $files, CoverageRecorderInterface $coverageRecorder): array
+    {
+        $this->logger->info('Attacker agent skipped — lean mode filtered all files', [
+            'files' => \count($files),
+            'markers' => 0,
+        ]);
+        ChunkCoverageRecorder::record($files, 'skipped', $coverageRecorder);
+
+        return [];
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     * @param list<ProjectFile> $effectiveFiles
+     * @param list<RiskMarker>  $markers
+     */
+    private function logStartingAnalysis(
+        array $files,
+        array $effectiveFiles,
+        array $markers,
+        bool $useTools,
+        AttackerAnalysisRequest $attackerAnalysisRequest,
+    ): void {
+        $this->logger->info('Attacker agent starting analysis', [
+            'files' => \count($effectiveFiles),
+            'files_filtered_lean' => \count($files) - \count($effectiveFiles),
+            'markers' => \count($markers),
+            'tools_enabled' => $useTools,
+            'cache_bypassed' => $attackerAnalysisRequest->bypassCache,
+            'previous_findings' => \count($attackerAnalysisRequest->previousFindings),
+            'rejected_findings' => \count($attackerAnalysisRequest->rejectedFindings),
+        ]);
+    }
+
+    private function concurrentChunkAnalyzerForConcurrentAnalysis(): ?ConcurrentChunkAnalyzer
+    {
+        if ($this->maxConcurrent <= 1) {
+            return null;
+        }
+
+        if (!$this->useStructuredCollection) {
+            return null;
+        }
+
+        return $this->concurrentChunkAnalyzer;
     }
 }

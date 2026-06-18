@@ -11,16 +11,17 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class NullCodeSlicer implements CodeSlicerInterface
+final readonly class NullVoterCapabilityParser implements VoterCapabilityParserInterface
 {
-    public function slice(ProjectFile $projectFile): string
+    public function parse(ProjectFile $projectFile): ?VoterCapability
     {
-        return $projectFile->content();
+        return null;
     }
 }

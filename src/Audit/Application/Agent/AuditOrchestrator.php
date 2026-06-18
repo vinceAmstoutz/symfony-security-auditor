@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditOrchestrator implements AuditOrchestratorInterface
@@ -34,8 +34,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         private AttackerAgentInterface $attackerAgent,
         private ReviewerAgentInterface $reviewerAgent,
         private LoggerInterface $logger,
-        private int $maxIterations = self::DEFAULT_MAX_ITERATIONS,
-        private float $minConfidence = self::DEFAULT_MIN_CONFIDENCE,
+        private AuditLoopSettings $loopSettings,
         ?ProgressReporterInterface $progressReporter = null,
     ) {
         $this->progressReporter = $progressReporter ?? new NullProgressReporter();
@@ -55,7 +54,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         $iteration = 0;
 
         $this->logger->info('Starting attacker vs reviewer loop', [
-            'max_iterations' => $this->maxIterations,
+            'max_iterations' => $this->loopSettings->maxIterations,
         ]);
 
         $this->progressReporter->report(ProgressEvent::AuditStarted->value, [
@@ -67,10 +66,10 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
         do {
             ++$iteration;
-            $this->logger->info(\sprintf('Audit iteration %d/%d', $iteration, $this->maxIterations));
+            $this->logger->info(\sprintf('Audit iteration %d/%d', $iteration, $this->loopSettings->maxIterations));
             $this->progressReporter->report(ProgressEvent::AuditIterationStarted->value, [
                 'iteration' => $iteration,
-                'max_iterations' => $this->maxIterations,
+                'max_iterations' => $this->loopSettings->maxIterations,
             ]);
 
             $previousFindings = array_values($auditContext->validatedVulnerabilities());
@@ -96,7 +95,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
                 'findings' => \count($filtered),
             ]);
             $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed());
-            $newFindings = $this->persistReviewedFindings(array_values($reviewed), $auditContext);
+            $newFindings = $this->persistReviewedFindings($reviewed, $auditContext);
 
             $acceptedCount = \count(array_filter(
                 $reviewed,
@@ -119,7 +118,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             if (0 === $newFindings) {
                 break;
             }
-        } while ($iteration < $this->maxIterations);
+        } while ($iteration < $this->loopSettings->maxIterations);
 
         $auditContext->setMeta('audit.iterations', $iteration);
         $auditContext->setMeta('audit.total_findings', \count($auditContext->vulnerabilities()));
@@ -151,7 +150,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     {
         return array_values(array_filter(
             $vulnerabilities,
-            fn (Vulnerability $vulnerability): bool => $vulnerability->confidence() >= $this->minConfidence,
+            fn (Vulnerability $vulnerability): bool => $vulnerability->confidence() >= $this->loopSettings->minConfidence,
         ));
     }
 

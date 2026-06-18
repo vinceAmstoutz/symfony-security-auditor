@@ -82,34 +82,47 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
         }
 
         $reader = $this->fileReader ?? static fn (SplFileInfo $splFile): string => $splFile->getContents();
-        $files = [];
 
-        if ([] !== $directories) {
-            $extensions = array_merge(
-                array_map(static fn (string $ext): string => '*.'.$ext, self::PHP_EXTENSIONS),
-                array_map(static fn (string $ext): string => '*.'.$ext, self::TEMPLATE_EXTENSIONS),
-                array_map(static fn (string $ext): string => '*.'.$ext, self::CONFIG_EXTENSIONS),
-            );
+        $files = array_merge(
+            $this->scanDirectories($directories, $projectPath, $reader),
+            $this->scanExplicitFiles($explicitFiles, $projectPath, $reader),
+        );
 
-            $finder = (new Finder())
-                ->files()
-                ->in($directories)
-                ->name($extensions)
-                ->size(\sprintf('<= %dKi', $this->maxFileSizeKb));
+        $this->logger->info('Scan complete', ['files' => \count($files)]);
 
-            if ($this->respectGitignore) {
-                $finder->ignoreVCSIgnored(true);
-            }
+        return $files;
+    }
 
-            /** @var SplFileInfo $splFile */
-            foreach ($finder as $splFile) {
-                $file = $this->buildProjectFile($splFile, $projectPath, $reader);
-                if ($file instanceof ProjectFile) {
-                    $files[] = $file;
-                }
-            }
+    /**
+     * @param list<string>                 $directories
+     * @param Closure(SplFileInfo): string $reader
+     *
+     * @return list<ProjectFile>
+     */
+    private function scanDirectories(array $directories, string $projectPath, Closure $reader): array
+    {
+        if ([] === $directories) {
+            return [];
         }
 
+        $finder = (new Finder())
+            ->files()
+            ->in($directories)
+            ->name($this->finderNamePatterns())
+            ->size(\sprintf('<= %dKi', $this->maxFileSizeKb));
+
+        return $this->collectFilesFrom($finder, $projectPath, $reader);
+    }
+
+    /**
+     * @param list<string>                 $explicitFiles
+     * @param Closure(SplFileInfo): string $reader
+     *
+     * @return list<ProjectFile>
+     */
+    private function scanExplicitFiles(array $explicitFiles, string $projectPath, Closure $reader): array
+    {
+        $files = [];
         foreach ($explicitFiles as $explicitFile) {
             $explicitFinder = (new Finder())
                 ->files()
@@ -118,22 +131,45 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
                 ->name(basename($explicitFile))
                 ->size(\sprintf('<= %dKi', $this->maxFileSizeKb));
 
-            if ($this->respectGitignore) {
-                $explicitFinder->ignoreVCSIgnored(true);
-            }
+            $files = array_merge($files, $this->collectFilesFrom($explicitFinder, $projectPath, $reader));
+        }
 
-            /** @var SplFileInfo $splFile */
-            foreach ($explicitFinder as $splFile) {
-                $file = $this->buildProjectFile($splFile, $projectPath, $reader);
-                if ($file instanceof ProjectFile) {
-                    $files[] = $file;
-                }
+        return $files;
+    }
+
+    /**
+     * @param Closure(SplFileInfo): string $reader
+     *
+     * @return list<ProjectFile>
+     */
+    private function collectFilesFrom(Finder $finder, string $projectPath, Closure $reader): array
+    {
+        if ($this->respectGitignore) {
+            $finder->ignoreVCSIgnored(true);
+        }
+
+        $files = [];
+        /** @var SplFileInfo $splFile */
+        foreach ($finder as $splFile) {
+            $file = $this->buildProjectFile($splFile, $projectPath, $reader);
+            if ($file instanceof ProjectFile) {
+                $files[] = $file;
             }
         }
 
-        $this->logger->info('Scan complete', ['files' => \count($files)]);
-
         return $files;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function finderNamePatterns(): array
+    {
+        return array_merge(
+            array_map(static fn (string $ext): string => '*.'.$ext, self::PHP_EXTENSIONS),
+            array_map(static fn (string $ext): string => '*.'.$ext, self::TEMPLATE_EXTENSIONS),
+            array_map(static fn (string $ext): string => '*.'.$ext, self::CONFIG_EXTENSIONS),
+        );
     }
 
     /**
@@ -147,7 +183,11 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
             $resolved = $projectPath.\DIRECTORY_SEPARATOR.$includedPath;
             if (is_dir($resolved)) {
                 $directories[] = $resolved;
-            } elseif (is_file($resolved)) {
+
+                continue;
+            }
+
+            if (is_file($resolved)) {
                 $explicitFiles[] = $resolved;
             }
         }

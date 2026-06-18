@@ -16,20 +16,13 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 use Psr\Log\LoggerInterface;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
-use Symfony\AI\Platform\PlatformInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
 
 /**
  * Implements the Domain LLM ports on top of the symfony/ai platform. The
@@ -63,44 +56,46 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
 
     private ToolConversationWavefront $toolConversationWavefront;
 
+    private string $model;
+
+    private LoggerInterface $logger;
+
+    private ?float $temperature;
+
+    private ?BudgetTracker $budgetTracker;
+
     public function __construct(
-        ?PlatformInterface $platform,
-        private string $model,
-        private LoggerInterface $logger,
-        private ?float $temperature = self::DEFAULT_TEMPERATURE,
-        ?TokenUsageRecorder $tokenUsageRecorder = null,
-        RetryPolicy $retryPolicy = new RetryPolicy(),
-        TransientFailureClassifier $transientFailureClassifier = new TransientFailureClassifier(),
-        SleeperInterface $sleeper = new UsleepSleeper(),
-        private ?BudgetTracker $budgetTracker = null,
-        bool $providerJsonMode = self::DEFAULT_PROVIDER_JSON_MODE,
-        RateLimiterInterface $rateLimiter = new NullRateLimiter(),
-        TokenEstimatorInterface $tokenEstimator = new ResolvingTokenEstimator(),
-        RetryAfterHeaderParser $retryAfterHeaderParser = new RetryAfterHeaderParser(),
-        ?int $maxOutputTokens = self::DEFAULT_MAX_OUTPUT_TOKENS,
+        PlatformBinding $platformBinding,
+        PlatformRequestConfig $requestConfig = new PlatformRequestConfig(),
+        PlatformResilienceConfig $resilienceConfig = new PlatformResilienceConfig(),
+        PlatformAccountingConfig $accountingConfig = new PlatformAccountingConfig(),
     ) {
-        $this->rateLimiter = $rateLimiter;
-        $this->promptTokenEstimator = new PromptTokenEstimator($tokenEstimator, $model);
-        $this->platformResultExtractor = new PlatformResultExtractor($tokenUsageRecorder);
-        $platformOptionsFactory = new PlatformOptionsFactory($model, $temperature, $providerJsonMode, $maxOutputTokens);
+        $this->model = $platformBinding->model;
+        $this->logger = $platformBinding->logger;
+        $this->temperature = $requestConfig->temperature;
+        $this->budgetTracker = $accountingConfig->budgetTracker;
+        $this->rateLimiter = $resilienceConfig->rateLimiter;
+        $this->promptTokenEstimator = new PromptTokenEstimator($requestConfig->tokenEstimator, $platformBinding->model);
+        $this->platformResultExtractor = new PlatformResultExtractor($accountingConfig->tokenUsageRecorder);
+        $platformOptionsFactory = new PlatformOptionsFactory($platformBinding->model, $requestConfig->temperature, $requestConfig->providerJsonMode, $platformBinding->maxOutputTokens);
         $this->platformOptionsFactory = $platformOptionsFactory;
 
         $this->retryingPlatformInvoker = new RetryingPlatformInvoker(
-            $platform,
-            $model,
-            $logger,
+            $platformBinding->platform,
+            $platformBinding->model,
+            $platformBinding->logger,
             $this->rateLimiter,
-            $retryPolicy,
-            $transientFailureClassifier,
-            $sleeper,
-            $retryAfterHeaderParser,
+            $resilienceConfig->retryPolicy,
+            $resilienceConfig->transientFailureClassifier,
+            $resilienceConfig->sleeper,
+            $resilienceConfig->retryAfterHeaderParser,
         );
 
         $this->sequentialToolLoop = new SequentialToolLoop(
-            $model,
-            $logger,
+            $platformBinding->model,
+            $platformBinding->logger,
             $this->rateLimiter,
-            $budgetTracker,
+            $accountingConfig->budgetTracker,
             $this->retryingPlatformInvoker,
             $this->platformResultExtractor,
             $platformOptionsFactory,
@@ -108,10 +103,10 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         );
 
         $this->batchWindowResolver = new BatchWindowResolver(
-            $platform,
-            $model,
+            $platformBinding->platform,
+            $platformBinding->model,
             $this->rateLimiter,
-            $budgetTracker,
+            $accountingConfig->budgetTracker,
             $this->platformResultExtractor,
             $platformOptionsFactory,
             $this->promptTokenEstimator,
@@ -119,11 +114,11 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         );
 
         $this->toolConversationWavefront = new ToolConversationWavefront(
-            $platform,
-            $model,
-            $logger,
+            $platformBinding->platform,
+            $platformBinding->model,
+            $platformBinding->logger,
             $this->rateLimiter,
-            $budgetTracker,
+            $accountingConfig->budgetTracker,
             $this->platformResultExtractor,
             $platformOptionsFactory,
             $this->promptTokenEstimator,
@@ -164,14 +159,11 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             'output_tokens' => $outputTokens,
         ]);
 
-        $llmResponse = LLMResponse::create(
-            content: $content,
-            inputTokens: $inputTokens,
-            outputTokens: $outputTokens,
-            model: $this->model,
-            stopReason: 'end_turn',
-            cacheReadTokens: $cacheReadTokens,
-            cacheCreationTokens: $cacheCreationTokens,
+        $llmResponse = LLMResponse::of(
+            $content,
+            $this->model,
+            'end_turn',
+            TokenUsageSnapshot::of($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens),
         );
         $this->budgetTracker?->recordCall($llmResponse);
         $this->budgetTracker?->assertWithinBudget();
@@ -231,12 +223,11 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             'error' => $emptyllmResponseException->getMessage(),
         ]);
 
-        return LLMResponse::create(
-            content: '',
-            inputTokens: 0,
-            outputTokens: 0,
-            model: $this->model,
-            stopReason: 'empty_content',
+        return LLMResponse::of(
+            '',
+            $this->model,
+            'empty_content',
+            TokenUsageSnapshot::of(0, 0),
         );
     }
 }

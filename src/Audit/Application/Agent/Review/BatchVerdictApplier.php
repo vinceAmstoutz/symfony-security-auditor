@@ -47,6 +47,28 @@ final readonly class BatchVerdictApplier
      */
     public function applyBatchReview(array $batch, array $rawData, CoverageRecorderInterface $coverageRecorder, array $codeContexts = []): array
     {
+        $reviewsById = $this->indexReviewsById($rawData);
+
+        $reviewed = [];
+        foreach ($batch as $vulnerability) {
+            $reviewed[] = $this->reviewVulnerability(
+                $vulnerability,
+                $reviewsById[$vulnerability->id()] ?? null,
+                $coverageRecorder,
+                $codeContexts,
+            );
+        }
+
+        return $reviewed;
+    }
+
+    /**
+     * @param array<int|string, mixed> $rawData
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function indexReviewsById(array $rawData): array
+    {
         $reviewsById = [];
         foreach ($rawData as $entry) {
             if (!\is_array($entry)) {
@@ -55,40 +77,52 @@ final readonly class BatchVerdictApplier
 
             $entryId = $entry['id'] ?? null;
             if (\is_string($entryId)) {
-                $stringKeyed = [];
-                foreach ($entry as $key => $value) {
-                    $stringKeyed[(string) $key] = $value;
-                }
-
-                $reviewsById[$entryId] = $stringKeyed;
+                $reviewsById[$entryId] = $this->withStringKeys($entry);
             }
         }
 
-        $reviewed = [];
-        foreach ($batch as $vulnerability) {
-            $review = $reviewsById[$vulnerability->id()] ?? null;
+        return $reviewsById;
+    }
 
-            if (null === $review) {
-                $reviewed[] = $vulnerability->withReviewerValidation(false);
-                $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
-
-                continue;
-            }
-
-            if (\array_key_exists($vulnerability->id(), $codeContexts)) {
-                $this->reviewerVerdictCache->store($vulnerability, $codeContexts[$vulnerability->id()], $review);
-            }
-
-            $applied = $this->verdictApplier->apply($vulnerability, $review);
-            $coverageRecorder->recordCoverage(
-                AgentRole::Reviewer->value,
-                $vulnerability->filePath(),
-                $applied->isReviewerValidated() ? 'validated' : 'rejected',
-            );
-            $reviewed[] = $applied;
+    /**
+     * @param array<int|string, mixed> $entry
+     *
+     * @return array<string, mixed>
+     */
+    private function withStringKeys(array $entry): array
+    {
+        $stringKeyed = [];
+        foreach ($entry as $key => $value) {
+            $stringKeyed[(string) $key] = $value;
         }
 
-        return $reviewed;
+        return $stringKeyed;
+    }
+
+    /**
+     * @param array<string, mixed>|null $review
+     * @param array<string, string>     $codeContexts
+     */
+    private function reviewVulnerability(Vulnerability $vulnerability, ?array $review, CoverageRecorderInterface $coverageRecorder, array $codeContexts): Vulnerability
+    {
+        if (null === $review) {
+            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
+
+            return $vulnerability->withReviewerValidation(false);
+        }
+
+        if (\array_key_exists($vulnerability->id(), $codeContexts)) {
+            $this->reviewerVerdictCache->store($vulnerability, $codeContexts[$vulnerability->id()], $review);
+        }
+
+        $applied = $this->verdictApplier->apply($vulnerability, $review);
+        $coverageRecorder->recordCoverage(
+            AgentRole::Reviewer->value,
+            $vulnerability->filePath(),
+            $applied->isReviewerValidated() ? 'validated' : 'rejected',
+        );
+
+        return $applied;
     }
 
     /**

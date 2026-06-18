@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
-use Symfony\Component\Console\Command\Command;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
@@ -23,7 +22,7 @@ final readonly class AuditExitCodeResolver implements AuditExitCodeResolverInter
     public function resolve(AuditReport $auditReport, RiskLevel $riskLevel): int
     {
         return $auditReport->riskLevelEnum()->isAtLeast($riskLevel)
-            ? Command::FAILURE
-            : Command::SUCCESS;
+            ? ExitCode::Failure->value
+            : ExitCode::Success->value;
     }
 }

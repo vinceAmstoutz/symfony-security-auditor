@@ -67,7 +67,7 @@ final readonly class RiskMarkerIndex
     {
         return array_values(array_filter(
             $files,
-            fn (ProjectFile $projectFile): bool => isset($this->byFile[$projectFile->relativePath()]),
+            fn (ProjectFile $projectFile): bool => array_key_exists($projectFile->relativePath(), $this->byFile),
         ));
     }
 }

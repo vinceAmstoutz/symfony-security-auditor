@@ -15,7 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 
 final class PhpParserControllerAccessControlParserTest extends TestCase
@@ -50,7 +49,6 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
         self::assertCount(1, $entries);
-        self::assertInstanceOf(RouteAccessControl::class, $entries[0]);
         self::assertSame('deleteUser', $entries[0]->methodName());
         self::assertSame('/admin/users/{id}', $entries[0]->routePath());
         self::assertSame(['DELETE'], $entries[0]->routeMethods());

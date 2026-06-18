@@ -16,13 +16,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM;
 use JsonException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 
 final class LLMResponseTest extends TestCase
 {
     public function test_it_creates_and_exposes_properties(): void
     {
-        $llmResponse = LLMResponse::create('Hello world', 100, 50, 'claude-opus', 'end_turn');
+        $llmResponse = LLMResponse::of('Hello world', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50));
 
         self::assertSame('Hello world', $llmResponse->content());
         self::assertSame(100, $llmResponse->inputTokens());
@@ -34,7 +35,7 @@ final class LLMResponseTest extends TestCase
 
     public function test_cache_tokens_default_to_zero_when_not_supplied(): void
     {
-        $llmResponse = LLMResponse::create('Hello world', 100, 50, 'claude-opus', 'end_turn');
+        $llmResponse = LLMResponse::of('Hello world', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50));
 
         self::assertSame(0, $llmResponse->cacheReadTokens());
         self::assertSame(0, $llmResponse->cacheCreationTokens());
@@ -42,7 +43,7 @@ final class LLMResponseTest extends TestCase
 
     public function test_it_exposes_supplied_cache_tokens(): void
     {
-        $llmResponse = LLMResponse::create('Hello world', 100, 50, 'claude-opus', 'end_turn', 30, 12);
+        $llmResponse = LLMResponse::of('Hello world', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50, 30, 12));
 
         self::assertSame(30, $llmResponse->cacheReadTokens());
         self::assertSame(12, $llmResponse->cacheCreationTokens());
@@ -50,16 +51,16 @@ final class LLMResponseTest extends TestCase
 
     public function test_it_detects_empty_content(): void
     {
-        $llmResponse = LLMResponse::create('  ', 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of('  ', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
         self::assertTrue($llmResponse->isEmpty());
 
-        $notEmpty = LLMResponse::create('{"key": "value"}', 10, 5, 'claude', 'end_turn');
+        $notEmpty = LLMResponse::of('{"key": "value"}', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
         self::assertFalse($notEmpty->isEmpty());
     }
 
     public function test_it_parses_json_content(): void
     {
-        $llmResponse = LLMResponse::create('{"vulnerabilities": []}', 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of('{"vulnerabilities": []}', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
         $data = $llmResponse->parseJson();
 
         self::assertArrayHasKey('vulnerabilities', $data);
@@ -69,7 +70,7 @@ final class LLMResponseTest extends TestCase
     public function test_it_strips_markdown_fences_before_parsing(): void
     {
         $content = "```json\n{\"key\": \"value\"}\n```";
-        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
         $data = $llmResponse->parseJson();
 
         self::assertSame('value', $data['key']);
@@ -78,7 +79,7 @@ final class LLMResponseTest extends TestCase
     public function test_it_extracts_json_array_when_wrapped_in_leading_prose(): void
     {
         $content = "I analyzed the code carefully:\n\n[{\"title\": \"finding\"}]";
-        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $data = $llmResponse->parseJson();
 
@@ -88,7 +89,7 @@ final class LLMResponseTest extends TestCase
     public function test_it_extracts_json_array_when_followed_by_trailing_prose(): void
     {
         $content = "[{\"title\": \"finding\"}]\n\nThat concludes my analysis.";
-        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $data = $llmResponse->parseJson();
 
@@ -100,7 +101,7 @@ final class LLMResponseTest extends TestCase
         // Validates that the extractor's balanced-brace walker correctly handles
         // nested `{` / `}` inside the outer `[ ... ]` block.
         $content = 'Found these issues: [{"id":1,"meta":{"score":0.9}}] — done.';
-        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $data = $llmResponse->parseJson();
 
@@ -112,7 +113,7 @@ final class LLMResponseTest extends TestCase
         // String contents must not affect depth counting — `]` inside a JSON
         // string would otherwise close the outer array prematurely.
         $content = 'note: [{"title":"contains ] bracket"}] end';
-        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $data = $llmResponse->parseJson();
 
@@ -122,7 +123,7 @@ final class LLMResponseTest extends TestCase
     public function test_it_treats_escaped_quote_as_part_of_string_during_extraction(): void
     {
         $content = 'prose: [{"title":"x \" ] y","other":"z"}] end';
-        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $data = $llmResponse->parseJson();
 
@@ -132,7 +133,7 @@ final class LLMResponseTest extends TestCase
     public function test_it_locks_extraction_length_to_closing_bracket_position(): void
     {
         $content = '[1,2]{garbage}';
-        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $data = $llmResponse->parseJson();
 
@@ -142,7 +143,7 @@ final class LLMResponseTest extends TestCase
     public function test_it_scans_for_opener_from_the_start_not_the_end_of_content(): void
     {
         $content = '[1,2] {';
-        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $data = $llmResponse->parseJson();
 
@@ -152,7 +153,7 @@ final class LLMResponseTest extends TestCase
     public function test_it_extracts_json_object_when_braces_are_the_first_opener(): void
     {
         $content = 'prose {"key": "value"} suffix';
-        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $data = $llmResponse->parseJson();
 
@@ -166,7 +167,7 @@ final class LLMResponseTest extends TestCase
             .' The recommendation card displays `recommendation.contents[locale]` without escaping override -'
             ." but since it's autoescaped HTML, no XSS.\n  \n"
             ."  No real exploitable vulnerabilities found in the provided files.\n  \n  []  ";
-        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $data = $llmResponse->parseJson();
 
@@ -182,7 +183,7 @@ final class LLMResponseTest extends TestCase
             .'"line_start":42,"line_end":42,"vulnerable_code":"$em->getConnection()->executeQuery($sql)",'
             .'"attack_vector":"id parameter","proof":"id=1 OR 1=1","remediation":"Use parameter binding.",'
             .'"confidence":0.9}]';
-        $llmResponse = LLMResponse::create($content, 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $data = $llmResponse->parseJson();
 
@@ -204,7 +205,7 @@ final class LLMResponseTest extends TestCase
 
     public function test_it_throws_on_invalid_json(): void
     {
-        $llmResponse = LLMResponse::create('not json at all', 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of('not json at all', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $this->expectException(JsonException::class);
         $llmResponse->parseJson();
@@ -212,7 +213,7 @@ final class LLMResponseTest extends TestCase
 
     public function test_recovery_is_skipped_when_first_character_is_an_object_opener_spanning_full_content(): void
     {
-        $llmResponse = LLMResponse::create('{xyz: [1]}', 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of('{xyz: [1]}', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $this->expectException(JsonException::class);
         $llmResponse->parseJson();
@@ -220,7 +221,7 @@ final class LLMResponseTest extends TestCase
 
     public function test_recovery_is_skipped_when_first_character_opens_a_block_spanning_full_content(): void
     {
-        $llmResponse = LLMResponse::create('[xyz, [1,2]]', 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of('[xyz, [1,2]]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $this->expectException(JsonException::class);
         $llmResponse->parseJson();
@@ -228,7 +229,7 @@ final class LLMResponseTest extends TestCase
 
     public function test_recovery_invokes_object_branch_only_on_brace_character(): void
     {
-        $llmResponse = LLMResponse::create('}{}', 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of('}{}', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $data = $llmResponse->parseJson();
 
@@ -237,7 +238,7 @@ final class LLMResponseTest extends TestCase
 
     public function test_recovery_iterator_starts_at_index_zero_not_minus_one(): void
     {
-        $llmResponse = LLMResponse::create('[1,2]"', 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of('[1,2]"', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $data = $llmResponse->parseJson();
 
@@ -249,7 +250,7 @@ final class LLMResponseTest extends TestCase
         // Prose mentions `[` but no matching `]` ever appears — every opener
         // candidate fails to scan a balanced block, so the original
         // `JsonException` propagates rather than masking the failure.
-        $llmResponse = LLMResponse::create('prose with [no real json here', 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of('prose with [no real json here', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $this->expectException(JsonException::class);
         $llmResponse->parseJson();
@@ -259,7 +260,7 @@ final class LLMResponseTest extends TestCase
     {
         // Unbalanced braces (`{{{` with no matching closers) — extractor returns
         // null and the original JsonException is rethrown.
-        $llmResponse = LLMResponse::create('invalid json {{{', 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of('invalid json {{{', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $this->expectException(JsonException::class);
         $llmResponse->parseJson();
@@ -267,7 +268,7 @@ final class LLMResponseTest extends TestCase
 
     public function test_it_throws_when_json_is_not_array(): void
     {
-        $llmResponse = LLMResponse::create('"just a string"', 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of('"just a string"', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $this->expectException(RuntimeException::class);
         $llmResponse->parseJson();
@@ -275,7 +276,7 @@ final class LLMResponseTest extends TestCase
 
     public function test_it_trims_surrounding_whitespace_before_parsing(): void
     {
-        $llmResponse = LLMResponse::create('   {"key": "value"}   ', 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of('   {"key": "value"}   ', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
         $data = $llmResponse->parseJson();
 
         self::assertSame('value', $data['key']);
@@ -285,7 +286,7 @@ final class LLMResponseTest extends TestCase
     {
         // depth=512 allows up to 511 levels; depth=511 mutant would reject this → kills DecrementInteger
         $json = str_repeat('[', 511).str_repeat(']', 511);
-        $llmResponse = LLMResponse::create($json, 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($json, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $data = $llmResponse->parseJson();
 
@@ -296,7 +297,7 @@ final class LLMResponseTest extends TestCase
     {
         // depth=512 rejects 512 levels; depth=513 mutant would accept it → kills IncrementInteger
         $json = str_repeat('[', 512).str_repeat(']', 512);
-        $llmResponse = LLMResponse::create($json, 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of($json, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $this->expectException(JsonException::class);
         $llmResponse->parseJson();
@@ -306,23 +307,40 @@ final class LLMResponseTest extends TestCase
     {
         // trim() removes \x00 (null byte); json_decode does NOT handle null bytes.
         // MethodCallRemoval on trim() would leave \x00 in content → JsonException.
-        $llmResponse = LLMResponse::create("\x00[1, 2, 3]\x00", 0, 0, 'test', 'end_turn');
+        $llmResponse = LLMResponse::of("\x00[1, 2, 3]\x00", 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
 
         self::assertSame([1, 2, 3], $llmResponse->parseJson());
     }
 
     public function test_parse_json_trims_non_json_whitespace_around_scalar_to_reach_array_guard(): void
     {
-        // Vertical tab (\x0b) is removed by `trim()` but rejected by `json_decode`
-        // as a control character — and unlike an array payload, a scalar offers
-        // no `[`/`{` opener for the balanced-block extractor to recover from.
-        // With `trim()`: the inner `"scalar"` decodes and fails the `!is_array`
-        // guard → RuntimeException. Without `trim()` (UnwrapTrim mutant): the
-        // first decode throws on `\x0b`, the extractor finds no opener, and the
-        // original JsonException is rethrown — pins the `trim()` call.
-        $llmResponse = LLMResponse::create("\x0b\"scalar\"\x0b", 10, 5, 'claude', 'end_turn');
+        $llmResponse = LLMResponse::of("\x0b\"scalar\"\x0b", 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $this->expectException(RuntimeException::class);
         $llmResponse->parseJson();
+    }
+
+    /**
+     * @deprecated covers the deprecated {@see LLMResponse::create()} delegator until it is removed in 2.0.
+     */
+    public function test_deprecated_create_maps_every_field(): void
+    {
+        $llmResponse = LLMResponse::create(
+            content: 'body',
+            inputTokens: 11,
+            outputTokens: 22,
+            model: 'claude-opus',
+            stopReason: 'end_turn',
+            cacheReadTokens: 33,
+            cacheCreationTokens: 44,
+        );
+
+        self::assertSame('body', $llmResponse->content());
+        self::assertSame(11, $llmResponse->inputTokens());
+        self::assertSame(22, $llmResponse->outputTokens());
+        self::assertSame('claude-opus', $llmResponse->model());
+        self::assertSame('end_turn', $llmResponse->stopReason());
+        self::assertSame(33, $llmResponse->cacheReadTokens());
+        self::assertSame(44, $llmResponse->cacheCreationTokens());
     }
 }

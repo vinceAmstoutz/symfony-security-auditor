@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Progress;
 
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
@@ -22,7 +23,7 @@ final class ProgressReporterHolderTest extends TestCase
 {
     public function test_it_is_silent_by_default(): void
     {
-        $progressReporterHolder = new ProgressReporterHolder();
+        $progressReporterHolder = new ProgressReporterHolder(new NullLogger());
         $progressReporterHolder->report('pipeline.started', ['stages' => ['a']]);
 
         $reporter = $this->createMock(ProgressReporterInterface::class);
@@ -32,7 +33,7 @@ final class ProgressReporterHolderTest extends TestCase
 
     public function test_it_delegates_to_set_reporter(): void
     {
-        $progressReporterHolder = new ProgressReporterHolder();
+        $progressReporterHolder = new ProgressReporterHolder(new NullLogger());
 
         $reporter = $this->createMock(ProgressReporterInterface::class);
         $reporter->expects(self::once())
@@ -45,7 +46,7 @@ final class ProgressReporterHolderTest extends TestCase
 
     public function test_it_swallows_reporter_exceptions(): void
     {
-        $progressReporterHolder = new ProgressReporterHolder();
+        $progressReporterHolder = new ProgressReporterHolder(new NullLogger());
 
         $throwing = self::createStub(ProgressReporterInterface::class);
         $throwing->method('report')->willThrowException(new RuntimeException('boom'));
@@ -60,7 +61,7 @@ final class ProgressReporterHolderTest extends TestCase
 
     public function test_it_forwards_context_to_delegate(): void
     {
-        $progressReporterHolder = new ProgressReporterHolder();
+        $progressReporterHolder = new ProgressReporterHolder(new NullLogger());
         $context = ['stage' => 'ingestion', 'audit_id' => 'abc'];
 
         $reporter = $this->createMock(ProgressReporterInterface::class);

@@ -38,14 +38,11 @@ final class LoggerProgressReporterTest extends TestCase
 
     public function test_report_swallows_logger_exceptions(): void
     {
-        $logger = self::createStub(LoggerInterface::class);
-        $logger->method('info')->willThrowException(new RuntimeException('logger died'));
+        $logger = self::createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('info')->willThrowException(new RuntimeException('logger died'));
 
         $loggerProgressReporter = new LoggerProgressReporter($logger);
 
-        // Must not throw.
         $loggerProgressReporter->report('any.event');
-
-        self::assertInstanceOf(LoggerProgressReporter::class, $loggerProgressReporter);
     }
 }

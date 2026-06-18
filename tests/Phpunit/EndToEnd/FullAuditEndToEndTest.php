@@ -17,14 +17,21 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -58,13 +65,13 @@ final class FullAuditEndToEndTest extends TestCase
                 $response = $attackerResponses[$callIndex] ?? '[]';
                 ++$callIndex;
 
-                return LLMResponse::create($response, 0, 0, 'stub', 'end_turn');
+                return LLMResponse::of($response, 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0));
             },
         );
 
         $reviewerLLM = self::createStub(LLMClientInterface::class);
         $reviewerLLM->method('complete')->willReturn(
-            LLMResponse::create((string) json_encode(['accepted' => true, 'adjusted_severity' => null, 'reviewer_notes' => 'Confirmed']), 0, 0, 'stub', 'end_turn'),
+            LLMResponse::of((string) json_encode(['accepted' => true, 'adjusted_severity' => null, 'reviewer_notes' => 'Confirmed']), 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $auditReport = $this->makeUseCase($attackerLLM, $reviewerLLM)->execute($this->fixtureProjectDir);
@@ -80,7 +87,7 @@ final class FullAuditEndToEndTest extends TestCase
 
         $attackerLLM = self::createStub(LLMClientInterface::class);
         $attackerLLM->method('complete')->willReturn(
-            LLMResponse::create('[]', 0, 0, 'stub', 'end_turn'),
+            LLMResponse::of('[]', 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $reviewerLLM = self::createStub(LLMClientInterface::class);
@@ -98,12 +105,12 @@ final class FullAuditEndToEndTest extends TestCase
 
         $attackerLLM = self::createStub(LLMClientInterface::class);
         $attackerLLM->method('complete')->willReturn(
-            LLMResponse::create($this->makeVulnerabilityJson('src/Controller/AdminController.php', 'high', 'SQL injection', 0.9, 'sql_injection'), 0, 0, 'stub', 'end_turn'),
+            LLMResponse::of($this->makeVulnerabilityJson('src/Controller/AdminController.php', 'high', 'SQL injection', 0.9, 'sql_injection'), 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $reviewerLLM = self::createStub(LLMClientInterface::class);
         $reviewerLLM->method('complete')->willReturn(
-            LLMResponse::create((string) json_encode(['accepted' => true, 'adjusted_severity' => null]), 0, 0, 'stub', 'end_turn'),
+            LLMResponse::of((string) json_encode(['accepted' => true, 'adjusted_severity' => null]), 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $auditReport = $this->makeUseCase($attackerLLM, $reviewerLLM)->execute($this->fixtureProjectDir);
@@ -117,12 +124,12 @@ final class FullAuditEndToEndTest extends TestCase
 
         $attackerLLM = self::createStub(LLMClientInterface::class);
         $attackerLLM->method('complete')->willReturn(
-            LLMResponse::create($this->makeVulnerabilityJson('src/Controller/AdminController.php', 'high', 'Missing check', 0.9), 0, 0, 'stub', 'end_turn'),
+            LLMResponse::of($this->makeVulnerabilityJson('src/Controller/AdminController.php', 'high', 'Missing check', 0.9), 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $reviewerLLM = self::createStub(LLMClientInterface::class);
         $reviewerLLM->method('complete')->willReturn(
-            LLMResponse::create((string) json_encode(['accepted' => true]), 0, 0, 'stub', 'end_turn'),
+            LLMResponse::of((string) json_encode(['accepted' => true]), 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $auditReport = $this->makeUseCase($attackerLLM, $reviewerLLM)->execute($this->fixtureProjectDir);
@@ -207,9 +214,17 @@ final class FullAuditEndToEndTest extends TestCase
     private function makeUseCase(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM): RunAuditUseCase
     {
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger()),
-            new ReviewerAgent($reviewerLLM, new ReviewerPromptBuilder(), new NullLogger()),
+            new AttackerAgent(new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator())), new AttackerScanCollaborators(new NullAttackerCache()), new AttackerAnalysisSettings(), new NullLogger()),
+            new ReviewerAgent(
+                new ReviewerAgentCollaborators(
+                    $reviewerLLM,
+                    new ReviewerPromptBuilder(),
+                    new NullLogger(),
+                ),
+                new ReviewerModeConfiguration(),
+            ),
             new NullLogger(),
+            new AuditLoopSettings(),
         );
 
         $auditPipeline = new AuditPipeline(

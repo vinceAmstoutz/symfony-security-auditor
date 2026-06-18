@@ -53,31 +53,46 @@ final readonly class VerdictApplier
             return $reviewed;
         }
 
-        if (null !== $adjustedSeverity) {
-            try {
-                $severity = VulnerabilitySeverity::from($adjustedSeverity);
-                $reviewed = $reviewed->withElevatedSeverity($severity);
-            } catch (ValueError) {
-                $this->logger->debug('Reviewer returned invalid severity, keeping original', [
-                    'adjusted_severity' => $adjustedSeverity,
-                ]);
-            }
-        }
-
-        if (null !== $correctedType) {
-            try {
-                $type = VulnerabilityType::from($correctedType);
-                $reviewed = $reviewed->withCorrectedType($type);
-            } catch (ValueError) {
-                $this->logger->debug('Reviewer returned invalid corrected_type, keeping original', [
-                    'corrected_type' => $correctedType,
-                ]);
-            }
-        }
+        $reviewed = $this->applyAdjustedSeverity($reviewed, $adjustedSeverity);
+        $reviewed = $this->applyCorrectedType($reviewed, $correctedType);
 
         $this->logReviewDecision($vulnerability, $accepted, $review);
 
         return $reviewed;
+    }
+
+    private function applyAdjustedSeverity(Vulnerability $reviewed, ?string $adjustedSeverity): Vulnerability
+    {
+        if (null === $adjustedSeverity) {
+            return $reviewed;
+        }
+
+        try {
+            return $reviewed->withElevatedSeverity(VulnerabilitySeverity::from($adjustedSeverity));
+        } catch (ValueError) {
+            $this->logger->debug('Reviewer returned invalid severity, keeping original', [
+                'adjusted_severity' => $adjustedSeverity,
+            ]);
+
+            return $reviewed;
+        }
+    }
+
+    private function applyCorrectedType(Vulnerability $reviewed, ?string $correctedType): Vulnerability
+    {
+        if (null === $correctedType) {
+            return $reviewed;
+        }
+
+        try {
+            return $reviewed->withCorrectedType(VulnerabilityType::from($correctedType));
+        } catch (ValueError) {
+            $this->logger->debug('Reviewer returned invalid corrected_type, keeping original', [
+                'corrected_type' => $correctedType,
+            ]);
+
+            return $reviewed;
+        }
     }
 
     /**
@@ -90,7 +105,7 @@ final readonly class VerdictApplier
      */
     public function normalize(array $reviewData): array
     {
-        $candidate = isset($reviewData[0]) && \is_array($reviewData[0]) ? $reviewData[0] : $reviewData;
+        $candidate = \is_array($reviewData[0] ?? null) ? $reviewData[0] : $reviewData;
 
         $review = [];
         foreach ($candidate as $key => $value) {

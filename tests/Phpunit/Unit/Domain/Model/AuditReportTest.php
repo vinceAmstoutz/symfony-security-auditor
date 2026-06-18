@@ -17,8 +17,11 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 
@@ -486,19 +489,11 @@ final class AuditReportTest extends TestCase
 
     private function sameFingerprintVuln(int $lineStart): Vulnerability
     {
-        return Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'Shared title',
-            description: 'desc',
-            filePath: 'src/Shared.php',
-            lineStart: $lineStart,
-            lineEnd: $lineStart + 1,
-            vulnerableCode: 'code',
-            attackVector: 'vec',
-            proof: 'proof',
-            remediation: 'fix',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Shared title', 0.9),
+            new CodeLocation('src/Shared.php', $lineStart, $lineStart + 1),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
         );
     }
 
@@ -507,19 +502,11 @@ final class AuditReportTest extends TestCase
         VulnerabilitySeverity $vulnerabilitySeverity,
         VulnerabilityType $vulnerabilityType = VulnerabilityType::SQL_INJECTION,
     ): Vulnerability {
-        return Vulnerability::create(
-            vulnerabilityType: $vulnerabilityType,
-            vulnerabilitySeverity: $vulnerabilitySeverity,
-            title: 'Test '.$discriminator,
-            description: 'Test vulnerability',
-            filePath: 'src/'.$discriminator.'.php',
-            lineStart: 1,
-            lineEnd: 5,
-            vulnerableCode: '$query',
-            attackVector: 'Inject',
-            proof: "' OR 1=1",
-            remediation: 'Fix it',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification($vulnerabilityType, $vulnerabilitySeverity, 'Test '.$discriminator, 0.9),
+            new CodeLocation('src/'.$discriminator.'.php', 1, 5),
+            new VulnerabilityNarrative('Test vulnerability', 'Inject', "' OR 1=1", 'Fix it'),
+            '$query',
         );
     }
 }

@@ -72,7 +72,7 @@ final readonly class ReadFileTool implements ToolInterface
             return 'Error: missing or empty "relative_path" argument.';
         }
 
-        if (!isset($this->filesByPath[$rawPath])) {
+        if (!\array_key_exists($rawPath, $this->filesByPath)) {
             return \sprintf('Error: file "%s" is not part of the audited project.', $rawPath);
         }
 
