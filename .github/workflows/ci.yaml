@@ -104,6 +104,14 @@ jobs:
       - name: PHPStan
         run: vendor/bin/phpstan analyse --memory-limit=500M
 
+      - name: Deptrac
+        run: vendor/bin/deptrac analyse --no-progress
+
+      - name: Swiss Knife
+        run: |
+          vendor/bin/swiss-knife check-commented-code src tests tools
+          vendor/bin/swiss-knife check-conflicts src tests tools
+
       - name: Composer audit
         run: composer audit
 
@@ -151,6 +159,14 @@ jobs:
             --coverage-xml=build/coverage/coverage-xml \
             --log-junit=build/coverage/junit.xml \
 
+      - name: Upload coverage to Codecov
+        if: matrix.php == '8.3' && matrix.symfony == '^7.4'
+        uses: codecov/codecov-action@v5
+        with:
+          files: build/coverage/clover.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
       - name: Run Infection mutation tests
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -162,3 +178,15 @@ jobs:
             ARGS="$ARGS --git-diff-lines --git-diff-base=origin/$BASE_REF --ignore-msi-with-no-mutations"
           fi
           php -d memory_limit=1G bin/infection $ARGS
+
+      - name: Publish MSI to Stryker dashboard (badge)
+        if: github.ref == 'refs/heads/main' && matrix.php == '8.3' && matrix.symfony == '^7.4'
+        env:
+          STRYKER_DASHBOARD_API_KEY: ${{ secrets.STRYKER_DASHBOARD_API_KEY }}
+        run: |
+          MSI=$(php -r '$s = json_decode(file_get_contents("infection/summary.json"), true); echo $s["stats"]["msi"];')
+          curl -sSf -X PUT \
+            "https://dashboard.stryker-mutator.io/api/reports/github.com/vinceamstoutz/symfony-security-auditor/main" \
+            -H "Content-Type: application/json" \
+            -H "X-Api-Key: ${STRYKER_DASHBOARD_API_KEY}" \
+            -d "{\"mutationScore\": ${MSI}}"

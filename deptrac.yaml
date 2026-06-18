@@ -1,0 +1,40 @@
+deptrac:
+  paths:
+    - ./src
+  layers:
+    - name: Domain
+      collectors:
+        - type: directory
+          value: src/Audit/Domain/.*
+    - name: Application
+      collectors:
+        - type: directory
+          value: src/Audit/Application/.*
+    - name: Infrastructure
+      collectors:
+        - type: directory
+          value: src/Audit/Infrastructure/.*
+    - name: Command
+      collectors:
+        - type: directory
+          value: src/Command/.*
+    - name: Bundle
+      collectors:
+        - type: classLike
+          value: VinceAmstoutz\\SymfonySecurityAuditor\\SymfonySecurityAuditorBundle
+  ruleset:
+    Domain: ~
+    Application:
+      - Domain
+    Infrastructure:
+      - Domain
+      - Application
+    Command:
+      - Application
+      - Domain
+      - Infrastructure
+    Bundle:
+      - Application
+      - Domain
+      - Infrastructure
+      - Command

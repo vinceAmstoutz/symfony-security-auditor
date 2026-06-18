@@ -50,10 +50,12 @@
         "symfony/validator": "^7.4 || ^8.0"
     },
     "require-dev": {
+        "deptrac/deptrac": "^4.6",
         "ergebnis/composer-normalize": "^2.52",
         "ergebnis/phpunit-agent-reporter": "^0.3",
         "ergebnis/phpunit-slow-test-detector": "^2.24",
         "friendsofphp/php-cs-fixer": "^3.95",
+        "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan": "^2.1",
         "phpstan/phpstan-deprecation-rules": "^2.0",
         "phpstan/phpstan-phpunit": "^2.0",
@@ -61,12 +63,16 @@
         "phpstan/phpstan-symfony": "^2.0",
         "phpunit/phpunit": "^12.5",
         "rector/rector": "^2.4",
+        "rector/swiss-knife": "^2.4",
         "robiningelbrecht/phpunit-coverage-tools": "^1.10",
+        "spaze/phpstan-disallowed-calls": "^4.12",
         "staabm/phpstan-todo-by": "^0.3",
         "symfony/clock": "^7.4 || ^8.0",
         "symfony/dotenv": "^7.4 || ^8.0",
         "symfony/error-handler": "^7.4 || ^8.0",
-        "symfony/var-dumper": "^7.4 || ^8.0"
+        "symfony/var-dumper": "^7.4 || ^8.0",
+        "symplify/phpstan-rules": "^14.10",
+        "tomasvotruba/cognitive-complexity": "^1.0"
     },
     "suggest": {
         "symfony/ai-anthropic-platform": "Anthropic (Claude) platform bridge — claude-opus-4-8, claude-sonnet-4-6, claude-haiku-4-5-20251001",
@@ -88,12 +94,14 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "VinceAmstoutz\\SymfonySecurityAuditor\\Tests\\": "tests/Phpunit/"
+            "VinceAmstoutz\\SymfonySecurityAuditor\\Tests\\": "tests/Phpunit/",
+            "VinceAmstoutz\\SymfonySecurityAuditor\\Tooling\\": "tools/"
         }
     },
     "config": {
         "allow-plugins": {
-            "ergebnis/composer-normalize": true
+            "ergebnis/composer-normalize": true,
+            "phpstan/extension-installer": true
         },
         "sort-packages": true
     },

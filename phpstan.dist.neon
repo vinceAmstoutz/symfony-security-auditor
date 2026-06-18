@@ -1,3 +1,6 @@
+includes:
+    - vendor/spaze/phpstan-disallowed-calls/disallowed-execution-calls.neon
+
 parameters:
     level: max
     paths:
@@ -5,4 +8,40 @@ parameters:
         - config/
         - src/
         - tests/
+        - tools/
+
     resultCachePath: var/phpstan
+
+    cognitive_complexity:
+        class: 40
+        function: 7
+
+    disallowedFunctionCalls:
+        -
+            function: 'compact()'
+            message: 'build an explicit array instead of compact()'
+        -
+            function: 'extract()'
+            message: 'assign variables explicitly instead of extract()'
+
+rules:
+    - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\MaxParameterCountRule
+    - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\NoEmptyCatchRule
+    - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\NoSilencingErrorHandlerRule
+    - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\FinalRule
+    - Symplify\PHPStanRules\Rules\NoDynamicNameRule
+    - Symplify\PHPStanRules\Rules\Complexity\ForeachCeptionRule
+
+services:
+    -
+        class: Symplify\PHPStanRules\Rules\ForbiddenNodeRule
+        arguments:
+            forbiddenNodes:
+                - PhpParser\Node\Expr\ErrorSuppress
+                - PhpParser\Node\Stmt\Else_
+                - PhpParser\Node\Stmt\ElseIf_
+                - PhpParser\Node\Expr\Isset_
+                - PhpParser\Node\Expr\Eval_
+                - PhpParser\Node\Stmt\Goto_
+        tags:
+            - phpstan.rules.rule

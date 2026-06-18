@@ -48,6 +48,24 @@ collaborators, each behind an interface.
 When you touch a file that bundles responsibilities, extract them into new
 classes rather than adding more.
 
+## Constructor & Method Parameters
+
+Cap every method and constructor at **5 parameters** — enforced by the custom
+`MaxParameterCountRule` (`tools/PHPStan/MaxParameterCountRule.php`). When a
+signature would exceed it, group related parameters into an immutable
+value/context object (a `Context` or config VO), never by merging helpers or
+relaxing the cap. See memory `[[feedback_context_object_over_param_threading]]`.
+
+- **All-promoted constructor** (every parameter promoted) is exempt — it _is_
+  the value object (e.g. the per-finding `Vulnerability` storage ctor).
+- **`@deprecated` methods** are exempt — they are scheduled for removal and
+  their replacement already satisfies the cap.
+- **Public, BC-frozen factories** that exceed the cap are not edited in place
+  (that would be a `MAJOR` break). Instead add an `of()`-style value-object
+  factory (`Vulnerability::of()`, `SymfonyMapping::of()`, `LLMResponse::of()`),
+  mark the wide `create()` `@deprecated`, and have it delegate to `of()`. The
+  new VOs live in the layer that owns the model (see [[ddd-layers]]).
+
 ## Custom Exceptions
 
 Never throw raw `\RuntimeException`, `\InvalidArgumentException`,
