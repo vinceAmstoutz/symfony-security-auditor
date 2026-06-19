@@ -149,11 +149,11 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
 
         $payload = implode("\n", $signatures);
         if ('' !== $this->keySalt) {
-            $payload = $this->keySalt."\0".$payload;
+            $payload = \sprintf("%s\0%s", $this->keySalt, $payload);
         }
 
         if ('' !== $contextKey) {
-            $payload .= "\0context:".$contextKey;
+            $payload = \sprintf("%s\0context:%s", $payload, $contextKey);
         }
 
         return hash('sha256', $payload);

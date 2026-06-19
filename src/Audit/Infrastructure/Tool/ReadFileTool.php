@@ -79,7 +79,7 @@ final readonly class ReadFileTool implements ToolInterface
         $content = $this->filesByPath[$rawPath]->content();
 
         if (\strlen($content) > self::MAX_BYTES) {
-            return substr($content, 0, self::MAX_BYTES)."\n\n... [truncated to ".self::MAX_BYTES.' bytes]';
+            return \sprintf("%s\n\n... [truncated to %d bytes]", substr($content, 0, self::MAX_BYTES), self::MAX_BYTES);
         }
 
         return $content;

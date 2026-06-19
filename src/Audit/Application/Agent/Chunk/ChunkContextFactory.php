@@ -81,7 +81,7 @@ final readonly class ChunkContextFactory
             return '';
         }
 
-        return hash('sha256', $rejectedPreamble."\0".$previousPreamble);
+        return hash('sha256', \sprintf("%s\0%s", $rejectedPreamble, $previousPreamble));
     }
 
     private function isCacheable(AttackerAnalysisRequest $attackerAnalysisRequest, string $contextKey, bool $cacheIsContextAware): bool
@@ -95,15 +95,15 @@ final readonly class ChunkContextFactory
     private function prependContext(string $userMessage, array $chunkMarkers, string $rejectedPreamble, string $previousPreamble): string
     {
         if ([] !== $chunkMarkers) {
-            $userMessage = $this->attackerContextPromptRenderer->renderRiskMarkers($chunkMarkers)."\n\n".$userMessage;
+            $userMessage = \sprintf("%s\n\n%s", $this->attackerContextPromptRenderer->renderRiskMarkers($chunkMarkers), $userMessage);
         }
 
         if ('' !== $rejectedPreamble) {
-            $userMessage = $rejectedPreamble."\n\n".$userMessage;
+            $userMessage = \sprintf("%s\n\n%s", $rejectedPreamble, $userMessage);
         }
 
         if ('' !== $previousPreamble) {
-            $userMessage = $previousPreamble."\n\n".$userMessage;
+            return \sprintf("%s\n\n%s", $previousPreamble, $userMessage);
         }
 
         return $userMessage;

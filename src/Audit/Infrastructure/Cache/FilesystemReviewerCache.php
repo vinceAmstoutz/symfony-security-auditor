@@ -131,9 +131,9 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
         $finding = $vulnerability->toArray();
         unset($finding['id']);
 
-        $signature = json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext;
+        $signature = \sprintf("%s\0%s", json_encode($finding, \JSON_THROW_ON_ERROR), $codeContext);
         if ('' !== $this->keySalt) {
-            $signature = $this->keySalt."\0".$signature;
+            $signature = \sprintf("%s\0%s", $this->keySalt, $signature);
         }
 
         return hash('sha256', $signature);
