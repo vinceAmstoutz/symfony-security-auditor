@@ -152,7 +152,7 @@ jobs:
           key: phpunit-php${{ matrix.php }}-sf${{ matrix.symfony }}-${{ hashFiles('src/**/*.php', 'tests/**/*.php', 'phpunit.xml', 'composer.json') }}
           restore-keys: phpunit-php${{ matrix.php }}-sf${{ matrix.symfony }}-
 
-      - name: Run test suite with coverage (enforces 100% via PHPUnit extension)
+      - name: Run test suite with coverage (enforces 100% via MinimumLineCoverageExtension)
         run: |
           bin/phpunit \
             --coverage-clover=build/coverage/clover.xml \

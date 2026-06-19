@@ -64,7 +64,6 @@
         "phpunit/phpunit": "^12.5",
         "rector/rector": "^2.4",
         "rector/swiss-knife": "^2.4",
-        "robiningelbrecht/phpunit-coverage-tools": "^1.10",
         "spaze/phpstan-disallowed-calls": "^4.12",
         "staabm/phpstan-todo-by": "^0.3",
         "symfony/clock": "^7.4 || ^8.0",
