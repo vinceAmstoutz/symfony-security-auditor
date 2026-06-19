@@ -43,6 +43,16 @@ final class LoggerProgressReporterTest extends TestCase
 
         $loggerProgressReporter = new LoggerProgressReporter($logger);
 
-        $loggerProgressReporter->report('any.event');
+        $errorLogFile = (string) tempnam(sys_get_temp_dir(), 'ssa_errlog_');
+        $previousErrorLog = ini_set('error_log', $errorLogFile);
+
+        try {
+            $loggerProgressReporter->report('any.event');
+        } finally {
+            ini_set('error_log', false === $previousErrorLog ? '' : $previousErrorLog);
+        }
+
+        self::assertStringContainsString('logger died', (string) file_get_contents($errorLogFile));
+        unlink($errorLogFile);
     }
 }

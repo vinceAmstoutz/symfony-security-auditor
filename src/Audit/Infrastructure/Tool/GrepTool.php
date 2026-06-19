@@ -94,12 +94,9 @@ final readonly class GrepTool implements ToolInterface
             }
 
             $matches = [...$matches, ...$this->matchesInFile($file, $pattern)];
-            if (\count($matches) >= self::MAX_MATCHES) {
-                return \array_slice($matches, 0, self::MAX_MATCHES);
-            }
         }
 
-        return $matches;
+        return \array_slice($matches, 0, self::MAX_MATCHES);
     }
 
     /**

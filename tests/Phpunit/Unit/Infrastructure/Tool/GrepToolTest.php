@@ -136,23 +136,26 @@ final class GrepToolTest extends TestCase
         self::assertStringContainsString('Error', $result);
     }
 
-    public function test_execute_caps_results_at_max_matches_and_stops_scanning_remaining_files(): void
+    public function test_execute_caps_results_at_max_matches_keeping_earliest_matches_across_files(): void
     {
         $contentA = '';
-        for ($i = 0; $i < self::MAX_MATCHES + 5; ++$i) {
-            $contentA .= "foo line\n";
+        $contentB = '';
+        for ($i = 0; $i < 30; ++$i) {
+            $contentA .= "foo a\n";
+            $contentB .= "foo b\n";
         }
 
-        $projectFile = ProjectFile::create('src/A.php', '/app/A', $contentA);
-        $fileB = ProjectFile::create('src/B.php', '/app/B', "foo unique-marker-zz\n");
+        $fileA = ProjectFile::create('src/A.php', '/app/A', $contentA);
+        $fileB = ProjectFile::create('src/B.php', '/app/B', $contentB);
 
-        $grepTool = new GrepTool([$projectFile, $fileB]);
+        $grepTool = new GrepTool([$fileA, $fileB]);
 
         $result = $grepTool->execute(['pattern' => 'foo']);
 
-        self::assertSame(self::MAX_MATCHES, substr_count($result, 'src/A.php'));
-        self::assertStringNotContainsString('unique-marker-zz', $result);
-        self::assertStringNotContainsString('src/B.php', $result);
+        // 30 from the first file are all kept; the second file fills the cap to 50.
+        self::assertSame(30, substr_count($result, 'src/A.php'));
+        self::assertSame(self::MAX_MATCHES - 30, substr_count($result, 'src/B.php'));
+        self::assertStringContainsString('src/A.php:1:', $result);
     }
 
     public function test_execute_treats_empty_file_type_as_unset(): void

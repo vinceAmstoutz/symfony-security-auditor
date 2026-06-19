@@ -35,16 +35,16 @@ final readonly class LLMResponse
         string $content,
         string $model,
         string $stopReason,
-        TokenUsageSnapshot $usage,
+        TokenUsageSnapshot $tokenUsageSnapshot,
     ): self {
         return new self(
             $content,
-            $usage->inputTokens(),
-            $usage->outputTokens(),
+            $tokenUsageSnapshot->inputTokens(),
+            $tokenUsageSnapshot->outputTokens(),
             $model,
             $stopReason,
-            $usage->cacheReadTokens(),
-            $usage->cacheCreationTokens(),
+            $tokenUsageSnapshot->cacheReadTokens(),
+            $tokenUsageSnapshot->cacheCreationTokens(),
         );
     }
 
@@ -212,11 +212,9 @@ final readonly class LLMResponse
             ];
         }
 
-        if ('"' === $char) {
-            return ['inString' => true, 'escape' => false, 'consumed' => true];
-        }
+        $opensString = '"' === $char;
 
-        return ['inString' => false, 'escape' => false, 'consumed' => false];
+        return ['inString' => $opensString, 'escape' => false, 'consumed' => $opensString];
     }
 
     /**
@@ -226,12 +224,7 @@ final readonly class LLMResponse
      */
     private function contentIsSingleBalancedBlock(string $content): bool
     {
-        if ('' === $content) {
-            return false;
-        }
-
-        $first = $content[0];
-        $block = match ($first) {
+        $block = match ($content[0] ?? '') {
             '[' => $this->scanBalancedBlockFrom($content, 0, '[', ']'),
             '{' => $this->scanBalancedBlockFrom($content, 0, '{', '}'),
             default => null,

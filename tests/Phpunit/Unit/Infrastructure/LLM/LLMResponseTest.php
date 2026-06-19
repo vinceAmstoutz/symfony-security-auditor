@@ -130,6 +130,35 @@ final class LLMResponseTest extends TestCase
         self::assertSame([['title' => 'x " ] y', 'other' => 'z']], $data);
     }
 
+    public function test_it_skips_a_leading_quoted_string_with_escaped_bracket_before_the_real_array(): void
+    {
+        $content = 'note "a \[9,9] b" then [1,2] end';
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
+
+        $data = $llmResponse->parseJson();
+
+        self::assertSame([1, 2], $data);
+    }
+
+    public function test_it_treats_empty_json_string_as_closed_during_extraction(): void
+    {
+        $content = 'see [{"a":"","b":9}] end';
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
+
+        $data = $llmResponse->parseJson();
+
+        self::assertSame([['a' => '', 'b' => 9]], $data);
+    }
+
+    public function test_it_throws_when_content_is_empty_after_stripping_fences(): void
+    {
+        $llmResponse = LLMResponse::of('```json``` ', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
+
+        $this->expectException(JsonException::class);
+
+        $llmResponse->parseJson();
+    }
+
     public function test_it_locks_extraction_length_to_closing_bracket_position(): void
     {
         $content = '[1,2]{garbage}';
@@ -342,5 +371,16 @@ final class LLMResponseTest extends TestCase
         self::assertSame('end_turn', $llmResponse->stopReason());
         self::assertSame(33, $llmResponse->cacheReadTokens());
         self::assertSame(44, $llmResponse->cacheCreationTokens());
+    }
+
+    /**
+     * @deprecated covers the deprecated {@see LLMResponse::create()} delegator until it is removed in 2.0.
+     */
+    public function test_deprecated_create_defaults_cache_tokens_to_zero(): void
+    {
+        $llmResponse = LLMResponse::create('body', 11, 22, 'claude-opus', 'end_turn');
+
+        self::assertSame(0, $llmResponse->cacheReadTokens());
+        self::assertSame(0, $llmResponse->cacheCreationTokens());
     }
 }
