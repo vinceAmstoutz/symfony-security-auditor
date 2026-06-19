@@ -111,7 +111,7 @@ final readonly class SequentialChunkAnalyzer
 
         $servedFromCache = $this->servedFromCacheOrNull($chunk, $cacheable, $contextKey, $coverageRecorder);
 
-        if (null !== $servedFromCache) {
+        if ($servedFromCache instanceof VulnerabilityHydrationResult) {
             return $servedFromCache;
         }
 
@@ -166,9 +166,9 @@ final readonly class SequentialChunkAnalyzer
     /**
      * @param list<ProjectFile> $chunk
      */
-    private function hydrateChunkResponse(array $chunk, LLMResponse $response, bool $cacheable, string $contextKey, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
+    private function hydrateChunkResponse(array $chunk, LLMResponse $llmResponse, bool $cacheable, string $contextKey, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
     {
-        if ($response->isEmpty()) {
+        if ($llmResponse->isEmpty()) {
             if ($cacheable) {
                 $this->attackerChunkCache->store($chunk, $contextKey, []);
             }
@@ -180,11 +180,11 @@ final readonly class SequentialChunkAnalyzer
 
         try {
             /** @var list<mixed> $rawData */
-            $rawData = $response->parseJson();
-        } catch (JsonException $exception) {
+            $rawData = $llmResponse->parseJson();
+        } catch (JsonException $jsonException) {
             $this->logger->error('Failed to parse attacker agent JSON response', [
-                'error' => $exception->getMessage(),
-                'content_preview' => substr($response->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
+                'error' => $jsonException->getMessage(),
+                'content_preview' => substr($llmResponse->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
             ]);
             ChunkCoverageRecorder::record($chunk, 'errored', $coverageRecorder);
 

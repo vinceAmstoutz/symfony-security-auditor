@@ -647,13 +647,6 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_passes_only_reviewer_rejected_findings_to_next_iteration(): void
     {
-        // The attacker returns both findings every iteration. The reviewer accepts
-        // 'KeepMe' (src/Accepted.php) and rejects 'DropMe' (src/Rejected.php).
-        // Iteration 2 must receive ONLY the rejected finding as rejected context:
-        // - dropping the array_filter would feed back both (count 2);
-        // - flipping !isReviewerValidated() would feed back the ACCEPTED finding
-        //   instead, so the identity assertion below pins the correct one.
-        // Both findings dedupe in iteration 2, so the loop stops.
         $recordingAttackerAgent = new RecordingAttackerAgent([
             Vulnerability::of(
                 new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'KeepMe', 0.9),
@@ -890,7 +883,7 @@ final class AuditOrchestratorTest extends TestCase
                 new ReviewerModeConfiguration(),
             ),
             logger: $overrides['logger'] ?? new NullLogger(),
-            loopSettings: new AuditLoopSettings(
+            auditLoopSettings: new AuditLoopSettings(
                 $overrides['maxIterations'] ?? AuditOrchestrator::DEFAULT_MAX_ITERATIONS,
                 $overrides['minConfidence'] ?? AuditOrchestrator::DEFAULT_MIN_CONFIDENCE,
             ),

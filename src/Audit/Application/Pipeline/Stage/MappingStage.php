@@ -26,10 +26,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 
 use function Symfony\Component\String\u;
 
@@ -69,15 +69,15 @@ final readonly class MappingStage implements StageInterface
             return;
         }
 
-        $inventory = ProjectFileInventory::fromFiles($files);
+        $projectFileInventory = ProjectFileInventory::fromFiles($files);
 
         [$routeAccessMap, $firewallRules] = $this->extractSecurityConfig($files);
-        $routeAccessControls = $this->parseControllerAccessControls($inventory->controllers());
-        $voterCapabilities = $this->parseVoterCapabilities($inventory->voters());
-        $formBindings = $this->parseFormBindings($inventory->controllers());
+        $routeAccessControls = $this->parseControllerAccessControls($projectFileInventory->controllers());
+        $voterCapabilities = $this->parseVoterCapabilities($projectFileInventory->voters());
+        $formBindings = $this->parseFormBindings($projectFileInventory->controllers());
 
         $symfonyMapping = SymfonyMapping::of(
-            $inventory,
+            $projectFileInventory,
             new AccessControlMap(
                 $routeAccessMap,
                 $firewallRules,
@@ -88,9 +88,9 @@ final readonly class MappingStage implements StageInterface
         );
 
         $auditContext->setMapping($symfonyMapping);
-        $auditContext->setMeta('mapping.controllers', \count($inventory->controllers()));
-        $auditContext->setMeta('mapping.entities', \count($inventory->entities()));
-        $auditContext->setMeta('mapping.voters', \count($inventory->voters()));
+        $auditContext->setMeta('mapping.controllers', \count($projectFileInventory->controllers()));
+        $auditContext->setMeta('mapping.entities', \count($projectFileInventory->entities()));
+        $auditContext->setMeta('mapping.voters', \count($projectFileInventory->voters()));
         $auditContext->setMeta('mapping.no_voter_controllers', \count($symfonyMapping->controllersWithoutVoters()));
         $auditContext->setMeta('mapping.routes', \count($routeAccessControls));
         $auditContext->setMeta('mapping.routes_without_access_check', \count($symfonyMapping->controllersWithoutAccessCheck()));

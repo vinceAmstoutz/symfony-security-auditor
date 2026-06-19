@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
-
 /**
  * Default reporter — discards every event. Used when the host has not
  * registered a custom reporter, so the pipeline can emit events

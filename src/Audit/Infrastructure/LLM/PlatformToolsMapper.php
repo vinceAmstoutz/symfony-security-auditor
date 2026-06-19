@@ -70,7 +70,11 @@ final readonly class PlatformToolsMapper
 
         $properties = [];
         foreach ($rawProperties as $name => $spec) {
-            if (!\is_string($name) || !\is_array($spec)) {
+            if (!\is_string($name)) {
+                continue;
+            }
+
+            if (!\is_array($spec)) {
                 continue;
             }
 

@@ -71,72 +71,72 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
     private bool $useStructuredCollection;
 
     public function __construct(
-        ReviewerAgentCollaborators $collaborators,
-        ReviewerModeConfiguration $mode,
+        ReviewerAgentCollaborators $reviewerAgentCollaborators,
+        ReviewerModeConfiguration $reviewerModeConfiguration,
         private ?ToolRegistryFactoryInterface $toolRegistryFactory = null,
     ) {
-        $this->logger = $collaborators->logger;
-        $this->batchSize = $mode->batchSize;
-        $this->toolsEnabled = $mode->toolsEnabled;
-        $this->maxConcurrent = $mode->maxConcurrent;
-        $this->useStructuredCollection = $mode->useStructuredCollection;
+        $this->logger = $reviewerAgentCollaborators->logger;
+        $this->batchSize = $reviewerModeConfiguration->batchSize;
+        $this->toolsEnabled = $reviewerModeConfiguration->toolsEnabled;
+        $this->maxConcurrent = $reviewerModeConfiguration->maxConcurrent;
+        $this->useStructuredCollection = $reviewerModeConfiguration->useStructuredCollection;
 
-        $verdictApplier = new VerdictApplier($collaborators->logger);
-        $reviewerVerdictCache = new ReviewerVerdictCache($collaborators->reviewerCache, $collaborators->logger);
-        $reviewOutcomeRecorder = new ReviewOutcomeRecorder($verdictApplier, $reviewerVerdictCache, $collaborators->logger);
+        $verdictApplier = new VerdictApplier($reviewerAgentCollaborators->logger);
+        $reviewerVerdictCache = new ReviewerVerdictCache($reviewerAgentCollaborators->reviewerCache, $reviewerAgentCollaborators->logger);
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger);
 
         $this->sequentialReviewAnalyzer = new SequentialReviewAnalyzer(
-            $collaborators->llmClient,
-            $collaborators->reviewerPromptBuilder,
+            $reviewerAgentCollaborators->llmClient,
+            $reviewerAgentCollaborators->reviewerPromptBuilder,
             $reviewerVerdictCache,
             $reviewOutcomeRecorder,
-            $mode->maxToolIterations,
+            $reviewerModeConfiguration->maxToolIterations,
         );
 
-        $this->structuredReviewAnalyzer = $collaborators->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface
+        $this->structuredReviewAnalyzer = $reviewerAgentCollaborators->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface
             ? new StructuredReviewAnalyzer(
-                $collaborators->llmClient,
-                $collaborators->reviewerPromptBuilder,
+                $reviewerAgentCollaborators->llmClient,
+                $reviewerAgentCollaborators->reviewerPromptBuilder,
                 $reviewerVerdictCache,
                 $reviewOutcomeRecorder,
-                $collaborators->recordReviewToolFactory,
-                $collaborators->logger,
-                $mode->maxToolIterations,
+                $reviewerAgentCollaborators->recordReviewToolFactory,
+                $reviewerAgentCollaborators->logger,
+                $reviewerModeConfiguration->maxToolIterations,
             )
             : null;
 
-        $this->concurrentReviewAnalyzer = $collaborators->llmClient instanceof BatchCapableLLMClientInterface
+        $this->concurrentReviewAnalyzer = $reviewerAgentCollaborators->llmClient instanceof BatchCapableLLMClientInterface
             ? new ConcurrentReviewAnalyzer(
-                $collaborators->llmClient,
-                $collaborators->reviewerPromptBuilder,
+                $reviewerAgentCollaborators->llmClient,
+                $reviewerAgentCollaborators->reviewerPromptBuilder,
                 $reviewerVerdictCache,
                 $reviewOutcomeRecorder,
-                $mode->maxConcurrent,
+                $reviewerModeConfiguration->maxConcurrent,
             )
             : null;
 
-        $this->concurrentStructuredReviewAnalyzer = $collaborators->llmClient instanceof ToolBatchCapableLLMClientInterface && $collaborators->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface
+        $this->concurrentStructuredReviewAnalyzer = $reviewerAgentCollaborators->llmClient instanceof ToolBatchCapableLLMClientInterface && $reviewerAgentCollaborators->recordReviewToolFactory instanceof RecordReviewToolFactoryInterface
             ? new ConcurrentStructuredReviewAnalyzer(
-                $collaborators->llmClient,
-                $collaborators->reviewerPromptBuilder,
+                $reviewerAgentCollaborators->llmClient,
+                $reviewerAgentCollaborators->reviewerPromptBuilder,
                 $reviewerVerdictCache,
                 $reviewOutcomeRecorder,
-                $collaborators->recordReviewToolFactory,
-                $collaborators->logger,
-                $mode->maxConcurrent,
-                $mode->maxToolIterations,
+                $reviewerAgentCollaborators->recordReviewToolFactory,
+                $reviewerAgentCollaborators->logger,
+                $reviewerModeConfiguration->maxConcurrent,
+                $reviewerModeConfiguration->maxToolIterations,
             )
             : null;
 
         $this->batchReviewAnalyzer = new BatchReviewAnalyzer(
-            $collaborators->llmClient,
-            $collaborators->reviewerPromptBuilder,
-            new BatchVerdictApplier($verdictApplier, $reviewerVerdictCache, $collaborators->logger),
+            $reviewerAgentCollaborators->llmClient,
+            $reviewerAgentCollaborators->reviewerPromptBuilder,
+            new BatchVerdictApplier($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger),
             $reviewerVerdictCache,
             $reviewOutcomeRecorder,
-            $collaborators->logger,
-            $mode->maxToolIterations,
-            $collaborators->recordReviewToolFactory,
+            $reviewerAgentCollaborators->logger,
+            $reviewerModeConfiguration->maxToolIterations,
+            $reviewerAgentCollaborators->recordReviewToolFactory,
         );
     }
 

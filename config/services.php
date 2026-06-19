@@ -56,6 +56,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
@@ -79,8 +82,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff\ProcessGitCha
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\BackoffSchedule;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSleeper;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\AnthropicTokenEstimator;
@@ -95,13 +98,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\StaticPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVoterCapabilityParser;
@@ -155,7 +155,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     // `AuditBudget` is built in SymfonySecurityAuditorBundle::loadExtension() so the
     // factory selection (unlimited/forTokens/forCost/forBoth) is explicit per config.
-
     $defaultsConfigurator->set(BudgetTracker::class)
         ->args([
             service(AuditBudget::class),
@@ -190,10 +189,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(NullSecretScrubber::class);
 
-    $defaultsConfigurator->set(RegexSecretScrubber::class)
-        ->args([param('symfony_security_auditor.scan.secret_scrubbing.additional_patterns')]);
     // `SecretScrubberInterface` alias is set in SymfonySecurityAuditorBundle::loadExtension()
     // based on `scan.secret_scrubbing.enabled`.
+    $defaultsConfigurator->set(RegexSecretScrubber::class)
+        ->args([param('symfony_security_auditor.scan.secret_scrubbing.additional_patterns')]);
 
     $defaultsConfigurator->set(ProjectFileScanner::class)
         ->args([
@@ -370,7 +369,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     // `AdvisoryDatabaseInterface` alias is set in SymfonySecurityAuditorBundle::loadExtension()
     // based on `audit.advisory_source` (default: in_memory).
-
     $defaultsConfigurator->set(SymfonyToolRegistryFactory::class)
         ->args([service('logger'), service(AdvisoryDatabaseInterface::class)]);
     $defaultsConfigurator->alias(ToolRegistryFactoryInterface::class, SymfonyToolRegistryFactory::class);

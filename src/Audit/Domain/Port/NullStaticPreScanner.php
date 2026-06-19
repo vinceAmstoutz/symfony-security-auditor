@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
-
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class NullStaticPreScanner implements StaticPreScannerInterface
 {

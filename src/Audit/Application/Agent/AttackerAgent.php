@@ -24,13 +24,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 
 /**
  * Orchestrates the attacker pass: deterministic pre-scan, optional lean-mode
@@ -75,50 +75,50 @@ final readonly class AttackerAgent implements AttackerAgentInterface
     private int $maxConcurrent;
 
     public function __construct(
-        AttackerLlmCollaborators $llm,
-        AttackerScanCollaborators $scan,
-        AttackerAnalysisSettings $settings,
+        AttackerLlmCollaborators $attackerLlmCollaborators,
+        AttackerScanCollaborators $attackerScanCollaborators,
+        AttackerAnalysisSettings $attackerAnalysisSettings,
         LoggerInterface $logger,
     ) {
         $this->logger = $logger;
-        $this->toolRegistryFactory = $scan->toolRegistryFactory;
-        $this->toolsEnabled = $settings->toolsEnabled;
-        $this->leanMode = $settings->leanMode;
-        $this->useStructuredCollection = $settings->useStructuredCollection;
-        $this->maxConcurrent = $settings->maxConcurrent;
-        $this->staticPreScanner = $scan->staticPreScanner ?? new NullStaticPreScanner();
-        $this->fileChunker = $scan->fileChunker ?? new FileChunker();
-        $this->progressReporter = $scan->progressReporter ?? new NullProgressReporter();
+        $this->toolRegistryFactory = $attackerScanCollaborators->toolRegistryFactory;
+        $this->toolsEnabled = $attackerAnalysisSettings->toolsEnabled;
+        $this->leanMode = $attackerAnalysisSettings->leanMode;
+        $this->useStructuredCollection = $attackerAnalysisSettings->useStructuredCollection;
+        $this->maxConcurrent = $attackerAnalysisSettings->maxConcurrent;
+        $this->staticPreScanner = $attackerScanCollaborators->staticPreScanner ?? new NullStaticPreScanner();
+        $this->fileChunker = $attackerScanCollaborators->fileChunker ?? new FileChunker();
+        $this->progressReporter = $attackerScanCollaborators->progressReporter ?? new NullProgressReporter();
 
         $chunkContextFactory = new ChunkContextFactory(
-            $llm->attackerPromptBuilder,
-            $llm->codeSlicer ?? new NullCodeSlicer(),
+            $attackerLlmCollaborators->attackerPromptBuilder,
+            $attackerLlmCollaborators->codeSlicer ?? new NullCodeSlicer(),
             new AttackerContextPromptRenderer(),
         );
-        $attackerChunkCache = new AttackerChunkCache($scan->attackerCache, $llm->vulnerabilityFactory, $logger);
+        $attackerChunkCache = new AttackerChunkCache($attackerScanCollaborators->attackerCache, $attackerLlmCollaborators->vulnerabilityFactory, $logger);
 
         $this->sequentialChunkAnalyzer = new SequentialChunkAnalyzer(
-            $llm->llmClient,
+            $attackerLlmCollaborators->llmClient,
             $chunkContextFactory,
             $attackerChunkCache,
-            $llm->vulnerabilityFactory,
+            $attackerLlmCollaborators->vulnerabilityFactory,
             $logger,
             $this->progressReporter,
-            $settings->maxToolIterations,
+            $attackerAnalysisSettings->maxToolIterations,
             $this->useStructuredCollection,
-            $llm->recordVulnerabilityToolFactory,
+            $attackerLlmCollaborators->recordVulnerabilityToolFactory,
         );
 
-        $this->concurrentChunkAnalyzer = $llm->llmClient instanceof ToolBatchCapableLLMClientInterface && $llm->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface
+        $this->concurrentChunkAnalyzer = $attackerLlmCollaborators->llmClient instanceof ToolBatchCapableLLMClientInterface && $attackerLlmCollaborators->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface
             ? new ConcurrentChunkAnalyzer(
-                $llm->llmClient,
+                $attackerLlmCollaborators->llmClient,
                 $chunkContextFactory,
                 $attackerChunkCache,
-                $llm->vulnerabilityFactory,
+                $attackerLlmCollaborators->vulnerabilityFactory,
                 $logger,
                 $this->progressReporter,
-                $settings->maxToolIterations,
-                $llm->recordVulnerabilityToolFactory,
+                $attackerAnalysisSettings->maxToolIterations,
+                $attackerLlmCollaborators->recordVulnerabilityToolFactory,
                 $this->maxConcurrent,
             )
             : null;

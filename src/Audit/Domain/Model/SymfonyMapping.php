@@ -16,13 +16,13 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 final readonly class SymfonyMapping
 {
     private function __construct(
-        private ProjectFileInventory $files,
-        private AccessControlMap $accessControl,
+        private ProjectFileInventory $projectFileInventory,
+        private AccessControlMap $accessControlMap,
     ) {}
 
-    public static function of(ProjectFileInventory $files, AccessControlMap $accessControl): self
+    public static function of(ProjectFileInventory $projectFileInventory, AccessControlMap $accessControlMap): self
     {
-        return new self($files, $accessControl);
+        return new self($projectFileInventory, $accessControlMap);
     }
 
     /**
@@ -78,121 +78,121 @@ final readonly class SymfonyMapping
     /** @return list<ProjectFile> */
     public function controllers(): array
     {
-        return $this->files->controllers();
+        return $this->projectFileInventory->controllers();
     }
 
     /** @return list<ProjectFile> */
     public function entities(): array
     {
-        return $this->files->entities();
+        return $this->projectFileInventory->entities();
     }
 
     /** @return list<ProjectFile> */
     public function voters(): array
     {
-        return $this->files->voters();
+        return $this->projectFileInventory->voters();
     }
 
     /** @return list<ProjectFile> */
     public function repositories(): array
     {
-        return $this->files->repositories();
+        return $this->projectFileInventory->repositories();
     }
 
     /** @return list<ProjectFile> */
     public function forms(): array
     {
-        return $this->files->forms();
+        return $this->projectFileInventory->forms();
     }
 
     /** @return list<ProjectFile> */
     public function services(): array
     {
-        return $this->files->services();
+        return $this->projectFileInventory->services();
     }
 
     /** @return list<ProjectFile> */
     public function templates(): array
     {
-        return $this->files->templates();
+        return $this->projectFileInventory->templates();
     }
 
     /** @return array<string, list<string>> */
     public function routeAccessMap(): array
     {
-        return $this->accessControl->routeAccessMap();
+        return $this->accessControlMap->routeAccessMap();
     }
 
     /** @return list<string> */
     public function firewallRules(): array
     {
-        return $this->accessControl->firewallRules();
+        return $this->accessControlMap->firewallRules();
     }
 
     /** @return list<RouteAccessControl> */
     public function routeAccessControls(): array
     {
-        return $this->accessControl->routeAccessControls();
+        return $this->accessControlMap->routeAccessControls();
     }
 
     /** @return list<RouteAccessControl> */
     public function controllersWithoutAccessCheck(): array
     {
-        return $this->accessControl->controllersWithoutAccessCheck();
+        return $this->accessControlMap->controllersWithoutAccessCheck();
     }
 
     /** @return list<VoterCapability> */
     public function voterCapabilities(): array
     {
-        return $this->accessControl->voterCapabilities();
+        return $this->accessControlMap->voterCapabilities();
     }
 
     /** @return list<VoterCapability> */
     public function votersFor(string $attribute, string $subject): array
     {
-        return $this->accessControl->votersFor($attribute, $subject);
+        return $this->accessControlMap->votersFor($attribute, $subject);
     }
 
     /** @return list<FormBinding> */
     public function formBindings(): array
     {
-        return $this->accessControl->formBindings();
+        return $this->accessControlMap->formBindings();
     }
 
     /** @return list<FormBinding> */
     public function formBindingsForController(string $controllerFilePath): array
     {
-        return $this->accessControl->formBindingsForController($controllerFilePath);
+        return $this->accessControlMap->formBindingsForController($controllerFilePath);
     }
 
     public function totalFiles(): int
     {
-        return $this->files->totalFiles();
+        return $this->projectFileInventory->totalFiles();
     }
 
     public function hasVoterForEntity(string $entityName): bool
     {
-        return $this->files->hasVoterForEntity($entityName);
+        return $this->projectFileInventory->hasVoterForEntity($entityName);
     }
 
     /** @return list<ProjectFile> */
     public function controllersWithoutVoters(): array
     {
-        return $this->files->controllersWithoutVoters();
+        return $this->projectFileInventory->controllersWithoutVoters();
     }
 
     public function toSummary(): string
     {
         $lines = [
-            \sprintf('Controllers: %d', \count($this->files->controllers())),
-            \sprintf('Entities: %d', \count($this->files->entities())),
-            \sprintf('Voters: %d', \count($this->files->voters())),
-            \sprintf('Repositories: %d', \count($this->files->repositories())),
-            \sprintf('Forms: %d', \count($this->files->forms())),
-            \sprintf('Services: %d', \count($this->files->services())),
-            \sprintf('Templates: %d', \count($this->files->templates())),
-            \sprintf('Routes mapped: %d', \count($this->accessControl->routeAccessMap())),
-            \sprintf('Firewall rules: %d', \count($this->accessControl->firewallRules())),
+            \sprintf('Controllers: %d', \count($this->projectFileInventory->controllers())),
+            \sprintf('Entities: %d', \count($this->projectFileInventory->entities())),
+            \sprintf('Voters: %d', \count($this->projectFileInventory->voters())),
+            \sprintf('Repositories: %d', \count($this->projectFileInventory->repositories())),
+            \sprintf('Forms: %d', \count($this->projectFileInventory->forms())),
+            \sprintf('Services: %d', \count($this->projectFileInventory->services())),
+            \sprintf('Templates: %d', \count($this->projectFileInventory->templates())),
+            \sprintf('Routes mapped: %d', \count($this->accessControlMap->routeAccessMap())),
+            \sprintf('Firewall rules: %d', \count($this->accessControlMap->firewallRules())),
         ];
 
         return implode("\n", $lines);

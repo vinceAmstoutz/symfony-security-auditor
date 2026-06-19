@@ -20,19 +20,19 @@ to detect vulnerabilities and produce structured reports.
 
 ## Tech Stack
 
-| Layer           | Technology                                                            |
-| --------------- | --------------------------------------------------------------------- |
-| Language        | PHP (see `composer.json` → `require.php`)                             |
-| Framework       | Symfony (see `composer.json`)                                         |
-| LLM             | symfony/ai (provider-agnostic: Anthropic, OpenAI, Mistral, Ollama, …) |
-| Packaging       | symfony-bundle + Flex recipe                                          |
-| Tests           | PHPUnit (Unit / Integration / EndToEnd)                               |
-| Mutation        | Infection (100% MSI required)                                         |
-| Static analysis | PHPStan max + phpstan-strict-rules + custom + symplify/spaze rules + Rector |
-| Layer conformance | deptrac (DDD layer rules — `deptrac.yaml`)                          |
-| Complexity      | tomasvotruba/cognitive-complexity (function ≤ 7, class ≤ 40)          |
-| Dead code       | rector/swiss-knife (`check-commented-code`, `check-conflicts`)        |
-| Style           | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets)                          |
+| Layer             | Technology                                                                  |
+| ----------------- | --------------------------------------------------------------------------- |
+| Language          | PHP (see `composer.json` → `require.php`)                                   |
+| Framework         | Symfony (see `composer.json`)                                               |
+| LLM               | symfony/ai (provider-agnostic: Anthropic, OpenAI, Mistral, Ollama, …)       |
+| Packaging         | symfony-bundle + Flex recipe                                                |
+| Tests             | PHPUnit (Unit / Integration / EndToEnd)                                     |
+| Mutation          | Infection (100% MSI required)                                               |
+| Static analysis   | PHPStan max + phpstan-strict-rules + custom + symplify/spaze rules + Rector |
+| Layer conformance | deptrac (DDD layer rules — `deptrac.yaml`)                                  |
+| Complexity        | tomasvotruba/cognitive-complexity (function ≤ 7, class ≤ 40)                |
+| Dead code         | rector/swiss-knife (`check-commented-code`, `check-conflicts`)              |
+| Style             | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets)                                |
 
 ## Build, Test & Lint Commands
 
@@ -52,9 +52,10 @@ bin/castor up
 
 `bin/castor lint` runs sequentially: Prettier (check) → Markdown lint
 (markdownlint-cli2) → Composer Normalize → PHP CS Fixer → Rector → PHPStan (max,
-500M) → Deptrac (DDD layers) → Swiss Knife (commented-code + merge-conflict scan)
-→ PHPUnit → Infection. `bin/castor lint:fix` auto-fixes Prettier + Markdown lint
-+ steps 1–3; remaining steps are check-only.
+500M) → Deptrac (DDD layers) → Swiss Knife (commented-code + merge-conflict
+scan) → PHPUnit → Infection. `bin/castor lint:fix` auto-fixes steps 1–3
+(Prettier, Markdown lint, Composer Normalize); the remaining steps are
+check-only.
 
 Commit messages are validated separately in CI via
 [commitlint](https://commitlint.js.org/) (`commitlint.config.js`) — see
@@ -204,8 +205,8 @@ Six jobs must all pass before merging: **Prettier Check** (markdown formatting)
 → **Markdown Lint** (markdownlint-cli2 semantics) → **Commit Lint** (commitlint,
 conventional commits) → **Lint** (Composer Normalize, PHP CS Fixer, Rector,
 PHPStan max, Deptrac, Swiss Knife, `composer audit`) → **Tests + Mutation**
-(PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1 with 100% coverage, then
-Infection 100% MSI; coverage uploads to Codecov and the MSI to the Stryker
+(PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1 with 100% coverage,
+then Infection 100% MSI; coverage uploads to Codecov and the MSI to the Stryker
 dashboard on `main`).
 
 Details: [`docs/ci.md`](docs/ci.md)
@@ -257,13 +258,12 @@ linked issue tracking removal — never silent suppression.
 The project follows [Semantic Versioning 2.0.0](https://semver.org) and, for its
 PHP API surface, the
 [Symfony Backward Compatibility promise](https://symfony.com/doc/current/contributing/code/bc.html)
-(`@internal` code is exempt). Treat every
-public-API element as load-bearing: configuration keys (and their defaults),
-`audit:run` arguments/options/exit codes, JSON and SARIF output schemas, Domain
-ports under `src/Audit/Domain/Port/` (including `AdvisoryDatabaseInterface`),
-Domain models/enums/exceptions, `RunAuditUseCase`, and the Bundle class. A
-change that removes or alters any of these is a `MAJOR` and requires a
-deprecation cycle.
+(`@internal` code is exempt). Treat every public-API element as load-bearing:
+configuration keys (and their defaults), `audit:run` arguments/options/exit
+codes, JSON and SARIF output schemas, Domain ports under
+`src/Audit/Domain/Port/` (including `AdvisoryDatabaseInterface`), Domain
+models/enums/exceptions, `RunAuditUseCase`, and the Bundle class. A change that
+removes or alters any of these is a `MAJOR` and requires a deprecation cycle.
 
 Internal classes (`@internal` PHPDoc tag) — concrete agents, pipeline stages,
 infrastructure adapters, Command collaborators — may be refactored freely in a

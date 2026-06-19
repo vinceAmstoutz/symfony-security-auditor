@@ -116,7 +116,7 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
         }
 
         foreach ($cheap as $vulnerability) {
-            if (!array_key_exists($vulnerability->id(), $byId)) {
+            if (!\array_key_exists($vulnerability->id(), $byId)) {
                 $byId[$vulnerability->id()] = $vulnerability;
             }
         }

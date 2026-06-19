@@ -79,9 +79,9 @@ final readonly class ScanPathFilter
     /**
      * @param list<string> $prefixes
      */
-    private static function matchesAnyPrefix(ProjectFile $file, array $prefixes): bool
+    private static function matchesAnyPrefix(ProjectFile $projectFile, array $prefixes): bool
     {
-        $relative = u($file->relativePath())->replace('\\', '/')->toString();
+        $relative = u($projectFile->relativePath())->replace('\\', '/')->toString();
         foreach ($prefixes as $prefix) {
             if ($relative === $prefix || u($relative)->startsWith($prefix.'/')) {
                 return true;

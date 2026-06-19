@@ -129,7 +129,7 @@ final readonly class ProjectFileInventory
     }
 
     /**
-     * @param list<ProjectFile>            $files
+     * @param list<ProjectFile>           $files
      * @param callable(ProjectFile): bool $predicate
      *
      * @return list<ProjectFile>

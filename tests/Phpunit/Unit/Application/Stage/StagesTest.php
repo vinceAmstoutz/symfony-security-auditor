@@ -877,7 +877,7 @@ final class StagesTest extends TestCase
                 new ReviewerModeConfiguration(),
             ),
             logger: new NullLogger(),
-            loopSettings: new AuditLoopSettings(),
+            auditLoopSettings: new AuditLoopSettings(),
         );
     }
 

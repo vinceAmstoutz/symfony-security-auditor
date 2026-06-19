@@ -20,30 +20,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   objects back this: `CodeLocation` (`src/Audit/Domain/Model/CodeLocation.php` —
   `filePath`, `lineStart`, `lineEnd`; reusable wherever a source span is
   described), `VulnerabilityClassification` (type, severity, title, confidence),
-  and `VulnerabilityNarrative` (description, attack vector, proof, remediation)
-  for `Vulnerability::of(VulnerabilityClassification, CodeLocation,
-  VulnerabilityNarrative, string $vulnerableCode)`; `ProjectFileInventory`
-  (`src/Audit/Domain/Model/ProjectFileInventory.php`, which now owns the
-  file-role classification) and `AccessControlMap`
+  and `VulnerabilityNarrative` (description, attack vector, proof, remediation),
+  all passed to `Vulnerability::of()` alongside `string $vulnerableCode`;
+  `ProjectFileInventory` (`src/Audit/Domain/Model/ProjectFileInventory.php`,
+  which now owns the file-role classification) and `AccessControlMap`
   (`src/Audit/Domain/Model/AccessControlMap.php`) for
   `SymfonyMapping::of(ProjectFileInventory, AccessControlMap)`; and the existing
-  `TokenUsageSnapshot` for `LLMResponse::of(string $content, string $model,
-  string $stopReason, TokenUsageSnapshot $usage)`. Every public accessor on
-  `Vulnerability`, `SymfonyMapping`, and `LLMResponse` is unchanged.
+  `TokenUsageSnapshot` for `LLMResponse::of()` (content, model, stop reason, and
+  the usage snapshot). Every public accessor on `Vulnerability`,
+  `SymfonyMapping`, and `LLMResponse` is unchanged.
 - **Domain exceptions `InvalidCodeLocationException` and
   `InvalidVulnerabilityClassificationException`** (under
   `src/Audit/Domain/Exception/`) for the relocated finding-field validation
   (line range, confidence range, blank title). Both extend
-  `\InvalidArgumentException`, so existing
-  `catch (\InvalidArgumentException)` / `expectException(\InvalidArgumentException::class)`
-  call sites keep working unchanged.
+  `\InvalidArgumentException`, so existing `catch (\InvalidArgumentException)` /
+  `expectException(\InvalidArgumentException::class)` call sites keep working
+  unchanged.
 
 ### Deprecated
 
 - **`Vulnerability::create()`, `SymfonyMapping::create()`, and
   `LLMResponse::create()`.** They remain fully functional for the rest of the
-  `1.x` cycle and now delegate to the new `of()` factories; switch to `of()` (see
-  Added above). Scheduled for removal in the next `MAJOR`.
+  `1.x` cycle and now delegate to the new `of()` factories; switch to `of()`
+  (see Added above). Scheduled for removal in the next `MAJOR`.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

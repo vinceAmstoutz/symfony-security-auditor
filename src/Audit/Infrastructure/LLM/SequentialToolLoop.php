@@ -139,18 +139,18 @@ final readonly class SequentialToolLoop
     private function emptyToolLoopResponseAndLog(
         EmptyLLMResponseException $emptyllmResponseException,
         int $iteration,
-        TokenUsageSnapshot $usage,
+        TokenUsageSnapshot $tokenUsageSnapshot,
     ): LLMResponse {
         $context = [
             'iterations' => $iteration,
-            'input_tokens' => $usage->inputTokens(),
-            'output_tokens' => $usage->outputTokens(),
+            'input_tokens' => $tokenUsageSnapshot->inputTokens(),
+            'output_tokens' => $tokenUsageSnapshot->outputTokens(),
             'error' => $emptyllmResponseException->getMessage(),
         ];
 
         $this->logEmptyContentResponse($iteration, $context);
 
-        return LLMResponse::of('', $this->model, 'empty_content', $usage);
+        return LLMResponse::of('', $this->model, 'empty_content', $tokenUsageSnapshot);
     }
 
     /**

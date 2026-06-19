@@ -54,7 +54,7 @@ final readonly class ConcurrentReviewAnalyzer
             $codeContext = CodeContextResolver::resolve($vulnerability->filePath(), $projectFiles);
 
             $verdict = $this->servedFromCache($vulnerability, $codeContext, $coverageRecorder, $bypassCache);
-            if (null !== $verdict) {
+            if ($verdict instanceof Vulnerability) {
                 $reviewed[$index] = $verdict;
 
                 continue;
@@ -99,7 +99,7 @@ final readonly class ConcurrentReviewAnalyzer
     }
 
     /**
-     * @param list<array{system: string, user: string}>                          $requests
+     * @param list<array{system: string, user: string}>                                        $requests
      * @param list<array{index: int, vulnerability: Vulnerability, cacheContext: string|null}> $pending
      *
      * @return array<int, Vulnerability>

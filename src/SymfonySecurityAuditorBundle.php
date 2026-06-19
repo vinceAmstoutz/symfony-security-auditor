@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor;
 
+use JsonException;
 use Psr\Clock\ClockInterface;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
@@ -40,6 +41,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
@@ -68,8 +71,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMCl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 
@@ -418,7 +419,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     /**
      * @param array<array-key, mixed> $config
      *
-     * @throws \JsonException
+     * @throws JsonException
      */
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
@@ -438,61 +439,61 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     }
 
     /**
-     * @throws \JsonException
+     * @throws JsonException
      */
-    private function registerParameters(ContainerBuilder $builder, BundleConfiguration $bundleConfiguration): void
+    private function registerParameters(ContainerBuilder $containerBuilder, BundleConfiguration $bundleConfiguration): void
     {
-        $builder->setParameter('symfony_security_auditor.attacker_model', $bundleConfiguration->llm->attackerModel());
-        $builder->setParameter('symfony_security_auditor.reviewer_model', $bundleConfiguration->llm->reviewerModel());
-        $builder->setParameter('symfony_security_auditor.attacker_max_output_tokens', $bundleConfiguration->llm->attackerMaxOutputTokens());
-        $builder->setParameter('symfony_security_auditor.reviewer_max_output_tokens', $bundleConfiguration->llm->reviewerMaxOutputTokens());
-        $builder->setParameter('symfony_security_auditor.scan.included_paths', $bundleConfiguration->scan->includedPaths);
-        $builder->setParameter('symfony_security_auditor.scan.respect_gitignore', $bundleConfiguration->scan->respectGitignore);
-        $builder->setParameter('symfony_security_auditor.scan.max_file_size_kb', $bundleConfiguration->scan->maxFileSizeKb);
-        $builder->setParameter('symfony_security_auditor.scan.secret_scrubbing.enabled', $bundleConfiguration->scan->secretScrubbingEnabled);
-        $builder->setParameter('symfony_security_auditor.scan.secret_scrubbing.additional_patterns', $bundleConfiguration->scan->additionalScrubberPatterns);
-        $builder->setParameter('symfony_security_auditor.scan.custom_risk_patterns', $bundleConfiguration->scan->customRiskPatterns);
-        $builder->setParameter('symfony_security_auditor.audit.max_iterations', $bundleConfiguration->audit->maxIterations);
-        $builder->setParameter('symfony_security_auditor.audit.min_confidence', $bundleConfiguration->audit->minConfidence);
-        $builder->setParameter('symfony_security_auditor.audit.reviewer_batch_size', $bundleConfiguration->audit->reviewerBatchSize);
-        $builder->setParameter('symfony_security_auditor.audit.tools_enabled', $bundleConfiguration->audit->toolsEnabled);
-        $builder->setParameter('symfony_security_auditor.audit.structured_collection', $bundleConfiguration->audit->structuredCollection);
-        $builder->setParameter('symfony_security_auditor.audit.reviewer_structured_collection', $bundleConfiguration->audit->reviewerStructuredCollection);
-        $builder->setParameter('symfony_security_auditor.audit.stable_system_prompt', $bundleConfiguration->audit->stableSystemPrompt);
-        $builder->setParameter('symfony_security_auditor.audit.max_tool_iterations', $bundleConfiguration->audit->maxToolIterations);
-        $builder->setParameter('symfony_security_auditor.audit.reviewer_tools_enabled', $bundleConfiguration->audit->reviewerToolsEnabled);
-        $builder->setParameter('symfony_security_auditor.audit.reviewer_max_tool_iterations', $bundleConfiguration->audit->reviewerMaxToolIterations);
-        $builder->setParameter('symfony_security_auditor.audit.baseline', $bundleConfiguration->audit->baseline);
-        $builder->setParameter('symfony_security_auditor.audit.fail_on', $bundleConfiguration->audit->failOn->value);
-        $builder->setParameter('symfony_security_auditor.audit.excluded_types', $bundleConfiguration->audit->excludedTypes);
-        $builder->setParameter('symfony_security_auditor.audit.included_types', $bundleConfiguration->audit->includedTypes);
-        $builder->setParameter('symfony_security_auditor.audit.reviewer_max_concurrent', $bundleConfiguration->audit->reviewerMaxConcurrent);
-        $builder->setParameter('symfony_security_auditor.audit.attacker_max_concurrent', $bundleConfiguration->audit->attackerMaxConcurrent);
-        $builder->setParameter('symfony_security_auditor.audit.static_prescan.enabled', $bundleConfiguration->audit->staticPreScanEnabled);
-        $builder->setParameter('symfony_security_auditor.audit.static_prescan.lean_mode', $bundleConfiguration->audit->staticPreScanLeanMode);
-        $builder->setParameter('symfony_security_auditor.audit.chunking.strategy', $bundleConfiguration->audit->chunkingStrategy);
-        $builder->setParameter('symfony_security_auditor.audit.poc_synthesis.enabled', $bundleConfiguration->audit->poCSynthesisEnabled);
-        $builder->setParameter('symfony_security_auditor.audit.poc_synthesis.severity_floor', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
-        $builder->setParameter('symfony_security_auditor.audit.code_slicing.enabled', $bundleConfiguration->audit->codeSlicingEnabled);
-        $builder->setParameter('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing', $bundleConfiguration->audit->codeSlicingMinLines);
-        $builder->setParameter('symfony_security_auditor.audit.budget.max_tokens', $bundleConfiguration->budget->maxTokens);
-        $builder->setParameter('symfony_security_auditor.audit.budget.max_cost_usd', $bundleConfiguration->budget->maxCostUsd);
-        $builder->setParameter('symfony_security_auditor.audit.retry.max_attempts', $bundleConfiguration->retry->maxAttempts);
-        $builder->setParameter('symfony_security_auditor.audit.retry.initial_delay_ms', $bundleConfiguration->retry->initialDelayMs);
-        $builder->setParameter('symfony_security_auditor.audit.retry.backoff_multiplier', $bundleConfiguration->retry->backoffMultiplier);
-        $builder->setParameter('symfony_security_auditor.audit.retry.jitter_ratio', $bundleConfiguration->retry->jitterRatio);
+        $containerBuilder->setParameter('symfony_security_auditor.attacker_model', $bundleConfiguration->llm->attackerModel());
+        $containerBuilder->setParameter('symfony_security_auditor.reviewer_model', $bundleConfiguration->llm->reviewerModel());
+        $containerBuilder->setParameter('symfony_security_auditor.attacker_max_output_tokens', $bundleConfiguration->llm->attackerMaxOutputTokens());
+        $containerBuilder->setParameter('symfony_security_auditor.reviewer_max_output_tokens', $bundleConfiguration->llm->reviewerMaxOutputTokens());
+        $containerBuilder->setParameter('symfony_security_auditor.scan.included_paths', $bundleConfiguration->scan->includedPaths);
+        $containerBuilder->setParameter('symfony_security_auditor.scan.respect_gitignore', $bundleConfiguration->scan->respectGitignore);
+        $containerBuilder->setParameter('symfony_security_auditor.scan.max_file_size_kb', $bundleConfiguration->scan->maxFileSizeKb);
+        $containerBuilder->setParameter('symfony_security_auditor.scan.secret_scrubbing.enabled', $bundleConfiguration->scan->secretScrubbingEnabled);
+        $containerBuilder->setParameter('symfony_security_auditor.scan.secret_scrubbing.additional_patterns', $bundleConfiguration->scan->additionalScrubberPatterns);
+        $containerBuilder->setParameter('symfony_security_auditor.scan.custom_risk_patterns', $bundleConfiguration->scan->customRiskPatterns);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.max_iterations', $bundleConfiguration->audit->maxIterations);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.min_confidence', $bundleConfiguration->audit->minConfidence);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.reviewer_batch_size', $bundleConfiguration->audit->reviewerBatchSize);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.tools_enabled', $bundleConfiguration->audit->toolsEnabled);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.structured_collection', $bundleConfiguration->audit->structuredCollection);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.reviewer_structured_collection', $bundleConfiguration->audit->reviewerStructuredCollection);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.stable_system_prompt', $bundleConfiguration->audit->stableSystemPrompt);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.max_tool_iterations', $bundleConfiguration->audit->maxToolIterations);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.reviewer_tools_enabled', $bundleConfiguration->audit->reviewerToolsEnabled);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.reviewer_max_tool_iterations', $bundleConfiguration->audit->reviewerMaxToolIterations);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.baseline', $bundleConfiguration->audit->baseline);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.fail_on', $bundleConfiguration->audit->failOn->value);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.excluded_types', $bundleConfiguration->audit->excludedTypes);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.included_types', $bundleConfiguration->audit->includedTypes);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.reviewer_max_concurrent', $bundleConfiguration->audit->reviewerMaxConcurrent);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.attacker_max_concurrent', $bundleConfiguration->audit->attackerMaxConcurrent);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.static_prescan.enabled', $bundleConfiguration->audit->staticPreScanEnabled);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.static_prescan.lean_mode', $bundleConfiguration->audit->staticPreScanLeanMode);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.chunking.strategy', $bundleConfiguration->audit->chunkingStrategy);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.poc_synthesis.enabled', $bundleConfiguration->audit->poCSynthesisEnabled);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.poc_synthesis.severity_floor', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.code_slicing.enabled', $bundleConfiguration->audit->codeSlicingEnabled);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing', $bundleConfiguration->audit->codeSlicingMinLines);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.budget.max_tokens', $bundleConfiguration->budget->maxTokens);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.budget.max_cost_usd', $bundleConfiguration->budget->maxCostUsd);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.retry.max_attempts', $bundleConfiguration->retry->maxAttempts);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.retry.initial_delay_ms', $bundleConfiguration->retry->initialDelayMs);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.retry.backoff_multiplier', $bundleConfiguration->retry->backoffMultiplier);
+        $containerBuilder->setParameter('symfony_security_auditor.audit.retry.jitter_ratio', $bundleConfiguration->retry->jitterRatio);
 
-        $builder->setParameter('symfony_security_auditor.config_notices', ConfigurationNotices::of($bundleConfiguration->audit, $bundleConfiguration->llm));
-        $builder->setParameter('symfony_security_auditor.cache.enabled', $bundleConfiguration->cache->enabled);
-        $builder->setParameter('symfony_security_auditor.cache.dir', $bundleConfiguration->cache->dir);
-        $builder->setParameter('symfony_security_auditor.cache.advisory_dir', $bundleConfiguration->cache->dir.'/advisory');
-        $builder->setParameter('symfony_security_auditor.cache.reviewer_dir', $bundleConfiguration->cache->dir.'/reviewer');
-        $builder->setParameter(
+        $containerBuilder->setParameter('symfony_security_auditor.config_notices', ConfigurationNotices::of($bundleConfiguration->audit, $bundleConfiguration->llm));
+        $containerBuilder->setParameter('symfony_security_auditor.cache.enabled', $bundleConfiguration->cache->enabled);
+        $containerBuilder->setParameter('symfony_security_auditor.cache.dir', $bundleConfiguration->cache->dir);
+        $containerBuilder->setParameter('symfony_security_auditor.cache.advisory_dir', $bundleConfiguration->cache->dir.'/advisory');
+        $containerBuilder->setParameter('symfony_security_auditor.cache.reviewer_dir', $bundleConfiguration->cache->dir.'/reviewer');
+        $containerBuilder->setParameter(
             'symfony_security_auditor.cache.reviewer_key_salt',
             \sprintf('%s|reviewer-v%d|prompt-v%d', $bundleConfiguration->llm->reviewerModel(), FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
         );
-        $builder->setParameter('symfony_security_auditor.cache.prompt_caching', $bundleConfiguration->cache->promptCaching);
-        $builder->setParameter(
+        $containerBuilder->setParameter('symfony_security_auditor.cache.prompt_caching', $bundleConfiguration->cache->promptCaching);
+        $containerBuilder->setParameter(
             'symfony_security_auditor.cache.key_salt',
             \sprintf(
                 '%s|prompt-v%d|prescan-v%d|patterns-%s|collect-%s|skills-%s',
@@ -513,7 +514,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         );
     }
 
-    private function registerBudget(ServicesConfigurator $services, BundleConfiguration $bundleConfiguration): void
+    private function registerBudget(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
     {
         $maxTokens = $bundleConfiguration->budget->maxTokens;
         $maxCostUsd = $bundleConfiguration->budget->maxCostUsd;
@@ -524,44 +525,44 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             default => [[AuditBudget::class, 'forCost'], [$maxCostUsd]],
         };
 
-        $services->set(AuditBudget::class)
+        $servicesConfigurator->set(AuditBudget::class)
             ->private()
             ->factory($auditBudgetFactory)
             ->args($auditBudgetArgs);
     }
 
-    private function registerRateLimiter(ServicesConfigurator $services, BundleConfiguration $bundleConfiguration): void
+    private function registerRateLimiter(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
     {
-        $services->set(NullRateLimiter::class)->private();
+        $servicesConfigurator->set(NullRateLimiter::class)->private();
 
         if (!$bundleConfiguration->rateLimit->isEnabled()) {
-            $services->alias(RateLimiterInterface::class, NullRateLimiter::class);
+            $servicesConfigurator->alias(RateLimiterInterface::class, NullRateLimiter::class);
 
             return;
         }
 
-        $services->set(RateLimitConfiguration::class)
+        $servicesConfigurator->set(RateLimitConfiguration::class)
             ->private()
             ->args([
                 $bundleConfiguration->rateLimit->requestsPerMinute,
                 $bundleConfiguration->rateLimit->inputTokensPerMinute,
                 $bundleConfiguration->rateLimit->outputTokensPerMinute,
             ]);
-        $services->set(TokenBucketRateLimiter::class)
+        $servicesConfigurator->set(TokenBucketRateLimiter::class)
             ->private()
             ->args([
                 service(RateLimitConfiguration::class),
                 service(ClockInterface::class),
                 service(SleeperInterface::class),
             ]);
-        $services->alias(RateLimiterInterface::class, TokenBucketRateLimiter::class);
+        $servicesConfigurator->alias(RateLimiterInterface::class, TokenBucketRateLimiter::class);
     }
 
-    private function registerLlmClients(ServicesConfigurator $services, BundleConfiguration $bundleConfiguration): void
+    private function registerLlmClients(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
     {
-        $services->set(RetryAfterHeaderParser::class)->private();
+        $servicesConfigurator->set(RetryAfterHeaderParser::class)->private();
 
-        $services->set('security_auditor.attacker_client', SymfonyAiLLMClient::class)
+        $servicesConfigurator->set('security_auditor.attacker_client', SymfonyAiLLMClient::class)
             ->private()
             ->args($this->llmClientArguments(
                 $bundleConfiguration,
@@ -569,7 +570,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration->llm->attackerMaxOutputTokens(),
             ));
 
-        $services->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
+        $servicesConfigurator->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
             ->private()
             ->args($this->llmClientArguments(
                 $bundleConfiguration,
@@ -577,35 +578,35 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration->llm->reviewerMaxOutputTokens(),
             ));
 
-        $services->alias(LLMClientInterface::class, 'security_auditor.attacker_client');
+        $servicesConfigurator->alias(LLMClientInterface::class, 'security_auditor.attacker_client');
     }
 
-    private function registerImplementationAliases(ServicesConfigurator $services, BundleConfiguration $bundleConfiguration): void
+    private function registerImplementationAliases(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
     {
-        $services->alias(AttackerCacheInterface::class, $bundleConfiguration->cache->enabled
+        $servicesConfigurator->alias(AttackerCacheInterface::class, $bundleConfiguration->cache->enabled
             ? FilesystemAttackerCache::class
             : NullAttackerCache::class);
 
-        $services->alias(ReviewerCacheInterface::class, $bundleConfiguration->cache->enabled
+        $servicesConfigurator->alias(ReviewerCacheInterface::class, $bundleConfiguration->cache->enabled
             ? FilesystemReviewerCache::class
             : NullReviewerCache::class);
 
-        $services->alias(SecretScrubberInterface::class, $bundleConfiguration->scan->secretScrubbingEnabled
+        $servicesConfigurator->alias(SecretScrubberInterface::class, $bundleConfiguration->scan->secretScrubbingEnabled
             ? RegexSecretScrubber::class
             : NullSecretScrubber::class);
 
-        $services->alias(AdvisoryDatabaseInterface::class, ComposerAuditAdvisoryDatabase::class);
+        $servicesConfigurator->alias(AdvisoryDatabaseInterface::class, ComposerAuditAdvisoryDatabase::class);
 
-        $services->alias(StaticPreScannerInterface::class, $bundleConfiguration->audit->staticPreScanEnabled
+        $servicesConfigurator->alias(StaticPreScannerInterface::class, $bundleConfiguration->audit->staticPreScanEnabled
             ? RegexStaticPreScanner::class
             : NullStaticPreScanner::class);
 
-        $services->alias(CodeSlicerInterface::class, $bundleConfiguration->audit->codeSlicingEnabled
+        $servicesConfigurator->alias(CodeSlicerInterface::class, $bundleConfiguration->audit->codeSlicingEnabled
             ? RegexCodeSlicer::class
             : NullCodeSlicer::class);
     }
 
-    private function registerEscalation(ServicesConfigurator $services, BundleConfiguration $bundleConfiguration): void
+    private function registerEscalation(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
     {
         if (!$bundleConfiguration->audit->escalationEnabled) {
             return;
@@ -613,7 +614,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
 
         $cheapModel = $bundleConfiguration->audit->escalationCheapModel ?? $bundleConfiguration->llm->reviewerModel();
 
-        $services->set('security_auditor.cheap_attacker_client', SymfonyAiLLMClient::class)
+        $servicesConfigurator->set('security_auditor.cheap_attacker_client', SymfonyAiLLMClient::class)
             ->private()
             ->args($this->llmClientArguments(
                 $bundleConfiguration,
@@ -621,7 +622,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration->llm->attackerMaxOutputTokens(),
             ));
 
-        $services->set('security_auditor.cheap_attacker', AttackerAgent::class)
+        $servicesConfigurator->set('security_auditor.cheap_attacker', AttackerAgent::class)
             ->private()
             ->args([
                 service('security_auditor.cheap_attacker_client'),
@@ -641,7 +642,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service(ProgressReporterInterface::class),
             ]);
 
-        $services->set(EscalatingAttackerAgent::class)
+        $servicesConfigurator->set(EscalatingAttackerAgent::class)
             ->private()
             ->args([
                 service('security_auditor.cheap_attacker'),
@@ -649,7 +650,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service('logger'),
             ]);
 
-        $services->alias(AttackerAgentInterface::class, EscalatingAttackerAgent::class);
+        $servicesConfigurator->alias(AttackerAgentInterface::class, EscalatingAttackerAgent::class);
     }
 
     /**

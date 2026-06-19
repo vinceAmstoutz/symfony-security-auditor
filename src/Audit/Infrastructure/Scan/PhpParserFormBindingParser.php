@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
+use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\MethodCall;
@@ -60,7 +61,7 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
     }
 
     /**
-     * @return array<\PhpParser\Node>|null
+     * @return array<Node>|null
      */
     private function parseAndResolveNames(string $content): ?array
     {
@@ -103,12 +104,12 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
     private function bindingsForPublicMethods(string $filePath, Class_ $class, NodeFinder $nodeFinder): array
     {
         $bindings = [];
-        foreach ($class->getMethods() as $methodNode) {
-            if (!$methodNode->isPublic()) {
+        foreach ($class->getMethods() as $classMethod) {
+            if (!$classMethod->isPublic()) {
                 continue;
             }
 
-            $bindings = [...$bindings, ...$this->bindingsForMethod($filePath, $methodNode, $nodeFinder)];
+            $bindings = [...$bindings, ...$this->bindingsForMethod($filePath, $classMethod, $nodeFinder)];
         }
 
         return $bindings;

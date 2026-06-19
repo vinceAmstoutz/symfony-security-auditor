@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class NullCodeSlicer implements CodeSlicerInterface

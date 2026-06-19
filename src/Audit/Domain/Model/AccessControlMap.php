@@ -17,10 +17,10 @@ final readonly class AccessControlMap
 {
     /**
      * @param array<string, list<string>> $routeAccessMap
-     * @param list<string>                 $firewallRules
-     * @param list<RouteAccessControl>     $routeAccessControls
-     * @param list<VoterCapability>        $voterCapabilities
-     * @param list<FormBinding>            $formBindings
+     * @param list<string>                $firewallRules
+     * @param list<RouteAccessControl>    $routeAccessControls
+     * @param list<VoterCapability>       $voterCapabilities
+     * @param list<FormBinding>           $formBindings
      */
     public function __construct(
         private array $routeAccessMap = [],

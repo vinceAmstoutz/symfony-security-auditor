@@ -27,7 +27,7 @@ final readonly class AuditReport
      * @param list<array{stage: string, file: string, status: string}> $coverage
      */
     private function __construct(
-        private ReportIdentity $identity,
+        private ReportIdentity $reportIdentity,
         private array $coverage,
         ?AuditCost $auditCost,
         Vulnerability ...$vulnerabilities,
@@ -69,27 +69,27 @@ final readonly class AuditReport
 
     public function auditId(): string
     {
-        return $this->identity->auditId;
+        return $this->reportIdentity->auditId;
     }
 
     public function projectPath(): string
     {
-        return $this->identity->projectPath;
+        return $this->reportIdentity->projectPath;
     }
 
     public function startedAt(): DateTimeImmutable
     {
-        return $this->identity->startedAt;
+        return $this->reportIdentity->startedAt;
     }
 
     public function completedAt(): DateTimeImmutable
     {
-        return $this->identity->completedAt;
+        return $this->reportIdentity->completedAt;
     }
 
     public function filesScanned(): int
     {
-        return $this->identity->filesScanned;
+        return $this->reportIdentity->filesScanned;
     }
 
     public function cost(): AuditCost
@@ -140,7 +140,7 @@ final readonly class AuditReport
         );
 
         return new self(
-            $this->identity,
+            $this->reportIdentity,
             $this->coverage,
             $this->auditCost,
             ...$kept,
@@ -165,7 +165,7 @@ final readonly class AuditReport
         );
 
         return new self(
-            $this->identity,
+            $this->reportIdentity,
             $this->coverage,
             $this->auditCost,
             ...$kept,
@@ -174,7 +174,7 @@ final readonly class AuditReport
 
     public function durationSeconds(): float
     {
-        return (float) ($this->identity->completedAt->getTimestamp() - $this->identity->startedAt->getTimestamp());
+        return (float) ($this->reportIdentity->completedAt->getTimestamp() - $this->reportIdentity->startedAt->getTimestamp());
     }
 
     public function totalVulnerabilities(): int
@@ -239,12 +239,12 @@ final readonly class AuditReport
         }
 
         return [
-            'audit_id' => $this->identity->auditId,
-            'project' => $this->identity->projectPath,
-            'started_at' => $this->identity->startedAt->format(DateTimeInterface::ATOM),
-            'completed_at' => $this->identity->completedAt->format(DateTimeInterface::ATOM),
+            'audit_id' => $this->reportIdentity->auditId,
+            'project' => $this->reportIdentity->projectPath,
+            'started_at' => $this->reportIdentity->startedAt->format(DateTimeInterface::ATOM),
+            'completed_at' => $this->reportIdentity->completedAt->format(DateTimeInterface::ATOM),
             'duration_seconds' => $this->durationSeconds(),
-            'files_scanned' => $this->identity->filesScanned,
+            'files_scanned' => $this->reportIdentity->filesScanned,
             'risk_score' => $this->riskScore(),
             'risk_level' => $this->riskLevel(),
             'total_vulnerabilities' => $this->totalVulnerabilities(),

@@ -90,12 +90,12 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         $classHasIsGranted = $this->hasIsGrantedAttribute($class->attrGroups);
 
         $entries = [];
-        foreach ($class->getMethods() as $methodNode) {
-            if (!$methodNode->isPublic()) {
+        foreach ($class->getMethods() as $classMethod) {
+            if (!$classMethod->isPublic()) {
                 continue;
             }
 
-            $entries[] = $this->buildEntry($filePath, $methodNode, $classHasIsGranted, $nodeFinder);
+            $entries[] = $this->buildEntry($filePath, $classMethod, $classHasIsGranted, $nodeFinder);
         }
 
         return $entries;

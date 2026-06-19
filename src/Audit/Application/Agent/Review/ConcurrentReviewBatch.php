@@ -28,10 +28,10 @@ final readonly class ConcurrentReviewBatch
 {
     /**
      * @param list<array{system: string, user: string, tools: ToolRegistry}> $requests
-     * @param list<int>                                                       $pendingIndexes
-     * @param array<int, ReviewCollector>                                     $reviewCollectors
-     * @param list<Vulnerability>                                             $vulnerabilities
-     * @param array<int, string>                                              $codeContexts
+     * @param list<int>                                                      $pendingIndexes
+     * @param array<int, ReviewCollector>                                    $reviewCollectors
+     * @param list<Vulnerability>                                            $vulnerabilities
+     * @param array<int, string>                                             $codeContexts
      */
     public function __construct(
         public array $requests,

@@ -12,7 +12,9 @@
     "MD024": {
       "siblings_only": true
     },
-    "MD036": false
+    "MD036": false,
+    // Prettier owns table formatting; its unicode column-width calc conflicts with MD060.
+    "MD060": false
   },
   "globs": [
     "**/*.md"

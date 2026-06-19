@@ -97,16 +97,16 @@ final readonly class AuditCommand
         array $scanPaths,
     ): int {
         $this->auditPresenter->estimatingSection($symfonyStyle);
-        $report = $this->estimateAuditCostUseCase->execute($projectPath, $scanPaths);
+        $auditReport = $this->estimateAuditCostUseCase->execute($projectPath, $scanPaths);
 
-        $this->auditPresenter->unsupportedModelWarnings($symfonyStyle, $report);
+        $this->auditPresenter->unsupportedModelWarnings($symfonyStyle, $auditReport);
 
         if ($auditCommandInput->isMachineReadableFormat()) {
-            $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+            $this->reportWriter->write($auditReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
         }
 
         if (!$auditCommandInput->isMachineReadableToStdout()) {
-            $this->auditPresenter->dryRunResult($symfonyStyle, $report);
+            $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
         }
 
         return ExitCode::Success->value;
@@ -131,11 +131,11 @@ final readonly class AuditCommand
     private function generateBaseline(
         SymfonyStyle $symfonyStyle,
         AuditCommandInput $auditCommandInput,
-        AuditReport $report,
+        AuditReport $auditReport,
         string $generateBaseline,
     ): int {
-        $fingerprintCount = $this->baselineProcessor->generate($report, $generateBaseline);
-        $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+        $fingerprintCount = $this->baselineProcessor->generate($auditReport, $generateBaseline);
+        $this->reportWriter->write($auditReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
 
         if (!$auditCommandInput->isMachineReadableToStdout()) {
             $this->auditPresenter->baselineGenerated($symfonyStyle, $generateBaseline, $fingerprintCount);
@@ -147,21 +147,21 @@ final readonly class AuditCommand
     private function finalizeAuditRun(
         SymfonyStyle $symfonyStyle,
         AuditCommandInput $auditCommandInput,
-        AuditReport $report,
+        AuditReport $auditReport,
     ): int {
-        $baselineResult = $this->baselineProcessor->apply($report, $auditCommandInput->baseline);
-        $report = $baselineResult->report;
+        $baselineResult = $this->baselineProcessor->apply($auditReport, $auditCommandInput->baseline);
+        $auditReport = $baselineResult->report;
 
         if (!$auditCommandInput->isMachineReadableToStdout()) {
             $this->auditPresenter->baselineApplied($symfonyStyle, $baselineResult->suppressedCount);
         }
 
-        $this->reportWriter->write($report, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
+        $this->reportWriter->write($auditReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
 
-        $exitCode = $this->auditExitCodeResolver->resolve($report, $auditCommandInput->failOn ?? $this->riskLevel);
+        $exitCode = $this->auditExitCodeResolver->resolve($auditReport, $auditCommandInput->failOn ?? $this->riskLevel);
 
         if (!$auditCommandInput->isMachineReadableToStdout()) {
-            $this->auditPresenter->result($symfonyStyle, $report, $exitCode);
+            $this->auditPresenter->result($symfonyStyle, $auditReport, $exitCode);
         }
 
         return $exitCode;

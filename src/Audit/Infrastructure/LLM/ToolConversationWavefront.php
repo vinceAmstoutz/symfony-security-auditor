@@ -104,7 +104,7 @@ final readonly class ToolConversationWavefront
 
     /**
      * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}> $states
-     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                                                            $window
+     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                                                             $window
      *
      * @return array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}>
      */
@@ -121,7 +121,7 @@ final readonly class ToolConversationWavefront
 
     /**
      * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}> $states
-     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                                                            $window
+     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                                                             $window
      *
      * @return array<int, DeferredResult|null>
      */
@@ -144,12 +144,12 @@ final readonly class ToolConversationWavefront
     /**
      * @param array<string, mixed> $options
      */
-    private function invokeWithoutThrowing(PlatformInterface $platform, MessageBag $bag, array $options): ?DeferredResult
+    private function invokeWithoutThrowing(PlatformInterface $platform, MessageBag $messageBag, array $options): ?DeferredResult
     {
         \assert('' !== $this->model, 'Model must be a non-empty string');
 
         try {
-            return $platform->invoke($this->model, $bag, $options);
+            return $platform->invoke($this->model, $messageBag, $options);
         } catch (Throwable) {
             return null;
         }

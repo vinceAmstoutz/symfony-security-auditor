@@ -150,12 +150,12 @@ final class StaticPricingProvider implements PricingProviderInterface
 
     public function hasModel(string $model): bool
     {
-        return array_key_exists($model, self::PRICES);
+        return \array_key_exists($model, self::PRICES);
     }
 
     private function warnUnknownModel(string $model): void
     {
-        if (array_key_exists($model, $this->warnedModels)) {
+        if (\array_key_exists($model, $this->warnedModels)) {
             return;
         }
 

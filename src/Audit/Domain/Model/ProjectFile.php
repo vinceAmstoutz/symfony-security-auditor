@@ -167,27 +167,57 @@ final readonly class ProjectFile
 
     private function matchesKnownComponentType(): bool
     {
-        return $this->matchesDomainComponentType()
-            || $this->matchesMessagingComponentType();
+        if ($this->matchesDomainComponentType()) {
+            return true;
+        }
+
+        return $this->matchesMessagingComponentType();
     }
 
     private function matchesDomainComponentType(): bool
     {
-        return $this->isController()
-            || $this->isEntity()
-            || $this->isVoter()
-            || $this->isRepository()
-            || $this->isForm();
+        if ($this->isController()) {
+            return true;
+        }
+
+        if ($this->isEntity()) {
+            return true;
+        }
+
+        if ($this->isVoter()) {
+            return true;
+        }
+
+        if ($this->isRepository()) {
+            return true;
+        }
+
+        return $this->isForm();
     }
 
     private function matchesMessagingComponentType(): bool
     {
-        return $this->isMessengerHandler()
-            || $this->isAuthenticator()
-            || $this->isEventSubscriber()
-            || $this->isNormalizer()
-            || $this->isWebhookConsumer()
-            || $this->isScheduler();
+        if ($this->isMessengerHandler()) {
+            return true;
+        }
+
+        if ($this->isAuthenticator()) {
+            return true;
+        }
+
+        if ($this->isEventSubscriber()) {
+            return true;
+        }
+
+        if ($this->isNormalizer()) {
+            return true;
+        }
+
+        if ($this->isWebhookConsumer()) {
+            return true;
+        }
+
+        return $this->isScheduler();
     }
 
     public function isTemplate(): bool

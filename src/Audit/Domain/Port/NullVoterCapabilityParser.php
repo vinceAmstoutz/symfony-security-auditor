@@ -15,7 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class NullVoterCapabilityParser implements VoterCapabilityParserInterface

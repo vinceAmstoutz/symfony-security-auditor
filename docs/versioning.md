@@ -235,7 +235,8 @@ are documented in the changelog only.
 - **`Vulnerability::create()`, `SymfonyMapping::create()`, and
   `LLMResponse::create()`** (since 1.13) — superseded by the value-object
   factories `Vulnerability::of()`, `SymfonyMapping::of()`, and
-  `LLMResponse::of()` (taking `VulnerabilityClassification`/`CodeLocation`/`VulnerabilityNarrative`,
+  `LLMResponse::of()` (taking
+  `VulnerabilityClassification`/`CodeLocation`/`VulnerabilityNarrative`,
   `ProjectFileInventory`/`AccessControlMap`, and `TokenUsageSnapshot`
   respectively). The old methods still work and delegate to the new factories.
   Scheduled for removal in the next `MAJOR`.

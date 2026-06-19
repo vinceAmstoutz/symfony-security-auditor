@@ -66,18 +66,18 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
 
     public function __construct(
         PlatformBinding $platformBinding,
-        PlatformRequestConfig $requestConfig = new PlatformRequestConfig(),
-        PlatformResilienceConfig $resilienceConfig = new PlatformResilienceConfig(),
-        PlatformAccountingConfig $accountingConfig = new PlatformAccountingConfig(),
+        PlatformRequestConfig $platformRequestConfig = new PlatformRequestConfig(),
+        PlatformResilienceConfig $platformResilienceConfig = new PlatformResilienceConfig(),
+        PlatformAccountingConfig $platformAccountingConfig = new PlatformAccountingConfig(),
     ) {
         $this->model = $platformBinding->model;
         $this->logger = $platformBinding->logger;
-        $this->temperature = $requestConfig->temperature;
-        $this->budgetTracker = $accountingConfig->budgetTracker;
-        $this->rateLimiter = $resilienceConfig->rateLimiter;
-        $this->promptTokenEstimator = new PromptTokenEstimator($requestConfig->tokenEstimator, $platformBinding->model);
-        $this->platformResultExtractor = new PlatformResultExtractor($accountingConfig->tokenUsageRecorder);
-        $platformOptionsFactory = new PlatformOptionsFactory($platformBinding->model, $requestConfig->temperature, $requestConfig->providerJsonMode, $platformBinding->maxOutputTokens);
+        $this->temperature = $platformRequestConfig->temperature;
+        $this->budgetTracker = $platformAccountingConfig->budgetTracker;
+        $this->rateLimiter = $platformResilienceConfig->rateLimiter;
+        $this->promptTokenEstimator = new PromptTokenEstimator($platformRequestConfig->tokenEstimator, $platformBinding->model);
+        $this->platformResultExtractor = new PlatformResultExtractor($platformAccountingConfig->tokenUsageRecorder);
+        $platformOptionsFactory = new PlatformOptionsFactory($platformBinding->model, $platformRequestConfig->temperature, $platformRequestConfig->providerJsonMode, $platformBinding->maxOutputTokens);
         $this->platformOptionsFactory = $platformOptionsFactory;
 
         $this->retryingPlatformInvoker = new RetryingPlatformInvoker(
@@ -85,17 +85,17 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformBinding->model,
             $platformBinding->logger,
             $this->rateLimiter,
-            $resilienceConfig->retryPolicy,
-            $resilienceConfig->transientFailureClassifier,
-            $resilienceConfig->sleeper,
-            $resilienceConfig->retryAfterHeaderParser,
+            $platformResilienceConfig->retryPolicy,
+            $platformResilienceConfig->transientFailureClassifier,
+            $platformResilienceConfig->sleeper,
+            $platformResilienceConfig->retryAfterHeaderParser,
         );
 
         $this->sequentialToolLoop = new SequentialToolLoop(
             $platformBinding->model,
             $platformBinding->logger,
             $this->rateLimiter,
-            $accountingConfig->budgetTracker,
+            $platformAccountingConfig->budgetTracker,
             $this->retryingPlatformInvoker,
             $this->platformResultExtractor,
             $platformOptionsFactory,
@@ -106,7 +106,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformBinding->platform,
             $platformBinding->model,
             $this->rateLimiter,
-            $accountingConfig->budgetTracker,
+            $platformAccountingConfig->budgetTracker,
             $this->platformResultExtractor,
             $platformOptionsFactory,
             $this->promptTokenEstimator,
@@ -118,7 +118,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformBinding->model,
             $platformBinding->logger,
             $this->rateLimiter,
-            $accountingConfig->budgetTracker,
+            $platformAccountingConfig->budgetTracker,
             $this->platformResultExtractor,
             $platformOptionsFactory,
             $this->promptTokenEstimator,

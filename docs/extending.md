@@ -60,9 +60,10 @@ LLMResponse::of(
 );
 ```
 
-> The legacy `LLMResponse::create(content, inputTokens, outputTokens, model,
-> stopReason)` factory is **deprecated since 1.13** and removed in the next
-> `MAJOR`; use `of()` in new code.
+> The legacy
+> `LLMResponse::create(content, inputTokens, outputTokens, model, stopReason)`
+> factory is **deprecated since 1.13** and removed in the next `MAJOR`; use
+> `of()` in new code.
 
 Key read methods: `content()`, `parseJson(): array` (strips markdown fences then
 JSON-decodes), `isEmpty(): bool`, `totalTokens(): int`.

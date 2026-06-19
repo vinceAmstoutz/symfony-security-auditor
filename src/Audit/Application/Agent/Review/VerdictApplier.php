@@ -61,37 +61,37 @@ final readonly class VerdictApplier
         return $reviewed;
     }
 
-    private function applyAdjustedSeverity(Vulnerability $reviewed, ?string $adjustedSeverity): Vulnerability
+    private function applyAdjustedSeverity(Vulnerability $vulnerability, ?string $adjustedSeverity): Vulnerability
     {
         if (null === $adjustedSeverity) {
-            return $reviewed;
+            return $vulnerability;
         }
 
         try {
-            return $reviewed->withElevatedSeverity(VulnerabilitySeverity::from($adjustedSeverity));
+            return $vulnerability->withElevatedSeverity(VulnerabilitySeverity::from($adjustedSeverity));
         } catch (ValueError) {
             $this->logger->debug('Reviewer returned invalid severity, keeping original', [
                 'adjusted_severity' => $adjustedSeverity,
             ]);
 
-            return $reviewed;
+            return $vulnerability;
         }
     }
 
-    private function applyCorrectedType(Vulnerability $reviewed, ?string $correctedType): Vulnerability
+    private function applyCorrectedType(Vulnerability $vulnerability, ?string $correctedType): Vulnerability
     {
         if (null === $correctedType) {
-            return $reviewed;
+            return $vulnerability;
         }
 
         try {
-            return $reviewed->withCorrectedType(VulnerabilityType::from($correctedType));
+            return $vulnerability->withCorrectedType(VulnerabilityType::from($correctedType));
         } catch (ValueError) {
             $this->logger->debug('Reviewer returned invalid corrected_type, keeping original', [
                 'corrected_type' => $correctedType,
             ]);
 
-            return $reviewed;
+            return $vulnerability;
         }
     }
 
