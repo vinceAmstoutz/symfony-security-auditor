@@ -772,10 +772,10 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->method('complete')
             ->willReturn(LLMResponse::of((string) json_encode([
-                    'accepted' => true,
-                    'adjusted_severity' => 'critical',
-                    'reviewer_notes' => 'severity upgraded',
-                ]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
+                'accepted' => true,
+                'adjusted_severity' => 'critical',
+                'reviewer_notes' => 'severity upgraded',
+            ]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $reviewerAgent = new ReviewerAgent(
             new ReviewerAgentCollaborators(
@@ -2708,7 +2708,7 @@ final class ReviewerAgentTest extends TestCase
         $second = $this->makeVulnerabilityAt('src/Second.php');
         $third = $this->makeVulnerabilityAt('src/Third.php');
 
-        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache = self::createStub(ReviewerCacheInterface::class);
         $reviewerCache->method('get')->willReturnOnConsecutiveCalls(null, ['accepted' => true], null);
         $storedFor = [];
         $reviewerCache->method('store')->willReturnCallback(
@@ -2764,7 +2764,7 @@ final class ReviewerAgentTest extends TestCase
         $reviewerCache->expects(self::never())->method('get');
         $reviewerCache->expects(self::never())->method('store');
 
-        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
         $llmClient
             ->method('completeBatchWithTools')
             ->willReturnCallback(
@@ -2797,7 +2797,7 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
 
-        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
         $llmClient->method('completeBatchWithTools')->willThrowException(new RuntimeException('boom'));
 
         $reviewerAgent = new ReviewerAgent(
@@ -2823,7 +2823,7 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
 
-        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
         $llmClient->method('completeBatchWithTools')->willThrowException(new LLMProviderException('platform gone'));
 
         $reviewerAgent = new ReviewerAgent(
@@ -2848,7 +2848,7 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
 
-        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
         $llmClient->method('completeBatchWithTools')->willThrowException(BudgetExceededException::forTokens(10, 5));
 
         $reviewerAgent = new ReviewerAgent(
@@ -2875,7 +2875,7 @@ final class ReviewerAgentTest extends TestCase
         $second = $this->makeVulnerabilityAt('src/Second.php');
         $third = $this->makeVulnerabilityAt('src/Third.php');
 
-        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache = self::createStub(ReviewerCacheInterface::class);
         $reviewerCache->method('get')->willReturnOnConsecutiveCalls(null, ['accepted' => true], null);
         $storedFor = [];
         $reviewerCache->method('store')->willReturnCallback(
@@ -2929,7 +2929,7 @@ final class ReviewerAgentTest extends TestCase
         $reviewerCache->expects(self::never())->method('get');
         $reviewerCache->expects(self::never())->method('store');
 
-        $llmClient = $this->createMock(BatchCapableLLMClientInterface::class);
+        $llmClient = self::createStub(BatchCapableLLMClientInterface::class);
         $llmClient
             ->method('completeBatch')
             ->willReturn([LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))]);
@@ -2957,7 +2957,7 @@ final class ReviewerAgentTest extends TestCase
         $second = $this->makeVulnerabilityAt('src/Second.php');
         $third = $this->makeVulnerabilityAt('src/Third.php');
 
-        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache = self::createStub(ReviewerCacheInterface::class);
         $reviewerCache->method('get')->willReturnOnConsecutiveCalls(null, ['accepted' => true, 'adjusted_severity' => 'critical'], null);
         $storedFor = [];
         $reviewerCache->method('store')->willReturnCallback(
@@ -2975,9 +2975,9 @@ final class ReviewerAgentTest extends TestCase
                 $capturedUserMessage = $user;
 
                 return LLMResponse::of((string) json_encode([
-                        ['id' => $first->id(), 'accepted' => true],
-                        ['id' => $third->id(), 'accepted' => true],
-                    ]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10));
+                    ['id' => $first->id(), 'accepted' => true],
+                    ['id' => $third->id(), 'accepted' => true],
+                ]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10));
             });
 
         $reviewerAgent = new ReviewerAgent(
@@ -3081,7 +3081,7 @@ final class ReviewerAgentTest extends TestCase
         );
 
         $storedFor = [];
-        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache = self::createStub(ReviewerCacheInterface::class);
         $reviewerCache->method('get')->willReturn(null);
         $reviewerCache->method('store')->willReturnCallback(
             static function (Vulnerability $vulnerability) use (&$storedFor): void {

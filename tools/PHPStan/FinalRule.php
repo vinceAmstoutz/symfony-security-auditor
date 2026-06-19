@@ -16,10 +16,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\Class_;
 use PHPStan\Analyser\Scope;
-use PHPStan\Rules\Rule;
 use PHPStan\Rules\IdentifierRuleError;
+use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 use PHPStan\ShouldNotHappenException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 
 /**
  * @implements Rule<Class_>
@@ -32,7 +33,7 @@ final readonly class FinalRule implements Rule
      *
      * @var list<string>
      */
-    private const array ALLOWED_NON_FINAL = ['VinceAmstoutz\\SymfonySecurityAuditor\\Audit\\Domain\\Exception\\LLMProviderException'];
+    private const array ALLOWED_NON_FINAL = [LLMProviderException::class];
 
     public function getNodeType(): string
     {
@@ -41,6 +42,7 @@ final readonly class FinalRule implements Rule
 
     /**
      * @return list<IdentifierRuleError>
+     *
      * @throws ShouldNotHappenException
      */
     public function processNode(Node $node, Scope $scope): array

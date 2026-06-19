@@ -22,8 +22,8 @@ use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\Return_;
 use PHPStan\Analyser\Scope;
-use PHPStan\Rules\Rule;
 use PHPStan\Rules\IdentifierRuleError;
+use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 use PHPStan\ShouldNotHappenException;
 
@@ -42,6 +42,7 @@ final readonly class NoSilencingErrorHandlerRule implements Rule
 
     /**
      * @return list<IdentifierRuleError>
+     *
      * @throws ShouldNotHappenException
      */
     public function processNode(Node $node, Scope $scope): array
@@ -70,17 +71,17 @@ final readonly class NoSilencingErrorHandlerRule implements Rule
         ];
     }
 
-    private function isBlanketSilencer(Expr $callback): bool
+    private function isBlanketSilencer(Expr $expr): bool
     {
-        if ($callback instanceof ArrowFunction) {
-            return $this->isTrueLiteral($callback->expr);
+        if ($expr instanceof ArrowFunction) {
+            return $this->isTrueLiteral($expr->expr);
         }
 
-        if ($callback instanceof Closure) {
-            return 1 === \count($callback->stmts)
-                && $callback->stmts[0] instanceof Return_
-                && $callback->stmts[0]->expr instanceof Expr
-                && $this->isTrueLiteral($callback->stmts[0]->expr);
+        if ($expr instanceof Closure) {
+            return 1 === \count($expr->stmts)
+                && $expr->stmts[0] instanceof Return_
+                && $expr->stmts[0]->expr instanceof Expr
+                && $this->isTrueLiteral($expr->stmts[0]->expr);
         }
 
         return false;

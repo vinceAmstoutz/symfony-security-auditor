@@ -74,7 +74,7 @@ final class BaselineProcessorTest extends TestCase
         $dropped = $this->makeVuln('src/Drop.php');
         $auditReport = $this->makeReport($vulnerability, $dropped);
 
-        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline = self::createStub(BaselineInterface::class);
         $baseline->method('load')->willReturn([$dropped->fingerprint()]);
 
         $baselineResult = (new BaselineProcessor($baseline))->apply($auditReport, '/baseline.json');

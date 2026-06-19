@@ -21,6 +21,7 @@ rules:
     - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\NoEmptyCatchRule
     - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\NoSilencingErrorHandlerRule
     - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\FinalRule
+    - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\ForbiddenTestAttributeRule
     - Symplify\PHPStanRules\Rules\NoDynamicNameRule
     - Symplify\PHPStanRules\Rules\NoReferenceRule
     - Symplify\PHPStanRules\Rules\NoGlobalConstRule

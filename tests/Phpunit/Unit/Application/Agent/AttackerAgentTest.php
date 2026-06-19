@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
-use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -68,7 +67,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPro
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
-#[AllowMockObjectsWithoutExpectations]
 final class AttackerAgentTest extends TestCase
 {
     private const int PARSE_FAILURE_PREVIEW_BYTES = 512;
@@ -76,7 +74,7 @@ final class AttackerAgentTest extends TestCase
     private string $tmpDir;
 
     /**
-     * @param list<ProjectFile>                                                                                          $files
+     * @param list<ProjectFile>                                                                                         $files
      * @param array{bypassCache?: bool, previousFindings?: list<Vulnerability>, rejectedFindings?: list<Vulnerability>} $overrides
      *
      * @return list<Vulnerability>
@@ -141,7 +139,7 @@ final class AttackerAgentTest extends TestCase
         $staticPreScanner->method('scan')->willReturn($markers);
 
         $captured = '';
-        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
             $captured = $user;
 
@@ -161,7 +159,7 @@ final class AttackerAgentTest extends TestCase
         $previousFindings = [$this->makeVulnerabilityFor('src/Controller/A.php')];
 
         $captured = '';
-        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
             $captured = $user;
 
@@ -184,7 +182,7 @@ final class AttackerAgentTest extends TestCase
         $rejectedFindings = [$this->makeVulnerabilityFor('src/Controller/Rejected.php')];
 
         $captured = '';
-        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
             $captured = $user;
 
@@ -210,7 +208,7 @@ final class AttackerAgentTest extends TestCase
         $codeSlicer->method('slice')->willReturn("<?php\n// SLICED-MARKER");
 
         $captured = '';
-        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
             $captured = $user;
 
@@ -1737,7 +1735,7 @@ final class AttackerAgentTest extends TestCase
         ];
 
         $callIndex = 0;
-        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('completeWithTools')
             ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry) use (&$callIndex): LLMResponse {
@@ -1788,7 +1786,7 @@ final class AttackerAgentTest extends TestCase
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
 
-        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('completeWithTools')
             ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
@@ -1833,7 +1831,7 @@ final class AttackerAgentTest extends TestCase
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
 
-        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('completeWithTools')
             ->willReturn(LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
@@ -1850,7 +1848,7 @@ final class AttackerAgentTest extends TestCase
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
 
-        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('completeWithTools')
             ->willReturn(LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
@@ -2116,7 +2114,7 @@ final class AttackerAgentTest extends TestCase
     {
         $files = [$this->makeFile('src/A.php')];
 
-        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
         $llmClient->method('completeBatchWithTools')->willThrowException(BudgetExceededException::forTokens(10, 5));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -2137,7 +2135,7 @@ final class AttackerAgentTest extends TestCase
     {
         $files = [$this->makeFile('src/A.php')];
 
-        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
         $llmClient->method('completeBatchWithTools')->willThrowException(new LLMProviderException('platform gone'));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
