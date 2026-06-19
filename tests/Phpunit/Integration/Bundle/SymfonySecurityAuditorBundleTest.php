@@ -30,6 +30,7 @@ use Symfony\Component\HttpKernel\Kernel;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
@@ -86,61 +87,84 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     public function test_bundle_default_model_is_claude_opus_4_8(): void
     {
-        $container = $this->loadParameters([]);
+        $containerBuilder = $this->loadParameters([]);
 
-        self::assertSame('claude-opus-4-8', $container->getParameter('symfony_security_auditor.attacker_model'));
-        self::assertSame('claude-opus-4-8', $container->getParameter('symfony_security_auditor.reviewer_model'));
+        self::assertSame('claude-opus-4-8', $containerBuilder->getParameter('symfony_security_auditor.attacker_model'));
+        self::assertSame('claude-opus-4-8', $containerBuilder->getParameter('symfony_security_auditor.reviewer_model'));
     }
 
     public function test_bundle_uses_shared_model_for_both_agents_when_split_overrides_omitted(): void
     {
-        $container = $this->loadParameters(['model' => 'claude-opus']);
+        $containerBuilder = $this->loadParameters(['model' => 'claude-opus']);
 
-        self::assertSame('claude-opus', $container->getParameter('symfony_security_auditor.attacker_model'));
-        self::assertSame('claude-opus', $container->getParameter('symfony_security_auditor.reviewer_model'));
+        self::assertSame('claude-opus', $containerBuilder->getParameter('symfony_security_auditor.attacker_model'));
+        self::assertSame('claude-opus', $containerBuilder->getParameter('symfony_security_auditor.reviewer_model'));
     }
 
     public function test_bundle_honors_split_model_overrides(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'claude-haiku',
             'attacker_model' => 'claude-opus',
             'reviewer_model' => 'claude-sonnet',
         ]);
 
-        self::assertSame('claude-opus', $container->getParameter('symfony_security_auditor.attacker_model'));
-        self::assertSame('claude-sonnet', $container->getParameter('symfony_security_auditor.reviewer_model'));
+        self::assertSame('claude-opus', $containerBuilder->getParameter('symfony_security_auditor.attacker_model'));
+        self::assertSame('claude-sonnet', $containerBuilder->getParameter('symfony_security_auditor.reviewer_model'));
     }
 
     public function test_bundle_defaults_max_output_tokens_to_4096_for_both_agents(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        self::assertSame(4096, $container->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
-        self::assertSame(4096, $container->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
+        self::assertSame(4096, $containerBuilder->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
+        self::assertSame(4096, $containerBuilder->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
     }
 
     public function test_bundle_honors_split_max_output_tokens_overrides(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'attacker_max_output_tokens' => 8192,
             'reviewer_max_output_tokens' => 2048,
         ]);
 
-        self::assertSame(8192, $container->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
-        self::assertSame(2048, $container->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
+        self::assertSame(8192, $containerBuilder->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
+        self::assertSame(2048, $containerBuilder->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
     }
 
     public function test_bundle_max_output_tokens_falls_back_to_shared_cap_when_overrides_omitted(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'max_output_tokens' => 6000,
         ]);
 
-        self::assertSame(6000, $container->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
-        self::assertSame(6000, $container->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
+        self::assertSame(6000, $containerBuilder->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
+        self::assertSame(6000, $containerBuilder->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
+    }
+
+    public function test_bundle_does_not_register_escalation_services_by_default(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        self::assertFalse($containerBuilder->hasDefinition(EscalatingAttackerAgent::class));
+        self::assertFalse($containerBuilder->hasDefinition('security_auditor.cheap_attacker'));
+        self::assertFalse($containerBuilder->hasDefinition('security_auditor.cheap_attacker_client'));
+    }
+
+    public function test_bundle_registers_escalation_services_and_aliases_the_attacker_agent_when_enabled(): void
+    {
+        $containerBuilder = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-4o-mini']],
+        ]);
+
+        self::assertTrue($containerBuilder->hasDefinition('security_auditor.cheap_attacker_client'));
+        self::assertTrue($containerBuilder->hasDefinition('security_auditor.cheap_attacker'));
+        self::assertTrue($containerBuilder->hasDefinition(EscalatingAttackerAgent::class));
+        self::assertTrue($containerBuilder->hasAlias(AttackerAgentInterface::class));
+        self::assertSame(EscalatingAttackerAgent::class, (string) $containerBuilder->getAlias(AttackerAgentInterface::class));
     }
 
     #[RunInSeparateProcess]
@@ -154,58 +178,58 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     public function test_bundle_defaults_structured_collection_to_true_so_provider_validates_findings(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        self::assertTrue($container->getParameter('symfony_security_auditor.audit.structured_collection'));
+        self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.structured_collection'));
     }
 
     public function test_bundle_propagates_structured_collection_opt_out_to_parameter(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'audit' => ['structured_collection' => false],
         ]);
 
-        self::assertFalse($container->getParameter('symfony_security_auditor.audit.structured_collection'));
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.structured_collection'));
     }
 
     public function test_bundle_defaults_reviewer_structured_collection_to_true(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        self::assertTrue($container->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'));
+        self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'));
     }
 
     public function test_bundle_propagates_reviewer_structured_collection_opt_out_to_parameter(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'audit' => ['reviewer_structured_collection' => false],
         ]);
 
-        self::assertFalse($container->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'));
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_structured_collection'));
     }
 
     public function test_bundle_defaults_stable_system_prompt_to_true(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        self::assertTrue($container->getParameter('symfony_security_auditor.audit.stable_system_prompt'));
+        self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.stable_system_prompt'));
     }
 
     public function test_bundle_propagates_stable_system_prompt_opt_in_to_parameter(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'audit' => ['stable_system_prompt' => true],
         ]);
 
-        self::assertTrue($container->getParameter('symfony_security_auditor.audit.stable_system_prompt'));
+        self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.stable_system_prompt'));
     }
 
     public function test_bundle_propagates_scan_config_to_parameters(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'scan' => [
                 'included_paths' => ['src', 'app'],
@@ -214,18 +238,18 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             ],
         ]);
 
-        self::assertSame(['src', 'app'], $container->getParameter('symfony_security_auditor.scan.included_paths'));
-        self::assertFalse($container->getParameter('symfony_security_auditor.scan.respect_gitignore'));
-        self::assertSame(1024, $container->getParameter('symfony_security_auditor.scan.max_file_size_kb'));
+        self::assertSame(['src', 'app'], $containerBuilder->getParameter('symfony_security_auditor.scan.included_paths'));
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.scan.respect_gitignore'));
+        self::assertSame(1024, $containerBuilder->getParameter('symfony_security_auditor.scan.max_file_size_kb'));
     }
 
     public function test_bundle_defaults_scan_included_paths_to_symfony_skeleton(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
         self::assertSame(
             ['src', 'config', 'templates', 'public/index.php'],
-            $container->getParameter('symfony_security_auditor.scan.included_paths'),
+            $containerBuilder->getParameter('symfony_security_auditor.scan.included_paths'),
         );
     }
 
@@ -287,7 +311,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     public function test_bundle_propagates_audit_retry_config_to_parameters(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'audit' => [
                 'retry' => [
@@ -299,10 +323,10 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             ],
         ]);
 
-        self::assertSame(5, $container->getParameter('symfony_security_auditor.audit.retry.max_attempts'));
-        self::assertSame(250, $container->getParameter('symfony_security_auditor.audit.retry.initial_delay_ms'));
-        self::assertSame(1.5, $container->getParameter('symfony_security_auditor.audit.retry.backoff_multiplier'));
-        self::assertSame(0.1, $container->getParameter('symfony_security_auditor.audit.retry.jitter_ratio'));
+        self::assertSame(5, $containerBuilder->getParameter('symfony_security_auditor.audit.retry.max_attempts'));
+        self::assertSame(250, $containerBuilder->getParameter('symfony_security_auditor.audit.retry.initial_delay_ms'));
+        self::assertSame(1.5, $containerBuilder->getParameter('symfony_security_auditor.audit.retry.backoff_multiplier'));
+        self::assertSame(0.1, $containerBuilder->getParameter('symfony_security_auditor.audit.retry.jitter_ratio'));
     }
 
     #[RunInSeparateProcess]
@@ -323,7 +347,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     public function test_bundle_propagates_audit_config_to_parameters(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'audit' => [
                 'max_iterations' => 5,
@@ -334,16 +358,16 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             ],
         ]);
 
-        self::assertSame(5, $container->getParameter('symfony_security_auditor.audit.max_iterations'));
-        self::assertSame(0.75, $container->getParameter('symfony_security_auditor.audit.min_confidence'));
-        self::assertSame(3, $container->getParameter('symfony_security_auditor.audit.reviewer_batch_size'));
-        self::assertFalse($container->getParameter('symfony_security_auditor.audit.tools_enabled'));
-        self::assertSame(7, $container->getParameter('symfony_security_auditor.audit.max_tool_iterations'));
+        self::assertSame(5, $containerBuilder->getParameter('symfony_security_auditor.audit.max_iterations'));
+        self::assertSame(0.75, $containerBuilder->getParameter('symfony_security_auditor.audit.min_confidence'));
+        self::assertSame(3, $containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_batch_size'));
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.tools_enabled'));
+        self::assertSame(7, $containerBuilder->getParameter('symfony_security_auditor.audit.max_tool_iterations'));
     }
 
     public function test_bundle_propagates_cache_config_to_parameters(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'cache' => [
                 'enabled' => false,
@@ -351,8 +375,8 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             ],
         ]);
 
-        self::assertFalse($container->getParameter('symfony_security_auditor.cache.enabled'));
-        self::assertSame('/custom/cache/path', $container->getParameter('symfony_security_auditor.cache.dir'));
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.cache.enabled'));
+        self::assertSame('/custom/cache/path', $containerBuilder->getParameter('symfony_security_auditor.cache.dir'));
     }
 
     #[RunInSeparateProcess]
@@ -409,22 +433,22 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     public function test_bundle_reviewer_cache_dir_and_salt_derive_from_cache_dir_and_reviewer_model(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'reviewer_model' => 'claude-haiku-4-5-20251001',
             'cache' => ['dir' => '/custom/cache'],
         ]);
 
-        self::assertSame('/custom/cache/reviewer', $container->getParameter('symfony_security_auditor.cache.reviewer_dir'));
+        self::assertSame('/custom/cache/reviewer', $containerBuilder->getParameter('symfony_security_auditor.cache.reviewer_dir'));
         self::assertSame(
             \sprintf('claude-haiku-4-5-20251001|reviewer-v%d|prompt-v%d', FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
-            $container->getParameter('symfony_security_auditor.cache.reviewer_key_salt'),
+            $containerBuilder->getParameter('symfony_security_auditor.cache.reviewer_key_salt'),
         );
     }
 
     public function test_bundle_propagates_secret_scrubbing_config_to_parameters(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'scan' => [
                 'secret_scrubbing' => [
@@ -434,8 +458,8 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             ],
         ]);
 
-        self::assertFalse($container->getParameter('symfony_security_auditor.scan.secret_scrubbing.enabled'));
-        self::assertSame(['/CUSTOM-[A-Z]{6}/'], $container->getParameter('symfony_security_auditor.scan.secret_scrubbing.additional_patterns'));
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.scan.secret_scrubbing.enabled'));
+        self::assertSame(['/CUSTOM-[A-Z]{6}/'], $containerBuilder->getParameter('symfony_security_auditor.scan.secret_scrubbing.additional_patterns'));
     }
 
     #[RunInSeparateProcess]
@@ -567,14 +591,14 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     public function test_bundle_exposes_audit_defaults_as_parameters(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        self::assertSame(1, $container->getParameter('symfony_security_auditor.audit.reviewer_max_concurrent'));
-        self::assertSame(80, $container->getParameter('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing'));
-        self::assertTrue($container->getParameter('symfony_security_auditor.audit.static_prescan.enabled'));
-        self::assertFalse($container->getParameter('symfony_security_auditor.audit.code_slicing.enabled'));
-        self::assertNull($container->getParameter('symfony_security_auditor.audit.budget.max_tokens'));
-        self::assertNull($container->getParameter('symfony_security_auditor.audit.budget.max_cost_usd'));
+        self::assertSame(1, $containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_max_concurrent'));
+        self::assertSame(80, $containerBuilder->getParameter('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing'));
+        self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.static_prescan.enabled'));
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.code_slicing.enabled'));
+        self::assertNull($containerBuilder->getParameter('symfony_security_auditor.audit.budget.max_tokens'));
+        self::assertNull($containerBuilder->getParameter('symfony_security_auditor.audit.budget.max_cost_usd'));
     }
 
     /**
@@ -583,9 +607,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     #[DataProvider('integerNodeMinimumCases')]
     public function test_bundle_accepts_integer_node_at_its_documented_minimum(array $config, string $parameter, int $expected): void
     {
-        $container = $this->loadParameters($config);
+        $containerBuilder = $this->loadParameters($config);
 
-        self::assertSame($expected, $container->getParameter($parameter));
+        self::assertSame($expected, $containerBuilder->getParameter($parameter));
     }
 
     /** @return iterable<string, array{array<string, mixed>, string, int}> */
@@ -674,9 +698,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     #[DataProvider('chunkingStrategyCases')]
     public function test_bundle_accepts_each_chunking_strategy(string $strategy): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['chunking' => ['strategy' => $strategy]]]);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['chunking' => ['strategy' => $strategy]]]);
 
-        self::assertSame($strategy, $container->getParameter('symfony_security_auditor.audit.chunking.strategy'));
+        self::assertSame($strategy, $containerBuilder->getParameter('symfony_security_auditor.audit.chunking.strategy'));
     }
 
     /** @return iterable<string, array{string}> */
@@ -689,9 +713,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     #[DataProvider('pocSeverityFloorCases')]
     public function test_bundle_accepts_each_poc_synthesis_severity_floor(string $severityFloor): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['poc_synthesis' => ['severity_floor' => $severityFloor]]]);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['poc_synthesis' => ['severity_floor' => $severityFloor]]]);
 
-        self::assertSame($severityFloor, $container->getParameter('symfony_security_auditor.audit.poc_synthesis.severity_floor'));
+        self::assertSame($severityFloor, $containerBuilder->getParameter('symfony_security_auditor.audit.poc_synthesis.severity_floor'));
     }
 
     /** @return iterable<string, array{string}> */
@@ -706,14 +730,14 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     public function test_bundle_derives_advisory_cache_dir_from_cache_dir(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'cache' => ['dir' => '/custom/cache']]);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'cache' => ['dir' => '/custom/cache']]);
 
-        self::assertSame('/custom/cache/advisory', $container->getParameter('symfony_security_auditor.cache.advisory_dir'));
+        self::assertSame('/custom/cache/advisory', $containerBuilder->getParameter('symfony_security_auditor.cache.advisory_dir'));
     }
 
     public function test_bundle_cache_key_salt_embeds_a_sixteen_char_truncated_pattern_hash(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
         $expectedPatternHash = substr(hash('sha256', json_encode([], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)), 0, 16);
         $expectedKeySalt = \sprintf(
@@ -723,105 +747,105 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             $expectedPatternHash,
         );
 
-        self::assertSame($expectedKeySalt, $container->getParameter('symfony_security_auditor.cache.key_salt'));
+        self::assertSame($expectedKeySalt, $containerBuilder->getParameter('symfony_security_auditor.cache.key_salt'));
     }
 
     public function test_bundle_cache_key_salt_folds_in_the_structured_collection_mode(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['structured_collection' => false]]);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['structured_collection' => false]]);
 
-        $keySalt = $container->getParameter('symfony_security_auditor.cache.key_salt');
+        $keySalt = $containerBuilder->getParameter('symfony_security_auditor.cache.key_salt');
         self::assertIsString($keySalt);
         self::assertStringContainsString('|collect-json|', $keySalt);
     }
 
     public function test_bundle_cache_key_salt_folds_in_the_stable_system_prompt_flag(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['stable_system_prompt' => false]]);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['stable_system_prompt' => false]]);
 
-        $keySalt = $container->getParameter('symfony_security_auditor.cache.key_salt');
+        $keySalt = $containerBuilder->getParameter('symfony_security_auditor.cache.key_salt');
         self::assertIsString($keySalt);
         self::assertStringEndsWith('|skills-lean', $keySalt);
     }
 
     public function test_bundle_fast_profile_resolves_cost_levers(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'profile' => 'fast']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'profile' => 'fast']);
 
-        self::assertSame(1, $container->getParameter('symfony_security_auditor.audit.max_iterations'));
-        self::assertTrue($container->getParameter('symfony_security_auditor.audit.static_prescan.lean_mode'));
-        self::assertTrue($container->getParameter('symfony_security_auditor.audit.code_slicing.enabled'));
-        self::assertFalse($container->getParameter('symfony_security_auditor.audit.poc_synthesis.enabled'));
-        self::assertSame(4, $container->getParameter('symfony_security_auditor.audit.reviewer_max_concurrent'));
-        self::assertSame(4, $container->getParameter('symfony_security_auditor.audit.attacker_max_concurrent'));
+        self::assertSame(1, $containerBuilder->getParameter('symfony_security_auditor.audit.max_iterations'));
+        self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.static_prescan.lean_mode'));
+        self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.code_slicing.enabled'));
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.poc_synthesis.enabled'));
+        self::assertSame(4, $containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_max_concurrent'));
+        self::assertSame(4, $containerBuilder->getParameter('symfony_security_auditor.audit.attacker_max_concurrent'));
     }
 
     public function test_bundle_thorough_profile_enables_poc_synthesis(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'profile' => 'thorough']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'profile' => 'thorough']);
 
-        self::assertTrue($container->getParameter('symfony_security_auditor.audit.poc_synthesis.enabled'));
-        self::assertSame(3, $container->getParameter('symfony_security_auditor.audit.max_iterations'));
+        self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.poc_synthesis.enabled'));
+        self::assertSame(3, $containerBuilder->getParameter('symfony_security_auditor.audit.max_iterations'));
     }
 
     public function test_bundle_explicit_key_overrides_the_profile(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'profile' => 'fast',
             'audit' => ['max_iterations' => 2],
         ]);
 
-        self::assertSame(2, $container->getParameter('symfony_security_auditor.audit.max_iterations'));
-        self::assertTrue($container->getParameter('symfony_security_auditor.audit.static_prescan.lean_mode'));
+        self::assertSame(2, $containerBuilder->getParameter('symfony_security_auditor.audit.max_iterations'));
+        self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.static_prescan.lean_mode'));
     }
 
     public function test_bundle_default_profile_keeps_balanced_defaults(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        self::assertSame(3, $container->getParameter('symfony_security_auditor.audit.max_iterations'));
-        self::assertFalse($container->getParameter('symfony_security_auditor.audit.static_prescan.lean_mode'));
-        self::assertFalse($container->getParameter('symfony_security_auditor.audit.code_slicing.enabled'));
-        self::assertFalse($container->getParameter('symfony_security_auditor.audit.poc_synthesis.enabled'));
-        self::assertSame(1, $container->getParameter('symfony_security_auditor.audit.reviewer_max_concurrent'));
-        self::assertSame(1, $container->getParameter('symfony_security_auditor.audit.attacker_max_concurrent'));
+        self::assertSame(3, $containerBuilder->getParameter('symfony_security_auditor.audit.max_iterations'));
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.static_prescan.lean_mode'));
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.code_slicing.enabled'));
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.poc_synthesis.enabled'));
+        self::assertSame(1, $containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_max_concurrent'));
+        self::assertSame(1, $containerBuilder->getParameter('symfony_security_auditor.audit.attacker_max_concurrent'));
     }
 
     public function test_bundle_config_notices_default_to_an_empty_list(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        self::assertSame([], $container->getParameter('symfony_security_auditor.config_notices'));
+        self::assertSame([], $containerBuilder->getParameter('symfony_security_auditor.config_notices'));
     }
 
     public function test_bundle_baseline_parameter_defaults_to_null(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        self::assertNull($container->getParameter('symfony_security_auditor.audit.baseline'));
+        self::assertNull($containerBuilder->getParameter('symfony_security_auditor.audit.baseline'));
     }
 
     public function test_bundle_baseline_parameter_reflects_the_configured_path(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['baseline' => '.security-baseline.json']]);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['baseline' => '.security-baseline.json']]);
 
-        self::assertSame('.security-baseline.json', $container->getParameter('symfony_security_auditor.audit.baseline'));
+        self::assertSame('.security-baseline.json', $containerBuilder->getParameter('symfony_security_auditor.audit.baseline'));
     }
 
     public function test_bundle_fail_on_parameter_defaults_to_critical(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        self::assertSame('critical', $container->getParameter('symfony_security_auditor.audit.fail_on'));
+        self::assertSame('critical', $containerBuilder->getParameter('symfony_security_auditor.audit.fail_on'));
     }
 
     #[DataProvider('failOnLevelCases')]
     public function test_bundle_accepts_each_fail_on_level(string $level): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['fail_on' => $level]]);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['fail_on' => $level]]);
 
-        self::assertSame($level, $container->getParameter('symfony_security_auditor.audit.fail_on'));
+        self::assertSame($level, $containerBuilder->getParameter('symfony_security_auditor.audit.fail_on'));
     }
 
     /** @return iterable<string, array{string}> */
@@ -845,15 +869,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     public function test_bundle_excluded_and_included_types_default_to_empty_lists(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o']);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        self::assertSame([], $container->getParameter('symfony_security_auditor.audit.excluded_types'));
-        self::assertSame([], $container->getParameter('symfony_security_auditor.audit.included_types'));
+        self::assertSame([], $containerBuilder->getParameter('symfony_security_auditor.audit.excluded_types'));
+        self::assertSame([], $containerBuilder->getParameter('symfony_security_auditor.audit.included_types'));
     }
 
     public function test_bundle_propagates_excluded_and_included_types(): void
     {
-        $container = $this->loadParameters([
+        $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
             'audit' => [
                 'excluded_types' => ['missing_rate_limiting', 'log_injection'],
@@ -861,8 +885,8 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             ],
         ]);
 
-        self::assertSame(['missing_rate_limiting', 'log_injection'], $container->getParameter('symfony_security_auditor.audit.excluded_types'));
-        self::assertSame(['sql_injection'], $container->getParameter('symfony_security_auditor.audit.included_types'));
+        self::assertSame(['missing_rate_limiting', 'log_injection'], $containerBuilder->getParameter('symfony_security_auditor.audit.excluded_types'));
+        self::assertSame(['sql_injection'], $containerBuilder->getParameter('symfony_security_auditor.audit.included_types'));
     }
 
     #[RunInSeparateProcess]
@@ -876,9 +900,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     public function test_bundle_emits_no_notice_for_batched_reviews_now_that_the_cache_covers_them(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['reviewer_batch_size' => 5]]);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['reviewer_batch_size' => 5]]);
 
-        self::assertSame([], $container->getParameter('symfony_security_auditor.config_notices'));
+        self::assertSame([], $containerBuilder->getParameter('symfony_security_auditor.config_notices'));
     }
 
     private function getPrivateService(Kernel $kernel, string $id): object
@@ -899,9 +923,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     public function test_bundle_accepts_max_file_size_at_one(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'scan' => ['max_file_size_kb' => 1]]);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'scan' => ['max_file_size_kb' => 1]]);
 
-        self::assertSame(1, $container->getParameter('symfony_security_auditor.scan.max_file_size_kb'));
+        self::assertSame(1, $containerBuilder->getParameter('symfony_security_auditor.scan.max_file_size_kb'));
     }
 
     #[RunInSeparateProcess]
@@ -922,9 +946,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     public function test_bundle_accepts_max_iterations_at_one(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['max_iterations' => 1]]);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['max_iterations' => 1]]);
 
-        self::assertSame(1, $container->getParameter('symfony_security_auditor.audit.max_iterations'));
+        self::assertSame(1, $containerBuilder->getParameter('symfony_security_auditor.audit.max_iterations'));
     }
 
     #[RunInSeparateProcess]
@@ -937,9 +961,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     public function test_bundle_accepts_reviewer_batch_size_at_one(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['reviewer_batch_size' => 1]]);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['reviewer_batch_size' => 1]]);
 
-        self::assertSame(1, $container->getParameter('symfony_security_auditor.audit.reviewer_batch_size'));
+        self::assertSame(1, $containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_batch_size'));
     }
 
     #[RunInSeparateProcess]
@@ -952,9 +976,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     public function test_bundle_accepts_max_tool_iterations_at_one(): void
     {
-        $container = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['max_tool_iterations' => 1]]);
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['max_tool_iterations' => 1]]);
 
-        self::assertSame(1, $container->getParameter('symfony_security_auditor.audit.max_tool_iterations'));
+        self::assertSame(1, $containerBuilder->getParameter('symfony_security_auditor.audit.max_tool_iterations'));
     }
 
     protected function setUp(): void

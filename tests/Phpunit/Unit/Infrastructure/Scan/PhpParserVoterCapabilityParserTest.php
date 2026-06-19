@@ -51,16 +51,97 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
 
     public function test_it_returns_null_for_unparseable_voter(): void
     {
-        $projectFile = ProjectFile::create('src/Security/Broken.php', '/app/x', '<?php class Broken { public function');
+        $projectFile = ProjectFile::create('src/Security/BrokenVoter.php', '/app/x', '<?php class BrokenVoter { public function');
+
+        self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
+    }
+
+    public function test_it_returns_null_when_voter_file_declares_no_class(): void
+    {
+        $projectFile = ProjectFile::create('src/Security/HelperVoter.php', '/app/x', '<?php function supports(): bool { return true; }');
 
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
 
     public function test_it_returns_null_when_voter_has_no_supports_method(): void
     {
-        $projectFile = ProjectFile::create('src/Security/Bare.php', '/app/x', '<?php class Bare { public function hello(): void {} }');
+        $projectFile = ProjectFile::create('src/Security/BareVoter.php', '/app/x', '<?php class BareVoter { public function hello(): void {} }');
 
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
+    }
+
+    public function test_it_returns_null_when_supports_is_abstract_without_a_body(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            abstract class AbstractVoter {
+                abstract public function supports(string $attribute, mixed $subject): bool;
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/AbstractVoter.php', '/app/x', $source);
+
+        self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
+    }
+
+    public function test_it_skips_empty_string_literals_in_supports_body(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class EmptyAttrVoter {
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, ['', 'EDIT'], true);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/EmptyAttrVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['EDIT'], $voterCapability->supportedAttributes());
+    }
+
+    public function test_it_skips_instanceof_against_a_dynamic_class_expression(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            use App\Entity\Post;
+            final class DynamicSubjectVoter {
+                public function supports(string $attribute, mixed $subject): bool {
+                    $class = Post::class;
+                    return $subject instanceof $class || $subject instanceof Post;
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/DynamicSubjectVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['App\\Entity\\Post'], $voterCapability->supportedSubjects());
+    }
+
+    public function test_it_returns_empty_class_name_for_an_anonymous_voter_class(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            $voter = new class {
+                public function supports(string $attribute, mixed $subject): bool {
+                    return $attribute === 'VIEW';
+                }
+            };
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/AnonymousVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame('', $voterCapability->className());
+        self::assertSame(['VIEW'], $voterCapability->supportedAttributes());
     }
 
     public function test_it_extracts_attributes_from_in_array_call(): void

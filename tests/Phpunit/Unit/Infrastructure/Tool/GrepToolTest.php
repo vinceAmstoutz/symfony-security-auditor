@@ -145,10 +145,10 @@ final class GrepToolTest extends TestCase
             $contentB .= "foo b\n";
         }
 
-        $fileA = ProjectFile::create('src/A.php', '/app/A', $contentA);
+        $projectFile = ProjectFile::create('src/A.php', '/app/A', $contentA);
         $fileB = ProjectFile::create('src/B.php', '/app/B', $contentB);
 
-        $grepTool = new GrepTool([$fileA, $fileB]);
+        $grepTool = new GrepTool([$projectFile, $fileB]);
 
         $result = $grepTool->execute(['pattern' => 'foo']);
 

@@ -423,6 +423,23 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([246, 246, 246], $fakeRateLimiter->acquired);
     }
 
+    public function test_complete_batch_falls_back_to_the_sequential_complete_path_when_dispatch_throws(): void
+    {
+        $platform = $this->flakyPlatform([
+            new RuntimeException('dispatch exploded'),
+            new TextResult('recovered-sequentially'),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
+
+        $responses = $symfonyAiLLMClient->completeBatch([
+            ['system' => 's', 'user' => 'u'],
+        ], 4);
+
+        self::assertCount(1, $responses);
+        self::assertSame('recovered-sequentially', $responses[0]->content());
+    }
+
     public function test_complete_batch_with_tools_resolves_each_conversation_against_its_own_registry(): void
     {
         $firstToolCalls = 0;

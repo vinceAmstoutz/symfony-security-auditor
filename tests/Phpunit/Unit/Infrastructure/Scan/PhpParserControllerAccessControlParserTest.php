@@ -284,6 +284,86 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['ROLE_GROUPED'], $entries[0]->methodLevelIsGranted());
     }
 
+    public function test_it_skips_non_route_attributes_when_extracting_the_route(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\HttpKernel\Attribute\Cache;
+            final class CachedController {
+                #[Cache(maxage: 60)]
+                #[Route(path: '/cached', methods: ['GET'])]
+                public function cached(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/CachedController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/cached', $entries[0]->routePath());
+        self::assertTrue($entries[0]->hasRouteAttribute());
+    }
+
+    public function test_it_reports_no_route_attribute_for_a_public_method_without_one(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            final class PlainController {
+                public function noRoute(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/PlainController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertCount(1, $entries);
+        self::assertFalse($entries[0]->hasRouteAttribute());
+        self::assertNull($entries[0]->routePath());
+        self::assertSame([], $entries[0]->routeMethods());
+    }
+
+    public function test_it_ignores_is_granted_attribute_with_no_string_argument(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            use Symfony\Component\ExpressionLanguage\Expression;
+            final class ExpressionController {
+                #[Route(path: '/expr')]
+                #[IsGranted(new Expression('is_authenticated()'))]
+                public function expr(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/ExpressionController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame([], $entries[0]->methodLevelIsGranted());
+    }
+
+    public function test_it_treats_an_abstract_action_without_a_body_as_lacking_deny_access(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            abstract class BaseController {
+                #[Route(path: '/abstract')]
+                abstract public function handle(): void;
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/BaseController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertCount(1, $entries);
+        self::assertFalse($entries[0]->methodHasDenyAccess());
+    }
+
     public function test_it_returns_empty_for_unparseable_source(): void
     {
         $projectFile = $this->makeFile('src/Controller/Broken.php', '<?php class Broken { public function');

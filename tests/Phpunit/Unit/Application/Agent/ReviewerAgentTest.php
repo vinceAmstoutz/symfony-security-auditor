@@ -1718,6 +1718,70 @@ final class ReviewerAgentTest extends TestCase
         self::assertTrue($reviewed[1]->isReviewerValidated());
     }
 
+    public function test_concurrent_review_skips_the_batch_call_when_every_finding_is_a_cache_hit(): void
+    {
+        $vulnerabilities = [$this->makeVulnerabilityAt('src/A.php'), $this->makeVulnerabilityAt('src/B.php')];
+
+        $llmClient = $this->createMock(BatchCapableLLMClientInterface::class);
+        $llmClient->expects(self::never())->method('completeBatch');
+        $llmClient->expects(self::never())->method('complete');
+
+        $reviewerCache = self::createStub(ReviewerCacheInterface::class);
+        $reviewerCache->method('get')->willReturn(['accepted' => true]);
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+            ),
+        );
+
+        $reviewed = $reviewerAgent->review($vulnerabilities, [], new NullCoverageRecorder());
+
+        self::assertCount(2, $reviewed);
+        self::assertTrue($reviewed[0]->isReviewerValidated());
+        self::assertTrue($reviewed[1]->isReviewerValidated());
+    }
+
+    public function test_batch_json_mode_invokes_the_tool_aware_completion_when_tools_are_enabled(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('complete');
+        $llmClient->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturn(LLMResponse::of((string) json_encode([['id' => $vulnerability->id(), 'accepted' => true]]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
+
+        $toolRegistry = new ToolRegistry([], new NullLogger());
+        $toolFactory = self::createStub(ToolRegistryFactoryInterface::class);
+        $toolFactory->method('forProjectFiles')->willReturn($toolRegistry);
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+                toolsEnabled: true,
+                useStructuredCollection: false,
+            ),
+            toolRegistryFactory: $toolFactory,
+        );
+
+        $reviewed = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertCount(1, $reviewed);
+        self::assertTrue($reviewed[0]->isReviewerValidated());
+    }
+
     public function test_it_stays_sequential_when_max_concurrent_is_one_even_if_batch_capable(): void
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');

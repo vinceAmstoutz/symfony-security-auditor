@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -67,6 +68,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPro
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
+#[AllowMockObjectsWithoutExpectations]
 final class AttackerAgentTest extends TestCase
 {
     private const int PARSE_FAILURE_PREVIEW_BYTES = 512;
@@ -2254,6 +2256,84 @@ final class AttackerAgentTest extends TestCase
 
         self::assertCount(1, $vulnerabilities);
         self::assertSame('json-path', $vulnerabilities[0]->title());
+    }
+
+    public function test_concurrent_structured_analysis_treats_bypass_cache_chunks_as_non_cacheable(): void
+    {
+        $files = [$this->makeFile('src/A.php')];
+
+        $cache = $this->createMock(AttackerCacheInterface::class);
+        $cache->expects(self::never())->method('get');
+        $cache->expects(self::never())->method('store');
+
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests): array {
+                self::registryOf($requests[0])->execute('record_vulnerability', self::recordedFinding('fresh'));
+
+                return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
+            });
+
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient, $cache);
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['bypassCache' => true]);
+
+        self::assertSame(['fresh'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
+    }
+
+    public function test_concurrent_structured_analysis_aggregates_dropped_entries_across_chunks(): void
+    {
+        $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];
+
+        $infoLogs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(static function (string $msg, array $ctx = []) use (&$infoLogs): void {
+            $infoLogs[] = [$msg, $ctx];
+        });
+        $logger->method('debug');
+        $logger->method('warning');
+
+        $malformed = self::recordedFinding('dropped');
+        $malformed['description'] = '';
+
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests) use ($malformed): array {
+                self::registryOf($requests[0])->execute('record_vulnerability', $malformed);
+                self::registryOf($requests[1])->execute('record_vulnerability', $malformed);
+
+                return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
+            });
+
+        $attackerAgent = new AttackerAgent(
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: new NullAttackerCache(),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+            ),
+            new AttackerAnalysisSettings(
+                useStructuredCollection: true,
+                maxConcurrent: 4,
+            ),
+            $logger,
+        );
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
+
+        $completeLog = $infoLogs[\count($infoLogs) - 1];
+        self::assertSame('Attacker agent complete', $completeLog[0]);
+        self::assertSame(0, $completeLog[1]['total_vulnerabilities']);
+        self::assertSame(2, $completeLog[1]['total_dropped_entries']);
+        self::assertSame([VulnerabilityDropReason::VALIDATION_FAILED->value => 2], $completeLog[1]['dropped_by_reason']);
     }
 
     /**

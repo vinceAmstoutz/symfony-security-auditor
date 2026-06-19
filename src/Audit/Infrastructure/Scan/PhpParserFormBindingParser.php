@@ -68,11 +68,7 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
         try {
             $parserFactory = new ParserFactory();
             $parser = $parserFactory->createForNewestSupportedVersion();
-            $ast = $parser->parse($content);
-
-            if (null === $ast) {
-                return null;
-            }
+            $ast = $parser->parse($content) ?? [];
 
             $nodeTraverser = new NodeTraverser();
             $nodeTraverser->addVisitor(new NameResolver());
