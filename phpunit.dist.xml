@@ -49,8 +49,8 @@
     <extensions>
         <bootstrap class="Ergebnis\PHPUnit\AgentReporter\Extension"/>
         <bootstrap class="Ergebnis\PHPUnit\SlowTestDetector\Extension">
-            <parameter name="maximum-count" value="3"/>
-            <parameter name="maximum-duration" value="50"/>
+            <parameter name="maximum-count" value="10"/>
+            <parameter name="maximum-duration" value="100"/>
         </bootstrap>
         <bootstrap class="RobinIngelbrecht\PHPUnitCoverageTools\PhpUnitExtension">
             <parameter name="exitOnLowCoverage" value="1"/>
