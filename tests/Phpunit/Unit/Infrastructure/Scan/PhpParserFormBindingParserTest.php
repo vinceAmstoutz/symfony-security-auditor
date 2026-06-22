@@ -78,6 +78,33 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame('App\\Form\\ProfileType', $bindings[1]->formTypeClass());
     }
 
+    public function test_it_collects_bindings_from_multiple_classes_in_the_same_file(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Form\UserType;
+            use App\Form\ProfileType;
+            final class UserController {
+                public function edit(): void {
+                    $form = $this->createForm(UserType::class);
+                }
+            }
+            final class ProfileController {
+                public function show(): void {
+                    $form = $this->createForm(ProfileType::class);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+
+        $bindings = $this->phpParserFormBindingParser->parse($projectFile);
+
+        self::assertCount(2, $bindings);
+        self::assertSame('App\\Form\\UserType', $bindings[0]->formTypeClass());
+        self::assertSame('App\\Form\\ProfileType', $bindings[1]->formTypeClass());
+    }
+
     public function test_it_skips_unresolvable_create_form_call_but_keeps_subsequent_ones(): void
     {
         $source = <<<'PHP'
@@ -247,6 +274,23 @@ final class PhpParserFormBindingParserTest extends TestCase
 
         self::assertCount(1, $bindings);
         self::assertSame('App\\Form\\UserType', $bindings[0]->formTypeClass());
+    }
+
+    public function test_it_does_not_bind_a_non_create_form_call_that_takes_a_class_constant(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Twig\ProfileTemplate;
+            final class UserController {
+                public function edit(): void {
+                    $this->render(ProfileTemplate::class);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+
+        self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
 
     public function test_it_ignores_create_form_called_on_something_other_than_this(): void

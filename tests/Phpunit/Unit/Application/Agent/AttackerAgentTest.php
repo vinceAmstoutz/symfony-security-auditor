@@ -2293,16 +2293,19 @@ final class AttackerAgentTest extends TestCase
         $logger->method('debug');
         $logger->method('warning');
 
-        $malformed = self::recordedFinding('dropped');
-        $malformed['description'] = '';
+        $validationFailed = self::recordedFinding('dropped-validation');
+        $validationFailed['description'] = '';
+
+        $hydrationFailed = self::recordedFinding('dropped-hydration');
+        $hydrationFailed['type'] = 'not_a_real_vulnerability_type';
 
         $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
         $llmClient
             ->expects(self::once())
             ->method('completeBatchWithTools')
-            ->willReturnCallback(static function (array $requests) use ($malformed): array {
-                self::registryOf($requests[0])->execute('record_vulnerability', $malformed);
-                self::registryOf($requests[1])->execute('record_vulnerability', $malformed);
+            ->willReturnCallback(static function (array $requests) use ($validationFailed, $hydrationFailed): array {
+                self::registryOf($requests[0])->execute('record_vulnerability', $validationFailed);
+                self::registryOf($requests[1])->execute('record_vulnerability', $hydrationFailed);
 
                 return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
             });
@@ -2331,7 +2334,13 @@ final class AttackerAgentTest extends TestCase
         self::assertSame('Attacker agent complete', $completeLog[0]);
         self::assertSame(0, $completeLog[1]['total_vulnerabilities']);
         self::assertSame(2, $completeLog[1]['total_dropped_entries']);
-        self::assertSame([VulnerabilityDropReason::VALIDATION_FAILED->value => 2], $completeLog[1]['dropped_by_reason']);
+        self::assertSame(
+            [
+                VulnerabilityDropReason::VALIDATION_FAILED->value => 1,
+                VulnerabilityDropReason::HYDRATION_FAILED->value => 1,
+            ],
+            $completeLog[1]['dropped_by_reason'],
+        );
     }
 
     /**

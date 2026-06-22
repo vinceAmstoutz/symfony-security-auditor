@@ -2766,6 +2766,47 @@ final class ReviewerAgentTest extends TestCase
         self::assertFalse($result[1]->isReviewerValidated());
     }
 
+    public function test_concurrent_structured_path_logs_structured_collection_enabled(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $infoLogs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$infoLogs): void {
+                $infoLogs[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('debug');
+
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(
+                static function (array $requests) use ($vulnerability): array {
+                    self::registryOf($requests[0])->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
+
+                    return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
+                });
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                $logger,
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+                useStructuredCollection: true,
+            ),
+        );
+
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertSame(['Reviewer agent validating findings', ['count' => 1, 'batch_size' => 1, 'tools_enabled' => false, 'structured_collection' => true]], $infoLogs[0]);
+    }
+
     public function test_structured_concurrent_reviews_serve_cached_verdicts_and_dispatch_only_misses(): void
     {
         $first = $this->makeVulnerabilityAt('src/First.php');
@@ -2860,6 +2901,7 @@ final class ReviewerAgentTest extends TestCase
     public function test_structured_concurrent_reviews_mark_pending_findings_errored_on_throwable(): void
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+        $second = $this->makeVulnerabilityAt('src/B.php');
 
         $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
         $llmClient->method('completeBatchWithTools')->willThrowException(new RuntimeException('boom'));
@@ -2877,10 +2919,13 @@ final class ReviewerAgentTest extends TestCase
             ),
         );
 
-        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability, $second], [], new NullCoverageRecorder());
 
-        self::assertCount(1, $result);
+        self::assertCount(2, $result);
+        self::assertSame('src/A.php', $result[0]->filePath());
         self::assertFalse($result[0]->isReviewerValidated());
+        self::assertSame('src/B.php', $result[1]->filePath());
+        self::assertFalse($result[1]->isReviewerValidated());
     }
 
     public function test_structured_concurrent_reviews_propagate_llm_provider_exceptions(): void

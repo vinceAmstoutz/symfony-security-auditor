@@ -1154,7 +1154,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                     'bogus_spec' => 'not-an-array',
                     'malformed_type' => ['type' => 42, 'description' => null],
                 ],
-                'required' => ['path', 456],
+                'required' => ['path', 456, 'mode'],
             ],
         );
 
@@ -1174,7 +1174,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $parameters = $platformTool->getParameters();
         self::assertNotNull($parameters);
-        self::assertSame(['path'], $parameters['required']);
+        self::assertSame(['path', 'mode'], $parameters['required']);
         $properties = $parameters['properties'];
         self::assertArrayHasKey('path', $properties);
         self::assertSame('string', $properties['path']['type']);
@@ -1854,6 +1854,23 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient->complete('sys', 'usr');
 
         self::assertSame([500], $fakeSleeper->durations);
+    }
+
+    public function test_non_rate_limit_transient_error_never_pauses_the_rate_limiter(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 Service Unavailable retry-after: 30'),
+            new TextResult('recovered'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 500, jitterRatio: 0.0), new RateLimitBackoff(initialDelayMs: 60_000), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper(), rateLimiter: $fakeRateLimiter),
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame([], $fakeRateLimiter->paused, 'A non-429 transient failure must not honor a Retry-After hint.');
     }
 
     public function test_eager_resolution_catches_transient_failure_thrown_from_deferred_result(): void

@@ -244,6 +244,18 @@ final class RegexSecretScrubberTest extends TestCase
         new RegexSecretScrubber(additionalPatterns: ['']);
     }
 
+    public function test_invalid_pattern_validation_suppresses_the_internal_pcre_warning(): void
+    {
+        error_clear_last();
+
+        try {
+            new RegexSecretScrubber(additionalPatterns: ['/[unterminated/']);
+            self::fail('expected SecretScrubberConfigurationException');
+        } catch (SecretScrubberConfigurationException) {
+            self::assertNull(error_get_last());
+        }
+    }
+
     protected function setUp(): void
     {
         $this->regexSecretScrubber = new RegexSecretScrubber();

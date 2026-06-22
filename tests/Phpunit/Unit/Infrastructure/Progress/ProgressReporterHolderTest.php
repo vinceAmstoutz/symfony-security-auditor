@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Progress;
 
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
@@ -57,6 +58,26 @@ final class ProgressReporterHolderTest extends TestCase
         $working->expects(self::once())->method('report')->with('stage.started', []);
         $progressReporterHolder->setDelegate($working);
         $progressReporterHolder->report('stage.started');
+    }
+
+    public function test_it_logs_the_failed_event_name_when_the_reporter_throws(): void
+    {
+        $loggedContext = [];
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('debug')
+            ->willReturnCallback(static function (string $message, array $context) use (&$loggedContext): void {
+                $loggedContext = $context;
+            });
+
+        $progressReporterHolder = new ProgressReporterHolder($logger);
+        $throwing = self::createStub(ProgressReporterInterface::class);
+        $throwing->method('report')->willThrowException(new RuntimeException('boom'));
+        $progressReporterHolder->setDelegate($throwing);
+
+        $progressReporterHolder->report('pipeline.failed');
+
+        self::assertSame('pipeline.failed', $loggedContext['event'] ?? null);
     }
 
     public function test_it_forwards_context_to_delegate(): void

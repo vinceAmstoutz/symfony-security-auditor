@@ -20,6 +20,7 @@ use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
+use Symfony\AI\Platform\Result\ToolCall;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
@@ -204,24 +205,16 @@ final readonly class ToolConversationWavefront
 
             $toolCalls = $this->platformResultExtractor->extractToolCalls($platformResult);
 
-            if ([] === $toolCalls) {
-                $state['response'] = LLMResponse::of(
-                    $this->platformResultExtractor->extractText($platformResult),
-                    $this->model,
-                    'end_turn',
-                    TokenUsageSnapshot::of($state['input'], $state['output'], $state['cacheRead'], $state['cacheCreation']),
-                );
-
-                return $state;
+            if ([] !== $toolCalls) {
+                return $this->runToolCalls($state, $toolCalls, $request);
             }
 
-            $state['bag']->add(new AssistantMessage(...$toolCalls));
-            foreach ($toolCalls as $toolCall) {
-                $result = $request['tools']->execute($toolCall->getName(), $toolCall->getArguments());
-                $state['bag']->add(new ToolCallMessage($toolCall, $result));
-            }
-
-            $state['toolsRan'] = true;
+            $state['response'] = LLMResponse::of(
+                $this->platformResultExtractor->extractText($platformResult),
+                $this->model,
+                'end_turn',
+                TokenUsageSnapshot::of($state['input'], $state['output'], $state['cacheRead'], $state['cacheCreation']),
+            );
 
             return $state;
         } catch (BudgetExceededException $budgetExceededException) {
@@ -229,6 +222,26 @@ final readonly class ToolConversationWavefront
         } catch (Throwable) {
             return $this->abortConversation($state, $request, $maxToolIterations);
         }
+    }
+
+    /**
+     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
+     * @param list<ToolCall>                                                                                                                                                 $toolCalls
+     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
+     *
+     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
+     */
+    private function runToolCalls(array $state, array $toolCalls, array $request): array
+    {
+        $state['bag']->add(new AssistantMessage(...$toolCalls));
+        foreach ($toolCalls as $toolCall) {
+            $result = $request['tools']->execute($toolCall->getName(), $toolCall->getArguments());
+            $state['bag']->add(new ToolCallMessage($toolCall, $result));
+        }
+
+        $state['toolsRan'] = true;
+
+        return $state;
     }
 
     /**

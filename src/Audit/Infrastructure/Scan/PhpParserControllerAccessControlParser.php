@@ -153,20 +153,20 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
             $argName = $this->resolveRouteArgName($arg->name?->toString(), $firstPositionalConsumed);
             $firstPositionalConsumed = $firstPositionalConsumed || null === $arg->name;
 
-            $path = $this->routePathFromArg($argName, $arg) ?? $path;
+            $path = $this->routePathFromArg($argName, $arg, $path);
             $methods = $this->routeMethodsFromArg($argName, $arg) ?? $methods;
         }
 
         return ['present' => true, 'path' => $path, 'methods' => $methods];
     }
 
-    private function routePathFromArg(?string $argName, Arg $arg): ?string
+    private function routePathFromArg(?string $argName, Arg $arg, ?string $currentPath): ?string
     {
         if ('path' === $argName && $arg->value instanceof String_) {
             return $arg->value->value;
         }
 
-        return null;
+        return $currentPath;
     }
 
     /**

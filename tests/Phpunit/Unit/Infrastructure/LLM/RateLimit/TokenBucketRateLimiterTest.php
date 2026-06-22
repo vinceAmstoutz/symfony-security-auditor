@@ -229,6 +229,30 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([30_000, 30_000], $sleeper->sleepsMs);
     }
 
+    public function test_pause_spanning_a_window_boundary_resets_the_window_before_reserving(): void
+    {
+        $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
+        $sleeper = $this->createRecordingSleeper($mockClock);
+
+        $tokenBucketRateLimiter = new TokenBucketRateLimiter(
+            rateLimitConfiguration: new RateLimitConfiguration(
+                requestsPerMinute: 1,
+                inputTokensPerMinute: null,
+                outputTokensPerMinute: null,
+            ),
+            clock: $this->boundedClock($mockClock),
+            sleeper: $sleeper,
+        );
+
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
+        $tokenBucketRateLimiter->pauseUntil(new DateTimeImmutable('2026-01-01T12:01:05+00:00'));
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
+
+        // The pause sleep alone (65s) lands the clock in a fresh window, so the
+        // re-evaluated window reset frees the exhausted RPM slot — no second sleep.
+        self::assertSame([65_000], $sleeper->sleepsMs);
+    }
+
     public function test_pause_until_in_the_past_does_not_block(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');

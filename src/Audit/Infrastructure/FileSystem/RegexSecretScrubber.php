@@ -137,11 +137,8 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             return true;
         });
 
-        try {
-            $isValidPattern = false !== preg_match($pattern, '');
-        } finally {
-            restore_error_handler();
-        }
+        $isValidPattern = false !== preg_match($pattern, '');
+        restore_error_handler();
 
         return $isValidPattern ? null : ($error ?? preg_last_error_msg());
     }

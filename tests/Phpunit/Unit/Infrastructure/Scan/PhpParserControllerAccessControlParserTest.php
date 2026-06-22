@@ -305,6 +305,140 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertTrue($entries[0]->hasRouteAttribute());
     }
 
+    public function test_it_skips_a_non_route_attribute_listed_before_route_in_the_same_group(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\HttpKernel\Attribute\Cache;
+            final class GroupedController {
+                #[Cache(maxage: 60), Route(path: '/grouped-route', methods: ['GET'])]
+                public function grouped(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/GroupedController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/grouped-route', $entries[0]->routePath());
+        self::assertTrue($entries[0]->hasRouteAttribute());
+    }
+
+    public function test_it_resolves_path_from_positional_argument_followed_by_a_named_argument(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class ProfileController {
+                #[Route('/profile', name: 'app_profile', methods: ['GET'])]
+                public function profile(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/ProfileController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/profile', $entries[0]->routePath());
+        self::assertSame(['GET'], $entries[0]->routeMethods());
+    }
+
+    public function test_it_treats_only_the_first_positional_argument_as_the_path(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class TwoPositionalController {
+                #[Route('/two-positional', 'the_route_name', methods: ['GET'])]
+                public function twoPositional(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/TwoPositionalController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/two-positional', $entries[0]->routePath());
+        self::assertSame(['GET'], $entries[0]->routeMethods());
+    }
+
+    public function test_it_resolves_the_first_positional_as_path_even_after_a_leading_named_argument(): void
+    {
+        // nikic/php-parser tolerates a positional after a named arg (PHP's compile-time ordering rule is not enforced here).
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class PositionalAfterNamedController {
+                #[Route(name: 'app_pos_after_named', '/positional-after-named', methods: ['GET'])]
+                public function positionalAfterNamed(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/PositionalAfterNamedController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/positional-after-named', $entries[0]->routePath());
+    }
+
+    public function test_it_resolves_path_from_named_argument_preceded_by_another_named_argument(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class SettingsController {
+                #[Route(name: 'app_settings', path: '/settings', methods: ['POST'])]
+                public function settings(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/SettingsController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/settings', $entries[0]->routePath());
+        self::assertSame(['POST'], $entries[0]->routeMethods());
+    }
+
+    public function test_it_does_not_treat_a_named_first_argument_as_the_positional_path(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class NamedOnlyController {
+                #[Route(name: 'app_named_only', methods: ['GET'])]
+                public function namedOnly(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/NamedOnlyController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertNull($entries[0]->routePath());
+        self::assertSame(['GET'], $entries[0]->routeMethods());
+    }
+
+    public function test_it_resolves_path_when_methods_argument_precedes_the_named_path(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class LatePathController {
+                #[Route(methods: ['GET'], path: '/late-path')]
+                public function latePath(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/LatePathController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/late-path', $entries[0]->routePath());
+        self::assertSame(['GET'], $entries[0]->routeMethods());
+    }
+
     public function test_it_reports_no_route_attribute_for_a_public_method_without_one(): void
     {
         $source = <<<'PHP'
