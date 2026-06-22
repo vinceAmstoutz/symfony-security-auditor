@@ -56,7 +56,7 @@ LLMResponse::of(
     content: string,      // raw text from the model
     model: string,
     stopReason: string,
-    usage: TokenUsageSnapshot::of(inputTokens: int, outputTokens: int),
+    tokenUsageSnapshot: TokenUsageSnapshot::of(inputTokens: int, outputTokens: int),
 );
 ```
 
@@ -101,7 +101,7 @@ final class AcmeLlmClient implements LLMClientInterface
             content:    $response['choices'][0]['text'],
             model:      $this->model(),
             stopReason: $response['choices'][0]['finish_reason'],
-            usage:      TokenUsageSnapshot::of(
+            tokenUsageSnapshot: TokenUsageSnapshot::of(
                 inputTokens:  $response['usage']['prompt_tokens'],
                 outputTokens: $response['usage']['completion_tokens'],
             ),

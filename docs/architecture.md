@@ -62,6 +62,9 @@ src/
 │   │       │              FormBindingParserInterface,
 │   │       │              GitChangedFilesResolverInterface,
 │   │       │              Attacker/ReviewerPromptBuilderInterface
+│   │       │              (+ null-object port defaults: NullStaticPreScanner, NullCodeSlicer,
+│   │       │              NullControllerAccessControlParser, NullVoterCapabilityParser,
+│   │       │              NullFormBindingParser, NullProgressReporter)
 │   │       └── Tool/    # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
 │   ├── Application/     # Orchestration — no I/O, depends only on Domain
 │   │   ├── UseCase/     # Entry points: RunAuditUseCase, EstimateAuditCostUseCase
@@ -86,7 +89,6 @@ src/
 │       ├── FileSystem/  # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
 │       ├── Scan/        # RegexStaticPreScanner, RegexCodeSlicer,
 │       │                  PhpParser{ControllerAccessControl, VoterCapability, FormBinding}Parser
-│       │                  (+ Null* no-op twins)
 │       ├── Diff/        # ProcessGitChangedFilesResolver (git diff for --since)
 │       ├── Prompt/      # AttackerPromptBuilder (+ SymfonyMappingContextRenderer,
 │       │                  NumberedFileContextRenderer), ReviewerPromptBuilder
@@ -96,7 +98,7 @@ src/
 │       │                  SymfonyProcessComposerAuditRunner + Exception/*
 │       ├── Pricing/     # StaticPricingProvider
 │       ├── Progress/    # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY),
-│       │                  LoggerProgressReporter, NullProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
+│       │                  LoggerProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
 │       ├── Tool/        # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool,
 │       │                  SymfonyToolRegistryFactory, RecordVulnerabilityTool + Factory,
 │       │                  RecordReviewTool + Factory
