@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exceptio
 
 use InvalidArgumentException;
 
+/** @internal not part of the BC promise — see docs/versioning.md */
 final class InvalidRetryConfigurationException extends InvalidArgumentException
 {
     public static function forNonPositiveMaxAttempts(int $maxAttempts): self
