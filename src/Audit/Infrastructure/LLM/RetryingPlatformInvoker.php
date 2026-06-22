@@ -66,14 +66,19 @@ final readonly class RetryingPlatformInvoker
 
                 return $deferredResult;
             } catch (Throwable $throwable) {
-                $this->rethrowWhenNotRetryable($throwable, $attempt, $maxAttempts);
+                $this->rethrowWhenNonTransient($throwable);
+
+                if ($attempt >= $maxAttempts) {
+                    throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $throwable);
+                }
+
                 $this->backOffBeforeNextAttempt($throwable, $attempt, $maxAttempts);
                 ++$attempt;
             }
         }
     }
 
-    private function rethrowWhenNotRetryable(Throwable $throwable, int $attempt, int $maxAttempts): void
+    private function rethrowWhenNonTransient(Throwable $throwable): void
     {
         if ($this->transientFailureClassifier->isEmptyContent($throwable)) {
             throw EmptyLLMResponseException::from($throwable);
@@ -81,10 +86,6 @@ final readonly class RetryingPlatformInvoker
 
         if (!$this->transientFailureClassifier->isTransient($throwable)) {
             throw NonTransientLLMFailureException::from($throwable);
-        }
-
-        if ($attempt >= $maxAttempts) {
-            throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $throwable);
         }
     }
 
