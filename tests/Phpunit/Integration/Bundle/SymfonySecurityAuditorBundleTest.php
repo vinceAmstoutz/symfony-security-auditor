@@ -25,6 +25,7 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
 use Throwable;
@@ -165,6 +166,13 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertTrue($containerBuilder->hasDefinition(EscalatingAttackerAgent::class));
         self::assertTrue($containerBuilder->hasAlias(AttackerAgentInterface::class));
         self::assertSame(EscalatingAttackerAgent::class, (string) $containerBuilder->getAlias(AttackerAgentInterface::class));
+        $cheapAttackerFirstArgument = $containerBuilder->getDefinition('security_auditor.cheap_attacker')->getArgument(0);
+        self::assertInstanceOf(Reference::class, $cheapAttackerFirstArgument);
+        self::assertSame('security_auditor.cheap_attacker_client', (string) $cheapAttackerFirstArgument);
+
+        $escalatingAttackerFirstArgument = $containerBuilder->getDefinition(EscalatingAttackerAgent::class)->getArgument(0);
+        self::assertInstanceOf(Reference::class, $escalatingAttackerFirstArgument);
+        self::assertSame('security_auditor.cheap_attacker', (string) $escalatingAttackerFirstArgument);
     }
 
     #[RunInSeparateProcess]

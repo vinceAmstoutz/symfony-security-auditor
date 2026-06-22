@@ -27,6 +27,7 @@ final class GitChangedFilesUnavailableExceptionTest extends TestCase
 
         self::assertSame('git diff against "main" failed: fatal: bad revision', $gitChangedFilesUnavailableException->getMessage());
         self::assertSame($runtimeException, $gitChangedFilesUnavailableException->getPrevious());
+        self::assertSame(0, $gitChangedFilesUnavailableException->getCode());
     }
 
     public function test_from_process_failure_falls_back_to_unknown_error_when_stderr_is_blank(): void
