@@ -55,6 +55,8 @@ final readonly class SymfonyMapping
         array $voterCapabilities = [],
         array $formBindings = [],
     ): self {
+        trigger_deprecation('vinceamstoutz/symfony-security-auditor', '1.13', 'SymfonyMapping::create() is deprecated, use SymfonyMapping::of() instead.');
+
         return self::of(
             ProjectFileInventory::fromGroups([
                 'controllers' => $controllers,

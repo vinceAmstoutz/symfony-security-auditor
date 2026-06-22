@@ -60,6 +60,8 @@ final readonly class LLMResponse
         int $cacheReadTokens = 0,
         int $cacheCreationTokens = 0,
     ): self {
+        trigger_deprecation('vinceamstoutz/symfony-security-auditor', '1.13', 'LLMResponse::create() is deprecated, use LLMResponse::of() instead.');
+
         return new self($content, $inputTokens, $outputTokens, $model, $stopReason, $cacheReadTokens, $cacheCreationTokens);
     }
 

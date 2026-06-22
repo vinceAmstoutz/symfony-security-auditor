@@ -42,7 +42,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 - **`Vulnerability::create()`, `SymfonyMapping::create()`, and
   `LLMResponse::create()`.** They remain fully functional for the rest of the
   `1.x` cycle and now delegate to the new `of()` factories; switch to `of()`
-  (see Added above). Scheduled for removal in the next `MAJOR`.
+  (see Added above). Each now emits a runtime deprecation via
+  `trigger_deprecation('vinceamstoutz/symfony-security-auditor', '1.13', …)`
+  when called, so usage surfaces in your deprecation log and in CI
+  (`failOnDeprecation`) and the removal in the next `MAJOR` does not arrive as
+  an unannounced fatal. Scheduled for removal in the next `MAJOR`.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

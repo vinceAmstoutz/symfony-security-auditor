@@ -218,9 +218,16 @@ When a public-API element needs to be removed:
 3. Removal happens in the next `MAJOR` release at the earliest, listed under
    `### Removed` in the changelog.
 
-Emitting a runtime deprecation via `trigger_deprecation()` is reserved for
-behavior changes that callers may notice; pure naming or signature deprecations
-are documented in the changelog only.
+Every deprecated public-API element emits a **runtime deprecation** for the rest
+of the current `MAJOR` cycle, so callers find it in their deprecation log and CI
+(`failOnDeprecation`) before the removal lands — not as a hard fatal on the day
+they upgrade. Config keys use the Config component's `setDeprecated()`; PHP
+methods, classes, and arguments use
+`trigger_deprecation('vinceamstoutz/symfony-security-auditor', '<since>', '<message>')`
+(from `symfony/deprecation-contracts`). The `@deprecated` PHPDoc tag is added
+alongside it for static analysis and IDE hints. The only deprecations documented
+in the changelog _without_ a runtime trigger are those with no runtime call site
+to attach one to.
 
 ### Currently deprecated
 
@@ -238,8 +245,9 @@ are documented in the changelog only.
   `LLMResponse::of()` (taking
   `VulnerabilityClassification`/`CodeLocation`/`VulnerabilityNarrative`,
   `ProjectFileInventory`/`AccessControlMap`, and `TokenUsageSnapshot`
-  respectively). The old methods still work and delegate to the new factories.
-  Scheduled for removal in the next `MAJOR`.
+  respectively). The old methods still work and delegate to the new factories,
+  and emit a runtime deprecation when called. Scheduled for removal in the next
+  `MAJOR`.
 
 ---
 

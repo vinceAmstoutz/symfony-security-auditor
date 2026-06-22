@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM;
 
 use JsonException;
+use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
@@ -352,8 +353,11 @@ final class LLMResponseTest extends TestCase
     /**
      * @deprecated covers the deprecated {@see LLMResponse::create()} delegator until it is removed in 2.0.
      */
+    #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
     public function test_deprecated_create_maps_every_field(): void
     {
+        $this->expectUserDeprecationMessageMatches('/LLMResponse::create\(\) is deprecated, use LLMResponse::of\(\) instead\./');
+
         $llmResponse = LLMResponse::create(
             content: 'body',
             inputTokens: 11,
@@ -371,13 +375,21 @@ final class LLMResponseTest extends TestCase
         self::assertSame('end_turn', $llmResponse->stopReason());
         self::assertSame(33, $llmResponse->cacheReadTokens());
         self::assertSame(44, $llmResponse->cacheCreationTokens());
+
+        self::assertEquals(
+            LLMResponse::of('body', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(11, 22, 33, 44)),
+            $llmResponse,
+        );
     }
 
     /**
      * @deprecated covers the deprecated {@see LLMResponse::create()} delegator until it is removed in 2.0.
      */
+    #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
     public function test_deprecated_create_defaults_cache_tokens_to_zero(): void
     {
+        $this->expectUserDeprecationMessageMatches('/LLMResponse::create\(\) is deprecated, use LLMResponse::of\(\) instead\./');
+
         $llmResponse = LLMResponse::create('body', 11, 22, 'claude-opus', 'end_turn');
 
         self::assertSame(0, $llmResponse->cacheReadTokens());
