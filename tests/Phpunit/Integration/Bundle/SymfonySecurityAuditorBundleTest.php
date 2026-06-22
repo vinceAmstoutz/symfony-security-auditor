@@ -1058,6 +1058,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
                 $this->registerPlatform = $registerPlatform;
             }
 
+            /**
+             * @return iterable<FrameworkBundle|SymfonySecurityAuditorBundle>
+             */
             public function registerBundles(): iterable
             {
                 yield new FrameworkBundle();
