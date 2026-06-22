@@ -65,6 +65,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttacker
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 final class AttackerAgentTest extends TestCase
@@ -427,17 +428,9 @@ final class AttackerAgentTest extends TestCase
     #[DataProvider('chunkPriorityCases')]
     public function test_it_orders_files_by_priority_in_chunks(string $higherPriorityPath, string $lowerPriorityPath): void
     {
-        $capturedUserMessages = [];
-        $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient
-            ->method('complete')
-            ->willReturnCallback(static function (string $sys, string $user) use (&$capturedUserMessages): LLMResponse {
-                $capturedUserMessages[] = $user;
+        $recordingLLMClient = new RecordingLLMClient();
 
-                return LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(100, 10));
-            });
-
-        $attackerAgent = $this->makeAttackerAgent($llmClient);
+        $attackerAgent = $this->makeAttackerAgent($recordingLLMClient);
 
         $this->callAnalyze($attackerAgent,
             [$this->makeFile($lowerPriorityPath), $this->makeFile($higherPriorityPath)],
@@ -445,9 +438,9 @@ final class AttackerAgentTest extends TestCase
             new NullCoverageRecorder(),
         );
 
-        self::assertCount(1, $capturedUserMessages);
-        $posHigher = strpos($capturedUserMessages[0], basename($higherPriorityPath));
-        $posLower = strpos($capturedUserMessages[0], basename($lowerPriorityPath));
+        self::assertCount(1, $recordingLLMClient->capturedUserMessages);
+        $posHigher = strpos($recordingLLMClient->capturedUserMessages[0], basename($higherPriorityPath));
+        $posLower = strpos($recordingLLMClient->capturedUserMessages[0], basename($lowerPriorityPath));
         self::assertNotFalse($posHigher);
         self::assertNotFalse($posLower);
         self::assertLessThan($posLower, $posHigher);
