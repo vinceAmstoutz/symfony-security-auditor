@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
+use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -94,6 +95,7 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    #[MaximumDuration(250)]
     public function test_lean_mode_skip_logs_counts_records_skipped_coverage_and_returns_empty(): void
     {
         $llmClient = $this->createMock(LLMClientInterface::class);
