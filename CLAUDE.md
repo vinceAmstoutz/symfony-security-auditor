@@ -211,6 +211,34 @@ dashboard on `main`).
 
 Details: [`docs/ci.md`](docs/ci.md)
 
+## Security Posture
+
+This project is itself a security tool — it must not ship the vulnerability
+classes it hunts. Command and code execution is therefore banned at the
+static-analysis level: `phpstan.dist.neon` explicitly `includes:` the
+`spaze/phpstan-disallowed-calls` `disallowed-execution-calls.neon` ruleset,
+forbidding raw execution sinks (`exec`, `shell_exec`, `system`, `passthru`,
+`proc_open`, `popen`, `pcntl_exec`, backtick operator, `eval`). `eval` is
+double-locked — also forbidden via the `ForbiddenNodeRule` `Eval_` entry.
+
+**This ban is a deliberate manual opt-in, not a freebie.** Although
+`phpstan/extension-installer` is installed, it only auto-loads the package's
+`extension.neon`, which registers the rule engine with **every** `disallowed*`
+array empty (zero bans by default). The curated
+`disallowed-execution-calls.neon` set is wired in by hand on line 2 of
+`phpstan.dist.neon` — delete that line and the ban silently disappears with no
+error. Keep it.
+
+Consequences for contributors:
+
+- **All subprocess work routes through Symfony `Process`** (e.g.
+  `ProcessGitChangedFilesResolver`, `SymfonyProcessComposerAuditRunner`), never
+  a raw exec call — `Process` does not invoke a shell by default, so there is no
+  argument-interpolation command-injection surface.
+- Never satisfy a disallowed-call error with an `allowIn`/exclusion entry; route
+  through `Process` instead. Suppressing this gate is covered by the
+  [Never Silence Quality Gates](#5-never-silence-quality-gates) rule.
+
 ## Behavioral Guidelines
 
 ### 1. Think Before Coding
