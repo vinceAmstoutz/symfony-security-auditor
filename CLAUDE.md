@@ -99,6 +99,7 @@ config/services.php  # DI wiring for all bundle services
 docs/
   architecture.md    # Layer overview, data flow, domain model details
   configuration.md   # Bundle config reference
+  cost-and-performance.md # Profiles, split-model, concurrency, caching, budgets, rate limits
   extending.md       # Extension point guide
   ci.md              # CI pipeline documentation
   diagrams.md        # Mermaid diagrams

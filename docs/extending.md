@@ -15,8 +15,6 @@ All extension points are PHP interfaces. Wire your implementations via
 > See also: [Architecture](architecture.md) · [Configuration](configuration.md)
 > · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
 
----
-
 ## 1. Custom LLM Client
 
 **Interface**:
@@ -155,8 +153,6 @@ VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface:
     alias: App\Llm\AcmeLlmClient
 ```
 
----
-
 ## 2. Custom Pipeline Stage
 
 **Interface**:
@@ -253,8 +249,6 @@ services:
         tags:
             - { name: symfony_security_auditor.pipeline_stage, priority: -100 }
 ```
-
----
 
 ## 3. Custom Agent (Attacker or Reviewer)
 
@@ -424,8 +418,6 @@ at `warning` level with a structured `reason` code
 in the returned `VulnerabilityHydrationResult` so callers can surface drop
 counts in their reports or metrics.
 
----
-
 ## 4. Custom Report Output
 
 `AuditReport` is produced by `AuditReport::fromContext(AuditContext $context)`
@@ -479,8 +471,6 @@ for SARIF upload workflows).
 inject it directly into any consumer (custom command, controller, event
 listener) and serialize it however fits your output target without going through
 `ReportRenderer`.
-
----
 
 ## 5. Other Pluggable Ports
 

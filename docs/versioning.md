@@ -12,8 +12,6 @@ element keeps working until at least the next `MAJOR`.
 > See also: [Configuration](configuration.md) · [Extending](extending.md) ·
 > [Architecture](architecture.md) · [CHANGELOG](../CHANGELOG.md)
 
----
-
 ## Semantic Versioning
 
 | Version bump | Meaning                                                                                  |
@@ -24,8 +22,6 @@ element keeps working until at least the next `MAJOR`.
 
 Every `MAJOR` release ships a migration note in
 [`CHANGELOG.md`](../CHANGELOG.md) explaining what changed and how to adapt.
-
----
 
 ## Public API — what is covered by the BC promise
 
@@ -176,8 +172,6 @@ BC-protected.
 `VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle` — referenced
 from `config/bundles.php`. Its existence and FQCN are stable.
 
----
-
 ## Internal — what is NOT covered
 
 Anything tagged `@internal` may be refactored, renamed, or removed in any
@@ -203,8 +197,6 @@ Anything tagged `@internal` may be refactored, renamed, or removed in any
 
 If you find yourself depending on an internal class, please open an issue — we
 will either promote it to public API or provide a stable replacement.
-
----
 
 ## Deprecation policy
 
@@ -249,8 +241,6 @@ to attach one to.
   and emit a runtime deprecation when called. Scheduled for removal in the next
   `MAJOR`.
 
----
-
 ## LLM model identifiers
 
 Model identifiers passed to `model:`, `attacker_model:`, or `reviewer_model:`
@@ -258,8 +248,6 @@ are free-form strings forwarded to `symfony/ai`. Their meaning, behavior,
 pricing, and availability are owned by the LLM provider, not by this bundle. If
 a provider deprecates a model, this bundle does not consider that a BC break —
 pin the identifier you want in your configuration.
-
----
 
 ## Reporting BC breaks
 

@@ -18,8 +18,6 @@ security auditor for Symfony applications.
 > See also: [Configuration](configuration.md) · [Architecture](architecture.md)
 > · [CI Integration](ci.md) · [Troubleshooting](troubleshooting.md)
 
----
-
 ## About the project
 
 ### What does it do?
@@ -74,9 +72,21 @@ being included in the final report. We recommend running it as a **scheduled
 nightly CI job** alongside existing tools (PHPStan / Psalm / Dependabot), not as
 a blocking PR gate. See [CI Integration](ci.md).
 
----
-
 ## Comparisons
+
+Where this auditor fits among the tools you already run:
+
+| Concern                                 | This auditor               | PHPStan / Psalm | Psalm Security / Progpilot (SAST) | Dependabot / Snyk |
+| --------------------------------------- | -------------------------- | --------------- | --------------------------------- | ----------------- |
+| Type bugs                               | ❌                         | ✅              | partial                           | ❌                |
+| Taint flow (SQLi, XSS)                  | ✅                         | ❌              | ✅                                | ❌                |
+| Missing `#[IsGranted]` / Voter          | ✅                         | ❌              | ❌                                | ❌                |
+| Business logic flaws                    | ✅                         | ❌              | ❌                                | ❌                |
+| IDOR / mass assignment                  | ✅                         | ❌              | partial                           | ❌                |
+| Firewall misconfiguration               | ✅                         | ❌              | ❌                                | ❌                |
+| Cross-file attack chains                | ✅                         | ❌              | partial                           | ❌                |
+| Dependency CVEs                         | ✅ (via `lookup_advisory`) | ❌              | ❌                                | ✅                |
+| OWASP Top 10 application-level coverage | ✅                         | ❌              | partial                           | ❌                |
 
 ### How does it compare to PHPStan or Psalm?
 
@@ -129,8 +139,6 @@ No. We recommend the layered approach:
 | Dependabot / Renovate / Snyk | CVE-known dependency vulnerabilities                 |
 | **symfony-security-auditor** | Logic flaws, missing authorization, Symfony-specific |
 
----
-
 ## Accuracy & False Positives
 
 ### How accurate is it?
@@ -169,8 +177,6 @@ low like `0.1`) in your model options to reduce variation, but identical input
 may still produce different findings across runs. The cache
 (`cache.enabled: true`) makes a _repeated_ run on identical code deterministic —
 chunks with the same content hash are short-circuited.
-
----
 
 ## Cost & Performance
 
@@ -212,8 +218,6 @@ configured on the `symfony/ai` platform, not in this bundle: set
 `cache_retention` (`short`/`long`) on the `anthropic` platform in `ai.yaml`
 (default `short` already enables it); OpenAI and Gemini cache automatically. The
 old `cache.prompt_caching` bundle flag is deprecated since 1.7 and ignored.
-
----
 
 ## Privacy & Data Handling
 
@@ -262,8 +266,6 @@ keyed by content hash; no plaintext source code is written to the cache.
 `lookup_advisory` shells out to `composer audit --format=json --locked` against
 your `composer.lock`. The shell-out happens on the host machine — only the LLM
 prompt receives the resulting CVE summaries, not your dependency list itself.
-
----
 
 ## Model Selection
 
@@ -356,8 +358,6 @@ symfony_security_auditor:
 
 See [Configuration → Model Options](configuration.md#model-options).
 
----
-
 ## Compatibility
 
 ### What PHP versions are supported?
@@ -406,8 +406,6 @@ symfony_security_auditor:
 
 `composer audit` covers vendor CVEs via the `lookup_advisory` tool.
 
----
-
 ## Integration & Workflow
 
 ### How do I run it in CI?
@@ -445,8 +443,6 @@ notification-only (Slack/email), and storage in a private repo via PAT.
 > **Public-repo warning**: do **not** store the JSON report as a public CI
 > artifact. It advertises your attack surface. Use SARIF + Code Scanning or
 > external private storage instead.
-
----
 
 ## Customization
 

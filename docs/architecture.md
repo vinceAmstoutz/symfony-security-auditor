@@ -33,8 +33,6 @@ responsibilities, data flow, key design decisions, and extension points.
 > See also: [Configuration](configuration.md) · [Extending](extending.md) ·
 > [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
 
----
-
 ## Layer Overview
 
 The bundle follows a strict Domain-Driven Design layering under `src/Audit/`.
@@ -140,8 +138,6 @@ graph LR
 
 **Namespace root**: `VinceAmstoutz\SymfonySecurityAuditor\`
 
----
-
 ## Data Flow
 
 ```mermaid
@@ -171,8 +167,6 @@ flowchart TD
     POC --> RPT
     RPT --> RENDER
 ```
-
----
 
 ## Domain Layer
 
@@ -334,8 +328,6 @@ CSRF analysis without re-deriving the binding from source.
 
 Both are pure domain ports. Concrete implementations live in
 `Application/Pipeline/`.
-
----
 
 ## Application Layer
 
@@ -509,8 +501,6 @@ vulnerabilities and per-reason drop counts. `AttackerAgent::analyze` aggregates
 the per-chunk drop counts and surfaces them on its `Attacker agent complete`
 info log as `total_dropped_entries` / `dropped_by_reason`.
 
----
-
 ## Infrastructure Layer
 
 ### `LLMClientInterface`
@@ -663,8 +653,6 @@ Three render methods:
 - `renderSarif(AuditReport): string` — SARIF 2.1.0; `tool.driver.version`
   sourced dynamically from installed Composer metadata
 
----
-
 ## Bundle Wiring (`SymfonySecurityAuditorBundle`)
 
 ### `SymfonySecurityAuditorBundle`
@@ -742,8 +730,6 @@ Parameters exposed for debugging: `symfony_security_auditor.attacker_model`,
 `symfony_security_auditor.reviewer_model`, and the matching `scan.*`, `audit.*`,
 `cache.*` parameters.
 
----
-
 ## `Command/AuditCommand`
 
 Console command `audit:run`. Arguments and options:
@@ -761,8 +747,6 @@ Input mapping and resolution live in `AuditCommandInput`; output writing in
 
 Exit codes: `0` (SAFE/LOW/MEDIUM/HIGH), `1` (CRITICAL risk or invalid path or
 unexpected failure), `2` (budget exceeded — partial report still emitted).
-
----
 
 ## Extension Points
 

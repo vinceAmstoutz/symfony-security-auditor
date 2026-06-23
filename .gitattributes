@@ -12,6 +12,7 @@
 /.prettierrc.json       export-ignore
 /CLAUDE.md              export-ignore
 /CONTRIBUTING.md        export-ignore
+/assets                 export-ignore
 /bin                    export-ignore
 /castor.php             export-ignore
 /commitlint.config.mjs  export-ignore

@@ -1,51 +1,69 @@
-# symfony-security-auditor
-
-> **AI-powered multi-agent security auditor for Symfony applications.** Catches
-> business logic flaws, broken access control, missing Voters, mass assignment,
-> and complex injection chains that traditional SAST tools miss.
-> Provider-agnostic via
-> [`symfony/ai`](https://symfony.com/doc/current/ai/index.html) — works with
-> Claude, GPT, Gemini, Mistral, Llama, DeepSeek, and Ollama.
+# Symfony Security Auditor
 
 [![CI](https://github.com/vinceamstoutz/symfony-security-auditor/actions/workflows/ci.yaml/badge.svg)](https://github.com/vinceamstoutz/symfony-security-auditor/actions/workflows/ci.yaml)
 [![codecov](https://codecov.io/gh/vinceamstoutz/symfony-security-auditor/branch/main/graph/badge.svg)](https://codecov.io/gh/vinceamstoutz/symfony-security-auditor)
 [![Mutation testing badge](https://img.shields.io/endpoint?style=flat&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fvinceamstoutz%2Fsymfony-security-auditor%2Fmain)](https://dashboard.stryker-mutator.io/reports/github.com/vinceamstoutz/symfony-security-auditor/main)
-[![PHPStan level max](https://img.shields.io/badge/PHPStan-level%20max-brightgreen)](phpstan.dist.neon)
 [![Total Downloads](https://poser.pugx.org/vinceamstoutz/symfony-security-auditor/downloads)](https://packagist.org/packages/vinceamstoutz/symfony-security-auditor)
-![PHP 8.3+](https://img.shields.io/badge/PHP-8.3%2B-blue)
-![Symfony 7.4+](https://img.shields.io/badge/Symfony-7.4%2B-black)
-![License MIT](https://img.shields.io/badge/License-MIT-green)
-[![SemVer 2.0.0](https://img.shields.io/badge/SemVer-2.0.0-brightgreen)](docs/versioning.md)
+[![PHP 8.3+](https://img.shields.io/badge/PHP-8.3%2B-blue)](composer.json)
+[![Symfony 7.4+](https://img.shields.io/badge/Symfony-7.4%2B-black)](composer.json)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
----
+AI-powered, multi-agent security auditor for Symfony applications. An
+adversarial **Attacker ⚔ Reviewer** loop catches the application-level flaws
+SAST tools miss. Provider-agnostic via
+[`symfony/ai`](https://symfony.com/doc/current/ai/index.html).
+
+![Symfony Security Auditor](assets/banner.webp?raw=true)
+
+## Why this auditor?
+
+Traditional PHP static analysis tools (PHPStan, Psalm) catch type errors. Static
+SAST tools (Psalm Security, Progpilot) follow taint flows but cannot reason
+about business logic, missing authorization, or multi-file attack chains.
+Dependency scanners (Dependabot, Renovate, Snyk) only flag known CVEs in
+third-party packages. This auditor runs alongside them, **targeting the
+application-level logic flaws they cannot see**.
+
+Side-by-side comparison with PHPStan, Psalm, Progpilot, Dependabot, and Snyk:
+[FAQ](docs/faq.md#comparisons).
 
 ## What it does
 
-Feeds your Symfony project through a three-stage AI pipeline that catches what
-SAST tools miss: broken access control, complex injection chains, business logic
-flaws, missing Voters, and mass assignment vulnerabilities. An adversarial
-**Attacker** agent hunts for issues; a skeptical **Reviewer** agent eliminates
-false positives over up to three iterations. Output is a validated vulnerability
-report in your console, as JSON, as SARIF for GitHub Code Scanning / GitLab
-Security Dashboard, as a self-contained HTML report, or as PR-friendly Markdown.
+An adversarial **Attacker** agent hunts for vulnerabilities; a skeptical
+**Reviewer** agent culls false positives over up to three iterations — then
+emits a validated report in console, JSON, SARIF, HTML, or Markdown.
 
-```text
-  Project files
-       │
-       ▼
-  1. Ingestion — scans .php / .twig / .yaml / .xml recursively
-       │
-       ▼
-  2. Mapping — classifies Controllers, Entities, Voters, Forms, Routes
-       │
-       ▼
-  3. Audit — Attacker ⚔ Reviewer multi-agent loop (up to 3 iterations)
-       │
-       ▼
-  Validated vulnerability report: console, JSON, SARIF, HTML, or Markdown
+🔀 **Pipeline**: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer) → Report.
+
+## See it in action
+
+### `--dry-run` mode
+
+![Dry run — token and cost estimate with no LLM calls](assets/dry-run.gif?raw=true)
+
+Scans files and estimates token usage and cost without calling the LLM. Use this
+to gauge cost before committing to a full audit.
+
+```bash
+bin/console audit:run --dry-run
 ```
 
----
+No LLM calls are made; exit code is always `0`.
+
+### Console mode
+
+![Live audit — the Attacker vs Reviewer feed streaming to the validated report](assets/demo.gif?raw=true)
+
+While the pipeline runs, the audit narrates itself live — an attack-surface
+overview, each finding streamed (color-coded by severity in a terminal) the
+moment the Attacker flags it, per-chunk timing, and a reviewer tally. In CI or
+any non-TTY output it degrades to clean, append-only lines (no bar, no ANSI
+codes). Progress is suppressed for `--format=json/sarif` to stdout and for
+`--dry-run`.
+
+The full report renders the same way in console, JSON, SARIF, HTML, and Markdown
+— see [CLI reference](docs/configuration.md#cli-reference) and
+[output formats](docs/ci.md#output-formats-reference).
 
 ## Getting Started
 
@@ -57,15 +75,8 @@ composer require --dev vinceamstoutz/symfony-security-auditor
 
 The official
 [Flex recipe](https://github.com/symfony/recipes-contrib/tree/main/vinceamstoutz/symfony-security-auditor)
-(published in
-[`symfony/recipes-contrib`](https://github.com/symfony/recipes-contrib))
-automatically:
-
-- registers `SymfonySecurityAuditorBundle` in `config/bundles.php` for the `dev`
-  and `test` environments;
-- creates a pre-configured `config/packages/symfony_security_auditor.yaml` with
-  a default model and commented split-model and rate-limit examples ready to
-  uncomment.
+registers the bundle (`dev`/`test`) and drops a pre-configured
+`config/packages/symfony_security_auditor.yaml`.
 
 Not using Flex? See
 [Manual setup](docs/configuration.md#manual-setup-without-flex).
@@ -83,7 +94,7 @@ Full list of supported providers:
 ### 3. Configure the platform
 
 ```yaml
-# config/packages/ai.yaml
+# config/packages/ai.yaml (or e.g. config/packages/ai_anthropic_platform.yaml)
 ai:
   platform:
     anthropic:
@@ -100,14 +111,17 @@ symfony_security_auditor:
     model: 'claude-opus-4-8'
 ```
 
-Optionally pick a one-knob preset — `fast`, `balanced` (default), or `thorough`;
-any explicitly configured key always wins:
+Optionally pick a one-knob preset — `fast`, `balanced` (default), or `thorough`:
 
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
     profile: 'fast'
 ```
+
+A profile only fills the keys you leave unset — any explicitly configured key
+always wins. See [Cost & Performance](docs/cost-and-performance.md) for exactly
+what each profile sets.
 
 ### 5. Run
 
@@ -138,7 +152,7 @@ bin/console audit:run --dry-run
 > collaborators), private storage (S3/GCS with IAM), or notification-only. See
 > [Report Visibility on Public Repositories](docs/ci.md#report-visibility-on-public-repositories).
 
----
+<!-- -->
 
 > [!TIP]
 >
@@ -150,8 +164,6 @@ bin/console audit:run --dry-run
 > pair it with [Dependabot](https://docs.github.com/en/code-security/dependabot)
 > or [Renovate](https://docs.renovatebot.com/) — this auditor targets the
 > application-level logic flaws those scanners cannot see.
-
----
 
 ## Features
 
@@ -177,10 +189,20 @@ bin/console audit:run --dry-run
   `read_file`, `grep`, `list_files`, and `lookup_advisory` (zero-config live CVE
   lookups via `composer audit`, backed by Packagist + GitHub Security
   Advisories).
-- **Cost levers** — split-model (powerful Attacker + cheap Reviewer, ~20×
-  cheaper), Anthropic prompt caching on by default (~90% input-token discount),
-  content-hash caching that skips identical chunks entirely, cheap→expensive
-  escalation, code slicing, and concurrent reviewer calls.
+- **One-knob profiles** — `fast`, `balanced`, and `thorough` preset the
+  cost/speed/depth levers in a single line; any explicit key still wins.
+- **Tunable for speed & cost** — split-model (powerful Attacker + cheap
+  Reviewer, ~20× cheaper), concurrent Attacker **and** Reviewer calls
+  (`attacker_max_concurrent` / `reviewer_max_concurrent`), Anthropic prompt
+  caching on by default (~90% input-token discount), content-hash caching that
+  skips identical chunks, cheap→expensive escalation, and code slicing.
+- **Secret-safe by default** — credential-shaped strings are scrubbed from file
+  content **before** it reaches the LLM (see
+  [Security by design](#security-by-design)).
+- **Rate-limit aware** — reactive retry with `Retry-After`-aware exponential
+  backoff plus an optional proactive token-bucket limiter keep you inside
+  provider quotas (see
+  [Cost & Performance](docs/cost-and-performance.md#avoiding-rate-limits-429)).
 - **PoC synthesis** — optionally attach a concrete, copy-pasteable reproduction
   (curl/console/payload) to every high-severity finding.
 - **Five output formats** — `console`, `json`, `sarif` (GitHub Code Scanning /
@@ -197,120 +219,35 @@ bin/console audit:run --dry-run
   let you plug in custom providers, agents, stages, advisory feeds, or report
   formats.
 
----
+## Security by design
 
-## Why this auditor?
+The auditor is conservative about what leaves your machine:
 
-Traditional **PHP static analysis** tools (PHPStan, Psalm) catch type errors.
-**Static SAST tools** (Psalm Security, Progpilot) follow taint flows but cannot
-reason about business logic, missing authorization, or multi-file attack chains.
-**Dependency scanners** (Dependabot, Renovate, Snyk) only flag known CVEs in
-third-party packages.
+- **Secrets are scrubbed before they leave your machine.** With
+  `scan.secret_scrubbing.enabled: true` (the default), credential-shaped strings
+  are redacted from file content _before_ it reaches the LLM: AWS / GitHub /
+  Stripe / Slack / Google API keys, JWTs, PEM private keys, env-style credential
+  assignments, and connection-string URIs with embedded credentials
+  (`postgres://user:pass@host`). Add project-specific shapes with
+  `scan.secret_scrubbing.additional_patterns`.
+- **The cache never stores your source.** The filesystem cache keys LLM
+  _responses_ by content hash — no plaintext source code is written to
+  `cache.dir`.
+- **You choose where the code goes.** Source is sent only to the provider you
+  wire in `ai.yaml`. For zero third-party exposure, run fully offline with
+  [Ollama](docs/configuration.md#supported-platforms) — nothing leaves your
+  network.
+- **Reports are sensitive — they list your weak spots.** On public repos, prefer
+  SARIF → GitHub Code Scanning (collaborator-only) over downloadable CI
+  artifacts. See
+  [Report Visibility](docs/ci.md#report-visibility-on-public-repositories).
 
-| Concern                                 | This auditor               | PHPStan / Psalm | Psalm Security / Progpilot (SAST) | Dependabot / Snyk |
-| --------------------------------------- | -------------------------- | --------------- | --------------------------------- | ----------------- |
-| Type bugs                               | ❌                         | ✅              | partial                           | ❌                |
-| Taint flow (SQLi, XSS)                  | ✅                         | ❌              | ✅                                | ❌                |
-| Missing `#[IsGranted]` / Voter          | ✅                         | ❌              | ❌                                | ❌                |
-| Business logic flaws                    | ✅                         | ❌              | ❌                                | ❌                |
-| IDOR / mass assignment                  | ✅                         | ❌              | partial                           | ❌                |
-| Firewall misconfiguration               | ✅                         | ❌              | ❌                                | ❌                |
-| Cross-file attack chains                | ✅                         | ❌              | partial                           | ❌                |
-| Dependency CVEs                         | ✅ (via `lookup_advisory`) | ❌              | ❌                                | ✅                |
-| OWASP Top 10 application-level coverage | ✅                         | ❌              | partial                           | ❌                |
+## Tuning & cost
 
-> **Use this alongside — not instead of — PHPStan/Psalm and Dependabot.** It
-> targets the application-level logic flaws those tools cannot see.
-
----
-
-## Example Output
-
-### Console mode (truncated)
-
-While the pipeline runs, the audit narrates itself live — an attack-surface
-overview, each finding streamed (color-coded by severity in a terminal) the
-moment the Attacker flags it, per-chunk timing, and a reviewer tally. In CI or
-any non-TTY output it degrades to clean, append-only lines (no bar, no ANSI
-codes). Progress is suppressed for `--format=json/sarif` to stdout and for
-`--dry-run`.
-
-```text
-🔍 Auditing 152 file(s) — 24 controller(s), 5 voter(s), 8 form(s)
-  ⚔ 🔴 CRITICAL sql_injection — src/Controller/UserController.php:42
-  ⚔ 🟠 HIGH broken_access_control — src/Controller/AdminController.php:88
-  ✓ chunk 1/12 analyzed (47s)
-  ✓ Reviewed: 2 validated, 1 rejected
- 2/3 [===============>          ]  67% — audit · iteration 1/3 · ⏳ querying model
-```
-
-Full output after the pipeline completes:
-
-```text
-══════════════════════════════════════════════════════════════════════
-  🔍 SYMFONY LLM AUDIT REPORT — AUDIT-a1b2c3d4
-  vinceamstoutz/symfony-security-auditor
-══════════════════════════════════════════════════════════════════════
-
-  Project : /var/www/my-app
-  Started : 2026-05-22 09:14:02
-  Duration: 2m 31s
-  Files   : 142 scanned
-
-──────────────────────────────────────────────────────────────────────
-  RISK LEVEL: HIGH  (Score: 34)
-──────────────────────────────────────────────────────────────────────
-
-  [1] VULN-7f3a1b2c   CRITICAL    broken_access_control
-      src/Controller/AdminController.php:42-58
-      Title: Missing #[IsGranted] on admin DELETE endpoint
-      OWASP: A01:2021 — Broken Access Control
-      Confidence: 0.95   Reviewer: ✓ validated
-
-  [2] VULN-2e9d5c1a   HIGH        mass_assignment
-      src/Controller/UserController.php:71-89
-      Title: Form type binds isAdmin field from untrusted request
-      OWASP: A04:2021 — Insecure Design
-      Confidence: 0.88   Reviewer: ✓ validated
-
-  ... (3 more findings)
-```
-
-### `--dry-run` mode
-
-Scans files and estimates token usage and cost without calling the LLM. Use this
-to gauge cost before committing to a full audit.
-
-```bash
-bin/console audit:run --dry-run
-```
-
-```text
- Symfony LLM Security Auditor
- =============================
-
- Project: /var/www/my-app
- Pipeline: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer)
-
- Estimating audit cost (dry run)...
- ───────────────────────────────────
-
- * Model : claude-opus-4-8
- * Tokens: 52,400 in / 4,200 out (total: 56,600)
- * Cost  : $0.3670 (estimate)
-
- ! [NOTE] Dry run — no LLM calls were made. This is a cost estimate only.
-
- [OK] Dry run complete.
-```
-
-No LLM calls are made; exit code is always `0`.
-
-The JSON, SARIF, HTML, and Markdown formats are documented in
-[CLI Reference](docs/configuration.md#cli-reference) and
-[Output Formats Reference](docs/ci.md#output-formats-reference).
-
----
+Profiles (`fast` / `balanced` / `thorough`), split-model, concurrency, caching,
+budget caps, and `429` rate-limit handling are covered in
+**[Cost & Performance](docs/cost-and-performance.md)** — start with a profile,
+then override individual keys as needed.
 
 ## Supported Platforms
 
@@ -331,12 +268,12 @@ The JSON, SARIF, HTML, and Markdown formats are documented in
 Swapping providers requires only a `config/packages/ai.yaml` change — no PHP
 edits.
 
----
-
 ## Documentation
 
 - [Configuration](docs/configuration.md) — every config key, all platforms,
   split-model, model options, CLI reference
+- [Cost & Performance](docs/cost-and-performance.md) — profiles, split-model,
+  concurrency, caching, budgets, and rate-limit handling
 - [Architecture](docs/architecture.md) — DDD layers, pipeline, agent loop,
   domain model, design decisions
 - [CI Integration](docs/ci.md) — scheduled GitHub Actions & GitLab CI, SARIF
@@ -348,8 +285,6 @@ edits.
   composer audit failures, cache issues
 - [Contributing](CONTRIBUTING.md) — dev setup, Docker workflow, QA, PR checklist
 
----
-
 ## FAQ
 
 **How much does an audit cost?** Depends on project size and model. A medium
@@ -357,29 +292,25 @@ Symfony app (~150 files) on Claude Opus + Haiku split-model with prompt caching
 enabled costs roughly $0.50 per nightly run. See
 [CI → Managing LLM Costs](docs/ci.md#managing-llm-costs).
 
-**Does it send my code to the cloud?** Only to the LLM provider you configure.
-For zero-cloud operation, use the
+**Does it send my code to the cloud?** Only to the LLM provider you configure,
+and credential-shaped strings are scrubbed first (see
+[Security by design](#security-by-design)). For zero-cloud operation, use the
 [Ollama local platform](docs/configuration.md#supported-platforms).
 
 Full FAQ — privacy, false positives, model picks, comparisons:
 [docs/faq.md](docs/faq.md).
 
----
-
 ## Contributing
 
 Contributions welcome, please refer to [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
 
 ## Security
 
 Found a vulnerability **in the auditor itself**? Do **not** open a public issue.
 Report privately via
 [GitHub Security Advisories](https://github.com/vinceamstoutz/symfony-security-auditor/security/advisories/new).
-See [SECURITY.md](SECURITY.md).
 
----
+See [SECURITY.md](SECURITY.md).
 
 ## License
 
