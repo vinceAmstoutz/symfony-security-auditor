@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 
@@ -31,5 +33,6 @@ final readonly class ReviewerAgentCollaborators
         public LoggerInterface $logger,
         public ?RecordReviewToolFactoryInterface $recordReviewToolFactory = null,
         public ?ReviewerCacheInterface $reviewerCache = null,
+        public ProgressReporterInterface $progressReporter = new NullProgressReporter(),
     ) {}
 }

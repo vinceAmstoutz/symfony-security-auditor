@@ -81,7 +81,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         $this->maxConcurrent = $reviewerModeConfiguration->maxConcurrent;
         $this->useStructuredCollection = $reviewerModeConfiguration->useStructuredCollection;
 
-        $verdictApplier = new VerdictApplier($reviewerAgentCollaborators->logger);
+        $verdictApplier = new VerdictApplier($reviewerAgentCollaborators->logger, $reviewerAgentCollaborators->progressReporter);
         $reviewerVerdictCache = new ReviewerVerdictCache($reviewerAgentCollaborators->reviewerCache, $reviewerAgentCollaborators->logger);
         $reviewOutcomeRecorder = new ReviewOutcomeRecorder($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger);
 

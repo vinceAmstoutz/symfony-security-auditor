@@ -430,6 +430,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
                 service('logger'),
                 service(RecordReviewToolFactoryInterface::class),
                 service(ReviewerCacheInterface::class),
+                service(ProgressReporterHolder::class),
             ]),
             inline_service(ReviewerModeConfiguration::class)->args([
                 param('symfony_security_auditor.audit.reviewer_batch_size'),

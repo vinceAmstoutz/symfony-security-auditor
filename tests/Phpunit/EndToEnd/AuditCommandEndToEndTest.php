@@ -83,6 +83,43 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('SAFE', $commandTester->getDisplay());
     }
 
+    public function test_command_streams_a_coherent_attacker_then_reviewer_then_report_narrative(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        $display = $commandTester->getDisplay();
+        self::assertStringContainsString('Auditing', $display);
+        self::assertStringContainsString('[CRITICAL] sql_injection', $display);
+        self::assertStringContainsString('[VALIDATED] sql_injection', $display);
+        self::assertStringContainsString('5 validated, 0 rejected', $display);
+        self::assertStringContainsString('SYMFONY LLM AUDIT REPORT', $display);
+
+        $attackerStreamPosition = mb_strpos($display, '[CRITICAL] sql_injection');
+        $reviewerStreamPosition = mb_strpos($display, '[VALIDATED] sql_injection');
+        $reportPosition = mb_strpos($display, 'SYMFONY LLM AUDIT REPORT');
+        self::assertIsInt($attackerStreamPosition);
+        self::assertIsInt($reviewerStreamPosition);
+        self::assertIsInt($reportPosition);
+        self::assertLessThan($reviewerStreamPosition, $attackerStreamPosition);
+        self::assertLessThan($reportPosition, $reviewerStreamPosition);
+    }
+
+    public function test_command_streams_rejected_verdicts_in_the_output_when_the_reviewer_rejects(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": false}');
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        $display = $commandTester->getDisplay();
+        self::assertStringContainsString('[CRITICAL] sql_injection', $display);
+        self::assertStringContainsString('[REJECTED] sql_injection', $display);
+        self::assertStringContainsString('0 validated, 5 rejected', $display);
+    }
+
     public function test_command_emits_secret_scrubbing_warning_when_scrubbing_disabled(): void
     {
         $this->createProjectDir();
@@ -621,6 +658,7 @@ final class AuditCommandEndToEndTest extends TestCase
                     $reviewerLLM,
                     new ReviewerPromptBuilder(),
                     new NullLogger(),
+                    progressReporter: $progressReporterHolder,
                 ),
                 new ReviewerModeConfiguration(),
             ),

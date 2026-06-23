@@ -309,6 +309,83 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertSame(2, $eraseLineSequencesFromClearThenRedraw);
     }
 
+    public function test_it_streams_a_validated_verdict_above_the_bar(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('review.started', ['findings' => 2]);
+        $this->consoleProgressReporter->report('review.finding.reviewed', ['accepted' => true, 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 18]);
+
+        self::assertStringContainsString('⚖ ✓ validated sql_injection — src/X.php:18', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_streams_a_rejected_verdict_above_the_bar(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('review.started', ['findings' => 2]);
+        $this->consoleProgressReporter->report('review.finding.reviewed', ['accepted' => false, 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 40]);
+
+        self::assertStringContainsString('⚖ ✗ rejected sql_injection — src/X.php:40', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_counts_reviewed_findings_in_the_bar_message(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('review.started', ['findings' => 8]);
+        $this->consoleProgressReporter->report('review.finding.reviewed', ['accepted' => true, 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
+        $this->consoleProgressReporter->report('review.finding.reviewed', ['accepted' => true, 'type' => 'xss', 'file' => 'b.php', 'line' => 2]);
+
+        self::assertStringContainsString('reviewing 2/8', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_resets_the_review_counter_for_each_new_review_round(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('review.started', ['findings' => 5]);
+        $this->consoleProgressReporter->report('review.finding.reviewed', ['accepted' => true, 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
+        $this->consoleProgressReporter->report('review.started', ['findings' => 3]);
+
+        $this->bufferedOutput->fetch();
+
+        $this->consoleProgressReporter->report('review.finding.reviewed', ['accepted' => true, 'type' => 'xss', 'file' => 'b.php', 'line' => 2]);
+
+        self::assertStringContainsString('reviewing 1/3', $this->bufferedOutput->fetch());
+    }
+
+    public function test_review_finding_events_before_pipeline_started_are_no_ops(): void
+    {
+        $this->consoleProgressReporter->report('review.finding.reviewed', ['accepted' => true, 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
+
+        self::assertSame('', $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_colors_a_validated_verdict_green_in_a_decorated_terminal(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $consoleProgressReporter = new ConsoleProgressReporter($bufferedOutput);
+        $consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $consoleProgressReporter->report('review.started', ['findings' => 1]);
+        $consoleProgressReporter->report('review.finding.reviewed', ['accepted' => true, 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
+
+        self::assertStringContainsString("\033[32m", $bufferedOutput->fetch());
+    }
+
+    public function test_it_colors_a_rejected_verdict_yellow_in_a_decorated_terminal(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $consoleProgressReporter = new ConsoleProgressReporter($bufferedOutput);
+        $consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $consoleProgressReporter->report('review.started', ['findings' => 1]);
+        $consoleProgressReporter->report('review.finding.reviewed', ['accepted' => false, 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
+
+        self::assertStringContainsString("\033[33m", $bufferedOutput->fetch());
+    }
+
     protected function setUp(): void
     {
         $this->bufferedOutput = new BufferedOutput();
