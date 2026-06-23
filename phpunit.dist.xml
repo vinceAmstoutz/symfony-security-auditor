@@ -52,7 +52,7 @@
     <extensions>
         <bootstrap class="Ergebnis\PHPUnit\AgentReporter\Extension"/>
         <bootstrap class="Ergebnis\PHPUnit\SlowTestDetector\Extension">
-            <parameter name="maximum-count" value="10"/>
+            <parameter name="maximum-count" value="1"/>
             <parameter name="maximum-duration" value="100"/>
         </bootstrap>
         <bootstrap class="VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPUnit\MinimumLineCoverageExtension">
