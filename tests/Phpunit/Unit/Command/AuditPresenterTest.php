@@ -234,9 +234,10 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->dryRunResult($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
 
         $display = $bufferedOutput->fetch();
-        self::assertStringContainsString('Dry run complete', $display);
-        self::assertStringContainsString('a real run typically costs less', $display);
-        self::assertStringContainsString('no LLM calls', $display);
+        $flattened = preg_replace('/[\s!]+/', ' ', $display) ?? '';
+        self::assertStringContainsString('Dry run complete', $flattened);
+        self::assertStringContainsString('a real run typically costs less', $flattened);
+        self::assertStringContainsString('no LLM calls', $flattened);
         self::assertStringNotContainsString('Audit complete', $display);
         self::assertStringNotContainsString('RISK LEVEL', $display);
         self::assertStringNotContainsString('vulnerabilities found', $display);
