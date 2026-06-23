@@ -53,7 +53,7 @@
     "require-dev": {
         "deptrac/deptrac": "^4.6",
         "ergebnis/composer-normalize": "^2.52",
-        "ergebnis/phpunit-agent-reporter": "^0.3",
+        "ergebnis/phpunit-agent-reporter": "^1.0",
         "ergebnis/phpunit-slow-test-detector": "^2.24",
         "friendsofphp/php-cs-fixer": "^3.95",
         "phpstan/extension-installer": "^1.4",
