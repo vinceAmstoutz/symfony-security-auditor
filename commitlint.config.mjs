@@ -36,6 +36,7 @@ export default {
                 'bundle',
                 'config',
                 'deps',
+                'deps-dev',
                 'ci',
                 'docs',
                 'tests',
