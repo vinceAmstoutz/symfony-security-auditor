@@ -15,9 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 
 use Psr\Log\LoggerInterface;
 use ValueError;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
  * Applies one reviewer verdict payload to a finding: acceptance, optional
@@ -30,6 +32,7 @@ final readonly class VerdictApplier
 {
     public function __construct(
         private LoggerInterface $logger,
+        private ProgressReporterInterface $progressReporter,
     ) {}
 
     /**
@@ -47,37 +50,59 @@ final readonly class VerdictApplier
 
         $reviewed = $vulnerability->withReviewerValidation($accepted);
 
-        if (!$accepted) {
-            $this->logReviewDecision($vulnerability, $accepted, $review);
-
-            return $reviewed;
-        }
-
-        if (null !== $adjustedSeverity) {
-            try {
-                $severity = VulnerabilitySeverity::from($adjustedSeverity);
-                $reviewed = $reviewed->withElevatedSeverity($severity);
-            } catch (ValueError) {
-                $this->logger->debug('Reviewer returned invalid severity, keeping original', [
-                    'adjusted_severity' => $adjustedSeverity,
-                ]);
-            }
-        }
-
-        if (null !== $correctedType) {
-            try {
-                $type = VulnerabilityType::from($correctedType);
-                $reviewed = $reviewed->withCorrectedType($type);
-            } catch (ValueError) {
-                $this->logger->debug('Reviewer returned invalid corrected_type, keeping original', [
-                    'corrected_type' => $correctedType,
-                ]);
-            }
+        if ($accepted) {
+            $reviewed = $this->applyAdjustedSeverity($reviewed, $adjustedSeverity);
+            $reviewed = $this->applyCorrectedType($reviewed, $correctedType);
         }
 
         $this->logReviewDecision($vulnerability, $accepted, $review);
+        $this->reportReviewed($reviewed, $accepted);
 
         return $reviewed;
+    }
+
+    private function reportReviewed(Vulnerability $vulnerability, bool $accepted): void
+    {
+        $this->progressReporter->report(ProgressEvent::ReviewFindingReviewed->value, [
+            'accepted' => $accepted,
+            'type' => $vulnerability->type()->value,
+            'file' => $vulnerability->filePath(),
+            'line' => $vulnerability->lineStart(),
+        ]);
+    }
+
+    private function applyAdjustedSeverity(Vulnerability $vulnerability, ?string $adjustedSeverity): Vulnerability
+    {
+        if (null === $adjustedSeverity) {
+            return $vulnerability;
+        }
+
+        try {
+            return $vulnerability->withElevatedSeverity(VulnerabilitySeverity::from($adjustedSeverity));
+        } catch (ValueError) {
+            $this->logger->debug('Reviewer returned invalid severity, keeping original', [
+                'adjusted_severity' => $adjustedSeverity,
+            ]);
+
+            return $vulnerability;
+        }
+    }
+
+    private function applyCorrectedType(Vulnerability $vulnerability, ?string $correctedType): Vulnerability
+    {
+        if (null === $correctedType) {
+            return $vulnerability;
+        }
+
+        try {
+            return $vulnerability->withCorrectedType(VulnerabilityType::from($correctedType));
+        } catch (ValueError) {
+            $this->logger->debug('Reviewer returned invalid corrected_type, keeping original', [
+                'corrected_type' => $correctedType,
+            ]);
+
+            return $vulnerability;
+        }
     }
 
     /**
@@ -90,7 +115,7 @@ final readonly class VerdictApplier
      */
     public function normalize(array $reviewData): array
     {
-        $candidate = isset($reviewData[0]) && \is_array($reviewData[0]) ? $reviewData[0] : $reviewData;
+        $candidate = \is_array($reviewData[0] ?? null) ? $reviewData[0] : $reviewData;
 
         $review = [];
         foreach ($candidate as $key => $value) {

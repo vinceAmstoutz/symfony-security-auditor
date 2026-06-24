@@ -21,10 +21,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
 interface ReviewerAgentInterface
 {
     /**
-     * @param Vulnerability[] $vulnerabilities
-     * @param ProjectFile[]   $projectFiles
+     * @param list<Vulnerability> $vulnerabilities
+     * @param list<ProjectFile>   $projectFiles
      *
-     * @return Vulnerability[]
+     * @return list<Vulnerability>
      */
     public function review(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false): array;
 }

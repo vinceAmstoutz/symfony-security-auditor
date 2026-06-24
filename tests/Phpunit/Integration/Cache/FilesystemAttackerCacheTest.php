@@ -154,7 +154,8 @@ final class FilesystemAttackerCacheTest extends TestCase
 
         $this->filesystemAttackerCache->store($chunk, $payload);
 
-        $files = glob($this->cacheDir.'/*/*.json') ?: [];
+        $globResult = glob($this->cacheDir.'/*/*.json');
+        $files = false !== $globResult ? $globResult : [];
         self::assertNotEmpty($files);
         file_put_contents($files[0], 'not json{{{');
 
@@ -168,7 +169,8 @@ final class FilesystemAttackerCacheTest extends TestCase
 
         $this->filesystemAttackerCache->store($chunk, $payload);
 
-        $files = glob($this->cacheDir.'/*/*.json') ?: [];
+        $globResult = glob($this->cacheDir.'/*/*.json');
+        $files = false !== $globResult ? $globResult : [];
         file_put_contents($files[0], '"a string"');
 
         self::assertNull($this->filesystemAttackerCache->get($chunk));
@@ -223,7 +225,8 @@ final class FilesystemAttackerCacheTest extends TestCase
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
         $this->filesystemAttackerCache->store($chunk, [['type' => 'sql_injection']]);
 
-        $files = glob($this->cacheDir.'/*/*.json') ?: [];
+        $globResult = glob($this->cacheDir.'/*/*.json');
+        $files = false !== $globResult ? $globResult : [];
         file_put_contents($files[0], '[123, {"type":"sql_injection","severity":"high"}, "scalar", null]');
 
         $entries = $this->filesystemAttackerCache->get($chunk);
@@ -236,7 +239,8 @@ final class FilesystemAttackerCacheTest extends TestCase
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
         $this->filesystemAttackerCache->store($chunk, [['type' => 'sql_injection']]);
 
-        $files = glob($this->cacheDir.'/*/*.json') ?: [];
+        $globResult = glob($this->cacheDir.'/*/*.json');
+        $files = false !== $globResult ? $globResult : [];
         file_put_contents($files[0], '{{{');
 
         $warnings = [];
@@ -260,7 +264,8 @@ final class FilesystemAttackerCacheTest extends TestCase
 
         $this->filesystemAttackerCache->store($chunk, [['type' => 'sql_injection']]);
 
-        $files = glob($this->cacheDir.'/*/*.json') ?: [];
+        $globResult = glob($this->cacheDir.'/*/*.json');
+        $files = false !== $globResult ? $globResult : [];
         self::assertCount(1, $files);
         $relative = substr($files[0], \strlen($this->cacheDir) + 1);
         self::assertMatchesRegularExpression('#^[a-f0-9]{2}/[a-f0-9]{64}\.json$#', $relative);
@@ -439,7 +444,8 @@ final class FilesystemAttackerCacheTest extends TestCase
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
         $this->filesystemAttackerCache->store($chunk, [['type' => 'sql_injection']]);
 
-        $files = glob($this->cacheDir.'/*/*.json') ?: [];
+        $globResult = glob($this->cacheDir.'/*/*.json');
+        $files = false !== $globResult ? $globResult : [];
         file_put_contents($files[0], '{{{');
 
         $warnings = [];

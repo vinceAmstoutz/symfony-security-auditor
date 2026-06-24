@@ -1,3 +1,6 @@
+includes:
+    - vendor/spaze/phpstan-disallowed-calls/disallowed-execution-calls.neon
+
 parameters:
     level: max
     paths:
@@ -5,4 +8,49 @@ parameters:
         - config/
         - src/
         - tests/
+        - tools/
+
     resultCachePath: var/phpstan
+
+    cognitive_complexity:
+        class: 40
+        function: 7
+
+rules:
+    - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\MaxParameterCountRule
+    - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\NoEmptyCatchRule
+    - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\NoSilencingErrorHandlerRule
+    - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\FinalRule
+    - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\ForbiddenTestAttributeRule
+    - Symplify\PHPStanRules\Rules\NoDynamicNameRule
+    - Symplify\PHPStanRules\Rules\NoReferenceRule
+    - Symplify\PHPStanRules\Rules\NoGlobalConstRule
+    - Symplify\PHPStanRules\Rules\NoReturnSetterMethodRule
+    - Symplify\PHPStanRules\Rules\ForbiddenMultipleClassLikeInOneFileRule
+    - Symplify\PHPStanRules\Rules\Complexity\ForeachCeptionRule
+    - Symplify\PHPStanRules\Rules\Complexity\NoConstructorOverrideRule
+    - Symplify\PHPStanRules\Rules\Complexity\NoJustPropertyAssignRule
+    - Symplify\PHPStanRules\Rules\Enum\RequireUniqueEnumConstantRule
+    - Symplify\PHPStanRules\Rules\Explicit\ExplicitClassPrefixSuffixRule
+    - Symplify\PHPStanRules\Rules\Domain\RequireExceptionNamespaceRule
+    - Symplify\PHPStanRules\Rules\Domain\RequireAttributeNamespaceRule
+    - Symplify\PHPStanRules\Rules\Symfony\NoGetInCommandRule
+    - Symplify\PHPStanRules\Rules\PHPUnit\PublicStaticDataProviderRule
+    - Symplify\PHPStanRules\Rules\PHPUnit\NoAssertFuncCallInTestsRule
+    - Symplify\PHPStanRules\Rules\PHPUnit\NoMockOnlyTestRule
+    - Symplify\PHPStanRules\Rules\PHPUnit\NoMockObjectAndRealObjectPropertyRule
+    - Symplify\PHPStanRules\Rules\PHPUnit\NoDoubleConsecutiveTestMockRule
+
+services:
+    -
+        class: Symplify\PHPStanRules\Rules\ForbiddenNodeRule
+        arguments:
+            forbiddenNodes:
+                - PhpParser\Node\Expr\ErrorSuppress
+                - PhpParser\Node\Stmt\Else_
+                - PhpParser\Node\Stmt\ElseIf_
+                - PhpParser\Node\Expr\Isset_
+                - PhpParser\Node\Expr\Eval_
+                - PhpParser\Node\Stmt\Goto_
+        tags:
+            - phpstan.rules.rule

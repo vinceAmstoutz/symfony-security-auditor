@@ -15,8 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 
@@ -105,19 +108,11 @@ final class AttackerContextPromptRendererTest extends TestCase
 
     private function makeVulnerability(VulnerabilityType $vulnerabilityType, string $filePath, int $start, int $end): Vulnerability
     {
-        return Vulnerability::create(
-            vulnerabilityType: $vulnerabilityType,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'T',
-            description: 'd',
-            filePath: $filePath,
-            lineStart: $start,
-            lineEnd: $end,
-            vulnerableCode: 'c',
-            attackVector: 'a',
-            proof: 'p',
-            remediation: 'r',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification($vulnerabilityType, VulnerabilitySeverity::HIGH, 'T', 0.9),
+            new CodeLocation($filePath, $start, $end),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            'c',
         );
     }
 }

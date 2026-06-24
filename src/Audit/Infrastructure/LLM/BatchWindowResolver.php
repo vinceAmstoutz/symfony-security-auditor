@@ -20,6 +20,7 @@ use Symfony\AI\Platform\Result\DeferredResult;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
@@ -96,14 +97,11 @@ final readonly class BatchWindowResolver
             [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->platformResultExtractor->extractTokens($deferredResult);
             $this->rateLimiter->record($inputTokens, $outputTokens);
 
-            $llmResponse = LLMResponse::create(
-                content: $content,
-                inputTokens: $inputTokens,
-                outputTokens: $outputTokens,
-                model: $this->model,
-                stopReason: 'end_turn',
-                cacheReadTokens: $cacheReadTokens,
-                cacheCreationTokens: $cacheCreationTokens,
+            $llmResponse = LLMResponse::of(
+                $content,
+                $this->model,
+                'end_turn',
+                TokenUsageSnapshot::of($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens),
             );
             $this->budgetTracker?->recordCall($llmResponse);
             $this->budgetTracker?->assertWithinBudget();

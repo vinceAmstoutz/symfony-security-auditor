@@ -74,38 +74,78 @@ final readonly class ConcurrentStructuredReviewAnalyzer
             $reviewCollector = new ReviewCollector();
             $reviewCollectors[$index] = $reviewCollector;
             $pendingIndexes[] = $index;
-            $requests[] = [
-                'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
-                'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
-                'tools' => new ToolRegistry([$this->recordReviewToolFactory->create($reviewCollector)], $this->logger),
-            ];
+            $requests[] = $this->buildRequest($vulnerability, $codeContext, $reviewCollector);
         }
 
         if ([] !== $requests) {
-            try {
-                $this->toolBatchCapableLLMClient->completeBatchWithTools($requests, $this->maxConcurrent, $this->maxToolIterations);
-
-                foreach ($pendingIndexes as $index) {
-                    $verdict = $reviewCollectors[$index]->drain()[0] ?? null;
-                    if (!$bypassCache) {
-                        $this->reviewerVerdictCache->store($vulnerabilities[$index], $codeContexts[$index], $verdict);
-                    }
-
-                    $reviewed[$index] = $this->reviewOutcomeRecorder->recordVerdict($vulnerabilities[$index], $verdict, $coverageRecorder);
-                }
-            } catch (BudgetExceededException $budgetExceededException) {
-                throw $budgetExceededException;
-            } catch (LLMProviderException $llmProviderException) {
-                throw $llmProviderException;
-            } catch (Throwable $exception) {
-                foreach ($pendingIndexes as $pendingIndex) {
-                    $reviewed[$pendingIndex] = $this->reviewOutcomeRecorder->recordReviewError($vulnerabilities[$pendingIndex], $exception, $coverageRecorder);
-                }
-            }
+            $concurrentReviewBatch = new ConcurrentReviewBatch($requests, $pendingIndexes, $reviewCollectors, $vulnerabilities, $codeContexts);
+            $reviewed = $this->dispatchPending($concurrentReviewBatch, $coverageRecorder, $bypassCache, $reviewed);
         }
 
         ksort($reviewed);
 
         return array_values($reviewed);
+    }
+
+    /**
+     * @return array{system: string, user: string, tools: ToolRegistry}
+     */
+    private function buildRequest(Vulnerability $vulnerability, string $codeContext, ReviewCollector $reviewCollector): array
+    {
+        return [
+            'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
+            'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
+            'tools' => new ToolRegistry([$this->recordReviewToolFactory->create($reviewCollector)], $this->logger),
+        ];
+    }
+
+    /**
+     * @param array<int, Vulnerability> $reviewed
+     *
+     * @return array<int, Vulnerability>
+     */
+    private function dispatchPending(ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, bool $bypassCache, array $reviewed): array
+    {
+        try {
+            $this->toolBatchCapableLLMClient->completeBatchWithTools($concurrentReviewBatch->requests, $this->maxConcurrent, $this->maxToolIterations);
+
+            foreach ($concurrentReviewBatch->pendingIndexes as $index) {
+                $reviewed[$index] = $this->recordPendingVerdict($index, $concurrentReviewBatch, $coverageRecorder, $bypassCache);
+            }
+
+            return $reviewed;
+        } catch (BudgetExceededException $budgetExceededException) {
+            throw $budgetExceededException;
+        } catch (LLMProviderException $llmProviderException) {
+            throw $llmProviderException;
+        } catch (Throwable $exception) {
+            return $this->recordPendingErrors($concurrentReviewBatch->pendingIndexes, $concurrentReviewBatch->vulnerabilities, $exception, $coverageRecorder, $reviewed);
+        }
+    }
+
+    private function recordPendingVerdict(int $index, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): Vulnerability
+    {
+        $verdict = $concurrentReviewBatch->reviewCollectors[$index]->drain()[0] ?? null;
+        if (!$bypassCache) {
+            $this->reviewerVerdictCache->store($concurrentReviewBatch->vulnerabilities[$index], $concurrentReviewBatch->codeContexts[$index], $verdict);
+        }
+
+        return $this->reviewOutcomeRecorder->recordVerdict($concurrentReviewBatch->vulnerabilities[$index], $verdict, $coverageRecorder);
+    }
+
+    /**
+     * @param list<int>                 $pendingIndexes
+     * @param list<Vulnerability>       $vulnerabilities
+     * @param array<int, Vulnerability> $reviewed
+     *
+     * @return array<int, Vulnerability>
+     */
+    private function recordPendingErrors(array $pendingIndexes, array $vulnerabilities, Throwable $throwable, CoverageRecorderInterface $coverageRecorder, array $reviewed): array
+    {
+        foreach ($pendingIndexes as $pendingIndex) {
+            $reviewed[$pendingIndex] = $this->reviewOutcomeRecorder->recordReviewError($vulnerabilities[$pendingIndex], $throwable, $coverageRecorder);
+        }
+
+        return $reviewed;
     }
 }

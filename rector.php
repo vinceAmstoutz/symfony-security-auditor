@@ -17,7 +17,7 @@ use Rector\PHPUnit\CodeQuality\Rector\Class_\PreferPHPUnitSelfCallRector;
 use Rector\PHPUnit\CodeQuality\Rector\Class_\PreferPHPUnitThisCallRector;
 
 return RectorConfig::configure()
-    ->withPaths([__DIR__.'/config', __DIR__.'/src', __DIR__.'/tests'])
+    ->withPaths([__DIR__.'/config', __DIR__.'/src', __DIR__.'/tests', __DIR__.'/tools'])
     ->withImportNames(removeUnusedImports: true)
     ->withPreparedSets(
         deadCode: true,

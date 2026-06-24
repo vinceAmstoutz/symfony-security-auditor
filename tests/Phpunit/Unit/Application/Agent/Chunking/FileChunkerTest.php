@@ -257,6 +257,43 @@ final class FileChunkerTest extends TestCase
         self::assertNotContains('src/Service/Misc.php', $paths);
     }
 
+    public function test_feature_strategy_skips_a_feature_whose_files_were_all_claimed_by_an_earlier_prefix_feature(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/Controller/UsersController.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $allPaths = $this->allPaths($chunks);
+        self::assertContains('src/Controller/UserController.php', $allPaths);
+        self::assertContains('src/Controller/UsersController.php', $allPaths);
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UsersController.php');
+        self::assertNotNull($userChunk);
+        $userChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
+        self::assertContains('src/Controller/UserController.php', $userChunkPaths);
+    }
+
+    public function test_feature_strategy_continues_past_an_emptied_feature_to_chunk_later_features(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/Controller/UsersController.php'),
+            $this->makeFile('src/Controller/OrderController.php'),
+            $this->makeFile('src/Entity/Order.php'),
+            $this->makeFile('src/Service/Misc.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $orderChunk = $this->findChunkContaining($chunks, 'src/Controller/OrderController.php');
+        self::assertNotNull($orderChunk);
+        $orderChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $orderChunk);
+        self::assertContains('src/Entity/Order.php', $orderChunkPaths);
+        self::assertNotContains('src/Service/Misc.php', $orderChunkPaths);
+    }
+
     public function test_non_positive_chunk_size_is_clamped_to_one(): void
     {
         $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];

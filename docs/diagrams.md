@@ -1,7 +1,5 @@
 # Presentation Diagrams
 
----
-
 ## CI / CD Integration
 
 ```mermaid
@@ -34,8 +32,6 @@ flowchart LR
     UPLOAD --> SARIF
     ARTIFACT --> JSON
 ```
-
----
 
 ## Full Pipeline
 
@@ -73,8 +69,6 @@ flowchart LR
     REV -- "validated findings" --> RPT
 ```
 
----
-
 ## Attacker vs Reviewer — Dual-Agent Loop
 
 ```mermaid
@@ -110,8 +104,6 @@ sequenceDiagram
     O->>C: write metadata
     note over C: iterations · total_findings · risk_score
 ```
-
----
 
 ## Multi-Provider LLM Support
 

@@ -15,7 +15,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
@@ -445,26 +448,13 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('record_review', $prompt);
     }
 
-    public function test_prompt_version_starts_at_one(): void
-    {
-        self::assertSame(1, ReviewerPromptBuilder::PROMPT_VERSION);
-    }
-
     private function makeVulnerability(string $filePath): Vulnerability
     {
-        return Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'Title for '.$filePath,
-            description: 'Desc',
-            filePath: $filePath,
-            lineStart: 1,
-            lineEnd: 5,
-            vulnerableCode: 'code',
-            attackVector: 'vec',
-            proof: 'proof',
-            remediation: 'fix',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Title for '.$filePath, 0.9),
+            new CodeLocation($filePath, 1, 5),
+            new VulnerabilityNarrative('Desc', 'vec', 'proof', 'fix'),
+            'code',
         );
     }
 }

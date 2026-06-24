@@ -21,8 +21,14 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
@@ -33,6 +39,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\Mappin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
@@ -76,11 +83,48 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('SAFE', $commandTester->getDisplay());
     }
 
+    public function test_command_streams_a_coherent_attacker_then_reviewer_then_report_narrative(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        $display = $commandTester->getDisplay();
+        self::assertStringContainsString('Auditing', $display);
+        self::assertStringContainsString('[CRITICAL] sql_injection', $display);
+        self::assertStringContainsString('[VALIDATED] sql_injection', $display);
+        self::assertStringContainsString('5 validated, 0 rejected', $display);
+        self::assertStringContainsString('SYMFONY LLM AUDIT REPORT', $display);
+
+        $attackerStreamPosition = mb_strpos($display, '[CRITICAL] sql_injection');
+        $reviewerStreamPosition = mb_strpos($display, '[VALIDATED] sql_injection');
+        $reportPosition = mb_strpos($display, 'SYMFONY LLM AUDIT REPORT');
+        self::assertIsInt($attackerStreamPosition);
+        self::assertIsInt($reviewerStreamPosition);
+        self::assertIsInt($reportPosition);
+        self::assertLessThan($reviewerStreamPosition, $attackerStreamPosition);
+        self::assertLessThan($reportPosition, $reviewerStreamPosition);
+    }
+
+    public function test_command_streams_rejected_verdicts_in_the_output_when_the_reviewer_rejects(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": false}');
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        $display = $commandTester->getDisplay();
+        self::assertStringContainsString('[CRITICAL] sql_injection', $display);
+        self::assertStringContainsString('[REJECTED] sql_injection', $display);
+        self::assertStringContainsString('0 validated, 5 rejected', $display);
+    }
+
     public function test_command_emits_secret_scrubbing_warning_when_scrubbing_disabled(): void
     {
         $this->createProjectDir();
 
-        $commandTester = $this->makeCommandTester('[]', '{}', secretScrubbingEnabled: false);
+        $commandTester = $this->makeCommandTester('[]', '{}', ['secretScrubbingEnabled' => false]);
         $commandTester->execute(['project-path' => $this->fixtureDir]);
 
         self::assertStringContainsString('Secret scrubbing is disabled', $commandTester->getDisplay());
@@ -90,7 +134,7 @@ final class AuditCommandEndToEndTest extends TestCase
     {
         $this->createProjectDir();
 
-        $commandTester = $this->makeCommandTester('[]', '{}', secretScrubbingEnabled: true);
+        $commandTester = $this->makeCommandTester('[]', '{}', ['secretScrubbingEnabled' => true]);
         $commandTester->execute(['project-path' => $this->fixtureDir]);
 
         self::assertStringNotContainsString('Secret scrubbing is disabled', $commandTester->getDisplay());
@@ -100,7 +144,7 @@ final class AuditCommandEndToEndTest extends TestCase
     {
         $this->createProjectDir();
 
-        $commandTester = $this->makeCommandTester('[]', '{}', secretScrubbingEnabled: false);
+        $commandTester = $this->makeCommandTester('[]', '{}', ['secretScrubbingEnabled' => false]);
         $commandTester->execute(
             [
                 'project-path' => $this->fixtureDir,
@@ -251,7 +295,7 @@ final class AuditCommandEndToEndTest extends TestCase
         ]);
         (new Baseline())->save($emptyBaseline, []);
 
-        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}', configuredBaseline: $emptyBaseline);
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}', ['configuredBaseline' => $emptyBaseline]);
         $commandTester->execute([
             'project-path' => $this->fixtureDir,
             '--baseline' => $fullBaseline,
@@ -270,7 +314,7 @@ final class AuditCommandEndToEndTest extends TestCase
             '--generate-baseline' => $baselineFile,
         ]);
 
-        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}', configuredBaseline: $baselineFile);
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}', ['configuredBaseline' => $baselineFile]);
         $commandTester->execute(['project-path' => $this->fixtureDir]);
 
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
@@ -460,7 +504,7 @@ final class AuditCommandEndToEndTest extends TestCase
     {
         $this->createProjectDir();
 
-        $commandTester = $this->makeCommandTester($this->highAttackerPayload(), '{"accepted": true}', riskLevel: RiskLevel::High);
+        $commandTester = $this->makeCommandTester($this->highAttackerPayload(), '{"accepted": true}', ['riskLevel' => RiskLevel::High]);
         $commandTester->execute(['project-path' => $this->fixtureDir]);
 
         self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
@@ -470,7 +514,7 @@ final class AuditCommandEndToEndTest extends TestCase
     {
         $this->createProjectDir();
 
-        $commandTester = $this->makeCommandTester($this->highAttackerPayload(), '{"accepted": true}', riskLevel: RiskLevel::High);
+        $commandTester = $this->makeCommandTester($this->highAttackerPayload(), '{"accepted": true}', ['riskLevel' => RiskLevel::High]);
         $commandTester->execute([
             'project-path' => $this->fixtureDir,
             '--fail-on' => 'critical',
@@ -483,7 +527,7 @@ final class AuditCommandEndToEndTest extends TestCase
     {
         $this->createProjectDir();
 
-        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}', excludedTypes: ['sql_injection']);
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}', ['excludedTypes' => ['sql_injection']]);
         $commandTester->execute([
             'project-path' => $this->fixtureDir,
             '--format' => 'json',
@@ -501,7 +545,7 @@ final class AuditCommandEndToEndTest extends TestCase
     {
         $this->createProjectDir();
 
-        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}', includedTypes: ['ssrf']);
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}', ['includedTypes' => ['ssrf']]);
         $commandTester->execute(['project-path' => $this->fixtureDir]);
 
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
@@ -573,35 +617,53 @@ final class AuditCommandEndToEndTest extends TestCase
     }
 
     /**
-     * @param list<string> $excludedTypes
-     * @param list<string> $includedTypes
+     * @param array{secretScrubbingEnabled?: bool, configuredBaseline?: string|null, riskLevel?: RiskLevel, excludedTypes?: list<string>, includedTypes?: list<string>} $overrides
      */
-    private function makeCommandTester(string $attackerResponse, string $reviewerResponse, bool $secretScrubbingEnabled = true, ?string $configuredBaseline = null, RiskLevel $riskLevel = RiskLevel::Critical, array $excludedTypes = [], array $includedTypes = []): CommandTester
+    private function makeCommandTester(string $attackerResponse, string $reviewerResponse, array $overrides = []): CommandTester
     {
         $attackerLLM = self::createStub(LLMClientInterface::class);
         $attackerLLM->method('complete')->willReturn(
-            LLMResponse::create($attackerResponse, 0, 0, 'stub', 'end_turn'),
+            LLMResponse::of($attackerResponse, 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $reviewerLLM = self::createStub(LLMClientInterface::class);
         $reviewerLLM->method('complete')->willReturn(
-            LLMResponse::create($reviewerResponse, 0, 0, 'stub', 'end_turn'),
+            LLMResponse::of($reviewerResponse, 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
-        return $this->makeCommandTesterWithLLM($attackerLLM, $reviewerLLM, $secretScrubbingEnabled, $configuredBaseline, $riskLevel, $excludedTypes, $includedTypes);
+        return $this->makeCommandTesterWithLLM($attackerLLM, $reviewerLLM, $overrides);
     }
 
     /**
-     * @param list<string> $excludedTypes
-     * @param list<string> $includedTypes
+     * @param array{secretScrubbingEnabled?: bool, configuredBaseline?: string|null, riskLevel?: RiskLevel, excludedTypes?: list<string>, includedTypes?: list<string>} $overrides
      */
-    private function makeCommandTesterWithLLM(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, bool $secretScrubbingEnabled = true, ?string $configuredBaseline = null, RiskLevel $riskLevel = RiskLevel::Critical, array $excludedTypes = [], array $includedTypes = []): CommandTester
+    private function makeCommandTesterWithLLM(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, array $overrides = []): CommandTester
     {
-        $progressReporterHolder = new ProgressReporterHolder();
+        $secretScrubbingEnabled = $overrides['secretScrubbingEnabled'] ?? true;
+        $configuredBaseline = $overrides['configuredBaseline'] ?? null;
+        $riskLevel = $overrides['riskLevel'] ?? RiskLevel::Critical;
+        $excludedTypes = $overrides['excludedTypes'] ?? [];
+        $includedTypes = $overrides['includedTypes'] ?? [];
+
+        $progressReporterHolder = new ProgressReporterHolder(new NullLogger());
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullAttackerCache(), new NullLogger(), progressReporter: $progressReporterHolder),
-            new ReviewerAgent($reviewerLLM, new ReviewerPromptBuilder(), new NullLogger()),
+            new AttackerAgent(
+                new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator())),
+                new AttackerScanCollaborators(new NullAttackerCache(), progressReporter: $progressReporterHolder),
+                new AttackerAnalysisSettings(),
+                new NullLogger(),
+            ),
+            new ReviewerAgent(
+                new ReviewerAgentCollaborators(
+                    $reviewerLLM,
+                    new ReviewerPromptBuilder(),
+                    new NullLogger(),
+                    progressReporter: $progressReporterHolder,
+                ),
+                new ReviewerModeConfiguration(),
+            ),
             new NullLogger(),
+            new AuditLoopSettings(),
             progressReporter: $progressReporterHolder,
         );
         $auditPipeline = new AuditPipeline(
@@ -651,7 +713,7 @@ final class AuditCommandEndToEndTest extends TestCase
             BudgetExceededException::forCost(1.5, 1.0),
         );
         $reviewerLLM = self::createStub(LLMClientInterface::class);
-        $reviewerLLM->method('complete')->willReturn(LLMResponse::create('{}', 0, 0, 'stub', 'end_turn'));
+        $reviewerLLM->method('complete')->willReturn(LLMResponse::of('{}', 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $commandTester = $this->makeCommandTesterWithLLM($abortingAttacker, $reviewerLLM);
         $outputFile = $this->fixtureDir.'/partial.json';
@@ -831,7 +893,7 @@ final class AuditCommandEndToEndTest extends TestCase
             BudgetExceededException::forCost(1.5, 1.0),
         );
         $reviewerLLM = self::createStub(LLMClientInterface::class);
-        $reviewerLLM->method('complete')->willReturn(LLMResponse::create('{}', 0, 0, 'stub', 'end_turn'));
+        $reviewerLLM->method('complete')->willReturn(LLMResponse::of('{}', 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $commandTester = $this->makeCommandTesterWithLLM($abortingAttacker, $reviewerLLM);
         $commandTester->execute(['project-path' => $this->fixtureDir]);

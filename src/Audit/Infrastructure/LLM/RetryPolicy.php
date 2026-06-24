@@ -46,44 +46,16 @@ final readonly class RetryPolicy
 
     /** @param ?Closure(): float $jitterSource returns a float in [0, 1]; defaults to mt_rand()/mt_getrandmax() */
     public function __construct(
-        private int $maxAttempts = self::DEFAULT_MAX_ATTEMPTS,
-        private int $initialDelayMs = self::DEFAULT_INITIAL_DELAY_MS,
-        private float $backoffMultiplier = self::DEFAULT_BACKOFF_MULTIPLIER,
-        private float $jitterRatio = self::DEFAULT_JITTER_RATIO,
-        private int $rateLimitInitialDelayMs = self::DEFAULT_RATE_LIMIT_DELAY_MS,
-        private int $rateLimitMaxDelayMs = self::DEFAULT_RATE_LIMIT_MAX_DELAY_MS,
+        private BackoffSchedule $backoffSchedule = new BackoffSchedule(),
+        private RateLimitBackoff $rateLimitBackoff = new RateLimitBackoff(),
         ?Closure $jitterSource = null,
     ) {
-        if ($maxAttempts < 1) {
-            throw new InvalidArgumentException(\sprintf('maxAttempts must be >= 1, got %d', $maxAttempts));
-        }
-
-        if ($initialDelayMs < 0) {
-            throw new InvalidArgumentException(\sprintf('initialDelayMs must be >= 0, got %d', $initialDelayMs));
-        }
-
-        if ($backoffMultiplier < 1.0) {
-            throw new InvalidArgumentException(\sprintf('backoffMultiplier must be >= 1.0, got %f', $backoffMultiplier));
-        }
-
-        if ($jitterRatio < 0.0 || $jitterRatio > 1.0) {
-            throw new InvalidArgumentException(\sprintf('jitterRatio must be in [0.0, 1.0], got %f', $jitterRatio));
-        }
-
-        if ($rateLimitInitialDelayMs < 0) {
-            throw new InvalidArgumentException(\sprintf('rateLimitInitialDelayMs must be >= 0, got %d', $rateLimitInitialDelayMs));
-        }
-
-        if ($rateLimitMaxDelayMs < 0) {
-            throw new InvalidArgumentException(\sprintf('rateLimitMaxDelayMs must be >= 0, got %d', $rateLimitMaxDelayMs));
-        }
-
         $this->jitterSource = $jitterSource ?? static fn (): float => mt_rand() / mt_getrandmax();
     }
 
     public function maxAttempts(): int
     {
-        return $this->maxAttempts;
+        return $this->backoffSchedule->maxAttempts;
     }
 
     public function delayMs(int $attempt): int
@@ -92,7 +64,7 @@ final readonly class RetryPolicy
             throw new InvalidArgumentException(\sprintf('attempt must be >= 1, got %d', $attempt));
         }
 
-        return $this->computeDelay($this->initialDelayMs, $attempt);
+        return $this->computeDelay($this->backoffSchedule->initialDelayMs, $attempt);
     }
 
     /**
@@ -113,16 +85,16 @@ final readonly class RetryPolicy
         }
 
         if (null !== $serverHintSeconds && $serverHintSeconds > 0) {
-            return min($serverHintSeconds * 1_000, $this->rateLimitMaxDelayMs);
+            return min($serverHintSeconds * 1_000, $this->rateLimitBackoff->maxDelayMs);
         }
 
-        return min($this->computeDelay($this->rateLimitInitialDelayMs, $attempt), $this->rateLimitMaxDelayMs);
+        return min($this->computeDelay($this->rateLimitBackoff->initialDelayMs, $attempt), $this->rateLimitBackoff->maxDelayMs);
     }
 
     private function computeDelay(int $baseInitialDelayMs, int $attempt): int
     {
-        $baseDelay = $baseInitialDelayMs * ($this->backoffMultiplier ** ($attempt - 1));
-        $jitterFactor = 1.0 + $this->jitterRatio * (2.0 * ($this->jitterSource)() - 1.0);
+        $baseDelay = $baseInitialDelayMs * ($this->backoffSchedule->backoffMultiplier ** ($attempt - 1));
+        $jitterFactor = 1.0 + $this->backoffSchedule->jitterRatio * (2.0 * ($this->jitterSource)() - 1.0);
 
         return (int) round($baseDelay * $jitterFactor);
     }

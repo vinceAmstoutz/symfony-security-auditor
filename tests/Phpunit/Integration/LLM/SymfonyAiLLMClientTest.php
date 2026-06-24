@@ -22,7 +22,6 @@ use RuntimeException;
 use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\MessageBag;
-use Symfony\AI\Platform\Message\MessageInterface;
 use Symfony\AI\Platform\Message\ToolCallMessage;
 use Symfony\AI\Platform\Model;
 use Symfony\AI\Platform\ModelCatalog\FallbackModelCatalog;
@@ -50,24 +49,34 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\BackoffSchedule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccountingConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformBinding;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformRequestConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformResilienceConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimitBackoff;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeRateLimiter;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeSleeper;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FixedTokenEstimator;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\InvocationOptionsCapture;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\PlatformInvocationLog;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingConverter;
 
 final class SymfonyAiLLMClientTest extends TestCase
 {
     public function test_complete_returns_text_from_platform_invoke(): void
     {
         $platform = $this->scriptedPlatform([new TextResult('Hello from LLM')]);
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'test-model', new NullLogger()));
 
         $llmResponse = $symfonyAiLLMClient->complete('You are a helper.', 'Tell me a joke.');
 
@@ -90,7 +99,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             },
         );
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', $logger, temperature: 0.42);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'test-model', $logger), new PlatformRequestConfig(temperature: 0.42));
         $symfonyAiLLMClient->complete('sys', 'usr-message');
 
         $startLog = $logs[0];
@@ -112,7 +121,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             },
         );
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', $logger);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'test-model', $logger));
         $symfonyAiLLMClient->complete('s', 'u');
 
         $respondedLogs = array_values(array_filter(
@@ -129,7 +138,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger(), temperature: 0.7);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'test-model', new NullLogger()), new PlatformRequestConfig(temperature: 0.7));
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -142,7 +151,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'test-model', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'test-model', new NullLogger()));
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -154,7 +163,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'claude-opus-4-8', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'claude-opus-4-8', new NullLogger()));
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -166,7 +175,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'claude-opus-4-8', new NullLogger(), providerJsonMode: true);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'claude-opus-4-8', new NullLogger()), new PlatformRequestConfig(providerJsonMode: true));
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -178,7 +187,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'gemini-3.1-pro-preview', new NullLogger(), providerJsonMode: true);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'gemini-3.1-pro-preview', new NullLogger()), new PlatformRequestConfig(providerJsonMode: true));
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -191,12 +200,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'claude-opus-4-8',
-            new NullLogger(),
-            temperature: 0.5,
-            providerJsonMode: true,
-            maxOutputTokens: 4096,
+            new PlatformBinding($platform, 'claude-opus-4-8', new NullLogger(), maxOutputTokens: 4096),
+            new PlatformRequestConfig(temperature: 0.5, providerJsonMode: true),
         );
         $symfonyAiLLMClient->complete('s', 'u');
 
@@ -212,7 +217,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'claude-opus-4-8', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'claude-opus-4-8', new NullLogger()));
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -225,10 +230,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'claude-opus-4-8',
-            new NullLogger(),
-            maxOutputTokens: 4096,
+            new PlatformBinding($platform, 'claude-opus-4-8', new NullLogger(), maxOutputTokens: 4096),
         );
         $symfonyAiLLMClient->complete('s', 'u');
 
@@ -242,10 +244,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'gemini-3.1-pro-preview',
-            new NullLogger(),
-            maxOutputTokens: 4096,
+            new PlatformBinding($platform, 'gemini-3.1-pro-preview', new NullLogger(), maxOutputTokens: 4096),
         );
         $symfonyAiLLMClient->complete('s', 'u');
 
@@ -258,7 +257,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'gemini-3.1-pro-preview', new NullLogger(), temperature: 0.7);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'gemini-3.1-pro-preview', new NullLogger()), new PlatformRequestConfig(temperature: 0.7));
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -270,7 +269,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $invocationOptionsCapture = new InvocationOptionsCapture();
         $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'claude-opus-4-8', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'claude-opus-4-8', new NullLogger()));
         $symfonyAiLLMClient->complete('s', 'u');
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -287,10 +286,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $toolRegistry = new ToolRegistry([$this->makeTool('lookup', 'lookup')], new NullLogger());
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'claude-opus-4-8',
-            new NullLogger(),
-            maxOutputTokens: 8192,
+            new PlatformBinding($platform, 'claude-opus-4-8', new NullLogger(), maxOutputTokens: 8192),
         );
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 3);
 
@@ -300,14 +296,14 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     public function test_model_returns_configured_model_name(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform(''), 'claude-test', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform(''), 'claude-test', new NullLogger()));
 
         self::assertSame('claude-test', $symfonyAiLLMClient->model());
     }
 
     public function test_complete_throws_when_no_ai_platform_is_configured(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(null, 'test-model', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(null, 'test-model', new NullLogger()));
 
         $this->expectException(MissingAiPlatformException::class);
         $this->expectExceptionMessage('No AI platform is configured');
@@ -317,7 +313,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     public function test_complete_with_tools_throws_when_no_ai_platform_is_configured(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(null, 'test-model', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(null, 'test-model', new NullLogger()));
         $toolRegistry = new ToolRegistry([$this->makeTool('lookup', 'lookup')], new NullLogger());
 
         $this->expectException(MissingAiPlatformException::class);
@@ -328,7 +324,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     public function test_complete_batch_throws_when_no_ai_platform_is_configured(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(null, 'test-model', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(null, 'test-model', new NullLogger()));
 
         $this->expectException(MissingAiPlatformException::class);
         $this->expectExceptionMessage('No AI platform is configured');
@@ -338,14 +334,14 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     public function test_complete_batch_returns_empty_for_no_requests(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform('x'), 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('x'), 'm', new NullLogger()));
 
         self::assertSame([], $symfonyAiLLMClient->completeBatch([], 4));
     }
 
     public function test_complete_batch_returns_one_response_per_request_in_order(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform('batched'), 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('batched'), 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatch([
             ['system' => 's1', 'user' => 'u1'],
@@ -361,7 +357,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     public function test_complete_batch_processes_more_requests_than_window_size(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform('ok'), 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()));
 
         $requests = [];
         for ($i = 0; $i < 5; ++$i) {
@@ -375,7 +371,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     public function test_complete_batch_clamps_non_positive_window_to_one(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform('ok'), 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatch([
             ['system' => 's', 'user' => 'u'],
@@ -394,10 +390,8 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $tokenUsageRecorder = new TokenUsageRecorder();
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            tokenUsageRecorder: $tokenUsageRecorder,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder),
         );
 
         $responses = $symfonyAiLLMClient->completeBatch([
@@ -415,11 +409,9 @@ final class SymfonyAiLLMClientTest extends TestCase
     {
         $fakeRateLimiter = new FakeRateLimiter();
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            new InMemoryPlatform('ok'),
-            'm',
-            new NullLogger(),
-            rateLimiter: $fakeRateLimiter,
-            tokenEstimator: new FixedTokenEstimator(123),
+            new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()),
+            new PlatformRequestConfig(tokenEstimator: new FixedTokenEstimator(123)),
+            new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
         );
 
         $symfonyAiLLMClient->completeBatch([
@@ -429,6 +421,23 @@ final class SymfonyAiLLMClientTest extends TestCase
         ], 2);
 
         self::assertSame([246, 246, 246], $fakeRateLimiter->acquired);
+    }
+
+    public function test_complete_batch_falls_back_to_the_sequential_complete_path_when_dispatch_throws(): void
+    {
+        $platform = $this->flakyPlatform([
+            new RuntimeException('dispatch exploded'),
+            new TextResult('recovered-sequentially'),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
+
+        $responses = $symfonyAiLLMClient->completeBatch([
+            ['system' => 's', 'user' => 'u'],
+        ], 4);
+
+        self::assertCount(1, $responses);
+        self::assertSame('recovered-sequentially', $responses[0]->content());
     }
 
     public function test_complete_batch_with_tools_resolves_each_conversation_against_its_own_registry(): void
@@ -452,7 +461,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TextResult('answer-0'),
         ]);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
             ['system' => 's0', 'user' => 'u0', 'tools' => $firstRegistry],
@@ -469,7 +478,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     public function test_complete_batch_with_tools_returns_empty_list_for_empty_requests(): void
     {
-        $symfonyAiLLMClient = new SymfonyAiLLMClient(new InMemoryPlatform('ok'), 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()));
 
         self::assertSame([], $symfonyAiLLMClient->completeBatchWithTools([], 4, 3));
     }
@@ -495,7 +504,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             new MultiPartResult([new ToolCallResult([new ToolCall('3', 'record')])]),
         ], $platformInvocationLog);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', $logger);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', $logger));
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
             ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
@@ -522,18 +531,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         ]);
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            retryPolicy: new RetryPolicy(
-                maxAttempts: 3,
-                initialDelayMs: 10,
-                backoffMultiplier: 2.0,
-                jitterRatio: 0.0,
-                jitterSource: static fn (): float => 0.5,
-            ),
-            transientFailureClassifier: new TransientFailureClassifier(),
-            sleeper: new FakeSleeper(),
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 10, backoffMultiplier: 2.0, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
         );
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
@@ -582,7 +581,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             }
         };
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
             ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
@@ -616,7 +615,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             new RuntimeException('HTTP 503 Service Unavailable'),
         ]);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', $logger);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', $logger));
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
             ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
@@ -649,7 +648,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             ],
         );
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
             ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
@@ -672,10 +671,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         ]);
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            rateLimiter: $fakeRateLimiter,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
         );
 
         $symfonyAiLLMClient->completeBatchWithTools([
@@ -696,7 +693,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             new MultiPartResult([new TextResult('done')]),
         ], $platformInvocationLog);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
         $symfonyAiLLMClient->completeBatchWithTools([
             ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
         ], 4, 3);
@@ -742,7 +739,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
         $platform = $this->scriptedPlatform([new TextResult('a'), new TextResult('b')]);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger(), rateLimiter: $rateLimiter);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()), platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $rateLimiter));
 
         $symfonyAiLLMClient->completeBatchWithTools([
             ['system' => 's0', 'user' => 'u0', 'tools' => $toolRegistry],
@@ -763,7 +760,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TextResult('answer-1'),
         ]);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatchWithTools([
             ['system' => 's0', 'user' => 'u0', 'tools' => $firstRegistry],
@@ -788,11 +785,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new CostCalculator($this->stubPricing(0.0, 0.0)),
         );
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            tokenUsageRecorder: new TokenUsageRecorder(),
-            budgetTracker: $budgetTracker,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: new TokenUsageRecorder(), budgetTracker: $budgetTracker),
         );
 
         $this->expectException(BudgetExceededException::class);
@@ -807,11 +801,9 @@ final class SymfonyAiLLMClientTest extends TestCase
         $fakeRateLimiter = new FakeRateLimiter();
         $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            new InMemoryPlatform('ok'),
-            'm',
-            new NullLogger(),
-            rateLimiter: $fakeRateLimiter,
-            tokenEstimator: new FixedTokenEstimator(123),
+            new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()),
+            new PlatformRequestConfig(tokenEstimator: new FixedTokenEstimator(123)),
+            new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
         );
 
         $symfonyAiLLMClient->completeBatchWithTools([
@@ -833,11 +825,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new CostCalculator($this->stubPricing(0.0, 0.0)),
         );
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            tokenUsageRecorder: new TokenUsageRecorder(),
-            budgetTracker: $budgetTracker,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: new TokenUsageRecorder(), budgetTracker: $budgetTracker),
         );
 
         $this->expectException(BudgetExceededException::class);
@@ -865,10 +854,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         };
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            new InMemoryPlatform('ok'),
-            'm',
-            new NullLogger(),
-            rateLimiter: $rateLimiter,
+            new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $rateLimiter),
         );
 
         $symfonyAiLLMClient->completeBatch([
@@ -905,7 +892,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             }
         };
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $responses = $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
 
@@ -942,20 +929,18 @@ final class SymfonyAiLLMClientTest extends TestCase
             new CostCalculator($this->stubPricing(0.0, 0.0)),
         );
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            tokenUsageRecorder: new TokenUsageRecorder(),
-            budgetTracker: $budgetTracker,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: new TokenUsageRecorder(), budgetTracker: $budgetTracker),
         );
 
+        $budgetExceeded = false;
         try {
             $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
-            self::fail('Expected BudgetExceededException');
         } catch (BudgetExceededException) {
-            // expected — the batch must abort rather than retry via complete().
+            $budgetExceeded = true;
         }
 
+        self::assertTrue($budgetExceeded, 'completeBatch must abort rather than retry via complete().');
         self::assertSame(1, $platformInvocationLog->invocations);
     }
 
@@ -964,7 +949,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $platform = $this->scriptedPlatform([
             new MultiPartResult([new TextResult('done')]),
         ]);
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $toolRegistry = new ToolRegistry([$this->makeTool('lookup', 'description here')], new NullLogger());
 
@@ -986,7 +971,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             new MultiPartResult([new TextResult('final answer')]),
         ]);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
         $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
 
         self::assertSame('final answer', $llmResponse->content());
@@ -1014,7 +999,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             new MultiPartResult([new ToolCallResult([new ToolCall('3', 'lookup')])]),
         ]);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', $logger);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', $logger));
         $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 2);
 
         self::assertSame('', $llmResponse->content());
@@ -1045,7 +1030,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             $platformInvocationLog,
         );
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 2);
 
         self::assertSame(2, $platformInvocationLog->invocations);
@@ -1069,7 +1054,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             new MultiPartResult([new TextResult('finished-12c')]),
         ]);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', $logger);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', $logger));
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
 
         $endedLogs = array_values(array_filter(
@@ -1096,7 +1081,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             $platformInvocationLog,
         );
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
 
         self::assertSame(2, $platformInvocationLog->invocations);
@@ -1137,7 +1122,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             new MultiPartResult([new TextResult('done')]),
         ]);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', $logger);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', $logger));
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
 
         $toolInvokedLogs = array_values(array_filter(
@@ -1169,11 +1154,11 @@ final class SymfonyAiLLMClientTest extends TestCase
                     'bogus_spec' => 'not-an-array',
                     'malformed_type' => ['type' => 42, 'description' => null],
                 ],
-                'required' => ['path', 456],
+                'required' => ['path', 456, 'mode'],
             ],
         );
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', new ToolRegistry([$tool], new NullLogger()), 3);
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -1189,8 +1174,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $parameters = $platformTool->getParameters();
         self::assertNotNull($parameters);
-        self::assertSame('object', $parameters['type']);
-        self::assertSame(['path'], $parameters['required']);
+        self::assertSame(['path', 'mode'], $parameters['required']);
         $properties = $parameters['properties'];
         self::assertArrayHasKey('path', $properties);
         self::assertSame('string', $properties['path']['type']);
@@ -1209,7 +1193,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             new MultiPartResult([new TextResult('final')]),
         ]);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
         $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
 
         self::assertSame('final', $llmResponse->content());
@@ -1222,7 +1206,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $platform = $this->scriptedPlatform([new TextResult('plain text')]);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
         $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 3);
 
         self::assertSame('plain text', $llmResponse->content());
@@ -1243,7 +1227,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $platform = $this->scriptedPlatform([$unknownResult]);
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
         $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 3);
 
         self::assertSame('', $llmResponse->content());
@@ -1267,7 +1251,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             ],
         );
 
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', new ToolRegistry([$tool], new NullLogger()), 1);
 
         self::assertNotNull($invocationOptionsCapture->options);
@@ -1289,10 +1273,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TokenUsage(promptTokens: 120, completionTokens: 30),
         );
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            tokenUsageRecorder: $tokenUsageRecorder,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder),
         );
 
         $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
@@ -1312,10 +1294,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TokenUsage(promptTokens: 120, completionTokens: 30, cacheCreationTokens: 40, cacheReadTokens: 200),
         );
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            tokenUsageRecorder: $tokenUsageRecorder,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder),
         );
 
         $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
@@ -1332,7 +1312,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TextResult('done'),
             new TokenUsage(promptTokens: 120, completionTokens: 30),
         );
-        $symfonyAiLLMClient = new SymfonyAiLLMClient($platform, 'm', new NullLogger());
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
 
         $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
 
@@ -1345,10 +1325,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         $tokenUsageRecorder = new TokenUsageRecorder();
         $platform = $this->scriptedPlatform([new TextResult('done')]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            tokenUsageRecorder: $tokenUsageRecorder,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder),
         );
 
         $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
@@ -1368,10 +1346,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TokenUsage(),
         );
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            tokenUsageRecorder: $tokenUsageRecorder,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder),
         );
 
         $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
@@ -1392,8 +1368,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TextResult('two'),
             new TokenUsage(promptTokens: 30, completionTokens: 5),
         );
-        $clientOne = new SymfonyAiLLMClient($attackerPlatform, 'attacker', new NullLogger(), tokenUsageRecorder: $tokenUsageRecorder);
-        $clientTwo = new SymfonyAiLLMClient($reviewerPlatform, 'reviewer', new NullLogger(), tokenUsageRecorder: $tokenUsageRecorder);
+        $clientOne = new SymfonyAiLLMClient(new PlatformBinding($attackerPlatform, 'attacker', new NullLogger()), platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder));
+        $clientTwo = new SymfonyAiLLMClient(new PlatformBinding($reviewerPlatform, 'reviewer', new NullLogger()), platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder));
 
         $clientOne->complete('sys', 'usr');
         $clientTwo->complete('sys', 'usr');
@@ -1420,11 +1396,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new CostCalculator($this->stubPricing(0.0, 0.0)),
         );
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            tokenUsageRecorder: $tokenUsageRecorder,
-            budgetTracker: $budgetTracker,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder, budgetTracker: $budgetTracker),
         );
 
         $this->expectException(BudgetExceededException::class);
@@ -1450,11 +1423,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new CostCalculator($this->stubPricing(0.0, 0.0)),
         );
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            tokenUsageRecorder: $tokenUsageRecorder,
-            budgetTracker: $budgetTracker,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder, budgetTracker: $budgetTracker),
         );
 
         $this->expectException(BudgetExceededException::class);
@@ -1500,10 +1470,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
         $tool = $this->makeTool('echo', 'echo', static fn (): string => 'echoed');
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            tokenUsageRecorder: $tokenUsageRecorder,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder),
         );
 
         $llmResponse = $symfonyAiLLMClient->completeWithTools(
@@ -1580,18 +1548,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TextResult('finally ok'),
         ]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            retryPolicy: new RetryPolicy(
-                maxAttempts: 3,
-                initialDelayMs: 10,
-                backoffMultiplier: 2.0,
-                jitterRatio: 0.0,
-                jitterSource: static fn (): float => 0.5,
-            ),
-            transientFailureClassifier: new TransientFailureClassifier(),
-            sleeper: $fakeSleeper,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 10, backoffMultiplier: 2.0, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: $fakeSleeper),
         );
 
         $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
@@ -1609,18 +1567,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new RuntimeException('HTTP 503 Service Unavailable'),
         ]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            retryPolicy: new RetryPolicy(
-                maxAttempts: 3,
-                initialDelayMs: 10,
-                backoffMultiplier: 2.0,
-                jitterRatio: 0.0,
-                jitterSource: static fn (): float => 0.5,
-            ),
-            transientFailureClassifier: new TransientFailureClassifier(),
-            sleeper: $fakeSleeper,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 10, backoffMultiplier: 2.0, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: $fakeSleeper),
         );
 
         $this->expectException(TransientLLMFailureException::class);
@@ -1650,18 +1598,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TextResult('recovered'),
         ]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            $logger,
-            retryPolicy: new RetryPolicy(
-                maxAttempts: 3,
-                initialDelayMs: 50,
-                backoffMultiplier: 2.0,
-                jitterRatio: 0.0,
-                jitterSource: static fn (): float => 0.5,
-            ),
-            transientFailureClassifier: new TransientFailureClassifier(),
-            sleeper: new FakeSleeper(),
+            new PlatformBinding($platform, 'm', $logger),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 50, backoffMultiplier: 2.0, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
         );
 
         $symfonyAiLLMClient->complete('sys', 'usr');
@@ -1692,18 +1630,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new RuntimeException('HTTP 503'),
         ]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            $logger,
-            retryPolicy: new RetryPolicy(
-                maxAttempts: 3,
-                initialDelayMs: 10,
-                backoffMultiplier: 2.0,
-                jitterRatio: 0.0,
-                jitterSource: static fn (): float => 0.5,
-            ),
-            transientFailureClassifier: new TransientFailureClassifier(),
-            sleeper: new FakeSleeper(),
+            new PlatformBinding($platform, 'm', $logger),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 10, backoffMultiplier: 2.0, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
         );
 
         try {
@@ -1724,12 +1652,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TextResult('should-not-reach'),
         ]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            retryPolicy: new RetryPolicy(maxAttempts: 5, jitterSource: static fn (): float => 0.5),
-            transientFailureClassifier: new TransientFailureClassifier(),
-            sleeper: $fakeSleeper,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 5), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: $fakeSleeper),
         );
 
         $this->expectException(NonTransientLLMFailureException::class);
@@ -1747,12 +1671,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         $fakeSleeper = new FakeSleeper();
         $platform = $this->emptyContentPlatform('Response does not contain any content.');
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            retryPolicy: new RetryPolicy(maxAttempts: 5, jitterSource: static fn (): float => 0.5),
-            transientFailureClassifier: new TransientFailureClassifier(),
-            sleeper: $fakeSleeper,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 5), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: $fakeSleeper),
         );
 
         $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
@@ -1777,10 +1697,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $this->emptyContentPlatform('Response does not contain any content.'),
-            'm',
-            $logger,
-            transientFailureClassifier: new TransientFailureClassifier(),
+            new PlatformBinding($this->emptyContentPlatform('Response does not contain any content.'), 'm', $logger),
+            platformResilienceConfig: new PlatformResilienceConfig(transientFailureClassifier: new TransientFailureClassifier()),
         );
 
         $symfonyAiLLMClient->complete('sys', 'usr');
@@ -1802,10 +1720,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         $toolRegistry = new ToolRegistry([$tool], new NullLogger());
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $this->emptyContentPlatform('Response does not contain any content.'),
-            'm',
-            new NullLogger(),
-            transientFailureClassifier: new TransientFailureClassifier(),
+            new PlatformBinding($this->emptyContentPlatform('Response does not contain any content.'), 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(transientFailureClassifier: new TransientFailureClassifier()),
         );
 
         $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
@@ -1831,10 +1747,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $this->emptyContentPlatform('Response does not contain any content.'),
-            'm',
-            $logger,
-            transientFailureClassifier: new TransientFailureClassifier(),
+            new PlatformBinding($this->emptyContentPlatform('Response does not contain any content.'), 'm', $logger),
+            platformResilienceConfig: new PlatformResilienceConfig(transientFailureClassifier: new TransientFailureClassifier()),
         );
 
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
@@ -1878,10 +1792,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         ]);
 
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            $logger,
-            transientFailureClassifier: new TransientFailureClassifier(),
+            new PlatformBinding($platform, 'm', $logger),
+            platformResilienceConfig: new PlatformResilienceConfig(transientFailureClassifier: new TransientFailureClassifier()),
         );
 
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
@@ -1900,12 +1812,8 @@ final class SymfonyAiLLMClientTest extends TestCase
         $platformInvocationLog = new PlatformInvocationLog();
         $platform = $this->emptyContentPlatform('Response does not contain any content.', $platformInvocationLog);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            retryPolicy: new RetryPolicy(maxAttempts: 5, jitterSource: static fn (): float => 0.5),
-            transientFailureClassifier: new TransientFailureClassifier(),
-            sleeper: $fakeSleeper,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 5), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: $fakeSleeper),
         );
 
         $symfonyAiLLMClient->complete('sys', 'usr');
@@ -1922,18 +1830,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TextResult('recovered after rate limit'),
         ]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            retryPolicy: new RetryPolicy(
-                maxAttempts: 3,
-                initialDelayMs: 500,
-                jitterRatio: 0.0,
-                rateLimitInitialDelayMs: 60_000,
-                jitterSource: static fn (): float => 0.5,
-            ),
-            transientFailureClassifier: new TransientFailureClassifier(),
-            sleeper: $fakeSleeper,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 500, jitterRatio: 0.0), new RateLimitBackoff(initialDelayMs: 60_000), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: $fakeSleeper),
         );
 
         $symfonyAiLLMClient->complete('sys', 'usr');
@@ -1949,23 +1847,30 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TextResult('recovered'),
         ]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            retryPolicy: new RetryPolicy(
-                maxAttempts: 3,
-                initialDelayMs: 500,
-                jitterRatio: 0.0,
-                rateLimitInitialDelayMs: 60_000,
-                jitterSource: static fn (): float => 0.5,
-            ),
-            transientFailureClassifier: new TransientFailureClassifier(),
-            sleeper: $fakeSleeper,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 500, jitterRatio: 0.0), new RateLimitBackoff(initialDelayMs: 60_000), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: $fakeSleeper),
         );
 
         $symfonyAiLLMClient->complete('sys', 'usr');
 
         self::assertSame([500], $fakeSleeper->durations);
+    }
+
+    public function test_non_rate_limit_transient_error_never_pauses_the_rate_limiter(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 Service Unavailable retry-after: 30'),
+            new TextResult('recovered'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 500, jitterRatio: 0.0), new RateLimitBackoff(initialDelayMs: 60_000), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper(), rateLimiter: $fakeRateLimiter),
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame([], $fakeRateLimiter->paused, 'A non-429 transient failure must not honor a Retry-After hint.');
     }
 
     public function test_eager_resolution_catches_transient_failure_thrown_from_deferred_result(): void
@@ -1976,17 +1881,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TextResult('recovered after lazy 503'),
         ]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            retryPolicy: new RetryPolicy(
-                maxAttempts: 3,
-                initialDelayMs: 10,
-                jitterRatio: 0.0,
-                jitterSource: static fn (): float => 0.5,
-            ),
-            transientFailureClassifier: new TransientFailureClassifier(),
-            sleeper: $fakeSleeper,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 10, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: $fakeSleeper),
         );
 
         $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
@@ -2000,11 +1896,9 @@ final class SymfonyAiLLMClientTest extends TestCase
         $fakeRateLimiter = new FakeRateLimiter();
         $platform = $this->scriptedPlatform([new TextResult('ok')]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            rateLimiter: $fakeRateLimiter,
-            tokenEstimator: new FixedTokenEstimator(123),
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            new PlatformRequestConfig(tokenEstimator: new FixedTokenEstimator(123)),
+            new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
         );
 
         $symfonyAiLLMClient->complete('sys', 'usr');
@@ -2020,10 +1914,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TokenUsage(promptTokens: 250, completionTokens: 75),
         );
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            rateLimiter: $fakeRateLimiter,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
         );
 
         $symfonyAiLLMClient->complete('sys', 'usr');
@@ -2048,10 +1940,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             ],
         );
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            rateLimiter: $fakeRateLimiter,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
         );
 
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
@@ -2068,18 +1958,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TextResult('recovered'),
         ]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            retryPolicy: new RetryPolicy(
-                maxAttempts: 3,
-                jitterRatio: 0.0,
-                rateLimitInitialDelayMs: 60_000,
-                jitterSource: static fn (): float => 0.5,
-            ),
-            transientFailureClassifier: new TransientFailureClassifier(),
-            sleeper: $fakeSleeper,
-            rateLimiter: $fakeRateLimiter,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, jitterRatio: 0.0), new RateLimitBackoff(initialDelayMs: 60_000), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: $fakeSleeper, rateLimiter: $fakeRateLimiter),
         );
 
         $symfonyAiLLMClient->complete('sys', 'usr');
@@ -2097,18 +1977,8 @@ final class SymfonyAiLLMClientTest extends TestCase
             new TextResult('recovered'),
         ]);
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
-            $platform,
-            'm',
-            new NullLogger(),
-            retryPolicy: new RetryPolicy(
-                maxAttempts: 3,
-                jitterRatio: 0.0,
-                rateLimitInitialDelayMs: 60_000,
-                jitterSource: static fn (): float => 0.5,
-            ),
-            transientFailureClassifier: new TransientFailureClassifier(),
-            sleeper: $fakeSleeper,
-            rateLimiter: $fakeRateLimiter,
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, jitterRatio: 0.0), new RateLimitBackoff(initialDelayMs: 60_000), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: $fakeSleeper, rateLimiter: $fakeRateLimiter),
         );
 
         $symfonyAiLLMClient->complete('sys', 'usr');
@@ -2340,87 +2210,5 @@ final class SymfonyAiLLMClientTest extends TestCase
                 return $this->executor instanceof Closure ? ($this->executor)($arguments) : 'ok';
             }
         };
-    }
-}
-
-final class InvocationOptionsCapture
-{
-    /** @var ?array<int|string, mixed> */
-    public ?array $options = null;
-}
-
-final class PlatformInvocationLog
-{
-    public int $invocations = 0;
-
-    /** @var list<list<MessageInterface>> */
-    public array $messageSnapshots = [];
-}
-
-final class FakeSleeper implements SleeperInterface
-{
-    /** @var list<int> */
-    public array $durations = [];
-
-    public function sleep(int $milliseconds): void
-    {
-        $this->durations[] = $milliseconds;
-    }
-}
-
-final class FakeRateLimiter implements RateLimiterInterface
-{
-    /** @var list<int> */
-    public array $acquired = [];
-
-    /** @var list<array{int, int}> */
-    public array $recorded = [];
-
-    /** @var list<DateTimeImmutable> */
-    public array $paused = [];
-
-    public function acquire(int $estimatedInputTokens): void
-    {
-        $this->acquired[] = $estimatedInputTokens;
-    }
-
-    public function record(int $inputTokens, int $outputTokens): void
-    {
-        $this->recorded[] = [$inputTokens, $outputTokens];
-    }
-
-    public function pauseUntil(DateTimeImmutable $until): void
-    {
-        $this->paused[] = $until;
-    }
-}
-
-final class FixedTokenEstimator implements TokenEstimatorInterface
-{
-    public function __construct(private readonly int $tokensPerCall) {}
-
-    public function estimateTokens(string $text, string $model): int
-    {
-        return $this->tokensPerCall;
-    }
-}
-
-final class ThrowingConverter implements ResultConverterInterface
-{
-    public function __construct(private readonly RuntimeException $runtimeException) {}
-
-    public function supports(Model $model): bool
-    {
-        return true;
-    }
-
-    public function convert(RawResultInterface $result, array $options = []): ResultInterface
-    {
-        throw $this->runtimeException;
-    }
-
-    public function getTokenUsageExtractor(): ?TokenUsageExtractorInterface
-    {
-        return null;
     }
 }

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
+use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\MethodCall;
@@ -48,34 +49,63 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
             return [];
         }
 
-        try {
-            $parserFactory = new ParserFactory();
-            $parser = $parserFactory->createForNewestSupportedVersion();
-            $ast = $parser->parse($projectFile->content());
-
-            if (null === $ast) {
-                return [];
-            }
-
-            $nodeTraverser = new NodeTraverser();
-            $nodeTraverser->addVisitor(new NameResolver());
-            $ast = $nodeTraverser->traverse($ast);
-        } catch (Throwable) {
+        $ast = $this->parseAndResolveNames($projectFile->content());
+        if (null === $ast) {
             return [];
         }
 
         $nodeFinder = new NodeFinder();
         $classes = $nodeFinder->findInstanceOf($ast, Class_::class);
 
+        return $this->bindingsForClasses($projectFile->relativePath(), $classes, $nodeFinder);
+    }
+
+    /**
+     * @return array<Node>|null
+     */
+    private function parseAndResolveNames(string $content): ?array
+    {
+        try {
+            $parserFactory = new ParserFactory();
+            $parser = $parserFactory->createForNewestSupportedVersion();
+            $ast = $parser->parse($content) ?? [];
+
+            $nodeTraverser = new NodeTraverser();
+            $nodeTraverser->addVisitor(new NameResolver());
+
+            return $nodeTraverser->traverse($ast);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @param array<Class_> $classes
+     *
+     * @return list<FormBinding>
+     */
+    private function bindingsForClasses(string $filePath, array $classes, NodeFinder $nodeFinder): array
+    {
         $bindings = [];
         foreach ($classes as $class) {
-            foreach ($class->getMethods() as $methodNode) {
-                if (!$methodNode->isPublic()) {
-                    continue;
-                }
+            $bindings = [...$bindings, ...$this->bindingsForPublicMethods($filePath, $class, $nodeFinder)];
+        }
 
-                $bindings = [...$bindings, ...$this->bindingsForMethod($projectFile->relativePath(), $methodNode, $nodeFinder)];
+        return $bindings;
+    }
+
+    /**
+     * @return list<FormBinding>
+     */
+    private function bindingsForPublicMethods(string $filePath, Class_ $class, NodeFinder $nodeFinder): array
+    {
+        $bindings = [];
+        foreach ($class->getMethods() as $classMethod) {
+            if (!$classMethod->isPublic()) {
+                continue;
             }
+
+            $bindings = [...$bindings, ...$this->bindingsForMethod($filePath, $classMethod, $nodeFinder)];
         }
 
         return $bindings;

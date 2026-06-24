@@ -15,10 +15,15 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 
@@ -76,7 +81,7 @@ final class AuditContextTest extends TestCase
     public function test_it_accepts_mapping(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $symfonyMapping = SymfonyMapping::create();
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
 
         $auditContext->setMapping($symfonyMapping);
 
@@ -261,19 +266,11 @@ final class AuditContextTest extends TestCase
 
     private function makeVulnerability(string $discriminator, VulnerabilitySeverity $vulnerabilitySeverity): Vulnerability
     {
-        return Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: $vulnerabilitySeverity,
-            title: 'Test '.$discriminator,
-            description: 'Test',
-            filePath: 'src/'.$discriminator.'.php',
-            lineStart: 1,
-            lineEnd: 5,
-            vulnerableCode: '$query',
-            attackVector: 'Inject SQL',
-            proof: "' OR 1=1--",
-            remediation: 'Use prepared statements',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, $vulnerabilitySeverity, 'Test '.$discriminator, 0.9),
+            new CodeLocation('src/'.$discriminator.'.php', 1, 5),
+            new VulnerabilityNarrative('Test', 'Inject SQL', "' OR 1=1--", 'Use prepared statements'),
+            '$query',
         );
     }
 }

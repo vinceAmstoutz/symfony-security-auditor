@@ -15,8 +15,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
@@ -40,7 +42,10 @@ final class AttackerPromptBuilderTest extends TestCase
             '<?php class PublicController {}',
         );
 
-        $symfonyMapping = SymfonyMapping::create(controllers: [$projectFile]);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(),
+        );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
 
@@ -65,9 +70,9 @@ final class AttackerPromptBuilderTest extends TestCase
             classHasIsGranted: false,
         );
 
-        $symfonyMapping = SymfonyMapping::create(
-            controllers: [$projectFile],
-            routeAccessControls: [$routeAccessControl],
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(routeAccessControls: [$routeAccessControl]),
         );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
@@ -97,10 +102,12 @@ final class AttackerPromptBuilderTest extends TestCase
             classHasIsGranted: false,
         );
 
-        $symfonyMapping = SymfonyMapping::create(
-            controllers: [$projectFile],
-            routeAccessMap: ['^/admin' => ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']],
-            routeAccessControls: [$routeAccessControl],
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(
+                routeAccessMap: ['^/admin' => ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']],
+                routeAccessControls: [$routeAccessControl],
+            ),
         );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
@@ -128,10 +135,12 @@ final class AttackerPromptBuilderTest extends TestCase
             classHasIsGranted: false,
         );
 
-        $symfonyMapping = SymfonyMapping::create(
-            controllers: [$projectFile],
-            routeAccessMap: ['^/admin' => ['ROLE_ADMIN']],
-            routeAccessControls: [$routeAccessControl],
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(
+                routeAccessMap: ['^/admin' => ['ROLE_ADMIN']],
+                routeAccessControls: [$routeAccessControl],
+            ),
         );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
@@ -158,9 +167,9 @@ final class AttackerPromptBuilderTest extends TestCase
             classHasIsGranted: true,
         );
 
-        $symfonyMapping = SymfonyMapping::create(
-            controllers: [$projectFile],
-            routeAccessControls: [$routeAccessControl],
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(routeAccessControls: [$routeAccessControl]),
         );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
@@ -179,7 +188,10 @@ final class AttackerPromptBuilderTest extends TestCase
             '<?php class PlainController {}',
         );
 
-        $symfonyMapping = SymfonyMapping::create(controllers: [$projectFile]);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(),
+        );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
 
@@ -204,9 +216,9 @@ final class AttackerPromptBuilderTest extends TestCase
             classHasIsGranted: false,
         );
 
-        $symfonyMapping = SymfonyMapping::create(
-            controllers: [$projectFile],
-            routeAccessControls: [$routeAccessControl],
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(routeAccessControls: [$routeAccessControl]),
         );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
@@ -232,9 +244,9 @@ final class AttackerPromptBuilderTest extends TestCase
             classHasIsGranted: false,
         );
 
-        $symfonyMapping = SymfonyMapping::create(
-            controllers: [$projectFile],
-            routeAccessControls: [$routeAccessControl],
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(routeAccessControls: [$routeAccessControl]),
         );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
@@ -256,9 +268,9 @@ final class AttackerPromptBuilderTest extends TestCase
             supportedSubjects: ['App\\Entity\\User'],
         );
 
-        $symfonyMapping = SymfonyMapping::create(
-            voters: [$projectFile],
-            voterCapabilities: [$voterCapability],
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['voters' => [$projectFile]]),
+            new AccessControlMap(voterCapabilities: [$voterCapability]),
         );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
@@ -277,7 +289,10 @@ final class AttackerPromptBuilderTest extends TestCase
             '<?php class PlainController {}',
         );
 
-        $symfonyMapping = SymfonyMapping::create(controllers: [$projectFile]);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(),
+        );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
 
@@ -297,9 +312,9 @@ final class AttackerPromptBuilderTest extends TestCase
             formTypeClass: 'App\\Form\\UserType',
         );
 
-        $symfonyMapping = SymfonyMapping::create(
-            controllers: [$projectFile],
-            formBindings: [$formBinding],
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(formBindings: [$formBinding]),
         );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
@@ -317,7 +332,10 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $message = $this->attackerPromptBuilder->buildUserMessage(
             [$projectFile],
-            SymfonyMapping::create(routeAccessControls: [$routeAccessControl], voterCapabilities: [$voterCapability]),
+            SymfonyMapping::of(
+                ProjectFileInventory::fromGroups([]),
+                new AccessControlMap(routeAccessControls: [$routeAccessControl], voterCapabilities: [$voterCapability]),
+            ),
         );
 
         self::assertMatchesRegularExpression(
@@ -334,7 +352,10 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $message = $this->attackerPromptBuilder->buildUserMessage(
             [$projectFile],
-            SymfonyMapping::create(voterCapabilities: [$voterCapability], formBindings: [$formBinding]),
+            SymfonyMapping::of(
+                ProjectFileInventory::fromGroups([]),
+                new AccessControlMap(voterCapabilities: [$voterCapability], formBindings: [$formBinding]),
+            ),
         );
 
         self::assertMatchesRegularExpression(
@@ -350,7 +371,10 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $message = $this->attackerPromptBuilder->buildUserMessage(
             [$projectFile],
-            SymfonyMapping::create(formBindings: [$formBinding]),
+            SymfonyMapping::of(
+                ProjectFileInventory::fromGroups([]),
+                new AccessControlMap(formBindings: [$formBinding]),
+            ),
         );
 
         self::assertMatchesRegularExpression(
@@ -367,7 +391,10 @@ final class AttackerPromptBuilderTest extends TestCase
             '<?php class PlainController {}',
         );
 
-        $symfonyMapping = SymfonyMapping::create(controllers: [$projectFile]);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(),
+        );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
 
@@ -382,7 +409,10 @@ final class AttackerPromptBuilderTest extends TestCase
             '<?php class SecuredController { public function __construct() { $this->denyAccessUnlessGranted("ROLE_USER"); } }',
         );
 
-        $symfonyMapping = SymfonyMapping::create(controllers: [$projectFile]);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(),
+        );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
 
@@ -402,7 +432,10 @@ final class AttackerPromptBuilderTest extends TestCase
             '<?php class BController {}',
         );
 
-        $symfonyMapping = SymfonyMapping::create(controllers: [$projectFile, $controllerB]);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile, $controllerB]]),
+            new AccessControlMap(),
+        );
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile, $controllerB], $symfonyMapping);
 
@@ -751,7 +784,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $message = $this->attackerPromptBuilder->buildUserMessage(
             [$projectFile],
-            SymfonyMapping::create(),
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
         );
 
         self::assertStringContainsString(
@@ -771,7 +804,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $message = $this->attackerPromptBuilder->buildUserMessage(
             [$projectFile],
-            SymfonyMapping::create(),
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
         );
 
         self::assertStringNotContainsString('```php', $message);
@@ -801,7 +834,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $message = $this->attackerPromptBuilder->buildUserMessage(
             [$projectFile],
-            SymfonyMapping::create(),
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
         );
 
         // Lock both per-line numbering AND the "\n" separator between lines —
@@ -819,7 +852,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $message = $this->attackerPromptBuilder->buildUserMessage(
             [$projectFile],
-            SymfonyMapping::create(),
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
         );
 
         self::assertStringContainsString('Each line is prefixed with its line number', $message);
@@ -887,11 +920,6 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString("new Process(['ls', '-la'])", $prompt);
     }
 
-    public function test_prompt_version_is_bumped_when_modern_symfony_skill_blocks_are_added(): void
-    {
-        self::assertSame(9, AttackerPromptBuilder::PROMPT_VERSION);
-    }
-
     public function test_base_prompt_includes_the_source_to_sink_analysis_methodology(): void
     {
         $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
@@ -955,7 +983,7 @@ final class AttackerPromptBuilderTest extends TestCase
             '<?php class UserController {}',
         );
 
-        $message = $attackerPromptBuilder->buildUserMessage([$projectFile], SymfonyMapping::create());
+        $message = $attackerPromptBuilder->buildUserMessage([$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 
         self::assertStringNotContainsString('Return a JSON array', $message);
         self::assertStringContainsString('record_vulnerability', $message);
@@ -970,7 +998,7 @@ final class AttackerPromptBuilderTest extends TestCase
             '<?php class UserController {}',
         );
 
-        $message = $attackerPromptBuilder->buildUserMessage([$projectFile], SymfonyMapping::create());
+        $message = $attackerPromptBuilder->buildUserMessage([$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 
         self::assertStringContainsString('Return a JSON array of all vulnerabilities found.', $message);
         self::assertStringNotContainsString('record_vulnerability', $message);

@@ -16,8 +16,6 @@ GitHub Code Scanning or the GitLab Security Dashboard.
 > See also: [Configuration](configuration.md) · [FAQ](faq.md) ·
 > [Troubleshooting](troubleshooting.md)
 
----
-
 ## Why Scheduled, Not Per-Push
 
 The auditor runs a multi-agent LLM loop (up to 3 attacker/reviewer iterations).
@@ -29,8 +27,6 @@ are not introduced commit-by-commit.
 **Recommended pattern**: nightly scheduled pipeline. Results land in your
 security dashboard (GitHub Code Scanning, GitLab Security Dashboard) and can
 trigger alerts on new findings.
-
----
 
 ## Managing LLM Costs
 
@@ -84,8 +80,6 @@ scheduled runs:
   Usage limits
 - OpenAI: [platform.openai.com](https://platform.openai.com) → Settings → Limits
 - Others: check your provider's billing dashboard
-
----
 
 ## Report Visibility on Public Repositories
 
@@ -143,8 +137,6 @@ exposure:
 Use a scoped Personal Access Token (PAT) with `contents: write` on a private
 repo to push reports there. Keeps your source repo public while centralising
 security findings privately.
-
----
 
 ## GitHub Actions
 
@@ -275,8 +267,6 @@ code, so a green PR check means "no new findings since the baseline".
           retention-days: 30
 ```
 
----
-
 ## GitLab CI
 
 Add your LLM provider key as a CI/CD variable (`Settings → CI/CD → Variables`).
@@ -336,8 +326,6 @@ symfony-security-audit:
       - report.json
     expire_in: 30 days
 ```
-
----
 
 ## Output Formats Reference
 

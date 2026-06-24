@@ -120,6 +120,20 @@ final class PlainProgressReporterTest extends TestCase
         self::assertSame('', $this->bufferedOutput->fetch());
     }
 
+    public function test_it_prints_a_validated_review_line(): void
+    {
+        $this->plainProgressReporter->report('review.finding.reviewed', ['accepted' => true, 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 18]);
+
+        self::assertSame("  [VALIDATED] sql_injection — src/X.php:18\n", $this->bufferedOutput->fetch());
+    }
+
+    public function test_it_prints_a_rejected_review_line(): void
+    {
+        $this->plainProgressReporter->report('review.finding.reviewed', ['accepted' => false, 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 40]);
+
+        self::assertSame("  [REJECTED] sql_injection — src/X.php:40\n", $this->bufferedOutput->fetch());
+    }
+
     public function test_it_never_emits_carriage_returns(): void
     {
         $this->plainProgressReporter->report('audit.started', ['files' => 1, 'controllers' => 1, 'voters' => 0, 'forms' => 0]);

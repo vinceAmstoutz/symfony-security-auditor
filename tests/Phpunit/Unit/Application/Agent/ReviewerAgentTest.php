@@ -18,11 +18,17 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
@@ -71,7 +77,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($reviewResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(100, 100)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $result = $reviewerAgent->review([$vulnerability], $files, new NullCoverageRecorder());
@@ -96,7 +102,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($reviewResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(100, 100)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -121,7 +127,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($reviewResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(100, 100)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -145,7 +151,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($reviewResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(100, 100)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -164,7 +170,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create('not json!!!', 100, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('not json!!!', 'claude', 'end_turn', TokenUsageSnapshot::of(100, 10)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -198,7 +204,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create('', 100, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(100, 0)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -217,14 +223,8 @@ final class ReviewerAgentTest extends TestCase
             ->expects(self::exactly(2))
             ->method('complete')
             ->willReturnOnConsecutiveCalls(
-                LLMResponse::create(
-                    (string) json_encode(['accepted' => true, 'reviewer_notes' => 'confirmed']),
-                    100, 100, 'claude', 'end_turn',
-                ),
-                LLMResponse::create(
-                    (string) json_encode(['accepted' => false, 'reviewer_notes' => 'false positive']),
-                    100, 100, 'claude', 'end_turn',
-                ),
+                LLMResponse::of((string) json_encode(['accepted' => true, 'reviewer_notes' => 'confirmed']), 'claude', 'end_turn', TokenUsageSnapshot::of(100, 100)),
+                LLMResponse::of((string) json_encode(['accepted' => false, 'reviewer_notes' => 'false positive']), 'claude', 'end_turn', TokenUsageSnapshot::of(100, 100)),
             );
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
@@ -250,7 +250,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($reviewResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(100, 100)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -274,10 +274,7 @@ final class ReviewerAgentTest extends TestCase
             ->willReturnCallback(static function (string $sys, string $user) use (&$capturedUserMessage): LLMResponse {
                 $capturedUserMessage = $user;
 
-                return LLMResponse::create(
-                    (string) json_encode(['accepted' => false]),
-                    100, 10, 'claude', 'end_turn',
-                );
+                return LLMResponse::of((string) json_encode(['accepted' => false]), 'claude', 'end_turn', TokenUsageSnapshot::of(100, 10));
             });
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
@@ -309,13 +306,7 @@ final class ReviewerAgentTest extends TestCase
             ->willReturnCallback(static function (string $sys, string $user) use (&$capturedUserMessage): LLMResponse {
                 $capturedUserMessage = $user;
 
-                return LLMResponse::create(
-                    (string) json_encode(['accepted' => false, 'reviewer_notes' => 'ok']),
-                    100,
-                    10,
-                    'claude',
-                    'end_turn',
-                );
+                return LLMResponse::of((string) json_encode(['accepted' => false, 'reviewer_notes' => 'ok']), 'claude', 'end_turn', TokenUsageSnapshot::of(100, 10));
             });
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
@@ -339,15 +330,15 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create(
-                (string) json_encode(['accepted' => true]),
-                10, 10, 'claude', 'end_turn',
-            ));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => true]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -364,9 +355,12 @@ final class ReviewerAgentTest extends TestCase
         $llmClient->expects(self::never())->method('complete');
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $result = $reviewerAgent->review([], [], new NullCoverageRecorder());
@@ -390,12 +384,15 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('invalid json {{{', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('invalid json {{{', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -423,12 +420,15 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create($longInvalidContent, 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($longInvalidContent, 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $reviewerAgent->review([$this->makeVulnerability()], [], new NullCoverageRecorder());
@@ -464,13 +464,17 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create($longInvalidContent, 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($longInvalidContent, 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $reviewerAgent->review(
@@ -509,9 +513,12 @@ final class ReviewerAgentTest extends TestCase
             ->willThrowException(new RuntimeException('Timeout'));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -536,15 +543,15 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create(
-                (string) json_encode(['accepted' => true, 'reviewer_notes' => 'confirmed']),
-                10, 10, 'claude', 'end_turn',
-            ));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => true, 'reviewer_notes' => 'confirmed']), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -569,15 +576,15 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create(
-                (string) json_encode(['accepted' => false, 'reviewer_notes' => 'rejected']),
-                10, 10, 'claude', 'end_turn',
-            ));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => false, 'reviewer_notes' => 'rejected']), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -601,15 +608,15 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create(
-                (string) json_encode(['accepted' => true, 'reviewer_notes' => 'looks good']),
-                10, 10, 'claude', 'end_turn',
-            ));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => true, 'reviewer_notes' => 'looks good']), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -635,12 +642,15 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('', 10, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 0)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -664,15 +674,15 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create(
-                (string) json_encode(['accepted' => true, 'adjusted_severity' => 'SUPER_CRITICAL_9000']),
-                10, 10, 'claude', 'end_turn',
-            ));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => true, 'adjusted_severity' => 'SUPER_CRITICAL_9000']), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -692,10 +702,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create(
-                (string) json_encode(['reviewer_notes' => 'no accepted key']),
-                10, 10, 'claude', 'end_turn',
-            ));
+            ->willReturn(LLMResponse::of((string) json_encode(['reviewer_notes' => 'no accepted key']), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -720,15 +727,15 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create(
-                (string) json_encode(['accepted' => false, 'reviewer_notes' => 'false positive']),
-                10, 10, 'claude', 'end_turn',
-            ));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => false, 'reviewer_notes' => 'false positive']), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -764,19 +771,19 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create(
-                (string) json_encode([
-                    'accepted' => true,
-                    'adjusted_severity' => 'critical',
-                    'reviewer_notes' => 'severity upgraded',
-                ]),
-                10, 10, 'claude', 'end_turn',
-            ));
+            ->willReturn(LLMResponse::of((string) json_encode([
+                'accepted' => true,
+                'adjusted_severity' => 'critical',
+                'reviewer_notes' => 'severity upgraded',
+            ]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -817,10 +824,7 @@ final class ReviewerAgentTest extends TestCase
                 static function (string $sys, string $user) use (&$capturedUserMessage): LLMResponse {
                     $capturedUserMessage = $user;
 
-                    return LLMResponse::create(
-                        (string) json_encode(['accepted' => true]),
-                        10, 10, 'claude', 'end_turn',
-                    );
+                    return LLMResponse::of((string) json_encode(['accepted' => true]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10));
                 },
             );
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
@@ -846,13 +850,17 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create($batchResponse, 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($batchResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability, $b, $c], [], new NullCoverageRecorder());
@@ -878,14 +886,18 @@ final class ReviewerAgentTest extends TestCase
             ->willReturnCallback(static function () use (&$callIndex): LLMResponse {
                 ++$callIndex;
 
-                return LLMResponse::create('[]', 0, 0, 'claude', 'end_turn');
+                return LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 3,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 3,
+            ),
         );
 
         $reviewerAgent->review($vulns, [], new NullCoverageRecorder());
@@ -905,13 +917,17 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create($batchResponse, 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($batchResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability, $b], [], new NullCoverageRecorder());
@@ -933,15 +949,19 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create($batchResponse, 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($batchResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $reviewerAgent->review([$vulnerability, $b], [], $auditContext);
@@ -968,10 +988,14 @@ final class ReviewerAgentTest extends TestCase
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability, $b], [], $auditContext);
@@ -995,15 +1019,19 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('not json{{{', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('not json{{{', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $reviewerAgent->review([$vulnerability, $b], [], $auditContext);
@@ -1025,15 +1053,19 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('', 10, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 0)));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability, $b], [], $auditContext);
@@ -1067,15 +1099,19 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->method('complete')
             ->willReturnOnConsecutiveCalls(
-                LLMResponse::create($batch1Response, 0, 0, 'claude', 'end_turn'),
-                LLMResponse::create($batch2Response, 0, 0, 'claude', 'end_turn'),
+                LLMResponse::of($batch1Response, 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)),
+                LLMResponse::of($batch2Response, 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)),
             );
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 2,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 2,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability, $b, $c], [], new NullCoverageRecorder());
@@ -1095,15 +1131,19 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create($batchResponse, 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($batchResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $reviewerAgent->review([$vulnerability, $b], [], $auditContext);
@@ -1130,13 +1170,17 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create($batchResponse, 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($batchResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability, $b], [], new NullCoverageRecorder());
@@ -1162,13 +1206,17 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create($batchResponse, 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($batchResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability, $b], [], new NullCoverageRecorder());
@@ -1193,13 +1241,17 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('not json{{{', 0, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('not json{{{', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $reviewerAgent->review(
@@ -1238,10 +1290,14 @@ final class ReviewerAgentTest extends TestCase
             ->willThrowException(new RuntimeException('API down'));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $reviewerAgent->review(
@@ -1272,13 +1328,17 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create($batchResponse, 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($batchResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1289,19 +1349,11 @@ final class ReviewerAgentTest extends TestCase
     public function test_it_corrects_type_when_reviewer_reclassifies_accepted_finding(): void
     {
         // Attacker labelled it SQLi but reviewer determines it's actually an SSRF.
-        $vulnerability = Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'Mislabelled finding',
-            description: 'desc',
-            filePath: 'src/Service/Webhook.php',
-            lineStart: 10,
-            lineEnd: 12,
-            vulnerableCode: 'code',
-            attackVector: 'vec',
-            proof: 'proof',
-            remediation: 'fix',
-            confidence: 0.9,
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Mislabelled finding', 0.9),
+            new CodeLocation('src/Service/Webhook.php', 10, 12),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
         );
 
         $reviewResponse = (string) json_encode([
@@ -1314,7 +1366,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($reviewResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(100, 100)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1335,7 +1387,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($reviewResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(100, 100)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1358,7 +1410,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create($reviewResponse, 100, 100, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of($reviewResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(100, 100)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1383,15 +1435,15 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create(
-                (string) json_encode(['accepted' => true, 'corrected_type' => 'NOT_A_TYPE_999']),
-                10, 10, 'claude', 'end_turn',
-            ));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => true, 'corrected_type' => 'NOT_A_TYPE_999']), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1413,10 +1465,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create(
-                (string) json_encode(['accepted' => true, 'corrected_type' => 12345]),
-                10, 10, 'claude', 'end_turn',
-            ));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => true, 'corrected_type' => 12345]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1432,7 +1481,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create((string) json_encode(['accepted' => true]), 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => true]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -1452,7 +1501,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create((string) json_encode(['accepted' => false]), 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => false]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -1472,7 +1521,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('', 10, 0, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 0)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -1492,7 +1541,7 @@ final class ReviewerAgentTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient
             ->method('complete')
-            ->willReturn(LLMResponse::create('garbage{{{', 10, 10, 'claude', 'end_turn'));
+            ->willReturn(LLMResponse::of('garbage{{{', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
         $reviewerAgent = $this->makeReviewerAgent($llmClient);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -1562,10 +1611,14 @@ final class ReviewerAgentTest extends TestCase
             ->method('complete')
             ->willThrowException(new LLMProviderException('platform unreachable'));
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $this->expectException(LLMProviderException::class);
@@ -1582,10 +1635,14 @@ final class ReviewerAgentTest extends TestCase
             ->method('complete')
             ->willThrowException(BudgetExceededException::forTokens(500, 100));
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            batchSize: 5,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $this->expectException(BudgetExceededException::class);
@@ -1617,12 +1674,12 @@ final class ReviewerAgentTest extends TestCase
             {
                 ++$this->completeCalls;
 
-                return LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn');
+                return LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(0, 0));
             }
 
             public function completeWithTools(string $systemPrompt, string $userMessage, ToolRegistry $toolRegistry, int $maxToolIterations): LLMResponse
             {
-                return LLMResponse::create('{}', 0, 0, 'm', 'end_turn');
+                return LLMResponse::of('{}', 'm', 'end_turn', TokenUsageSnapshot::of(0, 0));
             }
 
             public function model(): string
@@ -1635,17 +1692,21 @@ final class ReviewerAgentTest extends TestCase
                 ++$this->batchCalls;
 
                 return array_map(
-                    static fn (): LLMResponse => LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn'),
+                    static fn (): LLMResponse => LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(0, 0)),
                     $requests,
                 );
             }
         };
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            maxConcurrent: 4,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+            ),
         );
 
         $reviewed = $reviewerAgent->review($vulnerabilities, [], new NullCoverageRecorder());
@@ -1655,6 +1716,70 @@ final class ReviewerAgentTest extends TestCase
         self::assertCount(2, $reviewed);
         self::assertTrue($reviewed[0]->isReviewerValidated());
         self::assertTrue($reviewed[1]->isReviewerValidated());
+    }
+
+    public function test_concurrent_review_skips_the_batch_call_when_every_finding_is_a_cache_hit(): void
+    {
+        $vulnerabilities = [$this->makeVulnerabilityAt('src/A.php'), $this->makeVulnerabilityAt('src/B.php')];
+
+        $llmClient = $this->createMock(BatchCapableLLMClientInterface::class);
+        $llmClient->expects(self::never())->method('completeBatch');
+        $llmClient->expects(self::never())->method('complete');
+
+        $reviewerCache = self::createStub(ReviewerCacheInterface::class);
+        $reviewerCache->method('get')->willReturn(['accepted' => true]);
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+            ),
+        );
+
+        $reviewed = $reviewerAgent->review($vulnerabilities, [], new NullCoverageRecorder());
+
+        self::assertCount(2, $reviewed);
+        self::assertTrue($reviewed[0]->isReviewerValidated());
+        self::assertTrue($reviewed[1]->isReviewerValidated());
+    }
+
+    public function test_batch_json_mode_invokes_the_tool_aware_completion_when_tools_are_enabled(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('complete');
+        $llmClient->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturn(LLMResponse::of((string) json_encode([['id' => $vulnerability->id(), 'accepted' => true]]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
+
+        $toolRegistry = new ToolRegistry([], new NullLogger());
+        $toolFactory = self::createStub(ToolRegistryFactoryInterface::class);
+        $toolFactory->method('forProjectFiles')->willReturn($toolRegistry);
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+                toolsEnabled: true,
+                useStructuredCollection: false,
+            ),
+            toolRegistryFactory: $toolFactory,
+        );
+
+        $reviewed = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertCount(1, $reviewed);
+        self::assertTrue($reviewed[0]->isReviewerValidated());
     }
 
     public function test_it_stays_sequential_when_max_concurrent_is_one_even_if_batch_capable(): void
@@ -1670,12 +1795,12 @@ final class ReviewerAgentTest extends TestCase
             {
                 ++$this->completeCalls;
 
-                return LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn');
+                return LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(0, 0));
             }
 
             public function completeWithTools(string $systemPrompt, string $userMessage, ToolRegistry $toolRegistry, int $maxToolIterations): LLMResponse
             {
-                return LLMResponse::create('{}', 0, 0, 'm', 'end_turn');
+                return LLMResponse::of('{}', 'm', 'end_turn', TokenUsageSnapshot::of(0, 0));
             }
 
             public function model(): string
@@ -1692,10 +1817,14 @@ final class ReviewerAgentTest extends TestCase
         };
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
-            maxConcurrent: 1,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 1,
+            ),
         );
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1712,21 +1841,22 @@ final class ReviewerAgentTest extends TestCase
         $llmClient->expects(self::never())->method('complete');
         $llmClient->expects(self::once())
             ->method('completeWithTools')
-            ->willReturn(LLMResponse::create(
-                (string) json_encode(['accepted' => true]),
-                10, 10, 'claude', 'end_turn',
-            ));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => true]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $toolRegistry = new ToolRegistry([], new NullLogger());
         $toolFactory = self::createStub(ToolRegistryFactoryInterface::class);
         $toolFactory->method('forProjectFiles')->willReturn($toolRegistry);
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                toolsEnabled: true,
+            ),
             toolRegistryFactory: $toolFactory,
-            toolsEnabled: true,
         );
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1740,21 +1870,22 @@ final class ReviewerAgentTest extends TestCase
         $llmClient->expects(self::never())->method('completeWithTools');
         $llmClient->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create(
-                (string) json_encode(['accepted' => true]),
-                10, 10, 'claude', 'end_turn',
-            ));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => true]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $toolRegistry = new ToolRegistry([], new NullLogger());
         $toolFactory = self::createStub(ToolRegistryFactoryInterface::class);
         $toolFactory->method('forProjectFiles')->willReturn($toolRegistry);
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                toolsEnabled: false,
+            ),
             toolRegistryFactory: $toolFactory,
-            toolsEnabled: false,
         );
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1774,21 +1905,22 @@ final class ReviewerAgentTest extends TestCase
         $logger->method('debug');
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('completeWithTools')->willReturn(LLMResponse::create(
-            (string) json_encode(['accepted' => true]),
-            10, 10, 'claude', 'end_turn',
-        ));
+        $llmClient->method('completeWithTools')->willReturn(LLMResponse::of((string) json_encode(['accepted' => true]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $toolRegistry = new ToolRegistry([], new NullLogger());
         $toolFactory = self::createStub(ToolRegistryFactoryInterface::class);
         $toolFactory->method('forProjectFiles')->willReturn($toolRegistry);
 
         $reviewerAgent = new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: $logger,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(
+                toolsEnabled: true,
+            ),
             toolRegistryFactory: $toolFactory,
-            toolsEnabled: true,
         );
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
@@ -1798,9 +1930,12 @@ final class ReviewerAgentTest extends TestCase
     private function makeReviewerAgent(LLMClientInterface $llmClient): ReviewerAgent
     {
         return new ReviewerAgent(
-            llmClient: $llmClient,
-            reviewerPromptBuilder: new ReviewerPromptBuilder(),
-            logger: new NullLogger(),
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(),
         );
     }
 
@@ -1822,15 +1957,19 @@ final class ReviewerAgentTest extends TestCase
                     'reviewer_notes' => 'confirmed',
                 ]);
 
-                return LLMResponse::create('', 10, 5, 'claude', 'end_turn');
+                return LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
             });
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1845,14 +1984,18 @@ final class ReviewerAgentTest extends TestCase
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('completeWithTools')->willReturn(LLMResponse::create('', 0, 0, 'claude', 'end_turn'));
+        $llmClient->method('completeWithTools')->willReturn(LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1869,11 +2012,15 @@ final class ReviewerAgentTest extends TestCase
         $llmClient->method('completeWithTools')->willThrowException(new RuntimeException('transport hiccup'));
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1895,16 +2042,20 @@ final class ReviewerAgentTest extends TestCase
                 $toolRegistry->execute('record_review', ['id' => $rejected->id(), 'accepted' => false]);
                 $toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
 
-                return LLMResponse::create('', 10, 5, 'claude', 'end_turn');
+                return LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
             });
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            batchSize: 5,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability, $rejected], [], new NullCoverageRecorder());
@@ -1923,15 +2074,19 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('completeBatch')
-            ->willReturn([LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn')]);
+            ->willReturn([LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(0, 0))]);
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            maxConcurrent: 4,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1951,20 +2106,24 @@ final class ReviewerAgentTest extends TestCase
             ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
                 self::assertFalse($toolRegistry->has('record_review'));
 
-                return LLMResponse::create('{"accepted": true}', 0, 0, 'm', 'end_turn');
+                return LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(0, 0));
             });
 
         $toolFactory = self::createStub(ToolRegistryFactoryInterface::class);
         $toolFactory->method('forProjectFiles')->willReturn(new ToolRegistry([], new NullLogger()));
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                toolsEnabled: true,
+                useStructuredCollection: true,
+            ),
             toolRegistryFactory: $toolFactory,
-            toolsEnabled: true,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -1986,14 +2145,17 @@ final class ReviewerAgentTest extends TestCase
                 self::assertTrue($toolRegistry->has('record_review'));
                 $toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
 
-                return LLMResponse::create('', 10, 5, 'claude', 'end_turn');
+                return LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
             });
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -2011,13 +2173,17 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create((string) json_encode(['accepted' => true]), 0, 0, 'test', 'end_turn'));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => true]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -2037,16 +2203,20 @@ final class ReviewerAgentTest extends TestCase
                 $id = str_contains($user, 'src/First.php') ? $vulnerability->id() : $second->id();
                 $toolRegistry->execute('record_review', ['id' => $id, 'accepted' => true]);
 
-                return LLMResponse::create('', 10, 5, 'claude', 'end_turn');
+                return LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
             },
         );
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability, $second], [], new NullCoverageRecorder());
@@ -2066,11 +2236,15 @@ final class ReviewerAgentTest extends TestCase
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], $auditContext);
@@ -2088,11 +2262,15 @@ final class ReviewerAgentTest extends TestCase
         $llmClient->method('completeWithTools')->willThrowException(new NonTransientLLMFailureException('retired model'));
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
         );
 
         $this->expectException(LLMProviderException::class);
@@ -2106,11 +2284,15 @@ final class ReviewerAgentTest extends TestCase
         $llmClient->method('completeWithTools')->willThrowException(new BudgetExceededException('budget gone'));
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
         );
 
         $this->expectException(BudgetExceededException::class);
@@ -2126,12 +2308,16 @@ final class ReviewerAgentTest extends TestCase
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            batchSize: 5,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$this->makeVulnerabilityAt('src/A.php'), $this->makeVulnerabilityAt('src/B.php')], [], $auditContext);
@@ -2153,12 +2339,16 @@ final class ReviewerAgentTest extends TestCase
         $llmClient->method('completeWithTools')->willThrowException(new NonTransientLLMFailureException('retired model'));
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            batchSize: 5,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+                useStructuredCollection: true,
+            ),
         );
 
         $this->expectException(LLMProviderException::class);
@@ -2172,12 +2362,16 @@ final class ReviewerAgentTest extends TestCase
         $llmClient->method('completeWithTools')->willThrowException(new BudgetExceededException('budget gone'));
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            batchSize: 5,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+                useStructuredCollection: true,
+            ),
         );
 
         $this->expectException(BudgetExceededException::class);
@@ -2197,10 +2391,13 @@ final class ReviewerAgentTest extends TestCase
         $reviewerCache->method('get')->willReturn(['accepted' => true, 'adjusted_severity' => 'critical']);
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -2227,10 +2424,13 @@ final class ReviewerAgentTest extends TestCase
         );
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            $logger,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -2249,7 +2449,7 @@ final class ReviewerAgentTest extends TestCase
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(
-            LLMResponse::create((string) json_encode(['accepted' => true]), 0, 0, 'test', 'end_turn'),
+            LLMResponse::of((string) json_encode(['accepted' => true]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
@@ -2259,10 +2459,13 @@ final class ReviewerAgentTest extends TestCase
             ->with($vulnerability, '', ['accepted' => true]);
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -2276,7 +2479,7 @@ final class ReviewerAgentTest extends TestCase
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(
-            LLMResponse::create((string) json_encode(['accepted' => true]), 0, 0, 'test', 'end_turn'),
+            LLMResponse::of((string) json_encode(['accepted' => true]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
@@ -2284,10 +2487,13 @@ final class ReviewerAgentTest extends TestCase
         $reviewerCache->expects(self::never())->method('store');
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder(), bypassCache: true);
@@ -2300,17 +2506,20 @@ final class ReviewerAgentTest extends TestCase
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('', 0, 0, 'test', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
         $reviewerCache->method('get')->willReturn(null);
         $reviewerCache->expects(self::never())->method('store');
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -2324,7 +2533,7 @@ final class ReviewerAgentTest extends TestCase
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(
-            LLMResponse::create((string) json_encode(['accepted' => true]), 0, 0, 'test', 'end_turn'),
+            LLMResponse::of((string) json_encode(['accepted' => true]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $reviewerCache = self::createStub(ReviewerCacheInterface::class);
@@ -2339,10 +2548,13 @@ final class ReviewerAgentTest extends TestCase
         );
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            $logger,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(),
         );
 
         $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -2359,14 +2571,18 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('complete')
-            ->willReturn(LLMResponse::create((string) json_encode(['accepted' => true]), 0, 0, 'test', 'end_turn'));
+            ->willReturn(LLMResponse::of((string) json_encode(['accepted' => true]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: false,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: false,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -2387,12 +2603,16 @@ final class ReviewerAgentTest extends TestCase
         $reviewerCache->method('get')->willReturn(['accepted' => true, 'adjusted_severity' => 'critical']);
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -2410,7 +2630,7 @@ final class ReviewerAgentTest extends TestCase
             static function (string $system, string $user, ToolRegistry $toolRegistry) use ($vulnerability): LLMResponse {
                 $toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
 
-                return LLMResponse::create('', 10, 5, 'claude', 'end_turn');
+                return LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
             },
         );
 
@@ -2421,12 +2641,16 @@ final class ReviewerAgentTest extends TestCase
             ->with($vulnerability, '', ['id' => $vulnerability->id(), 'accepted' => true]);
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -2443,7 +2667,7 @@ final class ReviewerAgentTest extends TestCase
             static function (string $system, string $user, ToolRegistry $toolRegistry) use ($vulnerability): LLMResponse {
                 $toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
 
-                return LLMResponse::create('', 10, 5, 'claude', 'end_turn');
+                return LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
             },
         );
 
@@ -2452,12 +2676,16 @@ final class ReviewerAgentTest extends TestCase
         $reviewerCache->expects(self::never())->method('store');
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder(), bypassCache: true);
@@ -2471,7 +2699,7 @@ final class ReviewerAgentTest extends TestCase
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('completeWithTools')->willReturn(
-            LLMResponse::create('', 10, 5, 'claude', 'end_turn'),
+            LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5)),
         );
 
         $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
@@ -2479,12 +2707,16 @@ final class ReviewerAgentTest extends TestCase
         $reviewerCache->expects(self::never())->method('store');
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -2509,16 +2741,20 @@ final class ReviewerAgentTest extends TestCase
                     self::registryOf($requests[0])->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
                     self::registryOf($requests[1])->execute('record_review', ['id' => $second->id(), 'accepted' => false]);
 
-                    return [LLMResponse::create('', 1, 1, 'm', 'end_turn'), LLMResponse::create('', 1, 1, 'm', 'end_turn')];
+                    return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
                 });
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            maxConcurrent: 4,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability, $second], [], new NullCoverageRecorder());
@@ -2530,13 +2766,54 @@ final class ReviewerAgentTest extends TestCase
         self::assertFalse($result[1]->isReviewerValidated());
     }
 
+    public function test_concurrent_structured_path_logs_structured_collection_enabled(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $infoLogs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$infoLogs): void {
+                $infoLogs[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('debug');
+
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(
+                static function (array $requests) use ($vulnerability): array {
+                    self::registryOf($requests[0])->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
+
+                    return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
+                });
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                $logger,
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+                useStructuredCollection: true,
+            ),
+        );
+
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertSame(['Reviewer agent validating findings', ['count' => 1, 'batch_size' => 1, 'tools_enabled' => false, 'structured_collection' => true]], $infoLogs[0]);
+    }
+
     public function test_structured_concurrent_reviews_serve_cached_verdicts_and_dispatch_only_misses(): void
     {
         $first = $this->makeVulnerabilityAt('src/First.php');
         $second = $this->makeVulnerabilityAt('src/Second.php');
         $third = $this->makeVulnerabilityAt('src/Third.php');
 
-        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache = self::createStub(ReviewerCacheInterface::class);
         $reviewerCache->method('get')->willReturnOnConsecutiveCalls(null, ['accepted' => true], null);
         $storedFor = [];
         $reviewerCache->method('store')->willReturnCallback(
@@ -2555,17 +2832,21 @@ final class ReviewerAgentTest extends TestCase
                     self::registryOf($requests[0])->execute('record_review', ['id' => $first->id(), 'accepted' => true]);
                     self::registryOf($requests[1])->execute('record_review', ['id' => $third->id(), 'accepted' => true]);
 
-                    return [LLMResponse::create('', 1, 1, 'm', 'end_turn'), LLMResponse::create('', 1, 1, 'm', 'end_turn')];
+                    return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
                 });
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            maxConcurrent: 4,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$first, $second, $third], [], new NullCoverageRecorder());
@@ -2588,24 +2869,28 @@ final class ReviewerAgentTest extends TestCase
         $reviewerCache->expects(self::never())->method('get');
         $reviewerCache->expects(self::never())->method('store');
 
-        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
         $llmClient
             ->method('completeBatchWithTools')
             ->willReturnCallback(
                 static function (array $requests) use ($vulnerability): array {
                     self::registryOf($requests[0])->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
 
-                    return [LLMResponse::create('', 1, 1, 'm', 'end_turn')];
+                    return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
                 });
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            maxConcurrent: 4,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder(), bypassCache: true);
@@ -2616,39 +2901,51 @@ final class ReviewerAgentTest extends TestCase
     public function test_structured_concurrent_reviews_mark_pending_findings_errored_on_throwable(): void
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+        $second = $this->makeVulnerabilityAt('src/B.php');
 
-        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
         $llmClient->method('completeBatchWithTools')->willThrowException(new RuntimeException('boom'));
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            maxConcurrent: 4,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+                useStructuredCollection: true,
+            ),
         );
 
-        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+        $result = $reviewerAgent->review([$vulnerability, $second], [], new NullCoverageRecorder());
 
-        self::assertCount(1, $result);
+        self::assertCount(2, $result);
+        self::assertSame('src/A.php', $result[0]->filePath());
         self::assertFalse($result[0]->isReviewerValidated());
+        self::assertSame('src/B.php', $result[1]->filePath());
+        self::assertFalse($result[1]->isReviewerValidated());
     }
 
     public function test_structured_concurrent_reviews_propagate_llm_provider_exceptions(): void
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
 
-        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
         $llmClient->method('completeBatchWithTools')->willThrowException(new LLMProviderException('platform gone'));
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            maxConcurrent: 4,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+                useStructuredCollection: true,
+            ),
         );
 
         $this->expectException(LLMProviderException::class);
@@ -2660,16 +2957,20 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
 
-        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
         $llmClient->method('completeBatchWithTools')->willThrowException(BudgetExceededException::forTokens(10, 5));
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            maxConcurrent: 4,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+                useStructuredCollection: true,
+            ),
         );
 
         $this->expectException(BudgetExceededException::class);
@@ -2683,7 +2984,7 @@ final class ReviewerAgentTest extends TestCase
         $second = $this->makeVulnerabilityAt('src/Second.php');
         $third = $this->makeVulnerabilityAt('src/Third.php');
 
-        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache = self::createStub(ReviewerCacheInterface::class);
         $reviewerCache->method('get')->willReturnOnConsecutiveCalls(null, ['accepted' => true], null);
         $storedFor = [];
         $reviewerCache->method('store')->willReturnCallback(
@@ -2700,17 +3001,21 @@ final class ReviewerAgentTest extends TestCase
                 self::assertCount(2, $requests);
 
                 return [
-                    LLMResponse::create('{"accepted": true}', 1, 1, 'm', 'end_turn'),
-                    LLMResponse::create('{"accepted": true}', 1, 1, 'm', 'end_turn'),
+                    LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)),
+                    LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)),
                 ];
             });
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            maxConcurrent: 4,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+            ),
         );
 
         $result = $reviewerAgent->review([$first, $second, $third], [], new NullCoverageRecorder());
@@ -2733,17 +3038,21 @@ final class ReviewerAgentTest extends TestCase
         $reviewerCache->expects(self::never())->method('get');
         $reviewerCache->expects(self::never())->method('store');
 
-        $llmClient = $this->createMock(BatchCapableLLMClientInterface::class);
+        $llmClient = self::createStub(BatchCapableLLMClientInterface::class);
         $llmClient
             ->method('completeBatch')
-            ->willReturn([LLMResponse::create('{"accepted": true}', 1, 1, 'm', 'end_turn')]);
+            ->willReturn([LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))]);
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            maxConcurrent: 4,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder(), bypassCache: true);
@@ -2757,7 +3066,7 @@ final class ReviewerAgentTest extends TestCase
         $second = $this->makeVulnerabilityAt('src/Second.php');
         $third = $this->makeVulnerabilityAt('src/Third.php');
 
-        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache = self::createStub(ReviewerCacheInterface::class);
         $reviewerCache->method('get')->willReturnOnConsecutiveCalls(null, ['accepted' => true, 'adjusted_severity' => 'critical'], null);
         $storedFor = [];
         $reviewerCache->method('store')->willReturnCallback(
@@ -2774,21 +3083,22 @@ final class ReviewerAgentTest extends TestCase
             ->willReturnCallback(static function (string $system, string $user) use ($first, $third, &$capturedUserMessage): LLMResponse {
                 $capturedUserMessage = $user;
 
-                return LLMResponse::create(
-                    (string) json_encode([
-                        ['id' => $first->id(), 'accepted' => true],
-                        ['id' => $third->id(), 'accepted' => true],
-                    ]),
-                    10, 10, 'claude', 'end_turn',
-                );
+                return LLMResponse::of((string) json_encode([
+                    ['id' => $first->id(), 'accepted' => true],
+                    ['id' => $third->id(), 'accepted' => true],
+                ]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10));
             });
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            batchSize: 5,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $result = $reviewerAgent->review([$first, $second, $third], [], new NullCoverageRecorder());
@@ -2813,10 +3123,7 @@ final class ReviewerAgentTest extends TestCase
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(
-            LLMResponse::create(
-                (string) json_encode([['id' => $vulnerability->id(), 'accepted' => true]]),
-                0, 0, 'test', 'end_turn',
-            ),
+            LLMResponse::of((string) json_encode([['id' => $vulnerability->id(), 'accepted' => true]]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
@@ -2826,11 +3133,15 @@ final class ReviewerAgentTest extends TestCase
             ->with($vulnerability, '', ['id' => $vulnerability->id(), 'accepted' => true]);
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            batchSize: 5,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -2844,10 +3155,7 @@ final class ReviewerAgentTest extends TestCase
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(
-            LLMResponse::create(
-                (string) json_encode([['id' => $vulnerability->id(), 'accepted' => true]]),
-                0, 0, 'test', 'end_turn',
-            ),
+            LLMResponse::of((string) json_encode([['id' => $vulnerability->id(), 'accepted' => true]]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
@@ -2855,11 +3163,15 @@ final class ReviewerAgentTest extends TestCase
         $reviewerCache->expects(self::never())->method('store');
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            batchSize: 5,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder(), bypassCache: true);
@@ -2874,14 +3186,11 @@ final class ReviewerAgentTest extends TestCase
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturn(
-            LLMResponse::create(
-                (string) json_encode([['id' => $matched->id(), 'accepted' => true]]),
-                0, 0, 'test', 'end_turn',
-            ),
+            LLMResponse::of((string) json_encode([['id' => $matched->id(), 'accepted' => true]]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $storedFor = [];
-        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache = self::createStub(ReviewerCacheInterface::class);
         $reviewerCache->method('get')->willReturn(null);
         $reviewerCache->method('store')->willReturnCallback(
             static function (Vulnerability $vulnerability) use (&$storedFor): void {
@@ -2890,11 +3199,15 @@ final class ReviewerAgentTest extends TestCase
         );
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            batchSize: 5,
-            reviewerCache: $reviewerCache,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                reviewerCache: $reviewerCache,
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
         );
 
         $result = $reviewerAgent->review([$matched, $unmatched], [], new NullCoverageRecorder());
@@ -2916,15 +3229,19 @@ final class ReviewerAgentTest extends TestCase
             ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry) use ($vulnerability): LLMResponse {
                 $toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
 
-                return LLMResponse::create('', 1, 1, 'm', 'end_turn');
+                return LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1));
             });
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -2947,17 +3264,21 @@ final class ReviewerAgentTest extends TestCase
                 $toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
                 $toolRegistry->execute('record_review', ['id' => $second->id(), 'accepted' => true]);
 
-                return LLMResponse::create('', 1, 1, 'm', 'end_turn');
+                return LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1));
             });
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(useStructuredCollection: true),
-            new NullLogger(),
-            batchSize: 2,
-            maxConcurrent: 4,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: true,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 2,
+                maxConcurrent: 4,
+                useStructuredCollection: true,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability, $second], [], new NullCoverageRecorder());
@@ -2976,15 +3297,19 @@ final class ReviewerAgentTest extends TestCase
         $llmClient
             ->expects(self::once())
             ->method('completeBatch')
-            ->willReturn([LLMResponse::create('{"accepted": true}', 1, 1, 'm', 'end_turn')]);
+            ->willReturn([LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))]);
 
         $reviewerAgent = new ReviewerAgent(
-            $llmClient,
-            new ReviewerPromptBuilder(),
-            new NullLogger(),
-            maxConcurrent: 4,
-            recordReviewToolFactory: new RecordReviewToolFactory(),
-            useStructuredCollection: false,
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+                useStructuredCollection: false,
+            ),
         );
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
@@ -3005,38 +3330,22 @@ final class ReviewerAgentTest extends TestCase
         string $filePath,
         VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,
     ): Vulnerability {
-        return Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::BROKEN_ACCESS_CONTROL,
-            vulnerabilitySeverity: $vulnerabilitySeverity,
-            title: 'Test '.$filePath,
-            description: 'Test',
-            filePath: $filePath,
-            lineStart: 1,
-            lineEnd: 5,
-            vulnerableCode: 'code',
-            attackVector: 'vec',
-            proof: 'proof',
-            remediation: 'fix',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::BROKEN_ACCESS_CONTROL, $vulnerabilitySeverity, 'Test '.$filePath, 0.9),
+            new CodeLocation($filePath, 1, 5),
+            new VulnerabilityNarrative('Test', 'vec', 'proof', 'fix'),
+            'code',
         );
     }
 
     private function makeVulnerability(
         VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,
     ): Vulnerability {
-        return Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::BROKEN_ACCESS_CONTROL,
-            vulnerabilitySeverity: $vulnerabilitySeverity,
-            title: 'Missing access control',
-            description: 'No voter on admin route',
-            filePath: 'src/Controller/UserController.php',
-            lineStart: 10,
-            lineEnd: 20,
-            vulnerableCode: 'public function editUser()',
-            attackVector: 'Direct access',
-            proof: 'GET /admin/user/1/edit',
-            remediation: 'Add IsGranted',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::BROKEN_ACCESS_CONTROL, $vulnerabilitySeverity, 'Missing access control', 0.9),
+            new CodeLocation('src/Controller/UserController.php', 10, 20),
+            new VulnerabilityNarrative('No voter on admin route', 'Direct access', 'GET /admin/user/1/edit', 'Add IsGranted'),
+            'public function editUser()',
         );
     }
 

@@ -43,6 +43,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
             ProgressEvent::AttackerChunkCompleted => $this->output->writeln($this->chunkDoneLine($context)),
             ProgressEvent::AttackerFindingRecorded => $this->output->writeln($this->findingLine($context)),
             ProgressEvent::ReviewStarted => $this->output->writeln($this->reviewStartLine($context)),
+            ProgressEvent::ReviewFindingReviewed => $this->output->writeln($this->reviewedLine($context)),
             ProgressEvent::ReviewCompleted => $this->output->writeln($this->reviewSummaryLine($context)),
             default => null,
         };
@@ -87,6 +88,18 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     private function reviewStartLine(array $context): string
     {
         return \sprintf('Reviewing %d finding(s)…', ProgressContext::int($context, 'findings'));
+    }
+
+    /** @param array<string, mixed> $context */
+    private function reviewedLine(array $context): string
+    {
+        return \sprintf(
+            '  [%s] %s — %s:%d',
+            true === ($context['accepted'] ?? null) ? 'VALIDATED' : 'REJECTED',
+            ProgressContext::string($context, 'type'),
+            ProgressContext::string($context, 'file'),
+            ProgressContext::int($context, 'line'),
+        );
     }
 
     /** @param array<string, mixed> $context */

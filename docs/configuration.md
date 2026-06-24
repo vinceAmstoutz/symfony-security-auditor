@@ -25,8 +25,6 @@ bundle registration, bundle-level configuration, platform wiring via
 > See also: [Architecture](architecture.md) · [Extending](extending.md) ·
 > [CI](ci.md) · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
 
----
-
 ## Bundle Registration
 
 Register both bundles in `config/bundles.php`. Symfony Flex does this
@@ -42,8 +40,6 @@ return [
 ];
 ```
 
----
-
 ## Manual Setup (without Flex)
 
 Without Symfony Flex (or with `composer require --no-scripts`), do by hand what
@@ -54,8 +50,6 @@ the recipe automates:
 2. Create `config/packages/symfony_security_auditor.yaml` — see
    [Bundle Configuration](#bundle-configuration) — or copy the
    [recipe's template](https://github.com/symfony/recipes-contrib/blob/main/vinceamstoutz/symfony-security-auditor/1.0/config/packages/symfony_security_auditor.yaml).
-
----
 
 ## Bundle Configuration
 
@@ -250,8 +244,6 @@ symfony_security_auditor:
         enabled: true
 ```
 
----
-
 ## Advisory Source (`lookup_advisory` tool)
 
 The `lookup_advisory` tool exposed to the attacker is backed by
@@ -284,8 +276,6 @@ services:
     VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface:
         alias: App\Security\MyCustomAdvisoryDatabase
 ```
-
----
 
 ## Platform Configuration
 
@@ -346,8 +336,6 @@ ai:
     #   endpoint: 'http://localhost:11434'
 ```
 
----
-
 ## Model Options
 
 The bundle exposes `max_output_tokens` directly at the top level (see
@@ -381,8 +369,6 @@ Both forms are equivalent. Use expanded syntax when setting many options or
 preferring readability. `max_tokens` set via either form overrides the bundle's
 `max_output_tokens` for that role.
 
----
-
 ## Split-Model Setup
 
 Using separate models per role lets you pair a large, high-accuracy model for
@@ -412,8 +398,6 @@ The attacker agent receives all source files grouped into chunks of 10, sorted
 by security priority (controllers first, then voters, entities, repositories,
 forms, then everything else). The reviewer agent then evaluates each candidate
 finding individually and decides whether to accept or escalate it.
-
----
 
 ## CLI Reference
 

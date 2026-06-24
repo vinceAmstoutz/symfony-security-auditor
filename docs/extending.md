@@ -15,8 +15,6 @@ All extension points are PHP interfaces. Wire your implementations via
 > See also: [Architecture](architecture.md) · [Configuration](configuration.md)
 > · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
 
----
-
 ## 1. Custom LLM Client
 
 **Interface**:
@@ -48,17 +46,22 @@ The default implementation (`SymfonyAiLLMClient`) delegates to `symfony/ai`'s
 `AgentInterface`. Replace it when you need direct HTTP calls, custom retry
 logic, token tracking, or a provider that `symfony/ai` does not support.
 
-`LLMResponse` is an immutable value object constructed with named arguments:
+`LLMResponse` is an immutable value object built via its `of()` factory, with
+the token counts grouped into a `TokenUsageSnapshot`:
 
 ```php
-LLMResponse::create(
+LLMResponse::of(
     content: string,      // raw text from the model
-    inputTokens: int,
-    outputTokens: int,
     model: string,
     stopReason: string,
+    tokenUsageSnapshot: TokenUsageSnapshot::of(inputTokens: int, outputTokens: int),
 );
 ```
+
+> The legacy
+> `LLMResponse::create(content, inputTokens, outputTokens, model, stopReason)`
+> factory is **deprecated since 1.13** and removed in the next `MAJOR`; use
+> `of()` in new code.
 
 Key read methods: `content()`, `parseJson(): array` (strips markdown fences then
 JSON-decodes), `isEmpty(): bool`, `totalTokens(): int`.
@@ -69,6 +72,7 @@ JSON-decodes), `isEmpty(): bool`, `totalTokens(): int`.
 // src/Llm/AcmeLlmClient.php
 namespace App\Llm;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
@@ -91,12 +95,14 @@ final class AcmeLlmClient implements LLMClientInterface
             ],
         ])->toArray();
 
-        return LLMResponse::create(
-            content:      $response['choices'][0]['text'],
-            inputTokens:  $response['usage']['prompt_tokens'],
-            outputTokens: $response['usage']['completion_tokens'],
-            model:        $this->model(),
-            stopReason:   $response['choices'][0]['finish_reason'],
+        return LLMResponse::of(
+            content:    $response['choices'][0]['text'],
+            model:      $this->model(),
+            stopReason: $response['choices'][0]['finish_reason'],
+            tokenUsageSnapshot: TokenUsageSnapshot::of(
+                inputTokens:  $response['usage']['prompt_tokens'],
+                outputTokens: $response['usage']['completion_tokens'],
+            ),
         );
     }
 
@@ -146,8 +152,6 @@ directly:
 VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface:
     alias: App\Llm\AcmeLlmClient
 ```
-
----
 
 ## 2. Custom Pipeline Stage
 
@@ -202,7 +206,7 @@ final class DeduplicationStage implements StageInterface
         foreach ($context->vulnerabilities() as $id => $vuln) {
             $key = $vuln->filePath() . ':' . $vuln->lineStart() . ':' . $vuln->type()->value;
 
-            if (isset($seen[$key])) {
+            if (array_key_exists($key, $seen)) {
                 // Keep the one with higher confidence; replace lower-confidence duplicate.
                 $existing = $context->vulnerabilities()[$seen[$key]];
                 if ($vuln->confidence() > $existing->confidence()) {
@@ -245,8 +249,6 @@ services:
         tags:
             - { name: symfony_security_auditor.pipeline_stage, priority: -100 }
 ```
-
----
 
 ## 3. Custom Agent (Attacker or Reviewer)
 
@@ -416,8 +418,6 @@ at `warning` level with a structured `reason` code
 in the returned `VulnerabilityHydrationResult` so callers can surface drop
 counts in their reports or metrics.
 
----
-
 ## 4. Custom Report Output
 
 `AuditReport` is produced by `AuditReport::fromContext(AuditContext $context)`
@@ -471,8 +471,6 @@ for SARIF upload workflows).
 inject it directly into any consumer (custom command, controller, event
 listener) and serialize it however fits your output target without going through
 `ReportRenderer`.
-
----
 
 ## 5. Other Pluggable Ports
 

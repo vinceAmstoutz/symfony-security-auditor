@@ -20,7 +20,11 @@ use Symfony\Component\ErrorHandler\BufferingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
@@ -43,9 +47,11 @@ final class PoCSynthesizerTest extends TestCase
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create(
+        $llmClient->method('complete')->willReturn(LLMResponse::of(
             "```sh\ncurl -X POST /admin/users\n```",
-            10, 10, 'claude', 'end_turn',
+            'claude',
+            'end_turn',
+            TokenUsageSnapshot::of(10, 10),
         ));
 
         $poCSynthesizer = new PoCSynthesizer($llmClient, new NullLogger());
@@ -53,7 +59,7 @@ final class PoCSynthesizerTest extends TestCase
         $enriched = $poCSynthesizer->synthesize([$vulnerability]);
 
         self::assertNotNull($enriched[0]->synthesizedPoC());
-        self::assertStringContainsString('curl -X POST /admin/users', (string) $enriched[0]->synthesizedPoC());
+        self::assertStringContainsString('curl -X POST /admin/users', $enriched[0]->synthesizedPoC());
     }
 
     public function test_it_skips_findings_below_severity_floor(): void
@@ -89,7 +95,7 @@ final class PoCSynthesizerTest extends TestCase
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('', 0, 0, 'test', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $poCSynthesizer = new PoCSynthesizer($llmClient, new NullLogger());
 
@@ -117,9 +123,11 @@ final class PoCSynthesizerTest extends TestCase
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::MEDIUM)->withReviewerValidation(true);
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create(
+        $llmClient->method('complete')->willReturn(LLMResponse::of(
             'curl /x',
-            10, 10, 'claude', 'end_turn',
+            'claude',
+            'end_turn',
+            TokenUsageSnapshot::of(10, 10),
         ));
 
         $poCSynthesizer = new PoCSynthesizer($llmClient, new NullLogger(), VulnerabilitySeverity::MEDIUM);
@@ -136,7 +144,7 @@ final class PoCSynthesizerTest extends TestCase
         $c = $this->makeVulnerability(VulnerabilitySeverity::CRITICAL, filePath: 'src/C.php')->withReviewerValidation(true);
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('PoC', 0, 0, 'test', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('PoC', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $poCSynthesizer = new PoCSynthesizer($llmClient, new NullLogger());
 
@@ -157,7 +165,7 @@ final class PoCSynthesizerTest extends TestCase
         $belowFloor = $this->makeVulnerability(VulnerabilitySeverity::LOW)->withReviewerValidation(true);
 
         $llmClient = self::createStub(LLMClientInterface::class);
-        $llmClient->method('complete')->willReturn(LLMResponse::create('curl /x', 10, 10, 'claude', 'end_turn'));
+        $llmClient->method('complete')->willReturn(LLMResponse::of('curl /x', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
 
         $bufferingLogger = new BufferingLogger();
         (new PoCSynthesizer($llmClient, $bufferingLogger))->synthesize([$belowFloor, $vulnerability]);
@@ -205,8 +213,8 @@ final class PoCSynthesizerTest extends TestCase
 
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willReturnOnConsecutiveCalls(
-            LLMResponse::create('', 0, 0, 'test', 'end_turn'),
-            LLMResponse::create('curl /x', 0, 0, 'test', 'end_turn'),
+            LLMResponse::of('', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
+            LLMResponse::of('curl /x', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
         $bufferingLogger = new BufferingLogger();
@@ -248,19 +256,11 @@ final class PoCSynthesizerTest extends TestCase
         VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,
         string $filePath = 'src/Controller/Foo.php',
     ): Vulnerability {
-        return Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: $vulnerabilitySeverity,
-            title: 'Test',
-            description: 'd',
-            filePath: $filePath,
-            lineStart: 10,
-            lineEnd: 15,
-            vulnerableCode: 'code',
-            attackVector: 'av',
-            proof: 'proof',
-            remediation: 'r',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, $vulnerabilitySeverity, 'Test', 0.9),
+            new CodeLocation($filePath, 10, 15),
+            new VulnerabilityNarrative('d', 'av', 'proof', 'r'),
+            'code',
         );
     }
 }

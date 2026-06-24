@@ -36,9 +36,8 @@ final readonly class LoggerProgressReporter implements ProgressReporterInterface
     {
         try {
             $this->logger->info('audit.progress: '.$event, $context);
-        } catch (Throwable) {
-            // The reporter contract forbids propagating failures — a broken
-            // logger must never abort the audit.
+        } catch (Throwable $throwable) {
+            error_log(\sprintf('LoggerProgressReporter could not forward progress event "%s": %s', $event, $throwable->getMessage()));
         }
     }
 }

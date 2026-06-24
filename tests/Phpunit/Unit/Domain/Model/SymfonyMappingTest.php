@@ -13,9 +13,12 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
+use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
@@ -24,7 +27,7 @@ final class SymfonyMappingTest extends TestCase
 {
     public function test_it_creates_empty_mapping(): void
     {
-        $symfonyMapping = SymfonyMapping::create();
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
 
         self::assertEmpty($symfonyMapping->controllers());
         self::assertEmpty($symfonyMapping->entities());
@@ -57,7 +60,7 @@ final class SymfonyMappingTest extends TestCase
             supportedSubjects: ['App\\Entity\\Comment'],
         );
 
-        $symfonyMapping = SymfonyMapping::create(voterCapabilities: [$userVoter, $commentVoter]);
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(voterCapabilities: [$userVoter, $commentVoter]));
 
         self::assertSame([$userVoter, $commentVoter], $symfonyMapping->voterCapabilities());
         self::assertSame([$userVoter], $symfonyMapping->votersFor('EDIT', 'User'));
@@ -69,7 +72,7 @@ final class SymfonyMappingTest extends TestCase
     {
         $voterCapability = new VoterCapability('src/Security/UserVoter.php', 'UserVoter', ['EDIT'], ['User']);
 
-        $symfonyMapping = SymfonyMapping::create(voterCapabilities: [$voterCapability]);
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(voterCapabilities: [$voterCapability]));
 
         self::assertSame([], $symfonyMapping->votersFor('EDIT', 'Comment'));
     }
@@ -78,7 +81,7 @@ final class SymfonyMappingTest extends TestCase
     {
         $voterCapability = new VoterCapability('src/Security/UserVoter.php', 'UserVoter', ['EDIT'], ['User']);
 
-        $symfonyMapping = SymfonyMapping::create(voterCapabilities: [$voterCapability]);
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(voterCapabilities: [$voterCapability]));
 
         self::assertSame([], $symfonyMapping->votersFor('PUBLISH', 'User'));
     }
@@ -89,7 +92,7 @@ final class SymfonyMappingTest extends TestCase
         $userPassword = new FormBinding('src/Controller/UserController.php', 'changePassword', 'App\\Form\\PasswordType');
         $admin = new FormBinding('src/Controller/AdminController.php', 'create', 'App\\Form\\AdminType');
 
-        $symfonyMapping = SymfonyMapping::create(formBindings: [$userEdit, $userPassword, $admin]);
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(formBindings: [$userEdit, $userPassword, $admin]));
 
         self::assertSame([$userEdit, $userPassword, $admin], $symfonyMapping->formBindings());
         self::assertSame([$userEdit, $userPassword], $symfonyMapping->formBindingsForController('src/Controller/UserController.php'));
@@ -119,7 +122,7 @@ final class SymfonyMappingTest extends TestCase
             classHasIsGranted: false,
         );
 
-        $symfonyMapping = SymfonyMapping::create(routeAccessControls: [$protected, $unprotected]);
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(routeAccessControls: [$protected, $unprotected]));
 
         self::assertSame([$protected, $unprotected], $symfonyMapping->routeAccessControls());
         self::assertSame([$unprotected], $symfonyMapping->controllersWithoutAccessCheck());
@@ -127,10 +130,13 @@ final class SymfonyMappingTest extends TestCase
 
     public function test_it_counts_total_files_correctly(): void
     {
-        $symfonyMapping = SymfonyMapping::create(
-            controllers: [$this->makeFile('src/Controller/Foo.php')],
-            entities: [$this->makeFile('src/Entity/User.php'), $this->makeFile('src/Entity/Post.php')],
-            voters: [$this->makeFile('src/Security/UserVoter.php')],
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([
+                'controllers' => [$this->makeFile('src/Controller/Foo.php')],
+                'entities' => [$this->makeFile('src/Entity/User.php'), $this->makeFile('src/Entity/Post.php')],
+                'voters' => [$this->makeFile('src/Security/UserVoter.php')],
+            ]),
+            new AccessControlMap(),
         );
 
         self::assertSame(4, $symfonyMapping->totalFiles());
@@ -138,9 +144,12 @@ final class SymfonyMappingTest extends TestCase
 
     public function test_total_files_includes_forms_and_services(): void
     {
-        $symfonyMapping = SymfonyMapping::create(
-            forms: [$this->makeFile('src/Form/UserType.php')],
-            services: [$this->makeFile('src/Service/FooService.php'), $this->makeFile('src/Service/BarService.php')],
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([
+                'forms' => [$this->makeFile('src/Form/UserType.php')],
+                'services' => [$this->makeFile('src/Service/FooService.php'), $this->makeFile('src/Service/BarService.php')],
+            ]),
+            new AccessControlMap(),
         );
 
         self::assertSame(3, $symfonyMapping->totalFiles());
@@ -148,9 +157,12 @@ final class SymfonyMappingTest extends TestCase
 
     public function test_total_files_includes_repositories_and_templates(): void
     {
-        $symfonyMapping = SymfonyMapping::create(
-            repositories: [$this->makeFile('src/Repository/UserRepository.php'), $this->makeFile('src/Repository/PostRepository.php')],
-            templates: [$this->makeFile('templates/user/index.html.twig')],
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([
+                'repositories' => [$this->makeFile('src/Repository/UserRepository.php'), $this->makeFile('src/Repository/PostRepository.php')],
+                'templates' => [$this->makeFile('templates/user/index.html.twig')],
+            ]),
+            new AccessControlMap(),
         );
 
         self::assertSame(3, $symfonyMapping->totalFiles());
@@ -158,14 +170,17 @@ final class SymfonyMappingTest extends TestCase
 
     public function test_total_files_sums_all_seven_categories(): void
     {
-        $symfonyMapping = SymfonyMapping::create(
-            controllers: [$this->makeFile('src/Controller/FooController.php')],
-            entities: [$this->makeFile('src/Entity/User.php'), $this->makeFile('src/Entity/Post.php')],
-            voters: [$this->makeFile('src/Security/UserVoter.php')],
-            repositories: [$this->makeFile('src/Repository/UserRepository.php')],
-            forms: [$this->makeFile('src/Form/UserType.php')],
-            services: [$this->makeFile('src/Service/FooService.php')],
-            templates: [$this->makeFile('templates/user/index.html.twig')],
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([
+                'controllers' => [$this->makeFile('src/Controller/FooController.php')],
+                'entities' => [$this->makeFile('src/Entity/User.php'), $this->makeFile('src/Entity/Post.php')],
+                'voters' => [$this->makeFile('src/Security/UserVoter.php')],
+                'repositories' => [$this->makeFile('src/Repository/UserRepository.php')],
+                'forms' => [$this->makeFile('src/Form/UserType.php')],
+                'services' => [$this->makeFile('src/Service/FooService.php')],
+                'templates' => [$this->makeFile('templates/user/index.html.twig')],
+            ]),
+            new AccessControlMap(),
         );
 
         self::assertSame(8, $symfonyMapping->totalFiles());
@@ -179,7 +194,7 @@ final class SymfonyMappingTest extends TestCase
             '<?php class UserVoter extends Voter { protected function supports(string $attribute, mixed $subject): bool { return $subject instanceof User; } }',
         );
 
-        $symfonyMapping = SymfonyMapping::create(voters: [$projectFile]);
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['voters' => [$projectFile]]), new AccessControlMap());
 
         self::assertTrue($symfonyMapping->hasVoterForEntity('User'));
         self::assertFalse($symfonyMapping->hasVoterForEntity('Post'));
@@ -199,7 +214,7 @@ final class SymfonyMappingTest extends TestCase
             '<?php class PublicController {}',
         );
 
-        $symfonyMapping = SymfonyMapping::create(controllers: [$projectFile, $insecure]);
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['controllers' => [$projectFile, $insecure]]), new AccessControlMap());
         $unprotected = $symfonyMapping->controllersWithoutVoters();
 
         self::assertCount(1, $unprotected);
@@ -208,11 +223,15 @@ final class SymfonyMappingTest extends TestCase
 
     public function test_it_generates_summary_string(): void
     {
-        $symfonyMapping = SymfonyMapping::create(
-            controllers: [$this->makeFile('src/Controller/Foo.php')],
-            entities: [$this->makeFile('src/Entity/User.php')],
-            routeAccessMap: ['/admin' => ['ROLE_ADMIN']],
-            firewallRules: ['^/admin'],
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([
+                'controllers' => [$this->makeFile('src/Controller/Foo.php')],
+                'entities' => [$this->makeFile('src/Entity/User.php')],
+            ]),
+            new AccessControlMap(
+                routeAccessMap: ['/admin' => ['ROLE_ADMIN']],
+                firewallRules: ['^/admin'],
+            ),
         );
 
         $summary = $symfonyMapping->toSummary();
@@ -221,6 +240,61 @@ final class SymfonyMappingTest extends TestCase
         self::assertStringContainsString('Entities: 1', $summary);
         self::assertStringContainsString('Routes mapped: 1', $summary);
         self::assertStringContainsString('Firewall rules: 1', $summary);
+    }
+
+    /**
+     * @deprecated covers the deprecated {@see SymfonyMapping::create()} delegator until it is removed in 2.0.
+     */
+    #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
+    public function test_deprecated_create_maps_every_group_to_of(): void
+    {
+        $controllers = [$this->makeFile('src/Controller/A.php')];
+        $entities = [$this->makeFile('src/Entity/B.php')];
+        $voters = [$this->makeFile('src/Security/C.php')];
+        $repositories = [$this->makeFile('src/Repository/D.php')];
+        $forms = [$this->makeFile('src/Form/E.php')];
+        $services = [$this->makeFile('src/Service/F.php')];
+        $templates = [$this->makeFile('templates/g.html.twig')];
+
+        $this->expectUserDeprecationMessageMatches('/SymfonyMapping::create\(\) is deprecated, use SymfonyMapping::of\(\) instead\./');
+
+        $symfonyMapping = SymfonyMapping::create(
+            controllers: $controllers,
+            entities: $entities,
+            voters: $voters,
+            repositories: $repositories,
+            forms: $forms,
+            services: $services,
+            templates: $templates,
+            routeAccessMap: ['/admin' => ['ROLE_ADMIN']],
+            firewallRules: ['^/admin'],
+        );
+
+        self::assertSame($controllers, $symfonyMapping->controllers());
+        self::assertSame($entities, $symfonyMapping->entities());
+        self::assertSame($voters, $symfonyMapping->voters());
+        self::assertSame($repositories, $symfonyMapping->repositories());
+        self::assertSame($forms, $symfonyMapping->forms());
+        self::assertSame($services, $symfonyMapping->services());
+        self::assertSame($templates, $symfonyMapping->templates());
+        self::assertSame(['/admin' => ['ROLE_ADMIN']], $symfonyMapping->routeAccessMap());
+        self::assertSame(['^/admin'], $symfonyMapping->firewallRules());
+
+        self::assertEquals(
+            SymfonyMapping::of(
+                ProjectFileInventory::fromGroups([
+                    'controllers' => $controllers,
+                    'entities' => $entities,
+                    'voters' => $voters,
+                    'repositories' => $repositories,
+                    'forms' => $forms,
+                    'services' => $services,
+                    'templates' => $templates,
+                ]),
+                new AccessControlMap(['/admin' => ['ROLE_ADMIN']], ['^/admin']),
+            ),
+            $symfonyMapping,
+        );
     }
 
     private function makeFile(string $path): ProjectFile

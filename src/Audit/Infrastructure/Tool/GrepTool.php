@@ -63,30 +63,57 @@ final readonly class GrepTool implements ToolInterface
             return 'Error: missing or empty "pattern" argument.';
         }
 
-        $rawFileType = $arguments['file_type'] ?? null;
-        $fileType = \is_string($rawFileType) && '' !== $rawFileType ? $rawFileType : null;
-
-        $matches = [];
-        foreach ($this->files as $file) {
-            if (null !== $fileType && $file->type() !== $fileType) {
-                continue;
-            }
-
-            $lines = explode("\n", $file->content());
-            foreach ($lines as $lineIndex => $line) {
-                if (u($line)->containsAny($pattern)) {
-                    $matches[] = \sprintf('%s:%d:%s', $file->relativePath(), $lineIndex + 1, u($line)->trim()->toString());
-                    if (\count($matches) >= self::MAX_MATCHES) {
-                        break 2;
-                    }
-                }
-            }
-        }
+        $matches = $this->collectMatches($pattern, $this->resolveFileType($arguments));
 
         if ([] === $matches) {
             return 'No matches found.';
         }
 
         return implode("\n", $matches);
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    private function resolveFileType(array $arguments): ?string
+    {
+        $rawFileType = $arguments['file_type'] ?? null;
+
+        return \is_string($rawFileType) && '' !== $rawFileType ? $rawFileType : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function collectMatches(string $pattern, ?string $fileType): array
+    {
+        $matches = [];
+        foreach ($this->files as $file) {
+            if (null !== $fileType && $file->type() !== $fileType) {
+                continue;
+            }
+
+            $matches = [...$matches, ...$this->matchesInFile($file, $pattern)];
+        }
+
+        return \array_slice($matches, 0, self::MAX_MATCHES);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function matchesInFile(ProjectFile $projectFile, string $pattern): array
+    {
+        $matches = [];
+        $lines = explode("\n", $projectFile->content());
+        foreach ($lines as $lineIndex => $line) {
+            if (!u($line)->containsAny($pattern)) {
+                continue;
+            }
+
+            $matches[] = \sprintf('%s:%d:%s', $projectFile->relativePath(), $lineIndex + 1, u($line)->trim()->toString());
+        }
+
+        return $matches;
     }
 }

@@ -66,40 +66,58 @@ final readonly class RetryingPlatformInvoker
 
                 return $deferredResult;
             } catch (Throwable $throwable) {
-                if ($this->transientFailureClassifier->isEmptyContent($throwable)) {
-                    throw EmptyLLMResponseException::from($throwable);
-                }
-
-                if (!$this->transientFailureClassifier->isTransient($throwable)) {
-                    throw NonTransientLLMFailureException::from($throwable);
-                }
+                $this->rethrowWhenNonTransient($throwable);
 
                 if ($attempt >= $maxAttempts) {
                     throw TransientLLMFailureException::afterExhaustedAttempts($maxAttempts, $throwable);
                 }
 
-                $serverHintSeconds = null;
-                if ($this->transientFailureClassifier->isRateLimit($throwable)) {
-                    $serverHintSeconds = $this->retryAfterHeaderParser->parse($throwable);
-                    if (null !== $serverHintSeconds) {
-                        $this->rateLimiter->pauseUntil(
-                            (new DateTimeImmutable())->modify(\sprintf('+%d seconds', $serverHintSeconds)),
-                        );
-                    }
-                }
-
-                $delay = $this->transientFailureClassifier->isRateLimit($throwable)
-                    ? $this->retryPolicy->rateLimitDelayMs($attempt, $serverHintSeconds)
-                    : $this->retryPolicy->delayMs($attempt);
-                $this->logger->warning('LLM call failed, retrying after backoff', [
-                    'attempt' => $attempt,
-                    'max_attempts' => $maxAttempts,
-                    'delay_ms' => $delay,
-                    'error' => $throwable->getMessage(),
-                ]);
-                $this->sleeper->sleep($delay);
+                $this->backOffBeforeNextAttempt($throwable, $attempt, $maxAttempts);
                 ++$attempt;
             }
         }
+    }
+
+    private function rethrowWhenNonTransient(Throwable $throwable): void
+    {
+        if ($this->transientFailureClassifier->isEmptyContent($throwable)) {
+            throw EmptyLLMResponseException::from($throwable);
+        }
+
+        if (!$this->transientFailureClassifier->isTransient($throwable)) {
+            throw NonTransientLLMFailureException::from($throwable);
+        }
+    }
+
+    private function backOffBeforeNextAttempt(Throwable $throwable, int $attempt, int $maxAttempts): void
+    {
+        $serverHintSeconds = $this->pauseRateLimiterAndResolveServerHint($throwable);
+
+        $delay = $this->transientFailureClassifier->isRateLimit($throwable)
+            ? $this->retryPolicy->rateLimitDelayMs($attempt, $serverHintSeconds)
+            : $this->retryPolicy->delayMs($attempt);
+        $this->logger->warning('LLM call failed, retrying after backoff', [
+            'attempt' => $attempt,
+            'max_attempts' => $maxAttempts,
+            'delay_ms' => $delay,
+            'error' => $throwable->getMessage(),
+        ]);
+        $this->sleeper->sleep($delay);
+    }
+
+    private function pauseRateLimiterAndResolveServerHint(Throwable $throwable): ?int
+    {
+        if (!$this->transientFailureClassifier->isRateLimit($throwable)) {
+            return null;
+        }
+
+        $serverHintSeconds = $this->retryAfterHeaderParser->parse($throwable);
+        if (null !== $serverHintSeconds) {
+            $this->rateLimiter->pauseUntil(
+                (new DateTimeImmutable())->modify(\sprintf('+%d seconds', $serverHintSeconds)),
+            );
+        }
+
+        return $serverHintSeconds;
     }
 }

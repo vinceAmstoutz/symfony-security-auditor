@@ -306,7 +306,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             return $base;
         }
 
-        return $base."\n\n".$skills;
+        return \sprintf("%s\n\n%s", $base, $skills);
     }
 
     /**

@@ -20,7 +20,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizerI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\PoCSynthesisStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 
@@ -216,19 +219,11 @@ final class PoCSynthesisStageTest extends TestCase
 
     private function makeVulnerability(): Vulnerability
     {
-        return Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'Test',
-            description: 'd',
-            filePath: 'src/Controller/Foo.php',
-            lineStart: 10,
-            lineEnd: 15,
-            vulnerableCode: 'code',
-            attackVector: 'av',
-            proof: 'proof',
-            remediation: 'r',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Test', 0.9),
+            new CodeLocation('src/Controller/Foo.php', 10, 15),
+            new VulnerabilityNarrative('d', 'av', 'proof', 'r'),
+            'code',
         );
     }
 }

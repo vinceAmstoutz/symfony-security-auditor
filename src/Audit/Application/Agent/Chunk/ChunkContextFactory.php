@@ -17,6 +17,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 
@@ -42,36 +43,70 @@ final readonly class ChunkContextFactory
     public function create(array $chunk, AttackerAnalysisRequest $attackerAnalysisRequest, RiskMarkerIndex $riskMarkerIndex, bool $cacheIsContextAware): ChunkContext
     {
         $chunkMarkers = $riskMarkerIndex->forChunk($chunk);
-        $hasMarkers = [] !== $chunkMarkers;
 
-        $rejectedPreamble = [] !== $attackerAnalysisRequest->rejectedFindings
-            ? $this->attackerContextPromptRenderer->renderRejectedFindings($attackerAnalysisRequest->rejectedFindings)
-            : '';
-        $previousPreamble = [] !== $attackerAnalysisRequest->previousFindings
-            ? $this->attackerContextPromptRenderer->renderPreviousFindings($attackerAnalysisRequest->previousFindings)
-            : '';
-        $contextKey = '' === $rejectedPreamble && '' === $previousPreamble
-            ? ''
-            : hash('sha256', $rejectedPreamble."\0".$previousPreamble);
-        $cacheable = !$attackerAnalysisRequest->bypassCache && ('' === $contextKey || $cacheIsContextAware);
+        $rejectedPreamble = $this->renderRejectedPreamble($attackerAnalysisRequest);
+        $previousPreamble = $this->renderPreviousPreamble($attackerAnalysisRequest);
+        $contextKey = $this->deriveContextKey($rejectedPreamble, $previousPreamble);
+        $cacheable = $this->isCacheable($attackerAnalysisRequest, $contextKey, $cacheIsContextAware);
 
         $slicedChunk = $this->sliceChunk($chunk);
         $systemPrompt = $this->attackerPromptBuilder->buildSystemPrompt($slicedChunk);
         $userMessage = $this->attackerPromptBuilder->buildUserMessage($slicedChunk, $attackerAnalysisRequest->symfonyMapping);
+        $userMessage = $this->prependContext($userMessage, $chunkMarkers, $rejectedPreamble, $previousPreamble);
 
-        if ($hasMarkers) {
-            $userMessage = $this->attackerContextPromptRenderer->renderRiskMarkers($chunkMarkers)."\n\n".$userMessage;
+        return new ChunkContext($systemPrompt, $userMessage, $contextKey, $cacheable);
+    }
+
+    private function renderRejectedPreamble(AttackerAnalysisRequest $attackerAnalysisRequest): string
+    {
+        if ([] === $attackerAnalysisRequest->rejectedFindings) {
+            return '';
+        }
+
+        return $this->attackerContextPromptRenderer->renderRejectedFindings($attackerAnalysisRequest->rejectedFindings);
+    }
+
+    private function renderPreviousPreamble(AttackerAnalysisRequest $attackerAnalysisRequest): string
+    {
+        if ([] === $attackerAnalysisRequest->previousFindings) {
+            return '';
+        }
+
+        return $this->attackerContextPromptRenderer->renderPreviousFindings($attackerAnalysisRequest->previousFindings);
+    }
+
+    private function deriveContextKey(string $rejectedPreamble, string $previousPreamble): string
+    {
+        if ('' === $rejectedPreamble && '' === $previousPreamble) {
+            return '';
+        }
+
+        return hash('sha256', \sprintf("%s\0%s", $rejectedPreamble, $previousPreamble));
+    }
+
+    private function isCacheable(AttackerAnalysisRequest $attackerAnalysisRequest, string $contextKey, bool $cacheIsContextAware): bool
+    {
+        return !$attackerAnalysisRequest->bypassCache && ('' === $contextKey || $cacheIsContextAware);
+    }
+
+    /**
+     * @param list<RiskMarker> $chunkMarkers
+     */
+    private function prependContext(string $userMessage, array $chunkMarkers, string $rejectedPreamble, string $previousPreamble): string
+    {
+        if ([] !== $chunkMarkers) {
+            $userMessage = \sprintf("%s\n\n%s", $this->attackerContextPromptRenderer->renderRiskMarkers($chunkMarkers), $userMessage);
         }
 
         if ('' !== $rejectedPreamble) {
-            $userMessage = $rejectedPreamble."\n\n".$userMessage;
+            $userMessage = \sprintf("%s\n\n%s", $rejectedPreamble, $userMessage);
         }
 
         if ('' !== $previousPreamble) {
-            $userMessage = $previousPreamble."\n\n".$userMessage;
+            return \sprintf("%s\n\n%s", $previousPreamble, $userMessage);
         }
 
-        return new ChunkContext($systemPrompt, $userMessage, $contextKey, $cacheable);
+        return $userMessage;
     }
 
     /**

@@ -19,6 +19,7 @@ use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
@@ -68,7 +69,7 @@ final readonly class SequentialToolLoop
             try {
                 $deferredResult = $this->retryingPlatformInvoker->invoke($messageBag, $options, $estimatedInputTokens);
             } catch (EmptyLLMResponseException $emptyllmResponseException) {
-                return $this->emptyToolLoopResponseAndLog($emptyllmResponseException, $iteration, $totalInputTokens, $totalOutputTokens, $totalCacheReadTokens, $totalCacheCreationTokens);
+                return $this->emptyToolLoopResponseAndLog($emptyllmResponseException, $iteration, TokenUsageSnapshot::of($totalInputTokens, $totalOutputTokens, $totalCacheReadTokens, $totalCacheCreationTokens));
             }
 
             $platformResult = $deferredResult->getResult();
@@ -79,14 +80,11 @@ final readonly class SequentialToolLoop
             $totalCacheCreationTokens += $callCacheCreation;
             $this->rateLimiter->record($callInput, $callOutput);
             if ($this->budgetTracker instanceof BudgetTracker) {
-                $this->budgetTracker->recordCall(LLMResponse::create(
-                    content: '',
-                    inputTokens: $callInput,
-                    outputTokens: $callOutput,
-                    model: $this->model,
-                    stopReason: 'tool_iteration',
-                    cacheReadTokens: $callCacheRead,
-                    cacheCreationTokens: $callCacheCreation,
+                $this->budgetTracker->recordCall(LLMResponse::of(
+                    '',
+                    $this->model,
+                    'tool_iteration',
+                    TokenUsageSnapshot::of($callInput, $callOutput, $callCacheRead, $callCacheCreation),
                 ));
                 $this->budgetTracker->assertWithinBudget();
             }
@@ -102,14 +100,11 @@ final readonly class SequentialToolLoop
                     'output_tokens' => $totalOutputTokens,
                 ]);
 
-                return LLMResponse::create(
-                    content: $content,
-                    inputTokens: $totalInputTokens,
-                    outputTokens: $totalOutputTokens,
-                    model: $this->model,
-                    stopReason: 'end_turn',
-                    cacheReadTokens: $totalCacheReadTokens,
-                    cacheCreationTokens: $totalCacheCreationTokens,
+                return LLMResponse::of(
+                    $content,
+                    $this->model,
+                    'end_turn',
+                    TokenUsageSnapshot::of($totalInputTokens, $totalOutputTokens, $totalCacheReadTokens, $totalCacheCreationTokens),
                 );
             }
 
@@ -133,46 +128,42 @@ final readonly class SequentialToolLoop
             'output_tokens' => $totalOutputTokens,
         ]);
 
-        return LLMResponse::create(
-            content: '',
-            inputTokens: $totalInputTokens,
-            outputTokens: $totalOutputTokens,
-            model: $this->model,
-            stopReason: 'max_tool_iterations',
-            cacheReadTokens: $totalCacheReadTokens,
-            cacheCreationTokens: $totalCacheCreationTokens,
+        return LLMResponse::of(
+            '',
+            $this->model,
+            'max_tool_iterations',
+            TokenUsageSnapshot::of($totalInputTokens, $totalOutputTokens, $totalCacheReadTokens, $totalCacheCreationTokens),
         );
     }
 
     private function emptyToolLoopResponseAndLog(
         EmptyLLMResponseException $emptyllmResponseException,
         int $iteration,
-        int $totalInputTokens,
-        int $totalOutputTokens,
-        int $totalCacheReadTokens,
-        int $totalCacheCreationTokens,
+        TokenUsageSnapshot $tokenUsageSnapshot,
     ): LLMResponse {
         $context = [
             'iterations' => $iteration,
-            'input_tokens' => $totalInputTokens,
-            'output_tokens' => $totalOutputTokens,
+            'input_tokens' => $tokenUsageSnapshot->inputTokens(),
+            'output_tokens' => $tokenUsageSnapshot->outputTokens(),
             'error' => $emptyllmResponseException->getMessage(),
         ];
 
+        $this->logEmptyContentResponse($iteration, $context);
+
+        return LLMResponse::of('', $this->model, 'empty_content', $tokenUsageSnapshot);
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function logEmptyContentResponse(int $iteration, array $context): void
+    {
         if ($iteration > 0) {
             $this->logger->debug('Tool-using loop ended with empty content response', $context);
-        } else {
-            $this->logger->warning('Tool-using loop ended with empty content response', $context);
+
+            return;
         }
 
-        return LLMResponse::create(
-            content: '',
-            inputTokens: $totalInputTokens,
-            outputTokens: $totalOutputTokens,
-            model: $this->model,
-            stopReason: 'empty_content',
-            cacheReadTokens: $totalCacheReadTokens,
-            cacheCreationTokens: $totalCacheCreationTokens,
-        );
+        $this->logger->warning('Tool-using loop ended with empty content response', $context);
     }
 }

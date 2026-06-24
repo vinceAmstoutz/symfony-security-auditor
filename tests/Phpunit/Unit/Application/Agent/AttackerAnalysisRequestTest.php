@@ -15,9 +15,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 
@@ -25,21 +30,21 @@ final class AttackerAnalysisRequestTest extends TestCase
 {
     public function test_bypass_cache_defaults_to_false(): void
     {
-        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::create());
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 
         self::assertFalse($attackerAnalysisRequest->bypassCache);
     }
 
     public function test_previous_findings_default_to_empty(): void
     {
-        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::create());
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 
         self::assertSame([], $attackerAnalysisRequest->previousFindings);
     }
 
     public function test_rejected_findings_default_to_empty(): void
     {
-        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::create());
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 
         self::assertSame([], $attackerAnalysisRequest->rejectedFindings);
     }
@@ -48,7 +53,7 @@ final class AttackerAnalysisRequestTest extends TestCase
     {
         $rejected = [$this->makeVulnerability()];
 
-        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::create(), false, [], $rejected);
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), false, [], $rejected);
 
         self::assertSame($rejected, $attackerAnalysisRequest->rejectedFindings);
     }
@@ -56,7 +61,7 @@ final class AttackerAnalysisRequestTest extends TestCase
     public function test_with_files_and_findings_preserves_rejected_findings(): void
     {
         $rejected = [$this->makeVulnerability()];
-        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::create(), true, [], $rejected);
+        $attackerAnalysisRequest = new AttackerAnalysisRequest([], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), true, [], $rejected);
 
         $derived = $attackerAnalysisRequest->withFilesAndFindings([], []);
 
@@ -66,7 +71,7 @@ final class AttackerAnalysisRequestTest extends TestCase
     public function test_it_exposes_the_constructor_arguments(): void
     {
         $files = [ProjectFile::create('src/A.php', '/app/src/A.php', '<?php')];
-        $symfonyMapping = SymfonyMapping::create();
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
         $findings = [$this->makeVulnerability()];
 
         $attackerAnalysisRequest = new AttackerAnalysisRequest($files, $symfonyMapping, true, $findings);
@@ -79,7 +84,7 @@ final class AttackerAnalysisRequestTest extends TestCase
 
     public function test_with_files_and_findings_replaces_both_and_preserves_mapping_and_bypass(): void
     {
-        $symfonyMapping = SymfonyMapping::create();
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
         $attackerAnalysisRequest = new AttackerAnalysisRequest(
             [ProjectFile::create('src/A.php', '/app/src/A.php', '<?php')],
             $symfonyMapping,
@@ -99,19 +104,11 @@ final class AttackerAnalysisRequestTest extends TestCase
 
     private function makeVulnerability(): Vulnerability
     {
-        return Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'T',
-            description: 'd',
-            filePath: 'src/A.php',
-            lineStart: 1,
-            lineEnd: 2,
-            vulnerableCode: 'c',
-            attackVector: 'a',
-            proof: 'p',
-            remediation: 'r',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'T', 0.9),
+            new CodeLocation('src/A.php', 1, 2),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            'c',
         );
     }
 }

@@ -48,36 +48,74 @@ final readonly class ConcurrentReviewAnalyzer
     public function analyze(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): array
     {
         $reviewed = [];
-        $codeContexts = [];
-        $pendingIndexes = [];
+        $pending = [];
         $requests = [];
         foreach ($vulnerabilities as $index => $vulnerability) {
             $codeContext = CodeContextResolver::resolve($vulnerability->filePath(), $projectFiles);
-            $codeContexts[$index] = $codeContext;
 
-            $cached = $this->reviewerVerdictCache->get($vulnerability, $codeContext, $bypassCache);
-            if (null !== $cached) {
-                $reviewed[$index] = $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $cached, $coverageRecorder);
+            $verdict = $this->servedFromCache($vulnerability, $codeContext, $coverageRecorder, $bypassCache);
+            if ($verdict instanceof Vulnerability) {
+                $reviewed[$index] = $verdict;
 
                 continue;
             }
 
-            $pendingIndexes[] = $index;
-            $requests[] = [
-                'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
-                'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
+            $pending[] = [
+                'index' => $index,
+                'vulnerability' => $vulnerability,
+                'cacheContext' => $bypassCache ? null : $codeContext,
             ];
+            $requests[] = $this->buildRequest($vulnerability, $codeContext);
         }
 
-        if ([] !== $requests) {
-            $responses = $this->batchCapableLLMClient->completeBatch($requests, $this->maxConcurrent);
-            foreach ($pendingIndexes as $position => $index) {
-                $reviewed[$index] = $this->reviewOutcomeRecorder->applyResponse($vulnerabilities[$index], $responses[$position], $coverageRecorder, $bypassCache ? null : $codeContexts[$index]);
-            }
+        foreach ($this->dispatchPending($requests, $pending, $coverageRecorder) as $index => $verdict) {
+            $reviewed[$index] = $verdict;
         }
 
         ksort($reviewed);
 
         return array_values($reviewed);
+    }
+
+    private function servedFromCache(Vulnerability $vulnerability, string $codeContext, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): ?Vulnerability
+    {
+        $cached = $this->reviewerVerdictCache->get($vulnerability, $codeContext, $bypassCache);
+        if (null === $cached) {
+            return null;
+        }
+
+        return $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $cached, $coverageRecorder);
+    }
+
+    /**
+     * @return array{system: string, user: string}
+     */
+    private function buildRequest(Vulnerability $vulnerability, string $codeContext): array
+    {
+        return [
+            'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
+            'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
+        ];
+    }
+
+    /**
+     * @param list<array{system: string, user: string}>                                        $requests
+     * @param list<array{index: int, vulnerability: Vulnerability, cacheContext: string|null}> $pending
+     *
+     * @return array<int, Vulnerability>
+     */
+    private function dispatchPending(array $requests, array $pending, CoverageRecorderInterface $coverageRecorder): array
+    {
+        if ([] === $requests) {
+            return [];
+        }
+
+        $responses = $this->batchCapableLLMClient->completeBatch($requests, $this->maxConcurrent);
+        $reviewed = [];
+        foreach ($pending as $position => $entry) {
+            $reviewed[$entry['index']] = $this->reviewOutcomeRecorder->applyResponse($entry['vulnerability'], $responses[$position], $coverageRecorder, $entry['cacheContext']);
+        }
+
+        return $reviewed;
     }
 }

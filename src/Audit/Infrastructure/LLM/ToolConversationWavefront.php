@@ -20,9 +20,11 @@ use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
+use Symfony\AI\Platform\Result\ToolCall;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
@@ -64,11 +66,24 @@ final readonly class ToolConversationWavefront
      */
     public function resolveToolWindow(array $window, int $maxToolIterations): array
     {
-        \assert('' !== $this->model, 'Model must be a non-empty string');
-
         $platform = $this->platform ?? throw MissingAiPlatformException::create();
 
-        /** @var array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}> $states */
+        $states = $this->initializeConversationStates($window);
+
+        for ($round = 0; $round < $maxToolIterations; ++$round) {
+            $states = $this->runWavefrontRound($platform, $states, $window, $maxToolIterations);
+        }
+
+        return $this->collectResponses($states, $maxToolIterations);
+    }
+
+    /**
+     * @param list<array{system: string, user: string, tools: ToolRegistry}> $window
+     *
+     * @return array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}>
+     */
+    private function initializeConversationStates(array $window): array
+    {
         $states = [];
         foreach ($window as $index => $request) {
             $options = $this->platformOptionsFactory->baseOptions();
@@ -85,27 +100,69 @@ final readonly class ToolConversationWavefront
             ];
         }
 
-        for ($round = 0; $round < $maxToolIterations; ++$round) {
-            $deferred = [];
-            foreach ($states as $index => $state) {
-                if ($state['response'] instanceof LLMResponse) {
-                    continue;
-                }
+        return $states;
+    }
 
-                $this->rateLimiter->acquire($this->promptTokenEstimator->estimate($window[$index]['system'], $window[$index]['user']));
+    /**
+     * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}> $states
+     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                                                             $window
+     *
+     * @return array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}>
+     */
+    private function runWavefrontRound(PlatformInterface $platform, array $states, array $window, int $maxToolIterations): array
+    {
+        $deferred = $this->dispatchPendingInvocations($platform, $states, $window);
 
-                try {
-                    $deferred[$index] = $platform->invoke($this->model, $state['bag'], $state['options']);
-                } catch (Throwable) {
-                    $deferred[$index] = null;
-                }
-            }
-
-            foreach ($deferred as $index => $deferredResult) {
-                $states[$index] = $this->advanceConversation($states[$index], $deferredResult, $window[$index], $maxToolIterations);
-            }
+        foreach ($deferred as $index => $deferredResult) {
+            $states[$index] = $this->advanceConversation($states[$index], $deferredResult, $window[$index], $maxToolIterations);
         }
 
+        return $states;
+    }
+
+    /**
+     * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}> $states
+     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                                                             $window
+     *
+     * @return array<int, DeferredResult|null>
+     */
+    private function dispatchPendingInvocations(PlatformInterface $platform, array $states, array $window): array
+    {
+        $deferred = [];
+        foreach ($states as $index => $state) {
+            if ($state['response'] instanceof LLMResponse) {
+                continue;
+            }
+
+            $this->rateLimiter->acquire($this->promptTokenEstimator->estimate($window[$index]['system'], $window[$index]['user']));
+
+            $deferred[$index] = $this->invokeWithoutThrowing($platform, $state['bag'], $state['options']);
+        }
+
+        return $deferred;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function invokeWithoutThrowing(PlatformInterface $platform, MessageBag $messageBag, array $options): ?DeferredResult
+    {
+        \assert('' !== $this->model, 'Model must be a non-empty string');
+
+        try {
+            return $platform->invoke($this->model, $messageBag, $options);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}> $states
+     *
+     * @return list<LLMResponse>
+     */
+    private function collectResponses(array $states, int $maxToolIterations): array
+    {
         $responses = [];
         foreach ($states as $state) {
             $responses[] = $state['response'] instanceof LLMResponse
@@ -137,39 +194,27 @@ final readonly class ToolConversationWavefront
             $state['cacheCreation'] += $callCacheCreation;
             $this->rateLimiter->record($callInput, $callOutput);
             if ($this->budgetTracker instanceof BudgetTracker) {
-                $this->budgetTracker->recordCall(LLMResponse::create(
-                    content: '',
-                    inputTokens: $callInput,
-                    outputTokens: $callOutput,
-                    model: $this->model,
-                    stopReason: 'tool_iteration',
-                    cacheReadTokens: $callCacheRead,
-                    cacheCreationTokens: $callCacheCreation,
+                $this->budgetTracker->recordCall(LLMResponse::of(
+                    '',
+                    $this->model,
+                    'tool_iteration',
+                    TokenUsageSnapshot::of($callInput, $callOutput, $callCacheRead, $callCacheCreation),
                 ));
                 $this->budgetTracker->assertWithinBudget();
             }
 
             $toolCalls = $this->platformResultExtractor->extractToolCalls($platformResult);
 
-            if ([] === $toolCalls) {
-                $state['response'] = LLMResponse::create(
-                    content: $this->platformResultExtractor->extractText($platformResult),
-                    inputTokens: $state['input'],
-                    outputTokens: $state['output'],
-                    model: $this->model,
-                    stopReason: 'end_turn',
-                    cacheReadTokens: $state['cacheRead'],
-                    cacheCreationTokens: $state['cacheCreation'],
-                );
-            } else {
-                $state['bag']->add(new AssistantMessage(...$toolCalls));
-                foreach ($toolCalls as $toolCall) {
-                    $result = $request['tools']->execute($toolCall->getName(), $toolCall->getArguments());
-                    $state['bag']->add(new ToolCallMessage($toolCall, $result));
-                }
-
-                $state['toolsRan'] = true;
+            if ([] !== $toolCalls) {
+                return $this->runToolCalls($state, $toolCalls, $request);
             }
+
+            $state['response'] = LLMResponse::of(
+                $this->platformResultExtractor->extractText($platformResult),
+                $this->model,
+                'end_turn',
+                TokenUsageSnapshot::of($state['input'], $state['output'], $state['cacheRead'], $state['cacheCreation']),
+            );
 
             return $state;
         } catch (BudgetExceededException $budgetExceededException) {
@@ -177,6 +222,26 @@ final readonly class ToolConversationWavefront
         } catch (Throwable) {
             return $this->abortConversation($state, $request, $maxToolIterations);
         }
+    }
+
+    /**
+     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
+     * @param list<ToolCall>                                                                                                                                                 $toolCalls
+     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
+     *
+     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
+     */
+    private function runToolCalls(array $state, array $toolCalls, array $request): array
+    {
+        $state['bag']->add(new AssistantMessage(...$toolCalls));
+        foreach ($toolCalls as $toolCall) {
+            $result = $request['tools']->execute($toolCall->getName(), $toolCall->getArguments());
+            $state['bag']->add(new ToolCallMessage($toolCall, $result));
+        }
+
+        $state['toolsRan'] = true;
+
+        return $state;
     }
 
     /**
@@ -197,14 +262,11 @@ final readonly class ToolConversationWavefront
             'input_tokens' => $state['input'],
             'output_tokens' => $state['output'],
         ]);
-        $state['response'] = LLMResponse::create(
-            content: '',
-            inputTokens: $state['input'],
-            outputTokens: $state['output'],
-            model: $this->model,
-            stopReason: 'empty_content',
-            cacheReadTokens: $state['cacheRead'],
-            cacheCreationTokens: $state['cacheCreation'],
+        $state['response'] = LLMResponse::of(
+            '',
+            $this->model,
+            'empty_content',
+            TokenUsageSnapshot::of($state['input'], $state['output'], $state['cacheRead'], $state['cacheCreation']),
         );
 
         return $state;
@@ -221,14 +283,11 @@ final readonly class ToolConversationWavefront
             'output_tokens' => $state['output'],
         ]);
 
-        return LLMResponse::create(
-            content: '',
-            inputTokens: $state['input'],
-            outputTokens: $state['output'],
-            model: $this->model,
-            stopReason: 'max_tool_iterations',
-            cacheReadTokens: $state['cacheRead'],
-            cacheCreationTokens: $state['cacheCreation'],
+        return LLMResponse::of(
+            '',
+            $this->model,
+            'max_tool_iterations',
+            TokenUsageSnapshot::of($state['input'], $state['output'], $state['cacheRead'], $state['cacheCreation']),
         );
     }
 }

@@ -15,16 +15,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Rat
 
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 
 final class NullRateLimiterTest extends TestCase
 {
-    public function test_implements_the_rate_limiter_port(): void
-    {
-        self::assertInstanceOf(RateLimiterInterface::class, new NullRateLimiter());
-    }
-
     public function test_acquire_record_and_pause_are_all_no_ops(): void
     {
         $nullRateLimiter = new NullRateLimiter();

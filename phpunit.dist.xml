@@ -44,17 +44,19 @@
             <directory>src</directory>
         </include>
 
+        <deprecationTrigger>
+            <function>trigger_deprecation</function>
+        </deprecationTrigger>
     </source>
 
     <extensions>
         <bootstrap class="Ergebnis\PHPUnit\AgentReporter\Extension"/>
         <bootstrap class="Ergebnis\PHPUnit\SlowTestDetector\Extension">
-            <parameter name="maximum-count" value="3"/>
-            <parameter name="maximum-duration" value="50"/>
+            <parameter name="maximum-count" value="1"/>
+            <parameter name="maximum-duration" value="100"/>
         </bootstrap>
-        <bootstrap class="RobinIngelbrecht\PHPUnitCoverageTools\PhpUnitExtension">
-            <parameter name="exitOnLowCoverage" value="1"/>
-            <parameter name="cleanUpCloverXml" value="0"/>
+        <bootstrap class="VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPUnit\MinimumLineCoverageExtension">
+            <parameter name="min-coverage" value="100"/>
         </bootstrap>
     </extensions>
 

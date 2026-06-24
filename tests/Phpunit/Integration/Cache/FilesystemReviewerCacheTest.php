@@ -18,7 +18,10 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
@@ -94,7 +97,8 @@ final class FilesystemReviewerCacheTest extends TestCase
         $vulnerability = $this->makeVulnerability('src/A.php');
         $this->filesystemReviewerCache->store($vulnerability, 'code', ['accepted' => true]);
 
-        $files = glob($this->cacheDir.'/*/*.json') ?: [];
+        $globResult = glob($this->cacheDir.'/*/*.json');
+        $files = false !== $globResult ? $globResult : [];
         self::assertNotEmpty($files);
         file_put_contents($files[0], 'not json{{{');
 
@@ -106,7 +110,8 @@ final class FilesystemReviewerCacheTest extends TestCase
         $vulnerability = $this->makeVulnerability('src/A.php');
         $this->filesystemReviewerCache->store($vulnerability, 'code', ['accepted' => true]);
 
-        $files = glob($this->cacheDir.'/*/*.json') ?: [];
+        $globResult = glob($this->cacheDir.'/*/*.json');
+        $files = false !== $globResult ? $globResult : [];
         file_put_contents($files[0], '"a string"');
 
         self::assertNull($this->filesystemReviewerCache->get($vulnerability, 'code'));
@@ -158,7 +163,8 @@ final class FilesystemReviewerCacheTest extends TestCase
         $vulnerability = $this->makeVulnerability('src/A.php');
         $this->filesystemReviewerCache->store($vulnerability, 'code', ['accepted' => true]);
 
-        $files = glob($this->cacheDir.'/*/*.json') ?: [];
+        $globResult = glob($this->cacheDir.'/*/*.json');
+        $files = false !== $globResult ? $globResult : [];
         file_put_contents($files[0], '{{{');
 
         $warnings = [];
@@ -184,7 +190,8 @@ final class FilesystemReviewerCacheTest extends TestCase
     {
         $this->filesystemReviewerCache->store($this->makeVulnerability('src/A.php'), 'code', ['accepted' => true]);
 
-        $files = glob($this->cacheDir.'/*/*.json') ?: [];
+        $globResult = glob($this->cacheDir.'/*/*.json');
+        $files = false !== $globResult ? $globResult : [];
         self::assertCount(1, $files);
         $relative = substr($files[0], \strlen($this->cacheDir) + 1);
         self::assertMatchesRegularExpression('#^[a-f0-9]{2}/[a-f0-9]{64}\.json$#', $relative);
@@ -324,19 +331,11 @@ final class FilesystemReviewerCacheTest extends TestCase
 
     private function makeVulnerability(string $filePath, string $title = 'Finding'): Vulnerability
     {
-        return Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: $title,
-            description: 'desc',
-            filePath: $filePath,
-            lineStart: 1,
-            lineEnd: 5,
-            vulnerableCode: 'code',
-            attackVector: 'vec',
-            proof: 'proof',
-            remediation: 'fix',
-            confidence: 0.9,
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, $title, 0.9),
+            new CodeLocation($filePath, 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
         );
     }
 

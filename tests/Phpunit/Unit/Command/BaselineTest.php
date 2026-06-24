@@ -75,7 +75,17 @@ final class BaselineTest extends TestCase
         (new Baseline($this->filesystem))->load($path);
     }
 
-    public function test_load_throws_when_the_json_is_not_an_array(): void
+    public function test_load_throws_when_the_json_is_a_bare_scalar(): void
+    {
+        $path = $this->tmpDir.'/scalar.json';
+        $this->filesystem->dumpFile($path, '42');
+
+        $this->expectException(MalformedBaselineFileException::class);
+
+        (new Baseline($this->filesystem))->load($path);
+    }
+
+    public function test_load_throws_when_the_json_is_an_object_of_non_string_entries(): void
     {
         $path = $this->tmpDir.'/object.json';
         $this->filesystem->dumpFile($path, '{"a": 1}');

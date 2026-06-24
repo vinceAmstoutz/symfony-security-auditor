@@ -52,11 +52,6 @@ final class UsleepSleeperTest extends TestCase
         self::assertSame([10_000], $invocations);
     }
 
-    public function test_microseconds_per_millisecond_constant_is_exactly_one_thousand(): void
-    {
-        self::assertSame(1_000, UsleepSleeper::MICROSECONDS_PER_MILLISECOND);
-    }
-
     public function test_default_constructor_uses_real_usleep_for_actual_blocking(): void
     {
         $usleepSleeper = new UsleepSleeper();

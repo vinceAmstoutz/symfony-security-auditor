@@ -22,18 +22,18 @@ final class ConfigurationNoticesTest extends TestCase
 {
     public function test_no_notices_for_the_default_configuration(): void
     {
-        self::assertSame([], ConfigurationNotices::of($this->audit(reviewerBatchSize: 1), $this->llm()));
+        self::assertSame([], ConfigurationNotices::of($this->audit(['reviewerBatchSize' => 1]), $this->llm()));
     }
 
     public function test_batched_reviews_emit_no_notice_now_that_the_cache_covers_them(): void
     {
-        self::assertSame([], ConfigurationNotices::of($this->audit(reviewerBatchSize: 5), $this->llm()));
+        self::assertSame([], ConfigurationNotices::of($this->audit(['reviewerBatchSize' => 5]), $this->llm()));
     }
 
     public function test_escalation_with_a_cheap_model_equal_to_the_attacker_model_emits_a_notice(): void
     {
         $notices = ConfigurationNotices::of(
-            $this->audit(reviewerBatchSize: 1, escalationEnabled: true, escalationCheapModel: 'claude-opus-4-8'),
+            $this->audit(['reviewerBatchSize' => 1, 'escalationEnabled' => true, 'escalationCheapModel' => 'claude-opus-4-8']),
             $this->llm('claude-opus-4-8'),
         );
 
@@ -45,7 +45,7 @@ final class ConfigurationNoticesTest extends TestCase
     public function test_escalation_with_a_genuinely_cheaper_model_emits_no_notice(): void
     {
         $notices = ConfigurationNotices::of(
-            $this->audit(reviewerBatchSize: 1, escalationEnabled: true, escalationCheapModel: 'claude-haiku-4-5-20251001'),
+            $this->audit(['reviewerBatchSize' => 1, 'escalationEnabled' => true, 'escalationCheapModel' => 'claude-haiku-4-5-20251001']),
             $this->llm('claude-opus-4-8'),
         );
 
@@ -55,7 +55,7 @@ final class ConfigurationNoticesTest extends TestCase
     public function test_escalation_falling_back_to_the_attacker_model_emits_a_notice(): void
     {
         $notices = ConfigurationNotices::of(
-            $this->audit(reviewerBatchSize: 1, escalationEnabled: true),
+            $this->audit(['reviewerBatchSize' => 1, 'escalationEnabled' => true]),
             $this->llm('claude-opus-4-8'),
         );
 
@@ -66,7 +66,7 @@ final class ConfigurationNoticesTest extends TestCase
     public function test_disabled_escalation_emits_no_notice_even_when_models_match(): void
     {
         $notices = ConfigurationNotices::of(
-            $this->audit(reviewerBatchSize: 1, escalationEnabled: false),
+            $this->audit(['reviewerBatchSize' => 1, 'escalationEnabled' => false]),
             $this->llm('claude-opus-4-8'),
         );
 
@@ -76,7 +76,7 @@ final class ConfigurationNoticesTest extends TestCase
     public function test_reviewer_concurrency_with_tools_enabled_emits_a_notice(): void
     {
         $notices = ConfigurationNotices::of(
-            $this->audit(reviewerBatchSize: 1, reviewerMaxConcurrent: 4, reviewerToolsEnabled: true),
+            $this->audit(['reviewerBatchSize' => 1, 'reviewerMaxConcurrent' => 4, 'reviewerToolsEnabled' => true]),
             $this->llm(),
         );
 
@@ -88,7 +88,7 @@ final class ConfigurationNoticesTest extends TestCase
     public function test_reviewer_concurrency_without_tools_emits_no_notice(): void
     {
         $notices = ConfigurationNotices::of(
-            $this->audit(reviewerBatchSize: 1, reviewerMaxConcurrent: 4, reviewerToolsEnabled: false),
+            $this->audit(['reviewerBatchSize' => 1, 'reviewerMaxConcurrent' => 4, 'reviewerToolsEnabled' => false]),
             $this->llm(),
         );
 
@@ -98,7 +98,7 @@ final class ConfigurationNoticesTest extends TestCase
     public function test_attacker_concurrency_with_tools_enabled_emits_a_notice(): void
     {
         $notices = ConfigurationNotices::of(
-            $this->audit(reviewerBatchSize: 1, attackerMaxConcurrent: 4, toolsEnabled: true, structuredCollection: true),
+            $this->audit(['reviewerBatchSize' => 1, 'attackerMaxConcurrent' => 4, 'toolsEnabled' => true, 'structuredCollection' => true]),
             $this->llm(),
         );
 
@@ -109,7 +109,7 @@ final class ConfigurationNoticesTest extends TestCase
     public function test_attacker_concurrency_with_structured_collection_off_emits_a_notice(): void
     {
         $notices = ConfigurationNotices::of(
-            $this->audit(reviewerBatchSize: 1, attackerMaxConcurrent: 4, toolsEnabled: false, structuredCollection: false),
+            $this->audit(['reviewerBatchSize' => 1, 'attackerMaxConcurrent' => 4, 'toolsEnabled' => false, 'structuredCollection' => false]),
             $this->llm(),
         );
 
@@ -120,7 +120,7 @@ final class ConfigurationNoticesTest extends TestCase
     public function test_attacker_concurrency_in_structured_toolless_mode_emits_no_notice(): void
     {
         $notices = ConfigurationNotices::of(
-            $this->audit(reviewerBatchSize: 1, attackerMaxConcurrent: 4, toolsEnabled: false, structuredCollection: true),
+            $this->audit(['reviewerBatchSize' => 1, 'attackerMaxConcurrent' => 4, 'toolsEnabled' => false, 'structuredCollection' => true]),
             $this->llm(),
         );
 
@@ -130,7 +130,7 @@ final class ConfigurationNoticesTest extends TestCase
     public function test_reviewer_concurrency_of_one_with_tools_emits_no_notice(): void
     {
         $notices = ConfigurationNotices::of(
-            $this->audit(reviewerBatchSize: 1, reviewerMaxConcurrent: 1, reviewerToolsEnabled: true),
+            $this->audit(['reviewerBatchSize' => 1, 'reviewerMaxConcurrent' => 1, 'reviewerToolsEnabled' => true]),
             $this->llm(),
         );
 
@@ -140,7 +140,7 @@ final class ConfigurationNoticesTest extends TestCase
     public function test_attacker_concurrency_of_one_with_tools_emits_no_notice(): void
     {
         $notices = ConfigurationNotices::of(
-            $this->audit(reviewerBatchSize: 1, attackerMaxConcurrent: 1, toolsEnabled: true),
+            $this->audit(['reviewerBatchSize' => 1, 'attackerMaxConcurrent' => 1, 'toolsEnabled' => true]),
             $this->llm(),
         );
 
@@ -150,13 +150,13 @@ final class ConfigurationNoticesTest extends TestCase
     public function test_multiple_simultaneous_footguns_each_emit_their_own_notice(): void
     {
         $notices = ConfigurationNotices::of(
-            $this->audit(
-                reviewerBatchSize: 5,
-                reviewerMaxConcurrent: 4,
-                reviewerToolsEnabled: true,
-                attackerMaxConcurrent: 4,
-                toolsEnabled: true,
-            ),
+            $this->audit([
+                'reviewerBatchSize' => 5,
+                'reviewerMaxConcurrent' => 4,
+                'reviewerToolsEnabled' => true,
+                'attackerMaxConcurrent' => 4,
+                'toolsEnabled' => true,
+            ]),
             $this->llm(),
         );
 
@@ -165,28 +165,32 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertStringContainsString('audit.attacker_max_concurrent', $notices[1]);
     }
 
-    private function audit(
-        int $reviewerBatchSize,
-        bool $escalationEnabled = false,
-        ?string $escalationCheapModel = null,
-        int $reviewerMaxConcurrent = 1,
-        bool $reviewerToolsEnabled = false,
-        int $attackerMaxConcurrent = 1,
-        bool $toolsEnabled = true,
-        bool $structuredCollection = true,
-    ): AuditExecutionConfiguration {
+    /**
+     * @param array{
+     *     reviewerBatchSize?: int,
+     *     escalationEnabled?: bool,
+     *     escalationCheapModel?: string|null,
+     *     reviewerMaxConcurrent?: int,
+     *     reviewerToolsEnabled?: bool,
+     *     attackerMaxConcurrent?: int,
+     *     toolsEnabled?: bool,
+     *     structuredCollection?: bool,
+     * } $overrides
+     */
+    private function audit(array $overrides = []): AuditExecutionConfiguration
+    {
         return new AuditExecutionConfiguration(
             maxIterations: 3,
             minConfidence: 0.6,
-            reviewerBatchSize: $reviewerBatchSize,
-            toolsEnabled: $toolsEnabled,
+            reviewerBatchSize: $overrides['reviewerBatchSize'] ?? 1,
+            toolsEnabled: $overrides['toolsEnabled'] ?? true,
             maxToolIterations: 8,
-            reviewerToolsEnabled: $reviewerToolsEnabled,
-            reviewerMaxConcurrent: $reviewerMaxConcurrent,
-            attackerMaxConcurrent: $attackerMaxConcurrent,
-            escalationEnabled: $escalationEnabled,
-            escalationCheapModel: $escalationCheapModel,
-            structuredCollection: $structuredCollection,
+            reviewerToolsEnabled: $overrides['reviewerToolsEnabled'] ?? false,
+            reviewerMaxConcurrent: $overrides['reviewerMaxConcurrent'] ?? 1,
+            attackerMaxConcurrent: $overrides['attackerMaxConcurrent'] ?? 1,
+            escalationEnabled: $overrides['escalationEnabled'] ?? false,
+            escalationCheapModel: $overrides['escalationCheapModel'] ?? null,
+            structuredCollection: $overrides['structuredCollection'] ?? true,
         );
     }
 

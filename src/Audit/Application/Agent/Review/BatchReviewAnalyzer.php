@@ -55,23 +55,41 @@ final readonly class BatchReviewAnalyzer
     /**
      * @param list<Vulnerability> $vulnerabilities
      * @param list<ProjectFile>   $projectFiles
-     * @param int<1, max>         $batchSize
      *
      * @return list<Vulnerability>
      */
-    public function analyze(array $vulnerabilities, array $projectFiles, int $batchSize, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, bool $structured, bool $bypassCache): array
+    public function analyze(array $vulnerabilities, array $projectFiles, ReviewBatchSettings $reviewBatchSettings): array
     {
-        $reviewed = [];
+        $cachePartition = $this->partitionByCache($vulnerabilities, $projectFiles, $reviewBatchSettings);
+
+        $cacheContexts = $reviewBatchSettings->bypassCache ? [] : $cachePartition->codeContexts;
+        $reviewCacheBuckets = new ReviewCacheBuckets($cachePartition->codeContexts, $cacheContexts);
+
+        $reviewed = $this->reviewMissesInBatches($cachePartition->reviewed, $cachePartition->misses, $cachePartition->missIndexes, $reviewBatchSettings, $reviewCacheBuckets);
+
+        ksort($reviewed);
+
+        return array_values($reviewed);
+    }
+
+    /**
+     * @param list<Vulnerability> $vulnerabilities
+     * @param list<ProjectFile>   $projectFiles
+     */
+    private function partitionByCache(array $vulnerabilities, array $projectFiles, ReviewBatchSettings $reviewBatchSettings): CachePartition
+    {
         $codeContexts = [];
+        $reviewed = [];
         $missIndexes = [];
         $misses = [];
+
         foreach ($vulnerabilities as $index => $vulnerability) {
             $codeContext = CodeContextResolver::resolve($vulnerability->filePath(), $projectFiles);
             $codeContexts[$vulnerability->id()] = $codeContext;
 
-            $cached = $this->reviewerVerdictCache->get($vulnerability, $codeContext, $bypassCache);
+            $cached = $this->reviewerVerdictCache->get($vulnerability, $codeContext, $reviewBatchSettings->bypassCache);
             if (null !== $cached) {
-                $reviewed[$index] = $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $cached, $coverageRecorder);
+                $reviewed[$index] = $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $cached, $reviewBatchSettings->coverageRecorder);
 
                 continue;
             }
@@ -80,23 +98,45 @@ final readonly class BatchReviewAnalyzer
             $misses[] = $vulnerability;
         }
 
-        $cacheContexts = $bypassCache ? [] : $codeContexts;
+        return new CachePartition($codeContexts, $reviewed, $missIndexes, $misses);
+    }
 
+    /**
+     * @param array<int, Vulnerability> $reviewed
+     * @param list<Vulnerability>       $misses
+     * @param list<int>                 $missIndexes
+     *
+     * @return array<int, Vulnerability>
+     */
+    private function reviewMissesInBatches(array $reviewed, array $misses, array $missIndexes, ReviewBatchSettings $reviewBatchSettings, ReviewCacheBuckets $reviewCacheBuckets): array
+    {
         $position = 0;
-        foreach (array_chunk($misses, $batchSize) as $batch) {
-            $batchReviewed = $structured
-                ? $this->reviewBatchViaStructuredCollection($batch, $codeContexts, $cacheContexts, $coverageRecorder)
-                : $this->reviewBatch($batch, $codeContexts, $cacheContexts, $coverageRecorder, $toolRegistry);
+        foreach (array_chunk($misses, $reviewBatchSettings->batchSize) as $batch) {
+            $batchReviewed = $reviewBatchSettings->structured
+                ? $this->reviewBatchViaStructuredCollection($batch, $reviewCacheBuckets->codeContexts, $reviewCacheBuckets->cacheContexts, $reviewBatchSettings->coverageRecorder)
+                : $this->reviewBatch($batch, $reviewCacheBuckets->codeContexts, $reviewCacheBuckets->cacheContexts, $reviewBatchSettings->coverageRecorder, $reviewBatchSettings->toolRegistry);
 
-            foreach ($batchReviewed as $reviewedVulnerability) {
-                $reviewed[$missIndexes[$position]] = $reviewedVulnerability;
-                ++$position;
-            }
+            [$reviewed, $position] = $this->mergeBatchIntoReviewed($batchReviewed, $missIndexes, $position, $reviewed);
         }
 
-        ksort($reviewed);
+        return $reviewed;
+    }
 
-        return array_values($reviewed);
+    /**
+     * @param list<Vulnerability>       $batchReviewed
+     * @param list<int>                 $missIndexes
+     * @param array<int, Vulnerability> $reviewed
+     *
+     * @return array{0: array<int, Vulnerability>, 1: int}
+     */
+    private function mergeBatchIntoReviewed(array $batchReviewed, array $missIndexes, int $position, array $reviewed): array
+    {
+        foreach ($batchReviewed as $reviewedVulnerability) {
+            $reviewed[$missIndexes[$position]] = $reviewedVulnerability;
+            ++$position;
+        }
+
+        return [$reviewed, $position];
     }
 
     /**

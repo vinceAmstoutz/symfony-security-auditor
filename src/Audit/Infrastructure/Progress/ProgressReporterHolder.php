@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress;
 
+use Psr\Log\LoggerInterface;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
@@ -38,7 +40,7 @@ final class ProgressReporterHolder implements ProgressReporterInterface
 {
     private ProgressReporterInterface $progressReporter;
 
-    public function __construct()
+    public function __construct(private readonly LoggerInterface $logger)
     {
         $this->progressReporter = new NullProgressReporter();
     }
@@ -52,7 +54,11 @@ final class ProgressReporterHolder implements ProgressReporterInterface
     {
         try {
             $this->progressReporter->report($event, $context);
-        } catch (Throwable) {
+        } catch (Throwable $throwable) {
+            $this->logger->debug('Progress reporter failed; audit continues.', [
+                'event' => $event,
+                'exception' => $throwable,
+            ]);
         }
     }
 }

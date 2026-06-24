@@ -19,13 +19,25 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
@@ -354,7 +366,7 @@ final class AuditOrchestratorTest extends TestCase
         );
         $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
 
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, $logger);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['logger' => $logger]);
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -384,7 +396,7 @@ final class AuditOrchestratorTest extends TestCase
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, $logger);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['logger' => $logger]);
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -411,7 +423,7 @@ final class AuditOrchestratorTest extends TestCase
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, $logger);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['logger' => $logger]);
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -449,7 +461,7 @@ final class AuditOrchestratorTest extends TestCase
             $this->reviewerRejectResponse(),
         );
 
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, $logger);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['logger' => $logger]);
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -477,7 +489,7 @@ final class AuditOrchestratorTest extends TestCase
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('complete')->willReturn($this->emptyResponse());
 
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, $logger);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['logger' => $logger]);
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -522,7 +534,7 @@ final class AuditOrchestratorTest extends TestCase
             ->with('No mapping available, skipping audit');
         $logger->expects(self::never())->method('info');
 
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, $logger);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['logger' => $logger]);
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -553,8 +565,7 @@ final class AuditOrchestratorTest extends TestCase
         $auditOrchestrator = $this->makeOrchestrator(
             $attackerLlm,
             $reviewerLlm,
-            new NullLogger(),
-            maxIterations: 5,
+            ['maxIterations' => 5],
         );
         $auditContext = $this->makeContextWithMapping();
 
@@ -575,8 +586,7 @@ final class AuditOrchestratorTest extends TestCase
         $auditOrchestrator = $this->makeOrchestrator(
             $attackerLlm,
             $reviewerLlm,
-            new NullLogger(),
-            minConfidence: 0.7,
+            ['minConfidence' => 0.7],
         );
         $auditContext = $this->makeContextWithMapping();
 
@@ -598,8 +608,7 @@ final class AuditOrchestratorTest extends TestCase
         $auditOrchestrator = $this->makeOrchestrator(
             $attackerLlm,
             $reviewerLlm,
-            new NullLogger(),
-            minConfidence: 0.7,
+            ['minConfidence' => 0.7],
         );
         $auditContext = $this->makeContextWithMapping();
 
@@ -610,19 +619,11 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_passes_previously_validated_findings_to_next_iteration(): void
     {
-        $vulnerability = Vulnerability::create(
-            vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-            vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-            title: 'First',
-            description: 'd',
-            filePath: 'src/A.php',
-            lineStart: 1,
-            lineEnd: 2,
-            vulnerableCode: 'c',
-            attackVector: 'a',
-            proof: 'p',
-            remediation: 'r',
-            confidence: 0.9,
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'First', 0.9),
+            new CodeLocation('src/A.php', 1, 2),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            'c',
         );
 
         // Returns the same finding every iteration; iteration 1 persists it (0 previous),
@@ -631,9 +632,12 @@ final class AuditOrchestratorTest extends TestCase
 
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
-        $reviewerAgent = new ReviewerAgent($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger());
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
+            new ReviewerModeConfiguration(),
+        );
 
-        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger());
+        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings());
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -643,41 +647,18 @@ final class AuditOrchestratorTest extends TestCase
 
     public function test_it_passes_only_reviewer_rejected_findings_to_next_iteration(): void
     {
-        // The attacker returns both findings every iteration. The reviewer accepts
-        // 'KeepMe' (src/Accepted.php) and rejects 'DropMe' (src/Rejected.php).
-        // Iteration 2 must receive ONLY the rejected finding as rejected context:
-        // - dropping the array_filter would feed back both (count 2);
-        // - flipping !isReviewerValidated() would feed back the ACCEPTED finding
-        //   instead, so the identity assertion below pins the correct one.
-        // Both findings dedupe in iteration 2, so the loop stops.
         $recordingAttackerAgent = new RecordingAttackerAgent([
-            Vulnerability::create(
-                vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-                vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-                title: 'KeepMe',
-                description: 'd',
-                filePath: 'src/Accepted.php',
-                lineStart: 1,
-                lineEnd: 2,
-                vulnerableCode: 'c',
-                attackVector: 'a',
-                proof: 'p',
-                remediation: 'r',
-                confidence: 0.9,
+            Vulnerability::of(
+                new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'KeepMe', 0.9),
+                new CodeLocation('src/Accepted.php', 1, 2),
+                new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+                'c',
             ),
-            Vulnerability::create(
-                vulnerabilityType: VulnerabilityType::SQL_INJECTION,
-                vulnerabilitySeverity: VulnerabilitySeverity::HIGH,
-                title: 'DropMe',
-                description: 'd',
-                filePath: 'src/Rejected.php',
-                lineStart: 1,
-                lineEnd: 2,
-                vulnerableCode: 'c',
-                attackVector: 'a',
-                proof: 'p',
-                remediation: 'r',
-                confidence: 0.9,
+            Vulnerability::of(
+                new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'DropMe', 0.9),
+                new CodeLocation('src/Rejected.php', 1, 2),
+                new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+                'c',
             ),
         ]);
 
@@ -687,9 +668,12 @@ final class AuditOrchestratorTest extends TestCase
                 ? $this->reviewerAcceptResponse()
                 : $this->reviewerRejectResponse(),
         );
-        $reviewerAgent = new ReviewerAgent($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger());
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
+            new ReviewerModeConfiguration(),
+        );
 
-        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger());
+        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings());
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -717,8 +701,7 @@ final class AuditOrchestratorTest extends TestCase
         $auditOrchestrator = $this->makeOrchestrator(
             $attackerLlm,
             $reviewerLlm,
-            $logger,
-            maxIterations: 7,
+            ['logger' => $logger, 'maxIterations' => 7],
         );
         $auditContext = $this->makeContextWithMapping();
 
@@ -753,7 +736,7 @@ final class AuditOrchestratorTest extends TestCase
         );
         $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
         $recordingProgressReporter = new RecordingProgressReporter();
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, recordingProgressReporter: $recordingProgressReporter);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['recordingProgressReporter' => $recordingProgressReporter]);
 
         $auditOrchestrator->orchestrate($this->makeContextWithMapping());
 
@@ -779,7 +762,7 @@ final class AuditOrchestratorTest extends TestCase
         );
         $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
         $recordingProgressReporter = new RecordingProgressReporter();
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, recordingProgressReporter: $recordingProgressReporter);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['recordingProgressReporter' => $recordingProgressReporter]);
 
         $auditOrchestrator->orchestrate($this->makeContextWithMapping());
 
@@ -800,7 +783,7 @@ final class AuditOrchestratorTest extends TestCase
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('complete')->willReturn($this->emptyResponse());
         $recordingProgressReporter = new RecordingProgressReporter();
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, recordingProgressReporter: $recordingProgressReporter);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['recordingProgressReporter' => $recordingProgressReporter]);
 
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
@@ -809,17 +792,20 @@ final class AuditOrchestratorTest extends TestCase
             ProjectFile::create('src/Entity/E.php', '/e', '<?php'),
             ProjectFile::create('src/Form/F.php', '/f', '<?php'),
         ]);
-        $auditContext->setMapping(SymfonyMapping::create(
-            controllers: [
-                ProjectFile::create('src/Controller/A.php', '/a', '<?php'),
-                ProjectFile::create('src/Controller/B.php', '/b', '<?php'),
-            ],
-            voters: [ProjectFile::create('src/Security/V.php', '/v', '<?php')],
-            forms: [
-                ProjectFile::create('src/Form/F1.php', '/f1', '<?php'),
-                ProjectFile::create('src/Form/F2.php', '/f2', '<?php'),
-                ProjectFile::create('src/Form/F3.php', '/f3', '<?php'),
-            ],
+        $auditContext->setMapping(SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([
+                'controllers' => [
+                    ProjectFile::create('src/Controller/A.php', '/a', '<?php'),
+                    ProjectFile::create('src/Controller/B.php', '/b', '<?php'),
+                ],
+                'voters' => [ProjectFile::create('src/Security/V.php', '/v', '<?php')],
+                'forms' => [
+                    ProjectFile::create('src/Form/F1.php', '/f1', '<?php'),
+                    ProjectFile::create('src/Form/F2.php', '/f2', '<?php'),
+                    ProjectFile::create('src/Form/F3.php', '/f3', '<?php'),
+                ],
+            ]),
+            new AccessControlMap(),
         ));
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -849,7 +835,7 @@ final class AuditOrchestratorTest extends TestCase
             $this->reviewerRejectResponse(),
         );
         $recordingProgressReporter = new RecordingProgressReporter();
-        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, recordingProgressReporter: $recordingProgressReporter);
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['recordingProgressReporter' => $recordingProgressReporter]);
 
         $auditOrchestrator->orchestrate($this->makeContextWithMapping());
 
@@ -862,31 +848,46 @@ final class AuditOrchestratorTest extends TestCase
         );
     }
 
+    /**
+     * @param array{
+     *     logger?: LoggerInterface,
+     *     maxIterations?: int,
+     *     minConfidence?: float,
+     *     recordingProgressReporter?: RecordingProgressReporter,
+     * } $overrides
+     */
     private function makeOrchestrator(
         LLMClientInterface $attackerLlm,
         LLMClientInterface $reviewerLlm,
-        ?LoggerInterface $logger = null,
-        int $maxIterations = AuditOrchestrator::DEFAULT_MAX_ITERATIONS,
-        float $minConfidence = AuditOrchestrator::DEFAULT_MIN_CONFIDENCE,
-        ?RecordingProgressReporter $recordingProgressReporter = null,
+        array $overrides = [],
     ): AuditOrchestrator {
         return new AuditOrchestrator(
             attackerAgent: new AttackerAgent(
-                llmClient: $attackerLlm,
-                attackerPromptBuilder: new AttackerPromptBuilder(),
-                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-                attackerCache: new NullAttackerCache(),
-                logger: new NullLogger(),
+                new AttackerLlmCollaborators(
+                    $attackerLlm,
+                    new AttackerPromptBuilder(),
+                    new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                ),
+                new AttackerScanCollaborators(
+                    new NullAttackerCache(),
+                ),
+                new AttackerAnalysisSettings(),
+                new NullLogger(),
             ),
             reviewerAgent: new ReviewerAgent(
-                llmClient: $reviewerLlm,
-                reviewerPromptBuilder: new ReviewerPromptBuilder(),
-                logger: new NullLogger(),
+                new ReviewerAgentCollaborators(
+                    $reviewerLlm,
+                    new ReviewerPromptBuilder(),
+                    new NullLogger(),
+                ),
+                new ReviewerModeConfiguration(),
             ),
-            logger: $logger ?? new NullLogger(),
-            maxIterations: $maxIterations,
-            minConfidence: $minConfidence,
-            progressReporter: $recordingProgressReporter,
+            logger: $overrides['logger'] ?? new NullLogger(),
+            auditLoopSettings: new AuditLoopSettings(
+                $overrides['maxIterations'] ?? AuditOrchestrator::DEFAULT_MAX_ITERATIONS,
+                $overrides['minConfidence'] ?? AuditOrchestrator::DEFAULT_MIN_CONFIDENCE,
+            ),
+            progressReporter: $overrides['recordingProgressReporter'] ?? null,
         );
     }
 
@@ -896,7 +897,7 @@ final class AuditOrchestratorTest extends TestCase
         $auditContext->setProjectFiles([
             ProjectFile::create('src/Controller/Foo.php', '/app/src/Controller/Foo.php', '<?php'),
         ]);
-        $auditContext->setMapping(SymfonyMapping::create());
+        $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 
         return $auditContext;
     }
@@ -930,21 +931,21 @@ final class AuditOrchestratorTest extends TestCase
     /** @param list<array<string, mixed>> $vulns */
     private function attackerResponse(array $vulns): LLMResponse
     {
-        return LLMResponse::create((string) json_encode($vulns), 0, 0, 'test', 'end_turn');
+        return LLMResponse::of((string) json_encode($vulns), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
     }
 
     private function emptyResponse(): LLMResponse
     {
-        return LLMResponse::create('[]', 0, 0, 'test', 'end_turn');
+        return LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
     }
 
     private function reviewerAcceptResponse(): LLMResponse
     {
-        return LLMResponse::create((string) json_encode(['accepted' => true]), 0, 0, 'test', 'end_turn');
+        return LLMResponse::of((string) json_encode(['accepted' => true]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
     }
 
     private function reviewerRejectResponse(): LLMResponse
     {
-        return LLMResponse::create((string) json_encode(['accepted' => false]), 0, 0, 'test', 'end_turn');
+        return LLMResponse::of((string) json_encode(['accepted' => false]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
     }
 }

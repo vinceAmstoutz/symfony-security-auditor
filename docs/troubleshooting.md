@@ -21,8 +21,6 @@ so we can document it.
 > See also: [FAQ](faq.md) · [Configuration](configuration.md) ·
 > [CI Integration](ci.md)
 
----
-
 ## Installation & Setup
 
 ### `Class "Symfony\AI\AiBundle\AiBundle" not found`
@@ -59,8 +57,6 @@ raised only when an audit actually runs.
 
 Same root cause as above. Verify `ai.yaml` has a `platform:` block and the
 corresponding `symfony/ai-*-platform` package is installed.
-
----
 
 ## Running the Audit
 
@@ -103,8 +99,6 @@ Exit code `1` is also used for:
   `console|json|sarif`).
 
 Re-run with `-v` or `-vv` to see the underlying error.
-
----
 
 ## LLM & Provider Errors
 
@@ -190,8 +184,6 @@ ollama pull llama3.3
 Then verify with `ollama list`. The model name in
 `symfony_security_auditor.yaml` must match exactly.
 
----
-
 ## Empty / Surprising Reports
 
 ### Report has zero vulnerabilities but I know there are some
@@ -236,8 +228,6 @@ symfony_security_auditor:
 
 With `temperature: 0.0` + `cache.enabled: true`, repeated runs on identical code
 become deterministic.
-
----
 
 ## Performance & Cost
 
@@ -300,8 +290,6 @@ from the table, the token counts in the report are still accurate — only the U
 figure is unavailable. Alias your own `PricingProviderInterface` implementation
 to supply prices (see [Extending](extending.md)).
 
----
-
 ## Cache Issues
 
 ### Cache seems stale — old findings persist after fixing code
@@ -344,8 +332,6 @@ symfony_security_auditor:
 `AttackerCacheInterface` is aliased to `NullAttackerCache` — every chunk hits
 the LLM.
 
----
-
 ## Advisory (`composer audit`) Issues
 
 ### `lookup_advisory` always returns empty results
@@ -382,8 +368,6 @@ services:
 See
 [Configuration → Advisory Source](configuration.md#advisory-source-lookup_advisory-tool).
 
----
-
 ## Tools (`read_file`, `grep`, `list_files`, `lookup_advisory`)
 
 ### Attacker never calls tools
@@ -410,8 +394,6 @@ See [Advisory (`composer audit`) Issues](#advisory-composer-audit-issues) above.
 The tools are scoped to the project path passed to `audit:run`. Symlinks outside
 that path are not followed. Use absolute paths only when the file is under the
 project root.
-
----
 
 ## CI Failures
 
@@ -446,8 +428,6 @@ Common causes:
 - CI runner lacks Composer 2.4+ → `lookup_advisory` reports empty.
 - `composer.lock` not committed → `lookup_advisory` reports empty.
 - Different model name between local config and CI config.
-
----
 
 ## Dev / Quality Gate Failures
 

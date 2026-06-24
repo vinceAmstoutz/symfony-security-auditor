@@ -46,6 +46,10 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
 
     private string $iterationLabel = '';
 
+    private int $reviewTotal = 0;
+
+    private int $reviewedCount = 0;
+
     public function __construct(private readonly OutputInterface $output) {}
 
     /**
@@ -64,6 +68,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
             ProgressEvent::AttackerChunkCompleted => $this->onAttackerChunkCompleted($context),
             ProgressEvent::AttackerFindingRecorded => $this->onAttackerFindingRecorded($context),
             ProgressEvent::ReviewStarted => $this->onReviewStarted($context),
+            ProgressEvent::ReviewFindingReviewed => $this->onReviewFindingReviewed($context),
             ProgressEvent::ReviewCompleted => $this->onReviewCompleted($context),
             null => null,
         };
@@ -190,7 +195,28 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
             return;
         }
 
+        $this->reviewTotal = $findings;
+        $this->reviewedCount = 0;
         $this->updateMessage(\sprintf('reviewing %d finding(s)', $findings));
+    }
+
+    /** @param array<string, mixed> $context */
+    private function onReviewFindingReviewed(array $context): void
+    {
+        ++$this->reviewedCount;
+
+        $accepted = true === ($context['accepted'] ?? null);
+
+        $line = \sprintf(
+            '  ⚖ %s %s — %s:%d',
+            $accepted ? '✓ validated' : '✗ rejected',
+            ProgressContext::string($context, 'type'),
+            ProgressContext::string($context, 'file'),
+            ProgressContext::int($context, 'line'),
+        );
+
+        $this->writeAboveBar(\sprintf('<fg=%s>%s</>', $accepted ? 'green' : 'yellow', $line));
+        $this->updateMessage(\sprintf('reviewing %d/%d', $this->reviewedCount, $this->reviewTotal));
     }
 
     private function updateMessage(string $detail = ''): void

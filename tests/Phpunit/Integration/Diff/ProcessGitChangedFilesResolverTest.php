@@ -164,6 +164,19 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         self::assertNotContains('src/Foo.php', $changed);
     }
 
+    public function test_it_wraps_a_git_diff_process_failure_when_the_ref_resolves_but_has_no_merge_base(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php', 'on main');
+        $this->runGit(['git', 'checkout', '--orphan', 'unrelated']);
+        $this->commit('src/Bar.php', '<?php', 'unrelated root');
+
+        $this->expectException(GitChangedFilesUnavailableException::class);
+        $this->expectExceptionMessage('git diff against "main...HEAD" failed');
+
+        (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+    }
+
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/git_diff_resolver_test_'.uniqid('', true);

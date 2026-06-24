@@ -14,20 +14,22 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullControllerAccessControlParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullControllerAccessControlParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullFormBindingParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NullVoterCapabilityParser;
 
 use function Symfony\Component\String\u;
 
@@ -62,43 +64,33 @@ final readonly class MappingStage implements StageInterface
 
         if ([] === $files) {
             $this->logger->warning('No files to map');
-            $auditContext->setMapping(SymfonyMapping::create());
+            $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromFiles([]), new AccessControlMap()));
 
             return;
         }
 
-        $controllers = array_values(array_filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isController()));
-        $entities = array_values(array_filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isEntity()));
-        $voters = array_values(array_filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isVoter()));
-        $repositories = array_values(array_filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isRepository()));
-        $forms = array_values(array_filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isForm()));
-        $services = array_values(array_filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isService()));
-        $templates = array_values(array_filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isTemplate()));
+        $projectFileInventory = ProjectFileInventory::fromFiles($files);
 
         [$routeAccessMap, $firewallRules] = $this->extractSecurityConfig($files);
-        $routeAccessControls = $this->parseControllerAccessControls($controllers);
-        $voterCapabilities = $this->parseVoterCapabilities($voters);
-        $formBindings = $this->parseFormBindings($controllers);
+        $routeAccessControls = $this->parseControllerAccessControls($projectFileInventory->controllers());
+        $voterCapabilities = $this->parseVoterCapabilities($projectFileInventory->voters());
+        $formBindings = $this->parseFormBindings($projectFileInventory->controllers());
 
-        $symfonyMapping = SymfonyMapping::create(
-            controllers: $controllers,
-            entities: $entities,
-            voters: $voters,
-            repositories: $repositories,
-            forms: $forms,
-            services: $services,
-            templates: $templates,
-            routeAccessMap: $routeAccessMap,
-            firewallRules: $firewallRules,
-            routeAccessControls: $routeAccessControls,
-            voterCapabilities: $voterCapabilities,
-            formBindings: $formBindings,
+        $symfonyMapping = SymfonyMapping::of(
+            $projectFileInventory,
+            new AccessControlMap(
+                $routeAccessMap,
+                $firewallRules,
+                $routeAccessControls,
+                $voterCapabilities,
+                $formBindings,
+            ),
         );
 
         $auditContext->setMapping($symfonyMapping);
-        $auditContext->setMeta('mapping.controllers', \count($controllers));
-        $auditContext->setMeta('mapping.entities', \count($entities));
-        $auditContext->setMeta('mapping.voters', \count($voters));
+        $auditContext->setMeta('mapping.controllers', \count($projectFileInventory->controllers()));
+        $auditContext->setMeta('mapping.entities', \count($projectFileInventory->entities()));
+        $auditContext->setMeta('mapping.voters', \count($projectFileInventory->voters()));
         $auditContext->setMeta('mapping.no_voter_controllers', \count($symfonyMapping->controllersWithoutVoters()));
         $auditContext->setMeta('mapping.routes', \count($routeAccessControls));
         $auditContext->setMeta('mapping.routes_without_access_check', \count($symfonyMapping->controllersWithoutAccessCheck()));

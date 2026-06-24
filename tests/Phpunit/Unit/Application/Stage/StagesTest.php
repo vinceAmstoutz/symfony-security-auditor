@@ -19,17 +19,26 @@ use Psr\Log\NullLogger;
 use Symfony\Component\ErrorHandler\BufferingLogger;
 use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
@@ -428,14 +437,14 @@ final class StagesTest extends TestCase
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
         $reviewerLlm = self::createStub(LLMClientInterface::class);
-        $attackerLlm->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'stub', 'end_turn'));
+        $attackerLlm->method('complete')->willReturn(LLMResponse::of('[]', 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $auditStage = new AuditStage($this->makeOrchestrator($attackerLlm, $reviewerLlm), new NullLogger());
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
             ProjectFile::create('src/A.php', '/app/src/A.php', '<?php'),
         ]);
-        $auditContext->setMapping(SymfonyMapping::create());
+        $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 
         $auditStage->process($auditContext);
 
@@ -773,7 +782,7 @@ final class StagesTest extends TestCase
         );
 
         $attackerLlm = self::createStub(LLMClientInterface::class);
-        $attackerLlm->method('complete')->willReturn(LLMResponse::create('[]', 0, 0, 'stub', 'end_turn'));
+        $attackerLlm->method('complete')->willReturn(LLMResponse::of('[]', 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)));
         $reviewerLlm = self::createStub(LLMClientInterface::class);
 
         $auditStage = new AuditStage($this->makeOrchestrator($attackerLlm, $reviewerLlm), $logger);
@@ -781,7 +790,7 @@ final class StagesTest extends TestCase
         $auditContext->setProjectFiles([
             ProjectFile::create('src/A.php', '/app/src/A.php', '<?php'),
         ]);
-        $auditContext->setMapping(SymfonyMapping::create());
+        $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
 
         $auditStage->process($auditContext);
 
@@ -848,18 +857,27 @@ final class StagesTest extends TestCase
     ): AuditOrchestrator {
         return new AuditOrchestrator(
             attackerAgent: new AttackerAgent(
-                llmClient: $attackerLlm ?? self::createStub(LLMClientInterface::class),
-                attackerPromptBuilder: new AttackerPromptBuilder(),
-                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-                attackerCache: new NullAttackerCache(),
-                logger: new NullLogger(),
+                new AttackerLlmCollaborators(
+                    $attackerLlm ?? self::createStub(LLMClientInterface::class),
+                    new AttackerPromptBuilder(),
+                    new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                ),
+                new AttackerScanCollaborators(
+                    new NullAttackerCache(),
+                ),
+                new AttackerAnalysisSettings(),
+                new NullLogger(),
             ),
             reviewerAgent: new ReviewerAgent(
-                llmClient: $reviewerLlm ?? self::createStub(LLMClientInterface::class),
-                reviewerPromptBuilder: new ReviewerPromptBuilder(),
-                logger: new NullLogger(),
+                new ReviewerAgentCollaborators(
+                    $reviewerLlm ?? self::createStub(LLMClientInterface::class),
+                    new ReviewerPromptBuilder(),
+                    new NullLogger(),
+                ),
+                new ReviewerModeConfiguration(),
             ),
             logger: new NullLogger(),
+            auditLoopSettings: new AuditLoopSettings(),
         );
     }
 

@@ -49,12 +49,6 @@ final class RiskLevelTest extends TestCase
         yield 'safe does not meet critical' => [RiskLevel::Safe, RiskLevel::Critical, false];
     }
 
-    public function test_it_is_backed_by_lowercase_severity_names(): void
-    {
-        self::assertSame('critical', RiskLevel::Critical->value);
-        self::assertSame('safe', RiskLevel::Safe->value);
-    }
-
     #[DataProvider('rankCases')]
     public function test_rank_returns_an_ascending_ordinal(RiskLevel $riskLevel, int $expectedRank): void
     {

@@ -75,6 +75,27 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
 
     public function acquire(int $estimatedInputTokens): void
     {
+        $this->assertAcceptableEstimate($estimatedInputTokens);
+
+        while (true) {
+            $now = $this->currentInstant();
+
+            if ($this->sleptThroughActivePause($now)) {
+                continue;
+            }
+
+            $this->resetWindowIfExpired($now);
+
+            if ($this->tryReserve($estimatedInputTokens)) {
+                return;
+            }
+
+            $this->sleepUntil($now, $this->nextWindowStart());
+        }
+    }
+
+    private function assertAcceptableEstimate(int $estimatedInputTokens): void
+    {
         if ($estimatedInputTokens < 0) {
             throw new InvalidArgumentException(\sprintf('estimatedInputTokens must be >= 0, got %d', $estimatedInputTokens));
         }
@@ -83,29 +104,31 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
         if (null !== $itpm && $estimatedInputTokens > $itpm) {
             throw RateLimitRequestTooLargeException::from($estimatedInputTokens, $itpm);
         }
+    }
 
-        while (true) {
-            $now = $this->currentInstant();
-
-            $pausedUntil = $this->pausedUntil;
-            if ($pausedUntil instanceof DateTimeImmutable && $now < $pausedUntil) {
-                $this->sleepUntil($now, $pausedUntil);
-
-                continue;
-            }
-
-            $this->resetWindowIfExpired($now);
-
-            if ($this->capacityAvailable($estimatedInputTokens)) {
-                ++$this->requestsUsed;
-                $this->inputTokensUsed += $estimatedInputTokens;
-                $this->pendingInputEstimate = $estimatedInputTokens;
-
-                return;
-            }
-
-            $this->sleepUntil($now, $this->nextWindowStart());
+    private function sleptThroughActivePause(DateTimeImmutable $now): bool
+    {
+        $pausedUntil = $this->pausedUntil;
+        if (!$pausedUntil instanceof DateTimeImmutable || $now >= $pausedUntil) {
+            return false;
         }
+
+        $this->sleepUntil($now, $pausedUntil);
+
+        return true;
+    }
+
+    private function tryReserve(int $estimatedInputTokens): bool
+    {
+        if (!$this->capacityAvailable($estimatedInputTokens)) {
+            return false;
+        }
+
+        ++$this->requestsUsed;
+        $this->inputTokensUsed += $estimatedInputTokens;
+        $this->pendingInputEstimate = $estimatedInputTokens;
+
+        return true;
     }
 
     public function record(int $inputTokens, int $outputTokens): void

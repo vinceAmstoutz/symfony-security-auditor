@@ -36,11 +36,13 @@ final readonly class ReportWriter implements ReportWriterInterface
             OutputFormat::Console => $this->reportRenderer->renderConsole($auditReport),
         };
 
-        if (null !== $outputFile) {
-            $this->filesystem->dumpFile($outputFile, $content);
-            $symfonyStyle->success(\sprintf('Report saved to %s', $outputFile));
-        } else {
+        if (null === $outputFile) {
             $symfonyStyle->writeln($content);
+
+            return;
         }
+
+        $this->filesystem->dumpFile($outputFile, $content);
+        $symfonyStyle->success(\sprintf('Report saved to %s', $outputFile));
     }
 }

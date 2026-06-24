@@ -40,6 +40,29 @@ final readonly class ScanPathFilter
      */
     public static function apply(array $files, array $scanPaths): array
     {
+        $normalized = self::normalizePrefixes($scanPaths);
+
+        if ([] === $normalized) {
+            return $files;
+        }
+
+        $filtered = [];
+        foreach ($files as $file) {
+            if (self::matchesAnyPrefix($file, $normalized)) {
+                $filtered[] = $file;
+            }
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * @param list<string> $scanPaths
+     *
+     * @return list<string>
+     */
+    private static function normalizePrefixes(array $scanPaths): array
+    {
         $normalized = [];
         foreach ($scanPaths as $scanPath) {
             $trimmed = u($scanPath)->trim();
@@ -50,22 +73,21 @@ final readonly class ScanPathFilter
             $normalized[] = $trimmed->replace('\\', '/')->trimEnd('/')->toString();
         }
 
-        if ([] === $normalized) {
-            return $files;
-        }
+        return $normalized;
+    }
 
-        $filtered = [];
-        foreach ($files as $file) {
-            $relative = u($file->relativePath())->replace('\\', '/')->toString();
-            foreach ($normalized as $prefix) {
-                if ($relative === $prefix || u($relative)->startsWith($prefix.'/')) {
-                    $filtered[] = $file;
-
-                    break;
-                }
+    /**
+     * @param list<string> $prefixes
+     */
+    private static function matchesAnyPrefix(ProjectFile $projectFile, array $prefixes): bool
+    {
+        $relative = u($projectFile->relativePath())->replace('\\', '/')->toString();
+        foreach ($prefixes as $prefix) {
+            if ($relative === $prefix || u($relative)->startsWith($prefix.'/')) {
+                return true;
             }
         }
 
-        return $filtered;
+        return false;
     }
 }

@@ -10,6 +10,58 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **Value-object factories `Vulnerability::of()`, `SymfonyMapping::of()`, and
+  `LLMResponse::of()` replace the wide positional `create()` signatures.** The
+  three public Domain factories each took a long flat argument list (12, 12, and
+  7 parameters); the data is now grouped into cohesive, immutable value objects
+  so call sites read by meaning rather than by position. New public Domain value
+  objects back this: `CodeLocation` (`src/Audit/Domain/Model/CodeLocation.php` —
+  `filePath`, `lineStart`, `lineEnd`; reusable wherever a source span is
+  described), `VulnerabilityClassification` (type, severity, title, confidence),
+  and `VulnerabilityNarrative` (description, attack vector, proof, remediation),
+  all passed to `Vulnerability::of()` alongside `string $vulnerableCode`;
+  `ProjectFileInventory` (`src/Audit/Domain/Model/ProjectFileInventory.php`,
+  which now owns the file-role classification) and `AccessControlMap`
+  (`src/Audit/Domain/Model/AccessControlMap.php`) for
+  `SymfonyMapping::of(ProjectFileInventory, AccessControlMap)`; and the existing
+  `TokenUsageSnapshot` for `LLMResponse::of()` (content, model, stop reason, and
+  the usage snapshot). Every public accessor on `Vulnerability`,
+  `SymfonyMapping`, and `LLMResponse` is unchanged.
+- **Domain exceptions `InvalidCodeLocationException` and
+  `InvalidVulnerabilityClassificationException`** (under
+  `src/Audit/Domain/Exception/`) for the relocated finding-field validation
+  (line range, confidence range, blank title). Both extend
+  `\InvalidArgumentException`, so existing `catch (\InvalidArgumentException)` /
+  `expectException(\InvalidArgumentException::class)` call sites keep working
+  unchanged.
+- **The reviewer phase now streams a live verdict line per finding, ending the
+  apparent freeze during long reviews.** Previously only the attacker streamed
+  per-finding progress (`attacker.finding.recorded`); the reviewer emitted
+  `review.started` once and `review.completed` at the end, so a sequential
+  review of _N_ findings parked the progress bar on the audit stage with no
+  visible movement for minutes — `ConsoleProgressReporter` had nothing to redraw
+  between the two events. The reviewer now emits a `review.finding.reviewed`
+  progress event per verdict from `VerdictApplier::apply()`, the single
+  chokepoint shared by every review mode (sequential, concurrent, structured,
+  and batched). A decorated terminal prints `⚖ ✓ validated <type> — file:line`
+  (green) and `⚖ ✗ rejected <type> — file:line` (yellow) above the bar and ticks
+  the bar suffix `reviewing i/N`; `PlainProgressReporter` appends
+  `[VALIDATED]`/`[REJECTED]` lines for non-TTY output. New stable progress-event
+  value `review.finding.reviewed`.
+
+### Deprecated
+
+- **`Vulnerability::create()`, `SymfonyMapping::create()`, and
+  `LLMResponse::create()`.** They remain fully functional for the rest of the
+  `1.x` cycle and now delegate to the new `of()` factories; switch to `of()`
+  (see Added above). Each now emits a runtime deprecation via
+  `trigger_deprecation('vinceamstoutz/symfony-security-auditor', '1.13', …)`
+  when called, so usage surfaces in your deprecation log and in CI
+  (`failOnDeprecation`) and the removal in the next `MAJOR` does not arrive as
+  an unannounced fatal. Scheduled for removal in the next `MAJOR`.
+
 ## [1.12.0] — 2026-06-16 — Spotlight
 
 An observability release. The long audit stage is no longer a black box:

@@ -72,6 +72,13 @@ function runCodeQualityTools(bool $fixMode = false): void
     io()->section('PHPStan');
     run('docker compose exec php vendor/bin/phpstan analyse --memory-limit=500M');
 
+    io()->section('Deptrac');
+    run('docker compose exec php vendor/bin/deptrac analyse --no-progress');
+
+    io()->section('Swiss Knife');
+    run('docker compose exec php vendor/bin/swiss-knife check-commented-code src tests tools');
+    run('docker compose exec php vendor/bin/swiss-knife check-conflicts src tests tools');
+
     io()->section('PHPUnit');
     run('docker compose exec php vendor/bin/phpunit --coverage-clover=build/coverage/clover.xml');
 

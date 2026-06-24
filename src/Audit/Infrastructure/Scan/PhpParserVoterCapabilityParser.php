@@ -50,11 +50,7 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
         try {
             $parserFactory = new ParserFactory();
             $parser = $parserFactory->createForNewestSupportedVersion();
-            $ast = $parser->parse($projectFile->content());
-
-            if (null === $ast) {
-                return null;
-            }
+            $ast = $parser->parse($projectFile->content()) ?? [];
 
             $nodeTraverser = new NodeTraverser();
             $nodeTraverser->addVisitor(new NameResolver());

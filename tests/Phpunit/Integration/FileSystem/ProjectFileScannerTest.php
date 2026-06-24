@@ -174,6 +174,27 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame('app/MyClass.php', $files[0]->relativePath());
     }
 
+    public function test_it_accumulates_every_explicit_file_across_included_paths(): void
+    {
+        mkdir($this->tmpDir.'/public', 0o777, true);
+        mkdir($this->tmpDir.'/bin', 0o777, true);
+        file_put_contents($this->tmpDir.'/public/index.php', '<?php // front controller');
+        file_put_contents($this->tmpDir.'/bin/console.php', '<?php // console');
+
+        $projectFileScanner = new ProjectFileScanner(
+            new NullLogger(),
+            includedPaths: ['public/index.php', 'bin/console.php'],
+        );
+
+        $paths = array_map(
+            static fn (ProjectFile $projectFile): string => $projectFile->relativePath(),
+            $projectFileScanner->scan($this->tmpDir),
+        );
+        sort($paths);
+
+        self::assertSame(['bin/console.php', 'public/index.php'], $paths);
+    }
+
     public function test_it_logs_warning_and_returns_empty_when_no_included_paths_exist(): void
     {
         $warningLogs = [];

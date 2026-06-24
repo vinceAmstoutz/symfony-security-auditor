@@ -3,10 +3,14 @@
 `symfony-security-auditor` follows
 [Semantic Versioning 2.0.0](https://semver.org) from `1.0.0` onward.
 
+For its PHP API surface it additionally adheres to the
+[Symfony Backward Compatibility promise](https://symfony.com/doc/current/contributing/code/bc.html):
+code tagged `@internal` is exempt, and any breaking change to covered API goes
+through the [deprecation cycle](#deprecation-policy) below — a deprecated
+element keeps working until at least the next `MAJOR`.
+
 > See also: [Configuration](configuration.md) · [Extending](extending.md) ·
 > [Architecture](architecture.md) · [CHANGELOG](../CHANGELOG.md)
-
----
 
 ## Semantic Versioning
 
@@ -18,8 +22,6 @@
 
 Every `MAJOR` release ships a migration note in
 [`CHANGELOG.md`](../CHANGELOG.md) explaining what changed and how to adapt.
-
----
 
 ## Public API — what is covered by the BC promise
 
@@ -170,8 +172,6 @@ BC-protected.
 `VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle` — referenced
 from `config/bundles.php`. Its existence and FQCN are stable.
 
----
-
 ## Internal — what is NOT covered
 
 Anything tagged `@internal` may be refactored, renamed, or removed in any
@@ -198,8 +198,6 @@ Anything tagged `@internal` may be refactored, renamed, or removed in any
 If you find yourself depending on an internal class, please open an issue — we
 will either promote it to public API or provide a stable replacement.
 
----
-
 ## Deprecation policy
 
 When a public-API element needs to be removed:
@@ -212,9 +210,16 @@ When a public-API element needs to be removed:
 3. Removal happens in the next `MAJOR` release at the earliest, listed under
    `### Removed` in the changelog.
 
-Triggering `@trigger_error(..., E_USER_DEPRECATED)` at runtime is reserved for
-behavior changes that callers may notice; pure naming or signature deprecations
-are documented in the changelog only.
+Every deprecated public-API element emits a **runtime deprecation** for the rest
+of the current `MAJOR` cycle, so callers find it in their deprecation log and CI
+(`failOnDeprecation`) before the removal lands — not as a hard fatal on the day
+they upgrade. Config keys use the Config component's `setDeprecated()`; PHP
+methods, classes, and arguments use
+`trigger_deprecation('vinceamstoutz/symfony-security-auditor', '<since>', '<message>')`
+(from `symfony/deprecation-contracts`). The `@deprecated` PHPDoc tag is added
+alongside it for static analysis and IDE hints. The only deprecations documented
+in the changelog _without_ a runtime trigger are those with no runtime call site
+to attach one to.
 
 ### Currently deprecated
 
@@ -226,8 +231,15 @@ are documented in the changelog only.
   Remove it from your config and, if you want a longer Anthropic cache window,
   set `cache_retention: long` on the `anthropic` platform in `ai.yaml`.
   Scheduled for removal in the next `MAJOR`.
-
----
+- **`Vulnerability::create()`, `SymfonyMapping::create()`, and
+  `LLMResponse::create()`** (since 1.13) — superseded by the value-object
+  factories `Vulnerability::of()`, `SymfonyMapping::of()`, and
+  `LLMResponse::of()` (taking
+  `VulnerabilityClassification`/`CodeLocation`/`VulnerabilityNarrative`,
+  `ProjectFileInventory`/`AccessControlMap`, and `TokenUsageSnapshot`
+  respectively). The old methods still work and delegate to the new factories,
+  and emit a runtime deprecation when called. Scheduled for removal in the next
+  `MAJOR`.
 
 ## LLM model identifiers
 
@@ -236,8 +248,6 @@ are free-form strings forwarded to `symfony/ai`. Their meaning, behavior,
 pricing, and availability are owned by the LLM provider, not by this bundle. If
 a provider deprecates a model, this bundle does not consider that a BC break —
 pin the identifier you want in your configuration.
-
----
 
 ## Reporting BC breaks
 

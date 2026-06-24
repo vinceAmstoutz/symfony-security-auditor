@@ -17,7 +17,8 @@ are documented **context carriers**:
 
 Each opt-out site declares the reason in a leading code comment and cites this
 rule. Anything outside that list must be `final readonly`. If inheritance feels
-needed, introduce an interface instead.
+needed, introduce an interface instead. The `final`-or-`abstract` requirement is
+enforced by the custom `FinalRule` (`tools/PHPStan/FinalRule.php`).
 
 ## Interfaces & SOLID
 
@@ -46,7 +47,28 @@ input mapping/validation goes to `AuditCommandInput`, user-facing messaging to
 collaborators, each behind an interface.
 
 When you touch a file that bundles responsibilities, extract them into new
-classes rather than adding more.
+classes rather than adding more. One class/interface/trait per file is enforced
+by Symplify's `ForbiddenMultipleClassLikeInOneFileRule`; test doubles and
+fixtures live in their own files under a sibling `Fixture/` namespace, never
+inlined after the test class.
+
+## Constructor & Method Parameters
+
+Cap every method and constructor at **5 parameters** — enforced by the custom
+`MaxParameterCountRule` (`tools/PHPStan/MaxParameterCountRule.php`). When a
+signature would exceed it, group related parameters into an immutable
+value/context object (a `Context` or config VO), never by merging helpers or
+relaxing the cap. See memory `[[feedback_context_object_over_param_threading]]`.
+
+- **All-promoted constructor** (every parameter promoted) is exempt — it _is_
+  the value object (e.g. the per-finding `Vulnerability` storage ctor).
+- **`@deprecated` methods** are exempt — they are scheduled for removal and
+  their replacement already satisfies the cap.
+- **Public, BC-frozen factories** that exceed the cap are not edited in place
+  (that would be a `MAJOR` break). Instead add an `of()`-style value-object
+  factory (`Vulnerability::of()`, `SymfonyMapping::of()`, `LLMResponse::of()`),
+  mark the wide `create()` `@deprecated`, and have it delegate to `of()`. The
+  new VOs live in the layer that owns the model (see [[ddd-layers]]).
 
 ## Custom Exceptions
 
@@ -76,6 +98,17 @@ class.
 Built-in throwables that are **not** authored by us (`\JsonException`,
 `\ValueError`, `\TypeError`, `\Throwable` in broad catches) are fine to consume
 — the rule applies to what we _throw_, not what we _catch_.
+
+### Never Swallow Errors
+
+A caught error must be handled, not silenced — enforced by two custom PHPStan
+rules in `tools/PHPStan/`:
+
+- `NoEmptyCatchRule` — an empty (or comment-only) `catch` block is forbidden;
+  handle the exception or at least log it.
+- `NoSilencingErrorHandlerRule` — a `set_error_handler()` callback that only
+  `return true` silently swallows every error; capture or convert it instead, or
+  remove the suppression.
 
 ## Symfony Components First
 
