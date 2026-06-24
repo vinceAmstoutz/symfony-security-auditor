@@ -178,15 +178,3 @@ jobs:
             ARGS="$ARGS --git-diff-lines --git-diff-base=origin/$BASE_REF --ignore-msi-with-no-mutations"
           fi
           php -d memory_limit=1G bin/infection $ARGS
-
-      - name: Publish MSI to Stryker dashboard (badge)
-        if: github.ref == 'refs/heads/main' && matrix.php == '8.3' && matrix.symfony == '^7.4'
-        env:
-          STRYKER_DASHBOARD_API_KEY: ${{ secrets.STRYKER_DASHBOARD_API_KEY }}
-        run: |
-          MSI=$(php -r '$s = json_decode(file_get_contents("infection/summary.json"), true); echo $s["stats"]["msi"];')
-          curl -sSf -X PUT \
-            "https://dashboard.stryker-mutator.io/api/reports/github.com/vinceamstoutz/symfony-security-auditor/main" \
-            -H "Content-Type: application/json" \
-            -H "X-Api-Key: ${STRYKER_DASHBOARD_API_KEY}" \
-            -d "{\"mutationScore\": ${MSI}}"
