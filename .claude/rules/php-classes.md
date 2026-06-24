@@ -99,6 +99,17 @@ Built-in throwables that are **not** authored by us (`\JsonException`,
 `\ValueError`, `\TypeError`, `\Throwable` in broad catches) are fine to consume
 — the rule applies to what we _throw_, not what we _catch_.
 
+### Never Swallow Errors
+
+A caught error must be handled, not silenced — enforced by two custom PHPStan
+rules in `tools/PHPStan/`:
+
+- `NoEmptyCatchRule` — an empty (or comment-only) `catch` block is forbidden;
+  handle the exception or at least log it.
+- `NoSilencingErrorHandlerRule` — a `set_error_handler()` callback that only
+  `return true` silently swallows every error; capture or convert it instead, or
+  remove the suppression.
+
 ## Symfony Components First
 
 Prefer Symfony components over hand-rolled or raw PHP equivalents:

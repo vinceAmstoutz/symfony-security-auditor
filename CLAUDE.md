@@ -20,19 +20,19 @@ to detect vulnerabilities and produce structured reports.
 
 ## Tech Stack
 
-| Layer             | Technology                                                                  |
-| ----------------- | --------------------------------------------------------------------------- |
-| Language          | PHP (see `composer.json` → `require.php`)                                   |
-| Framework         | Symfony (see `composer.json`)                                               |
-| LLM               | symfony/ai (provider-agnostic: Anthropic, OpenAI, Mistral, Ollama, …)       |
-| Packaging         | symfony-bundle + Flex recipe                                                |
-| Tests             | PHPUnit (Unit / Integration / EndToEnd)                                     |
-| Mutation          | Infection (100% MSI required)                                               |
-| Static analysis   | PHPStan max + phpstan-strict-rules + custom + symplify/spaze rules + Rector |
-| Layer conformance | deptrac (DDD layer rules — `deptrac.yaml`)                                  |
-| Complexity        | tomasvotruba/cognitive-complexity (function ≤ 7, class ≤ 40)                |
-| Dead code         | rector/swiss-knife (`check-commented-code`, `check-conflicts`)              |
-| Style             | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets)                                |
+| Layer             | Technology                                                                                                                                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language          | PHP (see `composer.json` → `require.php`)                                                                                                                                                                                       |
+| Framework         | Symfony (see `composer.json`)                                                                                                                                                                                                   |
+| LLM               | symfony/ai (provider-agnostic: Anthropic, OpenAI, Mistral, Ollama, …)                                                                                                                                                           |
+| Packaging         | symfony-bundle + Flex recipe                                                                                                                                                                                                    |
+| Tests             | PHPUnit (Unit / Integration / EndToEnd); 100% line coverage enforced via the custom `MinimumLineCoverageExtension` (`tools/PHPUnit/`)                                                                                           |
+| Mutation          | Infection (100% MSI required)                                                                                                                                                                                                   |
+| Static analysis   | PHPStan max + phpstan-strict-rules + custom rules (`FinalRule`, `MaxParameterCountRule`, `NoEmptyCatchRule`, `NoSilencingErrorHandlerRule`, `ForbiddenTestAttributeRule` — in `tools/PHPStan/`) + symplify/spaze rules + Rector |
+| Layer conformance | deptrac (DDD layer rules — `deptrac.yaml`)                                                                                                                                                                                      |
+| Complexity        | tomasvotruba/cognitive-complexity (function ≤ 7, class ≤ 40)                                                                                                                                                                    |
+| Dead code         | rector/swiss-knife (`check-commented-code`, `check-conflicts`)                                                                                                                                                                  |
+| Style             | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets)                                                                                                                                                                                    |
 
 ## Build, Test & Lint Commands
 

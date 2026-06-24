@@ -52,8 +52,10 @@ All production code is written using TDD by the book.
    staying green. **Never refactor while red — get to green first.**
 
 Every code change ships with tests. No production code without a test that
-justifies it. Coverage is a side-effect, not the target — Infection MSI must
-stay at 100% (see CI Pipeline in `CLAUDE.md`).
+justifies it. Mutation score is the quality bar — Infection MSI must stay at
+100%; 100% line coverage sits on top as a mechanical floor, enforced by the
+custom `MinimumLineCoverageExtension` (`tools/PHPUnit/`). Write tests for
+behavior, not to chase the line number (see CI Pipeline in `CLAUDE.md`).
 
 ### Planning Before Code
 
@@ -237,3 +239,12 @@ distinct edge-case behavior — those stay as separate test methods.
   assertion (`NoMockOnlyTestRule`), and repeated consecutive identical mock
   expectations (`NoDoubleConsecutiveTestMockRule`) signal a missing
   `#[DataProvider]`.
+- The custom `ForbiddenTestAttributeRule` (`tools/PHPStan/`) bans test
+  attributes that opt out of a gate instead of fixing the code:
+  `#[AllowMockObjectsWithoutExpectations]` (use `createStub` — see
+  `[[feedback_mock_vs_stub]]`), `#[DoesNotPerformAssertions]` (assert a real
+  outcome), and `#[WithoutErrorHandler]` (keeps `failOnWarning`/`failOnNotice`
+  live). `#[IgnoreDeprecations]` is allowed **only** scoped to this library
+  (`#[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]`) alongside
+  an `expectUserDeprecationMessage*()` assertion — see
+  `[[project_deprecation_testing_pattern]]`.
