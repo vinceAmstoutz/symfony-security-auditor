@@ -161,7 +161,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.php == '8.3' && matrix.symfony == '^7.4'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: build/coverage/clover.xml
           token: ${{ secrets.CODECOV_TOKEN }}
