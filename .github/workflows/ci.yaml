@@ -167,6 +167,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
+          INFECTION_DASHBOARD_API_KEY: ${{ secrets.INFECTION_DASHBOARD_API_KEY }}
         run: |
           ARGS="--configuration=infection.json5 --threads=max --coverage=build/coverage --skip-initial-tests --min-msi=100 --min-covered-msi=100"
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
