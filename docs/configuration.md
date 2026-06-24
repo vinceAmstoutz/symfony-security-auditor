@@ -421,6 +421,7 @@ bin/console audit:run [<project-path>] [options]
 | `--output`            | `-o`  | none       | Write the JSON, SARIF, HTML, or Markdown report to a file path                                                                                                                                                                                                                                                                                                                                                                                         |
 | `--dry-run`           |       | `false`    | Estimate token usage and cost without invoking the LLM. Exits `0` with zero findings and a populated `cost` block. If a configured model (`model`, `attacker_model`, `reviewer_model`) has no pricing entry in the `PricingProviderInterface`, a warning is printed to stderr and that role's estimated cost shows `$0.00`. The estimate does not model provider prompt-cache discounts, so real runs with caching enabled typically come in under it. |
 | `--path`              | `-p`  | none       | Restrict the scan to a project subdirectory (relative to the root). Repeat to include several. Useful for monorepos.                                                                                                                                                                                                                                                                                                                                   |
+| `--show-scanned`      |       | `false`    | List the files that would be audited — after applying `included_paths` and any `--path` filters — grouped by type with a per-type and total count, then exit, without invoking the LLM. Use it to confirm your scan scope before paying for a run. Combine with `--dry-run` to print the file list first and the cost estimate after.                                                                                                                    |
 | `--no-cache`          |       | `false`    | Bypass the filesystem caches — attacker chunks and reviewer verdicts — for this run (no reads, no writes). Use after upgrading the auditor or to force a fresh analysis.                                                                                                                                                                                                                                                                               |
 | `--since`             |       | none       | Diff mode: audit only files changed against the given git ref (e.g. `main`, `origin/main`, `abc1234`). Honors committed (`ref...HEAD`) and uncommitted working-tree changes. Designed for pull-request CI; the cache stays warm for unchanged files.                                                                                                                                                                                                   |
 | `--baseline`          |       | none       | Path to a baseline file of accepted-finding fingerprints. Findings whose fingerprint is listed are suppressed from the report and excluded from the exit code. Overrides the `audit.baseline` config key. A missing file suppresses nothing.                                                                                                                                                                                                           |
@@ -443,6 +444,11 @@ bin/console audit:run --format=sarif --output=report.sarif
 
 ```bash
 bin/console audit:run --dry-run --format=json
+```
+
+```bash
+# List the files that would be audited, without invoking the LLM
+bin/console audit:run --show-scanned
 ```
 
 ```bash

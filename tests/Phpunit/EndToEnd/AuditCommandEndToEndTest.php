@@ -37,6 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditS
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
@@ -691,6 +692,7 @@ final class AuditCommandEndToEndTest extends TestCase
             new AuditExitCodeResolver(),
             new AuditPresenter(new StaticPricingProvider(new NullLogger())),
             $estimateAuditCostUseCase,
+            new ListScannedFilesUseCase($projectFileScanner),
             $progressReporterHolder,
             new BaselineProcessor(new Baseline(), $configuredBaseline),
             secretScrubbingEnabled: $secretScrubbingEnabled,
@@ -948,6 +950,113 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertGreaterThan(0, $cost['input_tokens']);
         self::assertGreaterThan(0, $cost['output_tokens']);
         self::assertSame('stub', $cost['primary_model']);
+    }
+
+    public function test_show_scanned_lists_files_and_exits_success_without_invoking_llm(): void
+    {
+        $this->createProjectDir();
+
+        $throwingLLM = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($throwingLLM, $throwingLLM);
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--show-scanned' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $display = $commandTester->getDisplay();
+        self::assertStringContainsString('Scanned files', $display);
+        self::assertStringContainsString('HomeController.php', $display);
+        self::assertStringContainsString('file(s) in scope', $display);
+        self::assertStringNotContainsString('Running audit pipeline', $display);
+    }
+
+    public function test_show_scanned_honors_the_path_filter(): void
+    {
+        $this->createProjectDir();
+
+        $throwingLLM = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($throwingLLM, $throwingLLM);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--show-scanned' => true,
+            '--path' => ['nonexistent'],
+        ]);
+
+        self::assertStringContainsString('No files matched', $commandTester->getDisplay());
+    }
+
+    public function test_show_scanned_with_dry_run_lists_files_before_the_cost_estimate(): void
+    {
+        $this->createProjectDir();
+
+        $throwingLLM = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($throwingLLM, $throwingLLM);
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--show-scanned' => true,
+            '--dry-run' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $display = $commandTester->getDisplay();
+        $scannedPosition = mb_strpos($display, 'file(s) in scope');
+        $dryRunPosition = mb_strpos($display, 'Dry run complete');
+        self::assertIsInt($scannedPosition);
+        self::assertIsInt($dryRunPosition);
+        self::assertLessThan($dryRunPosition, $scannedPosition);
+    }
+
+    public function test_show_scanned_with_dry_run_omits_the_show_scanned_tip(): void
+    {
+        $this->createProjectDir();
+
+        $throwingLLM = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($throwingLLM, $throwingLLM);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--show-scanned' => true,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringNotContainsString('Tip: run with --show-scanned', $commandTester->getDisplay());
+    }
+
+    public function test_dry_run_alone_emits_the_show_scanned_tip(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringContainsString('Tip: run with --show-scanned', $commandTester->getDisplay());
+    }
+
+    private function throwingLLMClient(): LLMClientInterface
+    {
+        return new class implements LLMClientInterface {
+            public function complete(string $systemPrompt, string $userMessage): LLMResponse
+            {
+                throw new RuntimeException('the LLM platform must not be invoked for --show-scanned');
+            }
+
+            public function completeWithTools(
+                string $systemPrompt,
+                string $userMessage,
+                ToolRegistry $toolRegistry,
+                int $maxToolIterations,
+            ): LLMResponse {
+                throw new RuntimeException('the LLM platform must not be invoked for --show-scanned');
+            }
+
+            public function model(): string
+            {
+                return 'stub';
+            }
+        };
     }
 
     private function rmdirRecursive(string $dir): void

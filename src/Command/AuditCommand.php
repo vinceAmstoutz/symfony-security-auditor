@@ -19,6 +19,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
@@ -43,6 +44,7 @@ final readonly class AuditCommand
         private AuditExitCodeResolverInterface $auditExitCodeResolver,
         private AuditPresenterInterface $auditPresenter,
         private EstimateAuditCostUseCase $estimateAuditCostUseCase,
+        private ListScannedFilesUseCase $listScannedFilesUseCase,
         private ProgressReporterHolder $progressReporterHolder,
         private BaselineProcessorInterface $baselineProcessor,
         private bool $secretScrubbingEnabled,
@@ -64,8 +66,16 @@ final readonly class AuditCommand
         $scanPaths = $auditCommandInput->scanPaths();
 
         try {
+            if ($auditCommandInput->showScanned) {
+                $this->showScannedFiles($symfonyStyle, $projectPath, $scanPaths);
+            }
+
             if ($auditCommandInput->dryRun) {
                 return $this->runDryRun($symfonyStyle, $auditCommandInput, $projectPath, $scanPaths);
+            }
+
+            if ($auditCommandInput->showScanned) {
+                return ExitCode::Success->value;
             }
 
             $this->beginAuditRun($symfonyStyle, $auditCommandInput);
@@ -90,6 +100,17 @@ final readonly class AuditCommand
     /**
      * @param list<string> $scanPaths
      */
+    private function showScannedFiles(SymfonyStyle $symfonyStyle, string $projectPath, array $scanPaths): void
+    {
+        $this->auditPresenter->scannedFiles(
+            $symfonyStyle,
+            $this->listScannedFilesUseCase->execute($projectPath, $scanPaths),
+        );
+    }
+
+    /**
+     * @param list<string> $scanPaths
+     */
     private function runDryRun(
         SymfonyStyle $symfonyStyle,
         AuditCommandInput $auditCommandInput,
@@ -107,6 +128,10 @@ final readonly class AuditCommand
 
         if (!$auditCommandInput->isMachineReadableToStdout()) {
             $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+            if (!$auditCommandInput->showScanned) {
+                $this->auditPresenter->scannedFilesHint($symfonyStyle, $auditReport->filesScanned());
+            }
         }
 
         return ExitCode::Success->value;

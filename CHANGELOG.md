@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **New `--show-scanned` option on `audit:run` lists the exact files an audit
+  would ingest, without invoking the LLM.** Answers "did my `included_paths` /
+  `--path` configuration match the files I expect?" before paying for a run.
+  The files are resolved through the same scanner and scan-path filter a real
+  run uses (`ListScannedFilesUseCase`,
+  `src/Audit/Application/UseCase/ListScannedFilesUseCase.php`), grouped by
+  `ProjectFileType` with a per-type and total count; an empty result prints a
+  "No files matched. Check your included_paths configuration and any --path
+  filters." hint. Combine with `--dry-run` to print the file list first and the
+  cost estimate after. A `--dry-run` run without `--show-scanned` now ends with
+  a one-line tip pointing at the new option.
 - **Value-object factories `Vulnerability::of()`, `SymfonyMapping::of()`, and
   `LLMResponse::of()` replace the wide positional `create()` signatures.** The
   three public Domain factories each took a long flat argument list (12, 12, and
