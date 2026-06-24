@@ -207,8 +207,9 @@ Six jobs must all pass before merging: **Prettier Check** (markdown formatting)
 conventional commits) → **Lint** (Composer Normalize, PHP CS Fixer, Rector,
 PHPStan max, Deptrac, Swiss Knife, `composer audit`) → **Tests + Mutation**
 (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1 with 100% coverage,
-then Infection 100% MSI; coverage uploads to Codecov and the MSI to the Stryker
-dashboard on `main`).
+then Infection 100% MSI; coverage uploads to Codecov and the mutation report
+uploads to the Stryker dashboard via Infection's `stryker` logger — the badge
+tracks `main`, and same-repo branches publish their own report).
 
 Details: [`docs/ci.md`](docs/ci.md)
 

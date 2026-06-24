@@ -17,7 +17,10 @@
         "json": "infection/infection-log.json",
         "perMutator": "infection/per-mutator.md",
         "github": true,
-        "summaryJson": "infection/summary.json"
+        "summaryJson": "infection/summary.json",
+        "stryker": {
+            "report": "/.*/"
+        }
     },
     "testFramework":"phpunit",
     "staticAnalysisTool":"phpstan",

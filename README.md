@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/vinceamstoutz/symfony-security-auditor/actions/workflows/ci.yaml/badge.svg)](https://github.com/vinceamstoutz/symfony-security-auditor/actions/workflows/ci.yaml)
 [![codecov](https://codecov.io/gh/vinceamstoutz/symfony-security-auditor/branch/main/graph/badge.svg)](https://codecov.io/gh/vinceamstoutz/symfony-security-auditor)
-[![Mutation testing badge](https://img.shields.io/endpoint?style=flat&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fvinceamstoutz%2Fsymfony-security-auditor%2Fmain)](https://dashboard.stryker-mutator.io/reports/github.com/vinceamstoutz/symfony-security-auditor/main)
+[![Mutation testing badge](https://img.shields.io/endpoint?style=flat&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2FvinceAmstoutz%2Fsymfony-security-auditor%2Fmain)](https://dashboard.stryker-mutator.io/reports/github.com/vinceAmstoutz/symfony-security-auditor/main)
 [![Total Downloads](https://poser.pugx.org/vinceamstoutz/symfony-security-auditor/downloads)](https://packagist.org/packages/vinceamstoutz/symfony-security-auditor)
 [![PHP 8.3+](https://img.shields.io/badge/PHP-8.3%2B-blue)](composer.json)
 [![Symfony 7.4+](https://img.shields.io/badge/Symfony-7.4%2B-black)](composer.json)
