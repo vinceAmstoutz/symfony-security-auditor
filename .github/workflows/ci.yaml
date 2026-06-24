@@ -69,7 +69,7 @@ jobs:
           coverage: none
 
       - name: Cache Composer dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: vendor
           key: composer-lint-${{ hashFiles('composer.lock') }}
@@ -79,14 +79,14 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Cache Rector result cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: var/rector
           key: rector-${{ hashFiles('src/**/*.php', 'tests/**/*.php', 'rector.php', 'composer.lock') }}
           restore-keys: rector-
 
       - name: Cache PHP CS Fixer result cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .php-cs-fixer.cache
           key: php-cs-fixer-${{ hashFiles('src/**/*.php', 'tests/**/*.php', '.php-cs-fixer.dist.php', 'composer.lock') }}
@@ -136,7 +136,7 @@ jobs:
           coverage: pcov
 
       - name: Cache Composer dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: vendor
           key: composer-php${{ matrix.php }}-sf${{ matrix.symfony }}-${{ hashFiles('composer.json') }}
@@ -146,7 +146,7 @@ jobs:
         run: composer update --no-interaction --prefer-dist --no-progress
 
       - name: Cache PHPUnit result cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .phpunit.cache
           key: phpunit-php${{ matrix.php }}-sf${{ matrix.symfony }}-${{ hashFiles('src/**/*.php', 'tests/**/*.php', 'phpunit.xml', 'composer.json') }}
