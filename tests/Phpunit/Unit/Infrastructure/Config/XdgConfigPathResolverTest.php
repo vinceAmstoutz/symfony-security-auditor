@@ -21,30 +21,30 @@ final class XdgConfigPathResolverTest extends TestCase
 {
     public function test_it_resolves_the_config_file_under_xdg_config_home_when_set(): void
     {
-        $resolver = new XdgConfigPathResolver('/xdg/config', null, '/home/dev');
+        $xdgConfigPathResolver = new XdgConfigPathResolver('/xdg/config', null, '/home/dev');
 
-        self::assertSame('/xdg/config/symfony-security-auditor/config.yaml', $resolver->configFile());
+        self::assertSame('/xdg/config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
     }
 
     public function test_it_falls_back_to_home_dot_config_when_xdg_config_home_is_empty(): void
     {
-        $resolver = new XdgConfigPathResolver('', null, '/home/dev');
+        $xdgConfigPathResolver = new XdgConfigPathResolver('', null, '/home/dev');
 
-        self::assertSame('/home/dev/.config/symfony-security-auditor/config.yaml', $resolver->configFile());
+        self::assertSame('/home/dev/.config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
     }
 
     public function test_it_resolves_the_cache_dir_under_xdg_cache_home_when_set(): void
     {
-        $resolver = new XdgConfigPathResolver(null, '/xdg/cache', '/home/dev');
+        $xdgConfigPathResolver = new XdgConfigPathResolver(null, '/xdg/cache', '/home/dev');
 
-        self::assertSame('/xdg/cache/symfony-security-auditor', $resolver->cacheDir());
+        self::assertSame('/xdg/cache/symfony-security-auditor', $xdgConfigPathResolver->cacheDir());
     }
 
     public function test_it_falls_back_to_home_dot_cache_when_xdg_cache_home_is_unset(): void
     {
-        $resolver = new XdgConfigPathResolver(null, null, '/home/dev');
+        $xdgConfigPathResolver = new XdgConfigPathResolver(null, null, '/home/dev');
 
-        self::assertSame('/home/dev/.cache/symfony-security-auditor', $resolver->cacheDir());
+        self::assertSame('/home/dev/.cache/symfony-security-auditor', $xdgConfigPathResolver->cacheDir());
     }
 
     public function test_it_rejects_resolving_a_config_file_without_any_home(): void

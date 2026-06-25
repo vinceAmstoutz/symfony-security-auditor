@@ -28,6 +28,14 @@ final readonly class AuditConfigurationDefinition
 {
     public function defineChildren(NodeBuilder $nodeBuilder): void
     {
+        $this->defineModelNodes($nodeBuilder);
+        $this->defineScanNode($nodeBuilder);
+        $this->defineAuditNode($nodeBuilder);
+        $this->defineCacheNode($nodeBuilder);
+    }
+
+    private function defineModelNodes(NodeBuilder $nodeBuilder): void
+    {
         $nodeBuilder
                 ->scalarNode('model')
                     ->defaultValue('claude-opus-4-8')
@@ -65,6 +73,12 @@ final readonly class AuditConfigurationDefinition
                     ->defaultFalse()
                     ->info('Opt into the provider-native JSON mode by sending `response_format: {type: json_object}` on every LLM call. Honored by OpenAI/Mistral/Ollama; silently ignored by Anthropic (which has no equivalent knob). Default false because behaviour is provider-dependent — only enable if your provider supports it. The prompt contract ("Return ONLY the JSON array") remains authoritative.')
                 ->end()
+        ;
+    }
+
+    private function defineScanNode(NodeBuilder $nodeBuilder): void
+    {
+        $nodeBuilder
                 ->arrayNode('scan')
                     ->addDefaultsIfNotSet()
                     ->children()
@@ -113,6 +127,12 @@ final readonly class AuditConfigurationDefinition
                         ->end()
                     ->end()
                 ->end()
+        ;
+    }
+
+    private function defineAuditNode(NodeBuilder $nodeBuilder): void
+    {
+        $nodeBuilder
                 ->arrayNode('audit')
                     ->addDefaultsIfNotSet()
                     ->children()
@@ -325,6 +345,12 @@ final readonly class AuditConfigurationDefinition
                         ->end()
                     ->end()
                 ->end()
+        ;
+    }
+
+    private function defineCacheNode(NodeBuilder $nodeBuilder): void
+    {
+        $nodeBuilder
                 ->arrayNode('cache')
                     ->addDefaultsIfNotSet()
                     ->children()

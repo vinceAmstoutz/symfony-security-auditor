@@ -15,8 +15,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 use JsonException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use UnitEnum;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ConfigurationNotices;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
@@ -27,79 +29,113 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPr
  */
 final readonly class ContainerParameterRegistrar
 {
+    private const string PREFIX = 'symfony_security_auditor.';
+
     /**
      * @throws JsonException
      */
     public function register(BundleConfiguration $bundleConfiguration, ContainerBuilder $containerBuilder): void
     {
-        $containerBuilder->setParameter('symfony_security_auditor.attacker_model', $bundleConfiguration->llm->attackerModel());
-        $containerBuilder->setParameter('symfony_security_auditor.reviewer_model', $bundleConfiguration->llm->reviewerModel());
-        $containerBuilder->setParameter('symfony_security_auditor.attacker_max_output_tokens', $bundleConfiguration->llm->attackerMaxOutputTokens());
-        $containerBuilder->setParameter('symfony_security_auditor.reviewer_max_output_tokens', $bundleConfiguration->llm->reviewerMaxOutputTokens());
-        $containerBuilder->setParameter('symfony_security_auditor.scan.included_paths', $bundleConfiguration->scan->includedPaths);
-        $containerBuilder->setParameter('symfony_security_auditor.scan.respect_gitignore', $bundleConfiguration->scan->respectGitignore);
-        $containerBuilder->setParameter('symfony_security_auditor.scan.max_file_size_kb', $bundleConfiguration->scan->maxFileSizeKb);
-        $containerBuilder->setParameter('symfony_security_auditor.scan.secret_scrubbing.enabled', $bundleConfiguration->scan->secretScrubbingEnabled);
-        $containerBuilder->setParameter('symfony_security_auditor.scan.secret_scrubbing.additional_patterns', $bundleConfiguration->scan->additionalScrubberPatterns);
-        $containerBuilder->setParameter('symfony_security_auditor.scan.custom_risk_patterns', $bundleConfiguration->scan->customRiskPatterns);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.max_iterations', $bundleConfiguration->audit->maxIterations);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.min_confidence', $bundleConfiguration->audit->minConfidence);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.reviewer_batch_size', $bundleConfiguration->audit->reviewerBatchSize);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.tools_enabled', $bundleConfiguration->audit->toolsEnabled);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.structured_collection', $bundleConfiguration->audit->structuredCollection);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.reviewer_structured_collection', $bundleConfiguration->audit->reviewerStructuredCollection);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.stable_system_prompt', $bundleConfiguration->audit->stableSystemPrompt);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.max_tool_iterations', $bundleConfiguration->audit->maxToolIterations);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.reviewer_tools_enabled', $bundleConfiguration->audit->reviewerToolsEnabled);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.reviewer_max_tool_iterations', $bundleConfiguration->audit->reviewerMaxToolIterations);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.baseline', $bundleConfiguration->audit->baseline);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.fail_on', $bundleConfiguration->audit->failOn->value);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.excluded_types', $bundleConfiguration->audit->excludedTypes);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.included_types', $bundleConfiguration->audit->includedTypes);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.reviewer_max_concurrent', $bundleConfiguration->audit->reviewerMaxConcurrent);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.attacker_max_concurrent', $bundleConfiguration->audit->attackerMaxConcurrent);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.static_prescan.enabled', $bundleConfiguration->audit->staticPreScanEnabled);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.static_prescan.lean_mode', $bundleConfiguration->audit->staticPreScanLeanMode);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.chunking.strategy', $bundleConfiguration->audit->chunkingStrategy);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.poc_synthesis.enabled', $bundleConfiguration->audit->poCSynthesisEnabled);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.poc_synthesis.severity_floor', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.code_slicing.enabled', $bundleConfiguration->audit->codeSlicingEnabled);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.code_slicing.min_lines_before_slicing', $bundleConfiguration->audit->codeSlicingMinLines);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.budget.max_tokens', $bundleConfiguration->budget->maxTokens);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.budget.max_cost_usd', $bundleConfiguration->budget->maxCostUsd);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.retry.max_attempts', $bundleConfiguration->retry->maxAttempts);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.retry.initial_delay_ms', $bundleConfiguration->retry->initialDelayMs);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.retry.backoff_multiplier', $bundleConfiguration->retry->backoffMultiplier);
-        $containerBuilder->setParameter('symfony_security_auditor.audit.retry.jitter_ratio', $bundleConfiguration->retry->jitterRatio);
+        foreach ($this->parameters($bundleConfiguration) as $name => $value) {
+            $containerBuilder->setParameter(self::PREFIX.$name, $value);
+        }
+    }
 
-        $containerBuilder->setParameter('symfony_security_auditor.config_notices', ConfigurationNotices::of($bundleConfiguration->audit, $bundleConfiguration->llm));
-        $containerBuilder->setParameter('symfony_security_auditor.cache.enabled', $bundleConfiguration->cache->enabled);
-        $containerBuilder->setParameter('symfony_security_auditor.cache.dir', $bundleConfiguration->cache->dir);
-        $containerBuilder->setParameter('symfony_security_auditor.cache.advisory_dir', $bundleConfiguration->cache->dir.'/advisory');
-        $containerBuilder->setParameter('symfony_security_auditor.cache.reviewer_dir', $bundleConfiguration->cache->dir.'/reviewer');
-        $containerBuilder->setParameter(
-            'symfony_security_auditor.cache.reviewer_key_salt',
-            \sprintf('%s|reviewer-v%d|prompt-v%d', $bundleConfiguration->llm->reviewerModel(), FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
+    /**
+     * @return array<string, array<array-key, mixed>|bool|float|int|string|UnitEnum|null>
+     *
+     * @throws JsonException
+     */
+    private function parameters(BundleConfiguration $bundleConfiguration): array
+    {
+        $llm = $bundleConfiguration->llm;
+        $scan = $bundleConfiguration->scan;
+        $audit = $bundleConfiguration->audit;
+        $cache = $bundleConfiguration->cache;
+        $budget = $bundleConfiguration->budget;
+        $retry = $bundleConfiguration->retry;
+
+        return [
+            'attacker_model' => $llm->attackerModel(),
+            'reviewer_model' => $llm->reviewerModel(),
+            'attacker_max_output_tokens' => $llm->attackerMaxOutputTokens(),
+            'reviewer_max_output_tokens' => $llm->reviewerMaxOutputTokens(),
+            'scan.included_paths' => $scan->includedPaths,
+            'scan.respect_gitignore' => $scan->respectGitignore,
+            'scan.max_file_size_kb' => $scan->maxFileSizeKb,
+            'scan.secret_scrubbing.enabled' => $scan->secretScrubbingEnabled,
+            'scan.secret_scrubbing.additional_patterns' => $scan->additionalScrubberPatterns,
+            'scan.custom_risk_patterns' => $scan->customRiskPatterns,
+            'audit.max_iterations' => $audit->maxIterations,
+            'audit.min_confidence' => $audit->minConfidence,
+            'audit.reviewer_batch_size' => $audit->reviewerBatchSize,
+            'audit.tools_enabled' => $audit->toolsEnabled,
+            'audit.structured_collection' => $audit->structuredCollection,
+            'audit.reviewer_structured_collection' => $audit->reviewerStructuredCollection,
+            'audit.stable_system_prompt' => $audit->stableSystemPrompt,
+            'audit.max_tool_iterations' => $audit->maxToolIterations,
+            'audit.reviewer_tools_enabled' => $audit->reviewerToolsEnabled,
+            'audit.reviewer_max_tool_iterations' => $audit->reviewerMaxToolIterations,
+            'audit.baseline' => $audit->baseline,
+            'audit.fail_on' => $audit->failOn->value,
+            'audit.excluded_types' => $audit->excludedTypes,
+            'audit.included_types' => $audit->includedTypes,
+            'audit.reviewer_max_concurrent' => $audit->reviewerMaxConcurrent,
+            'audit.attacker_max_concurrent' => $audit->attackerMaxConcurrent,
+            'audit.static_prescan.enabled' => $audit->staticPreScanEnabled,
+            'audit.static_prescan.lean_mode' => $audit->staticPreScanLeanMode,
+            'audit.chunking.strategy' => $audit->chunkingStrategy,
+            'audit.poc_synthesis.enabled' => $audit->poCSynthesisEnabled,
+            'audit.poc_synthesis.severity_floor' => $audit->poCSynthesisSeverityFloor,
+            'audit.code_slicing.enabled' => $audit->codeSlicingEnabled,
+            'audit.code_slicing.min_lines_before_slicing' => $audit->codeSlicingMinLines,
+            'audit.budget.max_tokens' => $budget->maxTokens,
+            'audit.budget.max_cost_usd' => $budget->maxCostUsd,
+            'audit.retry.max_attempts' => $retry->maxAttempts,
+            'audit.retry.initial_delay_ms' => $retry->initialDelayMs,
+            'audit.retry.backoff_multiplier' => $retry->backoffMultiplier,
+            'audit.retry.jitter_ratio' => $retry->jitterRatio,
+            'config_notices' => ConfigurationNotices::of($audit, $llm),
+            'cache.enabled' => $cache->enabled,
+            'cache.dir' => $cache->dir,
+            'cache.advisory_dir' => $cache->dir.'/advisory',
+            'cache.reviewer_dir' => $cache->dir.'/reviewer',
+            'cache.reviewer_key_salt' => $this->reviewerKeySalt($llm),
+            'cache.prompt_caching' => $cache->promptCaching,
+            'cache.key_salt' => $this->attackerKeySalt($bundleConfiguration),
+        ];
+    }
+
+    private function reviewerKeySalt(LLMConfiguration $llmConfiguration): string
+    {
+        return \sprintf(
+            '%s|reviewer-v%d|prompt-v%d',
+            $llmConfiguration->reviewerModel(),
+            FilesystemReviewerCache::CACHE_VERSION,
+            ReviewerPromptBuilder::PROMPT_VERSION,
         );
-        $containerBuilder->setParameter('symfony_security_auditor.cache.prompt_caching', $bundleConfiguration->cache->promptCaching);
-        $containerBuilder->setParameter(
-            'symfony_security_auditor.cache.key_salt',
-            \sprintf(
-                '%s|prompt-v%d|prescan-v%d|patterns-%s|collect-%s|skills-%s',
-                $bundleConfiguration->llm->attackerModel(),
-                AttackerPromptBuilder::PROMPT_VERSION,
-                RegexStaticPreScanner::CACHE_VERSION,
-                substr(
-                    hash(
-                        'sha256',
-                        json_encode($bundleConfiguration->scan->customRiskPatterns, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES),
-                    ),
-                    0,
-                    16,
+    }
+
+    /**
+     * @throws JsonException
+     */
+    private function attackerKeySalt(BundleConfiguration $bundleConfiguration): string
+    {
+        return \sprintf(
+            '%s|prompt-v%d|prescan-v%d|patterns-%s|collect-%s|skills-%s',
+            $bundleConfiguration->llm->attackerModel(),
+            AttackerPromptBuilder::PROMPT_VERSION,
+            RegexStaticPreScanner::CACHE_VERSION,
+            substr(
+                hash(
+                    'sha256',
+                    json_encode($bundleConfiguration->scan->customRiskPatterns, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES),
                 ),
-                $bundleConfiguration->audit->structuredCollection ? 'tool' : 'json',
-                $bundleConfiguration->audit->stableSystemPrompt ? 'full' : 'lean',
+                0,
+                16,
             ),
+            $bundleConfiguration->audit->structuredCollection ? 'tool' : 'json',
+            $bundleConfiguration->audit->stableSystemPrompt ? 'full' : 'lean',
         );
     }
 }
