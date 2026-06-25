@@ -21,20 +21,26 @@ use Symfony\Component\Yaml\Yaml;
  */
 final readonly class StandaloneConfigLoader
 {
+    private const array PLATFORM_KEYS = ['provider', 'api_key', 'endpoint'];
+
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private AuditConfiguration $auditConfiguration,
+        private StandalonePlatformConfigResolver $standalonePlatformConfigResolver,
     ) {}
 
-    /**
-     * @return array<array-key, mixed>
-     */
-    public function load(): array
+    public function load(): StandaloneConfig
     {
         $configFile = $this->xdgConfigPathResolver->configFile();
         $rawConfig = is_file($configFile) ? $this->parse($configFile) : [];
 
-        return (new Processor())->processConfiguration($this->auditConfiguration, [$rawConfig]);
+        $platform = $this->standalonePlatformConfigResolver->resolve($rawConfig);
+        $auditConfig = (new Processor())->processConfiguration(
+            $this->auditConfiguration,
+            [array_diff_key($rawConfig, array_flip(self::PLATFORM_KEYS))],
+        );
+
+        return new StandaloneConfig($auditConfig, $platform);
     }
 
     /**

@@ -16,7 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Config;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 
 final class StandaloneConfigLoaderTest extends TestCase
@@ -36,23 +38,50 @@ final class StandaloneConfigLoaderTest extends TestCase
         $this->filesystem->remove($this->configHome);
     }
 
-    public function test_it_loads_and_normalizes_a_user_config_file(): void
+    public function test_it_normalizes_the_audit_settings_and_ignores_the_platform_keys(): void
+    {
+        $this->writeConfig("provider: anthropic\napi_key: sk-test\nmodel: gpt-5.4\n");
+
+        self::assertSame('gpt-5.4', $this->loader()->load()->auditConfig['model']);
+    }
+
+    public function test_it_resolves_the_platform_connection(): void
+    {
+        $this->writeConfig("provider: anthropic\napi_key: sk-test\n");
+
+        self::assertSame(['anthropic' => ['api_key' => 'sk-test']], $this->loader()->load()->platform->toAiPlatformConfig());
+    }
+
+    public function test_it_applies_audit_defaults_when_only_a_provider_is_configured(): void
+    {
+        $this->writeConfig("provider: ollama\nendpoint: http://localhost:11434\n");
+
+        self::assertSame('claude-opus-4-8', $this->loader()->load()->auditConfig['model']);
+    }
+
+    public function test_it_rejects_a_config_without_a_provider(): void
     {
         $this->writeConfig("model: gpt-5.4\n");
 
-        self::assertSame('gpt-5.4', $this->loader()->load()['model']);
+        $this->expectException(MissingProviderException::class);
+
+        $this->loader()->load();
     }
 
-    public function test_it_returns_defaults_when_no_config_file_exists(): void
+    public function test_it_rejects_a_missing_config_file(): void
     {
-        self::assertSame('claude-opus-4-8', $this->loader()->load()['model']);
+        $this->expectException(MissingProviderException::class);
+
+        $this->loader()->load();
     }
 
-    public function test_it_treats_an_empty_config_file_as_defaults(): void
+    public function test_it_rejects_an_empty_config_file(): void
     {
         $this->writeConfig('');
 
-        self::assertSame('claude-opus-4-8', $this->loader()->load()['model']);
+        $this->expectException(MissingProviderException::class);
+
+        $this->loader()->load();
     }
 
     private function loader(): StandaloneConfigLoader
@@ -60,6 +89,7 @@ final class StandaloneConfigLoaderTest extends TestCase
         return new StandaloneConfigLoader(
             new XdgConfigPathResolver($this->configHome, null, null),
             new AuditConfiguration(),
+            new StandalonePlatformConfigResolver(),
         );
     }
 
