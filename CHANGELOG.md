@@ -14,9 +14,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 - **New `--show-scanned` option on `audit:run` lists the exact files an audit
   would ingest, without invoking the LLM.** Answers "did my `included_paths` /
-  `--path` configuration match the files I expect?" before paying for a run.
-  The files are resolved through the same scanner and scan-path filter a real
-  run uses (`ListScannedFilesUseCase`,
+  `--path` configuration match the files I expect?" before paying for a run. The
+  files are resolved through the same scanner and scan-path filter a real run
+  uses (`ListScannedFilesUseCase`,
   `src/Audit/Application/UseCase/ListScannedFilesUseCase.php`), grouped by
   `ProjectFileType` with a per-type and total count; an empty result prints a
   "No files matched. Check your included_paths configuration and any --path
@@ -57,8 +57,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   progress event per verdict from `VerdictApplier::apply()`, the single
   chokepoint shared by every review mode (sequential, concurrent, structured,
   and batched). A decorated terminal prints `⚖ ✓ validated <type> — file:line`
-  (green) and `⚖ ✗ rejected <type> — file:line` (yellow) above the bar and ticks
-  the bar suffix `reviewing i/N`; `PlainProgressReporter` appends
+  (green) and `⚖ ✗ rejected <type> — file:line` (yellow) above the bar and
+  ticks the bar suffix `reviewing i/N`; `PlainProgressReporter` appends
   `[VALIDATED]`/`[REJECTED]` lines for non-TTY output. New stable progress-event
   value `review.finding.reviewed`.
 

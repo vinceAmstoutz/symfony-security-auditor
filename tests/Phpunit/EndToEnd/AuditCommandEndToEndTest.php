@@ -956,8 +956,8 @@ final class AuditCommandEndToEndTest extends TestCase
     {
         $this->createProjectDir();
 
-        $throwingLLM = $this->throwingLLMClient();
-        $commandTester = $this->makeCommandTesterWithLLM($throwingLLM, $throwingLLM);
+        $llmClient = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($llmClient, $llmClient);
         $exitCode = $commandTester->execute([
             'project-path' => $this->fixtureDir,
             '--show-scanned' => true,
@@ -975,8 +975,8 @@ final class AuditCommandEndToEndTest extends TestCase
     {
         $this->createProjectDir();
 
-        $throwingLLM = $this->throwingLLMClient();
-        $commandTester = $this->makeCommandTesterWithLLM($throwingLLM, $throwingLLM);
+        $llmClient = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($llmClient, $llmClient);
         $commandTester->execute([
             'project-path' => $this->fixtureDir,
             '--show-scanned' => true,
@@ -990,8 +990,8 @@ final class AuditCommandEndToEndTest extends TestCase
     {
         $this->createProjectDir();
 
-        $throwingLLM = $this->throwingLLMClient();
-        $commandTester = $this->makeCommandTesterWithLLM($throwingLLM, $throwingLLM);
+        $llmClient = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($llmClient, $llmClient);
         $exitCode = $commandTester->execute([
             'project-path' => $this->fixtureDir,
             '--show-scanned' => true,
@@ -1011,8 +1011,8 @@ final class AuditCommandEndToEndTest extends TestCase
     {
         $this->createProjectDir();
 
-        $throwingLLM = $this->throwingLLMClient();
-        $commandTester = $this->makeCommandTesterWithLLM($throwingLLM, $throwingLLM);
+        $llmClient = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($llmClient, $llmClient);
         $commandTester->execute([
             'project-path' => $this->fixtureDir,
             '--show-scanned' => true,
