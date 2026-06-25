@@ -43,6 +43,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\Mappin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\PoCSynthesisStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
@@ -456,6 +457,11 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.reviewer_model'),
         ]);
 
+    $defaultsConfigurator->set(ListScannedFilesUseCase::class)
+        ->args([
+            service(ProjectFileScannerInterface::class),
+        ]);
+
     $defaultsConfigurator->set(RunAuditUseCase::class)
         ->args([
             service(PipelineInterface::class),
@@ -472,6 +478,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(AuditExitCodeResolverInterface::class),
             service(AuditPresenterInterface::class),
             service(EstimateAuditCostUseCase::class),
+            service(ListScannedFilesUseCase::class),
             service(ProgressReporterHolder::class),
             service(BaselineProcessorInterface::class),
             param('symfony_security_auditor.scan.secret_scrubbing.enabled'),

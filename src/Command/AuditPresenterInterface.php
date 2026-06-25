@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 interface AuditPresenterInterface
@@ -36,6 +37,13 @@ interface AuditPresenterInterface
     public function estimatingSection(SymfonyStyle $symfonyStyle): void;
 
     public function dryRunResult(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void;
+
+    /**
+     * @param list<ProjectFile> $projectFiles
+     */
+    public function scannedFiles(SymfonyStyle $symfonyStyle, array $projectFiles): void;
+
+    public function scannedFilesHint(SymfonyStyle $symfonyStyle, int $fileCount): void;
 
     public function error(SymfonyStyle $symfonyStyle, Throwable $throwable): void;
 

@@ -46,7 +46,7 @@ function runCodeQualityTools(bool $fixMode = false): void
 
     io()->section('Prettier Markdown');
     run(sprintf(
-        'docker run --rm %s -v "%s:/work" -w /work tmknom/prettier:latest --%s "**/*.md"',
+        'docker run --rm %s -v "%s:/work" -w /work tmknom/prettier:3.6.2 --%s "**/*.md"',
         $userFlag,
         getcwd(),
         $fixMode ? 'write' : 'check',

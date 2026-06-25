@@ -23,6 +23,8 @@ use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Test\TestContainer;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Loader\LoaderInterface;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\DependencyInjection\Reference;
@@ -259,6 +261,33 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             ['src', 'config', 'templates', 'public/index.php'],
             $containerBuilder->getParameter('symfony_security_auditor.scan.included_paths'),
         );
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(2000)]
+    public function test_configured_scan_included_paths_scope_the_show_scanned_listing_end_to_end(): void
+    {
+        mkdir($this->tmpDir.'/src/Controller/Admin', 0o777, true);
+        mkdir($this->tmpDir.'/src/Service', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Controller/HomeController.php', '<?php class HomeController {}');
+        file_put_contents($this->tmpDir.'/src/Controller/Admin/DashboardController.php', '<?php class DashboardController {}');
+        file_put_contents($this->tmpDir.'/src/Service/PaymentService.php', '<?php class PaymentService {}');
+
+        $kernel = $this->boot(['model' => 'gpt-4o', 'scan' => ['included_paths' => ['src/Controller']]]);
+        $auditCommand = $this->getPrivateService($kernel, AuditCommand::class);
+        self::assertInstanceOf(AuditCommand::class, $auditCommand);
+
+        $commandTester = new CommandTester($auditCommand);
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->tmpDir,
+            '--show-scanned' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $display = $commandTester->getDisplay();
+        self::assertStringContainsString('src/Controller/HomeController.php', $display);
+        self::assertStringContainsString('src/Controller/Admin/DashboardController.php', $display);
+        self::assertStringNotContainsString('PaymentService.php', $display);
     }
 
     #[RunInSeparateProcess]
