@@ -16,9 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Standalone;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 
 final class StandaloneApplicationFactoryTest extends TestCase
@@ -47,15 +44,29 @@ final class StandaloneApplicationFactoryTest extends TestCase
     #[RunInSeparateProcess]
     public function test_it_builds_a_console_application_exposing_the_audit_command_and_alias(): void
     {
-        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, $this->cacheHome, null);
-        $standaloneConfigLoader = new StandaloneConfigLoader(
-            $xdgConfigPathResolver,
-            new StandalonePlatformConfigResolver(),
-        );
-
-        $application = (new StandaloneApplicationFactory($standaloneConfigLoader, $xdgConfigPathResolver))->create();
+        $application = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => $this->configHome,
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
 
         self::assertTrue($application->has('audit:run'));
         self::assertTrue($application->has('audit'));
+    }
+
+    #[RunInSeparateProcess]
+    public function test_the_registered_audit_command_keeps_the_full_cli_option_surface(): void
+    {
+        $application = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => $this->configHome,
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+
+        $definition = $application->find('audit:run')->getDefinition();
+        $optionNames = array_keys($definition->getOptions());
+
+        self::assertSame([], array_diff(
+            ['format', 'output', 'dry-run', 'no-cache', 'path', 'since', 'baseline', 'generate-baseline', 'fail-on'],
+            $optionNames,
+        ));
     }
 }

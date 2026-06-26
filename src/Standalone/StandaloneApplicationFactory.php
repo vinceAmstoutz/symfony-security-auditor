@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 
 use Symfony\Component\Console\Application;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 
 /**
@@ -30,6 +31,23 @@ final readonly class StandaloneApplicationFactory
         private StandaloneContainerFactory $standaloneContainerFactory = new StandaloneContainerFactory(),
         private StandaloneConsoleCommandFactory $standaloneConsoleCommandFactory = new StandaloneConsoleCommandFactory(),
     ) {}
+
+    /**
+     * @param array<string, string> $environment
+     */
+    public static function fromEnvironment(array $environment): self
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver(
+            $environment['XDG_CONFIG_HOME'] ?? null,
+            $environment['XDG_CACHE_HOME'] ?? null,
+            $environment['HOME'] ?? null,
+        );
+
+        return new self(
+            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver($environment)),
+            $xdgConfigPathResolver,
+        );
+    }
 
     public function create(): Application
     {
