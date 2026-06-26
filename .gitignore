@@ -5,6 +5,7 @@ composer.lock
 infection/
 /build/coverage/
 .playwright-mcp/
+/symfony-security-auditor.phar
 
 .castor.stub.php
 

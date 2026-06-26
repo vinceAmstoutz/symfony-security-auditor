@@ -12,6 +12,32 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **The auditor can now run as a standalone executable, configured once at the
+  user level instead of being installed into every audited app.** A new entry
+  point `bin/symfony-security-auditor` boots a kernel-less Symfony Console
+  application that reuses the exact same `audit:run` command (now also reachable
+  through the shorter `audit` alias) with its full option surface unchanged —
+  `project-path`, `-f/--format`, `-o/--output`, `--dry-run`, `--no-cache`,
+  `-p/--path`, `--since`, `--baseline`, `--generate-baseline`, `--fail-on` — and
+  the same `ExitCode` contract. Configuration is read from an XDG file
+  (`$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml`, falling back to
+  `~/.config/…`) and the cache lives under `$XDG_CACHE_HOME/…` (falling back to
+  `~/.cache/…`), resolved by `XdgConfigPathResolver`. The config is rootless
+  (the bundle keys without the `symfony_security_auditor:` wrapper) plus a
+  `platform:` block handed verbatim to `symfony/ai-bundle`, so every provider —
+  Anthropic, OpenAI, Gemini, Ollama, a generic OpenAI-compatible endpoint, … —
+  is configured the same way; an optional top-level `provider:` selector chooses
+  the active platform when several are declared. `%env(VAR)%` placeholders in
+  the platform block are resolved from the environment. New internal composition
+  root under `src/Standalone/` (`StandaloneApplicationFactory`,
+  `StandaloneContainerFactory`, `StandaloneConsoleCommandFactory`,
+  `BundleExtensionLoader`) and config seams under
+  `src/Audit/Infrastructure/Config/` (`StandaloneConfigLoader`,
+  `StandalonePlatformConfigResolver`, `StandalonePlatformConfig`,
+  `StandaloneConfig`). A tag-triggered `.github/workflows/release.yaml` compiles
+  the PHAR with `box compile` (see `box.json`) and attaches
+  `symfony-security-auditor.phar` to the GitHub release. The Symfony bundle
+  remains a fully supported, unchanged install method.
 - **Value-object factories `Vulnerability::of()`, `SymfonyMapping::of()`, and
   `LLMResponse::of()` replace the wide positional `create()` signatures.** The
   three public Domain factories each took a long flat argument list (12, 12, and
