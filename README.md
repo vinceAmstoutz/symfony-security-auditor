@@ -186,6 +186,10 @@ export ANTHROPIC_API_KEY=sk-…
 ./symfony-security-auditor.phar audit /path/to/your/symfony/project
 ```
 
+Each release also ships a dependency-free native binary
+(`symfony-security-auditor`) for hosts without PHP — download it the same way
+and run `./symfony-security-auditor audit …`.
+
 `audit` is an alias for `audit:run`; every option documented in the
 [CLI reference](docs/configuration.md#cli-reference) (`--format`, `--output`,
 `--dry-run`, `--since`, `--fail-on`, …) works identically. Configuration lives

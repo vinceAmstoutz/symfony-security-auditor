@@ -34,7 +34,51 @@ jobs:
       - name: Verify the PHAR was produced
         run: test -s symfony-security-auditor.phar
 
+      - name: Upload the PHAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: symfony-security-auditor-phar
+          path: symfony-security-auditor.phar
+
       - name: Attach the PHAR to the release
         uses: softprops/action-gh-release@v2
         with:
           files: symfony-security-auditor.phar
+
+  binary:
+    name: Build and attach the native binary
+    runs-on: ubuntu-latest
+    needs: phar
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup static-php-cli
+        uses: static-php-cli/setup-spc@v1
+        with:
+          php-version: '8.3'
+
+      - name: Download the PHAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: symfony-security-auditor-phar
+
+      - name: Resolve the required extensions
+        id: extensions
+        run: echo "list=$(spc dump-extensions . --format=text)" >> "$GITHUB_OUTPUT"
+
+      - name: Build the static micro PHP
+        run: |
+          spc download --for-extensions="${{ steps.extensions.outputs.list }}" --with-php=8.3 --prefer-pre-built
+          spc build "${{ steps.extensions.outputs.list }}" --build-micro
+
+      - name: Combine the micro runtime with the PHAR
+        run: spc micro:combine symfony-security-auditor.phar --output=symfony-security-auditor
+
+      - name: Verify the binary was produced
+        run: test -s symfony-security-auditor
+
+      - name: Attach the binary to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: symfony-security-auditor

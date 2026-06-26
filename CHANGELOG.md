@@ -45,9 +45,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`StandaloneConfigLoader`, `StandalonePlatformConfigResolver`,
   `StandalonePlatformConfig`, `StandaloneConfig`, `YamlStandaloneConfigWriter`,
   `ComposerBridgeInstaller`). A tag-triggered `.github/workflows/release.yaml`
-  compiles the PHAR with `box compile` (see `box.json`) and attaches
-  `symfony-security-auditor.phar` to the GitHub release. The Symfony bundle
-  remains a fully supported, unchanged install method.
+  compiles the PHAR with `box compile` (see `box.json`) and a dependency-free
+  native binary with `static-php-cli`, attaching both
+  `symfony-security-auditor.phar` and `symfony-security-auditor` to the GitHub
+  release. The Symfony bundle remains a fully supported, unchanged install
+  method.
 - **Value-object factories `Vulnerability::of()`, `SymfonyMapping::of()`, and
   `LLMResponse::of()` replace the wide positional `create()` signatures.** The
   three public Domain factories each took a long flat argument list (12, 12, and
