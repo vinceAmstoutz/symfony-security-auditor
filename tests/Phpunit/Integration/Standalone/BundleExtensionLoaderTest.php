@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Standalone;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\BundleExtensionLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
@@ -25,7 +26,13 @@ final class BundleExtensionLoaderTest extends TestCase
 {
     public function test_it_loads_a_bundle_extension_into_the_container(): void
     {
-        $containerBuilder = new ContainerBuilder();
+        $containerBuilder = new ContainerBuilder(new ParameterBag([
+            'kernel.cache_dir' => sys_get_temp_dir(),
+            'kernel.build_dir' => sys_get_temp_dir(),
+            'kernel.project_dir' => sys_get_temp_dir(),
+            'kernel.environment' => 'prod',
+            'kernel.debug' => false,
+        ]));
 
         (new BundleExtensionLoader())->load(new SymfonySecurityAuditorBundle(), [], $containerBuilder);
 
