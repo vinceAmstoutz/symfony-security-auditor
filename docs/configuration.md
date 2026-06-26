@@ -20,6 +20,7 @@ bundle registration, bundle-level configuration, platform wiring via
 - [Platform Configuration](#platform-configuration)
 - [Model Options](#model-options)
 - [Split-Model Setup](#split-model-setup)
+- [Standalone Configuration](#standalone-configuration)
 - [CLI Reference](#cli-reference)
 
 > See also: [Architecture](architecture.md) · [Extending](extending.md) ·
@@ -398,6 +399,52 @@ The attacker agent receives all source files grouped into chunks of 10, sorted
 by security priority (controllers first, then voters, entities, repositories,
 forms, then everything else). The reviewer agent then evaluates each candidate
 finding individually and decides whether to accept or escalate it.
+
+## Standalone Configuration
+
+When you run the [standalone PHAR](../README.md#standalone-tool-phar) instead of
+the bundle, configuration is read from a single user-level file resolved through
+the XDG Base Directory specification:
+
+| Path                                                                      | Purpose                               |
+| ------------------------------------------------------------------------- | ------------------------------------- |
+| `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml` (→ `~/.config/…`) | the configuration file                |
+| `$XDG_CACHE_HOME/symfony-security-auditor` (→ `~/.cache/…`)               | attacker/reviewer and advisory caches |
+| `$XDG_DATA_HOME/symfony-security-auditor` (→ `~/.local/share/…`)          | the downloaded provider bridge(s)     |
+
+Run `symfony-security-auditor init` to generate the file interactively and fetch
+the provider bridge. The file is **rootless** — the same keys as the bundle
+configuration above, without the `symfony_security_auditor:` wrapper — plus two
+standalone-only top-level keys:
+
+- **`platform:`** — handed verbatim to `symfony/ai`'s `ai.platform` config, so
+  it takes the exact shape documented in
+  [Platform Configuration](#platform-configuration).
+- **`provider:`** — optional selector naming the active platform when several
+  are declared; omit it when only one platform is configured.
+
+```yaml
+# ~/.config/symfony-security-auditor/config.yaml
+provider: anthropic
+platform:
+    anthropic:
+        api_key: '%env(ANTHROPIC_API_KEY)%'
+model: claude-opus-4-8
+# scan:, audit:, cache: are all accepted here too, unwrapped.
+```
+
+`%env(VAR)%` placeholders in the `platform:` block are resolved from the
+environment, so secrets never live in the file. To switch providers, configure
+several platforms and change `provider:` (run `init` again to fetch the other
+bridge):
+
+```yaml
+provider: openai
+platform:
+    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }
+    openai: { api_key: '%env(OPENAI_API_KEY)%' }
+model: gpt-5.4
+```
 
 ## CLI Reference
 

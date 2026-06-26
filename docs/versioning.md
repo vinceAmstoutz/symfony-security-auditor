@@ -89,6 +89,30 @@ is a `MAJOR` change.
   - `2` — audit aborted because the configured token or cost budget was exceeded
     (partial report still emitted).
 
+### Standalone executable & XDG configuration
+
+The standalone tool is a supported install method alongside the bundle, and the
+following surface is BC-protected:
+
+- The executable `bin/symfony-security-auditor` and the published
+  `symfony-security-auditor.phar` artifact (its release-asset name).
+- The `audit` command alias for `audit:run` and the `init` command name. The
+  standalone exposes the **identical** `audit:run` argument, option, and
+  exit-code surface listed above.
+- The XDG configuration contract: the config file path
+  `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml` (falling back to
+  `~/.config/…`), the cache directory `$XDG_CACHE_HOME/symfony-security-auditor`
+  (falling back to `~/.cache/…`), and the bridge data directory
+  `$XDG_DATA_HOME/symfony-security-auditor` (falling back to
+  `~/.local/share/…`).
+- The standalone `config.yaml` shape: the bundle configuration keys **without**
+  the `symfony_security_auditor:` root wrapper, plus the standalone-only
+  top-level `platform:` block (passed verbatim to `symfony/ai-bundle`) and the
+  optional `provider:` selector. Removing or renaming these keys is a `MAJOR`.
+
+The bundle remains a fully supported install method; neither method is
+deprecated by the other.
+
 ### GitHub Action
 
 - The composite action defined by `action.yml` at the repository root and its
