@@ -73,6 +73,16 @@ final class StandaloneApplicationFactoryTest extends TestCase
         self::assertTrue($application->has('init'));
     }
 
+    public function test_it_registers_the_audit_command_as_visible(): void
+    {
+        $application = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+
+        self::assertFalse($application->get('audit:run')->isHidden());
+    }
+
     public function test_it_resolves_the_bridge_autoload_file_under_the_data_directory(): void
     {
         self::assertSame(

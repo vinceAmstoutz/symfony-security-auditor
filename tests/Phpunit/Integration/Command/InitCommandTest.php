@@ -127,6 +127,40 @@ final class InitCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $commandTester->execute([]));
     }
 
+    public function test_it_confirms_where_the_configuration_was_written(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Configuration written to', $commandTester->getDisplay());
+    }
+
+    public function test_it_treats_an_empty_answer_as_declining_the_overwrite(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
+
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(['model' => 'keep-me'], Yaml::parseFile($this->configFile()));
+    }
+
+    public function test_it_warns_when_it_leaves_the_existing_configuration_untouched(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
+
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['no']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Aborted', $commandTester->getDisplay());
+    }
+
     private function commandTester(): CommandTester
     {
         $initCommand = new InitCommand(

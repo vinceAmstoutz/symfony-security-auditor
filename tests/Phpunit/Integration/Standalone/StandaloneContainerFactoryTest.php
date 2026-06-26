@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Standalone;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
@@ -47,6 +48,19 @@ final class StandaloneContainerFactoryTest extends TestCase
         );
 
         self::assertInstanceOf(AuditCommand::class, $containerBuilder->get(AuditCommand::class));
+    }
+
+    #[RunInSeparateProcess]
+    public function test_it_configures_a_non_debug_kernel_with_a_public_event_dispatcher(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]])),
+            $this->cacheDir,
+        );
+
+        self::assertSame(getcwd(), $containerBuilder->getParameter('kernel.project_dir'));
+        self::assertFalse($containerBuilder->getParameter('kernel.debug'));
+        self::assertInstanceOf(EventDispatcher::class, $containerBuilder->get('event_dispatcher'));
     }
 
     #[RunInSeparateProcess]

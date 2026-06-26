@@ -77,6 +77,16 @@ final class ComposerBridgeInstallerTest extends TestCase
         $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
     }
 
+    public function test_the_failure_message_carries_the_composer_error_output(): void
+    {
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, string $targetDirectory): Process => Process::fromShellCommandline('echo "network unreachable" 1>&2; exit 1'));
+
+        $this->expectException(BridgeInstallationFailedException::class);
+        $this->expectExceptionMessage('network unreachable');
+
+        $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
+    }
+
     public function test_it_throws_when_composer_cannot_be_started(): void
     {
         $composerBridgeInstaller = new ComposerBridgeInstaller(timeoutSeconds: -1, processBuilder: $this->succeedingProcess());

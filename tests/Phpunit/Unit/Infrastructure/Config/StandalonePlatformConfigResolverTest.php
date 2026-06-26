@@ -90,6 +90,7 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     public function test_it_rejects_an_env_placeholder_whose_variable_is_unset(): void
     {
         $this->expectException(MissingEnvironmentVariableException::class);
+        $this->expectExceptionMessage('"ANTHROPIC_API_KEY"');
 
         (new StandalonePlatformConfigResolver())
             ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]]);
