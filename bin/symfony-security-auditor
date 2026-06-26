@@ -28,4 +28,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory
     exit(1);
 })();
 
-exit(StandaloneApplicationFactory::fromEnvironment(getenv())->create()->run());
+$environment = getenv();
+
+$bridgeAutoloadFile = StandaloneApplicationFactory::bridgeAutoloadFile($environment);
+if (is_file($bridgeAutoloadFile)) {
+    require_once $bridgeAutoloadFile;
+}
+
+exit(StandaloneApplicationFactory::fromEnvironment($environment)->create()->run());

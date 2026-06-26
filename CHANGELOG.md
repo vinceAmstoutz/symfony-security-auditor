@@ -28,14 +28,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   Anthropic, OpenAI, Gemini, Ollama, a generic OpenAI-compatible endpoint, … —
   is configured the same way; an optional top-level `provider:` selector chooses
   the active platform when several are declared. `%env(VAR)%` placeholders in
-  the platform block are resolved from the environment. New internal composition
-  root under `src/Standalone/` (`StandaloneApplicationFactory`,
-  `StandaloneContainerFactory`, `StandaloneConsoleCommandFactory`,
-  `BundleExtensionLoader`) and config seams under
-  `src/Audit/Infrastructure/Config/` (`StandaloneConfigLoader`,
-  `StandalonePlatformConfigResolver`, `StandalonePlatformConfig`,
-  `StandaloneConfig`). A tag-triggered `.github/workflows/release.yaml` compiles
-  the PHAR with `box compile` (see `box.json`) and attaches
+  the platform block are resolved from the environment. A guided `init` command
+  writes that config file (owner-only `0600` permissions) from interactive
+  prompts and then downloads the chosen provider's
+  `symfony/ai-<provider>-platform` bridge into the XDG data directory
+  (`$XDG_DATA_HOME/symfony-security-auditor`, falling back to
+  `~/.local/share/…`) via `composer require`; the executable itself ships no
+  provider bridges, and the same pick-and-fetch path applies to every provider.
+  New internal composition root under `src/Standalone/`
+  (`StandaloneApplicationFactory`, `StandaloneContainerFactory`,
+  `StandaloneConsoleCommandFactory`, `BundleExtensionLoader`), the `init`
+  command, and config/bridge seams under `src/Audit/Infrastructure/`
+  (`StandaloneConfigLoader`, `StandalonePlatformConfigResolver`,
+  `StandalonePlatformConfig`, `StandaloneConfig`, `YamlStandaloneConfigWriter`,
+  `ComposerBridgeInstaller`). A tag-triggered `.github/workflows/release.yaml`
+  compiles the PHAR with `box compile` (see `box.json`) and attaches
   `symfony-security-auditor.phar` to the GitHub release. The Symfony bundle
   remains a fully supported, unchanged install method.
 - **Value-object factories `Vulnerability::of()`, `SymfonyMapping::of()`, and

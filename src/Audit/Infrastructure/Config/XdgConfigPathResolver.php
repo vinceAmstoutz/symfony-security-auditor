@@ -28,6 +28,7 @@ final readonly class XdgConfigPathResolver
         private ?string $xdgConfigHome,
         private ?string $xdgCacheHome,
         private ?string $home,
+        private ?string $xdgDataHome = null,
     ) {}
 
     public function configFile(): string
@@ -38,6 +39,11 @@ final readonly class XdgConfigPathResolver
     public function cacheDir(): string
     {
         return $this->baseDirectory($this->xdgCacheHome, '.cache').'/'.self::APP_DIRECTORY;
+    }
+
+    public function dataDir(): string
+    {
+        return $this->baseDirectory($this->xdgDataHome, '.local/share').'/'.self::APP_DIRECTORY;
     }
 
     private function baseDirectory(?string $xdgBase, string $homeRelativeFallback): string
