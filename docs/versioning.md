@@ -140,6 +140,10 @@ overriding the alias in `config/services.yaml` is a supported integration path:
   [`docs/extending.md`](extending.md).
 - `SecretScrubberInterface`
 - `PricingProviderInterface`
+- `CacheAwarePricingProviderInterface` — opt-in extension of
+  `PricingProviderInterface` for providers that expose real per-model
+  prompt-cache rates. `CostCalculator` checks `instanceof` and falls back to the
+  base input rate, so it never breaks an existing pricing provider.
 - `TokenEstimatorInterface`
 - `RateLimiterInterface` — host applications may implement this and alias it to
   swap the throttling strategy (e.g. cross-process Redis-backed bucket). See

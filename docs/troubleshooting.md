@@ -270,11 +270,11 @@ Expected behavior on large projects. Mitigations:
 ### `--dry-run` estimate shows `$0.00`
 
 The cost estimate multiplies token counts by per-model prices from the
-configured `PricingProviderInterface` (the bundled `StaticPricingProvider`
-carries a fixed price table). When a configured model (`model`,
-`attacker_model`, or `reviewer_model`) is absent from that table — a typo, or a
-model `symfony/ai` supports but the table does not yet list — its price resolves
-to `0.0` and the dry run now prints a stderr warning:
+configured `PricingProviderInterface` (the bundled `ModelsDevPricingProvider`
+reads prices from the `symfony/models-dev` catalog shipped in `vendor/`). When a
+configured model (`model`, `attacker_model`, or `reviewer_model`) is absent from
+that catalog — a typo, or a model `symfony/ai` supports but the catalog does not
+list — its price resolves to `0.0` and the dry run now prints a stderr warning:
 
 ```text
 No published pricing for the configured model(s): <model>. The dry-run cost
@@ -286,9 +286,10 @@ symfony/ai platform.
 ```
 
 Fix the model identifier if it is a typo. If the name is correct but missing
-from the table, the token counts in the report are still accurate — only the USD
-figure is unavailable. Alias your own `PricingProviderInterface` implementation
-to supply prices (see [Extending](extending.md)).
+from the catalog, the token counts in the report are still accurate — only the
+USD figure is unavailable. Run `composer update symfony/models-dev` to pull a
+fresher catalog, or alias your own `PricingProviderInterface` implementation to
+supply prices (see [Extending](extending.md)).
 
 ## Cache Issues
 

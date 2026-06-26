@@ -61,6 +61,58 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   ticks the bar suffix `reviewing i/N`; `PlainProgressReporter` appends
   `[VALIDATED]`/`[REJECTED]` lines for non-TTY output. New stable progress-event
   value `review.finding.reviewed`.
+- **LLM pricing is now sourced from the daily `symfony/models-dev` catalog
+  instead of a hand-maintained price table.** The new `ModelsDevPricingProvider`
+  (`src/Audit/Infrastructure/Pricing/ModelsDevPricingProvider.php`) reads
+  `vendor/symfony/models-dev/models-dev.json` once from disk (no network call)
+  and resolves `cost.input` / `output` / `cache_read` / `cache_write` per model.
+  A bare model id (`claude-opus-4-8`, `gpt-5.5`) resolves against official
+  first-party providers only (Anthropic, OpenAI, Google, Mistral, Cohere,
+  DeepSeek, Perplexity, Cerebras) — a version dot never makes it qualified — so
+  aggregator/cloud markups never leak in; a provider-qualified id, namely
+  slash-namespaced or one whose dot-delimited prefix is a catalog provider key
+  (`anthropic.claude-opus-4-8` and the cloud-region form
+  `us.anthropic.claude-opus-4-8`), matches anywhere in the catalog. Unknown
+  models still resolve to `$0.00` with a one-time
+  `"No pricing entry for LLM model — cost reporting will show zero"` warning,
+  and a missing/unreadable/malformed catalog (or an absent `symfony/models-dev`
+  install) degrades to zero pricing with a logged warning rather than failing
+  the run. Prices now refresh on your own `composer update symfony/models-dev`
+  instead of waiting for a bundle release. Adds `symfony/models-dev` (`>=87.0`)
+  as a hard runtime dependency.
+- **New `CacheAwarePricingProviderInterface` Domain port**
+  (`src/Audit/Domain/Port/CacheAwarePricingProviderInterface.php`) — an opt-in
+  extension of `PricingProviderInterface` exposing
+  `cacheReadPricePerMillionTokens()` and `cacheCreationPricePerMillionTokens()`.
+  `CostCalculator` consumes it via `instanceof` and falls back to the base input
+  rate for providers that do not implement it, so it never breaks an existing
+  pricing provider. Listed under the documented extension points in
+  `docs/versioning.md`.
+- **`audit:run` now warns up front when a configured model is unpriced, and
+  refuses to start a budgeted run whose cost it cannot enforce.** The new
+  `UnpricedModelBudgetGuard` (`src/Command/UnpricedModelBudgetGuard.php`) runs
+  at the start of a real audit: if any configured model (`model`,
+  `attacker_model`, or `reviewer_model`) has no catalog price it prints a
+  one-time `$0.00` notice to stderr (so the `--dry-run` warning now also
+  surfaces on real runs), and when `audit.budget.max_cost_usd` is additionally
+  set — so the budget guard could never trip — it prompts for confirmation on an
+  interactive terminal and fails closed with exit code `2` under
+  `--no-interaction` / CI. When every configured model is priced the run is
+  silent as before.
+
+### Changed
+
+- **Prompt-cache traffic is now priced from each provider's real per-model cache
+  rates instead of Anthropic-only multipliers.** `CostCalculator`
+  (`src/Audit/Application/Budget/CostCalculator.php`) previously derived cache
+  cost from two hardcoded constants (`0.1x` read, `1.25x` write) gated on the
+  model id containing `'claude'`, which mispriced every other provider's prompt
+  cache at `1.0x`. It now reads `cache_read` / `cache_write` from the catalog
+  via `CacheAwarePricingProviderInterface` (e.g. `gemini-2.5-flash` cache reads
+  at its real `0.075` rate). Anthropic figures are unchanged — the catalog's
+  `0.5` / `6.25` rates for `claude-opus-4-8` equal the old `5×0.1` / `5×1.25`.
+  The default `PricingProviderInterface` service alias now points at
+  `ModelsDevPricingProvider`.
 
 ### Deprecated
 
@@ -72,6 +124,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   when called, so usage surfaces in your deprecation log and in CI
   (`failOnDeprecation`) and the removal in the next `MAJOR` does not arrive as
   an unannounced fatal. Scheduled for removal in the next `MAJOR`.
+
+### Removed
+
+- **`StaticPricingProvider` and its hand-maintained 68-model `PRICES` constant**
+  (`src/Audit/Infrastructure/Pricing/StaticPricingProvider.php`). The
+  catalog-backed `ModelsDevPricingProvider` (see Added) is now the sole pricing
+  source, so no hardcoded prices remain. The class was `@internal`, so this is
+  not a public-API break. Of the 68 ids it carried, 58 keep identical
+  input/output prices from the catalog, 2 move to current provider rates
+  (`o4-mini` `0.55/2.20` → `1.1/4.4`, `mistral-medium-2604` `0.40/2.00` →
+  `1.5/7.5`), and 8 old/niche ids absent from the catalog (`claude-opus-4`,
+  `claude-sonnet-4`, `codestral-2508`, `devstral-{medium,small}-2512`,
+  `ministral-{3b,8b,14b}-2512`) now resolve to `$0.00` with a warning. The
+  default `claude-opus-4-8` and every current model are catalog-present and
+  unchanged.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 
