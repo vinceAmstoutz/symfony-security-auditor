@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\MapInput;
+use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
@@ -47,6 +48,7 @@ final readonly class AuditCommand
         private ListScannedFilesUseCase $listScannedFilesUseCase,
         private ProgressReporterHolder $progressReporterHolder,
         private BaselineProcessorInterface $baselineProcessor,
+        private UnpricedModelBudgetGuardInterface $unpricedModelBudgetGuard,
         private bool $secretScrubbingEnabled,
         private FindingTypeFilterInterface $findingTypeFilter,
         private array $configNotices = [],
@@ -54,6 +56,7 @@ final readonly class AuditCommand
     ) {}
 
     public function __invoke(
+        InputInterface $input,
         SymfonyStyle $symfonyStyle,
         #[MapInput] AuditCommandInput $auditCommandInput,
     ): int {
@@ -76,6 +79,10 @@ final readonly class AuditCommand
 
             if ($auditCommandInput->showScanned) {
                 return ExitCode::Success->value;
+            }
+
+            if (!$this->unpricedModelBudgetGuard->permitsRun($input, $symfonyStyle)) {
+                return ExitCode::BudgetAborted->value;
             }
 
             $this->beginAuditRun($symfonyStyle, $auditCommandInput);

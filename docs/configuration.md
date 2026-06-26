@@ -194,10 +194,13 @@ ai:
 ```
 
 When the provider reports cache usage, the auditor prices it into the cost it
-tracks and reports: cache reads at `0.1x` and cache writes at `1.25x` the
-model's input rate (Anthropic's published multipliers), so the budget tracker
-and the `estimated_cost_usd` in the report reflect the real discounted spend
-rather than charging every input token at the full rate.
+tracks and reports using the model's real per-provider cache rates from the
+`symfony/models-dev` catalog (for Anthropic that works out to cache reads at
+`0.1x` and cache writes at `1.25x` the input rate; other providers carry their
+own rates). Models with no published cache rate fall back to the base input
+rate. So the budget tracker and the `estimated_cost_usd` in the report reflect
+the real discounted spend rather than charging every input token at the full
+rate.
 
 ### Simple mode — one model for both roles
 
