@@ -53,6 +53,16 @@ final class StandaloneApplicationFactoryTest extends TestCase
         self::assertTrue($application->has('audit'));
     }
 
+    public function test_it_registers_the_audit_command_without_reading_a_config_file(): void
+    {
+        $application = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+
+        self::assertTrue($application->has('audit:run'));
+    }
+
     #[RunInSeparateProcess]
     public function test_the_registered_audit_command_keeps_the_full_cli_option_surface(): void
     {

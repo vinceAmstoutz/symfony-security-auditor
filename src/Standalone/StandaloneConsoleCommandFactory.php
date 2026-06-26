@@ -23,7 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableAuditC
  */
 final readonly class StandaloneConsoleCommandFactory
 {
-    private const string AUDIT_ALIAS = 'audit';
+    public const string AUDIT_ALIAS = 'audit';
 
     public function create(ContainerBuilder $containerBuilder): Command
     {

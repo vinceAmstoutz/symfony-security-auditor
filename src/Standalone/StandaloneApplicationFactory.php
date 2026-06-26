@@ -14,9 +14,13 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 
 use Symfony\Component\Console\Application;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Command\LazyCommand;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
@@ -51,14 +55,28 @@ final readonly class StandaloneApplicationFactory
 
     public function create(): Application
     {
-        $containerBuilder = $this->standaloneContainerFactory->create(
+        $application = new Application(self::APPLICATION_NAME);
+        $application->addCommand($this->lazyAuditCommand());
+
+        return $application;
+    }
+
+    private function lazyAuditCommand(): LazyCommand
+    {
+        return new LazyCommand(
+            AuditCommand::NAME,
+            [StandaloneConsoleCommandFactory::AUDIT_ALIAS],
+            AuditCommand::DESCRIPTION,
+            false,
+            fn (): Command => $this->standaloneConsoleCommandFactory->create($this->buildContainer()),
+        );
+    }
+
+    private function buildContainer(): ContainerBuilder
+    {
+        return $this->standaloneContainerFactory->create(
             $this->standaloneConfigLoader->load(),
             $this->xdgConfigPathResolver->cacheDir(),
         );
-
-        $application = new Application(self::APPLICATION_NAME);
-        $application->addCommand($this->standaloneConsoleCommandFactory->create($containerBuilder));
-
-        return $application;
     }
 }
