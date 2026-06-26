@@ -197,8 +197,8 @@ Format: `<type>[optional scope]: <description>` —
 | `perf`     | Performance improvement |
 
 Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`,
-`scan`, `deps`, `ci`, `rate-limit`. Breaking changes: `feat!:` with
-`BREAKING CHANGE:` footer.
+`standalone`, `scan`, `deps`, `ci`, `rate-limit`. Breaking changes: `feat!:`
+with `BREAKING CHANGE:` footer.
 
 ## CI Pipeline
 

@@ -95,8 +95,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   progress event per verdict from `VerdictApplier::apply()`, the single
   chokepoint shared by every review mode (sequential, concurrent, structured,
   and batched). A decorated terminal prints `⚖ ✓ validated <type> — file:line`
-  (green) and `⚖ ✗ rejected <type> — file:line` (yellow) above the bar and ticks
-  the bar suffix `reviewing i/N`; `PlainProgressReporter` appends
+  (green) and `⚖ ✗ rejected <type> — file:line` (yellow) above the bar and
+  ticks the bar suffix `reviewing i/N`; `PlainProgressReporter` appends
   `[VALIDATED]`/`[REJECTED]` lines for non-TTY output. New stable progress-event
   value `review.finding.reviewed`.
 - **LLM pricing is now sourced from the daily `symfony/models-dev` catalog

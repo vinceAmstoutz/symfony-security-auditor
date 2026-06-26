@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
-use Symfony\Component\DependencyInjection\Kernel\BundleInterface;
+use Symfony\Component\HttpKernel\Bundle\Bundle;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 
 /**
@@ -26,7 +26,7 @@ final readonly class BundleExtensionLoader
     /**
      * @param array<array-key, mixed> $config
      */
-    public function load(BundleInterface $bundle, array $config, ContainerBuilder $containerBuilder): void
+    public function load(Bundle $bundle, array $config, ContainerBuilder $containerBuilder): void
     {
         $extension = $bundle->getContainerExtension();
         if (!$extension instanceof ExtensionInterface) {
