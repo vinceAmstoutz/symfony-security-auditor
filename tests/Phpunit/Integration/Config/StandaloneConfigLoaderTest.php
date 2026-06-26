@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Config;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfiguration;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -40,37 +40,40 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     public function test_it_normalizes_the_audit_settings_and_ignores_the_platform_keys(): void
     {
-        $this->writeConfig("provider: anthropic\napi_key: sk-test\nmodel: gpt-5.4\n");
+        $this->writeConfig("provider: anthropic\nplatform:\n  anthropic:\n    api_key: sk-test\nmodel: gpt-5.4\n");
 
         self::assertSame('gpt-5.4', $this->loader()->load()->auditConfig['model']);
     }
 
     public function test_it_resolves_the_platform_connection(): void
     {
-        $this->writeConfig("provider: anthropic\napi_key: sk-test\n");
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-test\n");
 
-        self::assertSame(['anthropic' => ['api_key' => 'sk-test']], $this->loader()->load()->platform->toAiPlatformConfig());
+        self::assertSame(
+            ['platform' => ['anthropic' => ['api_key' => 'sk-test']]],
+            $this->loader()->load()->platform->toAiConfig(),
+        );
     }
 
-    public function test_it_applies_audit_defaults_when_only_a_provider_is_configured(): void
+    public function test_it_applies_audit_defaults_when_only_a_platform_is_configured(): void
     {
-        $this->writeConfig("provider: ollama\nendpoint: http://localhost:11434\n");
+        $this->writeConfig("platform:\n  ollama:\n    endpoint: http://localhost:11434\n");
 
         self::assertSame('claude-opus-4-8', $this->loader()->load()->auditConfig['model']);
     }
 
-    public function test_it_rejects_a_config_without_a_provider(): void
+    public function test_it_rejects_a_config_without_a_platform(): void
     {
         $this->writeConfig("model: gpt-5.4\n");
 
-        $this->expectException(MissingProviderException::class);
+        $this->expectException(MissingPlatformException::class);
 
         $this->loader()->load();
     }
 
     public function test_it_rejects_a_missing_config_file(): void
     {
-        $this->expectException(MissingProviderException::class);
+        $this->expectException(MissingPlatformException::class);
 
         $this->loader()->load();
     }
@@ -79,7 +82,7 @@ final class StandaloneConfigLoaderTest extends TestCase
     {
         $this->writeConfig('');
 
-        $this->expectException(MissingProviderException::class);
+        $this->expectException(MissingPlatformException::class);
 
         $this->loader()->load();
     }

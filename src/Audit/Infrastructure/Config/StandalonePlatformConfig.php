@@ -19,18 +19,18 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 final readonly class StandalonePlatformConfig
 {
     /**
-     * @param array<string, string> $options
+     * @param array<array-key, mixed> $platform the symfony/ai `ai.platform` config, env-resolved, passed through untouched
      */
     public function __construct(
-        public string $provider,
-        public array $options,
+        public array $platform,
+        public ?string $activeProvider = null,
     ) {}
 
     /**
-     * @return array<string, array<string, string>>
+     * @return array{platform: array<array-key, mixed>}
      */
-    public function toAiPlatformConfig(): array
+    public function toAiConfig(): array
     {
-        return [$this->provider => $this->options];
+        return ['platform' => $this->platform];
     }
 }

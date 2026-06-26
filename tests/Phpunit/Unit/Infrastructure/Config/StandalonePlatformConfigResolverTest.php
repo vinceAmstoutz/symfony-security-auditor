@@ -15,47 +15,76 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 
 final class StandalonePlatformConfigResolverTest extends TestCase
 {
-    public function test_it_resolves_the_provider_and_a_literal_api_key(): void
+    public function test_it_passes_the_platform_block_through_untouched(): void
     {
         $platformConfig = (new StandalonePlatformConfigResolver())
-            ->resolve(['provider' => 'anthropic', 'api_key' => 'sk-literal']);
+            ->resolve(['platform' => ['anthropic' => ['api_key' => 'sk-literal']]]);
 
-        self::assertSame(['anthropic' => ['api_key' => 'sk-literal']], $platformConfig->toAiPlatformConfig());
+        self::assertSame(['platform' => ['anthropic' => ['api_key' => 'sk-literal']]], $platformConfig->toAiConfig());
     }
 
-    public function test_it_resolves_an_env_placeholder_api_key_from_the_environment(): void
+    public function test_it_resolves_env_placeholders_anywhere_in_the_platform_block(): void
     {
         $platformConfig = (new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY' => 'sk-from-env']))
-            ->resolve(['provider' => 'anthropic', 'api_key' => '%env(ANTHROPIC_API_KEY)%']);
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]]);
 
-        self::assertSame(['anthropic' => ['api_key' => 'sk-from-env']], $platformConfig->toAiPlatformConfig());
+        self::assertSame(['platform' => ['anthropic' => ['api_key' => 'sk-from-env']]], $platformConfig->toAiConfig());
     }
 
-    public function test_it_resolves_a_keyless_endpoint_provider(): void
+    public function test_it_resolves_placeholders_in_a_nested_generic_platform(): void
+    {
+        $platformConfig = (new StandalonePlatformConfigResolver(['LLM_BASE_URL' => 'http://localhost:1234']))
+            ->resolve(['platform' => ['generic' => ['default' => ['base_url' => '%env(LLM_BASE_URL)%', 'supports_completions' => true]]]]);
+
+        self::assertSame(
+            ['platform' => ['generic' => ['default' => ['base_url' => 'http://localhost:1234', 'supports_completions' => true]]]],
+            $platformConfig->toAiConfig(),
+        );
+    }
+
+    public function test_it_carries_the_active_provider_selector(): void
+    {
+        $platformConfig = (new StandalonePlatformConfigResolver())->resolve([
+            'provider' => 'openai',
+            'platform' => ['anthropic' => ['api_key' => 'a'], 'openai' => ['api_key' => 'b']],
+        ]);
+
+        self::assertSame('openai', $platformConfig->activeProvider);
+    }
+
+    public function test_it_has_no_active_provider_when_the_selector_is_absent(): void
     {
         $platformConfig = (new StandalonePlatformConfigResolver())
-            ->resolve(['provider' => 'ollama', 'endpoint' => 'http://localhost:11434']);
+            ->resolve(['platform' => ['anthropic' => ['api_key' => 'a']]]);
 
-        self::assertSame(['ollama' => ['endpoint' => 'http://localhost:11434']], $platformConfig->toAiPlatformConfig());
+        self::assertNull($platformConfig->activeProvider);
     }
 
-    public function test_it_rejects_a_config_without_a_provider(): void
+    public function test_it_ignores_an_empty_active_provider_selector(): void
     {
-        $this->expectException(MissingProviderException::class);
+        $platformConfig = (new StandalonePlatformConfigResolver())
+            ->resolve(['provider' => '', 'platform' => ['anthropic' => ['api_key' => 'a']]]);
 
-        (new StandalonePlatformConfigResolver())->resolve(['api_key' => 'sk-literal']);
+        self::assertNull($platformConfig->activeProvider);
     }
 
-    public function test_it_rejects_an_empty_provider(): void
+    public function test_it_rejects_a_config_without_a_platform_block(): void
     {
-        $this->expectException(MissingProviderException::class);
+        $this->expectException(MissingPlatformException::class);
 
-        (new StandalonePlatformConfigResolver())->resolve(['provider' => '', 'api_key' => 'sk-literal']);
+        (new StandalonePlatformConfigResolver())->resolve(['provider' => 'anthropic']);
+    }
+
+    public function test_it_rejects_an_empty_platform_block(): void
+    {
+        $this->expectException(MissingPlatformException::class);
+
+        (new StandalonePlatformConfigResolver())->resolve(['platform' => []]);
     }
 
     public function test_it_rejects_an_env_placeholder_whose_variable_is_unset(): void
@@ -63,6 +92,6 @@ final class StandalonePlatformConfigResolverTest extends TestCase
         $this->expectException(MissingEnvironmentVariableException::class);
 
         (new StandalonePlatformConfigResolver())
-            ->resolve(['provider' => 'anthropic', 'api_key' => '%env(ANTHROPIC_API_KEY)%']);
+            ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]]);
     }
 }

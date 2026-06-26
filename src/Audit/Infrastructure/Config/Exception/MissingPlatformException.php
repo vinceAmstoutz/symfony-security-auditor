@@ -16,10 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Excep
 use RuntimeException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final class MissingProviderException extends RuntimeException
+final class MissingPlatformException extends RuntimeException
 {
     public static function create(): self
     {
-        return new self('No LLM provider configured. Set "provider" in your config.yaml (run the "init" command to create one).');
+        return new self('No LLM platform configured. Add a "platform:" block to your config.yaml (run the "init" command to create one).');
     }
 }

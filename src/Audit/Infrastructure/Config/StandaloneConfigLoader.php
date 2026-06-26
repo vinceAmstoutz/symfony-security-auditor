@@ -21,7 +21,7 @@ use Symfony\Component\Yaml\Yaml;
  */
 final readonly class StandaloneConfigLoader
 {
-    private const array PLATFORM_KEYS = ['provider', 'api_key', 'endpoint'];
+    private const array PLATFORM_KEYS = ['platform', 'provider'];
 
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,

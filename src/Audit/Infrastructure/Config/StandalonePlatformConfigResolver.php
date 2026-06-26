@@ -14,15 +14,13 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class StandalonePlatformConfigResolver
 {
-    private const array CREDENTIAL_KEYS = ['api_key', 'endpoint'];
-
     private const string ENV_PLACEHOLDER = '/^%env\(([A-Z0-9_]+)\)%$/';
 
     /**
@@ -37,20 +35,36 @@ final readonly class StandalonePlatformConfigResolver
      */
     public function resolve(array $rawConfig): StandalonePlatformConfig
     {
-        $provider = $rawConfig['provider'] ?? null;
-        if (!\is_string($provider) || '' === $provider) {
-            throw MissingProviderException::create();
+        $platform = $rawConfig['platform'] ?? null;
+        if (!\is_array($platform) || [] === $platform) {
+            throw MissingPlatformException::create();
         }
 
-        $options = [];
-        foreach (self::CREDENTIAL_KEYS as $key) {
-            $value = $rawConfig[$key] ?? null;
-            if (\is_string($value) && '' !== $value) {
-                $options[$key] = $this->resolveValue($value);
-            }
+        $activeProvider = $rawConfig['provider'] ?? null;
+
+        return new StandalonePlatformConfig(
+            $this->resolveEnvPlaceholders($platform),
+            \is_string($activeProvider) && '' !== $activeProvider ? $activeProvider : null,
+        );
+    }
+
+    /**
+     * @param array<array-key, mixed> $config
+     *
+     * @return array<array-key, mixed>
+     */
+    private function resolveEnvPlaceholders(array $config): array
+    {
+        $resolved = [];
+        foreach ($config as $key => $value) {
+            $resolved[$key] = match (true) {
+                \is_array($value) => $this->resolveEnvPlaceholders($value),
+                \is_string($value) => $this->resolveValue($value),
+                default => $value,
+            };
         }
 
-        return new StandalonePlatformConfig($provider, $options);
+        return $resolved;
     }
 
     private function resolveValue(string $value): string
