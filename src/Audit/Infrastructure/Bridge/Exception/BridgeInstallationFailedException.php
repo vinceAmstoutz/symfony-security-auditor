@@ -21,7 +21,7 @@ final class BridgeInstallationFailedException extends RuntimeException
 {
     public static function forUnavailableComposer(string $package, Throwable $throwable): self
     {
-        return new self(\sprintf('Could not run composer to install the "%s" provider bridge; is composer on the PATH?', $package), 0, $throwable);
+        return new self(\sprintf('Could not run composer to install the "%s" provider bridge; is composer on the PATH?', $package), previous: $throwable);
     }
 
     public static function forFailedProcess(string $package, string $errorOutput): self
