@@ -42,12 +42,12 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
     #[RunInSeparateProcess]
     public function test_it_wraps_the_invokable_audit_command_under_its_name_and_alias(): void
     {
-        $container = (new StandaloneContainerFactory())->create(
+        $containerBuilder = (new StandaloneContainerFactory())->create(
             new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]])),
             $this->cacheDir,
         );
 
-        $command = (new StandaloneConsoleCommandFactory())->create($container);
+        $command = (new StandaloneConsoleCommandFactory())->create($containerBuilder);
 
         self::assertSame('audit:run', $command->getName());
         self::assertContains('audit', $command->getAliases());
@@ -57,10 +57,10 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
     {
         $this->expectException(UnresolvableAuditCommandException::class);
 
-        $container = new ContainerBuilder();
-        $container->register(AuditCommand::class, stdClass::class)->setPublic(true);
-        $container->compile();
+        $containerBuilder = new ContainerBuilder();
+        $containerBuilder->register(AuditCommand::class, stdClass::class)->setPublic(true);
+        $containerBuilder->compile();
 
-        (new StandaloneConsoleCommandFactory())->create($container);
+        (new StandaloneConsoleCommandFactory())->create($containerBuilder);
     }
 }

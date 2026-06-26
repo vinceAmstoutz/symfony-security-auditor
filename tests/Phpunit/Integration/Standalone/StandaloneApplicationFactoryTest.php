@@ -61,8 +61,8 @@ final class StandaloneApplicationFactoryTest extends TestCase
             'XDG_CACHE_HOME' => $this->cacheHome,
         ])->create();
 
-        $definition = $application->find('audit:run')->getDefinition();
-        $optionNames = array_keys($definition->getOptions());
+        $inputDefinition = $application->find('audit:run')->getDefinition();
+        $optionNames = array_keys($inputDefinition->getOptions());
 
         self::assertSame([], array_diff(
             ['format', 'output', 'dry-run', 'no-cache', 'path', 'since', 'baseline', 'generate-baseline', 'fail-on'],

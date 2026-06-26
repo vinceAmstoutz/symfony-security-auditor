@@ -26,7 +26,7 @@ use Symfony\AI\Platform\Test\InMemoryPlatform;
 
 final class Factory
 {
-    public static function createPlatform(mixed ...$arguments): PlatformInterface
+    public static function createPlatform(): PlatformInterface
     {
         return new InMemoryPlatform('stub-response');
     }

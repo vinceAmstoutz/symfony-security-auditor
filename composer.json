@@ -94,13 +94,13 @@
         }
     },
     "autoload-dev": {
-        "classmap": [
-            "tests/Fixture/"
-        ],
         "psr-4": {
             "VinceAmstoutz\\SymfonySecurityAuditor\\Tests\\": "tests/Phpunit/",
             "VinceAmstoutz\\SymfonySecurityAuditor\\Tooling\\": "tools/"
-        }
+        },
+        "classmap": [
+            "tests/Fixture/"
+        ]
     },
     "config": {
         "allow-plugins": {

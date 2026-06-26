@@ -41,18 +41,18 @@ final class StandaloneContainerFactoryTest extends TestCase
     #[RunInSeparateProcess]
     public function test_it_builds_a_container_exposing_a_fully_wired_audit_command(): void
     {
-        $container = (new StandaloneContainerFactory())->create(
+        $containerBuilder = (new StandaloneContainerFactory())->create(
             new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]])),
             $this->cacheDir,
         );
 
-        self::assertInstanceOf(AuditCommand::class, $container->get(AuditCommand::class));
+        self::assertInstanceOf(AuditCommand::class, $containerBuilder->get(AuditCommand::class));
     }
 
     #[RunInSeparateProcess]
     public function test_it_aliases_the_selected_provider_when_several_are_configured(): void
     {
-        $container = (new StandaloneContainerFactory())->create(
+        $containerBuilder = (new StandaloneContainerFactory())->create(
             new StandaloneConfig(
                 [],
                 new StandalonePlatformConfig(
@@ -63,7 +63,7 @@ final class StandaloneContainerFactoryTest extends TestCase
             $this->cacheDir,
         );
 
-        self::assertInstanceOf(PlatformInterface::class, $container->get(PlatformInterface::class));
+        self::assertInstanceOf(PlatformInterface::class, $containerBuilder->get(PlatformInterface::class));
     }
 
     #[RunInSeparateProcess]
