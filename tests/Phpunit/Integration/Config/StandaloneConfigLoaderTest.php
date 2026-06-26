@@ -15,7 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Config;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
@@ -38,11 +37,11 @@ final class StandaloneConfigLoaderTest extends TestCase
         $this->filesystem->remove($this->configHome);
     }
 
-    public function test_it_normalizes_the_audit_settings_and_ignores_the_platform_keys(): void
+    public function test_it_passes_audit_settings_through_and_strips_the_platform_keys(): void
     {
         $this->writeConfig("provider: anthropic\nplatform:\n  anthropic:\n    api_key: sk-test\nmodel: gpt-5.4\n");
 
-        self::assertSame('gpt-5.4', $this->loader()->load()->auditConfig['model']);
+        self::assertSame(['model' => 'gpt-5.4'], $this->loader()->load()->auditConfig);
     }
 
     public function test_it_resolves_the_platform_connection(): void
@@ -55,11 +54,11 @@ final class StandaloneConfigLoaderTest extends TestCase
         );
     }
 
-    public function test_it_applies_audit_defaults_when_only_a_platform_is_configured(): void
+    public function test_it_leaves_the_audit_settings_empty_when_only_a_platform_is_configured(): void
     {
         $this->writeConfig("platform:\n  ollama:\n    endpoint: http://localhost:11434\n");
 
-        self::assertSame('claude-opus-4-8', $this->loader()->load()->auditConfig['model']);
+        self::assertSame([], $this->loader()->load()->auditConfig);
     }
 
     public function test_it_rejects_a_config_without_a_platform(): void
@@ -91,7 +90,6 @@ final class StandaloneConfigLoaderTest extends TestCase
     {
         return new StandaloneConfigLoader(
             new XdgConfigPathResolver($this->configHome, null, null),
-            new AuditConfiguration(),
             new StandalonePlatformConfigResolver(),
         );
     }

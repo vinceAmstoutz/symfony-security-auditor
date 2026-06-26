@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
-use Symfony\Component\Config\Definition\Processor;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -25,7 +24,6 @@ final readonly class StandaloneConfigLoader
 
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
-        private AuditConfiguration $auditConfiguration,
         private StandalonePlatformConfigResolver $standalonePlatformConfigResolver,
     ) {}
 
@@ -34,13 +32,10 @@ final readonly class StandaloneConfigLoader
         $configFile = $this->xdgConfigPathResolver->configFile();
         $rawConfig = is_file($configFile) ? $this->parse($configFile) : [];
 
-        $platform = $this->standalonePlatformConfigResolver->resolve($rawConfig);
-        $auditConfig = (new Processor())->processConfiguration(
-            $this->auditConfiguration,
-            [array_diff_key($rawConfig, array_flip(self::PLATFORM_KEYS))],
-        );
+        $standalonePlatformConfig = $this->standalonePlatformConfigResolver->resolve($rawConfig);
+        $auditConfig = array_diff_key($rawConfig, array_flip(self::PLATFORM_KEYS));
 
-        return new StandaloneConfig($auditConfig, $platform);
+        return new StandaloneConfig($auditConfig, $standalonePlatformConfig);
     }
 
     /**
