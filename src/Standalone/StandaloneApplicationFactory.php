@@ -32,6 +32,8 @@ final readonly class StandaloneApplicationFactory
 {
     private const string APPLICATION_NAME = 'symfony-security-auditor';
 
+    private const string PROJECT_CONFIG_FILENAME = '.symfony-security-auditor.yaml';
+
     public function __construct(
         private StandaloneConfigLoader $standaloneConfigLoader,
         private XdgConfigPathResolver $xdgConfigPathResolver,
@@ -47,9 +49,23 @@ final readonly class StandaloneApplicationFactory
         $xdgConfigPathResolver = self::resolverFromEnvironment($environment);
 
         return new self(
-            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver($environment)),
+            new StandaloneConfigLoader(
+                $xdgConfigPathResolver,
+                new StandalonePlatformConfigResolver($environment),
+                self::projectConfigFile($environment),
+            ),
             $xdgConfigPathResolver,
         );
+    }
+
+    /**
+     * @param array<string, string> $environment
+     */
+    public static function projectConfigFile(array $environment): ?string
+    {
+        $workingDirectory = $environment['PWD'] ?? null;
+
+        return null !== $workingDirectory ? $workingDirectory.'/'.self::PROJECT_CONFIG_FILENAME : null;
     }
 
     /**

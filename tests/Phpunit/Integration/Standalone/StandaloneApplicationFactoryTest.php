@@ -81,6 +81,19 @@ final class StandaloneApplicationFactoryTest extends TestCase
         );
     }
 
+    public function test_it_resolves_the_project_config_file_under_the_working_directory(): void
+    {
+        self::assertSame(
+            '/work/project/.symfony-security-auditor.yaml',
+            StandaloneApplicationFactory::projectConfigFile(['PWD' => '/work/project']),
+        );
+    }
+
+    public function test_it_has_no_project_config_file_without_a_working_directory(): void
+    {
+        self::assertNull(StandaloneApplicationFactory::projectConfigFile([]));
+    }
+
     #[RunInSeparateProcess]
     public function test_the_registered_audit_command_keeps_the_full_cli_option_surface(): void
     {

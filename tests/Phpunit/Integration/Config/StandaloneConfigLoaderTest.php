@@ -70,6 +70,31 @@ final class StandaloneConfigLoaderTest extends TestCase
         $this->loader()->load();
     }
 
+    public function test_a_project_config_overrides_the_user_config(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "model: project-model\n");
+
+        self::assertSame('project-model', $this->loader($projectConfigFile)->load()->auditConfig['model']);
+    }
+
+    public function test_user_config_keys_survive_when_a_project_config_omits_them(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "audit:\n  max_iterations: 1\n");
+
+        self::assertSame('user-model', $this->loader($projectConfigFile)->load()->auditConfig['model']);
+    }
+
+    public function test_a_missing_project_config_leaves_the_user_config_intact(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
+
+        self::assertSame('user-model', $this->loader($this->configHome.'/absent.yaml')->load()->auditConfig['model']);
+    }
+
     public function test_it_rejects_a_missing_config_file(): void
     {
         $this->expectException(MissingPlatformException::class);
@@ -86,11 +111,12 @@ final class StandaloneConfigLoaderTest extends TestCase
         $this->loader()->load();
     }
 
-    private function loader(): StandaloneConfigLoader
+    private function loader(?string $projectConfigFile = null): StandaloneConfigLoader
     {
         return new StandaloneConfigLoader(
             new XdgConfigPathResolver($this->configHome, null, null),
             new StandalonePlatformConfigResolver(),
+            $projectConfigFile,
         );
     }
 

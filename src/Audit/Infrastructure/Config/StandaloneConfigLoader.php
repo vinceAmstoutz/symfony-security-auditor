@@ -25,12 +25,15 @@ final readonly class StandaloneConfigLoader
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private StandalonePlatformConfigResolver $standalonePlatformConfigResolver,
+        private ?string $projectConfigFile = null,
     ) {}
 
     public function load(): StandaloneConfig
     {
-        $configFile = $this->xdgConfigPathResolver->configFile();
-        $rawConfig = is_file($configFile) ? $this->parse($configFile) : [];
+        $rawConfig = array_replace_recursive(
+            $this->read($this->xdgConfigPathResolver->configFile()),
+            $this->read($this->projectConfigFile),
+        );
 
         $standalonePlatformConfig = $this->standalonePlatformConfigResolver->resolve($rawConfig);
         $auditConfig = array_diff_key($rawConfig, array_flip(self::PLATFORM_KEYS));
@@ -41,8 +44,12 @@ final readonly class StandaloneConfigLoader
     /**
      * @return array<array-key, mixed>
      */
-    private function parse(string $configFile): array
+    private function read(?string $configFile): array
     {
+        if (null === $configFile || !is_file($configFile)) {
+            return [];
+        }
+
         $parsed = Yaml::parseFile($configFile);
 
         return \is_array($parsed) ? $parsed : [];

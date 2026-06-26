@@ -433,6 +433,25 @@ model: claude-opus-4-8
 # scan:, audit:, cache: are all accepted here too, unwrapped.
 ```
 
+### Per-project overrides
+
+A `.symfony-security-auditor.yaml` in the working directory (`$PWD`) is layered
+**over** the user config, with the project values winning. This lets a
+repository pin its own audit settings (chunking strategy, `fail_on`, excluded
+paths, …) while the API credentials stay in the shared user config. The
+effective precedence, highest first, is:
+
+1. CLI options (`--fail-on`, `--format`, …)
+2. The per-project `.symfony-security-auditor.yaml`
+3. The user-level `config.yaml`
+4. Built-in defaults
+
+> Scalars and mappings deep-merge; if you set the same **list** key (e.g.
+> `scan.included_paths`) in both files, keep it in one place to avoid surprising
+> index-wise merges.
+
+### Switching providers
+
 `%env(VAR)%` placeholders in the `platform:` block are resolved from the
 environment, so secrets never live in the file. To switch providers, configure
 several platforms and change `provider:` (run `init` again to fetch the other

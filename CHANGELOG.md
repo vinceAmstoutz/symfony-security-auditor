@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`$XDG_DATA_HOME/symfony-security-auditor`, falling back to
   `~/.local/share/…`) via `composer require`; the executable itself ships no
   provider bridges, and the same pick-and-fetch path applies to every provider.
+  A per-project `.symfony-security-auditor.yaml` in the working directory
+  (`$PWD`) is layered over the user config, the project values winning, so a
+  repo can pin its own audit settings while sharing the user-level credentials.
   New internal composition root under `src/Standalone/`
   (`StandaloneApplicationFactory`, `StandaloneContainerFactory`,
   `StandaloneConsoleCommandFactory`, `BundleExtensionLoader`), the `init`
