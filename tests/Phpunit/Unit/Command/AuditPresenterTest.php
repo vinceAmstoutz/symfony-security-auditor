@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
@@ -257,6 +258,50 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('claude-opus-4-7', $display);
         self::assertStringContainsString('1,000', $display);
         self::assertStringContainsString('0.0123', $display);
+    }
+
+    public function test_scanned_files_lists_each_file_grouped_by_type(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+            ProjectFile::create('config/packages/security.yaml', '/p/config/packages/security.yaml', 'security:'),
+        ]);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('Scanned files (2)', $flattened);
+        self::assertStringContainsString('controller (1)', $flattened);
+        self::assertStringContainsString('src/Controller/HomeController.php', $flattened);
+        self::assertStringContainsString('config (1)', $flattened);
+        self::assertStringContainsString('config/packages/security.yaml', $flattened);
+        self::assertStringContainsString('2 file(s) in scope.', $flattened);
+    }
+
+    public function test_scanned_files_warns_when_nothing_matched(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, []);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('No files matched.', $flattened);
+        self::assertStringContainsString('included_paths', $flattened);
+        self::assertStringNotContainsString('file(s) in scope', $flattened);
+    }
+
+    public function test_scanned_files_hint_points_to_the_flag_with_the_file_count(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFilesHint($symfonyStyle, 7);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('--show-scanned', $display);
+        self::assertStringContainsString('7 file(s)', $display);
     }
 
     public function test_unsupported_model_warning_names_every_unsupported_model(): void

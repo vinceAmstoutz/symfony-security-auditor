@@ -37,6 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditS
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
@@ -46,7 +47,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\StaticPricingProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
@@ -56,8 +57,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 
 final class AuditCommandEndToEndTest extends TestCase
 {
@@ -138,6 +141,28 @@ final class AuditCommandEndToEndTest extends TestCase
         $commandTester->execute(['project-path' => $this->fixtureDir]);
 
         self::assertStringNotContainsString('Secret scrubbing is disabled', $commandTester->getDisplay());
+    }
+
+    public function test_command_fails_closed_when_a_cost_budget_is_set_but_the_model_is_unpriced(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}', ['maxCostUsd' => 10.0]);
+        $commandTester->execute(['project-path' => $this->fixtureDir], ['interactive' => false]);
+
+        self::assertSame(ExitCode::BudgetAborted->value, $commandTester->getStatusCode());
+        self::assertStringContainsString('non-interactive', $commandTester->getDisplay());
+    }
+
+    public function test_command_warns_on_a_real_run_when_a_configured_model_is_unpriced(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute(['project-path' => $this->fixtureDir]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertStringContainsString('No published pricing', $commandTester->getDisplay());
     }
 
     public function test_command_still_emits_scrubbing_warning_for_machine_readable_output_on_stderr(): void
@@ -617,7 +642,7 @@ final class AuditCommandEndToEndTest extends TestCase
     }
 
     /**
-     * @param array{secretScrubbingEnabled?: bool, configuredBaseline?: string|null, riskLevel?: RiskLevel, excludedTypes?: list<string>, includedTypes?: list<string>} $overrides
+     * @param array{secretScrubbingEnabled?: bool, configuredBaseline?: string|null, riskLevel?: RiskLevel, excludedTypes?: list<string>, includedTypes?: list<string>, maxCostUsd?: float|null} $overrides
      */
     private function makeCommandTester(string $attackerResponse, string $reviewerResponse, array $overrides = []): CommandTester
     {
@@ -635,7 +660,7 @@ final class AuditCommandEndToEndTest extends TestCase
     }
 
     /**
-     * @param array{secretScrubbingEnabled?: bool, configuredBaseline?: string|null, riskLevel?: RiskLevel, excludedTypes?: list<string>, includedTypes?: list<string>} $overrides
+     * @param array{secretScrubbingEnabled?: bool, configuredBaseline?: string|null, riskLevel?: RiskLevel, excludedTypes?: list<string>, includedTypes?: list<string>, maxCostUsd?: float|null} $overrides
      */
     private function makeCommandTesterWithLLM(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, array $overrides = []): CommandTester
     {
@@ -644,6 +669,7 @@ final class AuditCommandEndToEndTest extends TestCase
         $riskLevel = $overrides['riskLevel'] ?? RiskLevel::Critical;
         $excludedTypes = $overrides['excludedTypes'] ?? [];
         $includedTypes = $overrides['includedTypes'] ?? [];
+        $maxCostUsd = $overrides['maxCostUsd'] ?? null;
 
         $progressReporterHolder = new ProgressReporterHolder(new NullLogger());
         $auditOrchestrator = new AuditOrchestrator(
@@ -680,7 +706,7 @@ final class AuditCommandEndToEndTest extends TestCase
         $estimateAuditCostUseCase = new EstimateAuditCostUseCase(
             $projectFileScanner,
             new ResolvingTokenEstimator(),
-            new CostCalculator(new StaticPricingProvider(new NullLogger())),
+            new CostCalculator(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json')),
             new NullLogger(),
             'stub',
             1,
@@ -689,10 +715,16 @@ final class AuditCommandEndToEndTest extends TestCase
             new RunAuditUseCase($auditPipeline, new NullLogger()),
             new ReportWriter(new ReportRenderer(), new Filesystem()),
             new AuditExitCodeResolver(),
-            new AuditPresenter(new StaticPricingProvider(new NullLogger())),
+            new AuditPresenter(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json')),
             $estimateAuditCostUseCase,
+            new ListScannedFilesUseCase($projectFileScanner),
             $progressReporterHolder,
             new BaselineProcessor(new Baseline(), $configuredBaseline),
+            new UnpricedModelBudgetGuard(
+                new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json'),
+                ['stub'],
+                $maxCostUsd,
+            ),
             secretScrubbingEnabled: $secretScrubbingEnabled,
             findingTypeFilter: new FindingTypeFilter($includedTypes, $excludedTypes),
             riskLevel: $riskLevel,
@@ -948,6 +980,113 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertGreaterThan(0, $cost['input_tokens']);
         self::assertGreaterThan(0, $cost['output_tokens']);
         self::assertSame('stub', $cost['primary_model']);
+    }
+
+    public function test_show_scanned_lists_files_and_exits_success_without_invoking_llm(): void
+    {
+        $this->createProjectDir();
+
+        $llmClient = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($llmClient, $llmClient);
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--show-scanned' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $display = $commandTester->getDisplay();
+        self::assertStringContainsString('Scanned files', $display);
+        self::assertStringContainsString('HomeController.php', $display);
+        self::assertStringContainsString('file(s) in scope', $display);
+        self::assertStringNotContainsString('Running audit pipeline', $display);
+    }
+
+    public function test_show_scanned_honors_the_path_filter(): void
+    {
+        $this->createProjectDir();
+
+        $llmClient = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($llmClient, $llmClient);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--show-scanned' => true,
+            '--path' => ['nonexistent'],
+        ]);
+
+        self::assertStringContainsString('No files matched', $commandTester->getDisplay());
+    }
+
+    public function test_show_scanned_with_dry_run_lists_files_before_the_cost_estimate(): void
+    {
+        $this->createProjectDir();
+
+        $llmClient = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($llmClient, $llmClient);
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--show-scanned' => true,
+            '--dry-run' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        $display = $commandTester->getDisplay();
+        $scannedPosition = mb_strpos($display, 'file(s) in scope');
+        $dryRunPosition = mb_strpos($display, 'Dry run complete');
+        self::assertIsInt($scannedPosition);
+        self::assertIsInt($dryRunPosition);
+        self::assertLessThan($dryRunPosition, $scannedPosition);
+    }
+
+    public function test_show_scanned_with_dry_run_omits_the_show_scanned_tip(): void
+    {
+        $this->createProjectDir();
+
+        $llmClient = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($llmClient, $llmClient);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--show-scanned' => true,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringNotContainsString('Tip: run with --show-scanned', $commandTester->getDisplay());
+    }
+
+    public function test_dry_run_alone_emits_the_show_scanned_tip(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringContainsString('Tip: run with --show-scanned', $commandTester->getDisplay());
+    }
+
+    private function throwingLLMClient(): LLMClientInterface
+    {
+        return new class implements LLMClientInterface {
+            public function complete(string $systemPrompt, string $userMessage): LLMResponse
+            {
+                throw new RuntimeException('the LLM platform must not be invoked for --show-scanned');
+            }
+
+            public function completeWithTools(
+                string $systemPrompt,
+                string $userMessage,
+                ToolRegistry $toolRegistry,
+                int $maxToolIterations,
+            ): LLMResponse {
+                throw new RuntimeException('the LLM platform must not be invoked for --show-scanned');
+            }
+
+            public function model(): string
+            {
+                return 'stub';
+            }
+        };
     }
 
     private function rmdirRecursive(string $dir): void

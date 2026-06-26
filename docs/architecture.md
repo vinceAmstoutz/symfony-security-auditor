@@ -94,7 +94,7 @@ src/
 │       │                  FilesystemReviewerCache, NullReviewerCache
 │       ├── Advisory/    # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase,
 │       │                  SymfonyProcessComposerAuditRunner + Exception/*
-│       ├── Pricing/     # StaticPricingProvider
+│       ├── Pricing/     # ModelsDevPricingProvider (symfony/models-dev catalog), ModelPrice
 │       ├── Progress/    # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY),
 │       │                  LoggerProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
 │       ├── Tool/        # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool,
@@ -798,5 +798,7 @@ your own implementation tagged `symfony_security_auditor.token_estimator` to add
 a provider, or alias `TokenEstimatorInterface` to replace the whole strategy.
 
 **Replace pricing provider** — implement
-`Audit\Domain\Port\PricingProviderInterface` to supply custom per-token prices.
-Default: `StaticPricingProvider` (hardcoded table).
+`Audit\Domain\Port\PricingProviderInterface` (or
+`CacheAwarePricingProviderInterface` to also supply real prompt-cache rates) to
+supply custom per-token prices. Default: `ModelsDevPricingProvider`, which reads
+the daily `symfony/models-dev` catalog snapshot from `vendor/` (no network).

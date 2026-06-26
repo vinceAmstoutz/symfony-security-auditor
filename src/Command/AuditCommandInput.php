@@ -42,6 +42,9 @@ final class AuditCommandInput
     #[Option(description: 'Estimate token usage and cost without invoking the LLM; emits a report with zero vulnerabilities and an estimated cost block.')]
     public bool $dryRun = false;
 
+    #[Option(description: 'List the files that would be audited (after applying included_paths and any --path filters) and exit, without invoking the LLM. Use it to confirm your scan scope. Combine with --dry-run to also print the cost estimate.', name: 'show-scanned')]
+    public bool $showScanned = false;
+
     #[Option(description: 'Bypass the attacker and reviewer caches for this run: skip cache reads so every chunk and verdict hits the LLM, and skip cache writes so existing entries stay untouched. Useful after upgrading the auditor or when you need to force a fresh analysis.', name: 'no-cache')]
     public bool $noCache = false;
 

@@ -19,8 +19,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 
 final class BudgetTrackerTest extends TestCase
 {
@@ -150,18 +150,18 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->assertWithinBudget();
     }
 
-    public function test_cache_read_tokens_contribute_to_cost_at_one_tenth_input_price(): void
+    public function test_cache_read_tokens_contribute_to_cost_at_the_cache_read_rate(): void
     {
-        $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0);
+        $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), cacheReadPrice: 1.0);
 
         $budgetTracker->recordCall(LLMResponse::of('x', 'claude-opus-4-7', 'end_turn', TokenUsageSnapshot::of(0, 0, 1_000_000, 0)));
 
         self::assertSame(1.0, $budgetTracker->costUsdUsed());
     }
 
-    public function test_cache_creation_tokens_contribute_to_cost_at_one_and_a_quarter_input_price(): void
+    public function test_cache_creation_tokens_contribute_to_cost_at_the_cache_creation_rate(): void
     {
-        $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0);
+        $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), cacheCreationPrice: 12.5);
 
         $budgetTracker->recordCall(LLMResponse::of('x', 'claude-opus-4-7', 'end_turn', TokenUsageSnapshot::of(0, 0, 0, 1_000_000)));
 
@@ -172,11 +172,15 @@ final class BudgetTrackerTest extends TestCase
         AuditBudget $auditBudget,
         float $inputPrice = 0.0,
         float $outputPrice = 0.0,
+        float $cacheReadPrice = 0.0,
+        float $cacheCreationPrice = 0.0,
     ): BudgetTracker {
-        $pricingProvider = new class($inputPrice, $outputPrice) implements PricingProviderInterface {
+        $pricingProvider = new class($inputPrice, $outputPrice, $cacheReadPrice, $cacheCreationPrice) implements CacheAwarePricingProviderInterface {
             public function __construct(
                 private readonly float $inputPrice,
                 private readonly float $outputPrice,
+                private readonly float $cacheReadPrice,
+                private readonly float $cacheCreationPrice,
             ) {}
 
             public function pricePerMillionInputTokens(string $model): float
@@ -187,6 +191,16 @@ final class BudgetTrackerTest extends TestCase
             public function pricePerMillionOutputTokens(string $model): float
             {
                 return $this->outputPrice;
+            }
+
+            public function cacheReadPricePerMillionTokens(string $model): float
+            {
+                return $this->cacheReadPrice;
+            }
+
+            public function cacheCreationPricePerMillionTokens(string $model): float
+            {
+                return $this->cacheCreationPrice;
             }
 
             public function hasModel(string $model): bool

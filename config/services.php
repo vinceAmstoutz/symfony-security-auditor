@@ -43,6 +43,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\Mappin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\PoCSynthesisStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
@@ -96,7 +97,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ProviderTokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\StaticPricingProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
@@ -123,6 +124,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
@@ -146,9 +149,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(TokenUsageRecorder::class);
 
-    $defaultsConfigurator->set(StaticPricingProvider::class)
+    $defaultsConfigurator->set(ModelsDevPricingProvider::class)
         ->args([service('logger')]);
-    $defaultsConfigurator->alias(PricingProviderInterface::class, StaticPricingProvider::class);
+    $defaultsConfigurator->alias(PricingProviderInterface::class, ModelsDevPricingProvider::class);
 
     $defaultsConfigurator->set(CostCalculator::class)
         ->args([service(PricingProviderInterface::class)]);
@@ -456,6 +459,11 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.reviewer_model'),
         ]);
 
+    $defaultsConfigurator->set(ListScannedFilesUseCase::class)
+        ->args([
+            service(ProjectFileScannerInterface::class),
+        ]);
+
     $defaultsConfigurator->set(RunAuditUseCase::class)
         ->args([
             service(PipelineInterface::class),
@@ -465,6 +473,17 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.attacker_model'),
         ]);
 
+    $defaultsConfigurator->set(UnpricedModelBudgetGuard::class)
+        ->args([
+            service(PricingProviderInterface::class),
+            [
+                param('symfony_security_auditor.attacker_model'),
+                param('symfony_security_auditor.reviewer_model'),
+            ],
+            param('symfony_security_auditor.audit.budget.max_cost_usd'),
+        ]);
+    $defaultsConfigurator->alias(UnpricedModelBudgetGuardInterface::class, UnpricedModelBudgetGuard::class);
+
     $defaultsConfigurator->set(AuditCommand::class)
         ->args([
             service(RunAuditUseCase::class),
@@ -472,8 +491,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(AuditExitCodeResolverInterface::class),
             service(AuditPresenterInterface::class),
             service(EstimateAuditCostUseCase::class),
+            service(ListScannedFilesUseCase::class),
             service(ProgressReporterHolder::class),
             service(BaselineProcessorInterface::class),
+            service(UnpricedModelBudgetGuardInterface::class),
             param('symfony_security_auditor.scan.secret_scrubbing.enabled'),
             service(FindingTypeFilterInterface::class),
             param('symfony_security_auditor.config_notices'),

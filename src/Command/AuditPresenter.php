@@ -19,6 +19,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
@@ -130,6 +131,47 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
         $symfonyStyle->note('Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.');
         $symfonyStyle->success('Dry run complete.');
+    }
+
+    public function scannedFiles(SymfonyStyle $symfonyStyle, array $projectFiles): void
+    {
+        if ([] === $projectFiles) {
+            $symfonyStyle->warning('No files matched. Check your included_paths configuration and any --path filters.');
+
+            return;
+        }
+
+        $symfonyStyle->section(\sprintf('Scanned files (%d)', \count($projectFiles)));
+
+        foreach ($this->relativePathsByType($projectFiles) as $type => $relativePaths) {
+            $symfonyStyle->writeln(\sprintf(' <info>%s</info> (%d)', $type, \count($relativePaths)));
+            $symfonyStyle->listing($relativePaths);
+        }
+
+        $symfonyStyle->success(\sprintf('%d file(s) in scope.', \count($projectFiles)));
+    }
+
+    public function scannedFilesHint(SymfonyStyle $symfonyStyle, int $fileCount): void
+    {
+        $symfonyStyle->writeln(\sprintf(
+            ' <fg=gray>Tip: run with --show-scanned to list the %d file(s) that would be audited.</>',
+            $fileCount,
+        ));
+    }
+
+    /**
+     * @param list<ProjectFile> $projectFiles
+     *
+     * @return array<string, list<string>>
+     */
+    private function relativePathsByType(array $projectFiles): array
+    {
+        $byType = [];
+        foreach ($projectFiles as $projectFile) {
+            $byType[$projectFile->type()][] = $projectFile->relativePath();
+        }
+
+        return $byType;
     }
 
     public function error(SymfonyStyle $symfonyStyle, Throwable $throwable): void

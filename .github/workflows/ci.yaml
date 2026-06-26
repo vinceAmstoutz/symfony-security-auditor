@@ -24,7 +24,7 @@ jobs:
           node-version: '24'
 
       - name: Run Prettier check MD files
-        run: npx --yes prettier@3 --check "**/*.md"
+        run: npx --yes prettier@3.6.2 --check "**/*.md"
 
   markdown-lint:
     name: Markdown Lint
