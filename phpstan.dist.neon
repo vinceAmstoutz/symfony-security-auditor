@@ -14,6 +14,8 @@ parameters:
     reportAnyTypeWideningInVarTag: true
     reportAlwaysTrueInLastCondition: true
     reportPossiblyNonexistentConstantArrayOffset: true
+    featureToggles:
+        checkPrintfParameterTypes: true
     exceptions:
         check:
             missingCheckedExceptionInThrows: true
