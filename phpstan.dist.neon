@@ -4,10 +4,14 @@ includes:
 parameters:
     level: max
     checkTooWideReturnTypesInProtectedAndPublicMethods: true
+    checkTooWideParameterOutInProtectedAndPublicMethods: true
+    checkTooWideThrowTypesInProtectedAndPublicMethods: true
     checkUninitializedProperties: true
     checkImplicitMixed: true
     checkBenevolentUnionTypes: true
     checkMissingOverrideMethodAttribute: true
+    reportAnyTypeWideningInVarTag: true
+    reportAlwaysTrueInLastCondition: true
     exceptions:
         check:
             missingCheckedExceptionInThrows: true
