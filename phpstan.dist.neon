@@ -3,6 +3,13 @@ includes:
 
 parameters:
     level: max
+    checkTooWideReturnTypesInProtectedAndPublicMethods: true
+    checkUninitializedProperties: true
+    checkImplicitMixed: true
+    checkBenevolentUnionTypes: true
+    exceptions:
+        check:
+            tooWideThrowType: true
     paths:
         - bin/
         - config/

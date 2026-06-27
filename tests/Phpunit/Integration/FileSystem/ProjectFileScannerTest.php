@@ -527,7 +527,12 @@ final class ProjectFileScannerTest extends TestCase
             return;
         }
 
-        foreach (scandir($dir) as $item) {
+        $items = scandir($dir);
+        if (false === $items) {
+            return;
+        }
+
+        foreach ($items as $item) {
             if ('.' === $item) {
                 continue;
             }
