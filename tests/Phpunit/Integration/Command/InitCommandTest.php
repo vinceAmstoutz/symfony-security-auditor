@@ -18,6 +18,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
@@ -165,6 +166,7 @@ final class InitCommandTest extends TestCase
     {
         $initCommand = new InitCommand(
             new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome),
+            new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             $this->recordingBridgeInstaller,
         );

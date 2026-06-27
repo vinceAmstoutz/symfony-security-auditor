@@ -18,6 +18,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 
@@ -33,6 +34,7 @@ final readonly class InitCommand
 
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
+        private StandaloneConfigFactoryInterface $standaloneConfigFactory,
         private StandaloneConfigWriterInterface $standaloneConfigWriter,
         private BridgeInstallerInterface $bridgeInstaller,
         private Filesystem $filesystem = new Filesystem(),
@@ -41,7 +43,8 @@ final readonly class InitCommand
     public function __invoke(SymfonyStyle $symfonyStyle): int
     {
         $configFile = $this->xdgConfigPathResolver->configFile();
-        if ($this->filesystem->exists($configFile) && !$symfonyStyle->confirm(\sprintf('A configuration already exists at %s. Overwrite it?', $configFile), false)) {
+
+        if ($this->isOverwriteDeclined($symfonyStyle, $configFile)) {
             $symfonyStyle->warning('Aborted; the existing configuration was left untouched.');
 
             return Command::SUCCESS;
@@ -51,17 +54,18 @@ final readonly class InitCommand
         $model = $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8');
         $environmentVariable = $this->ask($symfonyStyle, 'Which environment variable holds the API key?', u($provider)->upper().'_API_KEY');
 
-        $this->standaloneConfigWriter->write($configFile, [
-            'provider' => $provider,
-            'platform' => [$provider => ['api_key' => \sprintf('%%env(%s)%%', $environmentVariable)]],
-            'model' => $model,
-        ]);
-
+        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $environmentVariable));
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
 
         $symfonyStyle->success(\sprintf('Configuration written to %s. Export %s, then run "audit <path>".', $configFile, $environmentVariable));
 
         return Command::SUCCESS;
+    }
+
+    private function isOverwriteDeclined(SymfonyStyle $symfonyStyle, string $configFile): bool
+    {
+        return $this->filesystem->exists($configFile)
+            && !$symfonyStyle->confirm(\sprintf('A configuration already exists at %s. Overwrite it?', $configFile), false);
     }
 
     private function ask(SymfonyStyle $symfonyStyle, string $question, string $default): string
