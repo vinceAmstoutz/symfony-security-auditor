@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Budget;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
@@ -24,6 +25,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 
 final class BudgetTrackerTest extends TestCase
 {
+    /**
+     * @throws BudgetExceededException
+     */
     public function test_unlimited_budget_never_throws(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited());
@@ -34,6 +38,9 @@ final class BudgetTrackerTest extends TestCase
         self::expectNotToPerformAssertions();
     }
 
+    /**
+     * @throws BudgetExceededException
+     */
     public function test_token_budget_passes_at_cap(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forTokens(150));
@@ -44,6 +51,9 @@ final class BudgetTrackerTest extends TestCase
         self::assertSame(150, $budgetTracker->tokensUsed());
     }
 
+    /**
+     * @throws BudgetExceededException
+     */
     public function test_token_budget_exceeded_throws(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forTokens(100));
@@ -56,6 +66,9 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->assertWithinBudget();
     }
 
+    /**
+     * @throws BudgetExceededException
+     */
     public function test_cost_budget_exceeded_throws(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forCost(0.01), inputPrice: 100.0, outputPrice: 100.0);
@@ -68,6 +81,9 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->assertWithinBudget();
     }
 
+    /**
+     * @throws BudgetExceededException
+     */
     public function test_for_both_enforces_whichever_cap_is_hit_first(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forBoth(maxTokens: 1_000_000, maxCostUsd: 0.001), inputPrice: 100.0, outputPrice: 0.0);
@@ -80,6 +96,9 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->assertWithinBudget();
     }
 
+    /**
+     * @throws BudgetExceededException
+     */
     public function test_multiple_record_calls_accumulate(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forTokens(500));
@@ -113,6 +132,9 @@ final class BudgetTrackerTest extends TestCase
         self::assertSame(15.0, $budgetTracker->costUsdUsed());
     }
 
+    /**
+     * @throws BudgetExceededException
+     */
     public function test_cost_budget_passes_at_exact_cap_and_aborts_above(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forCost(5.0), inputPrice: 10.0);
@@ -136,6 +158,9 @@ final class BudgetTrackerTest extends TestCase
         self::assertSame(0.000001, $budgetTracker->costUsdUsed());
     }
 
+    /**
+     * @throws BudgetExceededException
+     */
     public function test_at_cap_call_completes_next_call_aborts(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::forTokens(100));
@@ -183,26 +208,31 @@ final class BudgetTrackerTest extends TestCase
                 private readonly float $cacheCreationPrice,
             ) {}
 
+            #[Override]
             public function pricePerMillionInputTokens(string $model): float
             {
                 return $this->inputPrice;
             }
 
+            #[Override]
             public function pricePerMillionOutputTokens(string $model): float
             {
                 return $this->outputPrice;
             }
 
+            #[Override]
             public function cacheReadPricePerMillionTokens(string $model): float
             {
                 return $this->cacheReadPrice;
             }
 
+            #[Override]
             public function cacheCreationPricePerMillionTokens(string $model): float
             {
                 return $this->cacheCreationPrice;
             }
 
+            #[Override]
             public function hasModel(string $model): bool
             {
                 return true;

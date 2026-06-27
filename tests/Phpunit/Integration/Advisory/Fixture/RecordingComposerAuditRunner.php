@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Advisory\Fixture;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 
 /**
@@ -27,6 +28,7 @@ final class RecordingComposerAuditRunner implements ComposerAuditRunnerInterface
 
     public function __construct(public string $payload) {}
 
+    #[Override]
     public function run(string $projectPath): string
     {
         ++$this->callCount;

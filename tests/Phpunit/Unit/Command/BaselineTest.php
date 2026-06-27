@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
@@ -24,6 +25,7 @@ final class BaselineTest extends TestCase
 
     private string $tmpDir;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->filesystem = new Filesystem();
@@ -31,16 +33,23 @@ final class BaselineTest extends TestCase
         $this->filesystem->mkdir($this->tmpDir);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $this->filesystem->remove($this->tmpDir);
     }
 
+    /**
+     * @throws MalformedBaselineFileException
+     */
     public function test_load_returns_empty_list_for_a_missing_file(): void
     {
         self::assertSame([], (new Baseline($this->filesystem))->load($this->tmpDir.'/absent.json'));
     }
 
+    /**
+     * @throws MalformedBaselineFileException
+     */
     public function test_save_then_load_round_trips_the_fingerprints(): void
     {
         $path = $this->tmpDir.'/baseline.json';
@@ -65,6 +74,9 @@ final class BaselineTest extends TestCase
         self::assertStringEndsWith(']'.\PHP_EOL, $contents);
     }
 
+    /**
+     * @throws MalformedBaselineFileException
+     */
     public function test_load_throws_when_the_file_is_not_valid_json(): void
     {
         $path = $this->tmpDir.'/broken.json';
@@ -75,6 +87,9 @@ final class BaselineTest extends TestCase
         (new Baseline($this->filesystem))->load($path);
     }
 
+    /**
+     * @throws MalformedBaselineFileException
+     */
     public function test_load_throws_when_the_json_is_a_bare_scalar(): void
     {
         $path = $this->tmpDir.'/scalar.json';
@@ -85,6 +100,9 @@ final class BaselineTest extends TestCase
         (new Baseline($this->filesystem))->load($path);
     }
 
+    /**
+     * @throws MalformedBaselineFileException
+     */
     public function test_load_throws_when_the_json_is_an_object_of_non_string_entries(): void
     {
         $path = $this->tmpDir.'/object.json';
@@ -95,6 +113,9 @@ final class BaselineTest extends TestCase
         (new Baseline($this->filesystem))->load($path);
     }
 
+    /**
+     * @throws MalformedBaselineFileException
+     */
     public function test_load_throws_when_an_entry_is_not_a_string(): void
     {
         $path = $this->tmpDir.'/mixed.json';

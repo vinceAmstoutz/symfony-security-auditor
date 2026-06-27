@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
 
 use JsonException;
+use Override;
 use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
@@ -48,6 +49,7 @@ final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseIn
         $this->entriesByPackage = $this->load($composerAuditRunner, $projectPath, $logger);
     }
 
+    #[Override]
     public function lookup(string $packageName, string $installedVersion): array
     {
         return $this->entriesByPackage[$packageName] ?? [];
@@ -91,6 +93,8 @@ final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseIn
 
     /**
      * @return array<string, list<array{cve: ?string, title: string, summary: string, affected_versions: string, link: ?string}>>
+     *
+     * @throws MalformedAdvisoryPayloadException
      */
     private function parse(string $json): array
     {

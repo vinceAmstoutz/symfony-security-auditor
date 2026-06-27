@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Cache;
 
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -24,11 +26,19 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewer
 
 final class NullReviewerCacheTest extends TestCase
 {
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_always_misses(): void
     {
         self::assertNull((new NullReviewerCache())->get($this->makeVulnerability(), 'code'));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_misses_even_after_store(): void
     {
         $nullReviewerCache = new NullReviewerCache();
@@ -39,6 +49,10 @@ final class NullReviewerCacheTest extends TestCase
         self::assertNull($nullReviewerCache->get($vulnerability, 'code'));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function makeVulnerability(): Vulnerability
     {
         return Vulnerability::of(

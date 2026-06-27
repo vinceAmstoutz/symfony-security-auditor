@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 
@@ -24,10 +25,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterfac
  */
 final readonly class NullReviewerCache implements ReviewerCacheInterface
 {
+    #[Override]
     public function get(Vulnerability $vulnerability, string $codeContext): ?array
     {
         return null;
     }
 
+    #[Override]
     public function store(Vulnerability $vulnerability, string $codeContext, array $review): void {}
 }

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -32,6 +33,7 @@ final class RecordingLLMClient implements LLMClientInterface
         private readonly string $responseContent = '[]',
     ) {}
 
+    #[Override]
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
     {
         $this->capturedUserMessages[] = $userMessage;
@@ -39,6 +41,7 @@ final class RecordingLLMClient implements LLMClientInterface
         return $this->response();
     }
 
+    #[Override]
     public function completeWithTools(
         string $systemPrompt,
         string $userMessage,
@@ -50,6 +53,7 @@ final class RecordingLLMClient implements LLMClientInterface
         return $this->response();
     }
 
+    #[Override]
     public function model(): string
     {
         return 'claude';

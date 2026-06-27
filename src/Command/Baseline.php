@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use JsonException;
+use Override;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 
@@ -28,6 +29,10 @@ final readonly class Baseline implements BaselineInterface
         private Filesystem $filesystem = new Filesystem(),
     ) {}
 
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    #[Override]
     public function load(string $path): array
     {
         if (!$this->filesystem->exists($path)) {
@@ -56,6 +61,7 @@ final readonly class Baseline implements BaselineInterface
         return $fingerprints;
     }
 
+    #[Override]
     public function save(string $path, array $fingerprints): void
     {
         $this->filesystem->dumpFile(

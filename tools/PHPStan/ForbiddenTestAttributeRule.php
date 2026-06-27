@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan;
 
+use Override;
 use PhpParser\Node;
 use PhpParser\Node\Attribute;
 use PhpParser\Node\Expr\MethodCall;
@@ -58,6 +59,7 @@ final readonly class ForbiddenTestAttributeRule implements Rule
         'WithoutErrorHandler' => 'keep the error handler so failOnWarning/failOnNotice still apply',
     ];
 
+    #[Override]
     public function getNodeType(): string
     {
         return ClassMethod::class;
@@ -68,6 +70,7 @@ final readonly class ForbiddenTestAttributeRule implements Rule
      *
      * @throws ShouldNotHappenException
      */
+    #[Override]
     public function processNode(Node $node, Scope $scope): array
     {
         $errors = [];

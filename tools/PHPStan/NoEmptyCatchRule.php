@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan;
 
+use Override;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\Catch_;
 use PhpParser\Node\Stmt\Nop;
@@ -27,6 +28,7 @@ use PHPStan\ShouldNotHappenException;
  */
 final readonly class NoEmptyCatchRule implements Rule
 {
+    #[Override]
     public function getNodeType(): string
     {
         return Catch_::class;
@@ -37,6 +39,7 @@ final readonly class NoEmptyCatchRule implements Rule
      *
      * @throws ShouldNotHappenException
      */
+    #[Override]
     public function processNode(Node $node, Scope $scope): array
     {
         $meaningfulStatements = array_filter($node->stmts, static fn (Node $statement): bool => !$statement instanceof Nop);

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\UseCase;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -49,6 +50,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 {
     private string $tmpDir;
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_execute_report_contains_correct_project_path(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
@@ -59,6 +63,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         self::assertSame($this->tmpDir, $auditReport->projectPath());
     }
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_execute_report_files_scanned_matches_real_file_count(): void
     {
         mkdir($this->tmpDir.'/src/Controller', 0o777, true);
@@ -72,6 +79,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         self::assertSame(2, $auditReport->filesScanned());
     }
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_execute_returns_safe_report_when_no_vulnerabilities_found(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
@@ -83,6 +93,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         self::assertSame(0, $auditReport->totalVulnerabilities());
     }
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_execute_report_contains_vulnerability_found_by_stub_llm(): void
     {
         mkdir($this->tmpDir.'/src/Controller', 0o777, true);
@@ -100,6 +113,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         self::assertSame('Missing access control on admin route', $auditReport->vulnerabilities()[0]->title());
     }
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_execute_attaches_token_and_cost_telemetry_to_report(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
@@ -116,6 +132,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         self::assertGreaterThan(0.0, $auditReport->cost()->estimatedCostUsd());
     }
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_execute_includes_cache_tokens_in_the_reported_cost(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
@@ -154,6 +173,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         }
     }
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_execute_attaches_zero_cost_when_recorder_set_but_calculator_omitted(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
@@ -209,6 +231,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         self::assertSame(0.0, $auditReport->cost()->estimatedCostUsd());
     }
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_execute_propagates_reviewer_budget_exception_as_audit_aborted(): void
     {
         mkdir($this->tmpDir.'/src/Controller', 0o777, true);
@@ -233,6 +258,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         $runAuditUseCase->execute($this->tmpDir);
     }
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_execute_propagates_reviewer_batch_budget_exception(): void
     {
         mkdir($this->tmpDir.'/src/Controller', 0o777, true);
@@ -326,6 +354,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         self::assertArrayHasKey('error', $abortLogs[0][1]);
     }
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_execute_report_audit_id_is_non_empty(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
@@ -337,12 +368,14 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         self::assertStringStartsWith('AUDIT-', $auditReport->auditId());
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/usecase_int_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $this->rmdirRecursive($this->tmpDir);

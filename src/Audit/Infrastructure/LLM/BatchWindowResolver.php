@@ -53,6 +53,9 @@ final readonly class BatchWindowResolver
      * @param list<array{system: string, user: string}> $window
      *
      * @return list<LLMResponse>
+     *
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
      */
     public function resolveWindow(array $window): array
     {
@@ -85,6 +88,8 @@ final readonly class BatchWindowResolver
 
     /**
      * @param array{system: string, user: string} $request
+     *
+     * @throws BudgetExceededException
      */
     private function resolveOne(?DeferredResult $deferredResult, array $request): LLMResponse
     {

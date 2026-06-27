@@ -17,6 +17,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocat
 
 final readonly class CodeLocation
 {
+    /**
+     * @throws InvalidCodeLocationException
+     */
     public function __construct(
         private string $filePath,
         private int $lineStart,

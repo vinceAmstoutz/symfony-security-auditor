@@ -63,6 +63,9 @@ final readonly class ToolConversationWavefront
      * @param list<array{system: string, user: string, tools: ToolRegistry}> $window
      *
      * @return list<LLMResponse>
+     *
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
      */
     public function resolveToolWindow(array $window, int $maxToolIterations): array
     {
@@ -108,6 +111,8 @@ final readonly class ToolConversationWavefront
      * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                                                             $window
      *
      * @return array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}>
+     *
+     * @throws BudgetExceededException
      */
     private function runWavefrontRound(PlatformInterface $platform, array $states, array $window, int $maxToolIterations): array
     {
@@ -178,6 +183,8 @@ final readonly class ToolConversationWavefront
      * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
      *
      * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
+     *
+     * @throws BudgetExceededException
      */
     private function advanceConversation(array $state, ?DeferredResult $deferredResult, array $request, int $maxToolIterations): array
     {

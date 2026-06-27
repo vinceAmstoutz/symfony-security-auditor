@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing;
 use Composer\InstalledVersions;
 use JsonException;
 use OutOfBoundsException;
+use Override;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
 
@@ -55,26 +56,31 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
         private readonly string $catalogPackage = self::CATALOG_PACKAGE,
     ) {}
 
+    #[Override]
     public function pricePerMillionInputTokens(string $model): float
     {
         return $this->priced($model)->input;
     }
 
+    #[Override]
     public function pricePerMillionOutputTokens(string $model): float
     {
         return $this->priced($model)->output;
     }
 
+    #[Override]
     public function cacheReadPricePerMillionTokens(string $model): float
     {
         return $this->priced($model)->cacheRead;
     }
 
+    #[Override]
     public function cacheCreationPricePerMillionTokens(string $model): float
     {
         return $this->priced($model)->cacheCreation;
     }
 
+    #[Override]
     public function hasModel(string $model): bool
     {
         return $this->lookup($model) instanceof ModelPrice;

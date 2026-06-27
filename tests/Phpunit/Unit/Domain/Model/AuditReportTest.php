@@ -13,8 +13,11 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
+use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -40,6 +43,10 @@ final class AuditReportTest extends TestCase
         self::assertSame(0, $auditReport->filesScanned());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_includes_only_validated_vulnerabilities(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -58,6 +65,10 @@ final class AuditReportTest extends TestCase
         self::assertSame(10, $auditReport->riskScore());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_classifies_risk_levels_correctly(): void
     {
         // CRITICAL: score >= 50
@@ -72,6 +83,10 @@ final class AuditReportTest extends TestCase
         self::assertSame('SAFE', $this->reportWithScore(0)->riskLevel());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_filters_vulnerabilities_by_severity(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -94,6 +109,10 @@ final class AuditReportTest extends TestCase
         self::assertCount(0, $auditReport->vulnerabilitiesBySeverity(VulnerabilitySeverity::LOW));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_filters_vulnerabilities_by_type(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -113,6 +132,10 @@ final class AuditReportTest extends TestCase
         self::assertCount(0, $auditReport->vulnerabilitiesByType(VulnerabilityType::SSRF));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_vulnerabilities_are_ordered_most_severe_first(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -147,6 +170,10 @@ final class AuditReportTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_vulnerabilities_with_equal_severity_keep_discovery_order(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -198,6 +225,10 @@ final class AuditReportTest extends TestCase
         self::assertLessThan(1.0, $auditReport->durationSeconds());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_classifies_risk_level_at_exact_boundaries(): void
     {
         self::assertSame('CRITICAL', $this->reportWithExactScore(50)->riskLevel());
@@ -210,6 +241,10 @@ final class AuditReportTest extends TestCase
         self::assertSame('SAFE', $this->reportWithExactScore(4)->riskLevel());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     #[DataProvider('riskLevelEnumCases')]
     public function test_risk_level_enum_classifies_by_aggregate_score(int $score, RiskLevel $riskLevel): void
     {
@@ -232,12 +267,20 @@ final class AuditReportTest extends TestCase
         yield 'safe at 0' => [0, RiskLevel::Safe];
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_risk_level_string_is_the_uppercased_enum_value(): void
     {
         self::assertSame('CRITICAL', $this->reportWithExactScore(50)->riskLevel());
         self::assertSame('SAFE', $this->reportWithExactScore(0)->riskLevel());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_toarray_vulnerabilities_is_array_of_arrays(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -305,17 +348,23 @@ final class AuditReportTest extends TestCase
         );
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/report_test_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function reportWithExactScore(int $score): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -338,6 +387,10 @@ final class AuditReportTest extends TestCase
         return AuditReport::fromContext($auditContext);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function reportWithScore(int $targetScore): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -353,6 +406,10 @@ final class AuditReportTest extends TestCase
         return AuditReport::fromContext($auditContext);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_fingerprints_lists_each_distinct_finding(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -366,6 +423,10 @@ final class AuditReportTest extends TestCase
         self::assertEqualsCanonicalizing([$vulnerability->fingerprint(), $second->fingerprint()], $auditReport->fingerprints());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_fingerprints_deduplicates_findings_that_share_a_fingerprint(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -377,6 +438,10 @@ final class AuditReportTest extends TestCase
         self::assertCount(1, $auditReport->fingerprints());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_without_fingerprints_removes_only_matching_findings(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -391,6 +456,10 @@ final class AuditReportTest extends TestCase
         self::assertSame($vulnerability->fingerprint(), $auditReport->vulnerabilities()[0]->fingerprint());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_without_fingerprints_keeps_findings_absent_from_the_list(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -402,6 +471,10 @@ final class AuditReportTest extends TestCase
         self::assertSame(2, $auditReport->totalVulnerabilities());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_without_fingerprints_preserves_report_metadata(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -416,6 +489,10 @@ final class AuditReportTest extends TestCase
         self::assertSame($auditReport->projectPath(), $filtered->projectPath());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_filtered_by_types_with_no_filters_keeps_all_findings(): void
     {
         $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION, VulnerabilityType::SSRF);
@@ -423,6 +500,10 @@ final class AuditReportTest extends TestCase
         self::assertSame(2, $auditReport->filteredByTypes([], [])->totalVulnerabilities());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_filtered_by_types_drops_excluded_types(): void
     {
         $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION, VulnerabilityType::SSRF);
@@ -432,6 +513,10 @@ final class AuditReportTest extends TestCase
         self::assertSame([VulnerabilityType::SSRF], $this->typesOf($filtered));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_filtered_by_types_with_an_allowlist_keeps_only_included_types(): void
     {
         $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION, VulnerabilityType::SSRF, VulnerabilityType::MISSING_RATE_LIMITING);
@@ -441,6 +526,10 @@ final class AuditReportTest extends TestCase
         self::assertSame([VulnerabilityType::SSRF], $this->typesOf($filtered));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_filtered_by_types_lets_exclusions_win_over_the_allowlist(): void
     {
         $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION, VulnerabilityType::SSRF);
@@ -453,6 +542,10 @@ final class AuditReportTest extends TestCase
         self::assertSame([VulnerabilityType::SSRF], $this->typesOf($filtered));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_filtered_by_types_preserves_report_metadata(): void
     {
         $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION);
@@ -464,6 +557,10 @@ final class AuditReportTest extends TestCase
         self::assertSame($auditReport->projectPath(), $filtered->projectPath());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function reportWithTypes(VulnerabilityType ...$types): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -487,6 +584,10 @@ final class AuditReportTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function sameFingerprintVuln(int $lineStart): Vulnerability
     {
         return Vulnerability::of(
@@ -497,6 +598,10 @@ final class AuditReportTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function makeVulnerability(
         string $discriminator,
         VulnerabilitySeverity $vulnerabilitySeverity,

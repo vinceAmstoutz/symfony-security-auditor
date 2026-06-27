@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 
 /**
@@ -22,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterfa
  */
 final readonly class NullSecretScrubber implements SecretScrubberInterface
 {
+    #[Override]
     public function scrub(string $content): string
     {
         return $content;

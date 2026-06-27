@@ -7,9 +7,13 @@ parameters:
     checkUninitializedProperties: true
     checkImplicitMixed: true
     checkBenevolentUnionTypes: true
+    checkMissingOverrideMethodAttribute: true
     exceptions:
         check:
+            missingCheckedExceptionInThrows: true
             tooWideThrowType: true
+        checkedExceptionRegexes:
+            - '#^VinceAmstoutz\\SymfonySecurityAuditor\\.+\\Exception\\#'
     paths:
         - bin/
         - config/

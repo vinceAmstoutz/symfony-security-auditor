@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
 
+use Override;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
@@ -42,6 +43,7 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
         private LoggerInterface $logger,
     ) {}
 
+    #[Override]
     public function run(string $projectPath): string
     {
         $lockfileHash = $this->lockfileHash($projectPath);

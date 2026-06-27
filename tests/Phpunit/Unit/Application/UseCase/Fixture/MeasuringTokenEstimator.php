@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 
 /**
@@ -24,6 +25,7 @@ final class MeasuringTokenEstimator implements TokenEstimatorInterface
 {
     public int $lastInputLength = -1;
 
+    #[Override]
     public function estimateTokens(string $text, string $model): int
     {
         $this->lastInputLength = mb_strlen($text);

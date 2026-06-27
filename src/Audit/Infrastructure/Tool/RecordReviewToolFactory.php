@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewCollector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
@@ -20,6 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class RecordReviewToolFactory implements RecordReviewToolFactoryInterface
 {
+    #[Override]
     public function create(ReviewCollector $reviewCollector): ToolInterface
     {
         return new RecordReviewTool($reviewCollector);

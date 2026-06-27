@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
+use Override;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
@@ -40,6 +41,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         $this->progressReporter = $progressReporter ?? new NullProgressReporter();
     }
 
+    #[Override]
     public function orchestrate(AuditContext $auditContext): void
     {
         $mapping = $auditContext->mapping();

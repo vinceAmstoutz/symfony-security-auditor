@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPUnit;
 
+use Override;
 use PHPUnit\Event\Application\Finished;
 use PHPUnit\Event\Application\FinishedSubscriber;
 
@@ -23,6 +24,7 @@ final readonly class MinimumLineCoverageSubscriber implements FinishedSubscriber
         private float $minimumCoverage,
     ) {}
 
+    #[Override]
     public function notify(Finished $finished): void
     {
         if (null === $this->cloverPath || !is_file($this->cloverPath)) {

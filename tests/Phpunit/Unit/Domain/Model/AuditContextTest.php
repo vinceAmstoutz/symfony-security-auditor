@@ -14,7 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use InvalidArgumentException;
+use Override;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -88,6 +91,10 @@ final class AuditContextTest extends TestCase
         self::assertSame($symfonyMapping, $auditContext->mapping());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_stores_and_filters_vulnerabilities(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -104,6 +111,10 @@ final class AuditContextTest extends TestCase
         self::assertCount(1, $auditContext->criticalVulnerabilities());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_critical_vulnerabilities_requires_both_critical_severity_and_reviewer_validation(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -133,6 +144,10 @@ final class AuditContextTest extends TestCase
         self::assertSame(VulnerabilitySeverity::CRITICAL, $only->severity());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_replaces_vulnerability_by_id(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -148,6 +163,10 @@ final class AuditContextTest extends TestCase
         self::assertTrue($stored->isReviewerValidated());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_calculates_risk_score_from_validated_vulnerabilities(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -178,6 +197,7 @@ final class AuditContextTest extends TestCase
         self::assertSame('default', $auditContext->getMeta('missing', 'default'));
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/audit_test_'.uniqid('', true);
@@ -259,11 +279,16 @@ final class AuditContextTest extends TestCase
         self::assertTrue($auditContext->isCacheBypassed());
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function makeVulnerability(string $discriminator, VulnerabilitySeverity $vulnerabilitySeverity): Vulnerability
     {
         return Vulnerability::of(

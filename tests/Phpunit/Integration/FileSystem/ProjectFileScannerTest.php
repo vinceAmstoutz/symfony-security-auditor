@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\FileSystem;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -20,6 +21,7 @@ use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
@@ -422,6 +424,9 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame('public/index.php', $files[0]->relativePath());
     }
 
+    /**
+     * @throws SecretScrubberConfigurationException
+     */
     public function test_it_scrubs_secrets_from_file_content_when_scrubber_is_injected(): void
     {
         $stripeShape = self::STRIPE_LIVE_PREFIX.'_4eC39HqLyjWDarjtT1zdp7dc';
@@ -509,6 +514,7 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame('disk read error', $error);
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/scanner_int_'.uniqid('', true);
@@ -516,6 +522,7 @@ final class ProjectFileScannerTest extends TestCase
         $this->projectFileScanner = new ProjectFileScanner(new NullLogger());
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $this->rmdirRecursive($this->tmpDir);

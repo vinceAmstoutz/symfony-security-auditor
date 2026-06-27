@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline;
 
 use ArrayIterator;
 use Closure;
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -258,12 +259,14 @@ final class AuditPipelineTest extends TestCase
         self::assertSame(['a', 'b'], $callOrder);
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/pipeline_test_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
@@ -277,11 +280,13 @@ final class AuditPipelineTest extends TestCase
                 private readonly Closure $callback,
             ) {}
 
+            #[Override]
             public function process(AuditContext $auditContext): void
             {
                 ($this->callback)($auditContext);
             }
 
+            #[Override]
             public function name(): string
             {
                 return $this->stageName;

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SecretPatternLabel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
@@ -57,6 +58,8 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      * @param list<string> $additionalPatterns extra PCRE patterns merged with the defaults.
      *                                         Each pattern is given a synthetic label
      *                                         `custom_<index>` for redaction reporting.
+     *
+     * @throws SecretScrubberConfigurationException
      */
     public function __construct(array $additionalPatterns = [])
     {
@@ -73,6 +76,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         $this->patterns = $patterns;
     }
 
+    #[Override]
     public function scrub(string $content): string
     {
         foreach ($this->patterns as $label => $pattern) {

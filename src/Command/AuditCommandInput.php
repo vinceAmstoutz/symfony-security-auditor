@@ -68,6 +68,8 @@ final class AuditCommandInput
 
     /**
      * @param ?callable(): (string|false) $cwdResolver defaults to PHP's getcwd; tests inject a stub
+     *
+     * @throws WorkingDirectoryUnavailableException
      */
     public function resolvedProjectPath(?callable $cwdResolver = null): string
     {

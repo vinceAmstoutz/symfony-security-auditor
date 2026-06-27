@@ -13,11 +13,14 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Stage;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\ErrorHandler\BufferingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\PoCSynthesisStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -50,6 +53,10 @@ final class PoCSynthesisStageTest extends TestCase
         $poCSynthesisStage->process(AuditContext::forProject($this->tmpDir));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_does_not_call_synthesizer_when_no_validated_findings(): void
     {
         $synthesizer = self::createMock(PoCSynthesizerInterface::class);
@@ -62,6 +69,10 @@ final class PoCSynthesisStageTest extends TestCase
         $poCSynthesisStage->process($auditContext);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_replaces_validated_findings_with_enriched_copies(): void
     {
         $vulnerability = $this->makeVulnerability()->withReviewerValidation(true);
@@ -80,6 +91,10 @@ final class PoCSynthesisStageTest extends TestCase
         self::assertSame('curl /x', $stored->synthesizedPoC());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_records_count_metadata_in_context(): void
     {
         $vulnerability = $this->makeVulnerability()->withReviewerValidation(true);
@@ -97,6 +112,10 @@ final class PoCSynthesisStageTest extends TestCase
         self::assertSame(1, $auditContext->getMeta('audit.poc_synthesized'));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_does_not_replace_findings_whose_poc_remained_null(): void
     {
         $vulnerability = $this->makeVulnerability()->withReviewerValidation(true);
@@ -114,6 +133,10 @@ final class PoCSynthesisStageTest extends TestCase
         self::assertNull($stored->synthesizedPoC());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_disabled_stage_does_not_synthesize_even_with_validated_findings(): void
     {
         $synthesizer = self::createMock(PoCSynthesizerInterface::class);
@@ -125,6 +148,10 @@ final class PoCSynthesisStageTest extends TestCase
         (new PoCSynthesisStage($synthesizer, new NullLogger(), false))->process($auditContext);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_stage_is_disabled_by_default_even_with_validated_findings(): void
     {
         $synthesizer = self::createMock(PoCSynthesizerInterface::class);
@@ -146,6 +173,10 @@ final class PoCSynthesisStageTest extends TestCase
         self::assertSame([], $this->contextOf($bufferingLogger->cleanLogs(), 'PoC synthesis stage disabled, skipping'));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_logs_when_there_are_no_validated_findings(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -157,6 +188,10 @@ final class PoCSynthesisStageTest extends TestCase
         self::assertSame([], $this->contextOf($bufferingLogger->cleanLogs(), 'PoC synthesis: no validated findings to enrich'));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_logs_completion_with_enriched_and_total_counts(): void
     {
         $vulnerability = $this->makeVulnerability()->withReviewerValidation(true);
@@ -176,12 +211,14 @@ final class PoCSynthesisStageTest extends TestCase
         );
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/poc_synthesis_stage_test_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
@@ -210,6 +247,7 @@ final class PoCSynthesisStageTest extends TestCase
     private function makeNoopSynthesizer(): PoCSynthesizerInterface
     {
         return new class implements PoCSynthesizerInterface {
+            #[Override]
             public function synthesize(array $vulnerabilities): array
             {
                 return $vulnerabilities;
@@ -217,6 +255,10 @@ final class PoCSynthesisStageTest extends TestCase
         };
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function makeVulnerability(): Vulnerability
     {
         return Vulnerability::of(

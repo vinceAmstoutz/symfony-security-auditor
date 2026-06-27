@@ -13,11 +13,14 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Cache;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -33,11 +36,20 @@ final class FilesystemReviewerCacheTest extends TestCase
 
     private FilesystemReviewerCache $filesystemReviewerCache;
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_returns_null_when_no_entry_exists(): void
     {
         self::assertNull($this->filesystemReviewerCache->get($this->makeVulnerability('src/A.php'), 'code'));
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_skips_read_when_no_entry_exists(): void
     {
         $filesystem = $this->createMock(Filesystem::class);
@@ -49,6 +61,10 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertNull($filesystemReviewerCache->get($this->makeVulnerability('src/A.php'), 'code'));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_round_trip_store_and_get_returns_same_review(): void
     {
         $vulnerability = $this->makeVulnerability('src/A.php');
@@ -59,6 +75,10 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertSame($review, $this->filesystemReviewerCache->get($vulnerability, 'code-context'));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_returns_null_when_finding_content_differs(): void
     {
         $vulnerability = $this->makeVulnerability('src/A.php', title: 'original');
@@ -69,6 +89,10 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertNull($this->filesystemReviewerCache->get($changed, 'code'));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_returns_null_when_code_context_differs(): void
     {
         $vulnerability = $this->makeVulnerability('src/A.php');
@@ -78,6 +102,10 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertNull($this->filesystemReviewerCache->get($vulnerability, 'context two'));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_hits_for_a_distinct_finding_object_with_identical_content(): void
     {
         // Two separately-created findings with identical content reuse the same
@@ -92,6 +120,10 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertSame($review, $this->filesystemReviewerCache->get($twin, 'code'));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_returns_null_when_cache_file_is_invalid_json(): void
     {
         $vulnerability = $this->makeVulnerability('src/A.php');
@@ -105,6 +137,10 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertNull($this->filesystemReviewerCache->get($vulnerability, 'code'));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_returns_null_when_cache_file_contains_non_array_json(): void
     {
         $vulnerability = $this->makeVulnerability('src/A.php');
@@ -117,12 +153,20 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertNull($this->filesystemReviewerCache->get($vulnerability, 'code'));
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_constructor_rejects_empty_cache_dir(): void
     {
         $this->expectException(InvalidCacheConfigurationException::class);
         new FilesystemReviewerCache('   ', new Filesystem(), new NullLogger());
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_returns_null_when_filesystem_read_throws_io_exception(): void
     {
         $filesystem = self::createStub(Filesystem::class);
@@ -134,6 +178,11 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertNull($filesystemReviewerCache->get($this->makeVulnerability('src/A.php'), 'code'));
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_logs_warning_with_path_and_error_when_read_throws_io_exception(): void
     {
         $filesystem = self::createStub(Filesystem::class);
@@ -158,6 +207,11 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertSame('permission denied', $warnings[0][1]['error']);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_logs_warning_when_cache_entry_is_unreadable_json(): void
     {
         $vulnerability = $this->makeVulnerability('src/A.php');
@@ -186,6 +240,10 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertNotSame('', $warnings[0][1]['error']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_store_creates_nested_shard_directory_from_key_prefix(): void
     {
         $this->filesystemReviewerCache->store($this->makeVulnerability('src/A.php'), 'code', ['accepted' => true]);
@@ -197,6 +255,11 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertMatchesRegularExpression('#^[a-f0-9]{2}/[a-f0-9]{64}\.json$#', $relative);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_store_calls_mkdir_to_create_shard_directory(): void
     {
         $filesystem = $this->createMock(Filesystem::class);
@@ -207,6 +270,11 @@ final class FilesystemReviewerCacheTest extends TestCase
         $filesystemReviewerCache->store($this->makeVulnerability('src/A.php'), 'code', ['accepted' => true]);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_key_is_sha256_of_salt_null_byte_finding_without_id_and_code_context(): void
     {
         $vulnerability = $this->makeVulnerability('src/A.php');
@@ -224,6 +292,11 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertFileExists($expectedPath);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_distinct_key_salts_produce_distinct_cache_entries(): void
     {
         $vulnerability = $this->makeVulnerability('src/A.php');
@@ -238,6 +311,10 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertNull($opus->get($vulnerability, 'code'), 'switching the salt must invalidate the cache');
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_empty_salt_keeps_unprefixed_key(): void
     {
         $vulnerability = $this->makeVulnerability('src/A.php');
@@ -253,6 +330,11 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertFileExists($expectedPath);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_dump_path_has_trailing_slash_stripped_from_cache_dir(): void
     {
         $capturedPath = '';
@@ -269,6 +351,11 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertStringNotContainsString('//', $capturedPath);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_logs_debug_cache_hit_with_path(): void
     {
         $vulnerability = $this->makeVulnerability('src/A.php');
@@ -290,6 +377,11 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertArrayHasKey('path', $hitLogs[0][1]);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_store_logs_debug_stored_with_path(): void
     {
         $debugLogs = [];
@@ -308,6 +400,11 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertArrayHasKey('path', $storedLogs[0][1]);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_store_failure_logs_warning_with_path_and_error(): void
     {
         $warnings = [];
@@ -329,6 +426,10 @@ final class FilesystemReviewerCacheTest extends TestCase
         self::assertNotSame('', $failures[0][1]['error']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function makeVulnerability(string $filePath, string $title = 'Finding'): Vulnerability
     {
         return Vulnerability::of(
@@ -339,12 +440,17 @@ final class FilesystemReviewerCacheTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    #[Override]
     protected function setUp(): void
     {
         $this->cacheDir = sys_get_temp_dir().'/reviewer_cache_'.uniqid('', true);
         $this->filesystemReviewerCache = new FilesystemReviewerCache($this->cacheDir, new Filesystem(), new NullLogger());
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $filesystem = new Filesystem();

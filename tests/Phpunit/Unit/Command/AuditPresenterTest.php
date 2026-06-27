@@ -14,12 +14,15 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use InvalidArgumentException;
+use Override;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
@@ -39,6 +42,7 @@ final class AuditPresenterTest extends TestCase
 
     private string $tmpDir;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->auditPresenter = new AuditPresenter($this->pricingProviderKnowing('claude-opus-4-7', 'claude-haiku-4-5-20251001'));
@@ -46,6 +50,7 @@ final class AuditPresenterTest extends TestCase
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
@@ -99,6 +104,10 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('Pipeline:', $display);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_result_for_failure_exit_omits_success_message(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -372,16 +381,19 @@ final class AuditPresenterTest extends TestCase
             /** @param array<string> $supportedModels */
             public function __construct(private array $supportedModels) {}
 
+            #[Override]
             public function pricePerMillionInputTokens(string $model): float
             {
                 return 0.0;
             }
 
+            #[Override]
             public function pricePerMillionOutputTokens(string $model): float
             {
                 return 0.0;
             }
 
+            #[Override]
             public function hasModel(string $model): bool
             {
                 return \in_array($model, $this->supportedModels, true);
@@ -389,6 +401,10 @@ final class AuditPresenterTest extends TestCase
         };
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function makeCriticalReport(): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);

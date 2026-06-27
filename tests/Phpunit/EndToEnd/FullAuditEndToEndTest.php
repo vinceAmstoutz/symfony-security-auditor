@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Validator\Validation;
@@ -26,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
@@ -50,6 +52,9 @@ final class FullAuditEndToEndTest extends TestCase
 {
     private string $fixtureProjectDir;
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_audit_of_unprotected_symfony_project_produces_critical_report(): void
     {
         $this->createSymfonyProjectFixture(secure: false);
@@ -81,6 +86,9 @@ final class FullAuditEndToEndTest extends TestCase
         self::assertGreaterThan(0, $auditReport->riskScore());
     }
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_audit_of_secured_project_produces_safe_report(): void
     {
         $this->createSymfonyProjectFixture(secure: true);
@@ -99,6 +107,9 @@ final class FullAuditEndToEndTest extends TestCase
         self::assertSame(0, $auditReport->riskScore());
     }
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_audit_report_vulnerability_has_correct_owasp_type(): void
     {
         $this->createSymfonyProjectFixture(secure: false);
@@ -118,6 +129,9 @@ final class FullAuditEndToEndTest extends TestCase
         self::assertCount(1, $auditReport->vulnerabilitiesByType(VulnerabilityType::SQL_INJECTION));
     }
 
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_audit_report_serialises_to_valid_json(): void
     {
         $this->createSymfonyProjectFixture(secure: false);
@@ -143,12 +157,14 @@ final class FullAuditEndToEndTest extends TestCase
         self::assertIsString(json_encode($data));
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->fixtureProjectDir = sys_get_temp_dir().'/e2e_project_'.uniqid('', true);
         mkdir($this->fixtureProjectDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $this->rmdirRecursive($this->fixtureProjectDir);

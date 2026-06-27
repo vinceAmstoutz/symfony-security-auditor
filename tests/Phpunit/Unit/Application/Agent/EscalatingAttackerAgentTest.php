@@ -19,6 +19,8 @@ use Symfony\Component\ErrorHandler\BufferingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -53,6 +55,10 @@ final class EscalatingAttackerAgentTest extends TestCase
         self::assertSame(0, $expensive->callCount);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_runs_expensive_pass_only_on_files_flagged_by_cheap(): void
     {
         $files = [
@@ -75,6 +81,10 @@ final class EscalatingAttackerAgentTest extends TestCase
         self::assertSame('src/Controller/A.php', $expensive->lastFiles[0]->relativePath());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_expensive_findings_supersede_cheap_findings_on_overlap(): void
     {
         $vulnerability = $this->makeVulnerability(
@@ -103,6 +113,10 @@ final class EscalatingAttackerAgentTest extends TestCase
         self::assertSame('expensive version', $result[0]->title());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_cheap_findings_on_files_expensive_did_not_re_flag_are_kept(): void
     {
         $cheapOnA = $this->makeVulnerability('src/Controller/A.php', title: 'cheap A');
@@ -125,6 +139,10 @@ final class EscalatingAttackerAgentTest extends TestCase
         self::assertContains('cheap B', $titles);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_expensive_pass_receives_cheap_findings_as_previous_context(): void
     {
         $vulnerability = $this->makeVulnerability('src/Controller/A.php');
@@ -143,6 +161,10 @@ final class EscalatingAttackerAgentTest extends TestCase
         self::assertSame([$vulnerability], $expensive->lastPreviousFindings);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_logs_file_counts_for_both_passes(): void
     {
         $files = [
@@ -175,6 +197,10 @@ final class EscalatingAttackerAgentTest extends TestCase
         self::assertSame([], $this->contextOf($bufferingLogger->cleanLogs(), 'Escalation: cheap pass found nothing, skipping expensive pass'));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_expensive_pass_receives_original_previous_findings_plus_all_cheap_findings(): void
     {
         $previous = [$this->makeVulnerability('src/Controller/Z.php', title: 'prev')];
@@ -236,6 +262,10 @@ final class EscalatingAttackerAgentTest extends TestCase
         return ProjectFile::create($path, '/app/'.$path, '<?php');
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function makeVulnerability(
         string $filePath,
         VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,

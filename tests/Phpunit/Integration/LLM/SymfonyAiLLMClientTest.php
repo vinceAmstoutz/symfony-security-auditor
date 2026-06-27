@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM;
 
 use Closure;
 use DateTimeImmutable;
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -53,6 +54,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\BackoffSchedule;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
@@ -73,6 +75,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingC
 
 final class SymfonyAiLLMClientTest extends TestCase
 {
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_returns_text_from_platform_invoke(): void
     {
         $platform = $this->scriptedPlatform([new TextResult('Hello from LLM')]);
@@ -87,6 +95,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(0, $llmResponse->outputTokens());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_logs_debug_with_prompt_lengths_and_temperature(): void
     {
         $platform = $this->scriptedPlatform([new TextResult('ok')]);
@@ -109,6 +123,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(0.42, $startLog[1]['temperature']);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_logs_debug_response_with_content_length(): void
     {
         $platform = $this->scriptedPlatform([new TextResult('twelve-chars')]);
@@ -133,6 +153,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(12, $respondedLogs[0][1]['content_length']);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_passes_temperature_via_options(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -146,6 +172,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertArrayNotHasKey('cache_control', $invocationOptionsCapture->options);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_omits_temperature_when_left_at_default(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -158,6 +190,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertArrayNotHasKey('temperature', $invocationOptionsCapture->options);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_never_sends_cache_control_even_for_anthropic_model(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -170,6 +208,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertArrayNotHasKey('cache_control', $invocationOptionsCapture->options);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_passes_provider_json_mode_response_format_for_anthropic_model(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -182,6 +226,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(['type' => 'json_object'], $invocationOptionsCapture->options['response_format']);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_omits_response_format_for_non_anthropic_model_even_when_json_mode_enabled(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -194,6 +244,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertArrayNotHasKey('response_format', $invocationOptionsCapture->options);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_passes_all_anthropic_options_together_when_multiple_flags_enabled(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -212,6 +268,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertArrayNotHasKey('cache_control', $invocationOptionsCapture->options);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_omits_response_format_when_provider_json_mode_disabled(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -224,6 +286,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertArrayNotHasKey('response_format', $invocationOptionsCapture->options);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_passes_max_output_tokens_via_options_for_anthropic_model(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -238,6 +306,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(4096, $invocationOptionsCapture->options['max_tokens']);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_omits_max_output_tokens_for_non_anthropic_model_even_when_configured(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -252,6 +326,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertArrayNotHasKey('max_tokens', $invocationOptionsCapture->options);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_still_sends_temperature_for_non_anthropic_model(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -264,6 +344,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(0.7, $invocationOptionsCapture->options['temperature']);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_omits_max_output_tokens_when_left_at_default(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -276,6 +362,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertArrayNotHasKey('max_tokens', $invocationOptionsCapture->options);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_passes_max_output_tokens_via_options_for_anthropic_model(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -301,6 +393,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('claude-test', $symfonyAiLLMClient->model());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_throws_when_no_ai_platform_is_configured(): void
     {
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(null, 'test-model', new NullLogger()));
@@ -311,6 +409,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient->complete('sys', 'usr');
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_throws_when_no_ai_platform_is_configured(): void
     {
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(null, 'test-model', new NullLogger()));
@@ -322,6 +426,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 3);
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_throws_when_no_ai_platform_is_configured(): void
     {
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(null, 'test-model', new NullLogger()));
@@ -332,6 +440,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 2);
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_returns_empty_for_no_requests(): void
     {
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('x'), 'm', new NullLogger()));
@@ -339,6 +451,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([], $symfonyAiLLMClient->completeBatch([], 4));
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_returns_one_response_per_request_in_order(): void
     {
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('batched'), 'm', new NullLogger()));
@@ -355,6 +471,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('batched', $responses[2]->content());
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_processes_more_requests_than_window_size(): void
     {
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()));
@@ -369,6 +489,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertCount(5, $responses);
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_clamps_non_positive_window_to_one(): void
     {
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()));
@@ -381,6 +505,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertCount(2, $responses);
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_records_token_usage_per_response(): void
     {
         $platform = $this->scriptedPlatformWithTokenUsage(
@@ -405,6 +533,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(7, $responses[1]->outputTokens());
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_acquires_rate_limit_for_each_request(): void
     {
         $fakeRateLimiter = new FakeRateLimiter();
@@ -423,6 +555,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([246, 246, 246], $fakeRateLimiter->acquired);
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_falls_back_to_the_sequential_complete_path_when_dispatch_throws(): void
     {
         $platform = $this->flakyPlatform([
@@ -440,6 +576,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('recovered-sequentially', $responses[0]->content());
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_resolves_each_conversation_against_its_own_registry(): void
     {
         $firstToolCalls = 0;
@@ -476,6 +616,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(0, $secondToolCalls);
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_returns_empty_list_for_empty_requests(): void
     {
         $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding(new InMemoryPlatform('ok'), 'm', new NullLogger()));
@@ -483,6 +627,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([], $symfonyAiLLMClient->completeBatchWithTools([], 4, 3));
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_caps_iterations_and_warns(): void
     {
         $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
@@ -522,6 +670,11 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(2, $capLogs[0][1]['max_iterations']);
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_falls_back_to_the_sequential_path_when_dispatch_fails_before_tools_ran(): void
     {
         $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
@@ -543,6 +696,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('end_turn', $responses[0]->stopReason());
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_falls_back_to_the_sequential_path_when_resolution_fails_before_tools_ran(): void
     {
         $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
@@ -550,21 +707,25 @@ final class SymfonyAiLLMClientTest extends TestCase
         $platform = new class implements PlatformInterface {
             private int $invocations = 0;
 
+            #[Override]
             public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 ++$this->invocations;
                 $converter = 1 === $this->invocations
                     ? new class implements ResultConverterInterface {
+                        #[Override]
                         public function supports(Model $model): bool
                         {
                             return true;
                         }
 
+                        #[Override]
                         public function convert(RawResultInterface $result, array $options = []): ResultInterface
                         {
                             throw new RuntimeException('resolution exploded');
                         }
 
+                        #[Override]
                         public function getTokenUsageExtractor(): ?TokenUsageExtractorInterface
                         {
                             return null;
@@ -575,6 +736,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 return new DeferredResult($converter, new InMemoryRawResult(['text' => ''], [], (object) []), $options);
             }
 
+            #[Override]
             public function getModelCatalog(): ModelCatalogInterface
             {
                 return new FallbackModelCatalog();
@@ -591,6 +753,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('end_turn', $responses[0]->stopReason());
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_finalizes_as_empty_content_when_failing_after_tools_ran(): void
     {
         $toolCalls = 0;
@@ -634,6 +800,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertArrayHasKey('output_tokens', $failureLogs[0][1]);
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_accumulates_tokens_across_rounds(): void
     {
         $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
@@ -661,6 +831,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(3, $responses[0]->cacheCreationTokens());
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_records_rate_limit_for_each_round(): void
     {
         $fakeRateLimiter = new FakeRateLimiter();
@@ -682,6 +856,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertCount(2, $fakeRateLimiter->recorded);
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_appends_assistant_then_tool_call_message_between_rounds(): void
     {
         $tool = $this->makeTool('record', 'd', static fn (array $args): string => 'tool-output');
@@ -717,22 +895,29 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertTrue($hasToolCall, 'Second round should receive a ToolCallMessage carrying the tool execution result');
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_dispatches_one_window_at_a_time_when_concurrency_is_one(): void
     {
         $rateLimiter = new class implements RateLimiterInterface {
             /** @var list<string> */
             public array $events = [];
 
+            #[Override]
             public function acquire(int $estimatedInputTokens): void
             {
                 $this->events[] = 'acquire';
             }
 
+            #[Override]
             public function record(int $inputTokens, int $outputTokens): void
             {
                 $this->events[] = 'record';
             }
 
+            #[Override]
             public function pauseUntil(DateTimeImmutable $until): void {}
         };
 
@@ -749,6 +934,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(['acquire', 'record', 'acquire', 'record'], $rateLimiter->events);
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_keeps_dispatching_later_conversations_after_an_earlier_one_finishes(): void
     {
         $firstRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
@@ -773,6 +962,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('end_turn', $responses[1]->stopReason());
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_records_budget_and_aborts_when_a_response_exceeds_it(): void
     {
         $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
@@ -796,6 +989,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         ], 4, 3);
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_acquires_rate_limit_for_each_dispatch(): void
     {
         $fakeRateLimiter = new FakeRateLimiter();
@@ -814,6 +1011,10 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([246, 246], $fakeRateLimiter->acquired);
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_records_budget_and_aborts_when_a_response_exceeds_it(): void
     {
         $platform = $this->scriptedPlatformWithTokenUsage(
@@ -834,22 +1035,29 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_dispatches_one_request_per_window_when_concurrency_is_one(): void
     {
         $rateLimiter = new class implements RateLimiterInterface {
             /** @var list<string> */
             public array $events = [];
 
+            #[Override]
             public function acquire(int $estimatedInputTokens): void
             {
                 $this->events[] = 'acquire';
             }
 
+            #[Override]
             public function record(int $inputTokens, int $outputTokens): void
             {
                 $this->events[] = 'record';
             }
 
+            #[Override]
             public function pauseUntil(DateTimeImmutable $until): void {}
         };
 
@@ -868,11 +1076,16 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(['acquire', 'record', 'acquire', 'record'], $rateLimiter->events);
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_falls_back_to_complete_when_resolving_a_response_throws(): void
     {
         $platform = new class implements PlatformInterface {
             private int $calls = 0;
 
+            #[Override]
             public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 if ($this->calls >= 2) {
@@ -886,6 +1099,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 return new DeferredResult($converter, new InMemoryRawResult(['text' => ''], [], (object) []), $options);
             }
 
+            #[Override]
             public function getModelCatalog(): ModelCatalogInterface
             {
                 return new FallbackModelCatalog();
@@ -899,12 +1113,16 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('recovered', $responses[0]->content());
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     */
     public function test_complete_batch_rethrows_budget_exceeded_without_falling_back_to_complete(): void
     {
         $platformInvocationLog = new PlatformInvocationLog();
         $platform = new class($platformInvocationLog) implements PlatformInterface {
             public function __construct(private readonly PlatformInvocationLog $platformInvocationLog) {}
 
+            #[Override]
             public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 ++$this->platformInvocationLog->invocations;
@@ -918,6 +1136,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 return $deferredResult;
             }
 
+            #[Override]
             public function getModelCatalog(): ModelCatalogInterface
             {
                 return new FallbackModelCatalog();
@@ -944,6 +1163,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(1, $platformInvocationLog->invocations);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_returns_text_when_platform_emits_no_tool_calls(): void
     {
         $platform = $this->scriptedPlatform([
@@ -961,6 +1186,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(0, $llmResponse->outputTokens());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_executes_tool_calls_then_returns_final_text(): void
     {
         $tool = $this->makeTool('lookup', 'looks things up', static fn (array $args): string => 'tool-result');
@@ -978,6 +1209,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('end_turn', $llmResponse->stopReason());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_stops_at_iteration_cap_and_warns(): void
     {
         $tool = $this->makeTool('lookup', 'lookup');
@@ -1015,6 +1252,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(2, $capLogs[0][1]['max_iterations']);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_invokes_platform_exact_max_iterations_times_when_all_iterations_return_tool_calls(): void
     {
         $tool = $this->makeTool('lookup', 'lookup');
@@ -1036,6 +1279,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(2, $platformInvocationLog->invocations);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_logs_loop_ended_debug_with_iterations_count_and_content_length(): void
     {
         $toolRegistry = new ToolRegistry([$this->makeTool('lookup', 'lookup')], new NullLogger());
@@ -1067,6 +1316,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(12, $endedLogs[0][1]['content_length']);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_appends_assistant_message_then_tool_call_message_between_iterations(): void
     {
         $tool = $this->makeTool('lookup', 'lookup', static fn (array $args): string => 'tool-output');
@@ -1103,6 +1358,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertTrue($hasToolCall, 'Second invoke should receive a ToolCallMessage carrying the tool execution result');
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_logs_tool_invocation_with_tool_name_and_iteration_number(): void
     {
         $tool = $this->makeTool('lookup', 'lookup', static fn (array $args): string => 'ok');
@@ -1135,6 +1396,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(1, $toolInvokedLogs[0][1]['iteration']);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_passes_tool_definitions_in_options(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -1183,6 +1450,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('', $properties['malformed_type']['description']);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_handles_bare_tool_call_result_not_wrapped_in_multipart(): void
     {
         $tool = $this->makeTool('lookup', 'lookup', static fn (array $args): string => 'ok');
@@ -1199,6 +1472,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('final', $llmResponse->content());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_handles_bare_text_result_not_wrapped_in_multipart(): void
     {
         $tool = $this->makeTool('lookup', 'lookup');
@@ -1212,6 +1491,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('plain text', $llmResponse->content());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_falls_back_to_empty_text_when_platform_returns_unknown_result_type(): void
     {
         $tool = $this->makeTool('lookup', 'lookup');
@@ -1219,6 +1504,7 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $unknownResult = new class extends BaseResult {
             /** @return list<never> */
+            #[Override]
             public function getContent(): array
             {
                 return [];
@@ -1234,6 +1520,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('end_turn', $llmResponse->stopReason());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_normalize_schema_tolerates_missing_properties_and_required(): void
     {
         $invocationOptionsCapture = new InvocationOptionsCapture();
@@ -1265,6 +1557,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([], $parameters['required']);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_populates_input_and_output_tokens_from_platform_metadata(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -1286,6 +1584,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(30, $tokenUsageRecorder->snapshot()->outputTokens());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_populates_cache_tokens_from_platform_metadata(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -1306,6 +1610,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(40, $tokenUsageRecorder->snapshot()->cacheCreationTokens());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_defaults_cache_tokens_to_zero_when_token_usage_omits_them(): void
     {
         $platform = $this->scriptedPlatformWithTokenUsage(
@@ -1320,6 +1630,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(0, $llmResponse->cacheCreationTokens());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_returns_zero_tokens_when_platform_metadata_omits_token_usage(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -1338,6 +1654,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(0, $tokenUsageRecorder->snapshot()->totalTokens());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_returns_zero_tokens_when_token_usage_prompt_and_completion_are_null(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -1357,6 +1679,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(0, $tokenUsageRecorder->snapshot()->totalTokens());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_consecutive_complete_calls_accumulate_in_shared_recorder(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -1379,6 +1707,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(15, $snapshot->outputTokens());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_aborts_mid_loop_when_budget_exceeded(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -1411,6 +1745,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_records_budget_call_and_aborts_when_exceeded(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -1440,16 +1780,19 @@ final class SymfonyAiLLMClientTest extends TestCase
                 private readonly float $outputPrice,
             ) {}
 
+            #[Override]
             public function pricePerMillionInputTokens(string $model): float
             {
                 return $this->inputPrice;
             }
 
+            #[Override]
             public function pricePerMillionOutputTokens(string $model): float
             {
                 return $this->outputPrice;
             }
 
+            #[Override]
             public function hasModel(string $model): bool
             {
                 return true;
@@ -1457,6 +1800,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         };
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_accumulates_tokens_across_iterations(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -1512,6 +1861,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 private array $tokenUsages,
             ) {}
 
+            #[Override]
             public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 $result = array_shift($this->results);
@@ -1532,6 +1882,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 return $deferredResult;
             }
 
+            #[Override]
             public function getModelCatalog(): ModelCatalogInterface
             {
                 return new FallbackModelCatalog();
@@ -1539,6 +1890,13 @@ final class SymfonyAiLLMClientTest extends TestCase
         };
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_retries_transient_failures_and_succeeds(): void
     {
         $fakeSleeper = new FakeSleeper();
@@ -1558,6 +1916,13 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([10, 20], $fakeSleeper->durations);
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_throws_transient_failure_after_exhausting_attempts(): void
     {
         $fakeSleeper = new FakeSleeper();
@@ -1582,6 +1947,13 @@ final class SymfonyAiLLMClientTest extends TestCase
         }
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_logs_warning_with_full_context_when_retrying_transient_failure(): void
     {
         /** @var list<array{string, array<string, mixed>}> $warnings */
@@ -1613,6 +1985,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('HTTP 503 first failure message', $context['error']);
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_logs_one_warning_per_intermediate_attempt_no_warning_on_last(): void
     {
         /** @var list<array{string, array<string, mixed>}> $warnings */
@@ -1644,6 +2022,13 @@ final class SymfonyAiLLMClientTest extends TestCase
         }
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_does_not_retry_non_transient_failures(): void
     {
         $fakeSleeper = new FakeSleeper();
@@ -1666,6 +2051,13 @@ final class SymfonyAiLLMClientTest extends TestCase
         }
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_returns_empty_response_when_platform_reports_empty_content(): void
     {
         $fakeSleeper = new FakeSleeper();
@@ -1685,6 +2077,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([], $fakeSleeper->durations);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_logs_warning_when_platform_reports_empty_content(): void
     {
         /** @var list<array{string, array<string, mixed>}> $warnings */
@@ -1714,6 +2112,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_returns_empty_response_when_platform_reports_empty_content_on_first_iteration(): void
     {
         $tool = $this->makeTool('lookup', 'lookup');
@@ -1732,6 +2136,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(0, $llmResponse->outputTokens());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_logs_warning_when_platform_reports_empty_content(): void
     {
         $tool = $this->makeTool('lookup', 'lookup');
@@ -1765,6 +2175,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_demotes_empty_content_to_debug_after_at_least_one_tool_iteration(): void
     {
         $tool = $this->makeTool('lookup', 'lookup');
@@ -1806,6 +2222,13 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame(1, $emptyDebugs[0][1]['iterations']);
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_does_not_retry_empty_content_failures(): void
     {
         $fakeSleeper = new FakeSleeper();
@@ -1822,6 +2245,13 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([], $fakeSleeper->durations);
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_uses_rate_limit_delay_for_429_errors(): void
     {
         $fakeSleeper = new FakeSleeper();
@@ -1839,6 +2269,13 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([60_000], $fakeSleeper->durations);
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_uses_regular_delay_for_non_rate_limit_transient_errors(): void
     {
         $fakeSleeper = new FakeSleeper();
@@ -1856,6 +2293,13 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([500], $fakeSleeper->durations);
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_non_rate_limit_transient_error_never_pauses_the_rate_limiter(): void
     {
         $fakeRateLimiter = new FakeRateLimiter();
@@ -1873,6 +2317,13 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([], $fakeRateLimiter->paused, 'A non-429 transient failure must not honor a Retry-After hint.');
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_eager_resolution_catches_transient_failure_thrown_from_deferred_result(): void
     {
         $fakeSleeper = new FakeSleeper();
@@ -1891,6 +2342,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([10], $fakeSleeper->durations);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_acquire_runs_before_invoke_with_estimated_input_tokens(): void
     {
         $fakeRateLimiter = new FakeRateLimiter();
@@ -1906,6 +2363,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([246], $fakeRateLimiter->acquired, 'system + user prompts → 2 × 123 = 246');
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_record_runs_after_success_with_actual_tokens(): void
     {
         $fakeRateLimiter = new FakeRateLimiter();
@@ -1923,6 +2386,12 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([[250, 75]], $fakeRateLimiter->recorded);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_complete_with_tools_records_actual_tokens_after_each_iteration(): void
     {
         $fakeRateLimiter = new FakeRateLimiter();
@@ -1949,6 +2418,13 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame([[40, 10], [60, 5]], $fakeRateLimiter->recorded);
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_429_with_retry_after_uses_server_hint_and_pauses_rate_limiter(): void
     {
         $fakeSleeper = new FakeSleeper();
@@ -1968,6 +2444,13 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertCount(1, $fakeRateLimiter->paused);
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_429_without_retry_after_falls_back_to_exponential_delay(): void
     {
         $fakeSleeper = new FakeSleeper();
@@ -2002,6 +2485,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 $this->remaining = $scriptedResultsOrErrors;
             }
 
+            #[Override]
             public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 $next = array_shift($this->remaining);
@@ -2020,6 +2504,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 );
             }
 
+            #[Override]
             public function getModelCatalog(): ModelCatalogInterface
             {
                 return new FallbackModelCatalog();
@@ -2035,6 +2520,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 private readonly ?PlatformInvocationLog $platformInvocationLog,
             ) {}
 
+            #[Override]
             public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 if ($this->platformInvocationLog instanceof PlatformInvocationLog) {
@@ -2048,6 +2534,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 );
             }
 
+            #[Override]
             public function getModelCatalog(): ModelCatalogInterface
             {
                 return new FallbackModelCatalog();
@@ -2070,6 +2557,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 $this->remaining = $scriptedResultsOrErrors;
             }
 
+            #[Override]
             public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 $next = array_shift($this->remaining);
@@ -2090,6 +2578,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 );
             }
 
+            #[Override]
             public function getModelCatalog(): ModelCatalogInterface
             {
                 return new FallbackModelCatalog();
@@ -2116,6 +2605,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 $this->remaining = $scriptedResults;
             }
 
+            #[Override]
             public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 if ($this->platformInvocationLog instanceof PlatformInvocationLog) {
@@ -2137,6 +2627,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 );
             }
 
+            #[Override]
             public function getModelCatalog(): ModelCatalogInterface
             {
                 return new FallbackModelCatalog();
@@ -2156,6 +2647,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 private readonly InvocationOptionsCapture $invocationOptionsCapture,
             ) {}
 
+            #[Override]
             public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
             {
                 if (++$this->invocations > 1) {
@@ -2171,6 +2663,7 @@ final class SymfonyAiLLMClientTest extends TestCase
                 );
             }
 
+            #[Override]
             public function getModelCatalog(): ModelCatalogInterface
             {
                 return new FallbackModelCatalog();
@@ -2200,11 +2693,13 @@ final class SymfonyAiLLMClientTest extends TestCase
                 private readonly array $parametersSchema,
             ) {}
 
+            #[Override]
             public function definition(): ToolDefinition
             {
                 return new ToolDefinition($this->name, $this->description, $this->parametersSchema);
             }
 
+            #[Override]
             public function execute(array $arguments): string
             {
                 return $this->executor instanceof Closure ? ($this->executor)($arguments) : 'ok';

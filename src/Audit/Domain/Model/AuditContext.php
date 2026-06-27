@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 use DateTimeImmutable;
 use InvalidArgumentException;
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
 final class AuditContext implements CoverageRecorderInterface
@@ -183,6 +184,7 @@ final class AuditContext implements CoverageRecorderInterface
         );
     }
 
+    #[Override]
     public function recordCoverage(string $stage, string $filePath, string $status): void
     {
         $this->coverage[] = ['stage' => $stage, 'file' => $filePath, 'status' => $status];

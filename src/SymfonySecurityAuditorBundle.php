@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor;
 
 use JsonException;
+use Override;
 use Psr\Clock\ClockInterface;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
@@ -82,6 +83,7 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
  */
 final class SymfonySecurityAuditorBundle extends AbstractBundle
 {
+    #[Override]
     public function configure(DefinitionConfigurator $definition): void
     {
         $definition->rootNode()
@@ -421,6 +423,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      *
      * @throws JsonException
      */
+    #[Override]
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         $container->import('../config/services.php');

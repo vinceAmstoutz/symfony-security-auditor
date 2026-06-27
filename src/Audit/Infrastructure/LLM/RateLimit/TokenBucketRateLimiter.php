@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimi
 
 use DateTimeImmutable;
 use InvalidArgumentException;
+use Override;
 use Psr\Clock\ClockInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
@@ -73,6 +74,10 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
         $this->windowStart = $this->floorToMinute($this->clock->now());
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
+    #[Override]
     public function acquire(int $estimatedInputTokens): void
     {
         $this->assertAcceptableEstimate($estimatedInputTokens);
@@ -94,6 +99,9 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
         }
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     private function assertAcceptableEstimate(int $estimatedInputTokens): void
     {
         if ($estimatedInputTokens < 0) {
@@ -131,6 +139,7 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
         return true;
     }
 
+    #[Override]
     public function record(int $inputTokens, int $outputTokens): void
     {
         $this->inputTokensUsed = $this->inputTokensUsed - $this->pendingInputEstimate + $inputTokens;
@@ -138,6 +147,7 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
         $this->outputTokensUsed += $outputTokens;
     }
 
+    #[Override]
     public function pauseUntil(DateTimeImmutable $until): void
     {
         $this->pausedUntil = $until;

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use InvalidArgumentException;
+use Override;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
@@ -27,6 +28,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 {
     public function __construct(private PricingProviderInterface $pricingProvider) {}
 
+    #[Override]
     public function header(SymfonyStyle $symfonyStyle, string $projectPath): void
     {
         $symfonyStyle->title('Symfony LLM Security Auditor');
@@ -40,6 +42,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     /**
      * @param list<string> $configNotices
      */
+    #[Override]
     public function preflightWarnings(SymfonyStyle $symfonyStyle, bool $secretScrubbingEnabled, array $configNotices = []): void
     {
         foreach ($configNotices as $configNotice) {
@@ -53,6 +56,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $symfonyStyle->getErrorStyle()->warning('Secret scrubbing is disabled. File contents will be sent verbatim to the configured LLM provider. If that provider runs in the cloud, credentials in committed configs or .env.dist files may be exposed. Re-enable scan.secret_scrubbing.enabled (the default) or confirm you are using a local provider.');
     }
 
+    #[Override]
     public function unsupportedModelWarnings(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void
     {
         $unsupportedModels = $this->unsupportedModels($auditReport->cost());
@@ -81,11 +85,13 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         return $unsupportedModels;
     }
 
+    #[Override]
     public function runningSection(SymfonyStyle $symfonyStyle): void
     {
         $symfonyStyle->section('Running audit pipeline...');
     }
 
+    #[Override]
     public function longRunNotice(SymfonyStyle $symfonyStyle): void
     {
         $symfonyStyle->writeln([
@@ -95,11 +101,13 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         ]);
     }
 
+    #[Override]
     public function estimatingSection(SymfonyStyle $symfonyStyle): void
     {
         $symfonyStyle->section('Estimating audit cost (dry run)...');
     }
 
+    #[Override]
     public function dryRunResult(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void
     {
         $cost = $auditReport->cost();
@@ -133,6 +141,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $symfonyStyle->success('Dry run complete.');
     }
 
+    #[Override]
     public function scannedFiles(SymfonyStyle $symfonyStyle, array $projectFiles): void
     {
         if ([] === $projectFiles) {
@@ -151,6 +160,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $symfonyStyle->success(\sprintf('%d file(s) in scope.', \count($projectFiles)));
     }
 
+    #[Override]
     public function scannedFilesHint(SymfonyStyle $symfonyStyle, int $fileCount): void
     {
         $symfonyStyle->writeln(\sprintf(
@@ -174,6 +184,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         return $byType;
     }
 
+    #[Override]
     public function error(SymfonyStyle $symfonyStyle, Throwable $throwable): void
     {
         $message = $throwable instanceof InvalidArgumentException
@@ -183,6 +194,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $symfonyStyle->error($message);
     }
 
+    #[Override]
     public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void
     {
         if (Command::FAILURE === $exitCode) {
@@ -201,6 +213,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         ));
     }
 
+    #[Override]
     public function baselineGenerated(SymfonyStyle $symfonyStyle, string $path, int $fingerprintCount): void
     {
         $symfonyStyle->success(\sprintf(
@@ -210,6 +223,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         ));
     }
 
+    #[Override]
     public function baselineApplied(SymfonyStyle $symfonyStyle, int $suppressedCount): void
     {
         if ($suppressedCount < 1) {

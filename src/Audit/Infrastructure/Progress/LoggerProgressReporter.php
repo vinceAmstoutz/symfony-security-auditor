@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress;
 
+use Override;
 use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
@@ -32,6 +33,7 @@ final readonly class LoggerProgressReporter implements ProgressReporterInterface
 {
     public function __construct(private LoggerInterface $logger) {}
 
+    #[Override]
     public function report(string $event, array $context = []): void
     {
         try {

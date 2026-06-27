@@ -22,6 +22,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Inva
  */
 final readonly class BackoffSchedule
 {
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     public function __construct(
         public int $maxAttempts = RetryPolicy::DEFAULT_MAX_ATTEMPTS,
         public int $initialDelayMs = RetryPolicy::DEFAULT_INITIAL_DELAY_MS,

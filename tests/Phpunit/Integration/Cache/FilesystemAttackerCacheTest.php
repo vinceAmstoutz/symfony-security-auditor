@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Cache;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -35,6 +36,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertNull($this->filesystemAttackerCache->get($chunk));
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_get_returns_null_and_skips_read_when_no_entry_exists(): void
     {
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
@@ -176,12 +180,18 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertNull($this->filesystemAttackerCache->get($chunk));
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_constructor_rejects_empty_cache_dir(): void
     {
         $this->expectException(InvalidCacheConfigurationException::class);
         new FilesystemAttackerCache('   ', new Filesystem(), new NullLogger());
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_get_returns_null_when_filesystem_read_throws_io_exception(): void
     {
         $filesystem = self::createStub(Filesystem::class);
@@ -193,6 +203,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertNull($filesystemAttackerCache->get([ProjectFile::create('a.php', '/app/a.php', '<?php')]));
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_get_logs_warning_with_path_and_error_keys_when_filesystem_read_throws_io_exception(): void
     {
         $filesystem = self::createStub(Filesystem::class);
@@ -234,6 +247,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertSame([['type' => 'sql_injection', 'severity' => 'high']], $entries);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_get_logs_warning_when_cache_entry_is_unreadable_json(): void
     {
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
@@ -296,6 +312,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertSame([['type' => 'sql_injection', 'title' => 'b-finding']], $this->filesystemAttackerCache->get([$b]));
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_distinct_key_salts_produce_distinct_cache_entries(): void
     {
         $chunk = [ProjectFile::create('src/A.php', '/app/src/A.php', 'X')];
@@ -310,6 +329,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertNull($gptCache->get($chunk), 'switching the salt must invalidate the cache for the same chunk');
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_same_key_salt_yields_same_cache_entry_across_instances(): void
     {
         $chunk = [ProjectFile::create('src/A.php', '/app/src/A.php', 'X')];
@@ -335,6 +357,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertFileExists($expectedPath);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_salted_key_concatenates_salt_null_byte_and_signatures_in_that_order(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
@@ -348,6 +373,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertFileExists($expectedPath);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_dump_path_has_trailing_slash_stripped_from_cache_dir(): void
     {
         $capturedPath = '';
@@ -366,6 +394,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertStringNotContainsString('//', $capturedPath);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_get_logs_debug_cache_hit_with_path(): void
     {
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
@@ -392,6 +423,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertArrayHasKey('path', $hitLogs[0][1]);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_store_logs_debug_stored_with_path(): void
     {
         $debugLogs = [];
@@ -414,6 +448,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertArrayHasKey('path', $storedLogs[0][1]);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_store_failure_warning_includes_path_and_error_keys(): void
     {
         $warnings = [];
@@ -439,6 +476,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertNotSame('', $failureLogs[0][1]['error']);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_get_failure_warning_includes_path_and_error_keys(): void
     {
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
@@ -471,6 +511,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertNotSame('', $unreadableLogs[0][1]['error']);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_store_calls_mkdir_to_create_shard_directory(): void
     {
         $filesystem = $this->createMock(Filesystem::class);
@@ -481,6 +524,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         $filesystemAttackerCache->store([ProjectFile::create('a.php', '/app/a.php', '<?php')], [['type' => 'sql_injection']]);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_store_with_unwritable_dir_logs_warning_and_does_not_throw(): void
     {
         $warnings = [];
@@ -500,12 +546,17 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertContains('Failed to write attacker cache entry', $warnings);
     }
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    #[Override]
     protected function setUp(): void
     {
         $this->cacheDir = sys_get_temp_dir().'/attacker_cache_'.uniqid('', true);
         $this->filesystemAttackerCache = new FilesystemAttackerCache($this->cacheDir, new Filesystem(), new NullLogger());
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $filesystem = new Filesystem();

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline;
 
+use Override;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
@@ -46,6 +47,7 @@ final readonly class AuditPipeline implements PipelineInterface
         $this->progressReporter = $progressReporter ?? new NullProgressReporter();
     }
 
+    #[Override]
     public function process(AuditContext $auditContext): void
     {
         $stageNames = array_map(static fn (StageInterface $stage): string => $stage->name(), $this->stages);

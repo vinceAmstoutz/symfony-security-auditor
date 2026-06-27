@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 
@@ -35,6 +36,7 @@ final readonly class FindingTypeFilter implements FindingTypeFilterInterface
         $this->excludedTypes = array_map(VulnerabilityType::from(...), $excludedTypeValues);
     }
 
+    #[Override]
     public function apply(AuditReport $auditReport): AuditReport
     {
         return $auditReport->filteredByTypes($this->includedTypes, $this->excludedTypes);

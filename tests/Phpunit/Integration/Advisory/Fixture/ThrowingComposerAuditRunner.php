@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Advisory\Fixture;
 
+use Override;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 
@@ -23,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerA
  */
 final class ThrowingComposerAuditRunner implements ComposerAuditRunnerInterface
 {
+    #[Override]
     public function run(string $projectPath): string
     {
         throw new RuntimeException('inner exploded');

@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
+use Override;
+
 /**
  * Default reporter — discards every event. Used when the host has not
  * registered a custom reporter, so the pipeline can emit events
@@ -22,6 +24,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
  */
 final readonly class NullProgressReporter implements ProgressReporterInterface
 {
+    #[Override]
     public function report(string $event, array $context = []): void
     {
         // no-op

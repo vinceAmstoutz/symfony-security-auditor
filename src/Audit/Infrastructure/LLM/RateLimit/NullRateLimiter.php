@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit;
 
 use DateTimeImmutable;
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 
 /**
@@ -24,16 +25,19 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
  */
 final readonly class NullRateLimiter implements RateLimiterInterface
 {
+    #[Override]
     public function acquire(int $estimatedInputTokens): void
     {
         // No throttle configured — let the call through immediately.
     }
 
+    #[Override]
     public function record(int $inputTokens, int $outputTokens): void
     {
         // Nothing to reconcile when no bucket exists.
     }
 
+    #[Override]
     public function pauseUntil(DateTimeImmutable $until): void
     {
         // No bucket to freeze.
