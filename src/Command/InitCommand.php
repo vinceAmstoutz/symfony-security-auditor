@@ -23,8 +23,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPa
 
 use function Symfony\Component\String\u;
 
-#[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
 /** @internal not part of the BC promise — the command *name* (`init`) is public, but the PHP class itself is for internal use only. */
+#[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
 final readonly class InitCommand
 {
     public const string NAME = 'init';
