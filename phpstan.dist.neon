@@ -10,12 +10,15 @@ parameters:
     checkImplicitMixed: true
     checkBenevolentUnionTypes: true
     checkMissingOverrideMethodAttribute: true
+    checkMissingCallableSignature: true
     reportAnyTypeWideningInVarTag: true
     reportAlwaysTrueInLastCondition: true
+    reportPossiblyNonexistentConstantArrayOffset: true
     exceptions:
         check:
             missingCheckedExceptionInThrows: true
             tooWideThrowType: true
+            tooWideImplicitThrowType: true
         checkedExceptionRegexes:
             - '#^VinceAmstoutz\\SymfonySecurityAuditor\\.+\\Exception\\#'
     paths:

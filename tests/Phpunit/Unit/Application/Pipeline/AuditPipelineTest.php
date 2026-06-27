@@ -272,9 +272,15 @@ final class AuditPipelineTest extends TestCase
         rmdir($this->tmpDir);
     }
 
+    /**
+     * @param Closure(AuditContext): void $callback
+     */
     private function createNamedStage(string $name, Closure $callback): StageInterface
     {
         return new class($name, $callback) implements StageInterface {
+            /**
+             * @param Closure(AuditContext): void $callback
+             */
             public function __construct(
                 private readonly string $stageName,
                 private readonly Closure $callback,

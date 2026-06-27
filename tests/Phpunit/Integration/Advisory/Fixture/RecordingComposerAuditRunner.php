@@ -28,6 +28,9 @@ final class RecordingComposerAuditRunner implements ComposerAuditRunnerInterface
 
     public function __construct(public string $payload) {}
 
+    /**
+     * @throws void
+     */
     #[Override]
     public function run(string $projectPath): string
     {

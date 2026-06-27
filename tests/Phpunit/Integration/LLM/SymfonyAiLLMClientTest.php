@@ -719,6 +719,9 @@ final class SymfonyAiLLMClientTest extends TestCase
                             return true;
                         }
 
+                        /**
+                         * @throws RuntimeException
+                         */
                         #[Override]
                         public function convert(RawResultInterface $result, array $options = []): ResultInterface
                         {

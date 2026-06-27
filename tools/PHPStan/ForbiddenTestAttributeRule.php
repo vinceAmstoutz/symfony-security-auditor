@@ -74,13 +74,12 @@ final readonly class ForbiddenTestAttributeRule implements Rule
     public function processNode(Node $node, Scope $scope): array
     {
         $errors = [];
-        foreach ($this->forbiddenAttributes($node) as $attribute) {
+        foreach ($this->forbiddenAttributes($node) as [$attribute, $name, $reason]) {
             if ($this->isAllowed($attribute, $node)) {
                 continue;
             }
 
-            $name = $attribute->name->getLast();
-            $errors[] = RuleErrorBuilder::message(\sprintf('Attribute #[%s] is forbidden — %s.', $name, self::FORBIDDEN[$name]))
+            $errors[] = RuleErrorBuilder::message(\sprintf('Attribute #[%s] is forbidden — %s.', $name, $reason))
                 ->identifier('ssa.forbiddenTestAttribute')
                 ->build();
         }
@@ -89,14 +88,15 @@ final readonly class ForbiddenTestAttributeRule implements Rule
     }
 
     /**
-     * @return iterable<Attribute>
+     * @return iterable<array{Attribute, string, string}>
      */
     private function forbiddenAttributes(ClassMethod $classMethod): iterable
     {
         foreach ($classMethod->attrGroups as $group) {
             foreach ($group->attrs as $attribute) {
-                if (\array_key_exists($attribute->name->getLast(), self::FORBIDDEN)) {
-                    yield $attribute;
+                $name = $attribute->name->getLast();
+                if (\array_key_exists($name, self::FORBIDDEN)) {
+                    yield [$attribute, $name, self::FORBIDDEN[$name]];
                 }
             }
         }
