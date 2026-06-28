@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt;
 
+use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
@@ -29,6 +30,7 @@ final class AttackerPromptBuilderTest extends TestCase
 {
     private AttackerPromptBuilder $attackerPromptBuilder;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->attackerPromptBuilder = new AttackerPromptBuilder();

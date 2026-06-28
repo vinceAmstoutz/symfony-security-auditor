@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay;
 
 use Closure;
+use Override;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class UsleepSleeper implements SleeperInterface
@@ -29,6 +30,7 @@ final readonly class UsleepSleeper implements SleeperInterface
         $this->usleep = $usleep ?? usleep(...);
     }
 
+    #[Override]
     public function sleep(int $milliseconds): void
     {
         if ($milliseconds <= 0) {

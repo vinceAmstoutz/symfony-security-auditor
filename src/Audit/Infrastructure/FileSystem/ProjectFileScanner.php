@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
 use Closure;
+use Override;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
@@ -66,6 +67,7 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
     /**
      * @return list<ProjectFile>
      */
+    #[Override]
     public function scan(string $projectPath): array
     {
         $this->logger->info('Scanning project', ['path' => $projectPath]);

@@ -22,6 +22,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Inva
  */
 final readonly class RateLimitBackoff
 {
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     public function __construct(
         public int $initialDelayMs = RetryPolicy::DEFAULT_RATE_LIMIT_DELAY_MS,
         public int $maxDelayMs = RetryPolicy::DEFAULT_RATE_LIMIT_MAX_DELAY_MS,

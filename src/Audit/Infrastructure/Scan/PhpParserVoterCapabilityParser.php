@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
+use Override;
 use PhpParser\Node;
 use PhpParser\Node\Expr\Instanceof_;
 use PhpParser\Node\Name;
@@ -41,6 +42,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParser
  */
 final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityParserInterface
 {
+    #[Override]
     public function parse(ProjectFile $projectFile): ?VoterCapability
     {
         if (ProjectFileType::VOTER !== $projectFile->fileType()) {

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle;
 
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
+use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
@@ -1018,12 +1019,14 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame(1, $containerBuilder->getParameter('symfony_security_auditor.audit.max_tool_iterations'));
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/bundle_test_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         if ($this->bootedKernel instanceof Kernel) {
@@ -1090,12 +1093,14 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             /**
              * @return iterable<FrameworkBundle|SymfonySecurityAuditorBundle>
              */
+            #[Override]
             public function registerBundles(): iterable
             {
                 yield new FrameworkBundle();
                 yield new SymfonySecurityAuditorBundle();
             }
 
+            #[Override]
             public function registerContainerConfiguration(LoaderInterface $loader): void
             {
                 $bundleConfig = $this->bundleConfig;
@@ -1119,16 +1124,19 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
                 });
             }
 
+            #[Override]
             public function getProjectDir(): string
             {
                 return $this->tmpDir;
             }
 
+            #[Override]
             public function getCacheDir(): string
             {
                 return $this->tmpDir.'/cache';
             }
 
+            #[Override]
             public function getLogDir(): string
             {
                 return $this->tmpDir.'/log';

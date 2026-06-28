@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 
@@ -34,12 +35,14 @@ final class AuditContextDiffTest extends TestCase
         self::assertSame('origin/main', $auditContext->diffSinceRef());
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/audit_context_diff_test_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
+use Override;
 use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
@@ -39,6 +40,11 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
         private VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,
     ) {}
 
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    #[Override]
     public function synthesize(array $vulnerabilities): array
     {
         if ([] === $vulnerabilities) {
@@ -85,6 +91,10 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
             && $vulnerability->severity()->score() >= $this->vulnerabilitySeverity->score();
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     private function synthesizeOne(Vulnerability $vulnerability): ?string
     {
         $systemPrompt = $this->buildSystemPrompt();

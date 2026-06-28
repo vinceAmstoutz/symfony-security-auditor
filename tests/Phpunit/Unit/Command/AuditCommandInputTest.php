@@ -82,6 +82,9 @@ final class AuditCommandInputTest extends TestCase
         self::assertNull($auditCommandInput->projectPath);
     }
 
+    /**
+     * @throws WorkingDirectoryUnavailableException
+     */
     public function test_resolved_project_path_returns_cwd_when_property_is_null(): void
     {
         $auditCommandInput = new AuditCommandInput();
@@ -89,6 +92,9 @@ final class AuditCommandInputTest extends TestCase
         self::assertSame(getcwd(), $auditCommandInput->resolvedProjectPath());
     }
 
+    /**
+     * @throws WorkingDirectoryUnavailableException
+     */
     public function test_resolved_project_path_returns_cwd_when_property_is_empty_string(): void
     {
         $auditCommandInput = new AuditCommandInput();
@@ -97,6 +103,9 @@ final class AuditCommandInputTest extends TestCase
         self::assertSame(getcwd(), $auditCommandInput->resolvedProjectPath());
     }
 
+    /**
+     * @throws WorkingDirectoryUnavailableException
+     */
     public function test_resolved_project_path_returns_cwd_when_property_is_whitespace_only(): void
     {
         $auditCommandInput = new AuditCommandInput();
@@ -105,6 +114,9 @@ final class AuditCommandInputTest extends TestCase
         self::assertSame(getcwd(), $auditCommandInput->resolvedProjectPath());
     }
 
+    /**
+     * @throws WorkingDirectoryUnavailableException
+     */
     public function test_resolved_project_path_returns_provided_path_when_set(): void
     {
         $auditCommandInput = new AuditCommandInput();
@@ -113,6 +125,9 @@ final class AuditCommandInputTest extends TestCase
         self::assertSame('/tmp/project', $auditCommandInput->resolvedProjectPath());
     }
 
+    /**
+     * @throws WorkingDirectoryUnavailableException
+     */
     public function test_resolved_project_path_trims_surrounding_whitespace_and_returns_absolute(): void
     {
         $auditCommandInput = new AuditCommandInput();
@@ -121,6 +136,9 @@ final class AuditCommandInputTest extends TestCase
         self::assertSame('/tmp/project', $auditCommandInput->resolvedProjectPath());
     }
 
+    /**
+     * @throws WorkingDirectoryUnavailableException
+     */
     public function test_resolved_project_path_resolves_dot_to_the_working_directory(): void
     {
         $auditCommandInput = new AuditCommandInput();
@@ -129,6 +147,9 @@ final class AuditCommandInputTest extends TestCase
         self::assertSame('/custom/cwd', $auditCommandInput->resolvedProjectPath(static fn (): string => '/custom/cwd'));
     }
 
+    /**
+     * @throws WorkingDirectoryUnavailableException
+     */
     public function test_resolved_project_path_resolves_a_relative_path_against_the_working_directory(): void
     {
         $auditCommandInput = new AuditCommandInput();
@@ -137,6 +158,9 @@ final class AuditCommandInputTest extends TestCase
         self::assertSame('/custom/cwd/app', $auditCommandInput->resolvedProjectPath(static fn (): string => '/custom/cwd'));
     }
 
+    /**
+     * @throws WorkingDirectoryUnavailableException
+     */
     public function test_resolved_project_path_throws_when_cwd_lookup_returns_false(): void
     {
         $auditCommandInput = new AuditCommandInput();
@@ -147,6 +171,9 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput->resolvedProjectPath(static fn (): false => false);
     }
 
+    /**
+     * @throws WorkingDirectoryUnavailableException
+     */
     public function test_resolved_project_path_uses_injected_resolver_when_property_is_null(): void
     {
         $auditCommandInput = new AuditCommandInput();

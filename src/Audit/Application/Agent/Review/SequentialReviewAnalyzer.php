@@ -44,6 +44,9 @@ final readonly class SequentialReviewAnalyzer
      * @param list<ProjectFile>   $projectFiles
      *
      * @return list<Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function analyze(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, bool $bypassCache): array
     {
@@ -57,6 +60,9 @@ final readonly class SequentialReviewAnalyzer
 
     /**
      * @param list<ProjectFile> $projectFiles
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     private function reviewSingle(Vulnerability $vulnerability, array $projectFiles, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, bool $bypassCache): Vulnerability
     {

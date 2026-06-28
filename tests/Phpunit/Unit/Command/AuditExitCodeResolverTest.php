@@ -13,9 +13,12 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
+use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -33,6 +36,7 @@ final class AuditExitCodeResolverTest extends TestCase
 
     private string $tmpDir;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->auditExitCodeResolver = new AuditExitCodeResolver();
@@ -40,11 +44,16 @@ final class AuditExitCodeResolverTest extends TestCase
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     #[DataProvider('thresholdCases')]
     public function test_it_fails_only_when_risk_level_meets_the_threshold(int $criticalFindings, RiskLevel $riskLevel, int $expectedExitCode): void
     {
@@ -78,6 +87,10 @@ final class AuditExitCodeResolverTest extends TestCase
         yield 'safe risk fails the safe gate' => [0, RiskLevel::Safe, Command::FAILURE];
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function reportWith(int $criticalFindings): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);

@@ -13,11 +13,13 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class NullControllerAccessControlParser implements ControllerAccessControlParserInterface
 {
+    #[Override]
     public function parse(ProjectFile $projectFile): array
     {
         return [];

@@ -51,6 +51,9 @@ final class BudgetTracker
         );
     }
 
+    /**
+     * @throws BudgetExceededException
+     */
     public function assertWithinBudget(): void
     {
         $maxTokens = $this->auditBudget->maxTokens();

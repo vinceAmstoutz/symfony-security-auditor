@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
+use Override;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Attribute;
 use PhpParser\Node\AttributeGroup;
@@ -43,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessContr
  */
 final readonly class PhpParserControllerAccessControlParser implements ControllerAccessControlParserInterface
 {
+    #[Override]
     public function parse(ProjectFile $projectFile): array
     {
         if (ProjectFileType::CONTROLLER !== $projectFile->fileType()) {

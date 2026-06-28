@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan;
 
+use Override;
 use PhpParser\Comment\Doc;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\ClassMethod;
@@ -29,6 +30,7 @@ final readonly class MaxParameterCountRule implements Rule
 {
     private const int MAX_PARAMETERS = 5;
 
+    #[Override]
     public function getNodeType(): string
     {
         return ClassMethod::class;
@@ -39,6 +41,7 @@ final readonly class MaxParameterCountRule implements Rule
      *
      * @throws ShouldNotHappenException
      */
+    #[Override]
     public function processNode(Node $node, Scope $scope): array
     {
         $parameterCount = \count($node->params);

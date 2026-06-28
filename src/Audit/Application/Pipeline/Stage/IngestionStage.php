@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
+use Override;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -31,11 +32,13 @@ final readonly class IngestionStage implements StageInterface
         private ?GitChangedFilesResolverInterface $gitChangedFilesResolver = null,
     ) {}
 
+    #[Override]
     public function name(): string
     {
         return BuiltInStageName::Ingestion->value;
     }
 
+    #[Override]
     public function process(AuditContext $auditContext): void
     {
         $this->logger->info('Ingesting project files', [

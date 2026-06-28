@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
+use Override;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\ClassConstFetch;
@@ -43,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInte
  */
 final readonly class PhpParserFormBindingParser implements FormBindingParserInterface
 {
+    #[Override]
     public function parse(ProjectFile $projectFile): array
     {
         if (ProjectFileType::CONTROLLER !== $projectFile->fileType()) {

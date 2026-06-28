@@ -19,6 +19,8 @@ use RuntimeException;
 use Symfony\Component\ErrorHandler\BufferingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
@@ -32,6 +34,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 
 final class PoCSynthesizerTest extends TestCase
 {
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     public function test_it_returns_empty_when_input_is_empty(): void
     {
         $llmClient = self::createMock(LLMClientInterface::class);
@@ -42,6 +48,12 @@ final class PoCSynthesizerTest extends TestCase
         self::assertSame([], $poCSynthesizer->synthesize([]));
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
+     */
     public function test_it_synthesizes_poc_for_validated_high_severity_finding(): void
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
@@ -62,6 +74,12 @@ final class PoCSynthesizerTest extends TestCase
         self::assertStringContainsString('curl -X POST /admin/users', $enriched[0]->synthesizedPoC());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
+     */
     public function test_it_skips_findings_below_severity_floor(): void
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::LOW)->withReviewerValidation(true);
@@ -76,6 +94,12 @@ final class PoCSynthesizerTest extends TestCase
         self::assertNull($enriched[0]->synthesizedPoC());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
+     */
     public function test_it_skips_findings_not_validated_by_reviewer(): void
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH);
@@ -90,6 +114,12 @@ final class PoCSynthesizerTest extends TestCase
         self::assertNull($enriched[0]->synthesizedPoC());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
+     */
     public function test_it_keeps_original_when_llm_returns_empty(): void
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
@@ -104,6 +134,12 @@ final class PoCSynthesizerTest extends TestCase
         self::assertNull($enriched[0]->synthesizedPoC());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
+     */
     public function test_it_keeps_original_when_llm_throws_generic_exception(): void
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
@@ -118,6 +154,12 @@ final class PoCSynthesizerTest extends TestCase
         self::assertNull($enriched[0]->synthesizedPoC());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
+     */
     public function test_severity_floor_medium_includes_medium_findings(): void
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::MEDIUM)->withReviewerValidation(true);
@@ -137,6 +179,12 @@ final class PoCSynthesizerTest extends TestCase
         self::assertNotNull($enriched[0]->synthesizedPoC());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
+     */
     public function test_returned_list_preserves_input_order_and_length(): void
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH, filePath: 'src/A.php')->withReviewerValidation(true);
@@ -159,6 +207,12 @@ final class PoCSynthesizerTest extends TestCase
         self::assertNotNull($enriched[2]->synthesizedPoC());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
+     */
     public function test_it_logs_completion_summary_with_inputs_synthesized_and_skipped_counts(): void
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
@@ -177,6 +231,10 @@ final class PoCSynthesizerTest extends TestCase
         self::assertSame(['inputs' => 2, 'synthesized' => 1, 'skipped' => 1], $completion[2]);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     public function test_it_does_not_log_completion_for_empty_input(): void
     {
         $bufferingLogger = new BufferingLogger();
@@ -186,6 +244,12 @@ final class PoCSynthesizerTest extends TestCase
         self::assertSame([], $bufferingLogger->cleanLogs());
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
+     */
     public function test_it_logs_vulnerability_id_and_error_when_synthesis_throws(): void
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
@@ -206,6 +270,12 @@ final class PoCSynthesizerTest extends TestCase
         self::assertSame('network down', $entry[2]['error']);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
+     */
     public function test_it_continues_to_the_next_finding_after_one_yields_no_poc(): void
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH, filePath: 'src/First.php')->withReviewerValidation(true);
@@ -230,6 +300,12 @@ final class PoCSynthesizerTest extends TestCase
         self::assertSame(['inputs' => 2, 'synthesized' => 1, 'skipped' => 1], $completion[2]);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
+     */
     public function test_it_rethrows_budget_exceeded_exception(): void
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
@@ -241,6 +317,12 @@ final class PoCSynthesizerTest extends TestCase
         (new PoCSynthesizer($llmClient, new NullLogger()))->synthesize([$vulnerability]);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
+     */
     public function test_it_rethrows_llm_provider_exception(): void
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
@@ -252,6 +334,10 @@ final class PoCSynthesizerTest extends TestCase
         (new PoCSynthesizer($llmClient, new NullLogger()))->synthesize([$vulnerability]);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function makeVulnerability(
         VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,
         string $filePath = 'src/Controller/Foo.php',

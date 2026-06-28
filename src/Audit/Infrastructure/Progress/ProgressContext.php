@@ -54,6 +54,6 @@ final readonly class ProgressContext
             return '';
         }
 
-        return \sprintf(' (%ds)', round($value));
+        return \sprintf(' (%ds)', (int) round($value));
     }
 }

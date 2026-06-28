@@ -56,6 +56,9 @@ final readonly class ConcurrentChunkAnalyzer
      * @param list<list<ProjectFile>> $chunks
      *
      * @return array{0: list<Vulnerability>, 1: array<string, int>}
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function analyze(array $chunks, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, RiskMarkerIndex $riskMarkerIndex): array
     {
@@ -185,6 +188,9 @@ final readonly class ConcurrentChunkAnalyzer
     /**
      * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                      $requests
      * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}> $pending
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     private function dispatch(array $requests, array $pending, CoverageRecorderInterface $coverageRecorder): void
     {

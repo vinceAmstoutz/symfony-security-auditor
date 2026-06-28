@@ -48,7 +48,14 @@ final readonly class RetryingPlatformInvoker
         private RetryAfterHeaderParser $retryAfterHeaderParser,
     ) {}
 
-    /** @param array<string, mixed> $options */
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws EmptyLLMResponseException
+     * @throws NonTransientLLMFailureException
+     */
     public function invoke(MessageBag $messageBag, array $options, int $estimatedInputTokens): DeferredResult
     {
         $platform = $this->platform ?? throw MissingAiPlatformException::create();
@@ -78,6 +85,10 @@ final readonly class RetryingPlatformInvoker
         }
     }
 
+    /**
+     * @throws EmptyLLMResponseException
+     * @throws NonTransientLLMFailureException
+     */
     private function rethrowWhenNonTransient(Throwable $throwable): void
     {
         if ($this->transientFailureClassifier->isEmptyContent($throwable)) {

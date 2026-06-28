@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
@@ -22,6 +23,7 @@ final class RegexStaticPreScannerTest extends TestCase
 {
     private RegexStaticPreScanner $regexStaticPreScanner;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->regexStaticPreScanner = new RegexStaticPreScanner();

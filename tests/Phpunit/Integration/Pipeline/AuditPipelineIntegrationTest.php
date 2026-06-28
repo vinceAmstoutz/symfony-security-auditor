@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Pipeline;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Validator\Validation;
@@ -128,12 +129,14 @@ final class AuditPipelineIntegrationTest extends TestCase
         self::assertNotNull($auditContext->getMeta('audit.risk_score'));
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/pipeline_int_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $this->rmdirRecursive($this->tmpDir);
@@ -204,7 +207,12 @@ final class AuditPipelineIntegrationTest extends TestCase
             return;
         }
 
-        foreach (scandir($dir) as $item) {
+        $items = scandir($dir);
+        if (false === $items) {
+            return;
+        }
+
+        foreach ($items as $item) {
             if ('.' === $item) {
                 continue;
             }

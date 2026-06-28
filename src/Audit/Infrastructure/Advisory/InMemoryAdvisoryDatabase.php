@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 
 /**
@@ -34,6 +35,7 @@ final readonly class InMemoryAdvisoryDatabase implements AdvisoryDatabaseInterfa
      */
     public function __construct(private array $entriesByPackage = []) {}
 
+    #[Override]
     public function lookup(string $packageName, string $installedVersion): array
     {
         return $this->entriesByPackage[$packageName] ?? [];

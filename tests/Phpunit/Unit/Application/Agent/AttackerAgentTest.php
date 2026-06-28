@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
+use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -34,6 +35,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityCollector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -95,6 +98,10 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     #[MaximumDuration(250)]
     public function test_lean_mode_skip_logs_counts_records_skipped_coverage_and_returns_empty(): void
     {
@@ -111,6 +118,7 @@ final class AttackerAgentTest extends TestCase
             /** @var list<string> */
             public array $statuses = [];
 
+            #[Override]
             public function recordCoverage(string $stage, string $filePath, string $status): void
             {
                 $this->statuses[] = $status;
@@ -135,6 +143,10 @@ final class AttackerAgentTest extends TestCase
         self::assertNotContains('Attacker agent starting analysis', $messages);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     public function test_risk_markers_are_prepended_before_the_user_message(): void
     {
         $markers = [RiskMarker::create('src/Controller/A.php', 10, 'request_get', 'Request input read')];
@@ -157,6 +169,12 @@ final class AttackerAgentTest extends TestCase
         self::assertStringContainsString('## Source Code', $captured);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     public function test_previous_findings_are_prepended_before_the_user_message(): void
     {
         $previousFindings = [$this->makeVulnerabilityFor('src/Controller/A.php')];
@@ -180,6 +198,12 @@ final class AttackerAgentTest extends TestCase
         self::assertStringContainsString('## Source Code', $captured);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     public function test_rejected_findings_are_prepended_before_the_user_message_with_a_blank_line(): void
     {
         $rejectedFindings = [$this->makeVulnerabilityFor('src/Controller/Rejected.php')];
@@ -205,6 +229,10 @@ final class AttackerAgentTest extends TestCase
         self::assertStringContainsString('## Source Code', $captured);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     public function test_it_sends_the_sliced_content_to_the_llm(): void
     {
         $codeSlicer = self::createStub(CodeSlicerInterface::class);
@@ -1290,17 +1318,23 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/attacker_agent_test_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_injects_previous_findings_section_into_prompt_when_provided(): void
     {
         $sentMessages = [];
@@ -1352,6 +1386,10 @@ final class AttackerAgentTest extends TestCase
         self::assertStringNotContainsString('Patterns Already Confirmed', $sentMessages[0]);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_skips_cache_when_previous_findings_present(): void
     {
         $cache = self::createMock(AttackerCacheInterface::class);
@@ -1375,6 +1413,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['previousFindings' => $previousFindings]);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_injects_rejected_findings_section_into_prompt_when_provided(): void
     {
         $sentMessages = [];
@@ -1418,6 +1460,10 @@ final class AttackerAgentTest extends TestCase
         self::assertStringNotContainsString('Findings Already Rejected by the Reviewer', $sentMessages[0]);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_skips_cache_when_rejected_findings_present(): void
     {
         $cache = self::createMock(AttackerCacheInterface::class);
@@ -1448,6 +1494,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_previous_findings_section_groups_locations_by_vulnerability_type(): void
     {
         $sentMessages = [];
@@ -1496,6 +1546,7 @@ final class AttackerAgentTest extends TestCase
             });
 
         $scanner = new class implements StaticPreScannerInterface {
+            #[Override]
             public function scan(array $files): array
             {
                 return [
@@ -1565,6 +1616,7 @@ final class AttackerAgentTest extends TestCase
             });
 
         $scanner = new class implements StaticPreScannerInterface {
+            #[Override]
             public function scan(array $files): array
             {
                 return [
@@ -1596,6 +1648,7 @@ final class AttackerAgentTest extends TestCase
         $cache->expects(self::once())->method('store');
 
         $scanner = new class implements StaticPreScannerInterface {
+            #[Override]
             public function scan(array $files): array
             {
                 return [
@@ -1638,6 +1691,10 @@ final class AttackerAgentTest extends TestCase
         return ProjectFile::create($path, '/app/'.$path, '<?php class Foo {}');
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function makeVulnerabilityFor(string $filePath): Vulnerability
     {
         return Vulnerability::of(
@@ -1852,6 +1909,7 @@ final class AttackerAgentTest extends TestCase
             /** @var list<array{stage: string, file: string, status: string}> */
             public array $records = [];
 
+            #[Override]
             public function recordCoverage(string $stage, string $filePath, string $status): void
             {
                 $this->records[] = ['stage' => $stage, 'file' => $filePath, 'status' => $status];
@@ -2384,6 +2442,7 @@ final class AttackerAgentTest extends TestCase
     private function makeRecordToolFactory(): RecordVulnerabilityToolFactoryInterface
     {
         return new class implements RecordVulnerabilityToolFactoryInterface {
+            #[Override]
             public function create(VulnerabilityCollector $vulnerabilityCollector): ToolInterface
             {
                 return new RecordVulnerabilityTool($vulnerabilityCollector);
@@ -2391,6 +2450,10 @@ final class AttackerAgentTest extends TestCase
         };
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_context_aware_cache_serves_chunks_carrying_previous_findings(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -2413,6 +2476,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame([], $result);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_context_aware_cache_stores_context_carrying_chunks_after_the_llm_call(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -2449,6 +2516,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_context_unaware_cache_is_skipped_for_chunks_carrying_previous_findings(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -2468,6 +2539,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['previousFindings' => $previousFindings]);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_context_key_is_the_hash_of_the_rendered_context_preambles(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -2499,6 +2574,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame([$expectedKey], $contextKeys);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_previous_and_rejected_findings_produce_distinct_context_keys(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];

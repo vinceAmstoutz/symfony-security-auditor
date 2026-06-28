@@ -60,6 +60,9 @@ final readonly class SequentialChunkAnalyzer
      * @param list<list<ProjectFile>> $chunks
      *
      * @return array{0: list<Vulnerability>, 1: array<string, int>}
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function analyze(array $chunks, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, RiskMarkerIndex $riskMarkerIndex): array
     {
@@ -100,6 +103,9 @@ final readonly class SequentialChunkAnalyzer
 
     /**
      * @param list<ProjectFile> $chunk
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     private function analyzeChunk(array $chunk, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, RiskMarkerIndex $riskMarkerIndex): VulnerabilityHydrationResult
     {

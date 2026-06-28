@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 
@@ -143,6 +144,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         private bool $useStructuredCollection = self::DEFAULT_STRUCTURED_COLLECTION,
     ) {}
 
+    #[Override]
     public function buildSystemPrompt(): string
     {
         if ($this->useStructuredCollection) {
@@ -166,6 +168,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         ]);
     }
 
+    #[Override]
     public function buildBatchSystemPrompt(): string
     {
         $batchPreamble = 'You will receive SEVERAL vulnerability reports in a single batch and must validate each one.';
@@ -200,6 +203,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         ]);
     }
 
+    #[Override]
     public function buildBatchUserMessage(array $vulnerabilities, array $codeContexts): string
     {
         $sections = [];
@@ -271,6 +275,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         return "\n\nReturn a JSON array of reviews — one entry per finding above. Each entry's \"id\" must match the input; we re-key by id on parse, so a misordered array with correct ids will still be accepted.";
     }
 
+    #[Override]
     public function buildUserMessage(Vulnerability $vulnerability, string $codeContext): string
     {
         $data = $vulnerability->toArray();

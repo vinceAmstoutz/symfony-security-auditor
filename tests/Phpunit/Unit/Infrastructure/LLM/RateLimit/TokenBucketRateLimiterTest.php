@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\Rat
 
 use DateTimeImmutable;
 use InvalidArgumentException;
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
 use RuntimeException;
@@ -26,6 +27,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Toke
 
 final class TokenBucketRateLimiterTest extends TestCase
 {
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_acquire_returns_immediately_when_capacity_available(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -46,6 +50,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_acquire_sleeps_until_next_window_when_rpm_exhausted(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -70,6 +77,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([30_000], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_acquire_sleeps_when_input_tokens_would_exceed_window(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -93,6 +103,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([50_000], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_window_resets_when_minute_elapses(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -116,6 +129,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([], $sleeper->sleepsMs, 'fresh window should not require sleeping');
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_record_reconciles_input_estimate_against_actual(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -139,6 +155,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_output_token_exhaustion_blocks_next_acquire(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -163,6 +182,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([50_000], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_output_under_quota_does_not_block(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -185,6 +207,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_pause_until_blocks_acquire_until_target(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -206,6 +231,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([45_000], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_pause_resumes_into_capacity_check_and_consumes_quota(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -229,6 +257,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([30_000, 30_000], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_pause_spanning_a_window_boundary_resets_the_window_before_reserving(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -253,6 +284,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([65_000], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_pause_until_in_the_past_does_not_block(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -293,6 +327,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         );
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_estimate_larger_than_window_throws(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -314,6 +351,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 200);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_negative_estimate_is_rejected(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -335,6 +375,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: -1);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_record_accumulates_output_across_multiple_calls(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -361,6 +404,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([60_000], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_record_zero_output_does_not_increment_used(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -385,6 +431,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_post_reset_request_count_starts_at_zero(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -413,6 +462,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([59_000], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_post_reset_input_count_starts_at_zero(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -439,6 +491,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([59_000], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_post_reset_output_count_starts_at_zero(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -466,6 +521,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([59_000], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_acquire_accumulates_input_tokens_across_calls(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -488,6 +546,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([60_000], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_record_reconcile_adds_actual_input_to_bucket(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -510,6 +571,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([60_000], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_record_zero_input_uses_reconciled_value_not_pending_estimate(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -532,6 +596,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_consecutive_records_without_acquire_use_zeroed_pending_estimate(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -555,6 +622,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_ms_until_rounds_sub_millisecond_delta_up_to_one(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00.000500+00:00');
@@ -578,6 +648,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([1], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_ms_until_rounds_exact_one_millisecond_delta_to_one(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00.000000+00:00');
@@ -601,6 +674,9 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([1], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_ms_until_rounds_just_over_one_millisecond_delta_up_to_two(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00.000000+00:00');
@@ -634,6 +710,7 @@ final class TokenBucketRateLimiterTest extends TestCase
                 private readonly int $maxCalls,
             ) {}
 
+            #[Override]
             public function now(): DateTimeImmutable
             {
                 if (++$this->calls > $this->maxCalls) {
@@ -656,6 +733,7 @@ final class TokenBucketRateLimiterTest extends TestCase
 
             public function __construct(private readonly MockClock $mockClock) {}
 
+            #[Override]
             public function sleep(int $milliseconds): void
             {
                 $this->sleepsMs[] = $milliseconds;

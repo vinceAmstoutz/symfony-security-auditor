@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache;
 
 use JsonException;
+use Override;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
@@ -27,6 +28,9 @@ use function Symfony\Component\String\u;
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class FilesystemAttackerCache implements ContextAwareAttackerCacheInterface
 {
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function __construct(
         private string $cacheDir,
         private Filesystem $filesystem,
@@ -38,16 +42,19 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
         }
     }
 
+    #[Override]
     public function get(array $chunk): ?array
     {
         return $this->getForContext($chunk, '');
     }
 
+    #[Override]
     public function store(array $chunk, array $rawVulnerabilities): void
     {
         $this->storeForContext($chunk, '', $rawVulnerabilities);
     }
 
+    #[Override]
     public function getForContext(array $chunk, string $contextKey): ?array
     {
         $path = $this->pathForChunk($chunk, $contextKey);
@@ -84,6 +91,7 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
         }
     }
 
+    #[Override]
     public function storeForContext(array $chunk, string $contextKey, array $rawVulnerabilities): void
     {
         $path = $this->pathForChunk($chunk, $contextKey);

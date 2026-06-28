@@ -13,26 +13,31 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ContextAwareAttackerCacheInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class NullAttackerCache implements ContextAwareAttackerCacheInterface
 {
+    #[Override]
     public function get(array $chunk): ?array
     {
         return null;
     }
 
+    #[Override]
     public function store(array $chunk, array $rawVulnerabilities): void
     {
         // intentionally noop
     }
 
+    #[Override]
     public function getForContext(array $chunk, string $contextKey): ?array
     {
         return null;
     }
 
+    #[Override]
     public function storeForContext(array $chunk, string $contextKey, array $rawVulnerabilities): void
     {
         // intentionally noop

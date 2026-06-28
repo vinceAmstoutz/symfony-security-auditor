@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -49,6 +51,10 @@ final class AttackerAnalysisRequestTest extends TestCase
         self::assertSame([], $attackerAnalysisRequest->rejectedFindings);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_exposes_rejected_findings_from_the_constructor(): void
     {
         $rejected = [$this->makeVulnerability()];
@@ -58,6 +64,10 @@ final class AttackerAnalysisRequestTest extends TestCase
         self::assertSame($rejected, $attackerAnalysisRequest->rejectedFindings);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_with_files_and_findings_preserves_rejected_findings(): void
     {
         $rejected = [$this->makeVulnerability()];
@@ -68,6 +78,10 @@ final class AttackerAnalysisRequestTest extends TestCase
         self::assertSame($rejected, $derived->rejectedFindings);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_exposes_the_constructor_arguments(): void
     {
         $files = [ProjectFile::create('src/A.php', '/app/src/A.php', '<?php')];
@@ -82,6 +96,10 @@ final class AttackerAnalysisRequestTest extends TestCase
         self::assertSame($findings, $attackerAnalysisRequest->previousFindings);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_with_files_and_findings_replaces_both_and_preserves_mapping_and_bypass(): void
     {
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
@@ -102,6 +120,10 @@ final class AttackerAnalysisRequestTest extends TestCase
         self::assertTrue($derived->bypassCache);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function makeVulnerability(): Vulnerability
     {
         return Vulnerability::of(

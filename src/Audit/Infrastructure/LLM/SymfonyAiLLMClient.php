@@ -13,16 +13,21 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
+use Override;
 use Psr\Log\LoggerInterface;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 
 /**
  * Implements the Domain LLM ports on top of the symfony/ai platform. The
@@ -126,6 +131,13 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         );
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
+    #[Override]
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
     {
         $this->logger->debug('Invoking symfony/ai platform', [
@@ -171,6 +183,11 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         return $llmResponse;
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
+    #[Override]
     public function completeBatch(array $requests, int $maxConcurrent): array
     {
         \assert('' !== $this->model, 'Model must be a non-empty string');
@@ -187,6 +204,11 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         return $responses;
     }
 
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
+    #[Override]
     public function completeBatchWithTools(array $requests, int $maxConcurrent, int $maxToolIterations): array
     {
         \assert('' !== $this->model, 'Model must be a non-empty string');
@@ -203,6 +225,13 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         return $responses;
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
+    #[Override]
     public function completeWithTools(
         string $systemPrompt,
         string $userMessage,
@@ -212,6 +241,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         return $this->sequentialToolLoop->run($systemPrompt, $userMessage, $toolRegistry, $maxToolIterations);
     }
 
+    #[Override]
     public function model(): string
     {
         return $this->model;

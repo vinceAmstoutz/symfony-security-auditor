@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
@@ -236,6 +237,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      *
      * @return list<RiskMarker>
      */
+    #[Override]
     public function scan(array $files): array
     {
         $markers = [];

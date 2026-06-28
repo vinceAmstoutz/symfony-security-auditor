@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
@@ -25,6 +26,7 @@ final class RecordingProgressReporter implements ProgressReporterInterface
     /** @var list<array{0: string, 1: array<string, mixed>}> */
     public array $events = [];
 
+    #[Override]
     public function report(string $event, array $context = []): void
     {
         $this->events[] = [$event, $context];

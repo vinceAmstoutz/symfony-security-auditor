@@ -43,6 +43,8 @@ final readonly class RunAuditUseCase
      * @param ?string      $diffSinceRef when set, only files changed against
      *                                   this git ref are audited; null audits
      *                                   every file in scope
+     *
+     * @throws AuditAbortedByBudgetException
      */
     public function execute(string $projectPath, array $scanPaths = [], bool $bypassCache = false, ?string $diffSinceRef = null): AuditReport
     {

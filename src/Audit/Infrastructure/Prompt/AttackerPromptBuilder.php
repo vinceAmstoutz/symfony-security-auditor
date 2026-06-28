@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
@@ -296,6 +297,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
     /**
      * @param list<ProjectFile> $files
      */
+    #[Override]
     public function buildSystemPrompt(array $files = []): string
     {
         $base = $this->basePrompt();
@@ -312,6 +314,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
     /**
      * @param list<ProjectFile> $files
      */
+    #[Override]
     public function buildUserMessage(array $files, SymfonyMapping $symfonyMapping): string
     {
         $context = NumberedFileContextRenderer::render($files);

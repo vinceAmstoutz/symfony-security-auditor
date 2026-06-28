@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
+use Override;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestratorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -28,11 +29,13 @@ final readonly class AuditStage implements StageInterface
         private LoggerInterface $logger,
     ) {}
 
+    #[Override]
     public function name(): string
     {
         return BuiltInStageName::Audit->value;
     }
 
+    #[Override]
     public function process(AuditContext $auditContext): void
     {
         if ([] === $auditContext->projectFiles()) {

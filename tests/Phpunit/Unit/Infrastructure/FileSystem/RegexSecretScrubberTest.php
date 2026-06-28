@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\FileSystem;
 
+use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
@@ -169,6 +170,9 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertStringContainsString('***REDACTED:env_assignment***', $output);
     }
 
+    /**
+     * @throws SecretScrubberConfigurationException
+     */
     public function test_additional_patterns_are_applied(): void
     {
         $regexSecretScrubber = new RegexSecretScrubber(additionalPatterns: ['/INTERNAL-[A-Z0-9]{12}/']);
@@ -207,6 +211,9 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame($url, $this->regexSecretScrubber->scrub($url));
     }
 
+    /**
+     * @throws SecretScrubberConfigurationException
+     */
     public function test_runtime_pcre_failure_continues_to_remaining_patterns(): void
     {
         $regexSecretScrubber = new RegexSecretScrubber(additionalPatterns: [
@@ -228,6 +235,9 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertStringContainsString('***REDACTED:custom_1***', $output);
     }
 
+    /**
+     * @throws SecretScrubberConfigurationException
+     */
     public function test_invalid_additional_pattern_throws_configuration_exception(): void
     {
         $this->expectException(SecretScrubberConfigurationException::class);
@@ -236,6 +246,9 @@ final class RegexSecretScrubberTest extends TestCase
         new RegexSecretScrubber(additionalPatterns: ['/[unterminated/']);
     }
 
+    /**
+     * @throws SecretScrubberConfigurationException
+     */
     public function test_empty_additional_pattern_throws_configuration_exception(): void
     {
         $this->expectException(SecretScrubberConfigurationException::class);
@@ -256,6 +269,10 @@ final class RegexSecretScrubberTest extends TestCase
         }
     }
 
+    /**
+     * @throws SecretScrubberConfigurationException
+     */
+    #[Override]
     protected function setUp(): void
     {
         $this->regexSecretScrubber = new RegexSecretScrubber();

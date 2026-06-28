@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Budget;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
@@ -114,16 +115,19 @@ final class CostCalculatorTest extends TestCase
                 private readonly float $outputPrice,
             ) {}
 
+            #[Override]
             public function pricePerMillionInputTokens(string $model): float
             {
                 return $this->inputPrice;
             }
 
+            #[Override]
             public function pricePerMillionOutputTokens(string $model): float
             {
                 return $this->outputPrice;
             }
 
+            #[Override]
             public function hasModel(string $model): bool
             {
                 return true;
@@ -145,26 +149,31 @@ final class CostCalculatorTest extends TestCase
                 private readonly float $cacheCreationPrice,
             ) {}
 
+            #[Override]
             public function pricePerMillionInputTokens(string $model): float
             {
                 return $this->inputPrice;
             }
 
+            #[Override]
             public function pricePerMillionOutputTokens(string $model): float
             {
                 return $this->outputPrice;
             }
 
+            #[Override]
             public function cacheReadPricePerMillionTokens(string $model): float
             {
                 return $this->cacheReadPrice;
             }
 
+            #[Override]
             public function cacheCreationPricePerMillionTokens(string $model): float
             {
                 return $this->cacheCreationPrice;
             }
 
+            #[Override]
             public function hasModel(string $model): bool
             {
                 return true;

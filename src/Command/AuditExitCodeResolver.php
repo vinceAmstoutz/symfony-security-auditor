@@ -13,12 +13,14 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditExitCodeResolver implements AuditExitCodeResolverInterface
 {
+    #[Override]
     public function resolve(AuditReport $auditReport, RiskLevel $riskLevel): int
     {
         return $auditReport->riskLevelEnum()->isAtLeast($riskLevel)

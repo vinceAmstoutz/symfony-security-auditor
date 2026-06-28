@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool;
 
+use Override;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
@@ -32,6 +33,7 @@ final readonly class SymfonyToolRegistryFactory implements ToolRegistryFactoryIn
         private AdvisoryDatabaseInterface $advisoryDatabase,
     ) {}
 
+    #[Override]
     public function forProjectFiles(array $projectFiles): ToolRegistry
     {
         return new ToolRegistry(

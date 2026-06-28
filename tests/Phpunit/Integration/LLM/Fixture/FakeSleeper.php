@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 
 final class FakeSleeper implements SleeperInterface
@@ -20,6 +21,7 @@ final class FakeSleeper implements SleeperInterface
     /** @var list<int> */
     public array $durations = [];
 
+    #[Override]
     public function sleep(int $milliseconds): void
     {
         $this->durations[] = $milliseconds;

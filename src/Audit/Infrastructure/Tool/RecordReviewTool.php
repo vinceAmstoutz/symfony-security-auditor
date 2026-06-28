@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewCollector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
@@ -35,6 +36,7 @@ final readonly class RecordReviewTool implements ToolInterface
         private ReviewCollector $reviewCollector,
     ) {}
 
+    #[Override]
     public function definition(): ToolDefinition
     {
         return new ToolDefinition(
@@ -44,6 +46,7 @@ final readonly class RecordReviewTool implements ToolInterface
         );
     }
 
+    #[Override]
     public function execute(array $arguments): string
     {
         $this->reviewCollector->add($arguments);
