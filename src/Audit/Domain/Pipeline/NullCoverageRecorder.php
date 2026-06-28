@@ -13,8 +13,11 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline;
 
+use Override;
+
 final readonly class NullCoverageRecorder implements CoverageRecorderInterface
 {
+    #[Override]
     public function recordCoverage(string $stage, string $filePath, string $status): void
     {
         // intentionally noop

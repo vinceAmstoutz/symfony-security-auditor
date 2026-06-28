@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
 /**
@@ -29,6 +30,7 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
         private ?string $configuredBaseline = null,
     ) {}
 
+    #[Override]
     public function generate(AuditReport $auditReport, string $path): int
     {
         $fingerprints = $auditReport->fingerprints();
@@ -37,6 +39,7 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
         return \count($fingerprints);
     }
 
+    #[Override]
     public function apply(AuditReport $auditReport, ?string $cliBaseline): BaselineResult
     {
         $baselinePath = $cliBaseline ?? $this->configuredBaseline;

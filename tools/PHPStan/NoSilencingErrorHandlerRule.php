@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan;
 
+use Override;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\ArrowFunction;
@@ -35,6 +36,7 @@ use PHPStan\ShouldNotHappenException;
  */
 final readonly class NoSilencingErrorHandlerRule implements Rule
 {
+    #[Override]
     public function getNodeType(): string
     {
         return FuncCall::class;
@@ -45,6 +47,7 @@ final readonly class NoSilencingErrorHandlerRule implements Rule
      *
      * @throws ShouldNotHappenException
      */
+    #[Override]
     public function processNode(Node $node, Scope $scope): array
     {
         if (!$node->name instanceof Name) {

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
@@ -622,11 +623,13 @@ final class AuditCommandEndToEndTest extends TestCase
         return (string) json_encode($vulns);
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->fixtureDir = sys_get_temp_dir().'/cmd_e2e_'.uniqid('', true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $this->rmdirRecursive($this->fixtureDir);
@@ -940,11 +943,13 @@ final class AuditCommandEndToEndTest extends TestCase
         file_put_contents($this->fixtureDir.'/src/Controller/UserController.php', '<?php class UserController { public function indexAction() {} }');
 
         $throwingLLM = new class implements LLMClientInterface {
+            #[Override]
             public function complete(string $systemPrompt, string $userMessage): LLMResponse
             {
                 throw new RuntimeException('platform must not be invoked during --dry-run');
             }
 
+            #[Override]
             public function completeWithTools(
                 string $systemPrompt,
                 string $userMessage,
@@ -954,6 +959,7 @@ final class AuditCommandEndToEndTest extends TestCase
                 throw new RuntimeException('platform must not be invoked during --dry-run');
             }
 
+            #[Override]
             public function model(): string
             {
                 return 'stub';
@@ -1068,11 +1074,13 @@ final class AuditCommandEndToEndTest extends TestCase
     private function throwingLLMClient(): LLMClientInterface
     {
         return new class implements LLMClientInterface {
+            #[Override]
             public function complete(string $systemPrompt, string $userMessage): LLMResponse
             {
                 throw new RuntimeException('the LLM platform must not be invoked for --show-scanned');
             }
 
+            #[Override]
             public function completeWithTools(
                 string $systemPrompt,
                 string $userMessage,
@@ -1082,6 +1090,7 @@ final class AuditCommandEndToEndTest extends TestCase
                 throw new RuntimeException('the LLM platform must not be invoked for --show-scanned');
             }
 
+            #[Override]
             public function model(): string
             {
                 return 'stub';
@@ -1095,7 +1104,12 @@ final class AuditCommandEndToEndTest extends TestCase
             return;
         }
 
-        foreach (scandir($dir) as $item) {
+        $items = scandir($dir);
+        if (false === $items) {
+            return;
+        }
+
+        foreach ($items as $item) {
             if ('.' === $item) {
                 continue;
             }

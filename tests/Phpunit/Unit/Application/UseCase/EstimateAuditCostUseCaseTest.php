@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -437,6 +438,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
             /** @param list<ProjectFile> $files */
             public function __construct(private readonly array $files) {}
 
+            #[Override]
             public function scan(string $projectPath): array
             {
                 return $this->files;
@@ -449,6 +451,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         return new class($perRoundTokens) implements TokenEstimatorInterface {
             public function __construct(private readonly int $perRoundTokens) {}
 
+            #[Override]
             public function estimateTokens(string $text, string $model): int
             {
                 return $this->perRoundTokens;
@@ -465,16 +468,19 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     private function zeroPricing(): PricingProviderInterface
     {
         return new class implements PricingProviderInterface {
+            #[Override]
             public function pricePerMillionInputTokens(string $model): float
             {
                 return 0.0;
             }
 
+            #[Override]
             public function pricePerMillionOutputTokens(string $model): float
             {
                 return 0.0;
             }
 
+            #[Override]
             public function hasModel(string $model): bool
             {
                 return true;
@@ -495,16 +501,19 @@ final class EstimateAuditCostUseCaseTest extends TestCase
                 private readonly float $outputPricePerMillion,
             ) {}
 
+            #[Override]
             public function pricePerMillionInputTokens(string $model): float
             {
                 return $this->inputPricePerMillion;
             }
 
+            #[Override]
             public function pricePerMillionOutputTokens(string $model): float
             {
                 return $this->outputPricePerMillion;
             }
 
+            #[Override]
             public function hasModel(string $model): bool
             {
                 return true;
@@ -517,12 +526,14 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         return ProjectFile::create($relative, $this->tmpDir.'/'.$relative, $content);
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/estimate_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         if (is_dir($this->tmpDir)) {

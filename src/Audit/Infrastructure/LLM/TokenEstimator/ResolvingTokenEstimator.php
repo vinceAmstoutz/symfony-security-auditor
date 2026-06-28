@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
@@ -34,6 +35,7 @@ final readonly class ResolvingTokenEstimator implements TokenEstimatorInterface
         private float $fallbackCharsPerToken = self::CHARS_PER_TOKEN_DEFAULT,
     ) {}
 
+    #[Override]
     public function estimateTokens(string $text, string $model): int
     {
         foreach ($this->providerEstimators as $providerEstimator) {

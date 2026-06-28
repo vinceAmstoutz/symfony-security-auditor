@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff;
 
+use Override;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
@@ -45,6 +46,10 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
         private Filesystem $filesystem = new Filesystem(),
     ) {}
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    #[Override]
     public function changedSince(string $projectPath, string $ref): array
     {
         if (!$this->filesystem->exists($projectPath.'/.git') && !$this->isInsideGitTree($projectPath)) {
@@ -81,6 +86,8 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
      * @param list<string> $argv
      *
      * @return list<string>
+     *
+     * @throws GitChangedFilesUnavailableException
      */
     private function runGit(string $projectPath, array $argv): array
     {

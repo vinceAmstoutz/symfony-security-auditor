@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPUnit;
 
+use Override;
 use PHPUnit\Runner\Extension\Extension;
 use PHPUnit\Runner\Extension\Facade;
 use PHPUnit\Runner\Extension\ParameterCollection;
@@ -27,6 +28,7 @@ final readonly class MinimumLineCoverageExtension implements Extension
 {
     private const float DEFAULT_MINIMUM = 100.0;
 
+    #[Override]
     public function bootstrap(Configuration $configuration, Facade $facade, ParameterCollection $parameters): void
     {
         $minimumCoverage = $parameters->has('min-coverage')

@@ -20,6 +20,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyPr
 
 final class SymfonyProcessComposerAuditRunnerTest extends TestCase
 {
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_it_returns_stdout_when_process_emits_json(): void
     {
         $symfonyProcessComposerAuditRunner = new SymfonyProcessComposerAuditRunner(
@@ -32,6 +35,9 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
         self::assertSame('{"advisories":{}}', $output);
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_it_throws_advisory_unavailable_when_stdout_is_empty(): void
     {
         $symfonyProcessComposerAuditRunner = new SymfonyProcessComposerAuditRunner(
@@ -84,6 +90,9 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
         self::assertStringContainsString("'--no-interaction'", $commandLine);
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_it_throws_when_stdout_is_only_whitespace(): void
     {
         $symfonyProcessComposerAuditRunner = new SymfonyProcessComposerAuditRunner(
@@ -95,6 +104,9 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
         $symfonyProcessComposerAuditRunner->run('/some/path');
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_it_wraps_process_exception_as_binary_not_found_when_setup_throws(): void
     {
         $symfonyProcessComposerAuditRunner = new SymfonyProcessComposerAuditRunner(

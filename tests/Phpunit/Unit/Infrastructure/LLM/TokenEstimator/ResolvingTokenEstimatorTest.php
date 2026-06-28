@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\TokenEstimator;
 
+use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\CharacterRatioCounter;
@@ -86,11 +87,13 @@ final class ResolvingTokenEstimatorTest extends TestCase
         return new class($supports, $tokens) implements ProviderTokenEstimatorInterface {
             public function __construct(private readonly bool $supports, private readonly int $tokens) {}
 
+            #[Override]
             public function supports(string $model): bool
             {
                 return $this->supports;
             }
 
+            #[Override]
             public function estimateTokens(string $text, string $model): int
             {
                 return $this->tokens;

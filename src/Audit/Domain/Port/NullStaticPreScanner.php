@@ -13,9 +13,12 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
+use Override;
+
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class NullStaticPreScanner implements StaticPreScannerInterface
 {
+    #[Override]
     public function scan(array $files): array
     {
         return [];

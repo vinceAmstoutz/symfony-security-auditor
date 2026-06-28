@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Stage;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -192,6 +193,7 @@ final class StagesTest extends TestCase
             /** @param list<RouteAccessControl> $entries */
             public function __construct(private array $entries) {}
 
+            #[Override]
             public function parse(ProjectFile $projectFile): array
             {
                 return $this->entries;
@@ -223,6 +225,7 @@ final class StagesTest extends TestCase
         $parser = new readonly class($entryA, $entryB) implements ControllerAccessControlParserInterface {
             public function __construct(private RouteAccessControl $entryA, private RouteAccessControl $entryB) {}
 
+            #[Override]
             public function parse(ProjectFile $projectFile): array
             {
                 return 'src/Controller/AController.php' === $projectFile->relativePath() ? [$this->entryA] : [$this->entryB];
@@ -249,6 +252,7 @@ final class StagesTest extends TestCase
         $parser = new readonly class($capabilityA, $capabilityB) implements VoterCapabilityParserInterface {
             public function __construct(private VoterCapability $capA, private VoterCapability $capB) {}
 
+            #[Override]
             public function parse(ProjectFile $projectFile): ?VoterCapability
             {
                 return match ($projectFile->relativePath()) {
@@ -275,6 +279,7 @@ final class StagesTest extends TestCase
     {
         $voterFile = ProjectFile::create('src/Security/SilentVoter.php', '/app/x', '<?php class SilentVoter {}');
         $parser = new readonly class implements VoterCapabilityParserInterface {
+            #[Override]
             public function parse(ProjectFile $projectFile): ?VoterCapability
             {
                 return null;
@@ -302,6 +307,7 @@ final class StagesTest extends TestCase
         $parser = new readonly class($bindingA, $bindingB) implements FormBindingParserInterface {
             public function __construct(private FormBinding $a, private FormBinding $b) {}
 
+            #[Override]
             public function parse(ProjectFile $projectFile): array
             {
                 return match ($projectFile->relativePath()) {
@@ -840,12 +846,14 @@ final class StagesTest extends TestCase
         self::fail(\sprintf('No log entry with message "%s"', $message));
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/stages_test_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $this->rmdirRecursive($this->tmpDir);
@@ -887,7 +895,12 @@ final class StagesTest extends TestCase
             return;
         }
 
-        foreach (scandir($dir) as $item) {
+        $items = scandir($dir);
+        if (false === $items) {
+            return;
+        }
+
+        foreach ($items as $item) {
             if ('.' === $item) {
                 continue;
             }

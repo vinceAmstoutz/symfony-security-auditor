@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache;
 
 use JsonException;
+use Override;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
@@ -42,6 +43,9 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
      */
     public const int CACHE_VERSION = 1;
 
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function __construct(
         private string $cacheDir,
         private Filesystem $filesystem,
@@ -53,6 +57,7 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
         }
     }
 
+    #[Override]
     public function get(Vulnerability $vulnerability, string $codeContext): ?array
     {
         $path = $this->pathFor($vulnerability, $codeContext);
@@ -87,6 +92,7 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
         }
     }
 
+    #[Override]
     public function store(Vulnerability $vulnerability, string $codeContext, array $review): void
     {
         $path = $this->pathFor($vulnerability, $codeContext);

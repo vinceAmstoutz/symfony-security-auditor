@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress;
 
+use Override;
 use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
@@ -50,6 +51,7 @@ final class ProgressReporterHolder implements ProgressReporterInterface
         $this->progressReporter = $progressReporter;
     }
 
+    #[Override]
     public function report(string $event, array $context = []): void
     {
         try {

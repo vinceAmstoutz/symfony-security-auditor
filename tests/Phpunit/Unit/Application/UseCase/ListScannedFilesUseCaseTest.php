@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -59,6 +60,7 @@ final class ListScannedFilesUseCaseTest extends TestCase
             /** @param list<ProjectFile> $files */
             public function __construct(private readonly array $files) {}
 
+            #[Override]
             public function scan(string $projectPath): array
             {
                 return $this->files;

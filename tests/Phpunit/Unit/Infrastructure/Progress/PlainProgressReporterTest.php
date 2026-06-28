@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Progress;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Output\BufferedOutput;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\PlainProgressReporter;
@@ -142,6 +143,7 @@ final class PlainProgressReporterTest extends TestCase
         self::assertStringNotContainsString("\r", $this->bufferedOutput->fetch());
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->bufferedOutput = new BufferedOutput();

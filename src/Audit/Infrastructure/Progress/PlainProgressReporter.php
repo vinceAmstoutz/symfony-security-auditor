@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress;
 
+use Override;
 use Symfony\Component\Console\Output\OutputInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
@@ -34,6 +35,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     /**
      * {@inheritDoc}
      */
+    #[Override]
     public function report(string $event, array $context = []): void
     {
         match (ProgressEvent::tryFrom($event)) {

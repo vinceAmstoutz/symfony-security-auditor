@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 
@@ -149,6 +150,7 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         private int $minLinesBeforeSlicing = self::DEFAULT_MIN_LINES_BEFORE_SLICING,
     ) {}
 
+    #[Override]
     public function slice(ProjectFile $projectFile): string
     {
         if (!$this->shouldSlice($projectFile)) {

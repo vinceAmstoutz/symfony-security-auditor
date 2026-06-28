@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
@@ -28,6 +29,7 @@ final readonly class LookupAdvisoryTool implements ToolInterface
 {
     public function __construct(private AdvisoryDatabaseInterface $advisoryDatabase) {}
 
+    #[Override]
     public function definition(): ToolDefinition
     {
         return new ToolDefinition(
@@ -50,6 +52,7 @@ final readonly class LookupAdvisoryTool implements ToolInterface
         );
     }
 
+    #[Override]
     public function execute(array $arguments): string
     {
         $package = $arguments['package'] ?? null;

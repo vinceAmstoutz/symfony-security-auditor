@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Diff;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
@@ -25,6 +26,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
 
     private Filesystem $filesystem;
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_throws_when_directory_is_not_a_git_tree(): void
     {
         $this->expectException(GitChangedFilesUnavailableException::class);
@@ -33,6 +37,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_throws_when_ref_does_not_exist_in_repo(): void
     {
         $this->initRepo();
@@ -43,6 +50,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'does-not-exist');
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_merged_committed_and_uncommitted_paths_are_sorted(): void
     {
         $this->initRepo();
@@ -58,6 +68,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         self::assertSame(['src/A.php', 'src/B.php'], $srcChanged);
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_a_path_changed_in_both_committed_and_uncommitted_diffs_is_deduplicated(): void
     {
         $this->initRepo();
@@ -73,6 +86,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         self::assertSame(['src/Shared.php'], $shared);
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_returns_files_changed_against_ref(): void
     {
         $this->initRepo();
@@ -86,6 +102,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         self::assertNotContains('src/Foo.php', $changed);
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_includes_uncommitted_changes_against_head(): void
     {
         $this->initRepo();
@@ -98,6 +117,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         self::assertContains('src/Bar.php', $changed);
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_returned_paths_are_sorted_for_determinism(): void
     {
         $this->initRepo();
@@ -112,6 +134,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         self::assertSame(['src/A.php', 'src/M.php'], $changedFiltered);
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_resolves_from_a_subdirectory_where_dot_git_is_not_present(): void
     {
         $this->initRepo();
@@ -127,6 +152,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         self::assertContains('src/sub/Bar.php', $changed);
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_relies_on_rev_parse_when_a_dot_git_path_exists_but_is_not_a_repo(): void
     {
         $this->filesystem->mkdir($this->tmpDir.'/.git');
@@ -137,6 +165,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_throws_for_a_path_inside_the_git_directory_not_the_work_tree(): void
     {
         $this->initRepo();
@@ -148,6 +179,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir.'/.git', 'main');
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_diffs_branch_commits_since_merge_base_not_the_raw_ref_diff(): void
     {
         $this->initRepo();
@@ -164,6 +198,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         self::assertNotContains('src/Foo.php', $changed);
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_wraps_a_git_diff_process_failure_when_the_ref_resolves_but_has_no_merge_base(): void
     {
         $this->initRepo();
@@ -177,6 +214,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/git_diff_resolver_test_'.uniqid('', true);
@@ -184,6 +222,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->filesystem = new Filesystem();
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $this->filesystem->remove($this->tmpDir);

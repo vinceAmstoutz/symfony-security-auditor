@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture;
 
 use DateTimeImmutable;
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 
 final class FakeRateLimiter implements RateLimiterInterface
@@ -27,16 +28,19 @@ final class FakeRateLimiter implements RateLimiterInterface
     /** @var list<DateTimeImmutable> */
     public array $paused = [];
 
+    #[Override]
     public function acquire(int $estimatedInputTokens): void
     {
         $this->acquired[] = $estimatedInputTokens;
     }
 
+    #[Override]
     public function record(int $inputTokens, int $outputTokens): void
     {
         $this->recorded[] = [$inputTokens, $outputTokens];
     }
 
+    #[Override]
     public function pauseUntil(DateTimeImmutable $until): void
     {
         $this->paused[] = $until;

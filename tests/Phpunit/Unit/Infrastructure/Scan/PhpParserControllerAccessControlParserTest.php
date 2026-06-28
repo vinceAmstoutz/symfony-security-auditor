@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
@@ -21,6 +22,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 {
     private PhpParserControllerAccessControlParser $phpParserControllerAccessControlParser;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->phpParserControllerAccessControlParser = new PhpParserControllerAccessControlParser();

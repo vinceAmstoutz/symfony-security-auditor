@@ -16,6 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Revi
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\VerdictApplier;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -27,6 +29,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
 
 final class VerdictApplierTest extends TestCase
 {
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_reports_an_accepted_verdict_as_a_review_finding_event(): void
     {
         $progressReporter = $this->createMock(ProgressReporterInterface::class);
@@ -42,6 +48,10 @@ final class VerdictApplierTest extends TestCase
         self::assertTrue($vulnerability->isReviewerValidated());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_reports_a_rejected_verdict_as_a_review_finding_event(): void
     {
         $progressReporter = $this->createMock(ProgressReporterInterface::class);
@@ -57,6 +67,10 @@ final class VerdictApplierTest extends TestCase
         self::assertFalse($vulnerability->isReviewerValidated());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_elevates_severity_when_the_verdict_is_accepted(): void
     {
         $verdictApplier = new VerdictApplier(new NullLogger(), new NullProgressReporter());
@@ -66,6 +80,10 @@ final class VerdictApplierTest extends TestCase
         self::assertSame(VulnerabilitySeverity::CRITICAL, $vulnerability->severity());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_does_not_adjust_severity_when_the_verdict_is_rejected(): void
     {
         $verdictApplier = new VerdictApplier(new NullLogger(), new NullProgressReporter());
@@ -75,6 +93,10 @@ final class VerdictApplierTest extends TestCase
         self::assertSame(VulnerabilitySeverity::HIGH, $vulnerability->severity());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function vulnerability(): Vulnerability
     {
         return Vulnerability::of(

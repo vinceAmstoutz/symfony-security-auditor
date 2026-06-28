@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
 
 use Closure;
+use Override;
 use Symfony\Component\Process\Exception\ExceptionInterface;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
@@ -51,6 +52,7 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
         );
     }
 
+    #[Override]
     public function run(string $projectPath): string
     {
         $builder = $this->processBuilder ?? self::defaultProcessBuilder();

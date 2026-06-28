@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 
@@ -33,11 +34,13 @@ final class RecordingStage implements StageInterface
     /** @var list<bool> */
     public array $observedCacheBypassed = [];
 
+    #[Override]
     public function name(): string
     {
         return 'recording';
     }
 
+    #[Override]
     public function process(AuditContext $auditContext): void
     {
         $this->processedAuditIds[] = $auditContext->auditId();

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use Override;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
@@ -27,6 +28,7 @@ final readonly class UnpricedModelBudgetGuard implements UnpricedModelBudgetGuar
         private ?float $maxCostUsd = null,
     ) {}
 
+    #[Override]
     public function permitsRun(InputInterface $input, SymfonyStyle $symfonyStyle): bool
     {
         $unpricedModels = $this->unpricedModels();

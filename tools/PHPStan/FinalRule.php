@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan;
 
+use Override;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\Class_;
 use PHPStan\Analyser\Scope;
@@ -35,6 +36,7 @@ final readonly class FinalRule implements Rule
      */
     private const array ALLOWED_NON_FINAL = [LLMProviderException::class];
 
+    #[Override]
     public function getNodeType(): string
     {
         return Class_::class;
@@ -45,6 +47,7 @@ final readonly class FinalRule implements Rule
      *
      * @throws ShouldNotHappenException
      */
+    #[Override]
     public function processNode(Node $node, Scope $scope): array
     {
         if ($node->isFinal() || $node->isAbstract() || $node->isAnonymous()) {

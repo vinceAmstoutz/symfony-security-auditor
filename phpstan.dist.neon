@@ -3,6 +3,26 @@ includes:
 
 parameters:
     level: max
+    checkTooWideReturnTypesInProtectedAndPublicMethods: true
+    checkTooWideParameterOutInProtectedAndPublicMethods: true
+    checkTooWideThrowTypesInProtectedAndPublicMethods: true
+    checkUninitializedProperties: true
+    checkImplicitMixed: true
+    checkBenevolentUnionTypes: true
+    checkMissingOverrideMethodAttribute: true
+    checkMissingCallableSignature: true
+    reportAnyTypeWideningInVarTag: true
+    reportAlwaysTrueInLastCondition: true
+    reportPossiblyNonexistentConstantArrayOffset: true
+    featureToggles:
+        checkPrintfParameterTypes: true
+    exceptions:
+        check:
+            missingCheckedExceptionInThrows: true
+            tooWideThrowType: true
+            tooWideImplicitThrowType: true
+        checkedExceptionRegexes:
+            - '#^VinceAmstoutz\\SymfonySecurityAuditor\\.+\\Exception\\#'
     paths:
         - bin/
         - config/

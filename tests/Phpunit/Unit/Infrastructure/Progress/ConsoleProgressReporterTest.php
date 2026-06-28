@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Progress;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Output\BufferedOutput;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
@@ -386,6 +387,7 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertStringContainsString("\033[33m", $bufferedOutput->fetch());
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->bufferedOutput = new BufferedOutput();

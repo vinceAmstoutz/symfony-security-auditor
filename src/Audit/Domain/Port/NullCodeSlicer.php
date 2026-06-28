@@ -13,11 +13,13 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class NullCodeSlicer implements CodeSlicerInterface
 {
+    #[Override]
     public function slice(ProjectFile $projectFile): string
     {
         return $projectFile->content();

@@ -27,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\PlainProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
 #[AsCommand(
     name: 'audit:run',
@@ -55,6 +56,9 @@ final readonly class AuditCommand
         private RiskLevel $riskLevel = RiskLevel::Critical,
     ) {}
 
+    /**
+     * @throws WorkingDirectoryUnavailableException
+     */
     public function __invoke(
         InputInterface $input,
         SymfonyStyle $symfonyStyle,

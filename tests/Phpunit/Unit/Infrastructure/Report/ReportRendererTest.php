@@ -14,7 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
 use Composer\InstalledVersions;
+use Override;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
@@ -32,6 +35,7 @@ final class ReportRendererTest extends TestCase
 
     private string $tmpDir;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/renderer_test_'.uniqid('', true);
@@ -39,6 +43,7 @@ final class ReportRendererTest extends TestCase
         $this->reportRenderer = new ReportRenderer();
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
@@ -60,6 +65,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString(ReportRenderer::PACKAGE_NAME, $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_vulnerability_has_description_label_with_blank_line_above(): void
     {
         $output = $this->reportRenderer->renderConsole($this->makeReport($this->makeValidatedVuln()));
@@ -67,6 +76,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString("\n\n  Description:\n", $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_vulnerability_has_attack_vector_label_with_blank_line_above(): void
     {
         $output = $this->reportRenderer->renderConsole($this->makeReport($this->makeValidatedVuln()));
@@ -74,6 +87,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString("\n\n  Attack Vector:\n", $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_vulnerability_has_remediation_label_with_blank_line_above(): void
     {
         $output = $this->reportRenderer->renderConsole($this->makeReport($this->makeValidatedVuln()));
@@ -129,6 +146,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString("\n".str_repeat('─', 69)."\n", $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_with_vulns_has_four_single_bar_separators(): void
     {
         $output = $this->reportRenderer->renderConsole($this->makeReport($this->makeValidatedVuln()));
@@ -137,6 +158,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString(str_repeat('─', 71), $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_vulnerability_dot_separator_is_exactly_70_chars(): void
     {
         $output = $this->reportRenderer->renderConsole($this->makeReport($this->makeValidatedVuln()));
@@ -154,6 +179,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('VULNERABILITIES', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_lists_vulnerabilities_most_severe_first(): void
     {
         $vulnerability = $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::LOW, filePath: 'src/Low.php');
@@ -168,6 +197,10 @@ final class ReportRendererTest extends TestCase
         self::assertLessThan($lowPosition, $criticalPosition);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_with_vulnerabilities_skips_no_findings_message(): void
     {
         $output = $this->reportRenderer->renderConsole($this->makeReport($this->makeValidatedVuln()));
@@ -176,6 +209,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString('VULNERABILITIES', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_severity_summary_shows_severity_with_count_one(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
@@ -184,6 +221,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString('HIGH', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_findings_output_ends_with_dot_separator_no_trailing_newline(): void
     {
         $output = $this->reportRenderer->renderConsole($this->makeReport($this->makeValidatedVuln()));
@@ -191,6 +232,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringEndsWith(str_repeat('·', 70), $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_severity_summary_has_header_line(): void
     {
         $vulnerability = $this->makeValidatedVuln();
@@ -199,6 +244,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString('  SUMMARY BY SEVERITY', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_severity_summary_omits_zero_count_severities(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
@@ -269,6 +318,10 @@ final class ReportRendererTest extends TestCase
         self::assertArrayHasKey('results', $decoded['runs'][0]);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_rules_is_sequential_array_not_object(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
@@ -280,6 +333,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame(array_values($rules), $rules);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_two_different_types_produce_two_rules(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
@@ -290,6 +347,10 @@ final class ReportRendererTest extends TestCase
         self::assertCount(2, $rules);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_results_contains_one_entry_per_vulnerability(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
@@ -299,6 +360,10 @@ final class ReportRendererTest extends TestCase
         self::assertCount(2, $decoded['runs'][0]['results']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_level_is_error_for_critical(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL);
@@ -307,6 +372,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame('error', $decoded['runs'][0]['results'][0]['level']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_level_is_error_for_high(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
@@ -315,6 +384,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame('error', $decoded['runs'][0]['results'][0]['level']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_level_is_warning_for_medium(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::MEDIUM);
@@ -323,6 +396,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame('warning', $decoded['runs'][0]['results'][0]['level']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_level_is_note_for_low(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::LOW);
@@ -331,6 +408,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame('note', $decoded['runs'][0]['results'][0]['level']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_level_is_note_for_info(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::INFO);
@@ -339,6 +420,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame('note', $decoded['runs'][0]['results'][0]['level']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_result_location_contains_file_and_lines(): void
     {
         $vulnerability = $this->makeValidatedVuln();
@@ -359,6 +444,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('\/', $schema);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_result_message_text_is_vulnerability_title(): void
     {
         $vulnerability = $this->makeValidatedVuln();
@@ -367,6 +456,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame('Test Vuln', $decoded['runs'][0]['results'][0]['message']['text']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_result_ruleid_is_owasp_reference(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION);
@@ -375,6 +468,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame(VulnerabilityType::SQL_INJECTION->owaspReference(), $decoded['runs'][0]['results'][0]['ruleId']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_artifact_location_uri_is_vulnerability_file_path(): void
     {
         $vulnerability = $this->makeValidatedVuln(filePath: 'src/Foo.php');
@@ -383,6 +480,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame('src/Foo.php', $decoded['runs'][0]['results'][0]['locations'][0]['physicalLocation']['artifactLocation']['uri']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_rule_short_description_text_is_type_category(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION);
@@ -396,6 +497,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame(VulnerabilityType::SQL_INJECTION->category(), $firstRule['shortDescription']['text']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_rule_has_all_required_keys(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION);
@@ -408,6 +513,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame(VulnerabilityType::SQL_INJECTION->owaspReferenceUrl(), $firstRule['helpUri']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_rule_help_uri_points_to_the_specific_owasp_category(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION);
@@ -417,6 +526,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame('https://owasp.org/Top10/A03_2021-Injection/', $firstRule['helpUri']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_result_carries_the_vulnerability_partial_fingerprint(): void
     {
         $vulnerability = $this->makeValidatedVuln();
@@ -428,6 +541,10 @@ final class ReportRendererTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_sarif_rule_is_not_overwritten_when_same_type_appears_twice(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
@@ -443,6 +560,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame(VulnerabilityType::SQL_INJECTION->category(), $firstRule['shortDescription']['text']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_description_chunks_at_exactly_65_chars(): void
     {
         $longDescription = str_repeat('a', 70);
@@ -458,6 +579,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString('    '.str_repeat('a', 65)."\n    ".str_repeat('a', 5), $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_attack_vector_chunks_at_exactly_65_chars(): void
     {
         $longVector = str_repeat('b', 70);
@@ -473,6 +598,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString('    '.str_repeat('b', 65)."\n    ".str_repeat('b', 5), $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_remediation_chunks_at_exactly_65_chars(): void
     {
         $longRemediation = str_repeat('c', 70);
@@ -604,6 +733,10 @@ final class ReportRendererTest extends TestCase
         self::assertSame('gpt-4o', $decoded['primary_model']);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_vulnerability_substitutes_id(): void
     {
         $vulnerability = $this->makeValidatedVuln();
@@ -613,6 +746,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('{{id}}', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_vulnerability_substitutes_title(): void
     {
         $vulnerability = $this->makeValidatedVuln();
@@ -622,6 +759,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('{{title}}', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_vulnerability_substitutes_severity_label(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
@@ -631,6 +772,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('{{severity}}', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_vulnerability_substitutes_owasp_reference(): void
     {
         $vulnerability = $this->makeValidatedVuln();
@@ -640,6 +785,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('{{owasp}}', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_vulnerability_substitutes_file_location_with_line_range(): void
     {
         $vulnerability = $this->makeValidatedVuln();
@@ -651,6 +800,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('{{lineEnd}}', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_vulnerability_substitutes_description(): void
     {
         $vulnerability = $this->makeValidatedVuln();
@@ -660,6 +813,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('{{description}}', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_vulnerability_substitutes_attack_vector(): void
     {
         $vulnerability = $this->makeValidatedVuln();
@@ -669,6 +826,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('{{attackVector}}', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_vulnerability_substitutes_proof(): void
     {
         $vulnerability = $this->makeValidatedVuln();
@@ -678,6 +839,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('{{proof}}', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_vulnerability_substitutes_remediation(): void
     {
         $vulnerability = $this->makeValidatedVuln();
@@ -687,6 +852,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('{{remediation}}', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_console_confidence_renders_as_exact_percent_value(): void
     {
         $vulnerability = Vulnerability::of(
@@ -810,6 +979,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString('unknown model', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_html_lists_a_validated_vulnerability(): void
     {
         $output = $this->reportRenderer->renderHtml($this->makeReport($this->makeValidatedVuln(filePath: 'src/Admin/UserController.php')));
@@ -819,6 +992,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString('class="finding severity-high"', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_html_summary_counts_only_present_severities(): void
     {
         $output = $this->reportRenderer->renderHtml($this->makeReport($this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::HIGH)));
@@ -828,6 +1005,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('<tr class="severity-critical">', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_html_escapes_finding_content_to_prevent_report_xss(): void
     {
         $vulnerability = Vulnerability::of(
@@ -843,6 +1024,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('<script>alert(1)</script>', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_html_renders_confidence_as_a_percentage(): void
     {
         $output = $this->reportRenderer->renderHtml($this->makeReport($this->makeValidatedVuln()));
@@ -850,6 +1035,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString('90%', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_html_replaces_every_template_placeholder(): void
     {
         $output = $this->reportRenderer->renderHtml($this->makeReport($this->makeValidatedVuln()));
@@ -857,6 +1046,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString('{{', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_html_escapes_quote_characters_in_finding_fields(): void
     {
         // makeValidatedVuln's proof is "' OR 1=1"; the single quote must be
@@ -867,6 +1060,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString("<pre>' OR 1=1", $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_html_renders_the_location_with_file_and_line_range(): void
     {
         $output = $this->reportRenderer->renderHtml($this->makeReport(
@@ -876,6 +1073,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString('<dd>src/Repo.php:10-14</dd>', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_html_summary_table_renders_exactly_one_row_per_present_severity(): void
     {
         $output = $this->reportRenderer->renderHtml($this->makeReport(
@@ -921,6 +1122,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString('SAFE', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_markdown_lists_a_validated_finding_with_its_location(): void
     {
         $output = $this->reportRenderer->renderMarkdown($this->makeReport(
@@ -932,6 +1137,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString('`src/Admin/UserController.php:10-14`', $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_markdown_finding_shows_confidence_percent_and_indented_proof(): void
     {
         $output = $this->reportRenderer->renderMarkdown($this->makeReport($this->makeValidatedVuln()));
@@ -940,6 +1149,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringContainsString("\n    ' OR 1=1", $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_markdown_renders_a_severity_summary_table(): void
     {
         $output = $this->reportRenderer->renderMarkdown($this->makeReport(
@@ -951,6 +1164,10 @@ final class ReportRendererTest extends TestCase
         self::assertStringNotContainsString(VulnerabilitySeverity::CRITICAL->label(), $output);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_markdown_orders_findings_most_severe_first(): void
     {
         $vulnerability = $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::LOW, filePath: 'src/Low.php');
@@ -985,6 +1202,10 @@ final class ReportRendererTest extends TestCase
         return AuditReport::fromContext($auditContext, $auditCost);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function makeValidatedVuln(
         VulnerabilityType $vulnerabilityType = VulnerabilityType::SQL_INJECTION,
         VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,

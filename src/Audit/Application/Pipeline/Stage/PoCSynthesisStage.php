@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
+use Override;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -28,11 +29,13 @@ final readonly class PoCSynthesisStage implements StageInterface
         private bool $enabled = false,
     ) {}
 
+    #[Override]
     public function name(): string
     {
         return BuiltInStageName::PoCSynthesis->value;
     }
 
+    #[Override]
     public function process(AuditContext $auditContext): void
     {
         if (!$this->enabled) {

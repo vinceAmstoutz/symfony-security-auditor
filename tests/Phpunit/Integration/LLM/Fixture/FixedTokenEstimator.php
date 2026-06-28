@@ -13,12 +13,14 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 
 final class FixedTokenEstimator implements TokenEstimatorInterface
 {
     public function __construct(private readonly int $tokensPerCall) {}
 
+    #[Override]
     public function estimateTokens(string $text, string $model): int
     {
         return $this->tokensPerCall;

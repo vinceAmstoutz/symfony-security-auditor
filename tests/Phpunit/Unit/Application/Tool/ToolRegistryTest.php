@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Tool;
 
 use InvalidArgumentException;
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -158,11 +159,13 @@ final class ToolRegistryTest extends TestCase
                 private readonly mixed $execute,
             ) {}
 
+            #[Override]
             public function definition(): ToolDefinition
             {
                 return new ToolDefinition($this->name, 'desc-'.$this->name, ['type' => 'object']);
             }
 
+            #[Override]
             public function execute(array $arguments): string
             {
                 if (null === $this->execute) {

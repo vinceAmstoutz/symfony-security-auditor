@@ -57,6 +57,9 @@ final readonly class BatchReviewAnalyzer
      * @param list<ProjectFile>   $projectFiles
      *
      * @return list<Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function analyze(array $vulnerabilities, array $projectFiles, ReviewBatchSettings $reviewBatchSettings): array
     {
@@ -107,6 +110,9 @@ final readonly class BatchReviewAnalyzer
      * @param list<int>                 $missIndexes
      *
      * @return array<int, Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     private function reviewMissesInBatches(array $reviewed, array $misses, array $missIndexes, ReviewBatchSettings $reviewBatchSettings, ReviewCacheBuckets $reviewCacheBuckets): array
     {
@@ -145,6 +151,9 @@ final readonly class BatchReviewAnalyzer
      * @param array<string, string> $cacheContexts
      *
      * @return list<Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     private function reviewBatch(array $batch, array $codeContexts, array $cacheContexts, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry): array
     {
@@ -186,6 +195,9 @@ final readonly class BatchReviewAnalyzer
      * @param array<string, string> $cacheContexts
      *
      * @return list<Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     private function reviewBatchViaStructuredCollection(array $batch, array $codeContexts, array $cacheContexts, CoverageRecorderInterface $coverageRecorder): array
     {

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Advisory;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -20,6 +21,7 @@ use RuntimeException;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Advisory\Fixture\RecordingComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Advisory\Fixture\ThrowingComposerAuditRunner;
@@ -30,6 +32,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
 
     private string $cacheDir;
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_runs_inner_and_persists_result_on_first_call(): void
     {
         $this->writeLockfile('{"lock": "v1"}');
@@ -45,6 +50,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertGreaterThan(0, \count(false !== $cacheFiles ? $cacheFiles : []));
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_missing_lockfile_does_not_emit_an_unreadable_warning(): void
     {
         $warnings = [];
@@ -67,6 +75,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame([], $warnings);
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_returns_cached_payload_without_invoking_inner(): void
     {
         $this->writeLockfile('{"lock": "v1"}');
@@ -81,6 +92,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame(1, $recordingComposerAuditRunner->callCount, 'second call must be served from cache');
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_cache_hit_emits_advisory_cache_hit_debug_log_with_lockfile_hash_context(): void
     {
         $lockfileContent = '{"lock": "v1"}';
@@ -116,6 +130,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame($expectedHash, $hitLogs[0][1]['lockfile_hash']);
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_different_lockfile_contents_produce_distinct_cache_entries(): void
     {
         $this->writeLockfile('{"lock": "v1"}');
@@ -133,6 +150,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame(2, $recordingComposerAuditRunner->callCount, 'lock content change must miss the cache');
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_falls_back_to_inner_when_no_lockfile_exists(): void
     {
         // No composer.lock written intentionally
@@ -149,6 +169,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame([], false !== $cacheFiles ? $cacheFiles : []);
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_does_not_persist_when_inner_throws(): void
     {
         $this->writeLockfile('{"lock": "v1"}');
@@ -166,6 +189,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         }
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_falls_back_to_live_audit_when_lockfile_read_throws_io_exception(): void
     {
         $this->writeLockfile('{"lock": "v1"}');
@@ -206,6 +232,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame('permission denied', $unreadableLogs[0][1]['error']);
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_cache_miss_when_existing_entry_is_unreadable_and_falls_back_to_inner(): void
     {
         $this->writeLockfile('{"lock": "v1"}');
@@ -262,6 +291,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame('cache entry unreadable', $unreadableLogs[0][1]['error'] ?? null);
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_cache_file_is_written_at_two_char_shard_directory_under_full_hash_filename(): void
     {
         $lockfileContent = '{"lock": "v1"}';
@@ -284,6 +316,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame($expectedPath, $files[0]);
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_cache_dir_with_trailing_slash_is_normalized_before_assembling_path(): void
     {
         $this->writeLockfile('{"lock": "v1"}');
@@ -312,6 +347,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertStringNotContainsString('//', $capturedDumpPaths[0]);
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_write_failure_is_logged_and_does_not_propagate(): void
     {
         $this->writeLockfile('{"lock": "v1"}');
@@ -357,6 +395,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame('cache dir unwritable', $failureLogs[0][1]['error'] ?? null);
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_successful_cache_write_emits_advisory_cache_stored_debug_log_with_lockfile_hash(): void
     {
         $lockfileContent = '{"lock": "v1"}';
@@ -387,6 +428,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame($expectedHash, $storedLogs[0][1]['lockfile_hash'] ?? null);
     }
 
+    #[Override]
     protected function setUp(): void
     {
         $this->projectDir = sys_get_temp_dir().'/advisory_cache_'.uniqid('', true);
@@ -394,6 +436,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         mkdir($this->projectDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $filesystem = new Filesystem();

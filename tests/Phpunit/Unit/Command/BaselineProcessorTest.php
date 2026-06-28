@@ -13,8 +13,11 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -30,17 +33,23 @@ final class BaselineProcessorTest extends TestCase
 {
     private string $tmpDir;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/baseline_processor_test_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         (new Filesystem())->remove($this->tmpDir);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_generate_writes_the_report_fingerprints_and_returns_their_count(): void
     {
         $auditReport = $this->makeReport($this->makeVuln('src/A.php'), $this->makeVuln('src/B.php'));
@@ -55,6 +64,10 @@ final class BaselineProcessorTest extends TestCase
         self::assertSame(2, $count);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_apply_returns_the_report_unchanged_when_no_baseline_path_is_set(): void
     {
         $auditReport = $this->makeReport($this->makeVuln('src/A.php'));
@@ -68,6 +81,10 @@ final class BaselineProcessorTest extends TestCase
         self::assertSame(0, $baselineResult->suppressedCount);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_apply_suppresses_matching_findings_and_reports_the_suppressed_count(): void
     {
         $vulnerability = $this->makeVuln('src/Keep.php');
@@ -84,6 +101,10 @@ final class BaselineProcessorTest extends TestCase
         self::assertSame(1, $baselineResult->suppressedCount);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_apply_prefers_the_cli_baseline_over_the_configured_path(): void
     {
         $auditReport = $this->makeReport($this->makeVuln('src/A.php'));
@@ -99,6 +120,10 @@ final class BaselineProcessorTest extends TestCase
         self::assertSame(0, $baselineResult->suppressedCount);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_apply_falls_back_to_the_configured_path_when_no_cli_override(): void
     {
         $auditReport = $this->makeReport($this->makeVuln('src/A.php'));
@@ -124,6 +149,10 @@ final class BaselineProcessorTest extends TestCase
         return AuditReport::fromContext($auditContext);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function makeVuln(string $filePath): Vulnerability
     {
         return Vulnerability::of(

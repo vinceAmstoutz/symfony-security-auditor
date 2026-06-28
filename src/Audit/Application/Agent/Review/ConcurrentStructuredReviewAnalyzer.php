@@ -52,6 +52,9 @@ final readonly class ConcurrentStructuredReviewAnalyzer
      * @param list<ProjectFile>   $projectFiles
      *
      * @return list<Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function analyze(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): array
     {
@@ -103,6 +106,9 @@ final readonly class ConcurrentStructuredReviewAnalyzer
      * @param array<int, Vulnerability> $reviewed
      *
      * @return array<int, Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     private function dispatchPending(ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, bool $bypassCache, array $reviewed): array
     {

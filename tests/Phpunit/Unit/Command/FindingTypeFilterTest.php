@@ -13,7 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
+use Override;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -28,17 +31,23 @@ final class FindingTypeFilterTest extends TestCase
 {
     private string $tmpDir;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->tmpDir = sys_get_temp_dir().'/type_filter_test_'.uniqid('', true);
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         rmdir($this->tmpDir);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_apply_without_configured_types_keeps_all_findings(): void
     {
         $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION, VulnerabilityType::SSRF);
@@ -46,6 +55,10 @@ final class FindingTypeFilterTest extends TestCase
         self::assertSame(2, (new FindingTypeFilter())->apply($auditReport)->totalVulnerabilities());
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_apply_excludes_configured_type_values(): void
     {
         $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION, VulnerabilityType::SSRF);
@@ -55,6 +68,10 @@ final class FindingTypeFilterTest extends TestCase
         self::assertSame([VulnerabilityType::SSRF], $this->typesOf($filtered));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_apply_restricts_to_included_type_values(): void
     {
         $auditReport = $this->reportWithTypes(VulnerabilityType::SQL_INJECTION, VulnerabilityType::SSRF, VulnerabilityType::MISSING_RATE_LIMITING);
@@ -64,6 +81,10 @@ final class FindingTypeFilterTest extends TestCase
         self::assertSame([VulnerabilityType::SSRF], $this->typesOf($filtered));
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function reportWithTypes(VulnerabilityType ...$types): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);

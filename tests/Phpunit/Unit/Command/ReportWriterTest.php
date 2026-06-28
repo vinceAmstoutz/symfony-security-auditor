@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -32,6 +33,7 @@ final class ReportWriterTest extends TestCase
 
     private string $tmpDir;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->filesystem = new Filesystem();
@@ -40,6 +42,7 @@ final class ReportWriterTest extends TestCase
         $this->filesystem->mkdir($this->tmpDir);
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $this->filesystem->remove($this->tmpDir);
