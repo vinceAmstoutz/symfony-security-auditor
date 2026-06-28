@@ -32,6 +32,9 @@ final readonly class StandalonePlatformConfigResolver
 
     /**
      * @param array<array-key, mixed> $rawConfig
+     *
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
      */
     public function resolve(array $rawConfig): StandalonePlatformConfig
     {
@@ -52,6 +55,8 @@ final readonly class StandalonePlatformConfigResolver
      * @param array<array-key, mixed> $config
      *
      * @return array<array-key, mixed>
+     *
+     * @throws MissingEnvironmentVariableException
      */
     private function resolveEnvPlaceholders(array $config): array
     {
@@ -67,6 +72,9 @@ final readonly class StandalonePlatformConfigResolver
         return $resolved;
     }
 
+    /**
+     * @throws MissingEnvironmentVariableException
+     */
     private function resolveValue(string $value): string
     {
         if (1 !== preg_match(self::ENV_PLACEHOLDER, $value, $matches)) {

@@ -24,6 +24,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Standalone\Fixture\Ex
 
 final class BundleExtensionLoaderTest extends TestCase
 {
+    /**
+     * @throws MissingBundleExtensionException
+     */
     public function test_it_loads_a_bundle_extension_into_the_container(): void
     {
         $containerBuilder = new ContainerBuilder(new ParameterBag([
@@ -39,6 +42,9 @@ final class BundleExtensionLoaderTest extends TestCase
         self::assertTrue($containerBuilder->hasDefinition(AuditCommand::class));
     }
 
+    /**
+     * @throws MissingBundleExtensionException
+     */
     public function test_it_rejects_a_bundle_without_a_container_extension(): void
     {
         $this->expectException(MissingBundleExtensionException::class);

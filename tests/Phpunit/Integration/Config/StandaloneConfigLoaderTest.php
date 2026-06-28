@@ -13,9 +13,12 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Config;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -26,17 +29,24 @@ final class StandaloneConfigLoaderTest extends TestCase
 
     private Filesystem $filesystem;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->filesystem = new Filesystem();
         $this->configHome = sys_get_temp_dir().'/ssa-config-'.bin2hex(random_bytes(6));
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $this->filesystem->remove($this->configHome);
     }
 
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_passes_audit_settings_through_and_strips_the_platform_keys(): void
     {
         $this->writeConfig("provider: anthropic\nplatform:\n  anthropic:\n    api_key: sk-test\nmodel: gpt-5.4\n");
@@ -44,6 +54,11 @@ final class StandaloneConfigLoaderTest extends TestCase
         self::assertSame(['model' => 'gpt-5.4'], $this->loader()->load()->auditConfig);
     }
 
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_resolves_the_platform_connection(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-test\n");
@@ -54,6 +69,11 @@ final class StandaloneConfigLoaderTest extends TestCase
         );
     }
 
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_leaves_the_audit_settings_empty_when_only_a_platform_is_configured(): void
     {
         $this->writeConfig("platform:\n  ollama:\n    endpoint: http://localhost:11434\n");
@@ -61,6 +81,11 @@ final class StandaloneConfigLoaderTest extends TestCase
         self::assertSame([], $this->loader()->load()->auditConfig);
     }
 
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_rejects_a_config_without_a_platform(): void
     {
         $this->writeConfig("model: gpt-5.4\n");
@@ -70,6 +95,11 @@ final class StandaloneConfigLoaderTest extends TestCase
         $this->loader()->load();
     }
 
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     */
     public function test_a_project_config_overrides_the_user_config(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
@@ -79,6 +109,11 @@ final class StandaloneConfigLoaderTest extends TestCase
         self::assertSame('project-model', $this->loader($projectConfigFile)->load()->auditConfig['model']);
     }
 
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     */
     public function test_user_config_keys_survive_when_a_project_config_omits_them(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
@@ -88,6 +123,11 @@ final class StandaloneConfigLoaderTest extends TestCase
         self::assertSame('user-model', $this->loader($projectConfigFile)->load()->auditConfig['model']);
     }
 
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     */
     public function test_a_missing_project_config_leaves_the_user_config_intact(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
@@ -95,6 +135,11 @@ final class StandaloneConfigLoaderTest extends TestCase
         self::assertSame('user-model', $this->loader($this->configHome.'/absent.yaml')->load()->auditConfig['model']);
     }
 
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_rejects_a_missing_config_file(): void
     {
         $this->expectException(MissingPlatformException::class);
@@ -102,6 +147,11 @@ final class StandaloneConfigLoaderTest extends TestCase
         $this->loader()->load();
     }
 
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_rejects_an_empty_config_file(): void
     {
         $this->writeConfig('');

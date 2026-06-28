@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture;
 
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 
 /**
@@ -27,6 +28,10 @@ final class RecordingBridgeInstaller implements BridgeInstallerInterface
      */
     public array $installations = [];
 
+    /**
+     * @throws void
+     */
+    #[Override]
     public function install(string $provider, string $targetDirectory): void
     {
         $this->installations[] = [$provider, $targetDirectory];

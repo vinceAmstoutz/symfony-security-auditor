@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
@@ -39,6 +40,11 @@ final readonly class StandaloneContainerFactory
         private BundleExtensionLoader $bundleExtensionLoader = new BundleExtensionLoader(),
     ) {}
 
+    /**
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws AmbiguousPlatformException
+     */
     public function create(StandaloneConfig $standaloneConfig, string $cacheDir): ContainerBuilder
     {
         $workingDirectory = getcwd();
@@ -65,6 +71,10 @@ final readonly class StandaloneContainerFactory
         return $containerBuilder;
     }
 
+    /**
+     * @throws UnknownPlatformProviderException
+     * @throws AmbiguousPlatformException
+     */
     private function selectActivePlatform(ContainerBuilder $containerBuilder, StandalonePlatformConfig $standalonePlatformConfig): void
     {
         $activeProvider = $standalonePlatformConfig->activeProvider;

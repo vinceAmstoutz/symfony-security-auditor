@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Config;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
@@ -22,11 +23,13 @@ final class YamlStandaloneConfigWriterTest extends TestCase
 {
     private string $configFile;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->configFile = sys_get_temp_dir().'/ssa-write-'.bin2hex(random_bytes(6)).'/config.yaml';
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         (new Filesystem())->remove(\dirname($this->configFile));
@@ -45,6 +48,8 @@ final class YamlStandaloneConfigWriterTest extends TestCase
     {
         (new YamlStandaloneConfigWriter())->write($this->configFile, ['model' => 'claude-opus-4-8']);
 
-        self::assertSame('0600', substr(\sprintf('%o', fileperms($this->configFile)), -4));
+        $permissions = fileperms($this->configFile);
+        self::assertNotFalse($permissions);
+        self::assertSame('0600', substr(\sprintf('%o', $permissions), -4));
     }
 }

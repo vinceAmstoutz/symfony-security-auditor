@@ -13,10 +13,15 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
+
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  */
 interface BridgeInstallerInterface
 {
+    /**
+     * @throws BridgeInstallationFailedException
+     */
     public function install(string $provider, string $targetDirectory): void;
 }

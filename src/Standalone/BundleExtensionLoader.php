@@ -25,6 +25,8 @@ final readonly class BundleExtensionLoader
 {
     /**
      * @param array<array-key, mixed> $config
+     *
+     * @throws MissingBundleExtensionException
      */
     public function load(Bundle $bundle, array $config, ContainerBuilder $containerBuilder): void
     {

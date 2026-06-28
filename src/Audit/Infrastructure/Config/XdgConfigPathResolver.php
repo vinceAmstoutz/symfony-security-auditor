@@ -31,21 +31,33 @@ final readonly class XdgConfigPathResolver
         private ?string $xdgDataHome = null,
     ) {}
 
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     public function configFile(): string
     {
         return $this->baseDirectory($this->xdgConfigHome, '.config').'/'.self::APP_DIRECTORY.'/'.self::CONFIG_FILENAME;
     }
 
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     public function cacheDir(): string
     {
         return $this->baseDirectory($this->xdgCacheHome, '.cache').'/'.self::APP_DIRECTORY;
     }
 
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     public function dataDir(): string
     {
         return $this->baseDirectory($this->xdgDataHome, '.local/share').'/'.self::APP_DIRECTORY;
     }
 
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     private function baseDirectory(?string $xdgBase, string $homeRelativeFallback): string
     {
         if (null !== $xdgBase && '' !== $xdgBase) {

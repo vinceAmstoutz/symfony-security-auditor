@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
+use Override;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
 
@@ -25,6 +26,7 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
         private Filesystem $filesystem = new Filesystem(),
     ) {}
 
+    #[Override]
     public function write(string $configFile, array $config): void
     {
         $this->filesystem->dumpFile($configFile, Yaml::dump($config));

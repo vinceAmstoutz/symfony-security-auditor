@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command;
 
+use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -32,6 +33,7 @@ final class InitCommandTest extends TestCase
 
     private RecordingBridgeInstaller $recordingBridgeInstaller;
 
+    #[Override]
     protected function setUp(): void
     {
         $suffix = bin2hex(random_bytes(6));
@@ -40,6 +42,7 @@ final class InitCommandTest extends TestCase
         $this->recordingBridgeInstaller = new RecordingBridgeInstaller();
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         (new Filesystem())->remove([$this->configHome, $this->dataHome]);

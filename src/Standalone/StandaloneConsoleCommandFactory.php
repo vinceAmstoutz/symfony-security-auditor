@@ -25,6 +25,9 @@ final readonly class StandaloneConsoleCommandFactory
 {
     public const string AUDIT_ALIAS = 'audit';
 
+    /**
+     * @throws UnresolvableAuditCommandException
+     */
     public function create(ContainerBuilder $containerBuilder): Command
     {
         $auditCommand = $containerBuilder->get(AuditCommand::class);

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Standalone;
 
+use Override;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use stdClass;
@@ -21,6 +22,9 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableAuditCommandException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneConsoleCommandFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneContainerFactory;
@@ -29,16 +33,24 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
 {
     private string $cacheDir;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->cacheDir = sys_get_temp_dir().'/ssa-cmd-'.bin2hex(random_bytes(6));
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         (new Filesystem())->remove($this->cacheDir);
     }
 
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws UnresolvableAuditCommandException
+     */
     #[RunInSeparateProcess]
     public function test_it_wraps_the_invokable_audit_command_under_its_name_and_alias(): void
     {
@@ -53,6 +65,9 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
         self::assertContains('audit', $command->getAliases());
     }
 
+    /**
+     * @throws UnresolvableAuditCommandException
+     */
     public function test_it_rejects_a_container_whose_audit_service_is_not_the_audit_command(): void
     {
         $this->expectException(UnresolvableAuditCommandException::class);

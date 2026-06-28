@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge;
 
 use Closure;
+use Override;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Exception\ExceptionInterface;
 use Symfony\Component\Process\Process;
@@ -55,6 +56,10 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         );
     }
 
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    #[Override]
     public function install(string $provider, string $targetDirectory): void
     {
         $this->ensureComposerProject($targetDirectory);

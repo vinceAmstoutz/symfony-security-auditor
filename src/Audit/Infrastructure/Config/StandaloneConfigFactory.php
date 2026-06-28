@@ -13,11 +13,14 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
+use Override;
+
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryInterface
 {
+    #[Override]
     public function create(string $provider, string $model, string $apiKeyEnvironmentVariable): array
     {
         return [

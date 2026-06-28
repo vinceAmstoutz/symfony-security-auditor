@@ -19,6 +19,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPa
 
 final class XdgConfigPathResolverTest extends TestCase
 {
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_resolves_the_config_file_under_xdg_config_home_when_set(): void
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver('/xdg/config', null, '/home/dev');
@@ -26,6 +29,9 @@ final class XdgConfigPathResolverTest extends TestCase
         self::assertSame('/xdg/config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
     }
 
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_falls_back_to_home_dot_config_when_xdg_config_home_is_empty(): void
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver('', null, '/home/dev');
@@ -33,6 +39,9 @@ final class XdgConfigPathResolverTest extends TestCase
         self::assertSame('/home/dev/.config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
     }
 
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_resolves_the_cache_dir_under_xdg_cache_home_when_set(): void
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver(null, '/xdg/cache', '/home/dev');
@@ -40,6 +49,9 @@ final class XdgConfigPathResolverTest extends TestCase
         self::assertSame('/xdg/cache/symfony-security-auditor', $xdgConfigPathResolver->cacheDir());
     }
 
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_falls_back_to_home_dot_cache_when_xdg_cache_home_is_unset(): void
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver(null, null, '/home/dev');
@@ -47,6 +59,9 @@ final class XdgConfigPathResolverTest extends TestCase
         self::assertSame('/home/dev/.cache/symfony-security-auditor', $xdgConfigPathResolver->cacheDir());
     }
 
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_resolves_the_data_dir_under_xdg_data_home_when_set(): void
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver(null, null, '/home/dev', '/xdg/data');
@@ -54,6 +69,9 @@ final class XdgConfigPathResolverTest extends TestCase
         self::assertSame('/xdg/data/symfony-security-auditor', $xdgConfigPathResolver->dataDir());
     }
 
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_falls_back_to_home_dot_local_share_when_xdg_data_home_is_unset(): void
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver(null, null, '/home/dev');
@@ -61,6 +79,9 @@ final class XdgConfigPathResolverTest extends TestCase
         self::assertSame('/home/dev/.local/share/symfony-security-auditor', $xdgConfigPathResolver->dataDir());
     }
 
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_rejects_resolving_a_config_file_without_any_home(): void
     {
         $this->expectException(UnresolvableConfigPathException::class);

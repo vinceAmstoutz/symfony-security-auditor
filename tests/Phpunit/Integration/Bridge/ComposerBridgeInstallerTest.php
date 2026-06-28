@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge;
 
 use Closure;
+use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
@@ -26,17 +27,22 @@ final class ComposerBridgeInstallerTest extends TestCase
 
     private Filesystem $filesystem;
 
+    #[Override]
     protected function setUp(): void
     {
         $this->filesystem = new Filesystem();
         $this->targetDirectory = sys_get_temp_dir().'/ssa-bridge-'.bin2hex(random_bytes(6));
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         $this->filesystem->remove($this->targetDirectory);
     }
 
+    /**
+     * @throws BridgeInstallationFailedException
+     */
     public function test_it_initialises_the_target_directory_as_a_composer_project(): void
     {
         (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $this->targetDirectory);
@@ -44,6 +50,9 @@ final class ComposerBridgeInstallerTest extends TestCase
         self::assertSame("{}\n", file_get_contents($this->targetDirectory.'/composer.json'));
     }
 
+    /**
+     * @throws BridgeInstallationFailedException
+     */
     public function test_it_preserves_an_existing_composer_manifest(): void
     {
         $this->filesystem->dumpFile($this->targetDirectory.'/composer.json', '{"name":"acme/app"}');
@@ -53,6 +62,9 @@ final class ComposerBridgeInstallerTest extends TestCase
         self::assertSame('{"name":"acme/app"}', file_get_contents($this->targetDirectory.'/composer.json'));
     }
 
+    /**
+     * @throws BridgeInstallationFailedException
+     */
     public function test_it_requires_the_provider_specific_bridge_package(): void
     {
         $captured = [];
@@ -67,6 +79,9 @@ final class ComposerBridgeInstallerTest extends TestCase
         self::assertSame(['symfony/ai-gemini-platform'], $captured);
     }
 
+    /**
+     * @throws BridgeInstallationFailedException
+     */
     public function test_it_throws_when_the_install_process_fails(): void
     {
         $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, string $targetDirectory): Process => new Process(['false']));
@@ -77,6 +92,9 @@ final class ComposerBridgeInstallerTest extends TestCase
         $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
     }
 
+    /**
+     * @throws BridgeInstallationFailedException
+     */
     public function test_the_failure_message_carries_the_composer_error_output(): void
     {
         $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, string $targetDirectory): Process => Process::fromShellCommandline('echo "network unreachable" 1>&2; exit 1'));
@@ -87,6 +105,9 @@ final class ComposerBridgeInstallerTest extends TestCase
         $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
     }
 
+    /**
+     * @throws BridgeInstallationFailedException
+     */
     public function test_it_throws_when_composer_cannot_be_started(): void
     {
         $composerBridgeInstaller = new ComposerBridgeInstaller(timeoutSeconds: -1, processBuilder: $this->succeedingProcess());
@@ -97,6 +118,9 @@ final class ComposerBridgeInstallerTest extends TestCase
         $composerBridgeInstaller->install('anthropic', $this->targetDirectory);
     }
 
+    /**
+     * @throws BridgeInstallationFailedException
+     */
     public function test_default_process_builder_uses_composer_require_in_the_target_directory(): void
     {
         $process = (ComposerBridgeInstaller::defaultProcessBuilder())('symfony/ai-anthropic-platform', '/data/bridges');
@@ -109,6 +133,9 @@ final class ComposerBridgeInstallerTest extends TestCase
         self::assertStringContainsString("'--no-interaction'", $commandLine);
     }
 
+    /**
+     * @return Closure(string, string): Process
+     */
     private function succeedingProcess(): Closure
     {
         return static fn (string $package, string $targetDirectory): Process => new Process(['true']);

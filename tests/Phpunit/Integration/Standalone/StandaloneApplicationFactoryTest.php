@@ -13,9 +13,11 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Standalone;
 
+use Override;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 
 final class StandaloneApplicationFactoryTest extends TestCase
@@ -24,6 +26,7 @@ final class StandaloneApplicationFactoryTest extends TestCase
 
     private string $cacheHome;
 
+    #[Override]
     protected function setUp(): void
     {
         $suffix = bin2hex(random_bytes(6));
@@ -36,6 +39,7 @@ final class StandaloneApplicationFactoryTest extends TestCase
         );
     }
 
+    #[Override]
     protected function tearDown(): void
     {
         (new Filesystem())->remove([$this->configHome, $this->cacheHome]);
@@ -83,6 +87,9 @@ final class StandaloneApplicationFactoryTest extends TestCase
         self::assertFalse($application->get('audit:run')->isHidden());
     }
 
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_resolves_the_bridge_autoload_file_under_the_data_directory(): void
     {
         self::assertSame(
