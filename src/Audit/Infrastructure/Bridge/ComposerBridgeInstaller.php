@@ -52,7 +52,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     public static function defaultProcessBuilder(): Closure
     {
         return static fn (string $package, string $targetDirectory): Process => new Process(
-            ['composer', 'require', $package, '--working-dir='.$targetDirectory, '--no-interaction'],
+            ['composer', 'require', $package, \sprintf('--working-dir=%s', $targetDirectory), '--no-interaction'],
         );
     }
 

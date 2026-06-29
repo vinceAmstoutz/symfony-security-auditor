@@ -40,7 +40,7 @@ final readonly class SymfonyMappingContextRenderer
             $lines[] = \sprintf('- %s — attributes: [%s] — subjects: [%s] — %s', $voterCapability->className(), $attributes, $subjects, $voterCapability->filePath());
         }
 
-        return implode("\n", $lines)."\n\n";
+        return \sprintf("%s\n\n", implode("\n", $lines));
     }
 
     public static function renderFormBindings(SymfonyMapping $symfonyMapping): string
@@ -56,7 +56,7 @@ final readonly class SymfonyMappingContextRenderer
             $lines[] = \sprintf('- %s::%s — %s', $formBinding->controllerFilePath(), $formBinding->controllerMethod(), $formBinding->formTypeClass());
         }
 
-        return implode("\n", $lines)."\n\n";
+        return \sprintf("%s\n\n", implode("\n", $lines));
     }
 
     public static function renderRouteAccessControlMap(SymfonyMapping $symfonyMapping): string
@@ -80,7 +80,7 @@ final readonly class SymfonyMappingContextRenderer
             }
 
             if ([] !== $routeAccessControl->methodLevelIsGranted()) {
-                $checks[] = 'method:#[IsGranted('.implode(',', $routeAccessControl->methodLevelIsGranted()).')]';
+                $checks[] = \sprintf('method:#[IsGranted(%s)]', implode(',', $routeAccessControl->methodLevelIsGranted()));
             }
 
             if ($routeAccessControl->methodHasDenyAccess()) {
@@ -91,7 +91,7 @@ final readonly class SymfonyMappingContextRenderer
             $lines[] = \sprintf('- %s %s — %s::%s — %s', $methods, $path, $routeAccessControl->filePath(), $routeAccessControl->methodName(), $checkLabel);
         }
 
-        return implode("\n", $lines)."\n\n";
+        return \sprintf("%s\n\n", implode("\n", $lines));
     }
 
     /**
@@ -106,7 +106,7 @@ final readonly class SymfonyMappingContextRenderer
 
         $firewallRoles = self::firewallRolesForPath($routePath, $routeAccessMap);
         if (null !== $firewallRoles) {
-            return 'COVERED_BY access_control['.implode(',', $firewallRoles).']';
+            return \sprintf('COVERED_BY access_control[%s]', implode(',', $firewallRoles));
         }
 
         return 'LACKS_ACCESS_CHECK';
@@ -129,7 +129,7 @@ final readonly class SymfonyMappingContextRenderer
         }
 
         foreach ($routeAccessMap as $pattern => $roles) {
-            if (1 === preg_match('#'.$pattern.'#', $routePath)) {
+            if (1 === preg_match(\sprintf('#%s#', $pattern), $routePath)) {
                 return $roles;
             }
         }

@@ -37,6 +37,6 @@ final readonly class AuditOverviewLine
             }
         }
 
-        return [] === $segments ? $files : $files.' — '.implode(', ', $segments);
+        return [] === $segments ? $files : \sprintf('%s — %s', $files, implode(', ', $segments));
     }
 }

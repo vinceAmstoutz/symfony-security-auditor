@@ -263,7 +263,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
             );
         }
 
-        return "## Vulnerability Reports to Review\n\n".implode("\n\n", $sections).$this->batchClosingInstruction();
+        return \sprintf("## Vulnerability Reports to Review\n\n%s%s", implode("\n\n", $sections), $this->batchClosingInstruction());
     }
 
     private function batchClosingInstruction(): string

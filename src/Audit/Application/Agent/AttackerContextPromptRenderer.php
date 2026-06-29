@@ -113,6 +113,6 @@ final readonly class AttackerContextPromptRenderer
 
     private function indent(string $content): string
     {
-        return implode("\n", array_map(static fn (string $line): string => '  '.$line, explode("\n", $content)));
+        return implode("\n", array_map(static fn (string $line): string => \sprintf('  %s', $line), explode("\n", $content)));
     }
 }
