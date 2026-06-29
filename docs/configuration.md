@@ -415,6 +415,14 @@ the XDG Base Directory specification:
 | `$XDG_CACHE_HOME/symfony-security-auditor` (→ `~/.cache/…`)               | attacker/reviewer and advisory caches |
 | `$XDG_DATA_HOME/symfony-security-auditor` (→ `~/.local/share/…`)          | the downloaded provider bridge(s)     |
 
+> **Requirements & platform support.** The PHAR is pure PHP: the single
+> published artifact runs unchanged on PHP **8.3, 8.4 and 8.5** (all three are
+> covered by the test matrix) and on any OS with a compatible PHP CLI — Linux,
+> macOS, or Windows. The native binary bundles its own PHP runtime, so it needs
+> no PHP installed, but is compiled for **Linux x64** only. `init` shells out to
+> `composer` (to fetch the bridge) and `--since` to `git`, so those tools must
+> be present on the host when you use those features.
+
 Run `symfony-security-auditor init` to generate the file interactively and fetch
 the provider bridge. The file is **rootless** — the same keys as the bundle
 configuration above, without the `symfony_security_auditor:` wrapper — plus two
