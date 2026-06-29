@@ -17,6 +17,7 @@ use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Command\LazyCommand;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
@@ -47,6 +48,7 @@ final readonly class StandaloneApplicationFactory
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private StandaloneContainerFactory $standaloneContainerFactory = new StandaloneContainerFactory(),
         private StandaloneConsoleCommandFactory $standaloneConsoleCommandFactory = new StandaloneConsoleCommandFactory(),
+        private BridgeInstallerInterface $bridgeInstaller = new ComposerBridgeInstaller(),
     ) {}
 
     /**
@@ -114,7 +116,7 @@ final readonly class StandaloneApplicationFactory
             $this->xdgConfigPathResolver,
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
-            new ComposerBridgeInstaller(),
+            $this->bridgeInstaller,
         );
     }
 
