@@ -147,27 +147,6 @@ Estimate cost before running:
 bin/console audit:run --dry-run
 ```
 
-> [!WARNING]
->
-> **Audit reports list your application's vulnerabilities.** On a **public
-> repository**, CI artifacts are publicly downloadable — storing the report
-> exposes your attack surface. Prefer GitHub Code Scanning (SARIF, restricted to
-> collaborators), private storage (S3/GCS with IAM), or notification-only. See
-> [Report Visibility on Public Repositories](docs/ci.md#report-visibility-on-public-repositories).
-
-<!-- -->
-
-> [!TIP]
->
-> Schedule the audit as a nightly CI job — the multi-agent LLM loop can take
-> minutes, so blocking PRs on it hurts productivity.
-> [CI Integration](docs/ci.md) has ready-to-copy GitHub Actions and GitLab CI
-> schedules and a split-model config to
-> [control API costs](docs/ci.md#managing-llm-costs). For **dependency CVEs**,
-> pair it with [Dependabot](https://docs.github.com/en/code-security/dependabot)
-> or [Renovate](https://docs.renovatebot.com/) — this auditor targets the
-> application-level logic flaws those scanners cannot see.
-
 ## Standalone tool (PHAR)
 
 Prefer to run the auditor like PHPStan or Psalm — one install, many projects,
@@ -203,6 +182,27 @@ keys as the bundle, without the `symfony_security_auditor:` wrapper) plus a
 `platform:` block handed verbatim to `symfony/ai`. See
 [configuration](docs/configuration.md#standalone-configuration) for the file
 format and provider switching.
+
+> [!WARNING]
+>
+> **Audit reports list your application's vulnerabilities.** On a **public
+> repository**, CI artifacts are publicly downloadable — storing the report
+> exposes your attack surface. Prefer GitHub Code Scanning (SARIF, restricted to
+> collaborators), private storage (S3/GCS with IAM), or notification-only. See
+> [Report Visibility on Public Repositories](docs/ci.md#report-visibility-on-public-repositories).
+
+<!-- -->
+
+> [!TIP]
+>
+> Schedule the audit as a nightly CI job — the multi-agent LLM loop can take
+> minutes, so blocking PRs on it hurts productivity.
+> [CI Integration](docs/ci.md) has ready-to-copy GitHub Actions and GitLab CI
+> schedules and a split-model config to
+> [control API costs](docs/ci.md#managing-llm-costs). For **dependency CVEs**,
+> pair it with [Dependabot](https://docs.github.com/en/code-security/dependabot)
+> or [Renovate](https://docs.renovatebot.com/) — this auditor targets the
+> application-level logic flaws those scanners cannot see.
 
 ## Features
 
