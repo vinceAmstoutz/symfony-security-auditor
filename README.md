@@ -190,19 +190,10 @@ Each release also ships a dependency-free native binary
 (`symfony-security-auditor`) for hosts without PHP — download it the same way
 and run `./symfony-security-auditor audit …`.
 
-### Requirements & platform support
-
-|                   | Needs PHP installed?             | Runs on                                |
-| ----------------- | -------------------------------- | -------------------------------------- |
-| **PHAR**          | Yes — a PHP **8.3+** CLI         | Cross-platform (Linux, macOS, Windows) |
-| **Native binary** | No — bundles its own PHP runtime | Linux x64 only                         |
-
-The PHAR is pure PHP, so the one published artifact runs unchanged on PHP **8.3,
-8.4 and 8.5** (the code is tested across all three) and on any OS with a
-compatible PHP CLI. The native binary embeds its own PHP runtime — it needs no
-PHP on the host but is compiled for Linux x64. Both `init` (fetches the provider
-bridge through `composer`) and `--since` (reads `git diff`) shell out to those
-tools, so `composer` / `git` must be on the host when you use those features.
+The PHAR runs anywhere with a PHP **8.3+** CLI (Linux, macOS, Windows); the
+native binary bundles its own runtime but targets Linux x64. See
+[requirements & platform support](docs/configuration.md#standalone-configuration)
+for details.
 
 `audit` is an alias for `audit:run`; every option documented in the
 [CLI reference](docs/configuration.md#cli-reference) (`--format`, `--output`,
