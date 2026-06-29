@@ -19,7 +19,6 @@ use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\EventDispatcher\EventDispatcher;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
@@ -37,14 +36,6 @@ final readonly class StandaloneContainerFactory
 
     private const string PLATFORM_SERVICE_PREFIX = 'ai.platform.';
 
-    /**
-     * @var list<string>
-     */
-    private const array OVERRIDABLE_LLM_CLIENT_IDS = [
-        'security_auditor.attacker_client',
-        'security_auditor.reviewer_client',
-    ];
-
     public function __construct(
         private BundleExtensionLoader $bundleExtensionLoader = new BundleExtensionLoader(),
     ) {}
@@ -54,7 +45,7 @@ final readonly class StandaloneContainerFactory
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
      */
-    public function create(StandaloneConfig $standaloneConfig, string $cacheDir, ?LLMClientInterface $llmClient = null): ContainerBuilder
+    public function create(StandaloneConfig $standaloneConfig, string $cacheDir): ContainerBuilder
     {
         $workingDirectory = getcwd();
 
@@ -73,31 +64,11 @@ final readonly class StandaloneContainerFactory
         $this->bundleExtensionLoader->load(new SymfonySecurityAuditorBundle(), $standaloneConfig->auditConfig, $containerBuilder);
 
         $this->selectActivePlatform($containerBuilder, $standaloneConfig->platform);
-        $this->overrideLlmClient($containerBuilder, $llmClient);
 
         $containerBuilder->getDefinition(AuditCommand::class)->setPublic(true);
         $containerBuilder->compile();
 
-        if ($llmClient instanceof LLMClientInterface) {
-            foreach (self::OVERRIDABLE_LLM_CLIENT_IDS as $serviceId) {
-                $containerBuilder->set($serviceId, $llmClient);
-            }
-        }
-
         return $containerBuilder;
-    }
-
-    private function overrideLlmClient(ContainerBuilder $containerBuilder, ?LLMClientInterface $llmClient): void
-    {
-        if (!$llmClient instanceof LLMClientInterface) {
-            return;
-        }
-
-        foreach (self::OVERRIDABLE_LLM_CLIENT_IDS as $serviceId) {
-            $containerBuilder->register($serviceId, LLMClientInterface::class)
-                ->setSynthetic(true)
-                ->setPublic(true);
-        }
     }
 
     /**
