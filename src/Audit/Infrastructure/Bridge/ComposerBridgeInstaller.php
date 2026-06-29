@@ -38,12 +38,12 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     private const string EMPTY_MANIFEST = "{}\n";
 
     /**
-     * @param ?Closure(string, string): Process $processBuilder defaults to the standard composer-require command; tests inject a stub
+     * @param Closure(string, string): Process $processBuilder the composer-require command builder (use self::defaultProcessBuilder() in production); tests inject a stub
      */
     public function __construct(
+        private Closure $processBuilder,
         private Filesystem $filesystem = new Filesystem(),
         private int $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,
-        private ?Closure $processBuilder = null,
     ) {}
 
     /**
@@ -65,8 +65,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         $this->ensureComposerProject($targetDirectory);
 
         $package = \sprintf(self::PACKAGE_TEMPLATE, $provider);
-        $builder = $this->processBuilder ?? self::defaultProcessBuilder();
-        $process = $builder($package, $targetDirectory);
+        $process = ($this->processBuilder)($package, $targetDirectory);
 
         try {
             $process->setTimeout((float) $this->timeoutSeconds);

@@ -46,9 +46,9 @@ final readonly class StandaloneApplicationFactory
     public function __construct(
         private StandaloneConfigLoader $standaloneConfigLoader,
         private XdgConfigPathResolver $xdgConfigPathResolver,
+        private BridgeInstallerInterface $bridgeInstaller,
         private StandaloneContainerFactory $standaloneContainerFactory = new StandaloneContainerFactory(),
         private StandaloneConsoleCommandFactory $standaloneConsoleCommandFactory = new StandaloneConsoleCommandFactory(),
-        private BridgeInstallerInterface $bridgeInstaller = new ComposerBridgeInstaller(),
     ) {}
 
     /**
@@ -65,6 +65,7 @@ final readonly class StandaloneApplicationFactory
                 self::projectConfigFile($environment),
             ),
             $xdgConfigPathResolver,
+            new ComposerBridgeInstaller(ComposerBridgeInstaller::defaultProcessBuilder()),
         );
     }
 
