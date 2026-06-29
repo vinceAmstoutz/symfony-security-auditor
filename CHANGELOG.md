@@ -44,12 +44,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   command, and config/bridge seams under `src/Audit/Infrastructure/`
   (`StandaloneConfigLoader`, `StandalonePlatformConfigResolver`,
   `StandalonePlatformConfig`, `StandaloneConfig`, `YamlStandaloneConfigWriter`,
-  `ComposerBridgeInstaller`). A tag-triggered `.github/workflows/release.yaml`
-  compiles the PHAR with `box compile` (see `box.json`) and a dependency-free
-  native binary with `static-php-cli`, attaching both
-  `symfony-security-auditor.phar` and `symfony-security-auditor` to the GitHub
-  release. The Symfony bundle remains a fully supported, unchanged install
-  method.
+  `ComposerBridgeInstaller`). Publishing a GitHub release runs
+  `.github/workflows/release.yaml`, which compiles the PHAR with `box compile`
+  (see `box.json`) and a dependency-free native binary with `static-php-cli`,
+  attaching both `symfony-security-auditor.phar` and `symfony-security-auditor`
+  to the GitHub release. The Symfony bundle remains a fully supported, unchanged
+  install method.
 - **New `--show-scanned` option on `audit:run` lists the exact files an audit
   would ingest, without invoking the LLM.** Answers "did my `included_paths` /
   `--path` configuration match the files I expect?" before paying for a run. The

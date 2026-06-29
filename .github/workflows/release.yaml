@@ -1,10 +1,9 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch: ~
+  release:
+    types:
+      - published
 
 permissions:
   contents: write
@@ -39,9 +38,11 @@ jobs:
         with:
           name: symfony-security-auditor-phar
           path: symfony-security-auditor.phar
+          retention-days: 1
+          compression-level: 9
 
       - name: Attach the PHAR to the release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: symfony-security-auditor.phar
 
@@ -59,7 +60,7 @@ jobs:
           php-version: '8.3'
 
       - name: Download the PHAR artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: symfony-security-auditor-phar
 
@@ -79,6 +80,6 @@ jobs:
         run: test -s symfony-security-auditor
 
       - name: Attach the binary to the release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: symfony-security-auditor
