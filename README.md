@@ -187,13 +187,10 @@ export ANTHROPIC_API_KEY=sk-…
 ```
 
 Each release also ships a dependency-free native binary
-(`symfony-security-auditor`) for hosts without PHP — download it the same way
-and run `./symfony-security-auditor audit …`.
-
-The PHAR runs anywhere with a PHP **8.3+** CLI (Linux, macOS, Windows); the
-native binary bundles its own runtime but targets Linux x64. See
-[requirements & platform support](docs/configuration.md#standalone-configuration)
-for details.
+(`symfony-security-auditor`, Linux x64) for hosts without PHP — download it the
+same way and run `./symfony-security-auditor audit …`. The PHAR needs a PHP
+**8.3+** CLI; see
+[platform support](docs/configuration.md#standalone-configuration).
 
 `audit` is an alias for `audit:run`; every option documented in the
 [CLI reference](docs/configuration.md#cli-reference) (`--format`, `--output`,
