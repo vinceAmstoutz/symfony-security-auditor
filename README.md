@@ -67,6 +67,9 @@ The full report renders the same way in console, JSON, SARIF, HTML, and Markdown
 
 ## Getting Started
 
+Two ways to run it: as a **Symfony bundle** (steps below) or as a
+**[standalone PHAR/binary](#standalone-tool-phar)**.
+
 ### 1. Install — Symfony Flex wires everything
 
 ```bash
