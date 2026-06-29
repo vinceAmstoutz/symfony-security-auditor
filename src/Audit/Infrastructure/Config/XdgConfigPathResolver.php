@@ -36,7 +36,7 @@ final readonly class XdgConfigPathResolver
      */
     public function configFile(): string
     {
-        return $this->baseDirectory($this->xdgConfigHome, '.config').'/'.self::APP_DIRECTORY.'/'.self::CONFIG_FILENAME;
+        return \sprintf('%s/%s/%s', $this->baseDirectory($this->xdgConfigHome, '.config'), self::APP_DIRECTORY, self::CONFIG_FILENAME);
     }
 
     /**
@@ -44,7 +44,7 @@ final readonly class XdgConfigPathResolver
      */
     public function cacheDir(): string
     {
-        return $this->baseDirectory($this->xdgCacheHome, '.cache').'/'.self::APP_DIRECTORY;
+        return \sprintf('%s/%s', $this->baseDirectory($this->xdgCacheHome, '.cache'), self::APP_DIRECTORY);
     }
 
     /**
@@ -52,7 +52,7 @@ final readonly class XdgConfigPathResolver
      */
     public function dataDir(): string
     {
-        return $this->baseDirectory($this->xdgDataHome, '.local/share').'/'.self::APP_DIRECTORY;
+        return \sprintf('%s/%s', $this->baseDirectory($this->xdgDataHome, '.local/share'), self::APP_DIRECTORY);
     }
 
     /**
@@ -65,7 +65,7 @@ final readonly class XdgConfigPathResolver
         }
 
         if (null !== $this->home && '' !== $this->home) {
-            return $this->home.'/'.$homeRelativeFallback;
+            return \sprintf('%s/%s', $this->home, $homeRelativeFallback);
         }
 
         throw UnresolvableConfigPathException::missingHome();

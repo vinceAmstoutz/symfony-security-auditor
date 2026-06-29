@@ -80,7 +80,7 @@ final readonly class StandaloneContainerFactory
         $activeProvider = $standalonePlatformConfig->activeProvider;
 
         if (null !== $activeProvider) {
-            $platformServiceId = self::PLATFORM_SERVICE_PREFIX.$activeProvider;
+            $platformServiceId = \sprintf('%s%s', self::PLATFORM_SERVICE_PREFIX, $activeProvider);
             if (!$containerBuilder->hasDefinition($platformServiceId)) {
                 throw UnknownPlatformProviderException::forProvider($activeProvider);
             }

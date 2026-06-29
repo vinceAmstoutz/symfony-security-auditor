@@ -73,7 +73,7 @@ final readonly class StandaloneApplicationFactory
     {
         $workingDirectory = $environment['PWD'] ?? null;
 
-        return null !== $workingDirectory ? $workingDirectory.'/'.self::PROJECT_CONFIG_FILENAME : null;
+        return null !== $workingDirectory ? \sprintf('%s/%s', $workingDirectory, self::PROJECT_CONFIG_FILENAME) : null;
     }
 
     /**
@@ -83,7 +83,7 @@ final readonly class StandaloneApplicationFactory
      */
     public static function bridgeAutoloadFile(array $environment): string
     {
-        return self::resolverFromEnvironment($environment)->dataDir().'/vendor/autoload.php';
+        return \sprintf('%s/vendor/autoload.php', self::resolverFromEnvironment($environment)->dataDir());
     }
 
     public function create(): Application

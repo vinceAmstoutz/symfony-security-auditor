@@ -82,7 +82,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
 
     private function ensureComposerProject(string $targetDirectory): void
     {
-        $manifest = $targetDirectory.'/'.self::MANIFEST_FILENAME;
+        $manifest = \sprintf('%s/%s', $targetDirectory, self::MANIFEST_FILENAME);
         if (!$this->filesystem->exists($manifest)) {
             $this->filesystem->dumpFile($manifest, self::EMPTY_MANIFEST);
         }
