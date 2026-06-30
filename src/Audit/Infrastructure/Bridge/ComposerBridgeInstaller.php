@@ -29,8 +29,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
  */
 final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
 {
-    public const int DEFAULT_TIMEOUT_SECONDS = 300;
-
     private const string PACKAGE_TEMPLATE = 'symfony/ai-%s-platform';
 
     private const string MANIFEST_FILENAME = 'composer.json';
@@ -43,7 +41,6 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     public function __construct(
         private Closure $processBuilder,
         private Filesystem $filesystem = new Filesystem(),
-        private int $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,
     ) {}
 
     /**
@@ -51,9 +48,12 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
      */
     public static function defaultProcessBuilder(): Closure
     {
-        return static fn (string $package, string $targetDirectory): Process => new Process(
-            ['composer', 'require', $package, \sprintf('--working-dir=%s', $targetDirectory), '--no-interaction'],
-        );
+        return static function (string $package, string $targetDirectory): Process {
+            $process = new Process(['composer', 'require', $package, \sprintf('--working-dir=%s', $targetDirectory), '--no-interaction']);
+            $process->setTimeout(null);
+
+            return $process;
+        };
     }
 
     /**
@@ -68,7 +68,6 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         $process = ($this->processBuilder)($package, $targetDirectory);
 
         try {
-            $process->setTimeout((float) $this->timeoutSeconds);
             $process->run();
         } catch (ExceptionInterface $exception) {
             throw BridgeInstallationFailedException::forUnavailableComposer($package, $exception);

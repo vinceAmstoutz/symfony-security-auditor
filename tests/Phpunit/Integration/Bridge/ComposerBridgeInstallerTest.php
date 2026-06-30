@@ -110,7 +110,8 @@ final class ComposerBridgeInstallerTest extends TestCase
      */
     public function test_it_throws_when_composer_cannot_be_started(): void
     {
-        $composerBridgeInstaller = new ComposerBridgeInstaller(timeoutSeconds: -1, processBuilder: $this->succeedingProcess());
+        $unlaunchableWorkingDirectory = $this->targetDirectory.'/missing-'.bin2hex(random_bytes(4));
+        $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static fn (string $package, string $targetDirectory): Process => new Process(['true'], $unlaunchableWorkingDirectory));
 
         $this->expectException(BridgeInstallationFailedException::class);
         $this->expectExceptionMessage('composer');
@@ -131,6 +132,7 @@ final class ComposerBridgeInstallerTest extends TestCase
         self::assertStringContainsString("'symfony/ai-anthropic-platform'", $commandLine);
         self::assertStringContainsString("'--working-dir=/data/bridges'", $commandLine);
         self::assertStringContainsString("'--no-interaction'", $commandLine);
+        self::assertNull($process->getTimeout());
     }
 
     /**
