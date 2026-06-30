@@ -188,7 +188,7 @@ what each profile sets.
 ### 5. Run
 
 ```bash
-# audit the current directory
+# audit the current directory (`bin/console audit` is an equivalent alias)
 bin/console audit:run
 
 # or point at another project

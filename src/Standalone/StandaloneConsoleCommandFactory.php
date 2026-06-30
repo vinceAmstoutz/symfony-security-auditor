@@ -23,8 +23,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableAuditC
  */
 final readonly class StandaloneConsoleCommandFactory
 {
-    public const string AUDIT_ALIAS = 'audit';
-
     /**
      * @throws UnresolvableAuditCommandException
      */
@@ -35,9 +33,6 @@ final readonly class StandaloneConsoleCommandFactory
             throw UnresolvableAuditCommandException::fromContainer(AuditCommand::class);
         }
 
-        $command = new Command(null, $auditCommand);
-        $command->setAliases([self::AUDIT_ALIAS]);
-
-        return $command;
+        return new Command(null, $auditCommand);
     }
 }

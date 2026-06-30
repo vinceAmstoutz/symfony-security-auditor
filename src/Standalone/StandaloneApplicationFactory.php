@@ -125,7 +125,7 @@ final readonly class StandaloneApplicationFactory
     {
         return new LazyCommand(
             AuditCommand::NAME,
-            [StandaloneConsoleCommandFactory::AUDIT_ALIAS],
+            [AuditCommand::ALIAS],
             AuditCommand::DESCRIPTION,
             false,
             $this->loadAuditCommand(...),

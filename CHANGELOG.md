@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **`bin/console audit` now works as a shorthand for `audit:run` in the bundle,
+  matching the standalone CLI.** The `audit` alias is declared on the command
+  itself (`AuditCommand` `#[AsCommand(aliases: ['audit'])]`, exposed as
+  `AuditCommand::ALIAS`), so both distributions accept `audit` and `audit:run`
+  interchangeably from a single source of truth.
 - **The auditor can now run as a standalone executable, configured once at the
   user level instead of being installed into every audited app.** A new entry
   point `bin/symfony-security-auditor` boots a kernel-less Symfony Console
