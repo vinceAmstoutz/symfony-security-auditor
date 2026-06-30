@@ -69,50 +69,63 @@ The full report renders the same way in console, JSON, SARIF, HTML, and Markdown
 
 The auditor ships two maintained ways to run it — pick the one that fits:
 
-- **Standalone CLI (recommended)** — one download, configured once, audits any
-  project with zero footprint in it (like PHPStan or Psalm). Best for most
-  users, and for auditing a project you don't want to add a dependency to.
-- **Symfony bundle** — wired into a Symfony app via Flex. Pick this to extend
-  the auditor (custom services, decorated ports) or to pin it in the app's `dev`
-  dependencies.
+- **[Standalone CLI](#standalone-tool-phar) (recommended)** — one download,
+  configured once, audits any project with zero footprint in it (like PHPStan or
+  Psalm). Best for most users, and for auditing a project you don't want to add
+  a dependency to.
+- **[Symfony bundle](#use-it-as-a-symfony-bundle)** — wired into a Symfony app
+  via Flex. Pick this to extend the auditor (custom services, decorated ports)
+  or to pin it in the app's `dev` dependencies.
 
-Both expose the same `audit` command, options, and output formats.
+> [!TIP]
+>
+> Both expose the same `audit` command, options, and output formats — see the
+> [CLI reference](docs/configuration.md#cli-reference).
 
 ## Standalone tool (PHAR)
 
-Prefer to run the auditor like PHPStan or Psalm — one install, many projects,
-zero footprint in the audited app? Use the standalone executable instead of the
-bundle. Configure it **once** at the user level and point it at any project.
+Run the auditor like PHPStan or Psalm — one install, many projects, zero
+footprint in the audited app. Configure it **once** at the user level and point
+it at any project.
+
+### 1. Download the PHAR
 
 ```bash
-# 1. Download the PHAR from the latest release
 curl -L -o symfony-security-auditor.phar \
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/latest/download/symfony-security-auditor.phar
 chmod +x symfony-security-auditor.phar
-
-# 2. Guided setup: writes ~/.config/symfony-security-auditor/config.yaml and
-#    downloads the provider bridge you pick into ~/.local/share/…
-./symfony-security-auditor.phar init
-
-# 3. Export the API key the config references, then audit any project
-export ANTHROPIC_API_KEY=sk-…
-./symfony-security-auditor.phar audit /path/to/your/symfony/project
 ```
 
 Each release also ships a dependency-free native binary
 (`symfony-security-auditor`, Linux x64) for hosts without PHP — download it the
-same way and run `./symfony-security-auditor audit …`. The PHAR needs a PHP
-**8.3+** CLI; see
+same way and run `./symfony-security-auditor` in place of
+`./symfony-security-auditor.phar`. The PHAR needs a PHP **8.3+** CLI; see
 [platform support](docs/configuration.md#standalone-configuration).
 
-`audit` is an alias for `audit:run`; every option documented in the
-[CLI reference](docs/configuration.md#cli-reference) (`--format`, `--output`,
-`--dry-run`, `--since`, `--fail-on`, …) works identically. Configuration lives
-in `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml` (rootless — the same
+### 2. Configure — the guided `init`
+
+```bash
+./symfony-security-auditor.phar init
+```
+
+Writes `~/.config/symfony-security-auditor/config.yaml` and downloads the
+provider bridge you pick into `~/.local/share/…`. The file is rootless (the same
 keys as the bundle, without the `symfony_security_auditor:` wrapper) plus a
 `platform:` block handed verbatim to `symfony/ai`. See
 [configuration](docs/configuration.md#standalone-configuration) for the file
 format and provider switching.
+
+### 3. Run
+
+```bash
+# export the env var your config references, then audit any project
+export ANTHROPIC_API_KEY=sk-…
+./symfony-security-auditor.phar audit /path/to/your/symfony/project
+```
+
+`audit` is an alias for `audit:run`; every option documented in the
+[CLI reference](docs/configuration.md#cli-reference) (`--format`, `--output`,
+`--dry-run`, `--since`, `--fail-on`, …) works identically.
 
 ## Use it as a Symfony bundle
 
