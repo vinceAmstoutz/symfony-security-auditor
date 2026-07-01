@@ -170,7 +170,7 @@ Split-model (larger attacker, faster reviewer):
 
 ```yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-7'
+    attacker_model: 'claude-opus-4-8'
     reviewer_model: 'claude-haiku-4-5-20251001'
 ```
 
