@@ -35,12 +35,11 @@ final readonly class MinimumLineCoverageSubscriber implements FinishedSubscriber
 
         $report = (string) file_get_contents($this->cloverPath);
 
-        $metricsCount = preg_match_all('/<metrics\b[^>]*>/', $report, $matches);
-        if (false === $metricsCount || 0 === $metricsCount || [] === $matches[0]) {
+        if (1 !== preg_match('/.*(<metrics\b[^>]*>)/s', $report, $matches)) {
             return;
         }
 
-        $projectMetrics = end($matches[0]);
+        $projectMetrics = $matches[1];
         $statements = $this->readMetric($projectMetrics, 'statements');
         $covered = $this->readMetric($projectMetrics, 'coveredstatements');
         $percentage = $statements > 0 ? $covered / $statements * 100 : 100.0;
