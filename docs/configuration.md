@@ -478,10 +478,14 @@ model: gpt-5.4
 
 ## CLI Reference
 
-The bundle registers a single console command.
+The bundle registers a single console command, also reachable through the
+shorter `audit` alias (`bin/console audit`). The standalone CLI exposes the same
+command and alias.
 
 ```bash
 bin/console audit:run [<project-path>] [options]
+# `audit` is an equivalent alias:
+bin/console audit [<project-path>] [options]
 ```
 
 ### Arguments

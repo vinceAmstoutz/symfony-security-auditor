@@ -89,7 +89,7 @@ src/
       Progress/      # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY), LoggerProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
       Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory, RecordReviewTool, RecordReviewToolFactory
       Report/        # ReportRenderer (console/json/sarif/html; + Template/*.txt + *.html stubs)
-  Command/           # AuditCommand (Symfony Console: audit:run) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, ExitCode enum, AuditCommandHelp, OutputFormat enum (console|json|sarif|html), Baseline (accepted-finding suppression)
+  Command/           # AuditCommand (Symfony Console: audit:run, alias audit) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, ExitCode enum, AuditCommandHelp, OutputFormat enum (console|json|sarif|html), Baseline (accepted-finding suppression)
   SymfonySecurityAuditorBundle.php  # Bundle class (configure + loadExtension)
 tests/Phpunit/
   Unit/              # Isolated class tests (stub/mock collaborators)
@@ -289,11 +289,12 @@ The project follows [Semantic Versioning 2.0.0](https://semver.org) and, for its
 PHP API surface, the
 [Symfony Backward Compatibility promise](https://symfony.com/doc/current/contributing/code/bc.html)
 (`@internal` code is exempt). Treat every public-API element as load-bearing:
-configuration keys (and their defaults), `audit:run` arguments/options/exit
-codes, JSON and SARIF output schemas, Domain ports under
-`src/Audit/Domain/Port/` (including `AdvisoryDatabaseInterface`), Domain
-models/enums/exceptions, `RunAuditUseCase`, and the Bundle class. A change that
-removes or alters any of these is a `MAJOR` and requires a deprecation cycle.
+configuration keys (and their defaults), the `audit:run` command (and its
+`audit` alias) arguments/options/exit codes, JSON and SARIF output schemas,
+Domain ports under `src/Audit/Domain/Port/` (including
+`AdvisoryDatabaseInterface`), Domain models/enums/exceptions, `RunAuditUseCase`,
+and the Bundle class. A change that removes or alters any of these is a `MAJOR`
+and requires a deprecation cycle.
 
 Internal classes (`@internal` PHPDoc tag) — concrete agents, pipeline stages,
 infrastructure adapters, Command collaborators — may be refactored freely in a

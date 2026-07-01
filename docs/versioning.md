@@ -73,7 +73,8 @@ is a `MAJOR` change.
 
 ### CLI surface
 
-- The command name `audit:run`.
+- The command name `audit:run` and its `audit` alias (both the bundle and the
+  standalone CLI accept either).
 - The `project-path` argument.
 - The `--format` (`-f`) and `--output` (`-o`) options, including the values
   accepted by `--format` (`console`, `json`, `sarif`, `html`, `markdown`).
@@ -96,9 +97,9 @@ following surface is BC-protected:
 
 - The executable `bin/symfony-security-auditor` and the published
   `symfony-security-auditor.phar` artifact (its release-asset name).
-- The `audit` command alias for `audit:run` and the `init` command name. The
-  standalone exposes the **identical** `audit:run` argument, option, and
-  exit-code surface listed above.
+- The `init` command name. The standalone exposes the **identical** `audit:run`
+  command (and its `audit` alias), arguments, options, and exit-code surface
+  listed above.
 - The XDG configuration contract: the config file path
   `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml` (falling back to
   `~/.config/…`), the cache directory `$XDG_CACHE_HOME/symfony-security-auditor`
