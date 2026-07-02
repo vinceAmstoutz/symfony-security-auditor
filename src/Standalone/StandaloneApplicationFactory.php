@@ -103,12 +103,7 @@ final readonly class StandaloneApplicationFactory
      */
     private static function resolverFromEnvironment(array $environment): XdgConfigPathResolver
     {
-        return new XdgConfigPathResolver(
-            $environment['XDG_CONFIG_HOME'] ?? null,
-            $environment['XDG_CACHE_HOME'] ?? null,
-            $environment['HOME'] ?? null,
-            $environment['XDG_DATA_HOME'] ?? null,
-        );
+        return XdgConfigPathResolver::fromEnvironment($environment, \PHP_OS_FAMILY);
     }
 
     private function initCommand(): InitCommand

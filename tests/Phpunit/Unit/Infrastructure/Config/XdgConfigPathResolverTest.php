@@ -88,4 +88,66 @@ final class XdgConfigPathResolverTest extends TestCase
 
         (new XdgConfigPathResolver(null, null, null))->configFile();
     }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_maps_windows_environment_to_the_native_app_data_directories(): void
+    {
+        $xdgConfigPathResolver = XdgConfigPathResolver::fromEnvironment([
+            'APPDATA' => 'C:/Users/dev/AppData/Roaming',
+            'LOCALAPPDATA' => 'C:/Users/dev/AppData/Local',
+            'USERPROFILE' => 'C:/Users/dev',
+        ], 'Windows');
+
+        self::assertSame('C:/Users/dev/AppData/Roaming/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
+        self::assertSame('C:/Users/dev/AppData/Local/symfony-security-auditor', $xdgConfigPathResolver->cacheDir());
+        self::assertSame('C:/Users/dev/AppData/Local/symfony-security-auditor', $xdgConfigPathResolver->dataDir());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_prefers_xdg_variables_over_the_windows_directories(): void
+    {
+        $xdgConfigPathResolver = XdgConfigPathResolver::fromEnvironment([
+            'XDG_CONFIG_HOME' => '/xdg/config',
+            'XDG_CACHE_HOME' => '/xdg/cache',
+            'XDG_DATA_HOME' => '/xdg/data',
+            'APPDATA' => 'C:/Users/dev/AppData/Roaming',
+            'LOCALAPPDATA' => 'C:/Users/dev/AppData/Local',
+        ], 'Windows');
+
+        self::assertSame('/xdg/config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
+        self::assertSame('/xdg/cache/symfony-security-auditor', $xdgConfigPathResolver->cacheDir());
+        self::assertSame('/xdg/data/symfony-security-auditor', $xdgConfigPathResolver->dataDir());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_maps_a_unix_environment_to_the_home_directory(): void
+    {
+        $xdgConfigPathResolver = XdgConfigPathResolver::fromEnvironment([
+            'HOME' => '/home/dev',
+            'APPDATA' => 'C:/Users/dev/AppData/Roaming',
+        ], 'Linux');
+
+        self::assertSame('/home/dev/.config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
+        self::assertSame('/home/dev/.cache/symfony-security-auditor', $xdgConfigPathResolver->cacheDir());
+        self::assertSame('/home/dev/.local/share/symfony-security-auditor', $xdgConfigPathResolver->dataDir());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_prefers_xdg_variables_over_the_unix_home_directory(): void
+    {
+        $xdgConfigPathResolver = XdgConfigPathResolver::fromEnvironment([
+            'XDG_CONFIG_HOME' => '/xdg/config',
+            'HOME' => '/home/dev',
+        ], 'Linux');
+
+        self::assertSame('/xdg/config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
+    }
 }
