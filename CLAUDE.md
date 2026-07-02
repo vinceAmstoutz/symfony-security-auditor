@@ -54,9 +54,8 @@ bin/castor up
 (markdownlint-cli2) → Composer Normalize → PHP CS Fixer → Rector → PHPStan (max,
 500M) → Deptrac (DDD layers) → Swiss Knife (commented-code + merge-conflict
 scan) → Install script tests (`tests/Shell/install_script_test.sh`) → PHPUnit →
-Infection. `bin/castor lint:fix` auto-fixes steps 1–3
-(Prettier, Markdown lint, Composer Normalize); the remaining steps are
-check-only.
+Infection. `bin/castor lint:fix` auto-fixes steps 1–3 (Prettier, Markdown lint,
+Composer Normalize); the remaining steps are check-only.
 
 Commit messages are validated separately in CI via
 [commitlint](https://commitlint.js.org/) (`commitlint.config.js`) — see
@@ -207,12 +206,12 @@ with `BREAKING CHANGE:` footer.
 Six jobs must all pass before merging: **Prettier Check** (markdown formatting)
 → **Markdown Lint** (markdownlint-cli2 semantics) → **Commit Lint** (commitlint,
 conventional commits) → **Lint** (Composer Normalize, PHP CS Fixer, Rector,
-PHPStan max, Deptrac, Swiss Knife, `composer audit`, install-script shell
-tests) → **Tests + Mutation**
-(PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1 with 100% coverage,
-then Infection 100% MSI; coverage uploads to Codecov and the mutation report
-uploads to the Stryker dashboard via Infection's `stryker` logger — the badge
-tracks `main`, and same-repo branches publish their own report).
+PHPStan max, Deptrac, Swiss Knife, `composer audit`, install-script shell tests)
+→ **Tests + Mutation** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1
+with 100% coverage, then Infection 100% MSI; coverage uploads to Codecov and the
+mutation report uploads to the Stryker dashboard via Infection's `stryker`
+logger — the badge tracks `main`, and same-repo branches publish their own
+report).
 
 Details: [`docs/ci.md`](docs/ci.md)
 
