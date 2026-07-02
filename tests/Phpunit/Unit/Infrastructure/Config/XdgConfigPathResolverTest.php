@@ -108,6 +108,28 @@ final class XdgConfigPathResolverTest extends TestCase
     /**
      * @throws UnresolvableConfigPathException
      */
+    public function test_it_falls_back_to_the_windows_user_profile_when_no_app_data_is_set(): void
+    {
+        $xdgConfigPathResolver = XdgConfigPathResolver::fromEnvironment([
+            'USERPROFILE' => 'C:/Users/dev',
+        ], 'Windows');
+
+        self::assertSame('C:/Users/dev/.config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_ignores_the_windows_user_profile_on_a_unix_system(): void
+    {
+        $this->expectException(UnresolvableConfigPathException::class);
+
+        XdgConfigPathResolver::fromEnvironment(['USERPROFILE' => 'C:/Users/dev'], 'Linux')->configFile();
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_prefers_xdg_variables_over_the_windows_directories(): void
     {
         $xdgConfigPathResolver = XdgConfigPathResolver::fromEnvironment([
