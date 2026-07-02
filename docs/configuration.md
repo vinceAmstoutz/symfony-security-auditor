@@ -405,23 +405,24 @@ finding individually and decides whether to accept or escalate it.
 
 ## Standalone Configuration
 
-When you run the [standalone PHAR](../README.md#standalone-tool-phar) instead of
-the bundle, configuration is read from a single user-level file resolved through
-the XDG Base Directory specification:
+When you run the [standalone binary](../README.md#standalone-tool-binary)
+instead of the bundle, configuration is read from a single user-level file. On
+Linux and macOS it follows the XDG Base Directory specification; on Windows it
+uses the native app-data directories:
 
-| Path                                                                      | Purpose                               |
-| ------------------------------------------------------------------------- | ------------------------------------- |
-| `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml` (→ `~/.config/…`) | the configuration file                |
-| `$XDG_CACHE_HOME/symfony-security-auditor` (→ `~/.cache/…`)               | attacker/reviewer and advisory caches |
-| `$XDG_DATA_HOME/symfony-security-auditor` (→ `~/.local/share/…`)          | the downloaded provider bridge(s)     |
+| Purpose                               | Linux / macOS                                                             | Windows                                          |
+| ------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------ |
+| the configuration file                | `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml` (→ `~/.config/…`) | `%APPDATA%\symfony-security-auditor\config.yaml` |
+| attacker/reviewer and advisory caches | `$XDG_CACHE_HOME/symfony-security-auditor` (→ `~/.cache/…`)               | `%LOCALAPPDATA%\symfony-security-auditor`        |
+| the downloaded provider bridge(s)     | `$XDG_DATA_HOME/symfony-security-auditor` (→ `~/.local/share/…`)          | `%LOCALAPPDATA%\symfony-security-auditor`        |
 
-> **Requirements & platform support.** The PHAR is pure PHP: the single
-> published artifact runs unchanged on PHP **8.3, 8.4 and 8.5** (all three are
-> covered by the test matrix) and on any OS with a compatible PHP CLI — Linux,
-> macOS, or Windows. The native binary bundles its own PHP runtime, so it needs
-> no PHP installed, but is compiled for **Linux x64** only. `init` shells out to
-> `composer` (to fetch the bridge) and `--since` to `git`, so those tools must
-> be present on the host when you use those features.
+> **Requirements & platform support.** Each release ships a self-contained
+> native binary that bundles its own PHP runtime (nothing to install on the
+> host) for **Linux** (x86-64, arm64), **macOS** (Intel, Apple Silicon), and
+> **Windows** (x86-64) — install it with the script or download it from the
+> release. `init` fetches the provider bridge with `composer`, and `--since`
+> uses `git`, so those tools must be present on the host when you use those
+> features (the audit itself needs only the binary).
 
 Run `symfony-security-auditor init` to generate the file interactively and fetch
 the provider bridge. The file is **rootless** — the same keys as the bundle

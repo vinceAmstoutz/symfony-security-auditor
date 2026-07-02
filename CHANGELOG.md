@@ -49,12 +49,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   command, and config/bridge seams under `src/Audit/Infrastructure/`
   (`StandaloneConfigLoader`, `StandalonePlatformConfigResolver`,
   `StandalonePlatformConfig`, `StandaloneConfig`, `YamlStandaloneConfigWriter`,
-  `ComposerBridgeInstaller`). Publishing a GitHub release runs
-  `.github/workflows/release.yaml`, which compiles the PHAR with `box compile`
-  (see `box.json`) and a dependency-free native binary with `static-php-cli`,
-  attaching both `symfony-security-auditor.phar` and `symfony-security-auditor`
-  to the GitHub release. The Symfony bundle remains a fully supported, unchanged
-  install method.
+  `ComposerBridgeInstaller`). Config paths are resolved natively on every OS —
+  the XDG spec on Linux/macOS and `%APPDATA%`/`%LOCALAPPDATA%` on Windows.
+  Publishing a GitHub release runs `.github/workflows/release.yaml`, which
+  builds the PHAR with `box compile` (see `box.json`) purely as a build input
+  and combines it with a `static-php-cli` micro runtime into **self-contained
+  native binaries for Linux (x86-64, arm64), macOS (Intel, Apple Silicon), and
+  Windows (x86-64)**, attaching each binary and its SHA-256 checksum to the
+  release; an `install.sh` script detects the OS/architecture and installs the
+  right one (the PHAR is no longer published as a release asset). The Symfony
+  bundle remains a fully supported, unchanged install method.
 - **New `--show-scanned` option on `audit:run` lists the exact files an audit
   would ingest, without invoking the LLM.** Answers "did my `included_paths` /
   `--path` configuration match the files I expect?" before paying for a run. The

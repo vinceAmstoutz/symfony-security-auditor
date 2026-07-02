@@ -95,17 +95,21 @@ is a `MAJOR` change.
 The standalone tool is a supported install method alongside the bundle, and the
 following surface is BC-protected:
 
-- The executable `bin/symfony-security-auditor` and the published
-  `symfony-security-auditor.phar` artifact (its release-asset name).
+- The published per-platform binary assets and their release-asset names
+  (`symfony-security-auditor-{linux-x86_64,linux-aarch64,darwin-x86_64,darwin-arm64}`
+  and `symfony-security-auditor-windows-x86_64.exe`), plus the `install.sh`
+  installer contract.
 - The `init` command name. The standalone exposes the **identical** `audit:run`
   command (and its `audit` alias), arguments, options, and exit-code surface
   listed above.
-- The XDG configuration contract: the config file path
-  `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml` (falling back to
-  `~/.config/…`), the cache directory `$XDG_CACHE_HOME/symfony-security-auditor`
-  (falling back to `~/.cache/…`), and the bridge data directory
-  `$XDG_DATA_HOME/symfony-security-auditor` (falling back to
-  `~/.local/share/…`).
+- The configuration path contract. On Linux/macOS the XDG Base Directory spec:
+  the config file `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml`
+  (falling back to `~/.config/…`), the cache directory
+  `$XDG_CACHE_HOME/symfony-security-auditor` (→ `~/.cache/…`), and the bridge
+  data directory `$XDG_DATA_HOME/symfony-security-auditor` (→
+  `~/.local/share/…`). On Windows the native app-data directories: `%APPDATA%`
+  for config and `%LOCALAPPDATA%` for cache and bridges (XDG variables still win
+  when set).
 - The standalone `config.yaml` shape: the bundle configuration keys **without**
   the `symfony_security_auditor:` root wrapper, plus the standalone-only
   top-level `platform:` block (passed verbatim to `symfony/ai-bundle`) and the

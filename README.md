@@ -69,7 +69,7 @@ The full report renders the same way in console, JSON, SARIF, HTML, and Markdown
 
 The auditor ships two maintained ways to run it — pick the one that fits:
 
-- **[Standalone CLI](#standalone-tool-phar) (recommended)** — one download,
+- **[Standalone CLI](#standalone-tool-binary) (recommended)** — one download,
   configured once, audits any project with zero footprint in it (like PHPStan or
   Psalm). Best for most users, and for auditing a project you don't want to add
   a dependency to.
@@ -82,45 +82,53 @@ The auditor ships two maintained ways to run it — pick the one that fits:
 > Both expose the same `audit` command, options, and output formats — see the
 > [CLI reference](docs/configuration.md#cli-reference).
 
-## Standalone tool (PHAR)
+## Standalone tool (binary)
 
 Run the auditor like PHPStan or Psalm — one install, many projects, zero
-footprint in the audited app. Configure it **once** at the user level and point
-it at any project.
+footprint in the audited app. Each release ships a **self-contained native
+binary** that bundles its own PHP runtime (nothing to install on the host) for
+Linux, macOS, and Windows.
 
-### 1. Download the PHAR
+### 1. Install
 
 ```bash
-curl -L -o symfony-security-auditor.phar \
-  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/latest/download/symfony-security-auditor.phar
-chmod +x symfony-security-auditor.phar
+# Linux / macOS — detects your OS + architecture, downloads and verifies the binary
+curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | sh
 ```
 
-Each release also ships a dependency-free native binary
-(`symfony-security-auditor`, Linux x64) for hosts without PHP — download it the
-same way and run `./symfony-security-auditor` in place of
-`./symfony-security-auditor.phar`. The PHAR needs a PHP **8.3+** CLI; see
-[platform support](docs/configuration.md#standalone-configuration).
+Or download the binary for your platform straight from the
+[latest release](https://github.com/vinceAmstoutz/symfony-security-auditor/releases/latest):
+
+| Platform            | Asset                                         |
+| ------------------- | --------------------------------------------- |
+| Linux x86-64        | `symfony-security-auditor-linux-x86_64`       |
+| Linux arm64         | `symfony-security-auditor-linux-aarch64`      |
+| macOS Intel         | `symfony-security-auditor-darwin-x86_64`      |
+| macOS Apple Silicon | `symfony-security-auditor-darwin-arm64`       |
+| Windows x86-64      | `symfony-security-auditor-windows-x86_64.exe` |
 
 ### 2. Configure — the guided `init`
 
 ```bash
-./symfony-security-auditor.phar init
+symfony-security-auditor init
 ```
 
-Writes `~/.config/symfony-security-auditor/config.yaml` and downloads the
-provider bridge you pick into `~/.local/share/…`. The file is rootless (the same
-keys as the bundle, without the `symfony_security_auditor:` wrapper) plus a
-`platform:` block handed verbatim to `symfony/ai`. See
-[configuration](docs/configuration.md#standalone-configuration) for the file
-format and provider switching.
+Writes the config file (`~/.config/symfony-security-auditor/config.yaml` on
+Linux/macOS, `%APPDATA%\symfony-security-auditor\config.yaml` on Windows) and
+downloads the provider bridge you pick. `init` fetches that bridge with
+`composer`, so composer must be available for this one-time setup step; running
+audits afterward needs only the binary. The file is rootless (the same keys as
+the bundle, without the `symfony_security_auditor:` wrapper) plus a `platform:`
+block handed verbatim to `symfony/ai`. See
+[configuration](docs/configuration.md#standalone-configuration) for the format
+and provider switching.
 
 ### 3. Run
 
 ```bash
 # export the env var your config references, then audit any project
 export ANTHROPIC_API_KEY=sk-…
-./symfony-security-auditor.phar audit /path/to/your/symfony/project
+symfony-security-auditor audit /path/to/your/symfony/project
 ```
 
 `audit` is an alias for `audit:run`; every option documented in the
@@ -281,9 +289,9 @@ bin/console audit:run --dry-run
   let you plug in custom providers, agents, stages, advisory feeds, or report
   formats.
 - **Bundle or standalone** — install as a Symfony bundle, or run it like
-  PHPStan/Psalm from a single PHAR/binary configured once at the user level to
-  audit any project with zero footprint (see
-  [Standalone tool](#standalone-tool-phar)).
+  PHPStan/Psalm from a single self-contained binary configured once at the user
+  level to audit any project with zero footprint (see
+  [Standalone tool](#standalone-tool-binary)).
 
 ## Security by design
 
