@@ -40,6 +40,28 @@ function fix(): void
     runCodeQualityTools(fixMode: true);
 }
 
+#[AsTask(name: 'lint:docs', description: 'Check Markdown formatting only (fast pre-push check)')]
+function lintDocs(): void
+{
+    $userFlag = sprintf('--user %d:%d', posix_getuid(), posix_getgid());
+
+    io()->section('Prettier Markdown');
+    run(sprintf(
+        'docker run --rm %s -v "%s:/work" -w /work tmknom/prettier:3.6.2 --check "**/*.md"',
+        $userFlag,
+        getcwd(),
+    ));
+
+    io()->section('Markdown lint');
+    run(sprintf(
+        'docker run --rm %s -v "%s:/workdir" davidanson/markdownlint-cli2:latest',
+        $userFlag,
+        getcwd(),
+    ));
+
+    io()->success('Markdown looks good.');
+}
+
 function runCodeQualityTools(bool $fixMode = false): void
 {
     $userFlag = sprintf('--user %d:%d', posix_getuid(), posix_getgid());
