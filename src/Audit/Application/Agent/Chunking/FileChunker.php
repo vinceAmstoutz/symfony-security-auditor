@@ -224,7 +224,7 @@ final readonly class FileChunker
             return true;
         }
 
-        return u($relativePath)->ignoreCase()->containsAny('/'.$featureName.'/');
+        return u($relativePath)->ignoreCase()->containsAny(\sprintf('/%s/', $featureName));
     }
 
     private function priority(ProjectFile $projectFile): int

@@ -220,7 +220,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
             return null;
         }
 
-        return null === $installPath ? null : $installPath.'/'.self::CATALOG_FILENAME;
+        return null === $installPath ? null : \sprintf('%s/%s', $installPath, self::CATALOG_FILENAME);
     }
 
     /** @return array<array-key, mixed> */

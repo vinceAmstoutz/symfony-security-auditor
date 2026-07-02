@@ -40,6 +40,28 @@ function fix(): void
     runCodeQualityTools(fixMode: true);
 }
 
+#[AsTask(name: 'lint:docs', description: 'Check Markdown formatting only (fast pre-push check)')]
+function lintDocs(): void
+{
+    $userFlag = sprintf('--user %d:%d', posix_getuid(), posix_getgid());
+
+    io()->section('Prettier Markdown');
+    run(sprintf(
+        'docker run --rm %s -v "%s:/work" -w /work tmknom/prettier:3.6.2 --check "**/*.md"',
+        $userFlag,
+        getcwd(),
+    ));
+
+    io()->section('Markdown lint');
+    run(sprintf(
+        'docker run --rm %s -v "%s:/workdir" davidanson/markdownlint-cli2:latest',
+        $userFlag,
+        getcwd(),
+    ));
+
+    io()->success('Markdown looks good.');
+}
+
 function runCodeQualityTools(bool $fixMode = false): void
 {
     $userFlag = sprintf('--user %d:%d', posix_getuid(), posix_getgid());
@@ -78,6 +100,9 @@ function runCodeQualityTools(bool $fixMode = false): void
     io()->section('Swiss Knife');
     run('docker compose exec php vendor/bin/swiss-knife check-commented-code src tests tools');
     run('docker compose exec php vendor/bin/swiss-knife check-conflicts src tests tools');
+
+    io()->section('Install script tests');
+    run('sh tests/Shell/install_script_test.sh');
 
     io()->section('PHPUnit');
     run('docker compose exec php vendor/bin/phpunit --coverage-clover=build/coverage/clover.xml');

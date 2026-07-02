@@ -42,6 +42,7 @@ rules:
     - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\NoSilencingErrorHandlerRule
     - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\FinalRule
     - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\ForbiddenTestAttributeRule
+    - VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\SprintfOverConcatRule
     - Symplify\PHPStanRules\Rules\NoDynamicNameRule
     - Symplify\PHPStanRules\Rules\NoReferenceRule
     - Symplify\PHPStanRules\Rules\NoGlobalConstRule
@@ -62,6 +63,10 @@ rules:
     - Symplify\PHPStanRules\Rules\PHPUnit\NoDoubleConsecutiveTestMockRule
 
 services:
+    -
+        class: VinceAmstoutz\SymfonySecurityAuditor\Tooling\PHPStan\ConcatRootMarkingVisitor
+        tags:
+            - phpstan.parser.richParserNodeVisitor
     -
         class: Symplify\PHPStanRules\Rules\ForbiddenNodeRule
         arguments:

@@ -34,6 +34,7 @@ export default {
                 'llm',
                 'command',
                 'bundle',
+                'standalone',
                 'config',
                 'deps',
                 'deps-dev',

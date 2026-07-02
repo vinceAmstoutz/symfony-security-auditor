@@ -20,19 +20,19 @@ to detect vulnerabilities and produce structured reports.
 
 ## Tech Stack
 
-| Layer             | Technology                                                                                                                                                                                                                      |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Language          | PHP (see `composer.json` → `require.php`)                                                                                                                                                                                       |
-| Framework         | Symfony (see `composer.json`)                                                                                                                                                                                                   |
-| LLM               | symfony/ai (provider-agnostic: Anthropic, OpenAI, Mistral, Ollama, …)                                                                                                                                                           |
-| Packaging         | symfony-bundle + Flex recipe                                                                                                                                                                                                    |
-| Tests             | PHPUnit (Unit / Integration / EndToEnd); 100% line coverage enforced via the custom `MinimumLineCoverageExtension` (`tools/PHPUnit/`)                                                                                           |
-| Mutation          | Infection (100% MSI required)                                                                                                                                                                                                   |
-| Static analysis   | PHPStan max + phpstan-strict-rules + custom rules (`FinalRule`, `MaxParameterCountRule`, `NoEmptyCatchRule`, `NoSilencingErrorHandlerRule`, `ForbiddenTestAttributeRule` — in `tools/PHPStan/`) + symplify/spaze rules + Rector |
-| Layer conformance | deptrac (DDD layer rules — `deptrac.yaml`)                                                                                                                                                                                      |
-| Complexity        | tomasvotruba/cognitive-complexity (function ≤ 7, class ≤ 40)                                                                                                                                                                    |
-| Dead code         | rector/swiss-knife (`check-commented-code`, `check-conflicts`)                                                                                                                                                                  |
-| Style             | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets)                                                                                                                                                                                    |
+| Layer             | Technology                                                                                                                                                                                                                                               |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language          | PHP (see `composer.json` → `require.php`)                                                                                                                                                                                                                |
+| Framework         | Symfony (see `composer.json`)                                                                                                                                                                                                                            |
+| LLM               | symfony/ai (provider-agnostic: Anthropic, OpenAI, Mistral, Ollama, …)                                                                                                                                                                                    |
+| Packaging         | symfony-bundle + Flex recipe; standalone self-contained native binary (`box` + `static-php-cli` micro) for Linux/macOS/Windows                                                                                                                           |
+| Tests             | PHPUnit (Unit / Integration / EndToEnd); 100% line coverage enforced via the custom `MinimumLineCoverageExtension` (`tools/PHPUnit/`)                                                                                                                    |
+| Mutation          | Infection (100% MSI required)                                                                                                                                                                                                                            |
+| Static analysis   | PHPStan max + phpstan-strict-rules + custom rules (`FinalRule`, `MaxParameterCountRule`, `NoEmptyCatchRule`, `NoSilencingErrorHandlerRule`, `ForbiddenTestAttributeRule`, `SprintfOverConcatRule` — in `tools/PHPStan/`) + symplify/spaze rules + Rector |
+| Layer conformance | deptrac (DDD layer rules — `deptrac.yaml`)                                                                                                                                                                                                               |
+| Complexity        | tomasvotruba/cognitive-complexity (function ≤ 7, class ≤ 40)                                                                                                                                                                                             |
+| Dead code         | rector/swiss-knife (`check-commented-code`, `check-conflicts`)                                                                                                                                                                                           |
+| Style             | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets)                                                                                                                                                                                                             |
 
 ## Build, Test & Lint Commands
 
@@ -46,6 +46,7 @@ bin/castor up
 | Stop containers      | `bin/castor down`                                 |
 | Lint (check only)    | `bin/castor lint`                                 |
 | Lint + auto-fix      | `bin/castor lint:fix`                             |
+| Markdown check only  | `bin/castor lint:docs` (fast pre-push check)      |
 | Run PHP tests        | `docker compose exec php vendor/bin/phpunit`      |
 | Run mutation tests   | `docker compose exec php bin/infection`           |
 | Symfony console      | `docker compose exec php bin/console <command>`   |
@@ -53,9 +54,9 @@ bin/castor up
 `bin/castor lint` runs sequentially: Prettier (check) → Markdown lint
 (markdownlint-cli2) → Composer Normalize → PHP CS Fixer → Rector → PHPStan (max,
 500M) → Deptrac (DDD layers) → Swiss Knife (commented-code + merge-conflict
-scan) → PHPUnit → Infection. `bin/castor lint:fix` auto-fixes steps 1–3
-(Prettier, Markdown lint, Composer Normalize); the remaining steps are
-check-only.
+scan) → Install script tests (`tests/Shell/install_script_test.sh`) → PHPUnit →
+Infection. `bin/castor lint:fix` auto-fixes steps 1–3 (Prettier, Markdown lint,
+Composer Normalize); the remaining steps are check-only.
 
 Commit messages are validated separately in CI via
 [commitlint](https://commitlint.js.org/) (`commitlint.config.js`) — see
@@ -89,12 +90,13 @@ src/
       Progress/      # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY), LoggerProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
       Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory, RecordReviewTool, RecordReviewToolFactory
       Report/        # ReportRenderer (console/json/sarif/html; + Template/*.txt + *.html stubs)
-  Command/           # AuditCommand (Symfony Console: audit:run) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, ExitCode enum, AuditCommandHelp, OutputFormat enum (console|json|sarif|html), Baseline (accepted-finding suppression)
+  Command/           # AuditCommand (Symfony Console: audit:run, alias audit) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, ExitCode enum, AuditCommandHelp, OutputFormat enum (console|json|sarif|html), Baseline (accepted-finding suppression)
   SymfonySecurityAuditorBundle.php  # Bundle class (configure + loadExtension)
 tests/Phpunit/
   Unit/              # Isolated class tests (stub/mock collaborators)
   Integration/       # Wire real classes, no LLM calls
   EndToEnd/          # Full pipeline, uses stub LLM client
+tests/Shell/         # POSIX shell tests (install_script_test.sh — covers install.sh)
 config/services.php  # DI wiring for all bundle services
 docs/
   architecture.md    # Layer overview, data flow, domain model details
@@ -170,7 +172,7 @@ Split-model (larger attacker, faster reviewer):
 
 ```yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-7'
+    attacker_model: 'claude-opus-4-8'
     reviewer_model: 'claude-haiku-4-5-20251001'
 ```
 
@@ -197,19 +199,20 @@ Format: `<type>[optional scope]: <description>` —
 | `perf`     | Performance improvement |
 
 Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`,
-`scan`, `deps`, `ci`, `rate-limit`. Breaking changes: `feat!:` with
-`BREAKING CHANGE:` footer.
+`standalone`, `scan`, `deps`, `ci`, `rate-limit`. Breaking changes: `feat!:`
+with `BREAKING CHANGE:` footer.
 
 ## CI Pipeline
 
 Six jobs must all pass before merging: **Prettier Check** (markdown formatting)
 → **Markdown Lint** (markdownlint-cli2 semantics) → **Commit Lint** (commitlint,
 conventional commits) → **Lint** (Composer Normalize, PHP CS Fixer, Rector,
-PHPStan max, Deptrac, Swiss Knife, `composer audit`) → **Tests + Mutation**
-(PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1 with 100% coverage,
-then Infection 100% MSI; coverage uploads to Codecov and the mutation report
-uploads to the Stryker dashboard via Infection's `stryker` logger — the badge
-tracks `main`, and same-repo branches publish their own report).
+PHPStan max, Deptrac, Swiss Knife, `composer audit`, install-script shell tests)
+→ **Tests + Mutation** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1
+with 100% coverage, then Infection 100% MSI; coverage uploads to Codecov and the
+mutation report uploads to the Stryker dashboard via Infection's `stryker`
+logger — the badge tracks `main`, and same-repo branches publish their own
+report).
 
 Details: [`docs/ci.md`](docs/ci.md)
 
@@ -289,11 +292,12 @@ The project follows [Semantic Versioning 2.0.0](https://semver.org) and, for its
 PHP API surface, the
 [Symfony Backward Compatibility promise](https://symfony.com/doc/current/contributing/code/bc.html)
 (`@internal` code is exempt). Treat every public-API element as load-bearing:
-configuration keys (and their defaults), `audit:run` arguments/options/exit
-codes, JSON and SARIF output schemas, Domain ports under
-`src/Audit/Domain/Port/` (including `AdvisoryDatabaseInterface`), Domain
-models/enums/exceptions, `RunAuditUseCase`, and the Bundle class. A change that
-removes or alters any of these is a `MAJOR` and requires a deprecation cycle.
+configuration keys (and their defaults), the `audit:run` command (and its
+`audit` alias) arguments/options/exit codes, JSON and SARIF output schemas,
+Domain ports under `src/Audit/Domain/Port/` (including
+`AdvisoryDatabaseInterface`), Domain models/enums/exceptions, `RunAuditUseCase`,
+and the Bundle class. A change that removes or alters any of these is a `MAJOR`
+and requires a deprecation cycle.
 
 Internal classes (`@internal` PHPDoc tag) — concrete agents, pipeline stages,
 infrastructure adapters, Command collaborators — may be refactored freely in a

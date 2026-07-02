@@ -22,6 +22,10 @@ deptrac:
       collectors:
         - type: classLike
           value: VinceAmstoutz\\SymfonySecurityAuditor\\SymfonySecurityAuditorBundle
+    - name: Standalone
+      collectors:
+        - type: directory
+          value: src/Standalone/.*
   ruleset:
     Domain: ~
     Application:
@@ -34,6 +38,12 @@ deptrac:
       - Domain
       - Infrastructure
     Bundle:
+      - Application
+      - Domain
+      - Infrastructure
+      - Command
+    Standalone:
+      - Bundle
       - Application
       - Domain
       - Infrastructure

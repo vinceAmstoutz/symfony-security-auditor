@@ -31,7 +31,7 @@ final readonly class ReportRenderer
 
     public const string UNKNOWN_VERSION = 'unknown';
 
-    private const string TEMPLATE_DIR = __DIR__.'/Template';
+    private const string TEMPLATE_DIRECTORY_NAME = 'Template';
 
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
@@ -225,7 +225,7 @@ final readonly class ReportRenderer
     private function markdownCodeBlock(string $text): string
     {
         return implode("\n", array_map(
-            static fn (string $line): string => '    '.$line,
+            static fn (string $line): string => \sprintf('    %s', $line),
             explode("\n", $text),
         ));
     }
@@ -249,7 +249,7 @@ final readonly class ReportRenderer
             }
         }
 
-        return '<table class="summary"><caption>Summary by severity</caption>'.implode('', $rows).'</table>';
+        return \sprintf('<table class="summary"><caption>Summary by severity</caption>%s</table>', implode('', $rows));
     }
 
     private function htmlBody(AuditReport $auditReport): string
@@ -346,14 +346,14 @@ final readonly class ReportRenderer
     private function indentChunks(string $text): string
     {
         return implode("\n", array_map(
-            static fn (string $chunk): string => '    '.$chunk,
+            static fn (string $chunk): string => \sprintf('    %s', $chunk),
             str_split($text, 65),
         ));
     }
 
     private function loadTemplate(string $name): string
     {
-        return u($this->filesystem->readFile(self::TEMPLATE_DIR.'/'.$name))->trimEnd("\n")->toString();
+        return u($this->filesystem->readFile(\sprintf('%s/%s/%s', __DIR__, self::TEMPLATE_DIRECTORY_NAME, $name)))->trimEnd("\n")->toString();
     }
 
     private function packageVersion(): string

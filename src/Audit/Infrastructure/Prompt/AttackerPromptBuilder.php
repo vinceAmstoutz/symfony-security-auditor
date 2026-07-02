@@ -321,7 +321,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
         $summary = $symfonyMapping->toSummary();
 
         $noVoterList = implode("\n", array_map(
-            static fn (ProjectFile $projectFile): string => '  - '.$projectFile->relativePath(),
+            static fn (ProjectFile $projectFile): string => \sprintf('  - %s', $projectFile->relativePath()),
             $symfonyMapping->controllersWithoutVoters(),
         ));
 
