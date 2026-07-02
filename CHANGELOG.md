@@ -59,6 +59,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   release; an `install.sh` script detects the OS/architecture and installs the
   right one (the PHAR is no longer published as a release asset). The Symfony
   bundle remains a fully supported, unchanged install method.
+- **A Windows PowerShell installer (`install.ps1`).** Mirrors `install.sh` for
+  Windows: `irm …/install.ps1 | iex` detects the architecture, downloads the
+  matching binary and its `.sha256`, verifies the checksum with `Get-FileHash`,
+  and installs to `%LOCALAPPDATA%\Programs\symfony-security-auditor`
+  (overridable via `SSA_INSTALL_DIR`, tag via `SSA_VERSION`).
 - **New `--show-scanned` option on `audit:run` lists the exact files an audit
   would ingest, without invoking the LLM.** Answers "did my `included_paths` /
   `--path` configuration match the files I expect?" before paying for a run. The
@@ -186,6 +191,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `ministral-{3b,8b,14b}-2512`) now resolve to `$0.00` with a warning. The
   default `claude-opus-4-8` and every current model are catalog-present and
   unchanged.
+
+### Security
+
+- **The install scripts now fail closed on checksum verification.** Previously
+  `install.sh` printed a warning and installed anyway when no SHA-256 tool was
+  present; it now **aborts** rather than install an unverified binary.
+  `install.ps1` verifies with `Get-FileHash` (built into PowerShell). The
+  release workflow (`.github/workflows/release.yaml`) also **smoke-tests** every
+  binary (`--version`) before publishing, so a broken build never reaches the
+  release.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

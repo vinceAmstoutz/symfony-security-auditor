@@ -11,6 +11,9 @@
 # Environment variables:
 #   SSA_VERSION      release tag to install (default: latest)
 #   SSA_INSTALL_DIR  target directory (default: /usr/local/bin, else ~/.local/bin)
+#
+# The SHA-256 checksum is always verified; the install aborts if no checksum
+# tool is available.
 
 set -eu
 
@@ -64,8 +67,7 @@ verify_checksum() {
     expected="$(cut -d' ' -f1 "$2")"
     actual="$(shasum -a 256 "$1" | cut -d' ' -f1)"
   else
-    echo "warning: no sha256 tool found — skipping checksum verification" >&2
-    return 0
+    fail "no SHA-256 tool (sha256sum or shasum) found — refusing to install an unverified binary"
   fi
   [ "$expected" = "$actual" ] || fail "checksum mismatch (expected $expected, got $actual)"
 }
