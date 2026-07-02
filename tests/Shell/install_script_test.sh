@@ -95,6 +95,13 @@ printf '%s  artifact\n' 00000000000000000000000000000000000000000000000000000000
 expect_failure "verify_checksum rejects a mismatching digest" \
   verify_checksum "$checksum_dir/artifact" "$checksum_dir/artifact.sha256"
 
+if (PATH= verify_checksum "$checksum_dir/artifact" "$checksum_dir/artifact.sha256" 2>&1); then
+  echo "NOT OK - verify_checksum should fail closed with no digest tool"
+  failures=$((failures + 1))
+else
+  echo "ok - verify_checksum fails closed when no digest tool is available"
+fi
+
 if [ "$failures" -eq 0 ]; then
   echo "All install.sh tests passed."
   exit 0

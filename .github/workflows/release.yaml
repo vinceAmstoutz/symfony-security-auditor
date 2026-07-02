@@ -91,6 +91,11 @@ jobs:
       - name: Verify the binary was produced
         run: test -s "${{ matrix.asset }}"
 
+      - name: Smoke-test the binary
+        run: |
+          chmod +x "${{ matrix.asset }}" 2>/dev/null || true
+          ./"${{ matrix.asset }}" --version
+
       - name: Generate the SHA-256 checksum
         run: |
           if command -v sha256sum >/dev/null 2>&1; then

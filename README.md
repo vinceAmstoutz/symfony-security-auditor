@@ -96,6 +96,11 @@ Linux, macOS, and Windows.
 curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | sh
 ```
 
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.ps1 | iex
+```
+
 Or download the binary for your platform straight from the
 [latest release](https://github.com/vinceAmstoutz/symfony-security-auditor/releases/latest):
 
@@ -106,6 +111,14 @@ Or download the binary for your platform straight from the
 | macOS Intel         | `symfony-security-auditor-darwin-x86_64`      |
 | macOS Apple Silicon | `symfony-security-auditor-darwin-arm64`       |
 | Windows x86-64      | `symfony-security-auditor-windows-x86_64.exe` |
+
+Every binary ships with a `.sha256` checksum, and the install scripts **abort**
+rather than install a binary they cannot verify. To check a manual download
+yourself:
+
+```bash
+sha256sum -c symfony-security-auditor-linux-x86_64.sha256
+```
 
 ### 2. Configure — the guided `init`
 
