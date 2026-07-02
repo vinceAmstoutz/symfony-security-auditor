@@ -110,4 +110,4 @@ main() {
   esac
 }
 
-main
+[ "${SSA_INSTALL_SOURCED:-0}" = "1" ] || main

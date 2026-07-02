@@ -79,6 +79,9 @@ function runCodeQualityTools(bool $fixMode = false): void
     run('docker compose exec php vendor/bin/swiss-knife check-commented-code src tests tools');
     run('docker compose exec php vendor/bin/swiss-knife check-conflicts src tests tools');
 
+    io()->section('Install script tests');
+    run('sh tests/Shell/install_script_test.sh');
+
     io()->section('PHPUnit');
     run('docker compose exec php vendor/bin/phpunit --coverage-clover=build/coverage/clover.xml');
 
