@@ -46,6 +46,7 @@ bin/castor up
 | Stop containers      | `bin/castor down`                                 |
 | Lint (check only)    | `bin/castor lint`                                 |
 | Lint + auto-fix      | `bin/castor lint:fix`                             |
+| Markdown check only  | `bin/castor lint:docs` (fast pre-push check)      |
 | Run PHP tests        | `docker compose exec php vendor/bin/phpunit`      |
 | Run mutation tests   | `docker compose exec php bin/infection`           |
 | Symfony console      | `docker compose exec php bin/console <command>`   |
