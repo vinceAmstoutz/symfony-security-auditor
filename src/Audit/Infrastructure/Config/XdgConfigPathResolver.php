@@ -32,6 +32,25 @@ final readonly class XdgConfigPathResolver
     ) {}
 
     /**
+     * XDG variables always win; on Windows the base directories fall back to the
+     * native `%APPDATA%` (config) and `%LOCALAPPDATA%` (cache/data) locations,
+     * with `%USERPROFILE%` as the home, since Windows has no `$HOME`/XDG dirs.
+     *
+     * @param array<string, string> $environment
+     */
+    public static function fromEnvironment(array $environment, string $osFamily): self
+    {
+        $windows = 'Windows' === $osFamily;
+
+        return new self(
+            $environment['XDG_CONFIG_HOME'] ?? ($windows ? ($environment['APPDATA'] ?? null) : null),
+            $environment['XDG_CACHE_HOME'] ?? ($windows ? ($environment['LOCALAPPDATA'] ?? null) : null),
+            $environment['HOME'] ?? ($windows ? ($environment['USERPROFILE'] ?? null) : null),
+            $environment['XDG_DATA_HOME'] ?? ($windows ? ($environment['LOCALAPPDATA'] ?? null) : null),
+        );
+    }
+
+    /**
      * @throws UnresolvableConfigPathException
      */
     public function configFile(): string
