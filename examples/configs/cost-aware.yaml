@@ -19,6 +19,7 @@ symfony_security_auditor:
         tools_enabled: false    # disables read_file / grep / list_files / lookup_advisory
         max_tool_iterations: 1
 
+    # Provider prompt caching is configured in config/packages/ai.yaml
+    # (e.g. Anthropic `cache_retention`) — see docs/configuration.md#prompt-caching.
     cache:
         enabled: true
-        prompt_caching: true
