@@ -523,7 +523,7 @@ final class ReportRendererTest extends TestCase
         $decoded = $this->decodeSarif($this->makeReport($vulnerability));
 
         $firstRule = array_values($decoded['runs'][0]['tool']['driver']['rules'])[0];
-        self::assertSame('https://owasp.org/Top10/A03_2021-Injection/', $firstRule['helpUri']);
+        self::assertSame('https://owasp.org/Top10/2025/A05_2025-Injection/', $firstRule['helpUri']);
     }
 
     /**

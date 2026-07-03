@@ -102,6 +102,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **OWASP references now point at the Top 10:2025 edition instead of 2021.**
+  `VulnerabilityType::owaspReference()` and `owaspReferenceUrl()`
+  (`src/Audit/Domain/Model/VulnerabilityType.php`) emitted 2021 category ids
+  (e.g. `OWASP A03:2021 - Injection`) in the report `owasp` field and SARIF
+  `helpUri`, which read as stale against the released OWASP Top 10:2025. Every
+  type is remapped to its 2025 category: injection types move to
+  `A05:2025 - Injection`, misconfiguration types to
+  `A02:2025 - Security Misconfiguration`, cryptographic types to
+  `A04:2025 - Cryptographic Failures`, design flaws to
+  `A06:2025 - Insecure Design`, integrity types to
+  `A08:2025 - Software or Data Integrity Failures` (renamed from "and"),
+  `authenticator_bypass` to `A07:2025 - Authentication Failures`, and `ssrf`
+  folds into `A01:2025 - Broken Access Control` per the 2025 consolidation. URLs
+  now use the `https://owasp.org/Top10/2025/…` category pages. The report schema
+  is unchanged — only the `owasp`/`helpUri` values move.
+
 - **Prompt-cache traffic is now priced from each provider's real per-model cache
   rates instead of Anthropic-only multipliers.** `CostCalculator`
   (`src/Audit/Application/Budget/CostCalculator.php`) previously derived cache
