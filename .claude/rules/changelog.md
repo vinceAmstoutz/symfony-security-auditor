@@ -37,10 +37,13 @@ following the established entry style:
 2. Add a short intro paragraph summarizing the release theme.
 3. Add the link reference at the bottom block:
    `[X.Y.Z]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/X.Y.Z`.
-4. Bump the version pins to `X.Y.Z`: the config-schema `$id` in
+4. Bump the version pins to `X.Y.Z`: run `bin/castor release:bump X.Y.Z`. It
+   rewrites every pinned location — the config-schema `$id` in
    `resources/schema.json` and the GitHub Action `uses:` examples in
-   `docs/ci.md` and `README.md`. These point at the release tag, so they must
-   move every release. (The `# $schema:` modelines in `examples/configs/*.yaml`,
+   `README.md`, `docs/ci.md`, and `docs/versioning.md` — and fails loudly if a
+   pin goes missing. The `Release Guard` workflow
+   (`.github/workflows/release-guard.yaml`) re-checks the pins against the tag
+   on every tag push. (The `# $schema:` modelines in `examples/configs/*.yaml`,
    `examples/vulnerable-app/…`, and `docs/configuration.md` track `main` and
    need no per-release bump.)
 5. Prepare GitHub release notes in this exact format:
