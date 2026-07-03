@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **Committed dotenv files are now part of the default scan surface, with
+  deterministic secret markers.** `.env`, `.env.local`, `.env.dev`, `.env.test`,
+  `.env.prod`, and `.env.dist` were previously invisible to the auditor twice
+  over: the default `scan.included_paths` never reached the project root, and
+  Symfony Finder's dot-file filtering skipped them even when listed explicitly
+  (`src/Audit/Infrastructure/FileSystem/ProjectFileScanner.php`). The root
+  dotenv files now ship in `ProjectFileScanner::DEFAULT_INCLUDED_PATHS`
+  (gitignored `.env.local` variants stay excluded via the default
+  `respect_gitignore: true`), classify as `config` files
+  (`ProjectFile::detectType()`), and the deterministic pre-scanner gains two
+  markers in the config bucket (`RegexStaticPreScanner`, `CACHE_VERSION` 3):
+  `env_credential_assignment` flags non-empty values assigned to
+  credential-named keys (`*SECRET*`, `*PASSWORD*`, `*TOKEN*`, `*API_KEY*`,
+  `*ACCESS_KEY*`, `*PRIVATE_KEY*`), and `scrubbed_secret` flags every
+  `***REDACTED:…***` placeholder the secret scrubber produced — so the attacker
+  is pointed at committed credentials while the real values still never reach
+  the LLM.
 - **`bin/console audit` now works as a shorthand for `audit:run` in the bundle,
   matching the standalone CLI.** The `audit` alias is declared on the command
   itself (`AuditCommand` `#[AsCommand(aliases: ['audit'])]`, exposed as

@@ -110,6 +110,32 @@ final class ProjectFileScannerTest extends TestCase
         self::assertSame('src/App.php', $files[0]->relativePath());
     }
 
+    public function test_it_scans_an_explicitly_included_dotenv_file(): void
+    {
+        file_put_contents($this->tmpDir.'/.env', "APP_ENV=prod\nAPP_SECRET=abcdef0123456789\n");
+
+        $files = (new ProjectFileScanner(new NullLogger(), ['.env']))->scan($this->tmpDir);
+
+        self::assertCount(1, $files);
+        self::assertSame('.env', $files[0]->relativePath());
+        self::assertSame('config', $files[0]->type());
+    }
+
+    public function test_default_included_paths_pick_up_committed_dotenv_files(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php class App {}');
+        file_put_contents($this->tmpDir.'/.env', "APP_ENV=prod\n");
+        file_put_contents($this->tmpDir.'/.env.dev', "APP_ENV=dev\n");
+
+        $files = $this->projectFileScanner->scan($this->tmpDir);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files);
+
+        self::assertContains('.env', $paths);
+        self::assertContains('.env.dev', $paths);
+        self::assertContains('src/App.php', $paths);
+    }
+
     public function test_default_included_paths_scan_src_config_templates_and_public_index(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);

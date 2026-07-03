@@ -378,19 +378,21 @@ context wouldn't apply, so accuracy drops. **Not recommended.**
 
 ### What file types does it scan?
 
-`.php`, `.twig`, `.yaml`, `.yml`, `.xml` — the file types where Symfony
-security-relevant code lives. Other extensions are skipped.
+`.php`, `.twig`, `.yaml`, `.yml`, `.xml`, plus the explicitly listed root dotenv
+files (`.env`, `.env.local`, `.env.dev`, `.env.test`, `.env.prod`, `.env.dist`)
+— the places where Symfony security-relevant code and committed secrets live.
+Other extensions are skipped.
 
 ### Does it scan `vendor/`, `tests/`, or `migrations/`?
 
 No. The scan is a strict **allow-list**: only the paths listed in
 `scan.included_paths` are inspected, defaulting to `src`, `config`, `templates`,
-and `public/index.php` (the Symfony Flex skeleton). Anything outside —
-`vendor/`, `node_modules/`, `var/`, `tests/`, `migrations/`, `translations/`,
-`bin/`, `app/`, root-level scripts, IDE folders, build artefacts — is silently
-skipped. To prune a sub-tree inside an included path (e.g. drop `src/Migrations`
-from the audit), tighten `included_paths` to the specific sub-directories you
-want instead — e.g.:
+`public/index.php`, and the root dotenv files (the Symfony Flex skeleton).
+Anything outside — `vendor/`, `node_modules/`, `var/`, `tests/`, `migrations/`,
+`translations/`, `bin/`, `app/`, root-level scripts, IDE folders, build
+artefacts — is silently skipped. To prune a sub-tree inside an included path
+(e.g. drop `src/Migrations` from the audit), tighten `included_paths` to the
+specific sub-directories you want instead — e.g.:
 
 ```yaml
 symfony_security_auditor:

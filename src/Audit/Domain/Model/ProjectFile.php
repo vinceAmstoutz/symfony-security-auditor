@@ -230,7 +230,14 @@ final readonly class ProjectFile
     {
         return str_ends_with($this->relativePath, '.yaml')
             || str_ends_with($this->relativePath, '.yml')
-            || str_ends_with($this->relativePath, '.xml');
+            || str_ends_with($this->relativePath, '.xml')
+            || self::isDotenvPath($this->relativePath);
+    }
+
+    private static function isDotenvPath(string $path): bool
+    {
+        return str_starts_with(basename($path), '.env')
+            && !str_ends_with($path, '.php');
     }
 
     public function containsKeyword(string $keyword): bool
@@ -352,7 +359,7 @@ final readonly class ProjectFile
             str_ends_with($path, 'Normalizer.php') || str_ends_with($path, 'Denormalizer.php') => ProjectFileType::NORMALIZER,
             str_ends_with($path, 'ScheduleProvider.php') || str_ends_with($path, 'Schedule.php') => ProjectFileType::SCHEDULER,
             str_ends_with($path, '.twig') => ProjectFileType::TEMPLATE,
-            str_ends_with($path, '.yaml') || str_ends_with($path, '.yml') => ProjectFileType::CONFIG,
+            str_ends_with($path, '.yaml') || str_ends_with($path, '.yml'), self::isDotenvPath($path) => ProjectFileType::CONFIG,
             str_ends_with($path, '.php') => ProjectFileType::PHP,
             default => ProjectFileType::OTHER,
         };

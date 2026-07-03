@@ -83,7 +83,7 @@ final readonly class AuditConfigurationDefinition
                     ->addDefaultsIfNotSet()
                     ->children()
                         ->arrayNode('included_paths')
-                            ->info('Project-relative directories and files that define the scan surface — the sole scoping knob. Defaults to the Symfony Flex skeleton (src/, config/, templates/, public/index.php). Anything outside this list is silently skipped, including vendor/, node_modules/, var/, tests/, migrations/, build artefacts, IDE folders, and any other top-level tree. Tighten or extend the list to match non-standard layouts; the audit only inspects what is listed here.')
+                            ->info('Project-relative directories and files that define the scan surface — the sole scoping knob. Defaults to the Symfony Flex skeleton (src/, config/, templates/, public/index.php) plus the root dotenv files (.env, .env.local, .env.dev, .env.test, .env.prod, .env.dist). Anything outside this list is silently skipped, including vendor/, node_modules/, var/, tests/, migrations/, build artefacts, IDE folders, and any other top-level tree. Tighten or extend the list to match non-standard layouts; the audit only inspects what is listed here.')
                             ->scalarPrototype()->end()
                             ->defaultValue(ProjectFileScanner::DEFAULT_INCLUDED_PATHS)
                         ->end()

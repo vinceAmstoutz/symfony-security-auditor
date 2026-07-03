@@ -84,10 +84,11 @@ absolute path, or omit the argument to default to the current working directory.
 
 The auditor walks the project for `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files
 inside `scan.included_paths` (default: `src/`, `config/`, `templates/`,
-`public/index.php` — the Symfony Flex skeleton). If nothing is found, the path
-is wrong, the layout is non-standard, or `scan.respect_gitignore` is filtering
-everything out. A log line `No included paths exist in project` at `warning`
-level confirms the allow-list resolved to nothing.
+`public/index.php`, and the root dotenv files — the Symfony Flex skeleton). If
+nothing is found, the path is wrong, the layout is non-standard, or
+`scan.respect_gitignore` is filtering everything out. A log line
+`No included paths exist in project` at `warning` level confirms the allow-list
+resolved to nothing.
 
 ### Audit exits with code `1` even though risk is LOW
 
@@ -247,8 +248,8 @@ Expected behavior on large projects. Mitigations:
 ### Cost blew past my budget
 
 - Confirm `scan.included_paths` matches the deployable code surface. The default
-  `['src', 'config', 'templates', 'public/index.php']` already skips every file
-  outside the Symfony skeleton — `vendor/`, `node_modules/`, `var/`, `tests/`,
+  (the Flex skeleton plus root dotenv files) already skips every file outside
+  the Symfony skeleton — `vendor/`, `node_modules/`, `var/`, `tests/`,
   `migrations/`, `translations/`, `bin/`, root scripts, IDE folders, build
   artefacts — without you having to enumerate them.
 - Trim further by tightening `scan.included_paths`: drop `templates/` or

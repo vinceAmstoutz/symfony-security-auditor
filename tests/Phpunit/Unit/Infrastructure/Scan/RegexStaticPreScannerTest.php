@@ -132,6 +132,46 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertNotContains('hardcoded_secret', $patterns);
     }
 
+    public function test_it_flags_credential_assignment_in_dotenv_file(): void
+    {
+        $projectFile = ProjectFile::create(
+            '.env',
+            '/app/.env',
+            "APP_ENV=prod\nAPP_SECRET=0123456789abcdef0123456789abcdef\n",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        self::assertCount(1, $markers);
+        self::assertSame('env_credential_assignment', $markers[0]->pattern());
+        self::assertSame(2, $markers[0]->line());
+    }
+
+    public function test_it_does_not_flag_empty_or_boilerplate_dotenv_values(): void
+    {
+        $projectFile = ProjectFile::create(
+            '.env',
+            '/app/.env',
+            "APP_ENV=dev\nAPP_SECRET=\nAPP_DEBUG=1\n",
+        );
+
+        self::assertSame([], $this->regexStaticPreScanner->scan([$projectFile]));
+    }
+
+    public function test_it_flags_scrubbed_secret_placeholder_in_config_file(): void
+    {
+        $projectFile = ProjectFile::create(
+            '.env.prod',
+            '/app/.env.prod',
+            "MAILER_DSN=***REDACTED:connection-string***\n",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('scrubbed_secret', $patterns);
+    }
+
     public function test_it_flags_voter_default_return_true(): void
     {
         $projectFile = ProjectFile::create(
