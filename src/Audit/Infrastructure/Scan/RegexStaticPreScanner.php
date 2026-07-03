@@ -33,7 +33,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 3;
+    public const int CACHE_VERSION = 4;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -138,6 +138,20 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'allow_extra_fields' => [
                 'regex' => '/[\'"]allow_extra_fields[\'"]\s*=>\s*true/',
                 'description' => 'allow_extra_fields: true — mass-assignment vector',
+            ],
+        ],
+        ProjectFileType::API_RESOURCE->value => [
+            'api_pagination_disabled' => [
+                'regex' => '/paginationEnabled\s*[:=]\s*false|paginationClientEnabled\s*[:=]\s*true/',
+                'description' => 'API Platform pagination disabled or client-controlled — unbounded collection responses',
+            ],
+            'api_filter_declared' => [
+                'regex' => '/#\[\s*ApiFilter\s*\(/',
+                'description' => 'ApiFilter declared — verify filtered properties are not sensitive or foreign-owned (data-exfiltration oracle)',
+            ],
+            'serializer_groups_attribute' => [
+                'regex' => '/#\[\s*Groups\s*\(|@Groups\s*\(/',
+                'description' => 'Serializer #[Groups] attribute — verify write groups do not expose privileged fields (roles, isAdmin, passwordHash) to mass assignment',
             ],
         ],
         ProjectFileType::ENTITY->value => [

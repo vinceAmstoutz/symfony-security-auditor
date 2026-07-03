@@ -293,6 +293,20 @@ final readonly class ProjectFile
                 || str_contains($content, '#[Route'));
     }
 
+    private static function looksLikeApiResource(string $path, string $content): bool
+    {
+        if (!str_ends_with($path, '.php')) {
+            return false;
+        }
+
+        if (str_contains($content, '#[ApiResource') || str_contains($content, '@ApiResource')) {
+            return true;
+        }
+
+        return str_contains($content, 'ApiPlatform\\Metadata')
+            && 1 === preg_match('/#\[\s*(?:Get|GetCollection|Post|Put|Patch|Delete|Query|QueryCollection|Mutation)\b/', $content);
+    }
+
     private static function isEntityPath(string $path): bool
     {
         return str_contains($path, '/Entity/')
@@ -348,6 +362,7 @@ final readonly class ProjectFile
     {
         return match (true) {
             self::isControllerPath($path), self::looksLikeController($path, $content) => ProjectFileType::CONTROLLER,
+            self::looksLikeApiResource($path, $content) => ProjectFileType::API_RESOURCE,
             self::isEntityPath($path), self::looksLikeEntity($path, $content) => ProjectFileType::ENTITY,
             self::isVoterPath($path), self::looksLikeVoter($path, $content) => ProjectFileType::VOTER,
             self::isRepositoryPath($path), self::looksLikeRepository($path, $content) => ProjectFileType::REPOSITORY,

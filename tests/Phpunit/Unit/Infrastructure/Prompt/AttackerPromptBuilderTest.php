@@ -453,6 +453,21 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('<skills role="', $prompt);
     }
 
+    public function test_api_resource_files_get_the_api_platform_skill_block(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: false);
+        $projectFile = ProjectFile::create(
+            'src/Entity/Book.php',
+            '/app/src/Entity/Book.php',
+            "<?php\n#[ApiResource]\nclass Book {}",
+        );
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('<skills role="api_resource">', $prompt);
+        self::assertStringContainsString('securityPostDenormalize', $prompt);
+    }
+
     public function test_stable_mode_emits_every_skill_block_regardless_of_chunk_contents(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: true);
@@ -464,8 +479,8 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
-        // All 14 skill roles are present even though only a generic PHP file is in the chunk.
-        self::assertSame(14, substr_count($prompt, '<skills role="'));
+        // All 15 skill roles are present even though only a generic PHP file is in the chunk.
+        self::assertSame(15, substr_count($prompt, '<skills role="'));
     }
 
     public function test_stable_mode_system_prompt_is_byte_identical_across_chunk_types(): void

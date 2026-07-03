@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 enum ProjectFileType: string
 {
     case CONTROLLER = 'controller';
+    case API_RESOURCE = 'api_resource';
     case ENTITY = 'entity';
     case VOTER = 'voter';
     case REPOSITORY = 'repository';

@@ -172,6 +172,34 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('scrubbed_secret', $patterns);
     }
 
+    public function test_it_flags_disabled_pagination_on_api_resources(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Entity/Book.php',
+            '/app/src/Entity/Book.php',
+            "<?php\n#[ApiResource(paginationEnabled: false)]\nclass Book {}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('api_pagination_disabled', $patterns);
+    }
+
+    public function test_it_flags_api_filters_for_review(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Entity/Offer.php',
+            '/app/src/Entity/Offer.php',
+            "<?php\n#[ApiResource]\n#[ApiFilter(SearchFilter::class, properties: ['owner.email' => 'exact'])]\nclass Offer {}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('api_filter_declared', $patterns);
+    }
+
     public function test_it_flags_voter_default_return_true(): void
     {
         $projectFile = ProjectFile::create(
