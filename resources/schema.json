@@ -262,5 +262,14 @@
         }
       }
     }
+  },
+  "patternProperties": {
+    "^when@[a-z0-9_-]+$": {
+      "type": "object",
+      "description": "Symfony environment-scoped configuration block (when@dev, when@test, …). Mirrors the root schema so editors give completion and validation for symfony_security_auditor nested under when@<env>.",
+      "properties": {
+        "symfony_security_auditor": { "$ref": "#/properties/symfony_security_auditor" }
+      }
+    }
   }
 }
