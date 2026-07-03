@@ -468,6 +468,21 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('securityPostDenormalize', $prompt);
     }
 
+    public function test_live_component_files_get_the_live_component_skill_block(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: false);
+        $projectFile = ProjectFile::create(
+            'src/Twig/Components/Cart.php',
+            '/app/src/Twig/Components/Cart.php',
+            "<?php\n#[AsLiveComponent]\nclass Cart {}",
+        );
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('<skills role="live_component">', $prompt);
+        self::assertStringContainsString('LiveProp', $prompt);
+    }
+
     public function test_stable_mode_emits_every_skill_block_regardless_of_chunk_contents(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: true);
@@ -479,8 +494,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
-        // All 15 skill roles are present even though only a generic PHP file is in the chunk.
-        self::assertSame(15, substr_count($prompt, '<skills role="'));
+        self::assertSame(16, substr_count($prompt, '<skills role="'));
     }
 
     public function test_stable_mode_system_prompt_is_byte_identical_across_chunk_types(): void

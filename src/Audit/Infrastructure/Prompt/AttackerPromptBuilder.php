@@ -28,7 +28,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 10;
+    public const int PROMPT_VERSION = 11;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
@@ -49,6 +49,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
     private const array SKILL_PRIORITY = [
         ProjectFileType::CONTROLLER,
         ProjectFileType::API_RESOURCE,
+        ProjectFileType::LIVE_COMPONENT,
         ProjectFileType::AUTHENTICATOR,
         ProjectFileType::VOTER,
         ProjectFileType::WEBHOOK_CONSUMER,
@@ -204,6 +205,21 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             - Operations guarded at the firewall/access_control level when the pattern provably covers the resource route prefix.
             - `security: "is_granted('PUBLIC_ACCESS')"` on intentionally public read-only catalogs.
             - Filters on non-sensitive catalog fields (title, name, public slugs).
+            </skills>
+            SKILL,
+        ProjectFileType::LIVE_COMPONENT->value => <<<'SKILL'
+            <skills role="live_component">
+            Symfony UX Live Components are HTTP endpoints without routes: every `#[LiveAction]` method is invokable via POST by anyone who can reach the component, and every writable `#[LiveProp]` is bound from the request payload. Neither appears in a controller or the access_control map. Hunt:
+            - `#[LiveAction]` methods performing privileged work (delete, promote, pay, toggle flags) without `denyAccessUnlessGranted()` / an `#[IsGranted]` attribute on the method or class. The surrounding page's access control does NOT protect the component endpoint. Report as `broken_access_control`.
+            - `#[LiveProp(writable: true)]` on sensitive fields (ids of owned resources, prices, quantities, role-ish flags) — the client can set them to arbitrary values before an action runs. Report as `mass_assignment` or `price_manipulation`.
+            - Writable props flowing into queries, file paths, or redirects inside actions — standard injection sinks reached from a non-obvious source.
+            - `hydrateWith`/`dehydrateWith` custom hydration performing `unserialize` or object construction from client data. Report as `insecure_deserialization`.
+            - `#[LiveListener]` handlers trusting event payloads emitted client-side.
+            - Actions mutating entities loaded by client-supplied ids without an ownership check (IDOR through the component).
+            Do NOT flag:
+            - Read-only props (`#[LiveProp]` without `writable: true`) — the client cannot change them.
+            - Actions guarded by `#[IsGranted]` on the class or method, or an explicit `denyAccessUnlessGranted()` first statement.
+            - `#[AsTwigComponent]` (non-live) classes — they render server-side only and expose no endpoint.
             </skills>
             SKILL,
         ProjectFileType::ENTITY->value => <<<'SKILL'

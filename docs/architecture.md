@@ -615,10 +615,10 @@ The attacker prompt has two modes selected by `audit.structured_collection`:
 Both modes share the same intro, severity/confidence rubrics, file-numbering
 protocol, scope guidance, single few-shot example, and — when files of the
 corresponding `ProjectFile` type appear in the chunk — per-artifact skill blocks
-(controller, api_resource, voter, form, repository, entity, template, config,
-php, …). Skill blocks emit both attack patterns to hunt and patterns explicitly
-NOT to flag, reducing reviewer noise. Blocks are emitted in attack-surface
-priority order, not alphabetically.
+(controller, api_resource, live_component, voter, form, repository, entity,
+template, config, php, …). Skill blocks emit both attack patterns to hunt and
+patterns explicitly NOT to flag, reducing reviewer noise. Blocks are emitted in
+attack-surface priority order, not alphabetically.
 
 Source files are wrapped as `<file path="…" type="…">…</file>` and every line is
 prefixed with a line-number marker of the form `` `NNN | ` `` (line number,

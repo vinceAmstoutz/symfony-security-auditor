@@ -307,6 +307,12 @@ final readonly class ProjectFile
             && 1 === preg_match('/#\[\s*(?:Get|GetCollection|Post|Put|Patch|Delete|Query|QueryCollection|Mutation)\b/', $content);
     }
 
+    private static function looksLikeLiveComponent(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && str_contains($content, '#[AsLiveComponent');
+    }
+
     private static function isEntityPath(string $path): bool
     {
         return str_contains($path, '/Entity/')
@@ -363,6 +369,7 @@ final readonly class ProjectFile
         return match (true) {
             self::isControllerPath($path), self::looksLikeController($path, $content) => ProjectFileType::CONTROLLER,
             self::looksLikeApiResource($path, $content) => ProjectFileType::API_RESOURCE,
+            self::looksLikeLiveComponent($path, $content) => ProjectFileType::LIVE_COMPONENT,
             self::isEntityPath($path), self::looksLikeEntity($path, $content) => ProjectFileType::ENTITY,
             self::isVoterPath($path), self::looksLikeVoter($path, $content) => ProjectFileType::VOTER,
             self::isRepositoryPath($path), self::looksLikeRepository($path, $content) => ProjectFileType::REPOSITORY,
