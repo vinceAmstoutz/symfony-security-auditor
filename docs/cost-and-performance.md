@@ -39,6 +39,14 @@ Each key a profile sets is documented in
   with an async transport; `4`–`8` (within your rate limits) cuts each phase's
   wall-clock roughly proportionally. Cache hits short-circuit, so only the
   misses are dispatched.
+- **Provider batch endpoints (planned)** — Anthropic Message Batches, the OpenAI
+  Batch API, and Mistral Batch price tokens ~50% below the live rate for
+  asynchronous workloads, which matches the attacker/reviewer fan-out exactly.
+  Support is intentionally deferred until the `symfony/ai` Platform component
+  ships its in-progress batch-processing support, so it can land once behind
+  `BatchCapableLLMClientInterface` for every provider instead of as per-provider
+  HTTP adapters. Until then, the concurrency levers above are the way to trade
+  rate-limit headroom for wall-clock.
 - **Caching** — content-hash caching skips identical chunks across runs, and
   Anthropic prompt caching (`cache_retention` in `ai.yaml`) gives a ~90%
   input-token discount on cache hits. Both are on by default; see
