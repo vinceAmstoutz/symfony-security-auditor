@@ -450,16 +450,20 @@ $report->toArray(): array<string, mixed>             // fully serializable; incl
 
 ### Built-in formats
 
-`ReportRenderer` ships three formats out of the box:
+`ReportRenderer` ships five formats out of the box:
 
 - `renderConsole(AuditReport): string` — human-readable terminal output
   (templates in `Report/Template/*.txt`).
 - `renderJson(AuditReport): string` — pretty-printed `AuditReport::toArray()`.
 - `renderSarif(AuditReport): string` — SARIF 2.1.0, consumable by GitHub Code
   Scanning and GitLab Security Dashboard.
+- `renderHtml(AuditReport): string` — self-contained HTML page (templates in
+  `Report/Template/*.html`).
+- `renderMarkdown(AuditReport): string` — Markdown suitable for PR comments and
+  wikis.
 
-Trigger them via `audit:run --format=console|json|sarif` (see [`ci.md`](ci.md)
-for SARIF upload workflows).
+Trigger them via `audit:run --format=console|json|sarif|html|markdown` (see
+[`ci.md`](ci.md) for SARIF upload workflows).
 
 ### Adding a new format
 
@@ -497,6 +501,47 @@ in `config/services.yaml` to override the bundled behaviour (see
   the factory if you want to enrich the tool's schema (extra fields, tighter
   enums) without forking the agent — every provider that supports tool use will
   validate calls against the schema you publish.
+- `SecretScrubberInterface` — `scrub(string $content): string`, applied to every
+  file before its content reaches the LLM (default: `RegexSecretScrubber`;
+  `NullSecretScrubber` when `scan.secret_scrubbing.enabled: false`). Implement
+  it for redaction the bundled patterns cannot express — e.g. calling out to a
+  dedicated secret-detection engine. Extra PCRE patterns alone do not need a
+  class: use `scan.secret_scrubbing.additional_patterns`.
+- `AdvisoryDatabaseInterface` — `lookup(string $package, string $version)`
+  backing the attacker's `lookup_advisory` tool (default:
+  `ComposerAuditAdvisoryDatabase` running `composer audit`;
+  `InMemoryAdvisoryDatabase` is the offline fallback). Implement it to query an
+  internal vulnerability feed or a commercial advisory service.
+- `PricingProviderInterface` — per-model USD prices for cost estimation
+  (default: `ModelsDevPricingProvider` reading the `symfony/models-dev`
+  catalog). Also implement `CacheAwarePricingProviderInterface` if your source
+  knows cache-read/cache-write rates — the cost report then prices cached tokens
+  at their discounted rate. Implement for private model deployments or
+  negotiated pricing.
+- `RateLimiterInterface` — `acquire()` / `record()` / `pauseUntil()` around
+  every LLM call (default: `NullRateLimiter`, or `TokenBucketRateLimiter` when
+  any `audit.rate_limit.*` key is set). Implement it to coordinate quota
+  out-of-process (Redis, file lock) across parallel CI jobs sharing one API key.
+- `TokenEstimatorInterface` — `estimateTokens(string $text, string $model)` used
+  for pre-flight budgeting and rate-limit sizing (default:
+  `ResolvingTokenEstimator`, which picks the per-provider heuristic matching the
+  model id). To tune a single provider instead of the whole port, register a
+  service implementing the Infrastructure-level
+  `ProviderTokenEstimatorInterface` — it is auto-tagged and joins the resolver's
+  candidate list.
+- `ControllerAccessControlParserInterface`, `VoterCapabilityParserInterface`,
+  `FormBindingParserInterface` — the deterministic AST extractions
+  (`#[IsGranted]`/`denyAccessUnlessGranted`, voter attributes, form
+  field-to-entity bindings) that feed the `SymfonyMapping` given to the attacker
+  (defaults: the `PhpParser*` implementations in `Infrastructure/Scan/`).
+  Implement one when your project encodes access control in a custom idiom the
+  bundled parser cannot see.
+- `ProgressReporterInterface` — `report(string $event, array $context)` for
+  every progress event the pipeline emits (defaults: `ConsoleProgressReporter`
+  on a TTY, `PlainProgressReporter` otherwise, `LoggerProgressReporter` for
+  logs). Implement it to stream audit progress to a dashboard, metrics system,
+  or chat webhook; the stable event names are the cases of the
+  `Audit\Domain\Model\ProgressEvent` enum.
 
 ## 6. Schema-Enforced Collection (`audit.structured_collection`)
 
