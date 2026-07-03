@@ -57,21 +57,22 @@ Create `config/packages/symfony_security_auditor.yaml`. The bundle exposes the
 following keys:
 
 > **Editor autocompletion.** A JSON Schema for this configuration ships at
-> [`resources/schema.json`](../resources/schema.json). Editors backed by the
+> [`resources/schema.json`](../resources/schema.json). Editors pick it up from a
+> `# $schema:` modeline on the first line of your config file — both the
 > [YAML Language Server](https://github.com/redhat-developer/yaml-language-server)
-> (VS Code, Neovim, …) pick it up from a modeline on the first line of your
-> config file:
+> (VS Code, Neovim, …) and PhpStorm/IntelliJ understand this form:
 >
 > ```yaml
-> # yaml-language-server: $schema=https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/1.12.0/resources/schema.json
+> # $schema: https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/main/resources/schema.json
+>
 > symfony_security_auditor:
 >     model: "claude-opus-4-8"
 > ```
 >
 > This gives key completion, type checking, and inline docs as you edit. The
 > example files under [`examples/configs/`](../examples/configs/) include the
-> modeline. The URL is pinned to the release tag (`…/1.12.0/…`) so the schema
-> matches the version you have installed — bump it when you upgrade the bundle.
+> modeline. The URL tracks the `main` branch so it always resolves to the
+> current schema — no per-release bump needed.
 
 ### Top-level
 
