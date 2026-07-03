@@ -37,11 +37,12 @@ following the established entry style:
 2. Add a short intro paragraph summarizing the release theme.
 3. Add the link reference at the bottom block:
    `[X.Y.Z]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/X.Y.Z`.
-4. Bump the version pins to `X.Y.Z`: the config-schema URL
-   (`resources/schema.json` `$id`, the `# yaml-language-server` modelines in
-   `examples/configs/*.yaml`, and `docs/configuration.md`) and the GitHub Action
-   `uses:` examples in `docs/ci.md` and `README.md`. These point at the release
-   tag, so they must move every release.
+4. Bump the version pins to `X.Y.Z`: the config-schema `$id` in
+   `resources/schema.json` and the GitHub Action `uses:` examples in
+   `docs/ci.md` and `README.md`. These point at the release tag, so they must
+   move every release. (The `# $schema:` modelines in `examples/configs/*.yaml`,
+   `examples/vulnerable-app/…`, and `docs/configuration.md` track `main` and
+   need no per-release bump.)
 5. Prepare GitHub release notes in this exact format:
 
    ```markdown

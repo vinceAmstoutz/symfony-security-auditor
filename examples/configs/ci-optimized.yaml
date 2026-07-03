@@ -1,4 +1,5 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/1.12.0/resources/schema.json
+# $schema: https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/main/resources/schema.json
+
 # Scheduled CI run — split-model, cache + prompt caching enabled.
 #
 # Target: accuracy on a medium-to-large Symfony codebase, run nightly.
