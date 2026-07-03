@@ -158,7 +158,7 @@
             },
             "baseline": {
               "type": ["string", "null"],
-              "description": "Default path to a baseline file of accepted-finding fingerprints to suppress. The --baseline CLI option overrides this."
+              "description": "Default path to a baseline file of accepted findings. Baselined findings skip the reviewer (saving its LLM calls) and are excluded from the report and exit code. The --baseline CLI option overrides this."
             },
             "fail_on": {
               "enum": ["safe", "low", "medium", "high", "critical"],

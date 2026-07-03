@@ -161,6 +161,184 @@ final class AuditOrchestratorTest extends TestCase
         self::assertEmpty($auditContext->vulnerabilities());
     }
 
+    public function test_it_skips_baseline_accepted_findings_before_the_reviewer(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(
+            $this->attackerResponse([$this->vulnPayload()]),
+        );
+        $reviewerLlm->expects(self::never())->method('complete');
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping([$this->defaultPayloadFingerprint()]);
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertEmpty($auditContext->vulnerabilities());
+        self::assertSame(1, $auditContext->getMeta('audit.baseline_skipped'));
+    }
+
+    public function test_non_baselined_findings_still_reach_the_reviewer_when_others_are_skipped(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([
+                $this->vulnPayload(),
+                $this->vulnPayload(title: 'Other', filePath: 'src/Repository/BarRepository.php'),
+            ]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping([$this->defaultPayloadFingerprint()]);
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertCount(1, $auditContext->vulnerabilities());
+        self::assertSame('Other', array_values($auditContext->vulnerabilities())[0]->title());
+        self::assertSame(1, $auditContext->getMeta('audit.baseline_skipped'));
+    }
+
+    public function test_it_emits_a_progress_event_per_baseline_skipped_finding(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(
+            $this->attackerResponse([$this->vulnPayload()]),
+        );
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, [
+            'recordingProgressReporter' => $recordingProgressReporter,
+        ]);
+        $auditOrchestrator->orchestrate($this->makeContextWithMapping([$this->defaultPayloadFingerprint()]));
+
+        self::assertContains(
+            ['baseline.finding.skipped', [
+                'type' => 'sql_injection',
+                'file' => 'src/Controller/FooController.php',
+                'line' => 10,
+                'title' => 'Vuln',
+            ]],
+            $recordingProgressReporter->events,
+        );
+    }
+
+    public function test_baseline_skip_meta_is_zero_when_no_fingerprints_are_accepted(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn($this->emptyResponse());
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping();
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertSame(0, $auditContext->getMeta('audit.baseline_skipped'));
+    }
+
+    public function test_it_stops_after_one_iteration_when_every_finding_is_baseline_accepted(): void
+    {
+        $infoLogs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$infoLogs): void {
+                $infoLogs[] = [$msg, $ctx];
+            },
+        );
+
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(
+            $this->attackerResponse([$this->vulnPayload()]),
+        );
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['maxIterations' => 3, 'logger' => $logger]);
+        $auditContext = $this->makeContextWithMapping([$this->defaultPayloadFingerprint()]);
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertSame(1, $auditContext->getMeta('audit.iterations'));
+        self::assertContains(['Every remaining finding is baseline-accepted, stopping', []], $infoLogs);
+    }
+
+    public function test_it_skips_a_baselined_finding_that_follows_a_non_baselined_one(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([
+                $this->vulnPayload(title: 'Fresh', filePath: 'src/Repository/BarRepository.php'),
+                $this->vulnPayload(title: 'Accepted'),
+            ]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping([$this->fingerprintFor('Accepted')]);
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertSame(1, $auditContext->getMeta('audit.baseline_skipped'));
+        self::assertCount(1, $auditContext->vulnerabilities());
+        self::assertSame('Fresh', array_values($auditContext->vulnerabilities())[0]->title());
+    }
+
+    public function test_it_forwards_every_non_baselined_finding_when_a_baseline_is_active(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([
+                $this->vulnPayload(title: 'FreshOne', lineStart: 10, lineEnd: 15, filePath: 'src/Repository/BarRepository.php'),
+                $this->vulnPayload(title: 'FreshTwo', lineStart: 30, lineEnd: 40, filePath: 'src/Repository/BazRepository.php'),
+            ]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping([$this->defaultPayloadFingerprint()]);
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertCount(2, $auditContext->vulnerabilities());
+    }
+
+    public function test_it_logs_the_skipped_finding_with_its_fingerprint_type_and_file(): void
+    {
+        $infoLogs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$infoLogs): void {
+                $infoLogs[] = [$msg, $ctx];
+            },
+        );
+
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(
+            $this->attackerResponse([$this->vulnPayload()]),
+        );
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['logger' => $logger]);
+        $auditOrchestrator->orchestrate($this->makeContextWithMapping([$this->defaultPayloadFingerprint()]));
+
+        self::assertContains(
+            ['Baseline-accepted finding skipped before review', [
+                'fingerprint' => $this->defaultPayloadFingerprint(),
+                'type' => 'sql_injection',
+                'file' => 'src/Controller/FooController.php',
+            ]],
+            $infoLogs,
+        );
+    }
+
     public function test_it_stores_audit_metadata_in_context(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -904,9 +1082,10 @@ final class AuditOrchestratorTest extends TestCase
         );
     }
 
-    private function makeContextWithMapping(): AuditContext
+    /** @param list<string> $acceptedFingerprints */
+    private function makeContextWithMapping(array $acceptedFingerprints = []): AuditContext
     {
-        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: $acceptedFingerprints);
         $auditContext->setProjectFiles([
             ProjectFile::create('src/Controller/Foo.php', '/app/src/Controller/Foo.php', '<?php'),
         ]);
@@ -960,5 +1139,18 @@ final class AuditOrchestratorTest extends TestCase
     private function reviewerRejectResponse(): LLMResponse
     {
         return LLMResponse::of((string) json_encode(['accepted' => false]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
+    }
+
+    private function defaultPayloadFingerprint(): string
+    {
+        return $this->fingerprintFor('Vuln', 'src/Controller/FooController.php');
+    }
+
+    private function fingerprintFor(string $title, string $filePath = 'src/Controller/FooController.php'): string
+    {
+        return \sprintf(
+            'SSA-%s',
+            strtoupper(substr(sha1(\sprintf('sql_injection|%s|%s', $filePath, $title)), 0, 12)),
+        );
     }
 }

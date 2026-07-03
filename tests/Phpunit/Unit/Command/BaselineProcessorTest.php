@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use Override;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
@@ -54,14 +55,79 @@ final class BaselineProcessorTest extends TestCase
     {
         $auditReport = $this->makeReport($this->makeVuln('src/A.php'), $this->makeVuln('src/B.php'));
 
+        $expectedEntries = array_map(
+            static fn (Vulnerability $vulnerability): array => [
+                'fingerprint' => $vulnerability->fingerprint(),
+                'type' => 'sql_injection',
+                'file' => $vulnerability->filePath(),
+                'title' => $vulnerability->title(),
+                'added_at' => '2026-07-03',
+            ],
+            $auditReport->vulnerabilities(),
+        );
+
         $baseline = $this->createMock(BaselineInterface::class);
         $baseline->expects(self::once())
             ->method('save')
-            ->with('/out/baseline.json', $auditReport->fingerprints());
+            ->with('/out/baseline.json', $expectedEntries);
+
+        $baselineProcessor = new BaselineProcessor($baseline, null, new MockClock('2026-07-03 10:00:00'));
+        $count = $baselineProcessor->generate($auditReport, '/out/baseline.json');
+
+        self::assertSame(2, $count);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_generate_writes_one_entry_per_unique_fingerprint(): void
+    {
+        $vulnerability = $this->makeVuln('src/A.php');
+        $auditReport = $this->makeReport($this->makeVuln('src/A.php'), $vulnerability->withElevatedSeverity(VulnerabilitySeverity::CRITICAL));
+
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::once())
+            ->method('save')
+            ->with('/out/baseline.json', self::countOf(1));
 
         $count = (new BaselineProcessor($baseline))->generate($auditReport, '/out/baseline.json');
 
-        self::assertSame(2, $count);
+        self::assertSame(1, $count);
+    }
+
+    public function test_accepted_fingerprints_returns_empty_when_no_path_is_configured(): void
+    {
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::never())->method('load');
+
+        self::assertSame([], (new BaselineProcessor($baseline))->acceptedFingerprints(null));
+    }
+
+    public function test_accepted_fingerprints_prefers_the_cli_baseline_over_the_configured_path(): void
+    {
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::once())
+            ->method('load')
+            ->with('/cli.json')
+            ->willReturn(['SSA-AAA']);
+
+        $baselineProcessor = new BaselineProcessor($baseline, '/configured.json');
+
+        self::assertSame(['SSA-AAA'], $baselineProcessor->acceptedFingerprints('/cli.json'));
+    }
+
+    public function test_accepted_fingerprints_falls_back_to_the_configured_path(): void
+    {
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::once())
+            ->method('load')
+            ->with('/configured.json')
+            ->willReturn(['SSA-BBB']);
+
+        $baselineProcessor = new BaselineProcessor($baseline, '/configured.json');
+
+        self::assertSame(['SSA-BBB'], $baselineProcessor->acceptedFingerprints(null));
     }
 
     /**

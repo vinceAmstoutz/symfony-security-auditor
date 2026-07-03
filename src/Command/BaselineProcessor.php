@@ -14,7 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Override;
+use Psr\Clock\ClockInterface;
+use Symfony\Component\Clock\Clock;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
  * Generates and applies the accepted-finding baseline: resolves the effective
@@ -28,28 +31,67 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
     public function __construct(
         private BaselineInterface $baseline,
         private ?string $configuredBaseline = null,
+        private ClockInterface $clock = new Clock(),
     ) {}
 
     #[Override]
     public function generate(AuditReport $auditReport, string $path): int
     {
-        $fingerprints = $auditReport->fingerprints();
-        $this->baseline->save($path, $fingerprints);
+        $entries = $this->entriesFor($auditReport);
+        $this->baseline->save($path, $entries);
 
-        return \count($fingerprints);
+        return \count($entries);
     }
 
     #[Override]
     public function apply(AuditReport $auditReport, ?string $cliBaseline): BaselineResult
     {
-        $baselinePath = $cliBaseline ?? $this->configuredBaseline;
-        if (null === $baselinePath) {
+        $fingerprints = $this->acceptedFingerprints($cliBaseline);
+        if ([] === $fingerprints) {
             return new BaselineResult($auditReport, 0);
         }
 
         $before = $auditReport->totalVulnerabilities();
-        $filtered = $auditReport->withoutFingerprints($this->baseline->load($baselinePath));
+        $filtered = $auditReport->withoutFingerprints($fingerprints);
 
         return new BaselineResult($filtered, $before - $filtered->totalVulnerabilities());
+    }
+
+    #[Override]
+    public function acceptedFingerprints(?string $cliBaseline): array
+    {
+        $baselinePath = $cliBaseline ?? $this->configuredBaseline;
+        if (null === $baselinePath) {
+            return [];
+        }
+
+        return $this->baseline->load($baselinePath);
+    }
+
+    /**
+     * @return list<array<string, string>>
+     */
+    private function entriesFor(AuditReport $auditReport): array
+    {
+        $entries = [];
+        foreach ($auditReport->vulnerabilities() as $vulnerability) {
+            $entries[$vulnerability->fingerprint()] = $this->entryFor($vulnerability);
+        }
+
+        return array_values($entries);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function entryFor(Vulnerability $vulnerability): array
+    {
+        return [
+            'fingerprint' => $vulnerability->fingerprint(),
+            'type' => $vulnerability->type()->value,
+            'file' => $vulnerability->filePath(),
+            'title' => $vulnerability->title(),
+            'added_at' => $this->clock->now()->format('Y-m-d'),
+        ];
     }
 }

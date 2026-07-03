@@ -34,28 +34,34 @@ final readonly class RunAuditUseCase
     ) {}
 
     /**
-     * @param list<string> $scanPaths    optional project-relative subdirectories
-     *                                   to restrict the scan to; empty list (the
-     *                                   default) audits the whole project
-     * @param bool         $bypassCache  when true, agents skip the attacker and
-     *                                   reviewer caches entirely (no reads, no
-     *                                   writes)
-     * @param ?string      $diffSinceRef when set, only files changed against
-     *                                   this git ref are audited; null audits
-     *                                   every file in scope
+     * @param list<string> $scanPaths            optional project-relative subdirectories
+     *                                           to restrict the scan to; empty list (the
+     *                                           default) audits the whole project
+     * @param bool         $bypassCache          when true, agents skip the attacker and
+     *                                           reviewer caches entirely (no reads, no
+     *                                           writes)
+     * @param ?string      $diffSinceRef         when set, only files changed against
+     *                                           this git ref are audited; null audits
+     *                                           every file in scope
+     * @param list<string> $acceptedFingerprints
+     *                                           baseline fingerprints of accepted
+     *                                           findings; matching attacker findings
+     *                                           skip the reviewer and never enter the
+     *                                           report
      *
      * @throws AuditAbortedByBudgetException
      */
-    public function execute(string $projectPath, array $scanPaths = [], bool $bypassCache = false, ?string $diffSinceRef = null): AuditReport
+    public function execute(string $projectPath, array $scanPaths = [], bool $bypassCache = false, ?string $diffSinceRef = null, array $acceptedFingerprints = []): AuditReport
     {
         $this->logger->info('Starting audit', [
             'project' => $projectPath,
             'scan_paths' => $scanPaths,
             'cache_bypassed' => $bypassCache,
             'diff_since_ref' => $diffSinceRef,
+            'accepted_fingerprints' => \count($acceptedFingerprints),
         ]);
 
-        $auditContext = AuditContext::forProject($projectPath, $scanPaths, $bypassCache, $diffSinceRef);
+        $auditContext = AuditContext::forProject($projectPath, $scanPaths, $bypassCache, $diffSinceRef, $acceptedFingerprints);
 
         try {
             $this->pipeline->process($auditContext);

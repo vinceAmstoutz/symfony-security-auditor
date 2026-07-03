@@ -25,7 +25,11 @@ interface BaselineInterface
     public function load(string $path): array;
 
     /**
-     * @param list<string> $fingerprints
+     * @param list<array<string, string>> $entries accepted-finding entries; each
+     *                                             carries at least a `fingerprint`
+     *                                             plus human-readable metadata
+     *                                             (`type`, `file`, `title`,
+     *                                             `added_at`)
      */
-    public function save(string $path, array $fingerprints): void;
+    public function save(string $path, array $entries): void;
 }

@@ -320,6 +320,15 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertStringContainsString('⚖ ✓ validated sql_injection — src/X.php:18', $this->bufferedOutput->fetch());
     }
 
+    public function test_it_streams_a_baseline_skip_line_above_the_bar(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('baseline.finding.skipped', ['type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 18, 'title' => 'Vuln']);
+
+        self::assertStringContainsString('⚖ ⤳ baseline-accepted sql_injection — src/X.php:18 (review skipped)', $this->bufferedOutput->fetch());
+    }
+
     public function test_it_streams_a_rejected_verdict_above_the_bar(): void
     {
         $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);

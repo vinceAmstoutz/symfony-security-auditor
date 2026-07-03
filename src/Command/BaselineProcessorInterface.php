@@ -25,6 +25,15 @@ interface BaselineProcessorInterface
     public function generate(AuditReport $auditReport, string $path): int;
 
     /**
+     * Fingerprints of accepted findings from the effective baseline file,
+     * resolving the CLI `--baseline` override against the configured default
+     * path. Empty when neither is set.
+     *
+     * @return list<string>
+     */
+    public function acceptedFingerprints(?string $cliBaseline): array;
+
+    /**
      * Suppresses baselined findings from the report, resolving the CLI
      * `--baseline` override against the configured default path. When no path
      * is set, the report is returned unchanged with a zero suppressed count.

@@ -51,22 +51,34 @@ final readonly class Baseline implements BaselineInterface
 
         $fingerprints = [];
         foreach ($decoded as $entry) {
-            if (!\is_string($entry)) {
-                throw MalformedBaselineFileException::notAJsonArrayOfStrings($path);
-            }
-
-            $fingerprints[] = $entry;
+            $fingerprints[] = $this->fingerprintOf($entry, $path);
         }
 
         return $fingerprints;
     }
 
     #[Override]
-    public function save(string $path, array $fingerprints): void
+    public function save(string $path, array $entries): void
     {
         $this->filesystem->dumpFile(
             $path,
-            json_encode($fingerprints, \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR).\PHP_EOL,
+            json_encode($entries, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR).\PHP_EOL,
         );
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    private function fingerprintOf(mixed $entry, string $path): string
+    {
+        if (\is_string($entry)) {
+            return $entry;
+        }
+
+        if (\is_array($entry) && \is_string($entry['fingerprint'] ?? null)) {
+            return $entry['fingerprint'];
+        }
+
+        throw MalformedBaselineFileException::notAJsonArrayOfStrings($path);
     }
 }

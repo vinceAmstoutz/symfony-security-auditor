@@ -100,7 +100,7 @@ final readonly class AuditCommand
 
             $this->beginAuditRun($symfonyStyle, $auditCommandInput);
 
-            $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache, $auditCommandInput->since);
+            $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache, $auditCommandInput->since, $this->acceptedFingerprintsFor($auditCommandInput));
             $report = $this->findingTypeFilter->apply($report);
 
             if (null !== $auditCommandInput->generateBaseline) {
@@ -173,6 +173,22 @@ final readonly class AuditCommand
                 ? new ConsoleProgressReporter($symfonyStyle)
                 : new PlainProgressReporter($symfonyStyle),
         );
+    }
+
+    /**
+     * Baseline fingerprints threaded into the pipeline so accepted findings
+     * skip the reviewer. Empty while (re)generating a baseline — every
+     * finding must then be collected, not suppressed.
+     *
+     * @return list<string>
+     */
+    private function acceptedFingerprintsFor(AuditCommandInput $auditCommandInput): array
+    {
+        if (null !== $auditCommandInput->generateBaseline) {
+            return [];
+        }
+
+        return $this->baselineProcessor->acceptedFingerprints($auditCommandInput->baseline);
     }
 
     /**
