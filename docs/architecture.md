@@ -350,7 +350,13 @@ calls `AuditContext::setProjectFiles()`.
 
 **`MappingStage`** — classifies `AuditContext::projectFiles()` into roles,
 constructs `SymfonyMapping`, calls `AuditContext::setMapping()`. May use the LLM
-client for semantic mapping or fall back to heuristic classification.
+client for semantic mapping or fall back to heuristic classification. The route
+access-control map and firewall rules come from `SecurityConfigParserInterface`
+(default impl `SymfonyYamlSecurityConfigParser`, a real `symfony/yaml` parse):
+list-form and scalar `roles`, `allow_if` expressions,
+`methods`/`ips`/`requires_channel` constraints, `when@<env>` overrides, and
+firewall `security: false` / `stateless` flags all land in the map the attacker
+prompt renders.
 
 **`AuditStage`** — delegates entirely to
 `AuditOrchestrator::orchestrate(AuditContext)`.

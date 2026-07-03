@@ -29,10 +29,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessContr
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
-
-use function Symfony\Component\String\u;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class MappingStage implements StageInterface
@@ -43,15 +43,19 @@ final readonly class MappingStage implements StageInterface
 
     private FormBindingParserInterface $formBindingParser;
 
+    private SecurityConfigParserInterface $securityConfigParser;
+
     public function __construct(
         private LoggerInterface $logger,
         ?ControllerAccessControlParserInterface $controllerAccessControlParser = null,
         ?VoterCapabilityParserInterface $voterCapabilityParser = null,
         ?FormBindingParserInterface $formBindingParser = null,
+        ?SecurityConfigParserInterface $securityConfigParser = null,
     ) {
         $this->controllerAccessControlParser = $controllerAccessControlParser ?? new NullControllerAccessControlParser();
         $this->voterCapabilityParser = $voterCapabilityParser ?? new NullVoterCapabilityParser();
         $this->formBindingParser = $formBindingParser ?? new NullFormBindingParser();
+        $this->securityConfigParser = $securityConfigParser ?? new NullSecurityConfigParser();
     }
 
     #[Override]
@@ -176,45 +180,10 @@ final readonly class MappingStage implements StageInterface
             }
 
             $content = $file->content();
-
-            if (u($file->relativePath())->containsAny('security')) {
-                $firewallRules = [...$firewallRules, ...$this->extractFirewallRules($content)];
-            }
-
-            $routeAccessMap = array_merge($routeAccessMap, $this->extractAccessControl($content));
+            $routeAccessMap = array_merge($routeAccessMap, $this->securityConfigParser->parseAccessControl($content));
+            $firewallRules = [...$firewallRules, ...$this->securityConfigParser->parseFirewallRules($content)];
         }
 
         return [$routeAccessMap, $firewallRules];
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function extractFirewallRules(string $content): array
-    {
-        preg_match_all('/pattern:\s*(.+)/m', $content, $matches);
-
-        return array_map('trim', $matches[1]);
-    }
-
-    /**
-     * @return array<string, list<string>>
-     */
-    private function extractAccessControl(string $content): array
-    {
-        if (!u($content)->containsAny('access_control')) {
-            return [];
-        }
-
-        preg_match_all('/path:\s*(.+)\n\s+roles?:\s*(.+)/m', $content, $matches);
-
-        $map = [];
-        foreach ($matches[1] as $i => $pathRaw) {
-            $path = u($pathRaw)->trim()->toString();
-            $rolesRaw = $matches[2][$i] ?? '';
-            $map[$path] = array_map('trim', explode(',', $rolesRaw));
-        }
-
-        return $map;
     }
 }

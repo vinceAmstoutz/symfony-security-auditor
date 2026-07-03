@@ -66,6 +66,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInt
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
@@ -108,6 +109,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserForm
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyYamlSecurityConfigParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRegistryFactory;
@@ -271,12 +273,17 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(PhpParserFormBindingParser::class);
     $defaultsConfigurator->alias(FormBindingParserInterface::class, PhpParserFormBindingParser::class);
 
+    $defaultsConfigurator->set(SymfonyYamlSecurityConfigParser::class)
+        ->args([service('logger')]);
+    $defaultsConfigurator->alias(SecurityConfigParserInterface::class, SymfonyYamlSecurityConfigParser::class);
+
     $defaultsConfigurator->set(MappingStage::class)
         ->args([
             service('logger'),
             service(ControllerAccessControlParserInterface::class),
             service(VoterCapabilityParserInterface::class),
             service(FormBindingParserInterface::class),
+            service(SecurityConfigParserInterface::class),
         ]);
 
     $defaultsConfigurator->set(AuditOrchestrator::class)

@@ -51,6 +51,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParser
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyYamlSecurityConfigParser;
 
 final class StagesTest extends TestCase
 {
@@ -371,7 +372,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_extracts_security_config(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
 
         $securityYaml = <<<'YAML'
             security:
@@ -512,7 +513,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_processes_all_config_files_not_just_first(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $security1 = "security:\n    firewalls:\n        main:\n            pattern: ^/api\n";
@@ -535,7 +536,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_merges_access_control_from_multiple_config_files(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $config1 = "access_control:\n    - path: ^/admin\n      roles: ROLE_ADMIN\n";
@@ -557,7 +558,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_trims_firewall_pattern_whitespace(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $content = "security:\n    firewalls:\n        main:\n            pattern: ^/api  \n";
@@ -609,7 +610,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_extracts_multiple_routes_from_access_control(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $content = "access_control:\n    - path: ^/admin\n      roles: ROLE_ADMIN\n    - path: ^/api\n      roles: ROLE_USER\n";
@@ -630,7 +631,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_trims_path_whitespace_in_access_control(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $content = "access_control:\n    - path: ^/admin   \n      roles: ROLE_ADMIN\n";
@@ -649,7 +650,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_trims_roles_in_access_control(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $content = "access_control:\n    - path: ^/admin\n      roles: ROLE_ADMIN, ROLE_SUPER\n";
