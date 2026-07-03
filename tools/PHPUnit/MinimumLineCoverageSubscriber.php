@@ -36,7 +36,7 @@ final readonly class MinimumLineCoverageSubscriber implements FinishedSubscriber
         $report = (string) file_get_contents($this->cloverPath);
 
         $metricsCount = preg_match_all('/<metrics\b[^>]*>/', $report, $matches);
-        if (false === $metricsCount || 0 === $metricsCount || [] === $matches[0]) {
+        if (false === $metricsCount || 0 === $metricsCount) {
             return;
         }
 
