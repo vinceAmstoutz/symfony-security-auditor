@@ -20,6 +20,7 @@ bundle registration, bundle-level configuration, platform wiring via
 - [Platform Configuration](#platform-configuration)
 - [Model Options](#model-options)
 - [Split-Model Setup](#split-model-setup)
+- [Standalone Configuration](#standalone-configuration)
 - [CLI Reference](#cli-reference)
 
 > See also: [Architecture](architecture.md) · [Extending](extending.md) ·
@@ -403,12 +404,90 @@ by security priority (controllers first, then voters, entities, repositories,
 forms, then everything else). The reviewer agent then evaluates each candidate
 finding individually and decides whether to accept or escalate it.
 
+## Standalone Configuration
+
+When you run the [standalone binary](../README.md#standalone-tool-binary)
+instead of the bundle, configuration is read from a single user-level file. On
+Linux and macOS it follows the XDG Base Directory specification; on Windows it
+uses the native app-data directories:
+
+| Purpose                               | Linux / macOS                                                             | Windows                                          |
+| ------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------ |
+| the configuration file                | `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml` (→ `~/.config/…`) | `%APPDATA%\symfony-security-auditor\config.yaml` |
+| attacker/reviewer and advisory caches | `$XDG_CACHE_HOME/symfony-security-auditor` (→ `~/.cache/…`)               | `%LOCALAPPDATA%\symfony-security-auditor`        |
+| the downloaded provider bridge(s)     | `$XDG_DATA_HOME/symfony-security-auditor` (→ `~/.local/share/…`)          | `%LOCALAPPDATA%\symfony-security-auditor`        |
+
+> **Requirements & platform support.** Each release ships a self-contained
+> native binary that bundles its own PHP runtime (nothing to install on the
+> host) for **Linux** (x86-64, arm64), **macOS** (Intel, Apple Silicon), and
+> **Windows** (x86-64) — install it with the script or download it from the
+> release. `init` fetches the provider bridge with `composer`, and `--since`
+> uses `git`, so those tools must be present on the host when you use those
+> features (the audit itself needs only the binary).
+
+Run `symfony-security-auditor init` to generate the file interactively and fetch
+the provider bridge. The file is **rootless** — the same keys as the bundle
+configuration above, without the `symfony_security_auditor:` wrapper — plus two
+standalone-only top-level keys:
+
+- **`platform:`** — handed verbatim to `symfony/ai`'s `ai.platform` config, so
+  it takes the exact shape documented in
+  [Platform Configuration](#platform-configuration).
+- **`provider:`** — optional selector naming the active platform when several
+  are declared; omit it when only one platform is configured.
+
+```yaml
+# ~/.config/symfony-security-auditor/config.yaml
+provider: anthropic
+platform:
+    anthropic:
+        api_key: '%env(ANTHROPIC_API_KEY)%'
+model: claude-opus-4-8
+# scan:, audit:, cache: are all accepted here too, unwrapped.
+```
+
+### Per-project overrides
+
+A `.symfony-security-auditor.yaml` in the working directory (`$PWD`) is layered
+**over** the user config, with the project values winning. This lets a
+repository pin its own audit settings (chunking strategy, `fail_on`, excluded
+paths, …) while the API credentials stay in the shared user config. The
+effective precedence, highest first, is:
+
+1. CLI options (`--fail-on`, `--format`, …)
+2. The per-project `.symfony-security-auditor.yaml`
+3. The user-level `config.yaml`
+4. Built-in defaults
+
+> Scalars and mappings deep-merge; if you set the same **list** key (e.g.
+> `scan.included_paths`) in both files, keep it in one place to avoid surprising
+> index-wise merges.
+
+### Switching providers
+
+`%env(VAR)%` placeholders in the `platform:` block are resolved from the
+environment, so secrets never live in the file. To switch providers, configure
+several platforms and change `provider:` (run `init` again to fetch the other
+bridge):
+
+```yaml
+provider: openai
+platform:
+    anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }
+    openai: { api_key: '%env(OPENAI_API_KEY)%' }
+model: gpt-5.4
+```
+
 ## CLI Reference
 
-The bundle registers a single console command.
+The bundle registers a single console command, also reachable through the
+shorter `audit` alias (`bin/console audit`). The standalone CLI exposes the same
+command and alias.
 
 ```bash
 bin/console audit:run [<project-path>] [options]
+# `audit` is an equivalent alias:
+bin/console audit [<project-path>] [options]
 ```
 
 ### Arguments

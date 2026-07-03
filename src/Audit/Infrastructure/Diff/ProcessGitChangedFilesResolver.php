@@ -52,7 +52,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
     #[Override]
     public function changedSince(string $projectPath, string $ref): array
     {
-        if (!$this->filesystem->exists($projectPath.'/.git') && !$this->isInsideGitTree($projectPath)) {
+        if (!$this->filesystem->exists(\sprintf('%s/.git', $projectPath)) && !$this->isInsideGitTree($projectPath)) {
             throw GitChangedFilesUnavailableException::forNonGitDirectory($projectPath);
         }
 
@@ -60,7 +60,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
             throw GitChangedFilesUnavailableException::forUnknownRef($ref, $projectPath);
         }
 
-        $committed = $this->runGit($projectPath, ['diff', '--name-only', '--diff-filter=ACMR', $ref.'...HEAD']);
+        $committed = $this->runGit($projectPath, ['diff', '--name-only', '--diff-filter=ACMR', \sprintf('%s...HEAD', $ref)]);
         $uncommitted = $this->runGit($projectPath, ['diff', '--name-only', '--diff-filter=ACMR', 'HEAD']);
 
         return $this->mergeAndNormalize([...$committed, ...$uncommitted]);

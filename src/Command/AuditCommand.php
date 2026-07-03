@@ -30,13 +30,20 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
 #[AsCommand(
-    name: 'audit:run',
-    description: 'Run AI-powered multi-agent security audit on a Symfony project',
+    name: self::NAME,
+    description: self::DESCRIPTION,
+    aliases: [self::ALIAS],
     help: AuditCommandHelp::HELP,
 )]
-/** @internal not part of the BC promise — the command *name* (`audit:run`) and its CLI surface are public, but the PHP class itself is for internal use only. */
+/** @internal not part of the BC promise — the command *name* (`audit:run`), its `audit` alias, and the CLI surface are public, but the PHP class itself is for internal use only. */
 final readonly class AuditCommand
 {
+    public const string NAME = 'audit:run';
+
+    public const string ALIAS = 'audit';
+
+    public const string DESCRIPTION = 'Run AI-powered multi-agent security audit on a Symfony project';
+
     /**
      * @param list<string> $configNotices
      */

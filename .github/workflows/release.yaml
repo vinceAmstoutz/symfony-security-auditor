@@ -1,0 +1,112 @@
+name: Release
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  phar:
+    name: Compile the PHAR (build input for the binaries)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: box
+          ini-values: phar.readonly=0
+
+      - name: Install production dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress --no-dev
+
+      - name: Compile the PHAR
+        run: box compile --no-interaction
+
+      - name: Verify the PHAR was produced
+        run: test -s symfony-security-auditor.phar
+
+      - name: Upload the PHAR build input
+        uses: actions/upload-artifact@v7
+        with:
+          name: symfony-security-auditor-phar
+          path: symfony-security-auditor.phar
+          retention-days: 1
+          compression-level: 9
+
+  binary:
+    name: ${{ matrix.asset }}
+    runs-on: ${{ matrix.runner }}
+    needs: phar
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            asset: symfony-security-auditor-linux-x86_64
+          - runner: ubuntu-24.04-arm
+            asset: symfony-security-auditor-linux-aarch64
+          - runner: macos-13
+            asset: symfony-security-auditor-darwin-x86_64
+          - runner: macos-14
+            asset: symfony-security-auditor-darwin-arm64
+          - runner: windows-latest
+            asset: symfony-security-auditor-windows-x86_64.exe
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup static-php-cli
+        uses: static-php-cli/setup-spc@v1
+        with:
+          php-version: '8.3'
+
+      - name: Download the PHAR build input
+        uses: actions/download-artifact@v8
+        with:
+          name: symfony-security-auditor-phar
+
+      - name: Resolve the required extensions
+        id: extensions
+        run: echo "list=$(spc dump-extensions . --format=text)" >> "$GITHUB_OUTPUT"
+
+      - name: Build the static micro PHP runtime
+        run: |
+          spc download --for-extensions="${{ steps.extensions.outputs.list }}" --with-php=8.3 --prefer-pre-built
+          spc build "${{ steps.extensions.outputs.list }}" --build-micro
+
+      - name: Combine the micro runtime with the PHAR
+        run: spc micro:combine symfony-security-auditor.phar --output="${{ matrix.asset }}"
+
+      - name: Verify the binary was produced
+        run: test -s "${{ matrix.asset }}"
+
+      - name: Smoke-test the binary
+        run: |
+          chmod +x "${{ matrix.asset }}" 2>/dev/null || true
+          ./"${{ matrix.asset }}" --version
+
+      - name: Generate the SHA-256 checksum
+        run: |
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+          else
+            shasum -a 256 "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+          fi
+
+      - name: Attach the binary and checksum to the release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            ${{ matrix.asset }}
+            ${{ matrix.asset }}.sha256

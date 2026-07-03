@@ -150,7 +150,7 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
     {
         $signatures = [];
         foreach ($chunk as $file) {
-            $signatures[] = $file->relativePath().'='.$file->contentHash();
+            $signatures[] = \sprintf('%s=%s', $file->relativePath(), $file->contentHash());
         }
 
         sort($signatures);

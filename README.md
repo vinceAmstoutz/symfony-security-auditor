@@ -67,6 +67,89 @@ The full report renders the same way in console, JSON, SARIF, HTML, and Markdown
 
 ## Getting Started
 
+The auditor ships two maintained ways to run it — pick the one that fits:
+
+- **[Standalone CLI](#standalone-tool-binary) (recommended)** — one download,
+  configured once, audits any project with zero footprint in it (like PHPStan or
+  Psalm). Best for most users, and for auditing a project you don't want to add
+  a dependency to.
+- **[Symfony bundle](#use-it-as-a-symfony-bundle)** — wired into a Symfony app
+  via Flex. Pick this to extend the auditor (custom services, decorated ports)
+  or to pin it in the app's `dev` dependencies.
+
+> [!TIP]
+>
+> Both expose the same `audit` command, options, and output formats — see the
+> [CLI reference](docs/configuration.md#cli-reference).
+
+## Standalone tool (binary)
+
+Run the auditor like PHPStan or Psalm — one install, many projects, zero
+footprint in the audited app. Each release ships a **self-contained native
+binary** that bundles its own PHP runtime (nothing to install on the host) for
+Linux, macOS, and Windows.
+
+### 1. Install
+
+```bash
+# Linux / macOS — detects your OS + architecture, downloads and verifies the binary
+curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.ps1 | iex
+```
+
+Or download the binary for your platform straight from the
+[latest release](https://github.com/vinceAmstoutz/symfony-security-auditor/releases/latest):
+
+| Platform            | Asset                                         |
+| ------------------- | --------------------------------------------- |
+| Linux x86-64        | `symfony-security-auditor-linux-x86_64`       |
+| Linux arm64         | `symfony-security-auditor-linux-aarch64`      |
+| macOS Intel         | `symfony-security-auditor-darwin-x86_64`      |
+| macOS Apple Silicon | `symfony-security-auditor-darwin-arm64`       |
+| Windows x86-64      | `symfony-security-auditor-windows-x86_64.exe` |
+
+Every binary ships with a `.sha256` checksum, and the install scripts **abort**
+rather than install a binary they cannot verify. To check a manual download
+yourself:
+
+```bash
+sha256sum -c symfony-security-auditor-linux-x86_64.sha256
+```
+
+### 2. Configure — the guided `init`
+
+```bash
+symfony-security-auditor init
+```
+
+Writes the config file (`~/.config/symfony-security-auditor/config.yaml` on
+Linux/macOS, `%APPDATA%\symfony-security-auditor\config.yaml` on Windows) and
+downloads the provider bridge you pick. `init` fetches that bridge with
+`composer`, so composer must be available for this one-time setup step; running
+audits afterward needs only the binary. The file is rootless (the same keys as
+the bundle, without the `symfony_security_auditor:` wrapper) plus a `platform:`
+block handed verbatim to `symfony/ai`. See
+[configuration](docs/configuration.md#standalone-configuration) for the format
+and provider switching.
+
+### 3. Run
+
+```bash
+# export the env var your config references, then audit any project
+export ANTHROPIC_API_KEY=sk-…
+symfony-security-auditor audit /path/to/your/symfony/project
+```
+
+`audit` is an alias for `audit:run`; every option documented in the
+[CLI reference](docs/configuration.md#cli-reference) (`--format`, `--output`,
+`--dry-run`, `--since`, `--fail-on`, …) works identically.
+
+## Use it as a Symfony bundle
+
 ### 1. Install — Symfony Flex wires everything
 
 ```bash
@@ -126,7 +209,7 @@ what each profile sets.
 ### 5. Run
 
 ```bash
-# audit the current directory
+# audit the current directory (`bin/console audit` is an equivalent alias)
 bin/console audit:run
 
 # or point at another project
@@ -218,6 +301,10 @@ bin/console audit:run --dry-run
 - **DDD architecture** — strict layering and a sole `LLMClientInterface` seam
   let you plug in custom providers, agents, stages, advisory feeds, or report
   formats.
+- **Bundle or standalone** — install as a Symfony bundle, or run it like
+  PHPStan/Psalm from a single self-contained binary configured once at the user
+  level to audit any project with zero footprint (see
+  [Standalone tool](#standalone-tool-binary)).
 
 ## Security by design
 

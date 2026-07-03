@@ -73,7 +73,8 @@ is a `MAJOR` change.
 
 ### CLI surface
 
-- The command name `audit:run`.
+- The command name `audit:run` and its `audit` alias (both the bundle and the
+  standalone CLI accept either).
 - The `project-path` argument.
 - The `--format` (`-f`) and `--output` (`-o`) options, including the values
   accepted by `--format` (`console`, `json`, `sarif`, `html`, `markdown`).
@@ -88,6 +89,36 @@ is a `MAJOR` change.
     `critical`), or the audit itself failed.
   - `2` — audit aborted because the configured token or cost budget was exceeded
     (partial report still emitted).
+
+### Standalone executable & XDG configuration
+
+The standalone tool is a supported install method alongside the bundle, and the
+following surface is BC-protected:
+
+- The published per-platform binary assets and their release-asset names
+  (`symfony-security-auditor-{linux-x86_64,linux-aarch64,darwin-x86_64,darwin-arm64}`
+  and `symfony-security-auditor-windows-x86_64.exe`), each accompanied by a
+  `.sha256` checksum, plus the `install.sh` (Linux/macOS) and `install.ps1`
+  (Windows) installer contracts and their `SSA_VERSION` / `SSA_INSTALL_DIR`
+  environment variables.
+- The `init` command name. The standalone exposes the **identical** `audit:run`
+  command (and its `audit` alias), arguments, options, and exit-code surface
+  listed above.
+- The configuration path contract. On Linux/macOS the XDG Base Directory spec:
+  the config file `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml`
+  (falling back to `~/.config/…`), the cache directory
+  `$XDG_CACHE_HOME/symfony-security-auditor` (→ `~/.cache/…`), and the bridge
+  data directory `$XDG_DATA_HOME/symfony-security-auditor` (→
+  `~/.local/share/…`). On Windows the native app-data directories: `%APPDATA%`
+  for config and `%LOCALAPPDATA%` for cache and bridges (XDG variables still win
+  when set).
+- The standalone `config.yaml` shape: the bundle configuration keys **without**
+  the `symfony_security_auditor:` root wrapper, plus the standalone-only
+  top-level `platform:` block (passed verbatim to `symfony/ai-bundle`) and the
+  optional `provider:` selector. Removing or renaming these keys is a `MAJOR`.
+
+The bundle remains a fully supported install method; neither method is
+deprecated by the other.
 
 ### GitHub Action
 

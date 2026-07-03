@@ -1,0 +1,38 @@
+#!/usr/bin/env php
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
+
+(static function (): void {
+    foreach ([__DIR__.'/../vendor/autoload.php', __DIR__.'/../../../autoload.php'] as $autoload) {
+        if (is_file($autoload)) {
+            require $autoload;
+
+            return;
+        }
+    }
+
+    fwrite(\STDERR, 'Composer autoloader not found. Run "composer install".'.\PHP_EOL);
+
+    exit(1);
+})();
+
+$environment = getenv();
+
+$bridgeAutoloadFile = StandaloneApplicationFactory::bridgeAutoloadFile($environment);
+if (is_file($bridgeAutoloadFile)) {
+    require_once $bridgeAutoloadFile;
+}
+
+exit(StandaloneApplicationFactory::fromEnvironment($environment)->create()->run());

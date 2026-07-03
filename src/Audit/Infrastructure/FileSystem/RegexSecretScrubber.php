@@ -70,7 +70,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
                 throw SecretScrubberConfigurationException::forInvalidPattern($pattern, $error);
             }
 
-            $patterns['custom_'.$index] = $pattern;
+            $patterns[\sprintf('custom_%s', $index)] = $pattern;
         }
 
         $this->patterns = $patterns;
@@ -97,9 +97,9 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     private function replacementFor(string $label): string
     {
         return match (SecretPatternLabel::tryFrom($label)) {
-            SecretPatternLabel::EnvAssignment => '$1=***REDACTED:'.$label.'***',
-            SecretPatternLabel::ConnectionUri => '$1***REDACTED:'.$label.'***@',
-            default => '***REDACTED:'.$label.'***',
+            SecretPatternLabel::EnvAssignment => \sprintf('$1=***REDACTED:%s***', $label),
+            SecretPatternLabel::ConnectionUri => \sprintf('$1***REDACTED:%s***@', $label),
+            default => \sprintf('***REDACTED:%s***', $label),
         };
     }
 
@@ -112,7 +112,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             return $match[0];
         }
 
-        return $match[1].'***REDACTED:'.SecretPatternLabel::InlineAssignment->value.'***'.$match[3];
+        return \sprintf('%s***REDACTED:%s***%s', $match[1], SecretPatternLabel::InlineAssignment->value, $match[3]);
     }
 
     /**

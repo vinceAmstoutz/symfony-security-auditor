@@ -37,7 +37,7 @@ final readonly class LoggerProgressReporter implements ProgressReporterInterface
     public function report(string $event, array $context = []): void
     {
         try {
-            $this->logger->info('audit.progress: '.$event, $context);
+            $this->logger->info(\sprintf('audit.progress: %s', $event), $context);
         } catch (Throwable $throwable) {
             error_log(\sprintf('LoggerProgressReporter could not forward progress event "%s": %s', $event, $throwable->getMessage()));
         }

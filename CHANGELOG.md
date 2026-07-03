@@ -12,6 +12,58 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **`bin/console audit` now works as a shorthand for `audit:run` in the bundle,
+  matching the standalone CLI.** The `audit` alias is declared on the command
+  itself (`AuditCommand` `#[AsCommand(aliases: ['audit'])]`, exposed as
+  `AuditCommand::ALIAS`), so both distributions accept `audit` and `audit:run`
+  interchangeably from a single source of truth.
+- **The auditor can now run as a standalone executable, configured once at the
+  user level instead of being installed into every audited app.** A new entry
+  point `bin/symfony-security-auditor` boots a kernel-less Symfony Console
+  application that reuses the exact same `audit:run` command (now also reachable
+  through the shorter `audit` alias) with its full option surface unchanged —
+  `project-path`, `-f/--format`, `-o/--output`, `--dry-run`, `--no-cache`,
+  `-p/--path`, `--since`, `--baseline`, `--generate-baseline`, `--fail-on` — and
+  the same `ExitCode` contract. Configuration is read from an XDG file
+  (`$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml`, falling back to
+  `~/.config/…`) and the cache lives under `$XDG_CACHE_HOME/…` (falling back to
+  `~/.cache/…`), resolved by `XdgConfigPathResolver`. The config is rootless
+  (the bundle keys without the `symfony_security_auditor:` wrapper) plus a
+  `platform:` block handed verbatim to `symfony/ai-bundle`, so every provider —
+  Anthropic, OpenAI, Gemini, Ollama, a generic OpenAI-compatible endpoint, … —
+  is configured the same way; an optional top-level `provider:` selector chooses
+  the active platform when several are declared. `%env(VAR)%` placeholders in
+  the platform block are resolved from the environment. A guided `init` command
+  writes that config file (owner-only `0600` permissions) from interactive
+  prompts and then downloads the chosen provider's
+  `symfony/ai-<provider>-platform` bridge into the XDG data directory
+  (`$XDG_DATA_HOME/symfony-security-auditor`, falling back to
+  `~/.local/share/…`) via `composer require`; the executable itself ships no
+  provider bridges, and the same pick-and-fetch path applies to every provider.
+  A per-project `.symfony-security-auditor.yaml` in the working directory
+  (`$PWD`) is layered over the user config, the project values winning, so a
+  repo can pin its own audit settings while sharing the user-level credentials.
+  New internal composition root under `src/Standalone/`
+  (`StandaloneApplicationFactory`, `StandaloneContainerFactory`,
+  `StandaloneConsoleCommandFactory`, `BundleExtensionLoader`), the `init`
+  command, and config/bridge seams under `src/Audit/Infrastructure/`
+  (`StandaloneConfigLoader`, `StandalonePlatformConfigResolver`,
+  `StandalonePlatformConfig`, `StandaloneConfig`, `YamlStandaloneConfigWriter`,
+  `ComposerBridgeInstaller`). Config paths are resolved natively on every OS —
+  the XDG spec on Linux/macOS and `%APPDATA%`/`%LOCALAPPDATA%` on Windows.
+  Publishing a GitHub release runs `.github/workflows/release.yaml`, which
+  builds the PHAR with `box compile` (see `box.json`) purely as a build input
+  and combines it with a `static-php-cli` micro runtime into **self-contained
+  native binaries for Linux (x86-64, arm64), macOS (Intel, Apple Silicon), and
+  Windows (x86-64)**, attaching each binary and its SHA-256 checksum to the
+  release; an `install.sh` script detects the OS/architecture and installs the
+  right one (the PHAR is no longer published as a release asset). The Symfony
+  bundle remains a fully supported, unchanged install method.
+- **A Windows PowerShell installer (`install.ps1`).** Mirrors `install.sh` for
+  Windows: `irm …/install.ps1 | iex` detects the architecture, downloads the
+  matching binary and its `.sha256`, verifies the checksum with `Get-FileHash`,
+  and installs to `%LOCALAPPDATA%\Programs\symfony-security-auditor`
+  (overridable via `SSA_INSTALL_DIR`, tag via `SSA_VERSION`).
 - **New `--show-scanned` option on `audit:run` lists the exact files an audit
   would ingest, without invoking the LLM.** Answers "did my `included_paths` /
   `--path` configuration match the files I expect?" before paying for a run. The
@@ -139,6 +191,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `ministral-{3b,8b,14b}-2512`) now resolve to `$0.00` with a warning. The
   default `claude-opus-4-8` and every current model are catalog-present and
   unchanged.
+
+### Security
+
+- **The install scripts now fail closed on checksum verification.** Previously
+  `install.sh` printed a warning and installed anyway when no SHA-256 tool was
+  present; it now **aborts** rather than install an unverified binary.
+  `install.ps1` verifies with `Get-FileHash` (built into PowerShell). The
+  release workflow (`.github/workflows/release.yaml`) also **smoke-tests** every
+  binary (`--version`) before publishing, so a broken build never reaches the
+  release.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

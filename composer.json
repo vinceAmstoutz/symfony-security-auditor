@@ -49,7 +49,8 @@
         "symfony/models-dev": ">=87.0",
         "symfony/process": "^7.4 || ^8.0",
         "symfony/string": "^7.4 || ^8.0",
-        "symfony/validator": "^7.4 || ^8.0"
+        "symfony/validator": "^7.4 || ^8.0",
+        "symfony/yaml": "^7.4 || ^8.0"
     },
     "require-dev": {
         "deptrac/deptrac": "^4.6",
@@ -97,7 +98,10 @@
         "psr-4": {
             "VinceAmstoutz\\SymfonySecurityAuditor\\Tests\\": "tests/Phpunit/",
             "VinceAmstoutz\\SymfonySecurityAuditor\\Tooling\\": "tools/"
-        }
+        },
+        "classmap": [
+            "tests/Fixture/"
+        ]
     },
     "config": {
         "allow-plugins": {

@@ -68,7 +68,7 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
 
     private function lockfileHash(string $projectPath): ?string
     {
-        $lockfilePath = u($projectPath)->trimEnd('/')->toString().'/composer.lock';
+        $lockfilePath = \sprintf('%s/composer.lock', u($projectPath)->trimEnd('/')->toString());
 
         if (!$this->filesystem->exists($lockfilePath)) {
             return null;

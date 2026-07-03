@@ -83,7 +83,7 @@ final readonly class ScanPathFilter
     {
         $relative = u($projectFile->relativePath())->replace('\\', '/')->toString();
         foreach ($prefixes as $prefix) {
-            if ($relative === $prefix || u($relative)->startsWith($prefix.'/')) {
+            if ($relative === $prefix || u($relative)->startsWith(\sprintf('%s/', $prefix))) {
                 return true;
             }
         }

@@ -168,9 +168,9 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
     private function finderNamePatterns(): array
     {
         return array_merge(
-            array_map(static fn (string $ext): string => '*.'.$ext, self::PHP_EXTENSIONS),
-            array_map(static fn (string $ext): string => '*.'.$ext, self::TEMPLATE_EXTENSIONS),
-            array_map(static fn (string $ext): string => '*.'.$ext, self::CONFIG_EXTENSIONS),
+            array_map(static fn (string $ext): string => \sprintf('*.%s', $ext), self::PHP_EXTENSIONS),
+            array_map(static fn (string $ext): string => \sprintf('*.%s', $ext), self::TEMPLATE_EXTENSIONS),
+            array_map(static fn (string $ext): string => \sprintf('*.%s', $ext), self::CONFIG_EXTENSIONS),
         );
     }
 

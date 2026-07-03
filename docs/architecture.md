@@ -732,7 +732,7 @@ Parameters exposed for debugging: `symfony_security_auditor.attacker_model`,
 
 ## `Command/AuditCommand`
 
-Console command `audit:run`. Arguments and options:
+Console command `audit:run` (alias `audit`). Arguments and options:
 
 | Name            | Type     | Default    | Purpose                                           |
 | --------------- | -------- | ---------- | ------------------------------------------------- |
