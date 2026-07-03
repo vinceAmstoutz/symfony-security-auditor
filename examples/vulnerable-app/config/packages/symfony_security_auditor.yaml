@@ -8,4 +8,3 @@ symfony_security_auditor:
         tools_enabled: true
     cache:
         enabled: true
-        prompt_caching: true

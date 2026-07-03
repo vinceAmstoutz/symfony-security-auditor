@@ -1,6 +1,6 @@
 # $schema: https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/main/resources/schema.json
 
-# Scheduled CI run — split-model, cache + prompt caching enabled.
+# Scheduled CI run — split-model, chunk/verdict cache enabled.
 #
 # Target: accuracy on a medium-to-large Symfony codebase, run nightly.
 # Cost:   ~$0.50–$2.00 per run on a 150-file project (varies by provider).
@@ -21,6 +21,7 @@ symfony_security_auditor:
         tools_enabled: true     # cross-file investigation + advisory lookups
         max_tool_iterations: 8
 
+    # Provider prompt caching is configured in config/packages/ai.yaml
+    # (e.g. Anthropic `cache_retention`) — see docs/configuration.md#prompt-caching.
     cache:
         enabled: true           # skip identical chunks on rerun
-        prompt_caching: true    # ~90% discount on Anthropic

@@ -26,4 +26,3 @@ symfony_security_auditor:
 
     cache:
         enabled: true
-        prompt_caching: false   # Ollama ignores prompt caching anyway
