@@ -30,6 +30,7 @@ final class AuditCommandHelp
           <info>sarif</info>    SARIF 2.1.0 for GitHub Code Scanning / GitLab Security Dashboard
           <info>html</info>     self-contained HTML report for sharing or archiving
           <info>markdown</info> Markdown report for a PR comment or GitHub step summary
+          <info>junit</info>    JUnit XML — findings as failed test cases for CI test-report panels (e.g. GitLab free-tier MR widgets)
 
         Use <info>--output</info> (<info>-o</info>) to write the report to a file:
           <info>%command.full_name% --format=sarif --output=report.sarif</info>

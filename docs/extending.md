@@ -450,7 +450,7 @@ $report->toArray(): array<string, mixed>             // fully serializable; incl
 
 ### Built-in formats
 
-`ReportRenderer` ships five formats out of the box:
+`ReportRenderer` ships six formats out of the box:
 
 - `renderConsole(AuditReport): string` — human-readable terminal output
   (templates in `Report/Template/*.txt`).
@@ -459,16 +459,23 @@ $report->toArray(): array<string, mixed>             // fully serializable; incl
   Scanning and GitLab Security Dashboard.
 - `renderHtml(AuditReport): string` — self-contained HTML page (templates in
   `Report/Template/*.html`).
+- `JunitReportRenderer::render(AuditReport): string` — JUnit XML, one failed
+  test case per finding, for CI test-report panels (e.g. GitLab merge-request
+  widgets on every tier). Lives in its own class so `ReportRenderer` does not
+  keep growing — prefer this shape for new formats.
 - `renderMarkdown(AuditReport): string` — Markdown suitable for PR comments and
   wikis.
 
-Trigger them via `audit:run --format=console|json|sarif|html|markdown` (see
-[`ci.md`](ci.md) for SARIF upload workflows).
+Trigger them via `audit:run --format=console|json|sarif|html|markdown|junit`
+(see [`ci.md`](ci.md) for SARIF upload workflows).
 
 ### Adding a new format
 
 1. Add a case to `Command\OutputFormat`.
-2. Add a `render<Name>(AuditReport): string` method to `ReportRenderer`.
+2. Add a dedicated `<Name>ReportRenderer` class with a
+   `render(AuditReport): string` method (see `JunitReportRenderer` for the
+   shape) — or, for a small variation on an existing format, a
+   `render<Name>(AuditReport): string` method on `ReportRenderer`.
 3. Add the matching arm to the `match` block in `Command\ReportWriter::write()`.
 
 `AuditReport` is a plain value object — once the pipeline completes you may also

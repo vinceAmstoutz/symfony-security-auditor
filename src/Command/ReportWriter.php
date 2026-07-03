@@ -17,6 +17,7 @@ use Override;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
@@ -25,6 +26,7 @@ final readonly class ReportWriter implements ReportWriterInterface
     public function __construct(
         private ReportRenderer $reportRenderer,
         private Filesystem $filesystem,
+        private JunitReportRenderer $junitReportRenderer = new JunitReportRenderer(),
     ) {}
 
     #[Override]
@@ -35,6 +37,7 @@ final readonly class ReportWriter implements ReportWriterInterface
             OutputFormat::Sarif => $this->reportRenderer->renderSarif($auditReport),
             OutputFormat::Html => $this->reportRenderer->renderHtml($auditReport),
             OutputFormat::Markdown => $this->reportRenderer->renderMarkdown($auditReport),
+            OutputFormat::Junit => $this->junitReportRenderer->render($auditReport),
             OutputFormat::Console => $this->reportRenderer->renderConsole($auditReport),
         };
 

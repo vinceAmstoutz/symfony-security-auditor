@@ -99,6 +99,18 @@ final class ReportWriterTest extends TestCase
         self::assertStringContainsString('Security Audit Report', $display);
     }
 
+    public function test_writing_junit_format_streams_a_junit_xml_document(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->reportWriter->write($this->makeReport(), OutputFormat::Junit, null, $symfonyStyle);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('<testsuites>', $display);
+        self::assertStringContainsString('symfony-security-auditor', $display);
+    }
+
     public function test_writing_to_file_creates_missing_parent_directories(): void
     {
         $symfonyStyle = new SymfonyStyle(new StringInput(''), new BufferedOutput());

@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **New `--format junit` output renders findings as JUnit XML for CI test-report
+  panels.** SARIF gets findings into GitHub Code Scanning and GitLab's security
+  dashboard, but GitLab's dashboard requires the Ultimate tier — free-tier users
+  had no way to see findings inline in a merge request.
+  `audit:run --format junit` emits one failed `<testcase>` per validated finding
+  (classname = vulnerability type, name = `<title> (<file>:<line>)`, `<failure>`
+  carrying severity, location, OWASP reference, and remediation), rendered
+  natively by GitLab merge-request test widgets on every tier, Jenkins, and any
+  other JUnit consumer. New `OutputFormat::Junit` case and a dedicated
+  `JunitReportRenderer`
+  (`src/Audit/Infrastructure/Report/JunitReportRenderer.php`); a ready-made
+  GitLab job example lives in `docs/ci.md`.
 - **`security.yaml` is now parsed with `symfony/yaml` instead of single-line
   regexes, so the access-control map the attacker reasons over is finally
   complete.** `MappingStage` previously extracted `access_control` with a
