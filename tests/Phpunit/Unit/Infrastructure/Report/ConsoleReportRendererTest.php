@@ -1,0 +1,548 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
+
+use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
+
+final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
+{
+    #[Override]
+    protected function createRenderer(): ReportRendererInterface
+    {
+        return new ConsoleReportRenderer();
+    }
+
+    public function test_it_advertises_the_console_format(): void
+    {
+        self::assertSame('console', $this->renderer->format());
+    }
+
+    public function test_render_no_vulns_has_two_double_bar_separators(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+
+        self::assertSame(2, substr_count($output, str_repeat('═', 70)));
+        self::assertStringNotContainsString(str_repeat('═', 71), $output);
+        self::assertStringNotContainsString("\n".str_repeat('═', 69)."\n", $output);
+    }
+
+    public function test_render_header_includes_package_name(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+
+        self::assertStringContainsString(ReportPackage::NAME, $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_vulnerability_has_description_label_with_blank_line_above(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringContainsString("\n\n  Description:\n", $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_vulnerability_has_attack_vector_label_with_blank_line_above(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringContainsString("\n\n  Attack Vector:\n", $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_vulnerability_has_remediation_label_with_blank_line_above(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringContainsString("\n\n  Remediation:\n", $output);
+    }
+
+    public function test_render_package_name_is_inside_double_bar_frame(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+        $frame = str_repeat('═', 70);
+        $firstFrame = strpos($output, $frame);
+        $secondFrame = strpos($output, $frame, (false === $firstFrame ? 0 : $firstFrame) + 1);
+        $packagePosition = strpos($output, ReportPackage::NAME);
+
+        self::assertNotFalse($firstFrame);
+        self::assertNotFalse($secondFrame);
+        self::assertNotFalse($packagePosition);
+        self::assertGreaterThan($firstFrame, $packagePosition);
+        self::assertLessThan($secondFrame, $packagePosition);
+    }
+
+    public function test_render_header_includes_the_project_homepage_url(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+
+        self::assertStringContainsString('https://github.com/vinceamstoutz/symfony-security-auditor', $output);
+    }
+
+    public function test_render_homepage_url_is_inside_double_bar_frame(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+        $frame = str_repeat('═', 70);
+        $firstFrame = strpos($output, $frame);
+        $secondFrame = strpos($output, $frame, (false === $firstFrame ? 0 : $firstFrame) + 1);
+        $urlPosition = strpos($output, 'https://github.com/vinceamstoutz/symfony-security-auditor');
+
+        self::assertNotFalse($firstFrame);
+        self::assertNotFalse($secondFrame);
+        self::assertNotFalse($urlPosition);
+        self::assertGreaterThan($firstFrame, $urlPosition);
+        self::assertLessThan($secondFrame, $urlPosition);
+    }
+
+    public function test_render_no_vulns_has_two_single_bar_separators(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+
+        self::assertSame(2, substr_count($output, str_repeat('─', 70)));
+        self::assertStringNotContainsString(str_repeat('─', 71), $output);
+        self::assertStringNotContainsString("\n".str_repeat('─', 69)."\n", $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_with_vulns_has_four_single_bar_separators(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertSame(4, substr_count($output, str_repeat('─', 70)));
+        self::assertStringNotContainsString(str_repeat('─', 71), $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_vulnerability_dot_separator_is_exactly_70_chars(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringContainsString("\n".str_repeat('·', 70), $output);
+        self::assertStringNotContainsString("\n".str_repeat('·', 71), $output);
+        self::assertStringNotContainsString("\n".str_repeat('·', 69)."\n", $output);
+    }
+
+    public function test_render_with_zero_vulnerabilities_shows_no_findings_message(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+
+        self::assertStringContainsString('No validated vulnerabilities found.', $output);
+        self::assertStringNotContainsString('VULNERABILITIES', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_lists_vulnerabilities_most_severe_first(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::LOW, filePath: 'src/Low.php');
+        $critical = $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::CRITICAL, filePath: 'src/Critical.php');
+
+        $output = $this->renderer->render($this->makeReport($vulnerability, $critical));
+
+        $criticalPosition = strpos($output, 'src/Critical.php');
+        $lowPosition = strpos($output, 'src/Low.php');
+        self::assertNotFalse($criticalPosition);
+        self::assertNotFalse($lowPosition);
+        self::assertLessThan($lowPosition, $criticalPosition);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_with_vulnerabilities_skips_no_findings_message(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringNotContainsString('No validated vulnerabilities found.', $output);
+        self::assertStringContainsString('VULNERABILITIES', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_severity_summary_shows_severity_with_count_one(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('HIGH', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_findings_output_ends_with_dot_separator_no_trailing_newline(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringEndsWith(str_repeat('·', 70), $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_severity_summary_has_header_line(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('  SUMMARY BY SEVERITY', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_severity_summary_omits_zero_count_severities(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringNotContainsString('CRITICAL', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_description_chunks_at_exactly_65_chars(): void
+    {
+        $longDescription = str_repeat('a', 70);
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Test Vuln', 0.7),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative($longDescription, 'short', 'p', 'r'),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('    '.str_repeat('a', 65)."\n    ".str_repeat('a', 5), $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_attack_vector_chunks_at_exactly_65_chars(): void
+    {
+        $longVector = str_repeat('b', 70);
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Test Vuln', 0.7),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('short', $longVector, 'p', 'r'),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('    '.str_repeat('b', 65)."\n    ".str_repeat('b', 5), $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_remediation_chunks_at_exactly_65_chars(): void
+    {
+        $longRemediation = str_repeat('c', 70);
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Test Vuln', 0.7),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('short', 'short', 'p', $longRemediation),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('    '.str_repeat('c', 65)."\n    ".str_repeat('c', 5), $output);
+    }
+
+    public function test_render_substitutes_audit_id(): void
+    {
+        $auditReport = $this->makeReport();
+        $output = $this->renderer->render($auditReport);
+
+        self::assertStringContainsString($auditReport->auditId(), $output);
+        self::assertStringNotContainsString('{{auditId}}', $output);
+    }
+
+    public function test_render_substitutes_project_path(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+
+        self::assertStringContainsString($this->tmpDir, $output);
+        self::assertStringNotContainsString('{{projectPath}}', $output);
+    }
+
+    public function test_render_substitutes_started_at_in_iso_like_format(): void
+    {
+        $auditReport = $this->makeReport();
+        $output = $this->renderer->render($auditReport);
+
+        self::assertStringContainsString($auditReport->startedAt()->format('Y-m-d H:i:s'), $output);
+        self::assertStringNotContainsString('{{startedAt}}', $output);
+    }
+
+    public function test_render_substitutes_duration_in_seconds(): void
+    {
+        $auditReport = $this->makeReport();
+        $output = $this->renderer->render($auditReport);
+
+        self::assertStringContainsString(\sprintf('%.1fs', $auditReport->durationSeconds()), $output);
+        self::assertStringNotContainsString('{{duration}}', $output);
+    }
+
+    public function test_render_substitutes_files_scanned_count(): void
+    {
+        $auditReport = $this->makeReport();
+        $output = $this->renderer->render($auditReport);
+
+        self::assertStringContainsString(\sprintf('%d scanned', $auditReport->filesScanned()), $output);
+        self::assertStringNotContainsString('{{filesScanned}}', $output);
+    }
+
+    public function test_render_substitutes_risk_level(): void
+    {
+        $auditReport = $this->makeReport();
+        $output = $this->renderer->render($auditReport);
+
+        self::assertStringContainsString($auditReport->riskLevel(), $output);
+        self::assertStringNotContainsString('{{riskLevel}}', $output);
+    }
+
+    public function test_render_substitutes_risk_score(): void
+    {
+        $auditReport = $this->makeReport();
+        $output = $this->renderer->render($auditReport);
+
+        self::assertStringContainsString(\sprintf('(Score: %d)', $auditReport->riskScore()), $output);
+        self::assertStringNotContainsString('{{riskScore}}', $output);
+    }
+
+    public function test_render_substitutes_unknown_model_label_when_primary_model_is_empty(): void
+    {
+        $auditReport = $this->makeReportWithCost(AuditCost::zero(''));
+        $output = $this->renderer->render($auditReport);
+
+        self::assertStringContainsString('unknown model', $output);
+        self::assertStringNotContainsString('{{primaryModel}}', $output);
+    }
+
+    public function test_render_renders_cost_without_estimated_suffix(): void
+    {
+        $auditReport = $this->makeReportWithCost(AuditCost::of(
+            inputTokens: 100,
+            outputTokens: 50,
+            estimatedCostUsd: 0.3755,
+            primaryModel: 'claude-opus-4-7',
+            byRole: [
+                'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 100, 'output_tokens' => 20, 'estimated_cost_usd' => 0.035],
+                'reviewer' => ['model' => 'claude-haiku-4-5', 'input_tokens' => 50, 'output_tokens' => 10, 'estimated_cost_usd' => 0.005],
+            ],
+        ));
+        $output = $this->renderer->render($auditReport);
+
+        self::assertStringNotContainsString('Cost', $output);
+        self::assertStringNotContainsString('$0.3755', $output);
+        self::assertStringNotContainsString('$0.0350', $output);
+        self::assertStringNotContainsString('$0.0050', $output);
+        self::assertStringNotContainsString('{{cost}}', $output);
+        self::assertStringNotContainsString('{{costBreakdown}}', $output);
+        self::assertStringContainsString('100 in / 50 out (claude-opus-4-7)', $output);
+    }
+
+    public function test_render_substitutes_actual_model_name_when_primary_model_is_set(): void
+    {
+        $auditReport = $this->makeReportWithCost(AuditCost::of(100, 50, 0.05, 'claude-opus-4-7'));
+        $output = $this->renderer->render($auditReport);
+
+        self::assertStringContainsString('claude-opus-4-7', $output);
+        self::assertStringNotContainsString('unknown model', $output);
+        self::assertStringNotContainsString('{{primaryModel}}', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_vulnerability_substitutes_id(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('['.$vulnerability->id().']', $output);
+        self::assertStringNotContainsString('{{id}}', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_vulnerability_substitutes_title(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString($vulnerability->title(), $output);
+        self::assertStringNotContainsString('{{title}}', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_vulnerability_substitutes_severity_label(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString(VulnerabilitySeverity::HIGH->label(), $output);
+        self::assertStringNotContainsString('{{severity}}', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_vulnerability_substitutes_owasp_reference(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('OWASP: '.$vulnerability->type()->owaspReference(), $output);
+        self::assertStringNotContainsString('{{owasp}}', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_vulnerability_substitutes_file_location_with_line_range(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString(\sprintf('File : %s:%d-%d', $vulnerability->filePath(), $vulnerability->lineStart(), $vulnerability->lineEnd()), $output);
+        self::assertStringNotContainsString('{{filePath}}', $output);
+        self::assertStringNotContainsString('{{lineStart}}', $output);
+        self::assertStringNotContainsString('{{lineEnd}}', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_vulnerability_substitutes_description(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('    '.$vulnerability->description(), $output);
+        self::assertStringNotContainsString('{{description}}', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_vulnerability_substitutes_attack_vector(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('    '.$vulnerability->attackVector(), $output);
+        self::assertStringNotContainsString('{{attackVector}}', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_vulnerability_substitutes_proof(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('    '.$vulnerability->proof(), $output);
+        self::assertStringNotContainsString('{{proof}}', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_vulnerability_substitutes_remediation(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('    '.$vulnerability->remediation(), $output);
+        self::assertStringNotContainsString('{{remediation}}', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_confidence_renders_as_exact_percent_value(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Test Vuln', 0.7),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('short', 'short', 'p', 'r'),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('Confidence: 70%', $output);
+        self::assertStringNotContainsString('Confidence: 71%', $output);
+        self::assertStringNotContainsString('Confidence: 69%', $output);
+        self::assertStringNotContainsString('Confidence: 0%', $output);
+    }
+}

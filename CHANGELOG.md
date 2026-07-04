@@ -12,6 +12,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **New `--format junit` output renders findings as JUnit XML for CI test-report
+  panels.** SARIF gets findings into GitHub Code Scanning and GitLab's security
+  dashboard, but GitLab's dashboard requires the Ultimate tier — free-tier users
+  had no way to see findings inline in a merge request.
+  `audit:run --format junit` emits one failed `<testcase>` per validated finding
+  (classname = vulnerability type, name = `<title> (<file>:<line>)`, `<failure>`
+  carrying severity, location, OWASP reference, and remediation), rendered
+  natively by GitLab merge-request test widgets on every tier, Jenkins, and any
+  other JUnit consumer. New `OutputFormat::Junit` case and a dedicated
+  `JunitReportRenderer`
+  (`src/Audit/Infrastructure/Report/JunitReportRenderer.php`, one of the
+  per-format renderers behind `ReportRendererInterface` — see _Changed_ below);
+  a ready-made GitLab job example lives in `docs/ci.md`.
 - **`security.yaml` is now parsed with `symfony/yaml` instead of single-line
   regexes, so the access-control map the attacker reasons over is finally
   complete.** `MappingStage` previously extracted `access_control` with a
@@ -187,6 +200,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **Report rendering is split into one class per output format behind a new
+  `ReportRendererInterface`, so no single class carries every format's logic.**
+  The `@internal` `ReportRenderer` god class
+  (`src/Audit/Infrastructure/Report/ReportRenderer.php`) bundled all six formats
+  as `renderConsole()`/`renderJson()`/`renderSarif()`/`renderHtml()`/
+  `renderMarkdown()` methods plus `JunitReportRenderer` sitting awkwardly beside
+  it. It is removed and replaced by six focused renderers —
+  `ConsoleReportRenderer`, `JsonReportRenderer`, `SarifReportRenderer`,
+  `HtmlReportRenderer`, `MarkdownReportRenderer`, `JunitReportRenderer` — each
+  implementing `ReportRendererInterface` (`format(): string` +
+  `render(AuditReport): string`) in `src/Audit/Infrastructure/Report/`. Shared
+  pieces move to `ReportPackage` (package name/homepage/version) and
+  `TemplateLoader` (template reads). Every renderer is autoconfigured with the
+  `symfony_security_auditor.report_renderer` tag; `Command\ReportWriter` now
+  takes the tagged iterator, indexes renderers by their `format()` key, and
+  dispatches the selected `--format` — throwing the new
+  `Command\Exception\UnsupportedOutputFormatException` when no renderer
+  advertises that key. All six `--format` values and their output are unchanged;
+  `ReportRenderer` was `@internal` so its removal is not a BC break. Adding a
+  format is now "new class + service registration", with no `match` arm to edit
+  (see [`docs/extending.md`](docs/extending.md)).
 - **OWASP references now point at the Top 10:2025 edition instead of 2021.**
   `VulnerabilityType::owaspReference()` and `owaspReferenceUrl()`
   (`src/Audit/Domain/Model/VulnerabilityType.php`) emitted 2021 category ids

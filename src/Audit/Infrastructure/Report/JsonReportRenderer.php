@@ -11,17 +11,23 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
-use Symfony\Component\Console\Style\SymfonyStyle;
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-interface ReportWriterInterface
+final readonly class JsonReportRenderer implements ReportRendererInterface
 {
-    /**
-     * @throws UnsupportedOutputFormatException
-     */
-    public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle): void;
+    #[Override]
+    public function format(): string
+    {
+        return 'json';
+    }
+
+    #[Override]
+    public function render(AuditReport $auditReport): string
+    {
+        return json_encode($auditReport->toArray(), \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR);
+    }
 }

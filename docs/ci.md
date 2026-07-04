@@ -305,6 +305,27 @@ symfony-security-audit:
 
 Set the schedule in `CI/CD → Schedules` (e.g., every night at 02:00).
 
+### JUnit test report (free tier)
+
+The `sast:` report above renders in GitLab's security dashboard, which requires
+the Ultimate tier. On any tier — including free — the JUnit format shows every
+finding directly in the merge-request test widget instead:
+
+```yaml
+security_audit_junit:
+  stage: test
+  image: php:8.4-cli
+  script:
+    - php bin/console audit:run --format junit --output junit-security.xml
+  artifacts:
+    when: always
+    reports:
+      junit: junit-security.xml
+```
+
+Each finding appears as a failed test case named `<title> (<file>:<line>)`,
+grouped under its vulnerability type.
+
 ### JSON artifact only (no dashboard)
 
 ```yaml

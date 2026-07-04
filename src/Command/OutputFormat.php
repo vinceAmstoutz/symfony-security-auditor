@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
-/** @internal not part of the BC promise — the enum *values* (`console`, `json`, `sarif`, `html`, `markdown`) are part of the CLI contract, but the PHP enum itself is for internal use only. */
+/** @internal not part of the BC promise — the enum *values* (`console`, `json`, `sarif`, `html`, `markdown`, `junit`) are part of the CLI contract, but the PHP enum itself is for internal use only. */
 enum OutputFormat: string
 {
     case Console = 'console';
@@ -21,4 +21,5 @@ enum OutputFormat: string
     case Sarif = 'sarif';
     case Html = 'html';
     case Markdown = 'markdown';
+    case Junit = 'junit';
 }

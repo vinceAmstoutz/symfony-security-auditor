@@ -103,7 +103,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerPro
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVoterCapabilityParser;
@@ -148,6 +154,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator
         ->instanceof(ProviderTokenEstimatorInterface::class)
         ->tag('symfony_security_auditor.token_estimator');
+
+    $defaultsConfigurator
+        ->instanceof(ReportRendererInterface::class)
+        ->tag('symfony_security_auditor.report_renderer');
 
     $defaultsConfigurator->set(TokenUsageRecorder::class);
 
@@ -226,9 +236,15 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->args([param('symfony_security_auditor.audit.reviewer_structured_collection')]);
     $defaultsConfigurator->alias(ReviewerPromptBuilderInterface::class, ReviewerPromptBuilder::class);
 
-    $defaultsConfigurator->set(ReportRenderer::class);
+    $defaultsConfigurator->set(ConsoleReportRenderer::class);
+    $defaultsConfigurator->set(JsonReportRenderer::class);
+    $defaultsConfigurator->set(SarifReportRenderer::class);
+    $defaultsConfigurator->set(HtmlReportRenderer::class);
+    $defaultsConfigurator->set(MarkdownReportRenderer::class);
+    $defaultsConfigurator->set(JunitReportRenderer::class);
 
-    $defaultsConfigurator->set(ReportWriter::class);
+    $defaultsConfigurator->set(ReportWriter::class)
+        ->args([tagged_iterator('symfony_security_auditor.report_renderer')]);
     $defaultsConfigurator->alias(ReportWriterInterface::class, ReportWriter::class);
 
     $defaultsConfigurator->set(AuditExitCodeResolver::class);
