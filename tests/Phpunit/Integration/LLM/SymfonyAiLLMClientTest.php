@@ -2454,6 +2454,36 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws TransientLLMFailureException
      * @throws NonTransientLLMFailureException
      */
+    public function test_429_with_retry_after_exceeding_the_ceiling_clamps_the_rate_limiter_pause_too(): void
+    {
+        $fakeSleeper = new FakeSleeper();
+        $fakeRateLimiter = new FakeRateLimiter();
+        $platform = $this->flakyPlatform([
+            new RateLimitExceededException(retryAfter: 3_600),
+            new TextResult('recovered'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, jitterRatio: 0.0), new RateLimitBackoff(initialDelayMs: 60_000, maxDelayMs: 300_000), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: $fakeSleeper, rateLimiter: $fakeRateLimiter),
+        );
+
+        $before = new DateTimeImmutable();
+        $symfonyAiLLMClient->complete('sys', 'usr');
+        $after = new DateTimeImmutable();
+
+        self::assertSame([300_000], $fakeSleeper->durations, 'a hostile 3600s hint must be clamped to the 300s ceiling');
+        self::assertCount(1, $fakeRateLimiter->paused);
+        self::assertGreaterThanOrEqual($before->modify('+299 seconds'), $fakeRateLimiter->paused[0]);
+        self::assertLessThanOrEqual($after->modify('+301 seconds'), $fakeRateLimiter->paused[0]);
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
     public function test_429_without_retry_after_falls_back_to_exponential_delay(): void
     {
         $fakeSleeper = new FakeSleeper();

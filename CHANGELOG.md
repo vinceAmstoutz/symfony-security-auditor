@@ -352,6 +352,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   default `claude-opus-4-8` and every current model are catalog-present and
   unchanged.
 
+### Fixed
+
+- **A hostile or misbehaving provider's `Retry-After` header could wedge the
+  rate limiter for hours, bypassing the documented safety ceiling.**
+  `RetryPolicy::rateLimitDelayMs()` already clamped the server-provided hint to
+  `rateLimitMaxDelayMs` (5 minutes by default) for the current retry's own
+  sleep, but `RetryingPlatformInvoker` separately called
+  `RateLimiterInterface::pauseUntil()` with the **raw, unclamped** hint
+  converted straight to a future timestamp. Since `pauseUntil()` affects the
+  shared rate limiter used by every concurrent and subsequent request in the
+  audit run — not just the current retry — a provider returning an absurd
+  `Retry-After: 3600` (or larger) paused the entire audit for that full duration
+  despite the retry delay itself correctly capping at 5 minutes.
+  `RetryingPlatformInvoker::backOffBeforeNextAttempt()` now derives the
+  `pauseUntil()` target from the same already-clamped delay used for the local
+  sleep, so the shared rate limiter can never be paused past the configured
+  ceiling.
+
 ### Security
 
 - **The install scripts now fail closed on checksum verification.** Previously
