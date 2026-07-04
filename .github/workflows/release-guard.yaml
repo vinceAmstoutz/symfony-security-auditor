@@ -1,0 +1,34 @@
+name: Release Guard
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  verify-version-pins:
+    name: Version pins match the tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify every pin points at ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.ref_name }}"
+          FAIL=0
+
+          check() {
+            local file="$1" pattern="$2"
+            if ! grep -qE "$pattern" "$file"; then
+              echo "::error file=$file::expected a version pin matching '$pattern' — run 'bin/castor release:bump $TAG' before tagging"
+              FAIL=1
+            fi
+          }
+
+          check resources/schema.json "symfony-security-auditor/${TAG}/resources/schema\.json"
+          check README.md "uses: vinceamstoutz/symfony-security-auditor@${TAG}"
+          check docs/ci.md "uses: vinceamstoutz/symfony-security-auditor@${TAG}"
+          check docs/versioning.md "uses: vinceamstoutz/symfony-security-auditor@${TAG}"
+
+          exit "$FAIL"

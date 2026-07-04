@@ -133,6 +133,9 @@ deprecated by the other.
   format used on Packagist. Bump the pin when upgrading. There is intentionally
   no floating `v1` tag: the `uses:` ref and the config-schema URL both point at
   the same release tag, so a given pin always resolves to one immutable release.
+  At release time, `bin/castor release:bump X.Y.Z` rewrites every pinned
+  location in one shot, and the `Release Guard` workflow fails the tag push if
+  any pin does not match the tag.
 
 ### Output schemas
 
