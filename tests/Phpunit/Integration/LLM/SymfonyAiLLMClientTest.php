@@ -580,6 +580,34 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
      */
+    public function test_complete_batch_releases_the_rate_limiter_reservation_when_dispatch_fails(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('dispatch exploded'),
+            new TextResult('recovered-sequentially'),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
+        );
+
+        $symfonyAiLLMClient->completeBatch([
+            ['system' => 's', 'user' => 'u'],
+        ], 4);
+
+        // The dispatch-loop acquire() for the request whose dispatch failed
+        // must be released (0,0) before falling back to the sequential
+        // path — otherwise it sits unreconciled in the limiter forever.
+        self::assertCount(2, $fakeRateLimiter->recorded);
+        self::assertSame([0, 0], $fakeRateLimiter->recorded[0]);
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_resolves_each_conversation_against_its_own_registry(): void
     {
         $firstToolCalls = 0;
@@ -694,6 +722,36 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         self::assertSame('recovered', $responses[0]->content());
         self::assertSame('end_turn', $responses[0]->stopReason());
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
+    public function test_complete_batch_with_tools_releases_the_rate_limiter_reservation_when_dispatch_fails_before_tools_ran(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new TextResult('recovered'),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 10, backoffMultiplier: 2.0, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper(), rateLimiter: $fakeRateLimiter),
+        );
+
+        $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 3);
+
+        // The wavefront round's acquire() for the conversation whose
+        // dispatch failed must be released (0,0) before falling back to
+        // the sequential path — otherwise it sits unreconciled forever.
+        self::assertCount(2, $fakeRateLimiter->recorded);
+        self::assertSame([0, 0], $fakeRateLimiter->recorded[0]);
     }
 
     /**
@@ -1917,6 +1975,35 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         self::assertSame('finally ok', $llmResponse->content());
         self::assertSame([10, 20], $fakeSleeper->durations);
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     */
+    public function test_complete_releases_the_rate_limiter_reservation_for_each_failed_retry_attempt(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new TextResult('recovered'),
+        ]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 10, backoffMultiplier: 2.0, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper(), rateLimiter: $fakeRateLimiter),
+        );
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+
+        // The failed first attempt's acquire() must be released (0,0)
+        // before retrying — otherwise it sits unreconciled in the limiter
+        // for the rest of the window, since only the eventual success
+        // triggers a real record() call.
+        self::assertCount(2, $fakeRateLimiter->recorded);
+        self::assertSame([0, 0], $fakeRateLimiter->recorded[0]);
     }
 
     /**

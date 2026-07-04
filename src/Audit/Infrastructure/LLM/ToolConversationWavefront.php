@@ -189,8 +189,12 @@ final readonly class ToolConversationWavefront
     private function advanceConversation(array $state, ?DeferredResult $deferredResult, array $request, int $maxToolIterations): array
     {
         if (!$deferredResult instanceof DeferredResult) {
+            $this->rateLimiter->record(0, 0);
+
             return $this->abortConversation($state, $request, $maxToolIterations);
         }
+
+        $reconciled = false;
 
         try {
             $platformResult = $deferredResult->getResult();
@@ -200,6 +204,7 @@ final readonly class ToolConversationWavefront
             $state['cacheRead'] += $callCacheRead;
             $state['cacheCreation'] += $callCacheCreation;
             $this->rateLimiter->record($callInput, $callOutput);
+            $reconciled = true;
             if ($this->budgetTracker instanceof BudgetTracker) {
                 $this->budgetTracker->recordCall(LLMResponse::of(
                     '',
@@ -227,6 +232,10 @@ final readonly class ToolConversationWavefront
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (Throwable) {
+            if (!$reconciled) {
+                $this->rateLimiter->record(0, 0);
+            }
+
             return $this->abortConversation($state, $request, $maxToolIterations);
         }
     }
