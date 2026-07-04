@@ -33,7 +33,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 5;
+    public const int CACHE_VERSION = 6;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -303,6 +303,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      */
     private function matchLines(string $content, string $regex): array
     {
+        if ($this->hasDotAllModifier($regex)) {
+            return $this->matchAcrossLines($content, $regex);
+        }
+
         $lines = explode("\n", $content);
         $matches = [];
 
@@ -313,5 +317,29 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         }
 
         return $matches;
+    }
+
+    private function hasDotAllModifier(string $regex): bool
+    {
+        preg_match('/[a-zA-Z]*$/', $regex, $modifiers);
+
+        return str_contains($modifiers[0], 's');
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function matchAcrossLines(string $content, string $regex): array
+    {
+        if (!preg_match_all($regex, $content, $matches, \PREG_OFFSET_CAPTURE)) {
+            return [];
+        }
+
+        $lines = [];
+        foreach ($matches[0] as $match) {
+            $lines[] = substr_count($content, "\n", 0, $match[1]) + 1;
+        }
+
+        return array_values(array_unique($lines));
     }
 }

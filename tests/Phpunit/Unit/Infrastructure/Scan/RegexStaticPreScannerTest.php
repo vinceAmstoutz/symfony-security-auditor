@@ -256,6 +256,34 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('dynamic_order_by', $patterns);
     }
 
+    public function test_it_flags_supports_returning_null_across_multiple_lines(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/LoginAuthenticator.php',
+            '/app/src/Security/LoginAuthenticator.php',
+            "<?php\nclass LoginAuthenticator {\n    public function supports(Request \$request): ?bool\n    {\n        return null;\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('supports_returns_null', $patterns);
+    }
+
+    public function test_it_flags_http_client_request_split_across_lines(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Service/Fetcher.php',
+            '/app/src/Service/Fetcher.php',
+            "<?php\nclass Fetcher {\n    public function __construct(private HttpClientInterface \$client) {}\n    public function fetch(string \$url) {\n        return \$this->client->request('GET', \$url);\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('http_client_request', $patterns);
+    }
+
     public function test_it_flags_self_validating_passport_in_authenticator(): void
     {
         $projectFile = ProjectFile::create(

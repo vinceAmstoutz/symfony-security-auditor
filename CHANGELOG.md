@@ -352,6 +352,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   default `claude-opus-4-8` and every current model are catalog-present and
   unchanged.
 
+### Fixed
+
+- **Static pre-scan patterns using the `s` (DOTALL) modifier never matched
+  anything.** `RegexStaticPreScanner::matchLines()`
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) explodes file
+  content into lines and matches each pattern against one line at a time, so the
+  two cross-line patterns in the dictionary — `supports_returns_null` (an
+  authenticator's `supports()` silently returning `null`, which Symfony treats
+  as "supports") and `http_client_request` (an `HttpClient` reference followed
+  by `->request(`, an SSRF surface) — could never fire: a real multi-line method
+  body never appears on a single line. Patterns carrying the `s` modifier are
+  now matched against the full file content instead, with the match offset
+  mapped back to a line number; all other (single-line) patterns are unchanged.
+  `RegexStaticPreScanner:: CACHE_VERSION` moves to `6` since this alters scan
+  output for existing chunk content, invalidating stale attacker cache entries.
+
 ### Security
 
 - **The install scripts now fail closed on checksum verification.** Previously
