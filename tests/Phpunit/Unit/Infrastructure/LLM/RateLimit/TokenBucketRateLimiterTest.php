@@ -661,6 +661,32 @@ final class TokenBucketRateLimiterTest extends TestCase
     /**
      * @throws RateLimitRequestTooLargeException
      */
+    public function test_consecutive_records_without_acquire_do_not_over_count_input_tokens(): void
+    {
+        $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
+        $sleeper = $this->createRecordingSleeper($mockClock);
+
+        $tokenBucketRateLimiter = new TokenBucketRateLimiter(
+            rateLimitConfiguration: new RateLimitConfiguration(
+                requestsPerMinute: null,
+                inputTokensPerMinute: 5,
+                outputTokensPerMinute: null,
+            ),
+            clock: $this->boundedClock($mockClock),
+            sleeper: $sleeper,
+        );
+
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
+        $tokenBucketRateLimiter->record(inputTokens: 5, outputTokens: 0);
+        $tokenBucketRateLimiter->record(inputTokens: 0, outputTokens: 0);
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
+
+        self::assertSame([], $sleeper->sleepsMs);
+    }
+
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_ms_until_rounds_sub_millisecond_delta_up_to_one(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00.000500+00:00');
