@@ -106,9 +106,9 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
     {
         $illegalCharacters = implode('', array_map('chr', [...range(0x00, 0x08), 0x0B, 0x0C, ...range(0x0E, 0x1F)]));
         $vulnerability = Vulnerability::of(
-            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, "Bad{$illegalCharacters}Title", 0.9),
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, \sprintf('Bad%sTitle', $illegalCharacters), 0.9),
             new CodeLocation('src/Foo.php', 1, 5),
-            new VulnerabilityNarrative("Desc{$illegalCharacters}End", 'vector', 'proof', "Rem{$illegalCharacters}End"),
+            new VulnerabilityNarrative(\sprintf('Desc%sEnd', $illegalCharacters), 'vector', 'proof', \sprintf('Rem%sEnd', $illegalCharacters)),
             '$q',
         )->withReviewerValidation(true);
 
