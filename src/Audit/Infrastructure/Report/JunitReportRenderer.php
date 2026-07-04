@@ -27,6 +27,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
  */
 final readonly class JunitReportRenderer implements ReportRendererInterface
 {
+    /**
+     * XML 1.0 forbids every control character other than tab, CR and LF.
+     *
+     * @var list<string>
+     */
+    private const array ILLEGAL_XML_CHARACTERS = [
+        "\x00", "\x01", "\x02", "\x03", "\x04", "\x05", "\x06", "\x07", "\x08",
+        "\x0B", "\x0C",
+        "\x0E", "\x0F", "\x10", "\x11", "\x12", "\x13", "\x14", "\x15", "\x16", "\x17", "\x18", "\x19", "\x1A", "\x1B", "\x1C", "\x1D", "\x1E", "\x1F",
+    ];
+
     #[Override]
     public function format(): string
     {
@@ -60,30 +71,42 @@ final readonly class JunitReportRenderer implements ReportRendererInterface
 
     private function testCase(DOMDocument $domDocument, Vulnerability $vulnerability): DOMElement
     {
+        $title = $this->stripIllegalXmlCharacters($vulnerability->title());
+
         $domElement = $domDocument->createElement('testcase');
         $domElement->setAttribute('classname', $vulnerability->type()->value);
         $domElement->setAttribute('name', \sprintf(
             '%s (%s:%d)',
-            $vulnerability->title(),
+            $title,
             $vulnerability->filePath(),
             $vulnerability->lineStart(),
         ));
 
         $failure = $domDocument->createElement('failure');
         $failure->setAttribute('type', $vulnerability->severity()->value);
-        $failure->setAttribute('message', $vulnerability->title());
+        $failure->setAttribute('message', $title);
         $failure->appendChild($domDocument->createTextNode(\sprintf(
             "%s\n\nSeverity: %s\nLocation: %s:%d-%d\nOWASP: %s\nRemediation: %s",
-            $vulnerability->description(),
+            $this->stripIllegalXmlCharacters($vulnerability->description()),
             $vulnerability->severity()->value,
             $vulnerability->filePath(),
             $vulnerability->lineStart(),
             $vulnerability->lineEnd(),
             $vulnerability->type()->owaspReference(),
-            $vulnerability->remediation(),
+            $this->stripIllegalXmlCharacters($vulnerability->remediation()),
         )));
         $domElement->appendChild($failure);
 
         return $domElement;
+    }
+
+    /**
+     * DOMDocument::saveXML() writes illegal control characters out verbatim
+     * without escaping them — a finding whose LLM-produced text carries one
+     * silently corrupts the document for any consumer that re-parses it.
+     */
+    private function stripIllegalXmlCharacters(string $value): string
+    {
+        return str_replace(self::ILLEGAL_XML_CHARACTERS, '', $value);
     }
 }

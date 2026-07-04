@@ -352,6 +352,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   default `claude-opus-4-8` and every current model are catalog-present and
   unchanged.
 
+### Fixed
+
+- **`--format junit` could emit XML that no consumer could re-parse.**
+  `JunitReportRenderer`
+  (`src/Audit/Infrastructure/Report/JunitReportRenderer.php`) inserted a
+  finding's LLM-produced title, description, and remediation text directly into
+  DOM attributes and text nodes. `DOMDocument::saveXML()` escapes XML
+  metacharacters (`<`, `&`, `"`) but writes XML-1.0-illegal control bytes
+  (`\x00`-`\x08`, `\x0B`, `\x0C`, `\x0E`-`\x1F`) out verbatim, so a finding
+  whose narrative happened to reproduce one of those bytes (a plausible outcome
+  when the model echoes a raw exploit payload) produced a `.xml` report that
+  GitLab, Jenkins, and any standard XML parser rejected outright. Those bytes
+  are now stripped before insertion.
+
 ### Security
 
 - **The install scripts now fail closed on checksum verification.** Previously
