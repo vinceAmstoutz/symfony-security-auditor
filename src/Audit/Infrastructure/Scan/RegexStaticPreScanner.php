@@ -321,9 +321,12 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
 
     private function hasDotAllModifier(string $regex): bool
     {
-        preg_match('/[a-zA-Z]*$/', $regex, $modifiers);
+        $lastDelimiter = strrpos($regex, '/');
+        if (false === $lastDelimiter) {
+            return false;
+        }
 
-        return str_contains($modifiers[0], 's');
+        return str_contains(substr($regex, $lastDelimiter + 1), 's');
     }
 
     /**
@@ -331,7 +334,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      */
     private function matchAcrossLines(string $content, string $regex): array
     {
-        if (!preg_match_all($regex, $content, $matches, \PREG_OFFSET_CAPTURE)) {
+        $matchCount = preg_match_all($regex, $content, $matches, \PREG_OFFSET_CAPTURE);
+        if (false === $matchCount || 0 === $matchCount) {
             return [];
         }
 
