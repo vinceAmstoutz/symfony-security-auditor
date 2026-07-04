@@ -102,7 +102,29 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevP
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRendererInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerPromptSections;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerPromptSectionsInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ApiResourceAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AuthenticatorAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfigAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EventSubscriberAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FormAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\LiveComponentAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\MessengerHandlerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\NormalizerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\PhpAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\RepositoryAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SchedulerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TemplateAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\VoterAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\WebhookConsumerAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
@@ -158,6 +180,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator
         ->instanceof(ReportRendererInterface::class)
         ->tag('symfony_security_auditor.report_renderer');
+
+    $defaultsConfigurator
+        ->instanceof(AttackerSkillInterface::class)
+        ->tag('symfony_security_auditor.attacker_skill');
 
     $defaultsConfigurator->set(TokenUsageRecorder::class);
 
@@ -225,15 +251,44 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger')->ignoreOnInvalid(),
             inline_service(ValidatorInterface::class)->factory([Validation::class, 'createValidator']),
         ]);
+    $defaultsConfigurator->set(ApiResourceAttackerSkill::class);
+    $defaultsConfigurator->set(AuthenticatorAttackerSkill::class);
+    $defaultsConfigurator->set(ConfigAttackerSkill::class);
+    $defaultsConfigurator->set(ControllerAttackerSkill::class);
+    $defaultsConfigurator->set(EntityAttackerSkill::class);
+    $defaultsConfigurator->set(EventSubscriberAttackerSkill::class);
+    $defaultsConfigurator->set(FormAttackerSkill::class);
+    $defaultsConfigurator->set(LiveComponentAttackerSkill::class);
+    $defaultsConfigurator->set(MessengerHandlerAttackerSkill::class);
+    $defaultsConfigurator->set(NormalizerAttackerSkill::class);
+    $defaultsConfigurator->set(PhpAttackerSkill::class);
+    $defaultsConfigurator->set(RepositoryAttackerSkill::class);
+    $defaultsConfigurator->set(SchedulerAttackerSkill::class);
+    $defaultsConfigurator->set(TemplateAttackerSkill::class);
+    $defaultsConfigurator->set(VoterAttackerSkill::class);
+    $defaultsConfigurator->set(WebhookConsumerAttackerSkill::class);
+    $defaultsConfigurator->set(AttackerSkillRegistry::class)
+        ->args([tagged_iterator('symfony_security_auditor.attacker_skill')]);
+
     $defaultsConfigurator->set(AttackerPromptBuilder::class)
         ->args([
             param('symfony_security_auditor.audit.structured_collection'),
             param('symfony_security_auditor.audit.stable_system_prompt'),
+            service(AttackerSkillRegistry::class),
         ]);
     $defaultsConfigurator->alias(AttackerPromptBuilderInterface::class, AttackerPromptBuilder::class);
 
+    $defaultsConfigurator->set(ReviewerPromptSections::class);
+    $defaultsConfigurator->alias(ReviewerPromptSectionsInterface::class, ReviewerPromptSections::class);
+    $defaultsConfigurator->set(ReviewerMessageRenderer::class);
+    $defaultsConfigurator->alias(ReviewerMessageRendererInterface::class, ReviewerMessageRenderer::class);
+
     $defaultsConfigurator->set(ReviewerPromptBuilder::class)
-        ->args([param('symfony_security_auditor.audit.reviewer_structured_collection')]);
+        ->args([
+            param('symfony_security_auditor.audit.reviewer_structured_collection'),
+            service(ReviewerPromptSectionsInterface::class),
+            service(ReviewerMessageRendererInterface::class),
+        ]);
     $defaultsConfigurator->alias(ReviewerPromptBuilderInterface::class, ReviewerPromptBuilder::class);
 
     $defaultsConfigurator->set(ConsoleReportRenderer::class);

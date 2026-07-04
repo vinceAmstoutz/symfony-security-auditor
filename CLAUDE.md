@@ -83,7 +83,7 @@ src/
       FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
       Scan/          # RegexStaticPreScanner, RegexCodeSlicer, PhpParserControllerAccessControlParser, PhpParserVoterCapabilityParser, PhpParserFormBindingParser, SymfonyYamlSecurityConfigParser
       Diff/          # ProcessGitChangedFilesResolver (git diff for --since)
-      Prompt/        # AttackerPromptBuilder (+ SymfonyMappingContextRenderer, NumberedFileContextRenderer), ReviewerPromptBuilder
+      Prompt/        # AttackerPromptBuilder (+ SymfonyMappingContextRenderer, NumberedFileContextRenderer, Skill/{AttackerSkillInterface, AttackerSkillRegistry, one *AttackerSkill per attack surface}), ReviewerPromptBuilder (+ Reviewer/{ReviewerPromptSectionsInterface, ReviewerPromptSections, ReviewerMessageRendererInterface, ReviewerMessageRenderer})
       Cache/         # FilesystemAttackerCache, NullAttackerCache, FilesystemReviewerCache, NullReviewerCache
       Advisory/      # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase (fallback), SymfonyProcessComposerAuditRunner
       Pricing/       # StaticPricingProvider

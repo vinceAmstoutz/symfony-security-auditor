@@ -89,7 +89,10 @@ src/
 │       │                  PhpParser{ControllerAccessControl, VoterCapability, FormBinding}Parser
 │       ├── Diff/        # ProcessGitChangedFilesResolver (git diff for --since)
 │       ├── Prompt/      # AttackerPromptBuilder (+ SymfonyMappingContextRenderer,
-│       │                  NumberedFileContextRenderer), ReviewerPromptBuilder
+│       │                  NumberedFileContextRenderer, Skill/{AttackerSkillInterface,
+│       │                  AttackerSkillRegistry, one *AttackerSkill per surface}),
+│       │                  ReviewerPromptBuilder (+ Reviewer/{ReviewerPromptSections,
+│       │                  ReviewerMessageRenderer})
 │       ├── Cache/       # FilesystemAttackerCache, NullAttackerCache,
 │       │                  FilesystemReviewerCache, NullReviewerCache
 │       ├── Advisory/    # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase,
@@ -595,8 +598,22 @@ Build system and user prompts fed to `LLMClientInterface::complete()`. Both are
 pure string builders with no network or I/O dependencies. The attacker's
 `SymfonyMapping` sections (route access-control map, voter coverage, form
 bindings) are rendered by `SymfonyMappingContextRenderer`, and its numbered
-`<file>` source blocks by `NumberedFileContextRenderer`; the builders themselves
-hold the prompt copy and the skill blocks.
+`<file>` source blocks by `NumberedFileContextRenderer`.
+
+Each builder is a thin composer delegating the bulk to collaborators:
+
+- **Attacker** — the per-surface skill blocks are individual
+  `AttackerSkillInterface` strategies under `Prompt/Skill/` (one class per
+  attack surface: `ControllerAttackerSkill`, `ApiResourceAttackerSkill`,
+  `VoterAttackerSkill`, …), each declaring its `ProjectFileType` and emission
+  `priority()`. `AttackerSkillRegistry` collects them (via the
+  `symfony_security_auditor.attacker_skill` DI tag) and emits, in priority
+  order, the blocks whose file type appears in the chunk. Adding an attack
+  surface is one new tagged class — no edit to the builder.
+- **Reviewer** — the fixed system-prompt text lives in `ReviewerPromptSections`
+  and the two line-numbered user-message templates in `ReviewerMessageRenderer`
+  (both under `Prompt/Reviewer/`, behind interfaces); `ReviewerPromptBuilder`
+  only composes them per mode.
 
 The attacker prompt has two modes selected by `audit.structured_collection`:
 
