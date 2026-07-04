@@ -352,6 +352,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   default `claude-opus-4-8` and every current model are catalog-present and
   unchanged.
 
+### Fixed
+
+- **Retryable LLM failures embedding a non-transient status code as a digit
+  substring were misclassified as fatal, aborting the audit instead of
+  retrying.** `TransientFailureClassifier::isTransient()`
+  (`src/Audit/Infrastructure/LLM/TransientFailureClassifier.php`) checked its
+  `400`/`401`/`403`/`404`/`422` "non-transient" hints with a plain substring
+  search, so a genuinely retryable message like `"HTTP 500 (request id 400123)"`
+  or `"cURL error 28: timed out after 1400 ms"` matched `400` and was rethrown
+  as fatal instead of retried. Status-code hints (for `isTransient()` and
+  `isRateLimit()`'s `429`) are now matched as word-bounded tokens instead of raw
+  substrings; the textual hints (`"rate limit"`, `"timed out"`, …) are
+  unchanged.
+
 ### Security
 
 - **The install scripts now fail closed on checksum verification.** Previously

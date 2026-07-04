@@ -46,6 +46,8 @@ final class TransientFailureClassifierTest extends TestCase
                 previous: new RuntimeException('underlying: 503 service unavailable'),
             ),
         ];
+        yield 'transient_code_with_embedded_non_transient_digits' => [new RuntimeException('HTTP 500 Internal Server Error (request id 400123)')];
+        yield 'timeout_message_with_embedded_non_transient_digits' => [new RuntimeException('cURL error 28: timed out after 1400 ms')];
     }
 
     #[DataProvider('nonTransientCases')]
@@ -98,6 +100,7 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'http_403_forbidden' => [new RuntimeException('Forbidden: 403')];
         yield 'http_404_not_found' => [new RuntimeException('Not Found (404)')];
         yield 'http_422_validation' => [new RuntimeException('422 Unprocessable Entity')];
+        yield 'non_transient_code_with_embedded_transient_digits' => [new RuntimeException('HTTP 401 Unauthorized (client waited 5001 ms)')];
         yield 'invalid_api_key' => [new RuntimeException('Invalid API key provided')];
         yield 'authentication_failed' => [new RuntimeException('authentication failed')];
         yield 'unknown_error_phrasing' => [new RuntimeException('Something went wrong without identifiable signal')];
