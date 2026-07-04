@@ -261,6 +261,94 @@ final class ProjectFileTest extends TestCase
         self::assertSame('php', $projectFile->type());
     }
 
+    public function test_it_detects_api_platform_resources_by_attribute(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Entity/Book.php',
+            '/app/src/Entity/Book.php',
+            "<?php\nuse ApiPlatform\\Metadata\\ApiResource;\n#[ApiResource]\n#[ORM\\Entity]\nclass Book {}",
+        );
+
+        self::assertSame('api_resource', $projectFile->type());
+    }
+
+    public function test_it_detects_api_platform_resources_outside_entity_directories(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/ApiResource/Offer.php',
+            '/app/src/ApiResource/Offer.php',
+            "<?php\n#[ApiResource(operations: [new Get()])]\nclass Offer {}",
+        );
+
+        self::assertSame('api_resource', $projectFile->type());
+    }
+
+    public function test_it_detects_standalone_operation_attributes_as_api_resources(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Entity/Article.php',
+            '/app/src/Entity/Article.php',
+            "<?php\nuse ApiPlatform\\Metadata\\GetCollection;\n#[GetCollection]\nclass Article {}",
+        );
+
+        self::assertSame('api_resource', $projectFile->type());
+    }
+
+    public function test_it_detects_graphql_operation_attributes_as_api_resources(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/ApiResource/Report.php',
+            '/app/src/ApiResource/Report.php',
+            "<?php\nuse ApiPlatform\\Metadata\\GraphQl\\QueryCollection;\n#[QueryCollection]\nclass Report {}",
+        );
+
+        self::assertSame('api_resource', $projectFile->type());
+    }
+
+    public function test_non_php_file_with_api_resource_content_is_not_an_api_resource(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/api_platform/resources.yaml',
+            '/app/config/api_platform/resources.yaml',
+            "# App\\Entity\\Book:\n#[ApiResource]\n",
+        );
+
+        self::assertSame('config', $projectFile->type());
+    }
+
+    public function test_api_platform_namespace_without_an_operation_attribute_is_not_an_api_resource(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/State/BookProvider.php',
+            '/app/src/State/BookProvider.php',
+            "<?php\nuse ApiPlatform\\Metadata\\Operation;\nclass BookProvider {}",
+        );
+
+        self::assertSame('php', $projectFile->type());
+    }
+
+    public function test_operation_attribute_without_api_platform_namespace_is_not_an_api_resource(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/HomeController.php',
+            '/app/src/Controller/HomeController.php',
+            "<?php\n#[Get]\nclass HomeController {}",
+        );
+
+        self::assertSame('controller', $projectFile->type());
+    }
+
+    public function test_plain_entities_without_api_resource_stay_entities(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Entity/User.php',
+            '/app/src/Entity/User.php',
+            "<?php\n#[ORM\\Entity]\nclass User {}",
+        );
+
+        self::assertSame('entity', $projectFile->type());
+    }
+
     public function test_it_counts_lines_correctly(): void
     {
         $content = "<?php\n\nclass Foo\n{\n    public function bar(): void {}\n}\n";

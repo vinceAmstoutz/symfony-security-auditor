@@ -28,7 +28,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 9;
+    public const int PROMPT_VERSION = 10;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
@@ -48,6 +48,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      */
     private const array SKILL_PRIORITY = [
         ProjectFileType::CONTROLLER,
+        ProjectFileType::API_RESOURCE,
         ProjectFileType::AUTHENTICATOR,
         ProjectFileType::VOTER,
         ProjectFileType::WEBHOOK_CONSUMER,
@@ -186,6 +187,23 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             Do NOT flag:
             - Voters that explicitly `return false` as the default — that is the secure-by-default pattern.
             - Voters using `Security::isGranted('ROLE_USER')` after a positive ownership check.
+            </skills>
+            SKILL,
+        ProjectFileType::API_RESOURCE->value => <<<'SKILL'
+            <skills role="api_resource">
+            API Platform resources declare their entire HTTP surface in attributes — every operation is a routeless endpoint that never appears in a controller or access_control map. Hunt:
+            - Operations without `security:` — any `Get`/`GetCollection`/`Post`/`Patch`/`Put`/`Delete` in `operations: [...]`, as a standalone class attribute (e.g. `#[GetCollection]` without a wrapping `#[ApiResource]`), or as a resource-level default lacking a `security`/`securityPostDenormalize` expression is callable by anyone. Report as `broken_access_control`.
+            - Write operations relying only on `security:` — the expression runs BEFORE denormalization, against the object's OLD state. Ownership or role checks on writable data need `securityPostDenormalize:` (with `previous_object` where relevant) or an attacker updates other users' objects. Report as `broken_access_control` or `role_escalation`.
+            - Collection `GetCollection` without `security` or a Doctrine extension scoping the query to the current user — every record leaks. Report as `insecure_direct_object_reference`.
+            - `#[ApiFilter(SearchFilter::class, properties: [...])]` exposing sensitive or foreign-key properties (`user.id`, `email`, `token`) — filters become data-exfiltration oracles even when item access is denied. Report as `sensitive_data_exposure`.
+            - Serialization groups: `normalizationContext`/`denormalizationContext` groups placing privileged fields (`roles`, `isAdmin`, `passwordHash`, internal ids) on the read or write side. Write-side exposure is `over_permissive_serializer_group`.
+            - `paginationEnabled: false` (or client-controlled `paginationClientEnabled: true`) on large collections — unbounded result sets. Report as `missing_rate_limiting`.
+            - `Patch`/`Put` with `validationContext` groups that skip constraints enforced elsewhere.
+            - Custom state processors/providers that skip the voter/ownership checks the equivalent controller would perform.
+            Do NOT flag:
+            - Operations guarded at the firewall/access_control level when the pattern provably covers the resource route prefix.
+            - `security: "is_granted('PUBLIC_ACCESS')"` on intentionally public read-only catalogs.
+            - Filters on non-sensitive catalog fields (title, name, public slugs).
             </skills>
             SKILL,
         ProjectFileType::ENTITY->value => <<<'SKILL'

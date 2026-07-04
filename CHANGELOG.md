@@ -25,6 +25,26 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/Report/JunitReportRenderer.php`, one of the
   per-format renderers behind `ReportRendererInterface` — see _Changed_ below);
   a ready-made GitLab job example lives in `docs/ci.md`.
+- **API Platform resources are now a first-class attack surface.** Classes
+  carrying `#[ApiResource]` declare routeless HTTP endpoints whose entire
+  security model lives in attributes — previously they classified as plain
+  entities, so operation-level `security:` gaps were invisible to the auditor. A
+  new `ProjectFileType::API_RESOURCE` case
+  (`src/Audit/Domain/Model/ProjectFile.php` detects `#[ApiResource]` anywhere,
+  as well as standalone operation attributes — `#[GetCollection]`, `#[Get]`,
+  `#[Post]`, GraphQL `#[QueryCollection]`, … — used without a wrapping
+  `#[ApiResource]` when the `ApiPlatform\Metadata` namespace is imported, taking
+  precedence over entity classification), a dedicated attacker skill block
+  (`AttackerPromptBuilder`, `PROMPT_VERSION` 10) hunting operations without
+  `security:`, writes relying on pre-denormalization `security:` instead of
+  `securityPostDenormalize:`, unscoped `GetCollection`, sensitive `#[ApiFilter]`
+  properties, over-permissive normalization/denormalization groups, and disabled
+  pagination; plus an `api_resource` pre-scanner bucket
+  (`RegexStaticPreScanner`, `CACHE_VERSION` 4) with `api_pagination_disabled`,
+  `api_filter_declared`, and `serializer_groups_attribute` markers, and a
+  chunking priority slot right after controllers. Custom markers can target the
+  new bucket via `scan.custom_risk_patterns.api_resource`. Attacker cache
+  entries are invalidated by the prompt/pre-scan version bumps.
 - **`security.yaml` is now parsed with `symfony/yaml` instead of single-line
   regexes, so the access-control map the attacker reasons over is finally
   complete.** `MappingStage` previously extracted `access_control` with a
