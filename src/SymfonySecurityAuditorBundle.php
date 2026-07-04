@@ -24,6 +24,9 @@ use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurat
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
@@ -227,21 +230,28 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $servicesConfigurator->set('security_auditor.cheap_attacker', AttackerAgent::class)
             ->private()
             ->args([
-                service('security_auditor.cheap_attacker_client'),
-                service(AttackerPromptBuilderInterface::class),
-                service(VulnerabilityFactory::class),
-                service(AttackerCacheInterface::class),
+                inline_service(AttackerLlmCollaborators::class)->args([
+                    service('security_auditor.cheap_attacker_client'),
+                    service(AttackerPromptBuilderInterface::class),
+                    service(VulnerabilityFactory::class),
+                    service(CodeSlicerInterface::class),
+                    service(RecordVulnerabilityToolFactoryInterface::class),
+                ]),
+                inline_service(AttackerScanCollaborators::class)->args([
+                    service(AttackerCacheInterface::class),
+                    service(StaticPreScannerInterface::class),
+                    service(FileChunker::class),
+                    service(ToolRegistryFactoryInterface::class),
+                    service(ProgressReporterInterface::class),
+                ]),
+                inline_service(AttackerAnalysisSettings::class)->args([
+                    $bundleConfiguration->audit->toolsEnabled,
+                    $bundleConfiguration->audit->maxToolIterations,
+                    $bundleConfiguration->audit->staticPreScanLeanMode,
+                    $bundleConfiguration->audit->structuredCollection,
+                    $bundleConfiguration->audit->attackerMaxConcurrent,
+                ]),
                 service('logger'),
-                service(ToolRegistryFactoryInterface::class),
-                $bundleConfiguration->audit->toolsEnabled,
-                $bundleConfiguration->audit->maxToolIterations,
-                service(StaticPreScannerInterface::class),
-                $bundleConfiguration->audit->staticPreScanLeanMode,
-                service(FileChunker::class),
-                service(CodeSlicerInterface::class),
-                service(RecordVulnerabilityToolFactoryInterface::class),
-                $bundleConfiguration->audit->structuredCollection,
-                service(ProgressReporterInterface::class),
             ]);
 
         $servicesConfigurator->set(EscalatingAttackerAgent::class)

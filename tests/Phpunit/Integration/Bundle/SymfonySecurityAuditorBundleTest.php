@@ -27,6 +27,7 @@ use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Filesystem\Filesystem;
@@ -34,6 +35,7 @@ use Symfony\Component\HttpKernel\Kernel;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
@@ -169,13 +171,28 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertTrue($containerBuilder->hasDefinition(EscalatingAttackerAgent::class));
         self::assertTrue($containerBuilder->hasAlias(AttackerAgentInterface::class));
         self::assertSame(EscalatingAttackerAgent::class, (string) $containerBuilder->getAlias(AttackerAgentInterface::class));
-        $cheapAttackerFirstArgument = $containerBuilder->getDefinition('security_auditor.cheap_attacker')->getArgument(0);
-        self::assertInstanceOf(Reference::class, $cheapAttackerFirstArgument);
-        self::assertSame('security_auditor.cheap_attacker_client', (string) $cheapAttackerFirstArgument);
+        $cheapAttackerLlmCollaborators = $containerBuilder->getDefinition('security_auditor.cheap_attacker')->getArgument(0);
+        self::assertInstanceOf(Definition::class, $cheapAttackerLlmCollaborators);
+        self::assertSame(AttackerLlmCollaborators::class, $cheapAttackerLlmCollaborators->getClass());
+        $cheapAttackerClientArgument = $cheapAttackerLlmCollaborators->getArgument(0);
+        self::assertInstanceOf(Reference::class, $cheapAttackerClientArgument);
+        self::assertSame('security_auditor.cheap_attacker_client', (string) $cheapAttackerClientArgument);
 
         $escalatingAttackerFirstArgument = $containerBuilder->getDefinition(EscalatingAttackerAgent::class)->getArgument(0);
         self::assertInstanceOf(Reference::class, $escalatingAttackerFirstArgument);
         self::assertSame('security_auditor.cheap_attacker', (string) $escalatingAttackerFirstArgument);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(1500)]
+    public function test_bundle_wires_escalating_attacker_agent_when_escalation_enabled(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-4o-mini']],
+        ]);
+
+        self::assertInstanceOf(EscalatingAttackerAgent::class, $this->getPrivateService($kernel, AttackerAgentInterface::class));
     }
 
     #[RunInSeparateProcess]

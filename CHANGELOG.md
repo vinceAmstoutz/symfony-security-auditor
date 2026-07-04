@@ -352,6 +352,25 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   default `claude-opus-4-8` and every current model are catalog-present and
   unchanged.
 
+### Fixed
+
+- **Enabling `audit.escalation.enabled` crashed the container.**
+  `SymfonySecurityAuditorBundle::registerEscalation()` wired the cheap-model
+  `AttackerAgent` (`security_auditor.cheap_attacker`) with a stale 15-argument
+  flat positional-argument list left over from before `AttackerAgent`'s
+  constructor moved to the `AttackerLlmCollaborators` /
+  `AttackerScanCollaborators` / `AttackerAnalysisSettings` collaborator-bag
+  shape it has used ever since — the two no longer matched, so the container
+  failed to compile/instantiate the service the moment
+  `escalation.enabled: true` was set. Fixed by wiring
+  `security_auditor.cheap_attacker` through the same three inline collaborator
+  bags the primary `AttackerAgent::class` definition already uses in
+  `config/services.php`. New
+  `test_bundle_wires_escalating_attacker_agent_when_escalation_enabled` boots a
+  real kernel with escalation enabled and resolves `AttackerAgentInterface` from
+  the container, which the previous structural-only test did not do and so did
+  not catch this.
+
 ### Security
 
 - **The install scripts now fail closed on checksum verification.** Previously
