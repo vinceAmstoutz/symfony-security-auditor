@@ -259,7 +259,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
         self::assertSame(
-            ['src', 'config', 'templates', 'public/index.php'],
+            ['src', 'config', 'templates', 'public/index.php', '.env', '.env.local', '.env.dev', '.env.test', '.env.prod', '.env.dist'],
             $containerBuilder->getParameter('symfony_security_auditor.scan.included_paths'),
         );
     }

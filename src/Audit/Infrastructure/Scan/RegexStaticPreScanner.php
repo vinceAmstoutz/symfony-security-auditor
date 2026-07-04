@@ -33,7 +33,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 2;
+    public const int CACHE_VERSION = 3;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -184,6 +184,14 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'php_serializer_transport' => [
                 'regex' => '/serializer\s*:\s*[\'"]?php_serialize/',
                 'description' => 'Messenger transport with php_serialize — PHP-native unserialize on dequeue',
+            ],
+            'env_credential_assignment' => [
+                'regex' => '/^\s*[A-Z0-9_]*(?:SECRET|PASSWORD|PASSWD|TOKEN|API_?KEY|ACCESS_KEY|PRIVATE_KEY)[A-Z0-9_]*\s*=\s*\S+/',
+                'description' => 'Credential assigned in a committed dotenv file — move it to secrets storage (vault) or an untracked .env.local',
+            ],
+            'scrubbed_secret' => [
+                'regex' => '/\*\*\*REDACTED:/',
+                'description' => 'A credential-shaped value was redacted here before analysis — a real secret is committed in this file',
             ],
         ],
         ProjectFileType::AUTHENTICATOR->value => [

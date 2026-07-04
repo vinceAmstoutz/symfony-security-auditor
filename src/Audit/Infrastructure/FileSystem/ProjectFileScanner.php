@@ -42,14 +42,27 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
      * Default allow-list of project-relative paths scanned for security
      * findings. Matches the Symfony Flex skeleton (`src/` for PHP, `config/`
      * for YAML/XML, `templates/` for Twig, `public/index.php` for the HTTP
-     * front controller). Anything outside this list is silently skipped —
-     * including ad-hoc root-level scripts, `bin/`, custom `app/` or `lib/`
-     * trees, and the build artefacts in `var/`, `public/build`, `vendor/`.
-     * Override via `scan.included_paths` for non-standard layouts.
+     * front controller, plus the root dotenv files where committed secrets
+     * hide — the gitignored `.env.local` variants are pruned by the default
+     * `respect_gitignore: true`). Anything outside this list is silently
+     * skipped — including ad-hoc root-level scripts, `bin/`, custom `app/`
+     * or `lib/` trees, and the build artefacts in `var/`, `public/build`,
+     * `vendor/`. Override via `scan.included_paths` for non-standard layouts.
      *
      * @var list<string>
      */
-    public const array DEFAULT_INCLUDED_PATHS = ['src', 'config', 'templates', 'public/index.php'];
+    public const array DEFAULT_INCLUDED_PATHS = [
+        'src',
+        'config',
+        'templates',
+        'public/index.php',
+        '.env',
+        '.env.local',
+        '.env.dev',
+        '.env.test',
+        '.env.prod',
+        '.env.dist',
+    ];
 
     /**
      * @param list<string>                  $includedPaths project-relative directories and files to scan; defaults to the Symfony skeleton layout
@@ -128,6 +141,7 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
         foreach ($explicitFiles as $explicitFile) {
             $explicitFinder = (new Finder())
                 ->files()
+                ->ignoreDotFiles(false)
                 ->in(\dirname($explicitFile))
                 ->depth('== 0')
                 ->name(basename($explicitFile))

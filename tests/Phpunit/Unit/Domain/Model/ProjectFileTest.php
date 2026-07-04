@@ -242,6 +242,25 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isConfiguration());
     }
 
+    public function test_it_detects_dotenv_files_as_config(): void
+    {
+        $projectFile = ProjectFile::create('.env', '/app/.env', 'APP_ENV=prod');
+        self::assertSame('config', $projectFile->type());
+        self::assertTrue($projectFile->isConfiguration());
+    }
+
+    public function test_it_detects_dotenv_variants_as_config(): void
+    {
+        $projectFile = ProjectFile::create('.env.dev', '/app/.env.dev', 'APP_ENV=dev');
+        self::assertSame('config', $projectFile->type());
+    }
+
+    public function test_compiled_dotenv_php_file_stays_php(): void
+    {
+        $projectFile = ProjectFile::create('.env.local.php', '/app/.env.local.php', '<?php return [];');
+        self::assertSame('php', $projectFile->type());
+    }
+
     public function test_it_counts_lines_correctly(): void
     {
         $content = "<?php\n\nclass Foo\n{\n    public function bar(): void {}\n}\n";
