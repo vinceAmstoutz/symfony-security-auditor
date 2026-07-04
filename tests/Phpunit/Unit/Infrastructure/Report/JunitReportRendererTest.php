@@ -15,11 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
 use DOMDocument;
 use Override;
-use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -28,25 +25,19 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrati
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 
-final class JunitReportRendererTest extends TestCase
+final class JunitReportRendererTest extends AbstractReportRendererTestCase
 {
-    private JunitReportRenderer $junitReportRenderer;
-
-    private string $tmpDir;
-
     #[Override]
-    protected function setUp(): void
+    protected function createRenderer(): ReportRendererInterface
     {
-        $this->tmpDir = sys_get_temp_dir().'/junit_renderer_test_'.uniqid('', true);
-        mkdir($this->tmpDir, 0o777, true);
-        $this->junitReportRenderer = new JunitReportRenderer();
+        return new JunitReportRenderer();
     }
 
-    #[Override]
-    protected function tearDown(): void
+    public function test_it_advertises_the_junit_format(): void
     {
-        (new Filesystem())->remove($this->tmpDir);
+        self::assertSame('junit', $this->renderer->format());
     }
 
     /**
@@ -113,47 +104,19 @@ final class JunitReportRendererTest extends TestCase
      */
     public function test_it_pretty_prints_the_document(): void
     {
-        $output = $this->junitReportRenderer->render($this->makeReport($this->makeValidatedVuln()));
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
 
         self::assertStringContainsString("<testsuites>\n  <testsuite", $output);
     }
 
     private function decodeJunit(AuditReport $auditReport): DOMDocument
     {
-        $output = $this->junitReportRenderer->render($auditReport);
+        $output = $this->renderer->render($auditReport);
 
         $domDocument = new DOMDocument();
         self::assertTrue($domDocument->loadXML($output));
         self::assertSame('testsuites', $domDocument->documentElement?->nodeName);
 
         return $domDocument;
-    }
-
-    private function makeReport(Vulnerability ...$vulnerabilities): AuditReport
-    {
-        $auditContext = AuditContext::forProject($this->tmpDir);
-        foreach ($vulnerabilities as $vulnerability) {
-            $auditContext->addVulnerability($vulnerability);
-        }
-
-        return AuditReport::fromContext($auditContext);
-    }
-
-    /**
-     * @throws InvalidCodeLocationException
-     * @throws InvalidVulnerabilityClassificationException
-     */
-    private function makeValidatedVuln(
-        VulnerabilityType $vulnerabilityType = VulnerabilityType::SQL_INJECTION,
-        VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,
-        string $filePath = 'src/Foo.php',
-        int $lineStart = 1,
-    ): Vulnerability {
-        return Vulnerability::of(
-            new VulnerabilityClassification($vulnerabilityType, $vulnerabilitySeverity, 'Test Vuln', 0.9),
-            new CodeLocation($filePath, $lineStart, $lineStart + 4),
-            new VulnerabilityNarrative('Test description', 'inject', "' OR 1=1", 'fix'),
-            '$q',
-        )->withReviewerValidation(true);
     }
 }

@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
 use DOMDocument;
 use DOMElement;
+use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
@@ -24,8 +25,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final readonly class JunitReportRenderer
+final readonly class JunitReportRenderer implements ReportRendererInterface
 {
+    #[Override]
+    public function format(): string
+    {
+        return 'junit';
+    }
+
+    #[Override]
     public function render(AuditReport $auditReport): string
     {
         $vulnerabilities = $auditReport->vulnerabilities();

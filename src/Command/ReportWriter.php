@@ -17,29 +17,35 @@ use Override;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ReportWriter implements ReportWriterInterface
 {
-    public function __construct(
-        private ReportRenderer $reportRenderer,
-        private Filesystem $filesystem,
-        private JunitReportRenderer $junitReportRenderer = new JunitReportRenderer(),
-    ) {}
+    /** @var array<string, ReportRendererInterface> */
+    private array $renderers;
 
+    /** @param iterable<ReportRendererInterface> $renderers */
+    public function __construct(
+        iterable $renderers,
+        private Filesystem $filesystem,
+    ) {
+        $indexed = [];
+        foreach ($renderers as $renderer) {
+            $indexed[$renderer->format()] = $renderer;
+        }
+
+        $this->renderers = $indexed;
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     */
     #[Override]
     public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle): void
     {
-        $content = match ($outputFormat) {
-            OutputFormat::Json => $this->reportRenderer->renderJson($auditReport),
-            OutputFormat::Sarif => $this->reportRenderer->renderSarif($auditReport),
-            OutputFormat::Html => $this->reportRenderer->renderHtml($auditReport),
-            OutputFormat::Markdown => $this->reportRenderer->renderMarkdown($auditReport),
-            OutputFormat::Junit => $this->junitReportRenderer->render($auditReport),
-            OutputFormat::Console => $this->reportRenderer->renderConsole($auditReport),
-        };
+        $content = $this->rendererFor($outputFormat)->render($auditReport);
 
         if (null === $outputFile) {
             $symfonyStyle->writeln($content);
@@ -49,5 +55,14 @@ final readonly class ReportWriter implements ReportWriterInterface
 
         $this->filesystem->dumpFile($outputFile, $content);
         $symfonyStyle->success(\sprintf('Report saved to %s', $outputFile));
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     */
+    private function rendererFor(OutputFormat $outputFormat): ReportRendererInterface
+    {
+        return $this->renderers[$outputFormat->value]
+            ?? throw UnsupportedOutputFormatException::forFormat($outputFormat->value);
     }
 }

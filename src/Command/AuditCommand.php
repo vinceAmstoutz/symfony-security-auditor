@@ -27,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\PlainProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
 #[AsCommand(
@@ -64,6 +65,7 @@ final readonly class AuditCommand
     ) {}
 
     /**
+     * @throws UnsupportedOutputFormatException
      * @throws WorkingDirectoryUnavailableException
      */
     public function __invoke(
@@ -128,6 +130,8 @@ final readonly class AuditCommand
 
     /**
      * @param list<string> $scanPaths
+     *
+     * @throws UnsupportedOutputFormatException
      */
     private function runDryRun(
         SymfonyStyle $symfonyStyle,
@@ -171,6 +175,9 @@ final readonly class AuditCommand
         );
     }
 
+    /**
+     * @throws UnsupportedOutputFormatException
+     */
     private function generateBaseline(
         SymfonyStyle $symfonyStyle,
         AuditCommandInput $auditCommandInput,
@@ -187,6 +194,9 @@ final readonly class AuditCommand
         return ExitCode::Success->value;
     }
 
+    /**
+     * @throws UnsupportedOutputFormatException
+     */
     private function finalizeAuditRun(
         SymfonyStyle $symfonyStyle,
         AuditCommandInput $auditCommandInput,
@@ -210,6 +220,9 @@ final readonly class AuditCommand
         return $exitCode;
     }
 
+    /**
+     * @throws UnsupportedOutputFormatException
+     */
     private function handleBudgetAbort(
         SymfonyStyle $symfonyStyle,
         AuditCommandInput $auditCommandInput,
