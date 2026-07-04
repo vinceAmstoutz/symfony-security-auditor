@@ -24,7 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
  */
 final readonly class AttackerSkillRegistry
 {
-    /** @var list<AttackerSkillInterface> */
+    /** @var array<AttackerSkillInterface> */
     private array $orderedSkills;
 
     /**
@@ -33,8 +33,7 @@ final readonly class AttackerSkillRegistry
      */
     public function __construct(?iterable $skills = null)
     {
-        $skills ??= $this->defaultSkills();
-        $ordered = $skills instanceof Traversable ? iterator_to_array($skills, false) : array_values($skills);
+        $ordered = $skills instanceof Traversable ? iterator_to_array($skills) : ($skills ?? $this->defaultSkills());
         usort(
             $ordered,
             static fn (AttackerSkillInterface $a, AttackerSkillInterface $b): int => $a->priority() <=> $b->priority(),
