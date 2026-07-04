@@ -12,6 +12,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **`security.yaml` is now parsed with `symfony/yaml` instead of single-line
+  regexes, so the access-control map the attacker reasons over is finally
+  complete.** `MappingStage` previously extracted `access_control` with a
+  `path:`/`roles:` two-line regex and firewalls with a bare `pattern:` match
+  (`src/Audit/Application/Pipeline/Stage/MappingStage.php`), silently missing
+  list-form `roles`, `allow_if` expressions, `methods`/`ips`/ `requires_channel`
+  constraints, `when@<env>` overrides, and firewall flags. The new Domain port
+  `SecurityConfigParserInterface`
+  (`src/Audit/Domain/Port/SecurityConfigParserInterface.php`, default impl
+  `SymfonyYamlSecurityConfigParser` in `src/Audit/Infrastructure/Scan/`)
+  performs a real YAML parse: every requirement lands in the route map
+  (`allow_if: <expr>`, `methods: POST|DELETE`, `ips: …`,
+  `requires_channel: https`), firewall rules carry their `security: false` /
+  `stateless` flags, `route:`-keyed entries and environment-scoped `when@prod`
+  blocks are read, and unparseable YAML degrades to an empty result instead of
+  aborting the audit. Adds `symfony/yaml` to the runtime requirements.
 - **Committed dotenv files are now part of the default scan surface, with
   deterministic secret markers.** `.env`, `.env.local`, `.env.dev`, `.env.test`,
   `.env.prod`, and `.env.dist` were previously invisible to the auditor twice
