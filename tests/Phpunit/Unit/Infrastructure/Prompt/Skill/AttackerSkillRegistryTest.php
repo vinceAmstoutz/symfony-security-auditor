@@ -44,11 +44,11 @@ final class AttackerSkillRegistryTest extends TestCase
     #[DataProvider('everySkill')]
     public function test_each_skill_declares_its_surface_priority_and_block(
         AttackerSkillInterface $attackerSkill,
-        ProjectFileType $expectedFileType,
+        ProjectFileType $projectFileType,
         int $expectedPriority,
         string $expectedRole,
     ): void {
-        self::assertSame($expectedFileType, $attackerSkill->fileType());
+        self::assertSame($projectFileType, $attackerSkill->fileType());
         self::assertSame($expectedPriority, $attackerSkill->priority());
         self::assertStringContainsString(\sprintf('<skills role="%s">', $expectedRole), $attackerSkill->block());
     }
