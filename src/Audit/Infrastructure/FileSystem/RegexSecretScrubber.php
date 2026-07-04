@@ -108,13 +108,14 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      */
     private function redactInlineAssignment(array $match): string
     {
-        $value = '' !== $match[3] ? $match[3] : $match[4];
+        $quote = $match[2] ?? '';
+        $value = ($match[3] ?? '').($match[4] ?? '');
 
         if ($this->isConfigPlaceholder($value)) {
             return $match[0];
         }
 
-        return \sprintf('%s%s***REDACTED:%s***%s', $match[1], $match[2], SecretPatternLabel::InlineAssignment->value, $match[2]);
+        return \sprintf('%s%s***REDACTED:%s***%s', $match[1], $quote, SecretPatternLabel::InlineAssignment->value, $quote);
     }
 
     /**
