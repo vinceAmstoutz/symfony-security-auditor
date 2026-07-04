@@ -352,6 +352,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   default `claude-opus-4-8` and every current model are catalog-present and
   unchanged.
 
+### Fixed
+
+- **`--since` silently dropped changed dotfiles (`.env`, `.github/...`) from
+  incremental audits.** `ProcessGitChangedFilesResolver::mergeAndNormalize()`
+  (`src/Audit/Infrastructure/Diff/ProcessGitChangedFilesResolver.php`) used
+  `trimStart('./')`, which strips a leading **character mask** (every leading
+  `.` and `/`), not the literal prefix `./` — `.env` was mangled to `env` and
+  `.github/workflows/ci.yml` to `github/workflows/ci.yml`. The mangled path
+  then failed the exact-match lookup against real project files, so a changed
+  `.env` (or any dotfile/dot-directory) was excluded from `audit:run --since`
+  scope even though it changed. Now uses `trimPrefix('./')`, which strips only
+  the literal `./` prefix.
+
 ### Security
 
 - **The install scripts now fail closed on checksum verification.** Previously
