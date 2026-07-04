@@ -79,7 +79,11 @@ final readonly class TransientFailureClassifier
             return false;
         }
 
-        return u($joined)->containsAny(self::TRANSIENT_HINTS) || $this->containsStatusCode($joined, self::TRANSIENT_STATUS_CODES);
+        if (u($joined)->containsAny(self::TRANSIENT_HINTS)) {
+            return true;
+        }
+
+        return $this->containsStatusCode($joined, self::TRANSIENT_STATUS_CODES);
     }
 
     /**
@@ -104,7 +108,11 @@ final readonly class TransientFailureClassifier
     {
         $joined = $this->joinMessages($throwable);
 
-        return u($joined)->containsAny(self::RATE_LIMIT_HINTS) || $this->containsStatusCode($joined, self::RATE_LIMIT_STATUS_CODES);
+        if (u($joined)->containsAny(self::RATE_LIMIT_HINTS)) {
+            return true;
+        }
+
+        return $this->containsStatusCode($joined, self::RATE_LIMIT_STATUS_CODES);
     }
 
     private function joinMessages(Throwable $throwable): string
