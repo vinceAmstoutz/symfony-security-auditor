@@ -321,7 +321,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
 
     private function hasDotAllModifier(string $regex): bool
     {
-        $lastDelimiter = strrpos($regex, '/') ?: 0;
+        $lastDelimiter = strrpos($regex, '/');
+        $lastDelimiter = false === $lastDelimiter ? 0 : $lastDelimiter;
 
         return str_contains(substr($regex, $lastDelimiter + 1), 's');
     }
