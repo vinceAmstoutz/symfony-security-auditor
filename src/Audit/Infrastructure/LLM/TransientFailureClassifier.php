@@ -132,6 +132,6 @@ final readonly class TransientFailureClassifier
      */
     private function containsStatusCode(string $joined, array $codes): bool
     {
-        return 1 === preg_match('/\b(?:'.implode('|', $codes).')\b/', $joined);
+        return 1 === preg_match(\sprintf('/\b(?:%s)\b/', implode('|', $codes)), $joined);
     }
 }
