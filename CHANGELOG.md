@@ -255,6 +255,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **Prompt building is split behind interfaces so neither builder is a
+  monolith.** `AttackerPromptBuilder`
+  (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) held all sixteen
+  per-attack-surface skill blocks inline as a ~255-line `SKILLS` constant, and
+  `ReviewerPromptBuilder` carried every system-prompt section plus both
+  line-numbered user-message templates. Following the same **Strategy +
+  Registry** idiom already used for token estimators and report renderers: each
+  attacker skill block is now an `AttackerSkillInterface` strategy under
+  `src/Audit/Infrastructure/Prompt/Skill/` (one class per surface —
+  `ControllerAttackerSkill`, `ApiResourceAttackerSkill`,
+  `LiveComponentAttackerSkill`, …), each declaring its `ProjectFileType` and
+  emission `priority()`; `AttackerSkillRegistry` collects them via the
+  `symfony_security_auditor.attacker_skill` DI tag and emits, in priority order,
+  the blocks whose type appears in the chunk. Adding an attack surface is now
+  one new tagged class with no edit to the builder. The reviewer's fixed prompt
+  text moves to `ReviewerPromptSections` and its two user-message templates to
+  `ReviewerMessageRenderer` (both under
+  `src/Audit/Infrastructure/Prompt/Reviewer/`, behind interfaces), leaving
+  `ReviewerPromptBuilder` as pure per-mode composition. The emitted prompts are
+  byte-identical — `PROMPT_VERSION` is unchanged (attacker 11, reviewer 1), so
+  no cached responses are invalidated — and all builders were `@internal`, so
+  their internals moving is not a BC break.
 - **Report rendering is split into one class per output format behind a new
   `ReportRendererInterface`, so no single class carries every format's logic.**
   The `@internal` `ReportRenderer` god class
