@@ -33,7 +33,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 4;
+    public const int CACHE_VERSION = 5;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -152,6 +152,16 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'serializer_groups_attribute' => [
                 'regex' => '/#\[\s*Groups\s*\(|@Groups\s*\(/',
                 'description' => 'Serializer #[Groups] attribute — verify write groups do not expose privileged fields (roles, isAdmin, passwordHash) to mass assignment',
+            ],
+        ],
+        ProjectFileType::LIVE_COMPONENT->value => [
+            'live_prop_writable' => [
+                'regex' => '/#\[\s*LiveProp\s*\([^)]*writable\s*:\s*true/',
+                'description' => 'Writable LiveProp — client-controlled before any action runs; verify it is not a privileged or owned-resource field',
+            ],
+            'live_action_endpoint' => [
+                'regex' => '/#\[\s*LiveAction\b/',
+                'description' => 'LiveAction — a routeless HTTP endpoint; verify an #[IsGranted]/denyAccessUnlessGranted guard covers it',
             ],
         ],
         ProjectFileType::ENTITY->value => [

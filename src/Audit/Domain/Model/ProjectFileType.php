@@ -17,6 +17,7 @@ enum ProjectFileType: string
 {
     case CONTROLLER = 'controller';
     case API_RESOURCE = 'api_resource';
+    case LIVE_COMPONENT = 'live_component';
     case ENTITY = 'entity';
     case VOTER = 'voter';
     case REPOSITORY = 'repository';

@@ -316,12 +316,45 @@ final class ProjectFileTest extends TestCase
         self::assertSame('config', $projectFile->type());
     }
 
+    public function test_it_detects_live_components_by_attribute(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/Components/SearchBar.php',
+            '/app/src/Twig/Components/SearchBar.php',
+            "<?php\nuse Symfony\\UX\\LiveComponent\\Attribute\\AsLiveComponent;\n#[AsLiveComponent]\nclass SearchBar {}",
+        );
+
+        self::assertSame('live_component', $projectFile->type());
+    }
+
+    public function test_non_php_file_with_live_component_content_is_not_a_live_component(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/live_component.yaml',
+            '/app/config/packages/live_component.yaml',
+            "# marker #[AsLiveComponent] in a comment\n",
+        );
+
+        self::assertSame('config', $projectFile->type());
+    }
+
     public function test_api_platform_namespace_without_an_operation_attribute_is_not_an_api_resource(): void
     {
         $projectFile = ProjectFile::create(
             'src/State/BookProvider.php',
             '/app/src/State/BookProvider.php',
             "<?php\nuse ApiPlatform\\Metadata\\Operation;\nclass BookProvider {}",
+        );
+
+        self::assertSame('php', $projectFile->type());
+    }
+
+    public function test_plain_twig_components_without_live_attribute_stay_php(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/Components/Badge.php',
+            '/app/src/Twig/Components/Badge.php',
+            "<?php\n#[AsTwigComponent]\nclass Badge {}",
         );
 
         self::assertSame('php', $projectFile->type());

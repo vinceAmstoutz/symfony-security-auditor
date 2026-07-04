@@ -29,6 +29,7 @@ final readonly class FileChunker
     private const array TYPE_PRIORITY = [
         ProjectFileType::CONTROLLER,
         ProjectFileType::API_RESOURCE,
+        ProjectFileType::LIVE_COMPONENT,
         ProjectFileType::AUTHENTICATOR,
         ProjectFileType::VOTER,
         ProjectFileType::WEBHOOK_CONSUMER,

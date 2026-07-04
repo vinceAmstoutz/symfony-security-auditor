@@ -45,6 +45,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   chunking priority slot right after controllers. Custom markers can target the
   new bucket via `scan.custom_risk_patterns.api_resource`. Attacker cache
   entries are invalidated by the prompt/pre-scan version bumps.
+- **Symfony UX Live Components are now a first-class attack surface.** Every
+  `#[LiveAction]` method is an HTTP endpoint without a route and every
+  `#[LiveProp(writable: true)]` is client-bound state — none of it visible in
+  controllers or the access_control map, and previously classified as plain
+  `php` files. A new `ProjectFileType::LIVE_COMPONENT` case
+  (`src/Audit/Domain/Model/ProjectFile.php` detects `#[AsLiveComponent]`;
+  non-live `#[AsTwigComponent]` classes are deliberately left as `php`), a
+  dedicated attacker skill block (`AttackerPromptBuilder`, `PROMPT_VERSION` 11)
+  hunting unguarded privileged `#[LiveAction]`s, writable props on sensitive
+  fields (mass assignment / price manipulation), injection sinks fed by writable
+  props, custom hydration `unserialize`, and client-trusted `#[LiveListener]`
+  payloads; plus a `live_component` pre-scanner bucket (`RegexStaticPreScanner`,
+  `CACHE_VERSION` 5) with `live_prop_writable` and `live_action_endpoint`
+  markers, and a chunking priority slot right after controllers. Custom markers
+  can target the new bucket via `scan.custom_risk_patterns.live_component`.
 - **`security.yaml` is now parsed with `symfony/yaml` instead of single-line
   regexes, so the access-control map the attacker reasons over is finally
   complete.** `MappingStage` previously extracted `access_control` with a

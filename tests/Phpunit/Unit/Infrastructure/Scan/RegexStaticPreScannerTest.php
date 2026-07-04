@@ -200,6 +200,34 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('api_filter_declared', $patterns);
     }
 
+    public function test_it_flags_writable_live_props(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/Components/ProfileForm.php',
+            '/app/src/Twig/Components/ProfileForm.php',
+            "<?php\n#[AsLiveComponent]\nclass ProfileForm {\n    #[LiveProp(writable: true)]\n    public string \$email = '';\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('live_prop_writable', $patterns);
+    }
+
+    public function test_it_flags_live_actions_for_authorization_review(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/Components/AdminPanel.php',
+            '/app/src/Twig/Components/AdminPanel.php',
+            "<?php\n#[AsLiveComponent]\nclass AdminPanel {\n    #[LiveAction]\n    public function deleteUser(): void {}\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('live_action_endpoint', $patterns);
+    }
+
     public function test_it_flags_voter_default_return_true(): void
     {
         $projectFile = ProjectFile::create(
