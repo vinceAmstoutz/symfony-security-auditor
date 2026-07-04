@@ -332,10 +332,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      */
     private function matchAcrossLines(string $content, string $regex): array
     {
-        $matchCount = preg_match_all($regex, $content, $matches, \PREG_OFFSET_CAPTURE);
-        if (false === $matchCount || 0 === $matchCount) {
-            return [];
-        }
+        preg_match_all($regex, $content, $matches, \PREG_OFFSET_CAPTURE);
 
         $lines = [];
         foreach ($matches[0] as $match) {
