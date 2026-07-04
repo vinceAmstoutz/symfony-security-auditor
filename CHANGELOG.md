@@ -369,7 +369,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `test_bundle_wires_escalating_attacker_agent_when_escalation_enabled` boots a
   real kernel with escalation enabled and resolves `AttackerAgentInterface` from
   the container, which the previous structural-only test did not do and so did
-  not catch this.
+  not catch this. The existing structural test now also pins the exact scalar
+  values (`toolsEnabled`, `maxToolIterations`, `staticPreScanLeanMode`,
+  `structuredCollection`, `attackerMaxConcurrent`) threaded into the escalation
+  attacker's `AttackerAnalysisSettings`, since PHP's reflection-based DI
+  instantiation weak-coerces `int`/`bool` silently, so a dropped or reordered
+  scalar argument would not otherwise fail loudly.
 
 ### Security
 
