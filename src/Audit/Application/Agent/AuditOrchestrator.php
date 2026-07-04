@@ -25,6 +25,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 {
+    private const string SKIPPED_FINGERPRINTS_META = 'audit.baseline_skipped_fingerprints';
+
     public const int DEFAULT_MAX_ITERATIONS = 3;
 
     public const float DEFAULT_MIN_CONFIDENCE = 0.6;
@@ -93,6 +95,15 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
                 break;
             }
 
+            $reviewCandidates = $this->withoutBaselineAccepted($filtered, $auditContext);
+
+            if ([] === $reviewCandidates) {
+                $this->logger->info('Every remaining finding is baseline-accepted, stopping');
+                break;
+            }
+
+            $filtered = $reviewCandidates;
+
             $this->progressReporter->report(ProgressEvent::ReviewStarted->value, [
                 'findings' => \count($filtered),
             ]);
@@ -122,6 +133,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             }
         } while ($iteration < $this->auditLoopSettings->maxIterations);
 
+        $auditContext->setMeta('audit.baseline_skipped', \count($this->skippedFingerprints($auditContext)));
         $auditContext->setMeta('audit.iterations', $iteration);
         $auditContext->setMeta('audit.total_findings', \count($auditContext->vulnerabilities()));
         $auditContext->setMeta('audit.validated', \count($auditContext->validatedVulnerabilities()));
@@ -141,6 +153,62 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             $auditContext->vulnerabilities(),
             static fn (Vulnerability $vulnerability): bool => !$vulnerability->isReviewerValidated(),
         ));
+    }
+
+    /**
+     * @param list<Vulnerability> $findings
+     *
+     * @return list<Vulnerability>
+     */
+    private function withoutBaselineAccepted(array $findings, AuditContext $auditContext): array
+    {
+        $acceptedFingerprints = $auditContext->acceptedFingerprints();
+
+        $remaining = [];
+        foreach ($findings as $finding) {
+            if (!\in_array($finding->fingerprint(), $acceptedFingerprints, true)) {
+                $remaining[] = $finding;
+
+                continue;
+            }
+
+            $this->recordBaselineSkip($finding, $auditContext);
+        }
+
+        return $remaining;
+    }
+
+    private function recordBaselineSkip(Vulnerability $vulnerability, AuditContext $auditContext): void
+    {
+        $skippedFingerprints = $this->skippedFingerprints($auditContext);
+        if (\in_array($vulnerability->fingerprint(), $skippedFingerprints, true)) {
+            return;
+        }
+
+        $skippedFingerprints[] = $vulnerability->fingerprint();
+        $auditContext->setMeta(self::SKIPPED_FINGERPRINTS_META, $skippedFingerprints);
+
+        $this->logger->info('Baseline-accepted finding skipped before review', [
+            'fingerprint' => $vulnerability->fingerprint(),
+            'type' => $vulnerability->type()->value,
+            'file' => $vulnerability->filePath(),
+        ]);
+        $this->progressReporter->report(ProgressEvent::BaselineFindingSkipped->value, [
+            'type' => $vulnerability->type()->value,
+            'file' => $vulnerability->filePath(),
+            'line' => $vulnerability->lineStart(),
+            'title' => $vulnerability->title(),
+        ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function skippedFingerprints(AuditContext $auditContext): array
+    {
+        $skipped = $auditContext->getMeta(self::SKIPPED_FINGERPRINTS_META, []);
+
+        return \is_array($skipped) ? array_values(array_filter($skipped, is_string(...))) : [];
     }
 
     /**

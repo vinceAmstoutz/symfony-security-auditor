@@ -34,6 +34,9 @@ final class RecordingStage implements StageInterface
     /** @var list<bool> */
     public array $observedCacheBypassed = [];
 
+    /** @var list<list<string>> */
+    public array $observedAcceptedFingerprints = [];
+
     #[Override]
     public function name(): string
     {
@@ -46,5 +49,6 @@ final class RecordingStage implements StageInterface
         $this->processedAuditIds[] = $auditContext->auditId();
         $this->observedScanPaths[] = $auditContext->scanPaths();
         $this->observedCacheBypassed[] = $auditContext->isCacheBypassed();
+        $this->observedAcceptedFingerprints[] = $auditContext->acceptedFingerprints();
     }
 }

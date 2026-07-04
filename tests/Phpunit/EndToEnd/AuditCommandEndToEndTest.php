@@ -287,6 +287,34 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('SYMFONY LLM AUDIT REPORT', $display);
     }
 
+    public function test_generate_baseline_collects_every_finding_even_when_a_baseline_is_already_configured(): void
+    {
+        $this->createProjectDir();
+        $seedBaseline = $this->fixtureDir.'/configured.json';
+        $regenerated = $this->fixtureDir.'/regenerated.json';
+
+        $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}')->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $seedBaseline,
+        ]);
+        $seedEntries = json_decode((string) file_get_contents($seedBaseline), true);
+        self::assertIsArray($seedEntries);
+        $firstEntry = $seedEntries[0];
+        self::assertIsArray($firstEntry);
+        $firstFingerprint = $firstEntry['fingerprint'] ?? null;
+        self::assertIsString($firstFingerprint);
+        (new Baseline())->save($seedBaseline, [['fingerprint' => $firstFingerprint]]);
+
+        $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}', ['configuredBaseline' => $seedBaseline])->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $regenerated,
+        ]);
+
+        $regeneratedEntries = json_decode((string) file_get_contents($regenerated), true);
+        self::assertIsArray($regeneratedEntries);
+        self::assertCount(5, $regeneratedEntries);
+    }
+
     public function test_baseline_reports_the_exact_number_of_suppressed_findings(): void
     {
         $this->createProjectDir();
@@ -297,13 +325,17 @@ final class AuditCommandEndToEndTest extends TestCase
             '--generate-baseline' => $baselineFile,
         ]);
 
-        $fingerprints = json_decode((string) file_get_contents($baselineFile), true);
-        self::assertIsArray($fingerprints);
-        $first = $fingerprints[0];
-        $second = $fingerprints[1];
-        self::assertIsString($first);
-        self::assertIsString($second);
-        (new Baseline())->save($baselineFile, [$first, $second]);
+        $entries = json_decode((string) file_get_contents($baselineFile), true);
+        self::assertIsArray($entries);
+        $partialBaseline = [];
+        foreach ([$entries[0], $entries[1]] as $entry) {
+            self::assertIsArray($entry);
+            $fingerprint = $entry['fingerprint'] ?? null;
+            self::assertIsString($fingerprint);
+            $partialBaseline[] = ['fingerprint' => $fingerprint];
+        }
+
+        (new Baseline())->save($baselineFile, $partialBaseline);
 
         $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}');
         $commandTester->execute([
@@ -311,7 +343,7 @@ final class AuditCommandEndToEndTest extends TestCase
             '--baseline' => $baselineFile,
         ]);
 
-        self::assertStringContainsString('2 finding(s) suppressed by the baseline.', $commandTester->getDisplay());
+        self::assertSame(2, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
     }
 
     public function test_cli_baseline_option_overrides_the_configured_baseline_path(): void
@@ -349,7 +381,7 @@ final class AuditCommandEndToEndTest extends TestCase
         $commandTester->execute(['project-path' => $this->fixtureDir]);
 
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
-        self::assertStringContainsString('5 finding(s) suppressed by the baseline.', $commandTester->getDisplay());
+        self::assertSame(5, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
     }
 
     public function test_baseline_suppresses_matching_findings_and_clears_the_exit_code(): void
@@ -369,7 +401,7 @@ final class AuditCommandEndToEndTest extends TestCase
         ]);
 
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
-        self::assertStringContainsString('5 finding(s) suppressed by the baseline.', $commandTester->getDisplay());
+        self::assertSame(5, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
     }
 
     public function test_command_json_output_written_to_file(): void

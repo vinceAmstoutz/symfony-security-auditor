@@ -38,6 +38,7 @@ final class AuditContext implements CoverageRecorderInterface
 
     /**
      * @param list<string> $scanPaths
+     * @param list<string> $acceptedFingerprints
      */
     private function __construct(
         private readonly string $projectPath,
@@ -45,23 +46,28 @@ final class AuditContext implements CoverageRecorderInterface
         private readonly array $scanPaths,
         private readonly bool $cacheBypassed,
         private readonly ?string $diffSinceRef = null,
+        private readonly array $acceptedFingerprints = [],
     ) {
         $this->startedAt = new DateTimeImmutable();
     }
 
     /**
-     * @param list<string> $scanPaths     optional project-relative subdirectories
-     *                                    that the scan should be restricted to;
-     *                                    empty list scans the whole project
-     * @param bool         $cacheBypassed when true, agents should skip the
-     *                                    attacker cache entirely for this run
-     *                                    (no reads, no writes)
-     * @param ?string      $diffSinceRef  when set, the IngestionStage filters
-     *                                    discovered files down to those changed
-     *                                    against this git ref (diff mode); null
-     *                                    (default) audits every file in scope
+     * @param list<string> $scanPaths            optional project-relative subdirectories
+     *                                           that the scan should be restricted to;
+     *                                           empty list scans the whole project
+     * @param bool         $cacheBypassed        when true, agents should skip the
+     *                                           attacker cache entirely for this run
+     *                                           (no reads, no writes)
+     * @param ?string      $diffSinceRef         when set, the IngestionStage filters
+     *                                           discovered files down to those changed
+     *                                           against this git ref (diff mode); null
+     *                                           (default) audits every file in scope
+     * @param list<string> $acceptedFingerprints
+     *                                           baseline fingerprints of accepted
+     *                                           findings; matching attacker findings
+     *                                           are dropped before the reviewer runs
      */
-    public static function forProject(string $projectPath, array $scanPaths = [], bool $cacheBypassed = false, ?string $diffSinceRef = null): self
+    public static function forProject(string $projectPath, array $scanPaths = [], bool $cacheBypassed = false, ?string $diffSinceRef = null, array $acceptedFingerprints = []): self
     {
         if (!is_dir($projectPath)) {
             throw new InvalidArgumentException(\sprintf('Project path "%s" is not a valid directory', $projectPath));
@@ -73,7 +79,14 @@ final class AuditContext implements CoverageRecorderInterface
             scanPaths: $scanPaths,
             cacheBypassed: $cacheBypassed,
             diffSinceRef: $diffSinceRef,
+            acceptedFingerprints: $acceptedFingerprints,
         );
+    }
+
+    /** @return list<string> */
+    public function acceptedFingerprints(): array
+    {
+        return $this->acceptedFingerprints;
     }
 
     public function diffSinceRef(): ?string

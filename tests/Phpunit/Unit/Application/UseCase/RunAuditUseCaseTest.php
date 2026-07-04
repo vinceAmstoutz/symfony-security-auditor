@@ -57,6 +57,19 @@ final class RunAuditUseCaseTest extends TestCase
     /**
      * @throws AuditAbortedByBudgetException
      */
+    public function test_it_threads_accepted_fingerprints_into_the_audit_context(): void
+    {
+        $recordingStage = new RecordingStage();
+        $runAuditUseCase = new RunAuditUseCase($this->makePipeline($recordingStage), new NullLogger());
+
+        $runAuditUseCase->execute($this->tmpDir, acceptedFingerprints: ['SSA-AAA', 'SSA-BBB']);
+
+        self::assertSame([['SSA-AAA', 'SSA-BBB']], $recordingStage->observedAcceptedFingerprints);
+    }
+
+    /**
+     * @throws AuditAbortedByBudgetException
+     */
     public function test_it_logs_starting_audit_with_project_path(): void
     {
         $infoLogs = [];
@@ -71,7 +84,7 @@ final class RunAuditUseCaseTest extends TestCase
         $runAuditUseCase->execute($this->tmpDir);
 
         self::assertSame(
-            ['Starting audit', ['project' => $this->tmpDir, 'scan_paths' => [], 'cache_bypassed' => false, 'diff_since_ref' => null]],
+            ['Starting audit', ['project' => $this->tmpDir, 'scan_paths' => [], 'cache_bypassed' => false, 'diff_since_ref' => null, 'accepted_fingerprints' => 0]],
             $infoLogs[0],
         );
     }

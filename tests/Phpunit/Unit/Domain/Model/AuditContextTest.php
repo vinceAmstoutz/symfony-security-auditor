@@ -45,6 +45,18 @@ final class AuditContextTest extends TestCase
         self::assertNull($auditContext->mapping());
     }
 
+    public function test_accepted_fingerprints_default_to_an_empty_list(): void
+    {
+        self::assertSame([], AuditContext::forProject($this->tmpDir)->acceptedFingerprints());
+    }
+
+    public function test_it_returns_the_accepted_fingerprints_it_was_created_with(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-AAA', 'SSA-BBB']);
+
+        self::assertSame(['SSA-AAA', 'SSA-BBB'], $auditContext->acceptedFingerprints());
+    }
+
     public function test_audit_id_matches_expected_format(): void
     {
         for ($i = 0; $i < 64; ++$i) {

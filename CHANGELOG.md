@@ -61,6 +61,26 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `stateless` flags, `route:`-keyed entries and environment-scoped `when@prod`
   blocks are read, and unparseable YAML degrades to an empty result instead of
   aborting the audit. Adds `symfony/yaml` to the runtime requirements.
+- **Baselined findings now skip the reviewer entirely, and the baseline file is
+  human-readable.** Previously the baseline was applied _after_ the audit
+  (`BaselineProcessor::apply()` in `src/Command/AuditCommand.php`), so every
+  accepted finding still paid full attacker _and_ reviewer LLM cost on every run
+  before being hidden from the report; the file itself was a flat JSON array of
+  opaque fingerprint hashes nobody could review. Accepted fingerprints are now
+  threaded into the pipeline (`RunAuditUseCase::execute()` fifth parameter →
+  `AuditContext::acceptedFingerprints()`), and `AuditOrchestrator` drops
+  matching attacker findings _before_ the review phase — each unique skip
+  streams once as `⚖ ⤳ baseline-accepted <type> — file:line (review skipped)`
+  on a decorated terminal or `[BASELINE-SKIPPED] <type> — file:line` in plain
+  output (new stable progress-event value `baseline.finding.skipped`), and the
+  total lands in the `audit.baseline_skipped` context metadata.
+  `--generate-baseline` now writes one JSON object per finding — `fingerprint`,
+  `type`, `file`, `title`, `added_at` — so a baseline diff in code review shows
+  _what_ was accepted; add a free-form `reason` key to any entry for posterity.
+  The legacy flat fingerprint array is still read, so existing baseline files
+  keep working unchanged. Note: the post-run "N finding(s) suppressed by the
+  baseline." console note no longer appears for pipeline-skipped findings — the
+  per-finding skip lines replace it.
 - **Committed dotenv files are now part of the default scan surface, with
   deterministic secret markers.** `.env`, `.env.local`, `.env.dev`, `.env.test`,
   `.env.prod`, and `.env.dist` were previously invisible to the auditor twice

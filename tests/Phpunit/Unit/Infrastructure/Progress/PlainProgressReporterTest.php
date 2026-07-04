@@ -128,6 +128,13 @@ final class PlainProgressReporterTest extends TestCase
         self::assertSame("  [VALIDATED] sql_injection — src/X.php:18\n", $this->bufferedOutput->fetch());
     }
 
+    public function test_it_prints_a_baseline_skip_line(): void
+    {
+        $this->plainProgressReporter->report('baseline.finding.skipped', ['type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 18, 'title' => 'Vuln']);
+
+        self::assertSame("  [BASELINE-SKIPPED] sql_injection — src/X.php:18\n", $this->bufferedOutput->fetch());
+    }
+
     public function test_it_prints_a_rejected_review_line(): void
     {
         $this->plainProgressReporter->report('review.finding.reviewed', ['accepted' => false, 'type' => 'sql_injection', 'file' => 'src/X.php', 'line' => 40]);

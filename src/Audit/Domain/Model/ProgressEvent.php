@@ -27,5 +27,6 @@ enum ProgressEvent: string
     case AttackerFindingRecorded = 'attacker.finding.recorded';
     case ReviewStarted = 'review.started';
     case ReviewFindingReviewed = 'review.finding.reviewed';
+    case BaselineFindingSkipped = 'baseline.finding.skipped';
     case ReviewCompleted = 'review.completed';
 }

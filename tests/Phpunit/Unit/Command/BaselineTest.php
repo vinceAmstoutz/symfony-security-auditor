@@ -55,7 +55,10 @@ final class BaselineTest extends TestCase
         $path = $this->tmpDir.'/baseline.json';
         $baseline = new Baseline($this->filesystem);
 
-        $baseline->save($path, ['SSA-AAA', 'SSA-BBB']);
+        $baseline->save($path, [
+            $this->entry('SSA-AAA'),
+            $this->entry('SSA-BBB'),
+        ]);
 
         self::assertSame(['SSA-AAA', 'SSA-BBB'], $baseline->load($path));
     }
@@ -64,12 +67,13 @@ final class BaselineTest extends TestCase
     {
         $path = $this->tmpDir.'/baseline.json';
 
-        (new Baseline($this->filesystem))->save($path, ['SSA-AAA']);
+        (new Baseline($this->filesystem))->save($path, [$this->entry('SSA-AAA')]);
 
         $contents = file_get_contents($path);
         self::assertIsString($contents);
         self::assertStringContainsString("[\n", $contents);
-        self::assertStringContainsString('"SSA-AAA"', $contents);
+        self::assertStringContainsString('"fingerprint": "SSA-AAA"', $contents);
+        self::assertStringContainsString('"file": "src/Foo.php"', $contents);
         self::assertStringStartsWith('[', $contents);
         self::assertStringEndsWith(']'.\PHP_EOL, $contents);
     }
@@ -124,5 +128,54 @@ final class BaselineTest extends TestCase
         $this->expectException(MalformedBaselineFileException::class);
 
         (new Baseline($this->filesystem))->load($path);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_load_reads_the_legacy_flat_fingerprint_array(): void
+    {
+        $path = $this->tmpDir.'/legacy.json';
+        $this->filesystem->dumpFile($path, '["SSA-AAA", "SSA-BBB"]');
+
+        self::assertSame(['SSA-AAA', 'SSA-BBB'], (new Baseline($this->filesystem))->load($path));
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_load_mixes_legacy_string_and_rich_object_entries(): void
+    {
+        $path = $this->tmpDir.'/mixed-format.json';
+        $this->filesystem->dumpFile($path, '["SSA-AAA", {"fingerprint": "SSA-BBB", "title": "X"}]');
+
+        self::assertSame(['SSA-AAA', 'SSA-BBB'], (new Baseline($this->filesystem))->load($path));
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_load_throws_when_an_entry_object_has_no_fingerprint(): void
+    {
+        $path = $this->tmpDir.'/no-fingerprint.json';
+        $this->filesystem->dumpFile($path, '[{"title": "X"}]');
+
+        $this->expectException(MalformedBaselineFileException::class);
+
+        (new Baseline($this->filesystem))->load($path);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function entry(string $fingerprint): array
+    {
+        return [
+            'fingerprint' => $fingerprint,
+            'type' => 'sql_injection',
+            'file' => 'src/Foo.php',
+            'title' => 'Test Vuln',
+            'added_at' => '2026-07-03',
+        ];
     }
 }

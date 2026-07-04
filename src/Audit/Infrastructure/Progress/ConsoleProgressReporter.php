@@ -71,6 +71,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
             ProgressEvent::AttackerFindingRecorded => $this->onAttackerFindingRecorded($context),
             ProgressEvent::ReviewStarted => $this->onReviewStarted($context),
             ProgressEvent::ReviewFindingReviewed => $this->onReviewFindingReviewed($context),
+            ProgressEvent::BaselineFindingSkipped => $this->onBaselineFindingSkipped($context),
             ProgressEvent::ReviewCompleted => $this->onReviewCompleted($context),
             null => null,
         };
@@ -200,6 +201,17 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
         $this->reviewTotal = $findings;
         $this->reviewedCount = 0;
         $this->updateMessage(\sprintf('reviewing %d finding(s)', $findings));
+    }
+
+    /** @param array<string, mixed> $context */
+    private function onBaselineFindingSkipped(array $context): void
+    {
+        $this->writeAboveBar(\sprintf(
+            '<fg=gray>  ⚖ ⤳ baseline-accepted %s — %s:%d (review skipped)</>',
+            ProgressContext::string($context, 'type'),
+            ProgressContext::string($context, 'file'),
+            ProgressContext::int($context, 'line'),
+        ));
     }
 
     /** @param array<string, mixed> $context */
