@@ -352,6 +352,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   default `claude-opus-4-8` and every current model are catalog-present and
   unchanged.
 
+### Fixed
+
+- **Unquoted credential values in config files reached the LLM prompt
+  unredacted.** `RegexSecretScrubber`'s `inline_assignment` pattern
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) required the
+  value to be wrapped in quotes, so `password: supersecretvalue` (valid,
+  unquoted YAML/NEON) skipped redaction entirely while
+  `password: "supersecretvalue"` was caught — exactly the kind of committed
+  secret the scrubber exists to keep out of the attacker prompt. The value's
+  quotes are now optional; an unquoted token is redacted the same way, with a
+  guard so an already-redacted `***REDACTED:...***` placeholder from an earlier
+  pattern (e.g. `env_assignment` on an all-caps `PASSWORD=...` line) is never
+  re-matched and double-redacted.
+
 ### Security
 
 - **The install scripts now fail closed on checksum verification.** Previously
