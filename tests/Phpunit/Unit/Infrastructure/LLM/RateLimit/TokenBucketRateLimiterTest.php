@@ -643,7 +643,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter = new TokenBucketRateLimiter(
             rateLimitConfiguration: new RateLimitConfiguration(
                 requestsPerMinute: null,
-                inputTokensPerMinute: 10,
+                inputTokensPerMinute: 9,
                 outputTokensPerMinute: null,
             ),
             clock: $this->boundedClock($mockClock),
@@ -655,7 +655,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter->record(inputTokens: 5, outputTokens: 0);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
 
-        self::assertSame([], $sleeper->sleepsMs);
+        self::assertSame([60_000], $sleeper->sleepsMs);
     }
 
     /**

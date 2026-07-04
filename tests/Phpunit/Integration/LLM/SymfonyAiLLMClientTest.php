@@ -608,6 +608,72 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
      */
+    public function test_complete_batch_releases_exactly_the_failed_reservation_before_falling_back_to_complete(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $platform = new class implements PlatformInterface {
+            private int $calls = 0;
+
+            #[Override]
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                if (0 === $this->calls) {
+                    ++$this->calls;
+
+                    return new DeferredResult(new ThrowingConverter(new RuntimeException('boom')), new InMemoryRawResult(['text' => ''], [], (object) []), $options);
+                }
+
+                $deferredResult = new DeferredResult(new PlainConverter(new TextResult('recovered')), new InMemoryRawResult(['text' => ''], [], (object) []), $options);
+                $deferredResult->getMetadata()->add('token_usage', new TokenUsage(promptTokens: 9, completionTokens: 4));
+
+                return $deferredResult;
+            }
+
+            #[Override]
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
+        );
+
+        $responses = $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+
+        self::assertSame('recovered', $responses[0]->content());
+        self::assertSame([[0, 0], [9, 4]], $fakeRateLimiter->recorded);
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
+    public function test_complete_batch_does_not_release_an_already_reconciled_reservation_when_a_later_step_fails(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            [new TextResult('ignored'), new TextResult('recovered')],
+            [new TokenUsage(promptTokens: -1, completionTokens: 0), new TokenUsage(promptTokens: 5, completionTokens: 2)],
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
+        );
+
+        $responses = $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+
+        self::assertSame('recovered', $responses[0]->content());
+        self::assertSame([[-1, 0], [5, 2]], $fakeRateLimiter->recorded);
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
     public function test_complete_batch_with_tools_resolves_each_conversation_against_its_own_registry(): void
     {
         $firstToolCalls = 0;
@@ -752,6 +818,78 @@ final class SymfonyAiLLMClientTest extends TestCase
         // the sequential path — otherwise it sits unreconciled forever.
         self::assertCount(2, $fakeRateLimiter->recorded);
         self::assertSame([0, 0], $fakeRateLimiter->recorded[0]);
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
+    public function test_complete_batch_with_tools_releases_exactly_the_failed_reservation_before_falling_back(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+        $platform = new class implements PlatformInterface {
+            private int $calls = 0;
+
+            #[Override]
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                if (0 === $this->calls) {
+                    ++$this->calls;
+
+                    return new DeferredResult(new ThrowingConverter(new RuntimeException('boom')), new InMemoryRawResult(['text' => ''], [], (object) []), $options);
+                }
+
+                $deferredResult = new DeferredResult(new PlainConverter(new TextResult('recovered')), new InMemoryRawResult(['text' => ''], [], (object) []), $options);
+                $deferredResult->getMetadata()->add('token_usage', new TokenUsage(promptTokens: 9, completionTokens: 4));
+
+                return $deferredResult;
+            }
+
+            #[Override]
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
+        );
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 3);
+
+        self::assertSame('recovered', $responses[0]->content());
+        self::assertSame([[0, 0], [9, 4]], $fakeRateLimiter->recorded);
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
+    public function test_complete_batch_with_tools_does_not_release_an_already_reconciled_reservation_when_a_later_step_fails(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            [new TextResult('ignored'), new TextResult('recovered')],
+            [new TokenUsage(promptTokens: -1, completionTokens: 0), new TokenUsage(promptTokens: 5, completionTokens: 2)],
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
+        );
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 3);
+
+        self::assertSame('recovered', $responses[0]->content());
+        self::assertSame([[-1, 0], [5, 2]], $fakeRateLimiter->recorded);
     }
 
     /**
