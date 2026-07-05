@@ -190,6 +190,29 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame('password: "***REDACTED:inline_assignment***"', $output);
     }
 
+    public function test_unquoted_inline_assignment_is_redacted(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('password: supersecretvalue');
+
+        self::assertSame('password: ***REDACTED:inline_assignment***', $output);
+    }
+
+    public function test_unquoted_inline_assignment_leaves_symfony_placeholder_unmodified(): void
+    {
+        $input = 'api_key: %env(ANTHROPIC_API_KEY)%';
+
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame($input, $output);
+    }
+
+    public function test_unquoted_all_caps_key_value_is_only_redacted_once_by_env_assignment(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('PASSWORD=hunter2supersecure');
+
+        self::assertSame('PASSWORD=***REDACTED:env_assignment***', $output);
+    }
+
     public function test_env_assignment_redaction_preserves_key_prefix(): void
     {
         $output = $this->regexSecretScrubber->scrub('STRIPE_SECRET_KEY=sk_super_secret_value');

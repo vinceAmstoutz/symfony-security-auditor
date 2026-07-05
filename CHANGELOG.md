@@ -529,6 +529,34 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `isRateLimit()`'s `429`) are now matched as word-bounded tokens instead of raw
   substrings; the textual hints (`"rate limit"`, `"timed out"`, …) are
   unchanged.
+- **Unquoted credential values in config files reached the LLM prompt
+  unredacted.** `RegexSecretScrubber`'s `inline_assignment` pattern
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) required the
+  value to be wrapped in quotes, so `password: supersecretvalue` (valid,
+  unquoted YAML/NEON) skipped redaction entirely while
+  `password: "supersecretvalue"` was caught — exactly the kind of committed
+  secret the scrubber exists to keep out of the attacker prompt. The value's
+  quotes are now optional; an unquoted token is redacted the same way, with a
+  guard so an already-redacted `***REDACTED:...***` placeholder from an earlier
+  pattern (e.g. `env_assignment` on an all-caps `PASSWORD=...` line) is never
+  re-matched and double-redacted.
+- **Concurrent LLM calls (batch dispatch, the tool-calling wavefront, and
+  retries) corrupted the rate limiter's input-token accounting, causing
+  premature throttling.** `TokenBucketRateLimiter` tracked exactly one pending
+  estimate as a scalar
+  (`src/Audit/Infrastructure/LLM/RateLimit/TokenBucketRateLimiter.php`), so when
+  `BatchWindowResolver`/`ToolConversationWavefront` called `acquire()` for every
+  request in a window before `record()`-ing any of them, each new `acquire()`
+  silently overwrote the previous one's estimate — only the last request in the
+  window was ever correctly reconciled, permanently inflating the window's
+  used-token count by the sum of every other request's estimate. The pending
+  estimate is now a FIFO queue, one entry per unreconciled `acquire()`, so each
+  `record()` reconciles against its own request's estimate regardless of how
+  many are in flight. `BatchWindowResolver`, `ToolConversationWavefront`, and
+  `RetryingPlatformInvoker`'s retry loop now also call `record(0, 0)` to release
+  a reservation whose call failed and fell back to a fresh attempt — previously
+  that reservation was never reconciled at all, leaking into the window's usage
+  for the rest of the minute.
 - **The attacker cache key ignored the code-slicing configuration, serving stale
   findings after `audit.code_slicing.enabled` or
   `audit.code_slicing.min_lines_before_slicing` changed.** The cache key
