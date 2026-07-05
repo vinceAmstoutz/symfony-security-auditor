@@ -303,6 +303,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      */
     private function matchLines(string $content, string $regex): array
     {
+        if ($this->hasDotAllModifier($regex)) {
+            return $this->matchAcrossLines($content, $regex);
+        }
+
         $lines = explode("\n", $content);
         $matches = [];
 
@@ -313,5 +317,27 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         }
 
         return $matches;
+    }
+
+    private function hasDotAllModifier(string $regex): bool
+    {
+        $segments = explode('/', $regex);
+
+        return str_contains(end($segments), 's');
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function matchAcrossLines(string $content, string $regex): array
+    {
+        preg_match_all($regex, $content, $matches, \PREG_OFFSET_CAPTURE);
+
+        $lines = [];
+        foreach ($matches[0] as $match) {
+            $lines[] = substr_count($content, "\n", 0, $match[1]) + 1;
+        }
+
+        return array_values(array_unique($lines));
     }
 }
