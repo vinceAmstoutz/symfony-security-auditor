@@ -244,7 +244,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame(FilesystemAttackerCache::class, $cheapCacheDefinition->getClass());
         self::assertSame(
             '%symfony_security_auditor.cache.cheap_attacker_key_salt%',
-            (string) $cheapCacheDefinition->getArgument(3),
+            $cheapCacheDefinition->getArgument(3),
         );
 
         $cheapScanCollaborators = $containerBuilder->getDefinition('security_auditor.cheap_attacker')->getArgument(1);

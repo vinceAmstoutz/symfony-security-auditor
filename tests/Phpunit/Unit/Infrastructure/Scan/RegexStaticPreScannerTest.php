@@ -111,7 +111,7 @@ final class RegexStaticPreScannerTest extends TestCase
 
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);
 
-        $patterns = array_map(static fn ($marker) => $marker->pattern(), $markers);
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
         self::assertContains('no_hash_equals', $patterns);
     }
 

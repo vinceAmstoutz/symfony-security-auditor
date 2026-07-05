@@ -19,8 +19,8 @@ use Throwable;
 /** @internal not part of the BC promise — see docs/versioning.md */
 final class ReportFileNotReadableException extends RuntimeException
 {
-    public static function forPath(string $path, ?Throwable $previous = null): self
+    public static function forPath(string $path, ?Throwable $throwable = null): self
     {
-        return new self(\sprintf('Report file "%s" does not exist or is not readable.', $path), previous: $previous);
+        return new self(\sprintf('Report file "%s" does not exist or is not readable.', $path), previous: $throwable);
     }
 }

@@ -96,13 +96,26 @@ final readonly class GrepTool implements ToolInterface
                 continue;
             }
 
-            foreach ($this->matchesInFile($file, $pattern) as $match) {
-                if (\count($matches) >= self::MAX_MATCHES) {
-                    return $matches;
-                }
+            $matches = $this->appendUpToCap($matches, $this->matchesInFile($file, $pattern));
+        }
 
-                $matches[] = $match;
+        return $matches;
+    }
+
+    /**
+     * @param list<string>     $matches
+     * @param iterable<string> $newMatches
+     *
+     * @return list<string>
+     */
+    private function appendUpToCap(array $matches, iterable $newMatches): array
+    {
+        foreach ($newMatches as $newMatch) {
+            if (\count($matches) >= self::MAX_MATCHES) {
+                break;
             }
+
+            $matches[] = $newMatch;
         }
 
         return $matches;

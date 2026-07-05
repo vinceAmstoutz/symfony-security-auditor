@@ -157,14 +157,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   payloads; plus a `live_component` pre-scanner bucket (`RegexStaticPreScanner`,
   `CACHE_VERSION` 5) with `live_prop_writable` and `live_action_endpoint`
   markers, and a chunking priority slot right after controllers. Custom markers
-  can target the new bucket via `scan.custom_risk_patterns.live_component`.
-  Both attribute signals (`#[ApiResource]`, `#[AsLiveComponent]`) take
-  precedence over the content-based controller heuristics, so a component
-  declared as `#[AsLiveComponent] class Cart extends AbstractController` (the
-  documented pattern for reusing `denyAccessUnlessGranted()`/`addFlash()`
-  helpers) keeps its dedicated skill block and pre-scan markers instead of
-  degrading to a plain controller; an explicit `Controller.php`/`/Controller/`
-  path still wins (`ProjectFileTypeClassifier`, `PROMPT_VERSION` 14).
+  can target the new bucket via `scan.custom_risk_patterns.live_component`. Both
+  attribute signals (`#[ApiResource]`, `#[AsLiveComponent]`) take precedence
+  over the content-based controller heuristics, so a component declared as
+  `#[AsLiveComponent] class Cart extends AbstractController` (the documented
+  pattern for reusing `denyAccessUnlessGranted()`/`addFlash()` helpers) keeps
+  its dedicated skill block and pre-scan markers instead of degrading to a plain
+  controller; an explicit `Controller.php`/`/Controller/` path still wins
+  (`ProjectFileTypeClassifier`, `PROMPT_VERSION` 14).
 - **`security.yaml` is now parsed with `symfony/yaml` instead of single-line
   regexes, so the access-control map the attacker reasons over is finally
   complete.** `MappingStage` previously extracted `access_control` with a
@@ -190,8 +190,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   threaded into the pipeline (`RunAuditUseCase::execute()` fifth parameter →
   `AuditContext::acceptedFingerprints()`), and `AuditOrchestrator` drops
   matching attacker findings _before_ the review phase — each unique skip
-  streams once as `⚖ ⤳ baseline-accepted <type> — file:line (review skipped)`
-  on a decorated terminal or `[BASELINE-SKIPPED] <type> — file:line` in plain
+  streams once as `⚖ ⤳ baseline-accepted <type> — file:line (review skipped)` on
+  a decorated terminal or `[BASELINE-SKIPPED] <type> — file:line` in plain
   output (new stable progress-event value `baseline.finding.skipped`), and the
   total lands in the `audit.baseline_skipped` context metadata.
   `--generate-baseline` now writes one JSON object per finding — `fingerprint`,
@@ -200,9 +200,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   The legacy flat fingerprint array is still read, so existing baseline files
   keep working unchanged. Note: the post-run "N finding(s) suppressed by the
   baseline." console note no longer appears for pipeline-skipped findings — the
-  per-finding skip lines replace it. `--format=sarif` opts out of the
-  pre-review skip so baselined findings can be rendered as suppressed results
-  — see the SARIF suppression entry under _Fixed_.
+  per-finding skip lines replace it. `--format=sarif` opts out of the pre-review
+  skip so baselined findings can be rendered as suppressed results — see the
+  SARIF suppression entry under _Fixed_.
 - **Committed dotenv files are now part of the default scan surface, with
   deterministic secret markers.** `.env`, `.env.local`, `.env.dev`, `.env.test`,
   `.env.prod`, and `.env.dist` were previously invisible to the auditor twice
@@ -317,8 +317,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   progress event per verdict from `VerdictApplier::apply()`, the single
   chokepoint shared by every review mode (sequential, concurrent, structured,
   and batched). A decorated terminal prints `⚖ ✓ validated <type> — file:line`
-  (green) and `⚖ ✗ rejected <type> — file:line` (yellow) above the bar and
-  ticks the bar suffix `reviewing i/N`; `PlainProgressReporter` appends
+  (green) and `⚖ ✗ rejected <type> — file:line` (yellow) above the bar and ticks
+  the bar suffix `reviewing i/N`; `PlainProgressReporter` appends
   `[VALIDATED]`/`[REJECTED]` lines for non-TTY output. New stable progress-event
   value `review.finding.reviewed`.
 - **LLM pricing is now sourced from the daily `symfony/models-dev` catalog
@@ -443,14 +443,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   instead of being dropped from `results`. Every other format's output is
   unchanged. To make this reachable, `--format=sarif` deliberately does not
   thread the accepted fingerprints into the pipeline
-  (`AuditCommand::acceptedFingerprintsFor()`): a finding the orchestrator
-  skips before review never reaches the report, so nothing would be left to
-  mark as suppressed. SARIF runs therefore pay the reviewer cost for
-  baselined findings — the price of Code Scanning showing them as dismissed
-  instead of vanished; every other format keeps the pre-review skip. `BaselineResult` (`src/Command/BaselineResult.php`) gained a third
-  `acceptedFingerprints` property alongside the existing filtered report and
-  suppressed count, so `AuditCommand` no longer needs a second baseline-file
-  read to get the matched set.
+  (`AuditCommand::acceptedFingerprintsFor()`): a finding the orchestrator skips
+  before review never reaches the report, so nothing would be left to mark as
+  suppressed. SARIF runs therefore pay the reviewer cost for baselined findings
+  — the price of Code Scanning showing them as dismissed instead of vanished;
+  every other format keeps the pre-review skip. `BaselineResult`
+  (`src/Command/BaselineResult.php`) gained a third `acceptedFingerprints`
+  property alongside the existing filtered report and suppressed count, so
+  `AuditCommand` no longer needs a second baseline-file read to get the matched
+  set.
 - **Prompt building is split behind interfaces so neither builder is a
   monolith.** `AttackerPromptBuilder`
   (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) held all sixteen
@@ -601,14 +602,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   whose narrative happened to reproduce one of those bytes (a plausible outcome
   when the model echoes a raw exploit payload) produced a `.xml` report that
   GitLab, Jenkins, and any standard XML parser rejected outright. Those bytes
-  are now stripped before insertion. The strip now covers the full complement
-  of the XML 1.0 `Char` production instead of a C0-control byte list — the
+  are now stripped before insertion. The strip now covers the full complement of
+  the XML 1.0 `Char` production instead of a C0-control byte list — the
   `U+FFFE`/`U+FFFF` non-characters and surrogate halves are valid UTF-8 that
   survives `json_decode` yet is equally rejected by every XML parser — and is
-  also applied to the LLM-reported file path, which was previously
-  interpolated into the `name` attribute and failure text unsanitized. A value
-  that is not valid UTF-8 at all is dropped wholesale rather than corrupting
-  the document.
+  also applied to the LLM-reported file path, which was previously interpolated
+  into the `name` attribute and failure text unsanitized. A value that is not
+  valid UTF-8 at all is dropped wholesale rather than corrupting the document.
 - **Retryable LLM failures embedding a non-transient status code as a digit
   substring were misclassified as fatal, aborting the audit instead of
   retrying.** `TransientFailureClassifier::isTransient()`
@@ -620,13 +620,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `isRateLimit()`'s `429`) are now matched as word-bounded tokens instead of raw
   substrings; the textual hints (`"rate limit"`, `"timed out"`, …) are
   unchanged. Word-bounded tokens alone were still fooled by thousands
-  separators: Anthropic's real 429 body
-  `"This request would exceed your organization's rate limit of 400,000 input
-  tokens per minute"` matched the non-transient `400` at the `,`-boundary and
-  aborted the audit on an ordinary rate-limit response. A code token directly
-  adjacent to a `,`/`.`-separated digit group (`400,000`, `1,400`, `429.5`) is
-  now ignored, while genuine codes followed by punctuation (`"HTTP 400."`)
-  still match.
+  separators: Anthropic's real 429 body (_"This request would exceed your
+  organization's rate limit of 400,000 input tokens per minute"_) matched the
+  non-transient `400` at the `,`-boundary and aborted the audit on an ordinary
+  rate-limit response. A code token directly adjacent to a `,`/`.`-separated
+  digit group (`400,000`, `1,400`, `429.5`) is now ignored, while genuine codes
+  followed by punctuation (`"HTTP 400."`) still match.
 - **Unquoted credential values in config files reached the LLM prompt
   unredacted.** `RegexSecretScrubber`'s `inline_assignment` pattern
   (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) required the
@@ -682,15 +681,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   wired the cheap-model `AttackerAgent` with the same `FilesystemAttackerCache`
   instance as the full-price attacker, whose key salt encodes only
   `attacker_model`. With `audit.escalation.enabled: true` and caching on, the
-  cheap first pass stored its (weaker, often empty) per-chunk verdicts under
-  the exact keys the expensive attacker computes — a later run with escalation
-  off (or the escalated second pass over a flagged file in a subsequent run)
-  silently served the cheap model's "no findings" as if the configured
-  attacker model had analyzed the chunk, with zero LLM calls and no trace. The
-  cheap attacker now gets a dedicated cache instance salted with the actual
-  cheap model (`cache.cheap_attacker_key_salt`), so the two namespaces can
-  never collide; with caching disabled it degrades to the null cache as
-  before.
+  cheap first pass stored its (weaker, often empty) per-chunk verdicts under the
+  exact keys the expensive attacker computes — a later run with escalation off
+  (or the escalated second pass over a flagged file in a subsequent run)
+  silently served the cheap model's "no findings" as if the configured attacker
+  model had analyzed the chunk, with zero LLM calls and no trace. The cheap
+  attacker now gets a dedicated cache instance salted with the actual cheap
+  model (`cache.cheap_attacker_key_salt`), so the two namespaces can never
+  collide; with caching disabled it degrades to the null cache as before.
 - **A hostile or misbehaving provider's `Retry-After` header could wedge the
   rate limiter for hours, bypassing the documented safety ceiling.**
   `RetryPolicy::rateLimitDelayMs()` already clamped the server-provided hint to
@@ -719,12 +717,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   above already claimed 6) since this changes scan output for existing chunk
   content and must invalidate stale attacker cache entries. The pattern also
   required at least one character _before_ the suffix, so the canonical bare
-  names — `$signature === $expected`, `$hash === $computed`,
-  `$a === $token` — never matched, and neither this marker nor the webhook
-  bucket's `no_hash_equals` matched the most common guard shape
-  `if ($signature !== $computed)`. Both patterns now accept the bare
-  variable names and the `!==` operator (`CACHE_VERSION` 8 → 9 — 8 was
-  already claimed by the Twig-extension bucket above).
+  names — `$signature === $expected`, `$hash === $computed`, `$a === $token` —
+  never matched, and neither this marker nor the webhook bucket's
+  `no_hash_equals` matched the most common guard shape
+  `if ($signature !== $computed)`. Both patterns now accept the bare variable
+  names and the `!==` operator (`CACHE_VERSION` 8 → 9 — 8 was already claimed by
+  the Twig-extension bucket above).
 - **Enabling `audit.escalation.enabled` crashed the container.**
   `SymfonySecurityAuditorBundle::registerEscalation()` wired the cheap-model
   `AttackerAgent` (`security_auditor.cheap_attacker`) with a stale 15-argument

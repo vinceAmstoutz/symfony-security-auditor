@@ -54,7 +54,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
             $results[] = $this->resultFor($vulnerability, $baselinedFingerprints);
         }
 
-        $rules = array_values(array_map(self::ruleFor(...), $typesByRule));
+        $rules = array_values(array_map($this->ruleFor(...), $typesByRule));
 
         $cost = $auditReport->cost();
         $sarif = [
@@ -131,20 +131,20 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
      *
      * @return array<string, mixed>
      */
-    private static function ruleFor(array $contributingTypes): array
+    private function ruleFor(array $contributingTypes): array
     {
-        $firstSeen = reset($contributingTypes);
+        $vulnerabilityType = reset($contributingTypes);
 
         return [
-            'id' => $firstSeen->owaspReference(),
-            'name' => $firstSeen->value,
-            'shortDescription' => ['text' => $firstSeen->category()],
-            'helpUri' => $firstSeen->owaspReferenceUrl(),
-            'properties' => ['tags' => array_values(array_unique(array_map(self::cweTag(...), $contributingTypes)))],
+            'id' => $vulnerabilityType->owaspReference(),
+            'name' => $vulnerabilityType->value,
+            'shortDescription' => ['text' => $vulnerabilityType->category()],
+            'helpUri' => $vulnerabilityType->owaspReferenceUrl(),
+            'properties' => ['tags' => array_values(array_unique(array_map($this->cweTag(...), $contributingTypes)))],
         ];
     }
 
-    private static function cweTag(VulnerabilityType $vulnerabilityType): string
+    private function cweTag(VulnerabilityType $vulnerabilityType): string
     {
         return \sprintf('external/cwe/cwe-%s', substr($vulnerabilityType->cweReference(), 4));
     }
