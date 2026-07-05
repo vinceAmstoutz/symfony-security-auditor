@@ -90,7 +90,7 @@ src/
       Progress/      # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY), LoggerProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
       Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory, RecordReviewTool, RecordReviewToolFactory
       Report/        # ReportRendererInterface (format/render) + one class per format ({Console,Json,Sarif,Html,Markdown,Junit,GithubAnnotations}ReportRenderer) + ReportPackage + TemplateLoader; + Template/*.txt + *.html stubs
-  Command/           # AuditCommand (Symfony Console: audit:run, alias audit) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, ExitCode enum, AuditCommandHelp, OutputFormat enum (console|json|sarif|html|markdown|junit|github), Baseline (accepted-finding suppression)
+  Command/           # AuditCommand (Symfony Console: audit:run, alias audit) + AuditCommandInput, AuditPresenter, ReportWriter, AuditExitCodeResolver, ExitCode enum, AuditCommandHelp, OutputFormat enum (console|json|sarif|html|markdown|junit|github), Baseline (accepted-finding suppression); DiffCommand (audit:diff — compares two JSON reports by finding fingerprint) + ReportDiffer, ReportDiff/DiffFinding, DiffPresenter, DiffOutputFormat enum (console|json)
   SymfonySecurityAuditorBundle.php  # Bundle class (configure + loadExtension)
 tests/Phpunit/
   Unit/              # Isolated class tests (stub/mock collaborators)

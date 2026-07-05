@@ -22,6 +22,7 @@ bundle registration, bundle-level configuration, platform wiring via
 - [Split-Model Setup](#split-model-setup)
 - [Standalone Configuration](#standalone-configuration)
 - [CLI Reference](#cli-reference)
+  - [`audit:diff`](#auditdiff--comparing-two-reports)
 
 > See also: [Architecture](architecture.md) · [Extending](extending.md) ·
 > [CI](ci.md) · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
@@ -480,9 +481,10 @@ model: gpt-5.4
 
 ## CLI Reference
 
-The bundle registers a single console command, also reachable through the
-shorter `audit` alias (`bin/console audit`). The standalone CLI exposes the same
-command and alias.
+The bundle registers the `audit:run` console command, also reachable through the
+shorter `audit` alias (`bin/console audit`), plus the `audit:diff` command for
+comparing two previously generated reports. The standalone CLI exposes the same
+commands.
 
 ```bash
 bin/console audit:run [<project-path>] [options]
@@ -551,3 +553,33 @@ bin/console audit:run --baseline=.security-baseline.json
 | `0`  | Audit completed; aggregate risk level is below the `fail_on` threshold (default `critical` → SAFE, LOW, MEDIUM, or HIGH)           |
 | `1`  | Aggregate risk level is at or above the `fail_on` threshold (default `critical`), the audit itself failed, or the path was invalid |
 | `2`  | Audit aborted because the configured token or cost budget was exceeded (partial report still emitted)                              |
+
+### `audit:diff` — comparing two reports
+
+Compares two JSON reports produced by `audit:run --format=json` and classifies
+every finding by its stable `fingerprint` (the same per-finding identity used by
+baseline suppression): findings only in the later report are **New**, findings
+only in the earlier report are **Fixed**, and findings in both are
+**Persisting**. A report generated before the `fingerprint` key existed is still
+accepted — the fingerprint is recomputed from `type`, `file`, and `title`.
+
+```bash
+bin/console audit:diff previous.json current.json
+```
+
+| Argument          | Required | Description                      |
+| ----------------- | -------- | -------------------------------- |
+| `previous-report` | yes      | Path to the earlier JSON report. |
+| `current-report`  | yes      | Path to the later JSON report.   |
+
+| Option     | Short | Default   | Description                        |
+| ---------- | ----- | --------- | ---------------------------------- |
+| `--format` | `-f`  | `console` | Output format: `console` or `json` |
+
+```bash
+bin/console audit:diff previous.json current.json --format=json
+```
+
+Exit codes: `0` on a successful comparison (regardless of whether any findings
+are new, fixed, or persisting), `1` if a report file is missing or is not valid
+JSON.
