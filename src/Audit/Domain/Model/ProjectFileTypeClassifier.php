@@ -31,6 +31,7 @@ final readonly class ProjectFileTypeClassifier
             str_ends_with($path, 'Subscriber.php') || str_ends_with($path, 'EventListener.php') => ProjectFileType::EVENT_SUBSCRIBER,
             str_ends_with($path, 'Normalizer.php') || str_ends_with($path, 'Denormalizer.php') => ProjectFileType::NORMALIZER,
             str_ends_with($path, 'ScheduleProvider.php') || str_ends_with($path, 'Schedule.php') => ProjectFileType::SCHEDULER,
+            self::looksLikeTwigExtension($path, $content) => ProjectFileType::TWIG_EXTENSION,
             str_ends_with($path, '.twig') => ProjectFileType::TEMPLATE,
             str_ends_with($path, '.yaml') || str_ends_with($path, '.yml') || str_ends_with($path, '.xml'), self::isDotenvPath($path) => ProjectFileType::CONFIG,
             str_ends_with($path, '.php') => ProjectFileType::PHP,
@@ -120,6 +121,13 @@ final readonly class ProjectFileTypeClassifier
     {
         return str_ends_with($path, '.php')
             && str_contains($content, 'extends AbstractType');
+    }
+
+    private static function looksLikeTwigExtension(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && (str_contains($content, 'implements ExtensionInterface')
+                || str_contains($content, 'extends AbstractExtension'));
     }
 
     private static function isMessengerHandlerPath(string $path): bool

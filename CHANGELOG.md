@@ -42,6 +42,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   now render the CWE reference alongside OWASP in their respective output.
   Additive change — the `cwe` JSON key and the SARIF tag are new; no existing
   key or field was removed or renamed.
+- **Twig extensions are now a first-class attack surface.** Classes implementing
+  `Twig\Extension\ExtensionInterface` (or extending `AbstractExtension`)
+  register functions and filters callable from every template in the project — a
+  shell/file sink or an unescaped `is_safe: ['html']` return inside one is
+  reachable wherever a template can call it, but these classes previously
+  classified as plain `php` files, so the attacker had no surface-specific
+  guidance for them. A new `ProjectFileType::TWIG_EXTENSION` case
+  (`src/Audit/Domain/Model/ProjectFile.php` detects
+  `implements ExtensionInterface` or `extends AbstractExtension` anywhere in a
+  `.php` file's content), a dedicated attacker skill block
+  (`TwigExtensionAttackerSkill`, `AttackerPromptBuilder` `PROMPT_VERSION` 13 —
+  12 was already claimed by the file-upload skill above) hunting shell/file
+  sinks reachable from template-supplied arguments, `is_safe: ['html']` declared
+  without justified sanitization, authorization-sensitive lookups missing a
+  security-context check, and sensitive `getGlobals()` entries; plus a
+  `twig_extension` pre-scanner bucket (`RegexStaticPreScanner`, `CACHE_VERSION`
+  8 — 6 and 7 were already claimed by earlier pre-scan fixes) with
+  `extension_shell_or_file_sink` and `extension_is_safe_html` markers, and a
+  chunking priority slot right after templates. Custom markers can target the
+  new bucket via `scan.custom_risk_patterns.twig_extension`. Attacker cache
+  entries are invalidated by the prompt/pre-scan version bumps.
 - **New `audit:diff` command compares two JSON reports and shows new, fixed, and
   persisting findings.** Nothing let a user answer "what changed between this
   run and the last one?" without diffing raw JSON by hand — findings shift line
@@ -388,6 +409,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   are now non-nullable, and the dead `?? new Null*()` fallbacks are removed. All
   classes are `@internal`, and the container always supplies a value, so this is
   not user-visible.
+- **SARIF output now marks baselined findings as suppressed instead of always
+  dropping them.** Every renderer previously received the same baseline-filtered
+  `AuditReport`, so a finding matching `--baseline` / `audit.baseline` was
+  invisible in `--format=sarif` exactly like JSON, console, HTML, Markdown, or
+  JUnit — GitHub Code Scanning / GitLab had no way to show it as a
+  dismissed/suppressed result, it just vanished.
+  `AuditCommand::finalizeAuditRun()` (`src/Command/AuditCommand.php`) now
+  renders `--format=sarif` from the report as returned by the pipeline
+  (`BaselineProcessor::apply()`'s filtering is skipped for that format only) and
+  threads the accepted fingerprints through a new fifth, optional
+  `$baselinedFingerprints` parameter on `ReportWriter::write()`
+  (`src/Command/ReportWriter.php`). `SarifReportRenderer`
+  (`src/Audit/Infrastructure/Report/SarifReportRenderer.php`) implements the new
+  `BaselineSuppressingReportRendererInterface::renderWithSuppressions()`
+  (`src/Audit/Infrastructure/Report/BaselineSuppressingReportRendererInterface.php`),
+  dispatched by `ReportWriter` for any renderer that supports it; a result whose
+  `Vulnerability::fingerprint()` is in the accepted set now gets
+  `"suppressions": [{"kind": "external", "justification": "Accepted via audit baseline"}]`
+  instead of being dropped from `results`. Every other format's output is
+  unchanged. `BaselineResult` (`src/Command/BaselineResult.php`) gained a third
+  `acceptedFingerprints` property alongside the existing filtered report and
+  suppressed count, so `AuditCommand` no longer needs a second baseline-file
+  read to get the matched set.
 - **Prompt building is split behind interfaces so neither builder is a
   monolith.** `AttackerPromptBuilder`
   (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) held all sixteen
@@ -618,6 +662,35 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `RegexStaticPreScanner::CACHE_VERSION` (6 → 7 — the multiline-pattern fix
   above already claimed 6) since this changes scan output for existing chunk
   content and must invalidate stale attacker cache entries.
+- **Enabling `audit.escalation.enabled` crashed the container.**
+  `SymfonySecurityAuditorBundle::registerEscalation()` wired the cheap-model
+  `AttackerAgent` (`security_auditor.cheap_attacker`) with a stale 15-argument
+  flat positional-argument list left over from before `AttackerAgent`'s
+  constructor moved to the `AttackerLlmCollaborators` /
+  `AttackerScanCollaborators` / `AttackerAnalysisSettings` collaborator-bag
+  shape it has used ever since — the two no longer matched, so the container
+  failed to compile/instantiate the service the moment
+  `escalation.enabled: true` was set. Fixed by wiring
+  `security_auditor.cheap_attacker` through the same three inline collaborator
+  bags the primary `AttackerAgent::class` definition already uses in
+  `config/services.php`. New
+  `test_bundle_wires_escalating_attacker_agent_when_escalation_enabled` boots a
+  real kernel with escalation enabled and resolves `AttackerAgentInterface` from
+  the container, which the previous structural-only test did not do and so did
+  not catch this. The existing structural test now also pins the exact scalar
+  values (`toolsEnabled`, `maxToolIterations`, `staticPreScanLeanMode`,
+  `structuredCollection`, `attackerMaxConcurrent`) threaded into the escalation
+  attacker's `AttackerAnalysisSettings`, since PHP's reflection-based DI
+  instantiation weak-coerces `int`/`bool` silently, so a dropped or reordered
+  scalar argument would not otherwise fail loudly. Since the primary and
+  escalation wirings had already drifted apart once, both now build
+  `AttackerAgent`'s constructor arguments from a single new
+  `Audit\Infrastructure\Config\AttackerAgentDefinitionFactory`
+  (`src/Audit/Infrastructure/Config/AttackerAgentDefinitionFactory.php`) instead
+  of each hand-writing the same three-bag shape — there is only one argument
+  list to write now, so the two call sites cannot drift out of sync again. New
+  `test_bundle_wires_escalation_attacker_agent_from_the_same_argument_shape_as_the_primary_one`
+  asserts both definitions produce the identical argument shape.
 
 ### Security
 

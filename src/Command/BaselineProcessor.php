@@ -48,13 +48,13 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
     {
         $fingerprints = $this->acceptedFingerprints($cliBaseline);
         if ([] === $fingerprints) {
-            return new BaselineResult($auditReport, 0);
+            return new BaselineResult($auditReport, 0, $fingerprints);
         }
 
         $before = $auditReport->totalVulnerabilities();
         $filtered = $auditReport->withoutFingerprints($fingerprints);
 
-        return new BaselineResult($filtered, $before - $filtered->totalVulnerabilities());
+        return new BaselineResult($filtered, $before - $filtered->totalVulnerabilities(), $fingerprints);
     }
 
     #[Override]

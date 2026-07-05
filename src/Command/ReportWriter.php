@@ -17,6 +17,7 @@ use Override;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BaselineSuppressingReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 
@@ -40,12 +41,14 @@ final readonly class ReportWriter implements ReportWriterInterface
     }
 
     /**
+     * @param list<string> $baselinedFingerprints
+     *
      * @throws UnsupportedOutputFormatException
      */
     #[Override]
-    public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle): void
+    public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle, array $baselinedFingerprints = []): void
     {
-        $content = $this->rendererFor($outputFormat)->render($auditReport);
+        $content = $this->renderContent($outputFormat, $auditReport, $baselinedFingerprints);
 
         if (null === $outputFile) {
             $symfonyStyle->writeln($content);
@@ -55,6 +58,20 @@ final readonly class ReportWriter implements ReportWriterInterface
 
         $this->filesystem->dumpFile($outputFile, $content);
         $symfonyStyle->success(\sprintf('Report saved to %s', $outputFile));
+    }
+
+    /**
+     * @param list<string> $baselinedFingerprints
+     *
+     * @throws UnsupportedOutputFormatException
+     */
+    private function renderContent(OutputFormat $outputFormat, AuditReport $auditReport, array $baselinedFingerprints): string
+    {
+        $reportRenderer = $this->rendererFor($outputFormat);
+
+        return $reportRenderer instanceof BaselineSuppressingReportRendererInterface
+            ? $reportRenderer->renderWithSuppressions($auditReport, $baselinedFingerprints)
+            : $reportRenderer->render($auditReport);
     }
 
     /**

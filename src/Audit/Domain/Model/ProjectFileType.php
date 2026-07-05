@@ -28,6 +28,7 @@ enum ProjectFileType: string
     case EVENT_SUBSCRIBER = 'event_subscriber';
     case NORMALIZER = 'normalizer';
     case SCHEDULER = 'scheduler';
+    case TWIG_EXTENSION = 'twig_extension';
     case TEMPLATE = 'template';
     case CONFIG = 'config';
     case PHP = 'php';

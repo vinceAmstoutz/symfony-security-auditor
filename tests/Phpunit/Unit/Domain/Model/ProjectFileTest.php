@@ -371,6 +371,50 @@ final class ProjectFileTest extends TestCase
         self::assertSame('php', $projectFile->type());
     }
 
+    public function test_it_detects_twig_extension_by_interface_implementation(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/AppExtension.php',
+            '/app/src/Twig/AppExtension.php',
+            "<?php\nclass AppExtension implements ExtensionInterface {}",
+        );
+
+        self::assertSame('twig_extension', $projectFile->type());
+    }
+
+    public function test_it_detects_twig_extension_by_abstract_extension_parent(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/MarkdownExtension.php',
+            '/app/src/Twig/MarkdownExtension.php',
+            "<?php\nclass MarkdownExtension extends AbstractExtension {}",
+        );
+
+        self::assertSame('twig_extension', $projectFile->type());
+    }
+
+    public function test_non_php_file_with_twig_extension_content_is_not_a_twig_extension(): void
+    {
+        $projectFile = ProjectFile::create(
+            'templates/macros/extension.html.twig',
+            '/app/templates/macros/extension.html.twig',
+            '{# extends AbstractExtension in a comment #}',
+        );
+
+        self::assertSame('template', $projectFile->type());
+    }
+
+    public function test_plain_service_without_twig_extension_signals_stays_php(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/Formatter.php',
+            '/app/src/Twig/Formatter.php',
+            "<?php class Formatter { public function format(): string { return ''; } }",
+        );
+
+        self::assertSame('php', $projectFile->type());
+    }
+
     public function test_operation_attribute_without_api_platform_namespace_is_not_an_api_resource(): void
     {
         $projectFile = ProjectFile::create(

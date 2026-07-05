@@ -21,7 +21,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputForm
 interface ReportWriterInterface
 {
     /**
+     * @param list<string> $baselinedFingerprints fingerprints rendered as suppressed instead of dropped, by formats that support it (currently SARIF)
+     *
      * @throws UnsupportedOutputFormatException
      */
-    public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle): void;
+    public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle, array $baselinedFingerprints = []): void;
 }
