@@ -154,6 +154,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `CACHE_VERSION` 5) with `live_prop_writable` and `live_action_endpoint`
   markers, and a chunking priority slot right after controllers. Custom markers
   can target the new bucket via `scan.custom_risk_patterns.live_component`.
+  Both attribute signals (`#[ApiResource]`, `#[AsLiveComponent]`) take
+  precedence over the content-based controller heuristics, so a component
+  declared as `#[AsLiveComponent] class Cart extends AbstractController` (the
+  documented pattern for reusing `denyAccessUnlessGranted()`/`addFlash()`
+  helpers) keeps its dedicated skill block and pre-scan markers instead of
+  degrading to a plain controller; an explicit `Controller.php`/`/Controller/`
+  path still wins (`ProjectFileTypeClassifier`, `PROMPT_VERSION` 14).
 - **`security.yaml` is now parsed with `symfony/yaml` instead of single-line
   regexes, so the access-control map the attacker reasons over is finally
   complete.** `MappingStage` previously extracted `access_control` with a
