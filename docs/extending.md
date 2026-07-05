@@ -452,7 +452,7 @@ $report->toArray(): array<string, mixed>             // fully serializable; incl
 
 Every format is its own class implementing `ReportRendererInterface`
 (`format(): string` + `render(AuditReport): string`). One class per format keeps
-each renderer small and independently testable. The bundle ships six:
+each renderer small and independently testable. The bundle ships seven:
 
 - `ConsoleReportRenderer` (`console`) — human-readable terminal output
   (templates in `Report/Template/*.txt`).
@@ -468,6 +468,9 @@ each renderer small and independently testable. The bundle ships six:
   wikis.
 - `JunitReportRenderer` (`junit`) — JUnit XML, one failed test case per finding,
   for CI test-report panels (e.g. GitLab merge-request widgets on every tier).
+- `GithubAnnotationsReportRenderer` (`github`) — one GitHub Actions
+  `::error`/`::warning`/`::notice` workflow-command annotation per finding, for
+  inline findings on a pull request's Files Changed view.
 
 Each renderer is tagged `symfony_security_auditor.report_renderer` (via the
 `ReportRendererInterface` `instanceof` autoconfiguration in
@@ -480,8 +483,9 @@ implements `BaselineSuppressingReportRendererInterface`, `ReportWriter` calls
 instead of `render()`, so that format can mark specific findings as suppressed
 rather than relying on the caller to drop them beforehand.
 
-Trigger them via `audit:run --format=console|json|sarif|html|markdown|junit`
-(see [`ci.md`](ci.md) for SARIF upload workflows).
+Trigger them via
+`audit:run --format=console|json|sarif|html|markdown|junit|github` (see
+[`ci.md`](ci.md) for SARIF upload and GitHub annotation workflows).
 
 ### Adding a new format
 

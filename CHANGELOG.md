@@ -41,6 +41,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/Report/JunitReportRenderer.php`, one of the
   per-format renderers behind `ReportRendererInterface` — see _Changed_ below);
   a ready-made GitLab job example lives in `docs/ci.md`.
+- **New `--format github` output renders findings as GitHub Actions
+  workflow-command annotations, so they show up inline on a pull request's Files
+  Changed view without a separate SARIF upload step.** SARIF upload to GitHub
+  Code Scanning needs `security-events: write` permissions and a dedicated
+  upload step whose result only surfaces in the Security tab;
+  `audit:run --format github` instead prints one
+  `::error`/`::warning`/`::notice` workflow command per validated finding
+  straight to the job log (`file`, `line`, and — when the finding spans more
+  than one line — `endLine` properties, plus a `title` property and a message
+  carrying the description and remediation), which GitHub Actions parses and
+  renders as an annotation on the exact changed line. Critical and high severity
+  map to `::error`, medium to `::warning`, and low/info to `::notice`, mirroring
+  the CRITICAL/HIGH → `error`, MEDIUM → `warning`, LOW/INFO → `note` reasoning
+  already used by the SARIF renderer's `level` mapping. Property and message
+  text are percent-escaped per GitHub's workflow-command rules (`%`, `\r`, `\n`
+  always; `:` and `,` additionally in property values) so a title or description
+  containing a comma, colon, or embedded code snippet cannot break the
+  annotation syntax. New `OutputFormat::GithubAnnotations` case (value `github`)
+  and a dedicated `GithubAnnotationsReportRenderer`
+  (`src/Audit/Infrastructure/Report/GithubAnnotationsReportRenderer.php`,
+  another `ReportRendererInterface` implementation); a ready-made workflow
+  example lives in `docs/ci.md`.
 - **API Platform resources are now a first-class attack surface.** Classes
   carrying `#[ApiResource]` declare routeless HTTP endpoints whose entire
   security model lives in attributes — previously they classified as plain

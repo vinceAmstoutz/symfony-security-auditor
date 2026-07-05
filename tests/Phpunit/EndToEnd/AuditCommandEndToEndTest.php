@@ -53,6 +53,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
@@ -263,6 +264,19 @@ final class AuditCommandEndToEndTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
         self::assertStringContainsString('# Security Audit Report', $commandTester->getDisplay());
+    }
+
+    public function test_command_github_format_outputs_workflow_command_annotations(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--format' => 'github',
+        ]);
+
+        self::assertStringContainsString('::error file=src/Repo1.php,line=1,endLine=5,title=Critical SQL Injection', $commandTester->getDisplay());
     }
 
     public function test_generate_baseline_writes_fingerprints_and_exits_zero_despite_critical_findings(): void
@@ -791,6 +805,7 @@ final class AuditCommandEndToEndTest extends TestCase
                 new HtmlReportRenderer(),
                 new MarkdownReportRenderer(),
                 new JunitReportRenderer(),
+                new GithubAnnotationsReportRenderer(),
             ], new Filesystem()),
             new AuditExitCodeResolver(),
             new AuditPresenter(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json')),
