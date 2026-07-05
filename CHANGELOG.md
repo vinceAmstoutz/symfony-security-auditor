@@ -676,6 +676,31 @@ repositories by directory and content, not just filename suffix; and the
   `ProjectFileType` classification, so the mapping counts, feature chunking, and
   route/form analysis all see the full set. Plain `.php` services without these
   signals stay classified as services.
+- **Concurrent tool-using conversations no longer abandon themselves on a
+  transient failure that happens after a tool already ran.**
+  `ToolConversationWavefront::advanceConversation()`
+  (`src/Audit/Infrastructure/LLM/ToolConversationWavefront.php`) caught every
+  dispatch or resolution failure in a bare `catch (Throwable)` and, once
+  `runToolCalls()` had executed a tool, finalized the conversation as an empty
+  `empty_content` response with no retry at all — a single timeout or `5xx`
+  right after a tool call threw the conversation away, even though every other
+  call path classifies and retries the same failure class via
+  `RetryingPlatformInvoker` (`SymfonyAiLLMClient::complete()` and
+  `SequentialToolLoop::run()` both go through it). A conversation that fails
+  after a tool ran now retries the same conversation through
+  `RetryingPlatformInvoker::invoke()` — the same classify-then-retry-or-fail
+  seam the sequential path already uses — via a new
+  `ToolConversationWavefront::retryOrAbortConversation()`, and only finalizes as
+  `empty_content` once that retry is exhausted or the failure is non-transient.
+  A dispatch failure before any tool has run now goes through the same
+  classified retry first too, falling back to the full `completeWithTools()`
+  restart only once that retry itself fails, instead of always paying for a full
+  restart on the very first failure. `BudgetExceededException` is unaffected: it
+  still propagates immediately and is never retried, on any path. Also extracted
+  the duplicated `empty_content` `LLMResponse` construction from
+  `SymfonyAiLLMClient::complete()` and `SequentialToolLoop::run()` into a shared
+  `EmptyLLMResponseFactory`
+  (`src/Audit/Infrastructure/LLM/EmptyLLMResponseFactory.php`).
 
 ## [1.11.0] — 2026-06-15 — Tracer
 
