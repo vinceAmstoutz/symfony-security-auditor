@@ -51,10 +51,10 @@ final class StructuredReviewCollectionSessionTest extends TestCase
     {
         $recordReviewToolFactory = new RecordReviewToolFactory();
 
-        $first = StructuredReviewCollectionSession::begin($recordReviewToolFactory, new NullLogger());
+        $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin($recordReviewToolFactory, new NullLogger());
         $second = StructuredReviewCollectionSession::begin($recordReviewToolFactory, new NullLogger());
 
-        $first->toolRegistry->execute('record_review', ['id' => 'VULN-abc123', 'accepted' => true]);
+        $structuredReviewCollectionSession->toolRegistry->execute('record_review', ['id' => 'VULN-abc123', 'accepted' => true]);
 
         self::assertSame([], $second->drain());
     }
