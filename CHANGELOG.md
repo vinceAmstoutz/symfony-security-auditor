@@ -12,6 +12,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **New `audit:diff` command compares two JSON reports and shows new, fixed, and
+  persisting findings.** Nothing let a user answer "what changed between this
+  run and the last one?" without diffing raw JSON by hand — findings shift line
+  numbers and change severity across runs, so naive JSON diffing produces noise.
+  `Vulnerability::fingerprint()` (`src/Audit/Domain/Model/Vulnerability.php`)
+  already gives every finding a stable, line-number-independent identity for
+  baseline suppression; `audit:diff previous.json current.json` reuses it to
+  bucket findings into **New** (in the current report only), **Fixed** (in the
+  previous report only), and **Persisting** (in both), printing a human-readable
+  summary by default or structured JSON via `--format=json`. The
+  `vulnerabilities[]` entries in the JSON report (`--format=json`) now also
+  carry a `fingerprint` key (`Vulnerability::toArray()`) so a report can be
+  diffed without recomputing the hash from raw fields; a report generated before
+  this key existed is still accepted — `ReportDiffer`
+  (`src/Command/ReportDiffer.php`) recomputes the fingerprint from `type`,
+  `file`, and `title` via the new `Vulnerability::fingerprintOf()` static
+  factory, the exact formula `fingerprint()` itself now delegates to. A missing
+  or unreadable report file throws `ReportFileNotReadableException`; invalid
+  JSON or a report without a `vulnerabilities` array throws
+  `MalformedReportFileException` (both under `src/Command/Exception/`), and the
+  command exits `1` with a clear error message rather than a stack trace.
 - **New `--format junit` output renders findings as JUnit XML for CI test-report
   panels.** SARIF gets findings into GitHub Code Scanning and GitLab's security
   dashboard, but GitLab's dashboard requires the Ultimate tier — free-tier users

@@ -89,6 +89,11 @@ is a `MAJOR` change.
     `critical`), or the audit itself failed.
   - `2` — audit aborted because the configured token or cost budget was exceeded
     (partial report still emitted).
+- The command name `audit:diff` (see
+  [CLI Reference → `audit:diff`](configuration.md#auditdiff--comparing-two-reports)),
+  its `previous-report` and `current-report` arguments, its `--format` option
+  (`console` or `json`), and its exit codes (`0` on a successful comparison, `1`
+  when a report file is missing or is not valid JSON).
 
 ### Standalone executable & XDG configuration
 
@@ -140,7 +145,10 @@ deprecated by the other.
 ### Output schemas
 
 - The **JSON report schema** produced by `--format=json`. Keys present today
-  remain present; new keys may be added in `MINOR` releases.
+  remain present; new keys may be added in `MINOR` releases. Each entry in
+  `vulnerabilities[]` carries a `fingerprint` key (since 1.13) — the same stable
+  per-finding identity `Vulnerability::fingerprint()` already used by baseline
+  suppression — consumed by `audit:diff` to compare two reports.
 - The **SARIF 2.1.0 output** produced by `--format=sarif`. The
   `runs[].tool.driver.name`, `informationUri`, and `version` fields are stable.
   The `version` is sourced dynamically from installed Composer metadata, so it

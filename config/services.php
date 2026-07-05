@@ -150,8 +150,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessorInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDifferInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
@@ -324,6 +329,12 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.audit.excluded_types'),
         ]);
     $defaultsConfigurator->alias(FindingTypeFilterInterface::class, FindingTypeFilter::class);
+
+    $defaultsConfigurator->set(ReportDiffer::class);
+    $defaultsConfigurator->alias(ReportDifferInterface::class, ReportDiffer::class);
+
+    $defaultsConfigurator->set(DiffPresenter::class);
+    $defaultsConfigurator->alias(DiffPresenterInterface::class, DiffPresenter::class);
 
     $defaultsConfigurator->set(ProcessGitChangedFilesResolver::class);
     $defaultsConfigurator->alias(GitChangedFilesResolverInterface::class, ProcessGitChangedFilesResolver::class);
@@ -579,6 +590,13 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             inline_service(RiskLevel::class)
                 ->factory([RiskLevel::class, 'from'])
                 ->args([param('symfony_security_auditor.audit.fail_on')]),
+        ])
+        ->tag('console.command');
+
+    $defaultsConfigurator->set(DiffCommand::class)
+        ->args([
+            service(ReportDifferInterface::class),
+            service(DiffPresenterInterface::class),
         ])
         ->tag('console.command');
 };
