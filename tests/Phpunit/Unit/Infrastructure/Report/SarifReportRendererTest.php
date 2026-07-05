@@ -303,6 +303,19 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */
+    public function test_render_rule_properties_tags_include_the_cwe_reference(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION);
+        $decoded = $this->decodeSarif($this->makeReport($vulnerability));
+
+        $firstRule = array_values($decoded['runs'][0]['tool']['driver']['rules'])[0];
+        self::assertSame(['external/cwe/cwe-89'], $firstRule['properties']['tags']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_result_carries_the_vulnerability_partial_fingerprint(): void
     {
         $vulnerability = $this->makeValidatedVuln();

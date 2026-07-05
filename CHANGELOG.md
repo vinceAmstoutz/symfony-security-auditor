@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **Findings now include a CWE reference alongside the existing OWASP Top 10
+  mapping.** `VulnerabilityType::cweReference()` (e.g. `CWE-89`) and
+  `cweReferenceUrl()` (`https://cwe.mitre.org/data/definitions/89.html`)
+  (`src/Audit/Domain/Model/VulnerabilityType.php`) map every case to its MITRE
+  CWE identifier. `Vulnerability::toArray()` gains a `cwe` key next to `owasp`
+  (`src/Audit/Domain/Model/Vulnerability.php`), so `JsonReportRenderer` picks it
+  up for free. `SarifReportRenderer` tags each rule with `external/cwe/cwe-<n>`
+  in `properties.tags`
+  (`src/Audit/Infrastructure/Report/SarifReportRenderer.php`), the format GitHub
+  Code Scanning already recognizes for CWE. `JunitReportRenderer`,
+  `HtmlReportRenderer`, `ConsoleReportRenderer`, and `MarkdownReportRenderer`
+  now render the CWE reference alongside OWASP in their respective output.
+  Additive change — the `cwe` JSON key and the SARIF tag are new; no existing
+  key or field was removed or renamed.
 - **New `--format junit` output renders findings as JUnit XML for CI test-report
   panels.** SARIF gets findings into GitHub Code Scanning and GitLab's security
   dashboard, but GitLab's dashboard requires the Ultimate tier — free-tier users

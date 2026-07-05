@@ -13,7 +13,7 @@ responsibilities, data flow, key design decisions, and extension points.
   - [`AuditReport`](#auditreport--immutable-final-snapshot)
   - [`Vulnerability`](#vulnerability--immutable-copy-on-write-mutations)
   - [`VulnerabilitySeverity`](#vulnerabilityseverity--backed-enum)
-  - [`VulnerabilityType`](#vulnerabilitytype--backed-enum-with-owasp-references)
+  - [`VulnerabilityType`](#vulnerabilitytype--backed-enum-with-owasp-and-cwe-references)
   - [`ProjectFile`](#projectfile--immutable-scanned-file)
   - [`SymfonyMapping`](#symfonymapping--immutable-project-structure-snapshot)
   - [Pipeline ports](#pipeline-ports-domainpipeline)
@@ -252,9 +252,9 @@ Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`,
 `score()` drives the risk calculation. `isExploitable()` is used by
 `Vulnerability::isHighRisk()`.
 
-### `VulnerabilityType` — backed enum with OWASP references
+### `VulnerabilityType` — backed enum with OWASP and CWE references
 
-32 cases in six categories:
+40 cases in six categories:
 
 | Category              | Examples                                                                   |
 | --------------------- | -------------------------------------------------------------------------- |
@@ -266,7 +266,10 @@ Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`,
 | Cryptographic         | `WEAK_CRYPTOGRAPHY`, `HARDCODED_SECRET`, `INSECURE_RANDOM`                 |
 
 `category()` and `owaspReference()` return human-readable strings used in report
-output and LLM prompts.
+output and LLM prompts. `cweReference()` and `cweReferenceUrl()` return the
+matching MITRE CWE identifier (e.g. `CWE-89`) and its
+`https://cwe.mitre.org/data/definitions/<n>.html` definition page, surfaced
+alongside the OWASP mapping in every report renderer.
 
 ### `ProjectFile` — immutable scanned file
 
@@ -785,7 +788,8 @@ provider-agnostic.
 `symfony/ai`.
 
 **Add new vulnerability types** — add a case to `VulnerabilityType`, add a
-branch in `category()` and `owaspReference()`. The factory, agents, and report
+branch in `category()`, `owaspReference()`, `owaspReferenceUrl()`,
+`cweReference()`, and `cweReferenceUrl()`. The factory, agents, and report
 serialization require no changes.
 
 **Add new severity levels** — add a case to `VulnerabilitySeverity` with
