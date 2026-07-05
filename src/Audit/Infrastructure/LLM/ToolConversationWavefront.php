@@ -37,11 +37,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Miss
  * conversation WITHOUT blocking, then resolves them, executes the requested
  * tools against that conversation's own registry, and queues the follow-up
  * round. On an async transport (the symfony/ai DeferredResult contract) the
- * per-round invocations overlap on the wire. A conversation that fails before
- * any of its tools ran falls back to the proven sequential completeWithTools()
- * path (full retry); one that fails after a tool already produced side effects
- * finalizes as an empty `empty_content` response so tools are never executed
- * twice.
+ * per-round invocations overlap on the wire. Any dispatch or resolution
+ * failure first retries the same conversation through
+ * `RetryingPlatformInvoker` — the same classify-then-retry-or-fail seam the
+ * sequential path uses. Only once that retry is exhausted or the failure is
+ * non-transient does it give up: a conversation that hasn't run a tool yet
+ * falls back to the proven sequential completeWithTools() path (full restart);
+ * one that already ran a tool cannot restart from scratch without executing
+ * it twice, so it finalizes as an empty `empty_content` response instead.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -57,6 +60,7 @@ final readonly class ToolConversationWavefront
         private PlatformOptionsFactory $platformOptionsFactory,
         private PromptTokenEstimator $promptTokenEstimator,
         private LLMClientInterface $llmClient,
+        private RetryingPlatformInvoker $retryingPlatformInvoker,
     ) {}
 
     /**
@@ -191,53 +195,94 @@ final readonly class ToolConversationWavefront
         if (!$deferredResult instanceof DeferredResult) {
             $this->rateLimiter->record(0, 0);
 
-            return $this->abortConversation($state, $request, $maxToolIterations);
+            return $this->retryOrAbortConversation($state, $request, $maxToolIterations);
         }
 
-        $reconciled = false;
-
         try {
-            $platformResult = $deferredResult->getResult();
-            [$callInput, $callOutput, $callCacheRead, $callCacheCreation] = $this->platformResultExtractor->extractTokens($deferredResult);
-            $state['input'] += $callInput;
-            $state['output'] += $callOutput;
-            $state['cacheRead'] += $callCacheRead;
-            $state['cacheCreation'] += $callCacheCreation;
-            $this->rateLimiter->record($callInput, $callOutput);
-            $reconciled = true;
-            if ($this->budgetTracker instanceof BudgetTracker) {
-                $this->budgetTracker->recordCall(LLMResponse::of(
-                    '',
-                    $this->model,
-                    'tool_iteration',
-                    TokenUsageSnapshot::of($callInput, $callOutput, $callCacheRead, $callCacheCreation),
-                ));
-                $this->budgetTracker->assertWithinBudget();
-            }
-
-            $toolCalls = $this->platformResultExtractor->extractToolCalls($platformResult);
-
-            if ([] !== $toolCalls) {
-                return $this->runToolCalls($state, $toolCalls, $request);
-            }
-
-            $state['response'] = LLMResponse::of(
-                $this->platformResultExtractor->extractText($platformResult),
-                $this->model,
-                'end_turn',
-                TokenUsageSnapshot::of($state['input'], $state['output'], $state['cacheRead'], $state['cacheCreation']),
-            );
-
-            return $state;
+            return $this->processDeferredResult($state, $deferredResult, $request);
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (Throwable) {
-            if (!$reconciled) {
-                $this->rateLimiter->record(0, 0);
-            }
+            return $this->retryOrAbortConversation($state, $request, $maxToolIterations);
+        }
+    }
 
+    /**
+     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
+     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
+     *
+     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
+     *
+     * @throws BudgetExceededException
+     */
+    private function processDeferredResult(array $state, DeferredResult $deferredResult, array $request): array
+    {
+        try {
+            $platformResult = $deferredResult->getResult();
+            [$callInput, $callOutput, $callCacheRead, $callCacheCreation] = $this->platformResultExtractor->extractTokens($deferredResult);
+        } catch (Throwable $throwable) {
+            $this->rateLimiter->record(0, 0);
+
+            throw $throwable;
+        }
+
+        $state['input'] += $callInput;
+        $state['output'] += $callOutput;
+        $state['cacheRead'] += $callCacheRead;
+        $state['cacheCreation'] += $callCacheCreation;
+        $this->rateLimiter->record($callInput, $callOutput);
+        if ($this->budgetTracker instanceof BudgetTracker) {
+            $this->budgetTracker->recordCall(LLMResponse::of(
+                '',
+                $this->model,
+                'tool_iteration',
+                TokenUsageSnapshot::of($callInput, $callOutput, $callCacheRead, $callCacheCreation),
+            ));
+            $this->budgetTracker->assertWithinBudget();
+        }
+
+        $toolCalls = $this->platformResultExtractor->extractToolCalls($platformResult);
+
+        if ([] !== $toolCalls) {
+            return $this->runToolCalls($state, $toolCalls, $request);
+        }
+
+        $state['response'] = LLMResponse::of(
+            $this->platformResultExtractor->extractText($platformResult),
+            $this->model,
+            'end_turn',
+            TokenUsageSnapshot::of($state['input'], $state['output'], $state['cacheRead'], $state['cacheCreation']),
+        );
+
+        return $state;
+    }
+
+    /**
+     * Retries a failed dispatch/resolution through the same
+     * classify-then-retry-or-fail seam the sequential path uses. Falls back to
+     * `abortConversation()` only once that retry itself fails — which restarts
+     * from scratch via completeWithTools() for a conversation that hasn't run
+     * a tool yet, or finalizes as `empty_content` for one that has (it cannot
+     * restart without executing that tool a second time).
+     *
+     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
+     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
+     *
+     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
+     *
+     * @throws BudgetExceededException
+     */
+    private function retryOrAbortConversation(array $state, array $request, int $maxToolIterations): array
+    {
+        $estimatedInputTokens = $this->promptTokenEstimator->estimate($request['system'], $request['user']);
+
+        try {
+            $deferredResult = $this->retryingPlatformInvoker->invoke($state['bag'], $state['options'], $estimatedInputTokens);
+        } catch (Throwable) {
             return $this->abortConversation($state, $request, $maxToolIterations);
         }
+
+        return $this->processDeferredResult($state, $deferredResult, $request);
     }
 
     /**
