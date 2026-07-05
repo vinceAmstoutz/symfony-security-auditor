@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -192,6 +193,21 @@ final class ReportDifferTest extends TestCase
      * @throws ReportFileNotReadableException
      * @throws MalformedReportFileException
      */
+    public function test_diff_throws_when_the_report_top_level_is_not_a_json_object(): void
+    {
+        $previous = $this->tmpDir.'/scalar.json';
+        $this->filesystem->dumpFile($previous, '42');
+        $current = $this->writeReport('current.json', []);
+
+        $this->expectException(MalformedReportFileException::class);
+
+        (new ReportDiffer($this->filesystem))->diff($previous, $current);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
     public function test_diff_throws_when_a_vulnerability_entry_is_not_an_object(): void
     {
         $previous = $this->tmpDir.'/bad-entry.json';
@@ -204,18 +220,46 @@ final class ReportDifferTest extends TestCase
     }
 
     /**
+     * @param array<string, string> $vulnerability
+     *
      * @throws ReportFileNotReadableException
      * @throws MalformedReportFileException
      */
-    public function test_diff_throws_when_a_vulnerability_entry_is_missing_a_required_field(): void
+    #[DataProvider('vulnerabilityEntriesMissingARequiredFieldCases')]
+    public function test_diff_throws_when_a_vulnerability_entry_is_missing_a_required_field(array $vulnerability): void
     {
         $previous = $this->tmpDir.'/missing-field.json';
-        $this->filesystem->dumpFile($previous, '{"vulnerabilities": [{"type": "sql_injection", "file": "src/Foo.php"}]}');
+        $this->filesystem->dumpFile($previous, (string) json_encode(['vulnerabilities' => [$vulnerability]], \JSON_THROW_ON_ERROR));
         $current = $this->writeReport('current.json', []);
 
         $this->expectException(MalformedReportFileException::class);
 
         (new ReportDiffer($this->filesystem))->diff($previous, $current);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>}>
+     */
+    public static function vulnerabilityEntriesMissingARequiredFieldCases(): iterable
+    {
+        $complete = ['type' => 'sql_injection', 'file' => 'src/Foo.php', 'title' => 'SQL Injection', 'severity' => 'high'];
+
+        yield 'missing type' => [self::withoutField($complete, 'type')];
+        yield 'missing file' => [self::withoutField($complete, 'file')];
+        yield 'missing title' => [self::withoutField($complete, 'title')];
+        yield 'missing severity' => [self::withoutField($complete, 'severity')];
+    }
+
+    /**
+     * @param array<string, string> $vulnerability
+     *
+     * @return array<string, string>
+     */
+    private static function withoutField(array $vulnerability, string $field): array
+    {
+        unset($vulnerability[$field]);
+
+        return $vulnerability;
     }
 
     /**
