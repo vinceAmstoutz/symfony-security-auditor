@@ -2222,6 +2222,25 @@ final class AttackerAgentTest extends TestCase
         }
     }
 
+    public function test_concurrent_structured_analysis_survives_an_unexpected_failure_and_records_errored_coverage(): void
+    {
+        $files = [$this->makeFile('src/A.php')];
+
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
+        $llmClient->method('completeBatchWithTools')->willThrowException(new RuntimeException('wavefront tore'));
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient);
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+
+        self::assertSame([], $vulnerabilities);
+        self::assertSame(
+            [['stage' => 'attacker', 'file' => 'src/A.php', 'status' => 'errored']],
+            $auditContext->coverage(),
+        );
+    }
+
     public function test_concurrency_is_ignored_when_the_client_cannot_batch_tools(): void
     {
         $files = [$this->makeFile('src/A.php')];

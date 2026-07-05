@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 
 use Psr\Log\LoggerInterface;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
@@ -85,11 +86,9 @@ final readonly class ConcurrentChunkAnalyzer
             $requests[] = $registered['request'];
         }
 
-        if ([] !== $requests) {
-            $this->dispatch($requests, $pending, $coverageRecorder);
-        }
+        $batchCompleted = [] === $requests || $this->dispatch($requests, $pending, $coverageRecorder);
 
-        return $this->aggregate($chunks, $cachedResults, $pending, $coverageRecorder, $totalChunks);
+        return $this->aggregate($chunks, $cachedResults, $pending, $coverageRecorder, $batchCompleted);
     }
 
     private function reportChunkStarted(int $index, int $totalChunks): void
@@ -144,12 +143,13 @@ final readonly class ConcurrentChunkAnalyzer
      *
      * @return array{0: list<Vulnerability>, 1: array<string, int>}
      */
-    private function aggregate(array $chunks, array $cachedResults, array $pending, CoverageRecorderInterface $coverageRecorder, int $totalChunks): array
+    private function aggregate(array $chunks, array $cachedResults, array $pending, CoverageRecorderInterface $coverageRecorder, bool $batchCompleted): array
     {
+        $totalChunks = \count($chunks);
         $allVulnerabilities = [];
         $totalDropsByReason = [];
         foreach (array_keys($chunks) as $index) {
-            $chunkResult = $cachedResults[$index] ?? $this->finalize($pending[$index], $coverageRecorder);
+            $chunkResult = $cachedResults[$index] ?? $this->dispatchedResult($pending[$index], $coverageRecorder, $batchCompleted);
             ChunkFindingProgress::report($this->progressReporter, $chunkResult->vulnerabilities());
             $this->reportChunkCompleted($index, $totalChunks);
             $allVulnerabilities = [...$allVulnerabilities, ...$chunkResult->vulnerabilities()];
@@ -157,6 +157,18 @@ final readonly class ConcurrentChunkAnalyzer
         }
 
         return [$allVulnerabilities, $totalDropsByReason];
+    }
+
+    /**
+     * @param array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession} $entry
+     */
+    private function dispatchedResult(array $entry, CoverageRecorderInterface $coverageRecorder, bool $batchCompleted): VulnerabilityHydrationResult
+    {
+        if (!$batchCompleted) {
+            return $this->vulnerabilityFactory->fromList([]);
+        }
+
+        return $this->finalize($entry, $coverageRecorder);
     }
 
     private function reportChunkCompleted(int $index, int $totalChunks): void
@@ -184,16 +196,22 @@ final readonly class ConcurrentChunkAnalyzer
     }
 
     /**
+     * Returns true when the batch completed; false when it failed in a way
+     * that must not abort the audit — the pending chunks are then recorded
+     * as errored and yield no findings, mirroring the sequential analyzer.
+     *
      * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                      $requests
      * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}> $pending
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    private function dispatch(array $requests, array $pending, CoverageRecorderInterface $coverageRecorder): void
+    private function dispatch(array $requests, array $pending, CoverageRecorderInterface $coverageRecorder): bool
     {
         try {
             $this->toolBatchCapableLLMClient->completeBatchWithTools($requests, $this->maxConcurrent, $this->maxToolIterations);
+
+            return true;
         } catch (BudgetExceededException $budgetExceededException) {
             $this->recordPendingCoverage($pending, 'aborted', $coverageRecorder);
 
@@ -202,6 +220,13 @@ final readonly class ConcurrentChunkAnalyzer
             $this->recordPendingCoverage($pending, 'errored', $coverageRecorder);
 
             throw $llmProviderException;
+        } catch (Throwable $throwable) {
+            $this->logger->warning('Concurrent attacker batch failed; its chunks are recorded as errored and the audit continues.', [
+                'error' => $throwable->getMessage(),
+            ]);
+            $this->recordPendingCoverage($pending, 'errored', $coverageRecorder);
+
+            return false;
         }
     }
 

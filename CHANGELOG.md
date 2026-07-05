@@ -572,6 +572,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **An unexpected failure in a concurrent attacker batch no longer aborts the
+  whole audit.** `ConcurrentChunkAnalyzer` only caught budget and provider
+  exceptions around the tool-batch dispatch, so with
+  `audit.attacker_max_concurrent` > 1 any other `Throwable` from the wavefront
+  propagated and killed the run — where the sequential analyzer logs, records
+  the chunk as `errored`, and continues. The concurrent path now does the same:
+  the batch's chunks are recorded as `errored` coverage, yield no findings, are
+  **not** written to the attacker cache (an errored chunk must not be replayed
+  as "no findings"), and the audit continues.
 - **`composer audit` advisories now target the audited project instead of the
   host application (or the standalone binary's working directory).**
   `ComposerAuditAdvisoryDatabase` received `kernel.project_dir` at
