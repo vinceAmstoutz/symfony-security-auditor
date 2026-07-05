@@ -386,7 +386,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      *     "$schema": string,
      *     version: string,
      *     runs: list<array{
-     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array<string, mixed>>}},
+     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array{id: string, name: string, shortDescription: array{text: string}, helpUri: string, properties: array{tags: list<string>}}>}},
      *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>}>,
      *         properties?: array<string, mixed>
      *     }>
@@ -405,7 +405,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      *     "$schema": string,
      *     version: string,
      *     runs: list<array{
-     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array<string, mixed>>}},
+     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array{id: string, name: string, shortDescription: array{text: string}, helpUri: string, properties: array{tags: list<string>}}>}},
      *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>}>
      *     }>
      * } $value
