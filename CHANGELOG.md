@@ -593,7 +593,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   as fatal instead of retried. Status-code hints (for `isTransient()` and
   `isRateLimit()`'s `429`) are now matched as word-bounded tokens instead of raw
   substrings; the textual hints (`"rate limit"`, `"timed out"`, …) are
-  unchanged.
+  unchanged. Word-bounded tokens alone were still fooled by thousands
+  separators: Anthropic's real 429 body
+  `"This request would exceed your organization's rate limit of 400,000 input
+  tokens per minute"` matched the non-transient `400` at the `,`-boundary and
+  aborted the audit on an ordinary rate-limit response. A code token directly
+  adjacent to a `,`/`.`-separated digit group (`400,000`, `1,400`, `429.5`) is
+  now ignored, while genuine codes followed by punctuation (`"HTTP 400."`)
+  still match.
 - **Unquoted credential values in config files reached the LLM prompt
   unredacted.** `RegexSecretScrubber`'s `inline_assignment` pattern
   (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) required the
