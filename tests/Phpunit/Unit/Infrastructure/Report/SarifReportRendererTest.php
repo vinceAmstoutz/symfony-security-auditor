@@ -338,7 +338,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
 
         self::assertSame(
             [['kind' => 'external', 'justification' => 'Accepted via audit baseline']],
-            $decoded['runs'][0]['results'][0]['suppressions'],
+            $decoded['runs'][0]['results'][0]['suppressions'] ?? null,
         );
     }
 

@@ -78,7 +78,7 @@ final class AuditCommandSarifBaselineSuppressionTest extends TestCase
     {
         $vulnerability = $this->makeVuln();
         $baselineFile = $this->fixtureDir.'/baseline.json';
-        (new Baseline())->save($baselineFile, [$vulnerability->fingerprint()]);
+        (new Baseline())->save($baselineFile, [['fingerprint' => $vulnerability->fingerprint()]]);
 
         $commandTester = $this->makeCommandTester($vulnerability);
         $commandTester->execute([
@@ -115,7 +115,7 @@ final class AuditCommandSarifBaselineSuppressionTest extends TestCase
     {
         $vulnerability = $this->makeVuln();
         $baselineFile = $this->fixtureDir.'/baseline.json';
-        (new Baseline())->save($baselineFile, [$vulnerability->fingerprint()]);
+        (new Baseline())->save($baselineFile, [['fingerprint' => $vulnerability->fingerprint()]]);
 
         $commandTester = $this->makeCommandTester($vulnerability);
         $commandTester->execute([
