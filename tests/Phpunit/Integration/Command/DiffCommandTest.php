@@ -132,8 +132,14 @@ final class DiffCommandTest extends TestCase
         self::assertArrayHasKey('new', $decoded);
         self::assertArrayHasKey('fixed', $decoded);
         self::assertArrayHasKey('persisting', $decoded);
-        self::assertCount(1, $decoded['new']);
-        self::assertSame('SSRF via Webhook', $decoded['new'][0]['title']);
+
+        $newFindings = $decoded['new'];
+        self::assertIsArray($newFindings);
+        self::assertCount(1, $newFindings);
+
+        $firstNewFinding = $newFindings[0];
+        self::assertIsArray($firstNewFinding);
+        self::assertSame('SSRF via Webhook', $firstNewFinding['title']);
     }
 
     /**
