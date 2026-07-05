@@ -50,6 +50,7 @@ final readonly class ProjectFileTypeClassifier
     {
         return str_ends_with($path, '.php')
             && (str_contains($content, 'extends AbstractController')
+                || str_contains($content, '#[AsController')
                 || str_contains($content, '#[Route'));
     }
 

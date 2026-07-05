@@ -569,6 +569,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Invokable `#[AsController]` services were not classified as controllers.**
+  A Symfony controller does not have to extend `AbstractController` — an
+  invokable service tagged with `#[AsController]` whose routes are declared in
+  routing configuration (YAML/PHP) rather than `#[Route]` attributes is just
+  as much an HTTP entry point, but `ProjectFileTypeClassifier`'s content
+  heuristic only recognized `extends AbstractController` and `#[Route`, so
+  such an action class outside a `Controller` path classified as plain `php`
+  and never received the controller attack-surface skill or pre-scan markers.
+  The heuristic now also matches the `#[AsController]` attribute. (A plain
+  invokable class with neither attribute nor base class remains detectable
+  only by path convention — content offers nothing to key on.)
 - **`--since` silently dropped changed dotfiles (`.env`, `.github/...`) from
   incremental audits.** `ProcessGitChangedFilesResolver::mergeAndNormalize()`
   (`src/Audit/Infrastructure/Diff/ProcessGitChangedFilesResolver.php`) used
