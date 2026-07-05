@@ -125,6 +125,35 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */
+    public function test_a_rule_shared_by_two_types_carries_both_cwe_tags(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
+        $vuln2 = $this->makeValidatedVuln(VulnerabilityType::COMMAND_INJECTION, VulnerabilitySeverity::CRITICAL, 'src/Bar.php', 10);
+        $decoded = $this->decodeSarif($this->makeReport($vulnerability, $vuln2));
+
+        $rules = $decoded['runs'][0]['tool']['driver']['rules'];
+        self::assertCount(1, $rules);
+        self::assertSame(['external/cwe/cwe-78', 'external/cwe/cwe-89'], array_values($rules)[0]['properties']['tags']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_a_rule_does_not_repeat_the_cwe_tag_of_a_recurring_type(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
+        $vuln2 = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'src/Bar.php', 10);
+        $decoded = $this->decodeSarif($this->makeReport($vulnerability, $vuln2));
+
+        $rules = $decoded['runs'][0]['tool']['driver']['rules'];
+        self::assertSame(['external/cwe/cwe-89'], array_values($rules)[0]['properties']['tags']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_results_contains_one_entry_per_vulnerability(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);

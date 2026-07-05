@@ -47,23 +47,14 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
         $vulnerabilities = $auditReport->vulnerabilities();
 
         $results = [];
-        $types = [];
+        $typesByRule = [];
 
         foreach ($vulnerabilities as $vulnerability) {
-            $types[$vulnerability->type()->owaspReference()] = $vulnerability->type();
+            $typesByRule[$vulnerability->type()->owaspReference()][$vulnerability->type()->value] = $vulnerability->type();
             $results[] = $this->resultFor($vulnerability, $baselinedFingerprints);
         }
 
-        $rules = array_values(array_map(
-            static fn (VulnerabilityType $vulnerabilityType): array => [
-                'id' => $vulnerabilityType->owaspReference(),
-                'name' => $vulnerabilityType->value,
-                'shortDescription' => ['text' => $vulnerabilityType->category()],
-                'helpUri' => $vulnerabilityType->owaspReferenceUrl(),
-                'properties' => ['tags' => [self::cweTag($vulnerabilityType)]],
-            ],
-            $types,
-        ));
+        $rules = array_values(array_map(self::ruleFor(...), $typesByRule));
 
         $cost = $auditReport->cost();
         $sarif = [
@@ -133,6 +124,24 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
             VulnerabilitySeverity::MEDIUM => 'warning',
             VulnerabilitySeverity::LOW, VulnerabilitySeverity::INFO => 'note',
         };
+    }
+
+    /**
+     * @param non-empty-array<string, VulnerabilityType> $contributingTypes
+     *
+     * @return array<string, mixed>
+     */
+    private static function ruleFor(array $contributingTypes): array
+    {
+        $firstSeen = reset($contributingTypes);
+
+        return [
+            'id' => $firstSeen->owaspReference(),
+            'name' => $firstSeen->value,
+            'shortDescription' => ['text' => $firstSeen->category()],
+            'helpUri' => $firstSeen->owaspReferenceUrl(),
+            'properties' => ['tags' => array_values(array_unique(array_map(self::cweTag(...), $contributingTypes)))],
+        ];
     }
 
     private static function cweTag(VulnerabilityType $vulnerabilityType): string

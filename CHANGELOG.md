@@ -37,7 +37,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   up for free. `SarifReportRenderer` tags each rule with `external/cwe/cwe-<n>`
   in `properties.tags`
   (`src/Audit/Infrastructure/Report/SarifReportRenderer.php`), the format GitHub
-  Code Scanning already recognizes for CWE. `JunitReportRenderer`,
+  Code Scanning already recognizes for CWE. SARIF rules are keyed by OWASP
+  category, which several vulnerability types can share (e.g. `sql_injection`
+  CWE-89 and `command_injection` CWE-78 are both `A05:2025 - Injection`), so a
+  shared rule aggregates the deduplicated CWE tags of every contributing type
+  instead of carrying only the last type's tag. `JunitReportRenderer`,
   `HtmlReportRenderer`, `ConsoleReportRenderer`, and `MarkdownReportRenderer`
   now render the CWE reference alongside OWASP in their respective output.
   Additive change — the `cwe` JSON key and the SARIF tag are new; no existing
