@@ -73,6 +73,7 @@ final readonly class RetryingPlatformInvoker
 
                 return $deferredResult;
             } catch (Throwable $throwable) {
+                $this->rateLimiter->record(0, 0);
                 $this->rethrowWhenNonTransient($throwable);
 
                 if ($attempt >= $maxAttempts) {
