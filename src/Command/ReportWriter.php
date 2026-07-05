@@ -67,11 +67,11 @@ final readonly class ReportWriter implements ReportWriterInterface
      */
     private function renderContent(OutputFormat $outputFormat, AuditReport $auditReport, array $baselinedFingerprints): string
     {
-        $renderer = $this->rendererFor($outputFormat);
+        $reportRenderer = $this->rendererFor($outputFormat);
 
-        return $renderer instanceof BaselineSuppressingReportRendererInterface
-            ? $renderer->renderWithSuppressions($auditReport, $baselinedFingerprints)
-            : $renderer->render($auditReport);
+        return $reportRenderer instanceof BaselineSuppressingReportRendererInterface
+            ? $reportRenderer->renderWithSuppressions($auditReport, $baselinedFingerprints)
+            : $reportRenderer->render($auditReport);
     }
 
     /**

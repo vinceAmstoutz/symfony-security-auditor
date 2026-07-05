@@ -174,15 +174,15 @@ final class BaselineProcessorTest extends TestCase
      */
     public function test_apply_exposes_the_matched_fingerprints_on_the_result(): void
     {
-        $dropped = $this->makeVuln('src/Drop.php');
-        $auditReport = $this->makeReport($dropped);
+        $vulnerability = $this->makeVuln('src/Drop.php');
+        $auditReport = $this->makeReport($vulnerability);
 
         $baseline = self::createStub(BaselineInterface::class);
-        $baseline->method('load')->willReturn([$dropped->fingerprint()]);
+        $baseline->method('load')->willReturn([$vulnerability->fingerprint()]);
 
         $baselineResult = (new BaselineProcessor($baseline))->apply($auditReport, '/baseline.json');
 
-        self::assertSame([$dropped->fingerprint()], $baselineResult->acceptedFingerprints);
+        self::assertSame([$vulnerability->fingerprint()], $baselineResult->acceptedFingerprints);
     }
 
     /**

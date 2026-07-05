@@ -149,19 +149,19 @@ final class AuditCommandSarifBaselineSuppressionTest extends TestCase
     private function makeCommandTester(Vulnerability $vulnerability): CommandTester
     {
         $pricingCatalog = __DIR__.'/../UseCase/Fixture/pricing-catalog.json';
-        $pricingProvider = new ModelsDevPricingProvider(new NullLogger(), $pricingCatalog);
+        $modelsDevPricingProvider = new ModelsDevPricingProvider(new NullLogger(), $pricingCatalog);
         $projectFileScanner = new ProjectFileScanner(new NullLogger());
 
         $auditCommand = new AuditCommand(
             new RunAuditUseCase(new FixedFindingPipeline($vulnerability), new NullLogger()),
             new ReportWriter([new JsonReportRenderer(), new SarifReportRenderer()], new Filesystem()),
             new AuditExitCodeResolver(),
-            new AuditPresenter($pricingProvider),
-            new EstimateAuditCostUseCase($projectFileScanner, new ResolvingTokenEstimator(), new CostCalculator($pricingProvider), new NullLogger(), 'stub', 1),
+            new AuditPresenter($modelsDevPricingProvider),
+            new EstimateAuditCostUseCase($projectFileScanner, new ResolvingTokenEstimator(), new CostCalculator($modelsDevPricingProvider), new NullLogger(), 'stub', 1),
             new ListScannedFilesUseCase($projectFileScanner),
             new ProgressReporterHolder(new NullLogger()),
             new BaselineProcessor(new Baseline()),
-            new UnpricedModelBudgetGuard($pricingProvider, ['stub']),
+            new UnpricedModelBudgetGuard($modelsDevPricingProvider, ['stub']),
             secretScrubbingEnabled: true,
             findingTypeFilter: new FindingTypeFilter([], []),
         );
