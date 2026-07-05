@@ -272,6 +272,17 @@ final class ProjectFileTest extends TestCase
         self::assertSame('api_resource', $projectFile->type());
     }
 
+    public function test_is_entity_is_false_for_an_entity_that_is_also_an_api_resource(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Entity/Book.php',
+            '/app/src/Entity/Book.php',
+            "<?php\nuse ApiPlatform\\Metadata\\ApiResource;\n#[ApiResource]\n#[ORM\\Entity]\nclass Book {}",
+        );
+
+        self::assertFalse($projectFile->isEntity());
+    }
+
     public function test_it_detects_api_platform_resources_outside_entity_directories(): void
     {
         $projectFile = ProjectFile::create(
@@ -615,10 +626,14 @@ final class ProjectFileTest extends TestCase
         self::assertSame('config', $projectFile->type());
     }
 
+    public function test_type_is_config_for_xml_extension(): void
+    {
+        $projectFile = ProjectFile::create('config/services.xml', '/app/config/services.xml', '');
+        self::assertSame('config', $projectFile->type());
+    }
+
     public function test_type_is_php_for_plain_php_service_file(): void
     {
-        // Tests MatchArmRemoval on the `.php` match arm in detectType().
-        // If the arm is removed, a service php file would fall through to 'other'.
         $projectFile = ProjectFile::create('src/Service/FooService.php', '/app/src/Service/FooService.php', '<?php');
         self::assertSame('php', $projectFile->type());
     }
@@ -751,6 +766,19 @@ final class ProjectFileTest extends TestCase
         );
 
         self::assertFalse($projectFile->isWebhookConsumer());
+        self::assertSame('config', $projectFile->type());
+    }
+
+    public function test_non_php_inside_message_handler_directory_is_not_a_messenger_handler(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/MessageHandler/config.yaml',
+            '/app/src/MessageHandler/config.yaml',
+            'foo: bar',
+        );
+
+        self::assertFalse($projectFile->isMessengerHandler());
+        self::assertSame('config', $projectFile->type());
     }
 
     public function test_it_detects_event_subscriber_by_suffix(): void
