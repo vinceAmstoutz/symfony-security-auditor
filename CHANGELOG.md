@@ -12,6 +12,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **File uploads are now a dedicated attacker skill.** `FormType`s carrying a
+  `FileType`/`VichUploaderBundle` field, and the manual `UploadedFile` handling
+  built on top of them, were only covered by `FormAttackerSkill`'s general
+  mass-assignment/CSRF hunting — extension/MIME spoofing, path traversal via the
+  original filename, and web-root RCE via an uploaded `.php` were invisible to
+  the attacker. A new `FileUploadAttackerSkill`
+  (`src/Audit/Infrastructure/Prompt/Skill/FileUploadAttackerSkill.php`, tagged
+  `symfony_security_auditor.attacker_skill`, `priority()` 115 — right after
+  `FormAttackerSkill`) targets the existing `ProjectFileType::FORM` case and
+  hunts client-trusted `Content-Type`/extension checks, missing size limits,
+  `getClientOriginalName()`-derived paths, public-web-root storage without
+  execution disabled, predictable stored filenames, missing authorization on the
+  upload endpoint, and download routes that don't re-check ownership — with a
+  "do NOT flag" section for allow-listed extensions stored outside the web root
+  and randomized filenames. `AttackerPromptBuilder::PROMPT_VERSION` bumps to 12,
+  invalidating cached attacker responses for chunks containing a form.
 - **New `--format junit` output renders findings as JUnit XML for CI test-report
   panels.** SARIF gets findings into GitHub Code Scanning and GitLab's security
   dashboard, but GitLab's dashboard requires the Ultimate tier — free-tier users
