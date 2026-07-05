@@ -44,6 +44,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullControllerAccessControlParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
@@ -53,6 +59,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
@@ -263,6 +270,19 @@ final class AuditCommandEndToEndTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
         self::assertStringContainsString('# Security Audit Report', $commandTester->getDisplay());
+    }
+
+    public function test_command_github_format_outputs_workflow_command_annotations(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--format' => 'github',
+        ]);
+
+        self::assertStringContainsString('::error file=src/Repo1.php,line=1,endLine=5,title=Critical SQL Injection', $commandTester->getDisplay());
     }
 
     public function test_generate_baseline_writes_fingerprints_and_exits_zero_despite_critical_findings(): void
@@ -714,8 +734,8 @@ final class AuditCommandEndToEndTest extends TestCase
         $progressReporterHolder = new ProgressReporterHolder(new NullLogger());
         $auditOrchestrator = new AuditOrchestrator(
             new AttackerAgent(
-                new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator())),
-                new AttackerScanCollaborators(new NullAttackerCache(), progressReporter: $progressReporterHolder),
+                new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullCodeSlicer()),
+                new AttackerScanCollaborators(new NullAttackerCache(), new NullStaticPreScanner(), progressReporter: $progressReporterHolder),
                 new AttackerAnalysisSettings(),
                 new NullLogger(),
             ),
@@ -735,7 +755,7 @@ final class AuditCommandEndToEndTest extends TestCase
         $auditPipeline = new AuditPipeline(
             [
                 new IngestionStage(new ProjectFileScanner(new NullLogger()), new NullLogger()),
-                new MappingStage(new NullLogger()),
+                new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser()),
                 new AuditStage($auditOrchestrator, new NullLogger()),
             ],
             new NullLogger(),
@@ -760,6 +780,7 @@ final class AuditCommandEndToEndTest extends TestCase
                 new HtmlReportRenderer(),
                 new MarkdownReportRenderer(),
                 new JunitReportRenderer(),
+                new GithubAnnotationsReportRenderer(),
             ], new Filesystem()),
             new AuditExitCodeResolver(),
             new AuditPresenter(new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json')),

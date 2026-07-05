@@ -86,13 +86,14 @@ final readonly class JunitReportRenderer implements ReportRendererInterface
         $failure->setAttribute('type', $vulnerability->severity()->value);
         $failure->setAttribute('message', $title);
         $failure->appendChild($domDocument->createTextNode(\sprintf(
-            "%s\n\nSeverity: %s\nLocation: %s:%d-%d\nOWASP: %s\nRemediation: %s",
+            "%s\n\nSeverity: %s\nLocation: %s:%d-%d\nOWASP: %s\nCWE: %s\nRemediation: %s",
             $this->stripIllegalXmlCharacters($vulnerability->description()),
             $vulnerability->severity()->value,
             $vulnerability->filePath(),
             $vulnerability->lineStart(),
             $vulnerability->lineEnd(),
             $vulnerability->type()->owaspReference(),
+            $vulnerability->type()->cweReference(),
             $this->stripIllegalXmlCharacters($vulnerability->remediation()),
         )));
         $domElement->appendChild($failure);

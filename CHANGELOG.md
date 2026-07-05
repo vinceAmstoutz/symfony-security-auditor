@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   "do NOT flag" section for allow-listed extensions stored outside the web root
   and randomized filenames. `AttackerPromptBuilder::PROMPT_VERSION` bumps to 12,
   invalidating cached attacker responses for chunks containing a form.
+- **Findings now include a CWE reference alongside the existing OWASP Top 10
+  mapping.** `VulnerabilityType::cweReference()` (e.g. `CWE-89`) and
+  `cweReferenceUrl()` (`https://cwe.mitre.org/data/definitions/89.html`)
+  (`src/Audit/Domain/Model/VulnerabilityType.php`) map every case to its MITRE
+  CWE identifier. `Vulnerability::toArray()` gains a `cwe` key next to `owasp`
+  (`src/Audit/Domain/Model/Vulnerability.php`), so `JsonReportRenderer` picks it
+  up for free. `SarifReportRenderer` tags each rule with `external/cwe/cwe-<n>`
+  in `properties.tags`
+  (`src/Audit/Infrastructure/Report/SarifReportRenderer.php`), the format GitHub
+  Code Scanning already recognizes for CWE. `JunitReportRenderer`,
+  `HtmlReportRenderer`, `ConsoleReportRenderer`, and `MarkdownReportRenderer`
+  now render the CWE reference alongside OWASP in their respective output.
+  Additive change — the `cwe` JSON key and the SARIF tag are new; no existing
+  key or field was removed or renamed.
 - **Twig extensions are now a first-class attack surface.** Classes implementing
   `Twig\Extension\ExtensionInterface` (or extending `AbstractExtension`)
   register functions and filters callable from every template in the project — a
@@ -38,14 +52,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Domain/Model/ProjectFile.php` detects
   `implements ExtensionInterface` or `extends AbstractExtension` anywhere in a
   `.php` file's content), a dedicated attacker skill block
-  (`TwigExtensionAttackerSkill`, `AttackerPromptBuilder` `PROMPT_VERSION` 12)
-  hunting shell/file sinks reachable from template-supplied arguments,
-  `is_safe: ['html']` declared without justified sanitization, authorization-
-  sensitive lookups missing a security-context check, and sensitive
-  `getGlobals()` entries; plus a `twig_extension` pre-scanner bucket
-  (`RegexStaticPreScanner`, `CACHE_VERSION` 6) with
-  `extension_shell_or_file_sink` and `extension_is_safe_html` markers, and a
-  chunking priority slot right after templates. Custom markers can target the
+  (`TwigExtensionAttackerSkill`, `AttackerPromptBuilder` `PROMPT_VERSION` 13 —
+  12 was already claimed by the file-upload skill above) hunting shell/file
+  sinks reachable from template-supplied arguments, `is_safe: ['html']`
+  declared without justified sanitization, authorization-sensitive lookups
+  missing a security-context check, and sensitive `getGlobals()` entries; plus
+  a `twig_extension` pre-scanner bucket (`RegexStaticPreScanner`,
+  `CACHE_VERSION` 8 — 6 and 7 were already claimed by earlier pre-scan fixes)
+  with `extension_shell_or_file_sink` and `extension_is_safe_html` markers, and
+  a chunking priority slot right after templates. Custom markers can target the
   new bucket via `scan.custom_risk_patterns.twig_extension`. Attacker cache
   entries are invalidated by the prompt/pre-scan version bumps.
 - **New `--format junit` output renders findings as JUnit XML for CI test-report
@@ -61,6 +76,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/Report/JunitReportRenderer.php`, one of the
   per-format renderers behind `ReportRendererInterface` — see _Changed_ below);
   a ready-made GitLab job example lives in `docs/ci.md`.
+- **New `--format github` output renders findings as GitHub Actions
+  workflow-command annotations, so they show up inline on a pull request's Files
+  Changed view without a separate SARIF upload step.** SARIF upload to GitHub
+  Code Scanning needs `security-events: write` permissions and a dedicated
+  upload step whose result only surfaces in the Security tab;
+  `audit:run --format github` instead prints one
+  `::error`/`::warning`/`::notice` workflow command per validated finding
+  straight to the job log (`file`, `line`, and — when the finding spans more
+  than one line — `endLine` properties, plus a `title` property and a message
+  carrying the description and remediation), which GitHub Actions parses and
+  renders as an annotation on the exact changed line. Critical and high severity
+  map to `::error`, medium to `::warning`, and low/info to `::notice`, mirroring
+  the CRITICAL/HIGH → `error`, MEDIUM → `warning`, LOW/INFO → `note` reasoning
+  already used by the SARIF renderer's `level` mapping. Property and message
+  text are percent-escaped per GitHub's workflow-command rules (`%`, `\r`, `\n`
+  always; `:` and `,` additionally in property values) so a title or description
+  containing a comma, colon, or embedded code snippet cannot break the
+  annotation syntax. New `OutputFormat::GithubAnnotations` case (value `github`)
+  and a dedicated `GithubAnnotationsReportRenderer`
+  (`src/Audit/Infrastructure/Report/GithubAnnotationsReportRenderer.php`,
+  another `ReportRendererInterface` implementation); a ready-made workflow
+  example lives in `docs/ci.md`.
 - **API Platform resources are now a first-class attack surface.** Classes
   carrying `#[ApiResource]` declare routeless HTTP endpoints whose entire
   security model lives in attributes — previously they classified as plain
@@ -328,6 +365,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (e.g. `src/Webhook/config.yaml`) previously had
   `type() === 'webhook_consumer'` while `isWebhookConsumer()` returned `false`.
   Both are fixed in the new classifier.
+- **Constructor ports that DI always resolves are now required instead of
+  silently falling back to a `Null*` default.** `MappingStage`
+  (`src/Audit/Application/Pipeline/Stage/MappingStage.php`), `AuditPipeline`
+  (`src/Audit/Application/Pipeline/AuditPipeline.php`), and `AuditOrchestrator`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) accepted nullable
+  `ControllerAccessControlParserInterface` / `VoterCapabilityParserInterface` /
+  `FormBindingParserInterface` / `SecurityConfigParserInterface` /
+  `ProgressReporterInterface` parameters and defaulted each to `new Null*()`
+  when omitted — but `config/services.php` always aliases every one of them to a
+  concrete implementation, so the fallback was only reachable via manual
+  construction (tests). Likewise
+  `AttackerScanCollaborators::staticPreScanner`/`progressReporter`
+  (`src/Audit/Application/Agent/AttackerScanCollaborators.php`) and
+  `AttackerLlmCollaborators::codeSlicer`
+  (`src/Audit/Application/Agent/AttackerLlmCollaborators.php`) fell back to
+  `NullStaticPreScanner`/`NullProgressReporter`/`NullCodeSlicer` inside
+  `AttackerAgent`, even though `SymfonySecurityAuditorBundle::loadExtension()`
+  unconditionally aliases `StaticPreScannerInterface`/`CodeSlicerInterface` to a
+  `Regex*`-or-`Null*` implementation based on config — the Null-vs-real choice
+  was already made once, correctly, in the container. All of these parameters
+  are now non-nullable, and the dead `?? new Null*()` fallbacks are removed. All
+  classes are `@internal`, and the container always supplies a value, so this is
+  not user-visible.
 - **Prompt building is split behind interfaces so neither builder is a
   monolith.** `AttackerPromptBuilder`
   (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) held all sixteen
@@ -398,6 +458,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `0.5` / `6.25` rates for `claude-opus-4-8` equal the old `5×0.1` / `5×1.25`.
   The default `PricingProviderInterface` service alias now points at
   `ModelsDevPricingProvider`.
+- **The structured-collection wiring shared by five attacker/reviewer analyzers
+  is extracted into one collaborator per domain, instead of being duplicated at
+  every call site.**
+  `SequentialChunkAnalyzer::analyzeChunkViaStructuredCollection()` and
+  `ConcurrentChunkAnalyzer::buildPendingRequest()`
+  (`src/Audit/Application/Agent/Chunk/`) each built their own
+  `VulnerabilityCollector` plus a single-tool `record_vulnerability`
+  `ToolRegistry` inline; `StructuredReviewAnalyzer::reviewSingle()`,
+  `ConcurrentStructuredReviewAnalyzer::buildRequest()`, and
+  `BatchReviewAnalyzer::reviewBatchViaStructuredCollection()`
+  (`src/Audit/Application/Agent/Review/`) duplicated the same pattern for
+  `ReviewCollector` and `record_review`. Both now call a new `begin()` factory —
+  `StructuredVulnerabilityCollectionSession` and
+  `StructuredReviewCollectionSession` — that wires the collector into the
+  registry and exposes `drain()`. Purely internal: every analyzer keeps its
+  existing constructor and `analyze()` signature, so `AttackerAgent` and
+  `ReviewerAgent` needed no changes, and the LLM-facing behavior (prompts, tool
+  schemas, caching, coverage, error handling) is unchanged.
 
 ### Deprecated
 
@@ -461,6 +539,85 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   when the model echoes a raw exploit payload) produced a `.xml` report that
   GitLab, Jenkins, and any standard XML parser rejected outright. Those bytes
   are now stripped before insertion.
+- **Retryable LLM failures embedding a non-transient status code as a digit
+  substring were misclassified as fatal, aborting the audit instead of
+  retrying.** `TransientFailureClassifier::isTransient()`
+  (`src/Audit/Infrastructure/LLM/TransientFailureClassifier.php`) checked its
+  `400`/`401`/`403`/`404`/`422` "non-transient" hints with a plain substring
+  search, so a genuinely retryable message like `"HTTP 500 (request id 400123)"`
+  or `"cURL error 28: timed out after 1400 ms"` matched `400` and was rethrown
+  as fatal instead of retried. Status-code hints (for `isTransient()` and
+  `isRateLimit()`'s `429`) are now matched as word-bounded tokens instead of raw
+  substrings; the textual hints (`"rate limit"`, `"timed out"`, …) are
+  unchanged.
+- **Unquoted credential values in config files reached the LLM prompt
+  unredacted.** `RegexSecretScrubber`'s `inline_assignment` pattern
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) required the
+  value to be wrapped in quotes, so `password: supersecretvalue` (valid,
+  unquoted YAML/NEON) skipped redaction entirely while
+  `password: "supersecretvalue"` was caught — exactly the kind of committed
+  secret the scrubber exists to keep out of the attacker prompt. The value's
+  quotes are now optional; an unquoted token is redacted the same way, with a
+  guard so an already-redacted `***REDACTED:...***` placeholder from an earlier
+  pattern (e.g. `env_assignment` on an all-caps `PASSWORD=...` line) is never
+  re-matched and double-redacted.
+- **Concurrent LLM calls (batch dispatch, the tool-calling wavefront, and
+  retries) corrupted the rate limiter's input-token accounting, causing
+  premature throttling.** `TokenBucketRateLimiter` tracked exactly one pending
+  estimate as a scalar
+  (`src/Audit/Infrastructure/LLM/RateLimit/TokenBucketRateLimiter.php`), so when
+  `BatchWindowResolver`/`ToolConversationWavefront` called `acquire()` for every
+  request in a window before `record()`-ing any of them, each new `acquire()`
+  silently overwrote the previous one's estimate — only the last request in the
+  window was ever correctly reconciled, permanently inflating the window's
+  used-token count by the sum of every other request's estimate. The pending
+  estimate is now a FIFO queue, one entry per unreconciled `acquire()`, so each
+  `record()` reconciles against its own request's estimate regardless of how
+  many are in flight. `BatchWindowResolver`, `ToolConversationWavefront`, and
+  `RetryingPlatformInvoker`'s retry loop now also call `record(0, 0)` to release
+  a reservation whose call failed and fell back to a fresh attempt — previously
+  that reservation was never reconciled at all, leaking into the window's usage
+  for the rest of the minute.
+- **The attacker cache key ignored the code-slicing configuration, serving stale
+  findings after `audit.code_slicing.enabled` or
+  `audit.code_slicing.min_lines_before_slicing` changed.** The cache key
+  (`FilesystemAttackerCache::keyForChunk()`) is derived from each file's
+  unsliced content hash, but `ChunkContextFactory` slices the actual prompt
+  content sent to the LLM (`RegexCodeSlicer`) after that key is computed — the
+  salt in `ContainerParameterRegistrar::attackerKeySalt()` had no representation
+  of the slicer's on/off state or its line threshold. Toggling code slicing, or
+  changing the threshold, left an unchanged file's cache key untouched, so a
+  stale cache hit could serve findings computed against a differently-sliced
+  view of the file than the current configuration would actually send. The salt
+  now includes a `slice-off` / `slice-on-<min_lines>` segment so any change to
+  the slicing configuration invalidates the affected cache entries.
+- **A hostile or misbehaving provider's `Retry-After` header could wedge the
+  rate limiter for hours, bypassing the documented safety ceiling.**
+  `RetryPolicy::rateLimitDelayMs()` already clamped the server-provided hint to
+  `rateLimitMaxDelayMs` (5 minutes by default) for the current retry's own
+  sleep, but `RetryingPlatformInvoker` separately called
+  `RateLimiterInterface::pauseUntil()` with the **raw, unclamped** hint
+  converted straight to a future timestamp. Since `pauseUntil()` affects the
+  shared rate limiter used by every concurrent and subsequent request in the
+  audit run — not just the current retry — a provider returning an absurd
+  `Retry-After: 3600` (or larger) paused the entire audit for that full duration
+  despite the retry delay itself correctly capping at 5 minutes.
+  `RetryingPlatformInvoker::backOffBeforeNextAttempt()` now derives the
+  `pauseUntil()` target from the same already-clamped delay used for the local
+  sleep, so the shared rate limiter can never be paused past the configured
+  ceiling.
+- **The `hash_equals_missing` pre-scan marker only flagged one operand order of
+  a non-constant-time signature comparison.** `RegexStaticPreScanner`'s pattern
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) required the
+  `Signature`/`Hash`/`Hmac`/`Token`-suffixed variable to appear on the
+  right-hand side of `===` (`$input === $expectedSignature`). Real code just as
+  commonly writes the comparison the other way around
+  (`$expectedSignature === $input`), which the pattern silently missed — exactly
+  the timing-attack-prone comparison this marker exists to surface. The regex
+  now matches the suffixed variable on either side of `===`. Bumps
+  `RegexStaticPreScanner::CACHE_VERSION` (6 → 7 — the multiline-pattern fix
+  above already claimed 6) since this changes scan output for existing chunk
+  content and must invalidate stale attacker cache entries.
 
 ### Security
 
@@ -608,6 +765,31 @@ repositories by directory and content, not just filename suffix; and the
   `ProjectFileType` classification, so the mapping counts, feature chunking, and
   route/form analysis all see the full set. Plain `.php` services without these
   signals stay classified as services.
+- **Concurrent tool-using conversations no longer abandon themselves on a
+  transient failure that happens after a tool already ran.**
+  `ToolConversationWavefront::advanceConversation()`
+  (`src/Audit/Infrastructure/LLM/ToolConversationWavefront.php`) caught every
+  dispatch or resolution failure in a bare `catch (Throwable)` and, once
+  `runToolCalls()` had executed a tool, finalized the conversation as an empty
+  `empty_content` response with no retry at all — a single timeout or `5xx`
+  right after a tool call threw the conversation away, even though every other
+  call path classifies and retries the same failure class via
+  `RetryingPlatformInvoker` (`SymfonyAiLLMClient::complete()` and
+  `SequentialToolLoop::run()` both go through it). A conversation that fails
+  after a tool ran now retries the same conversation through
+  `RetryingPlatformInvoker::invoke()` — the same classify-then-retry-or-fail
+  seam the sequential path already uses — via a new
+  `ToolConversationWavefront::retryOrAbortConversation()`, and only finalizes as
+  `empty_content` once that retry is exhausted or the failure is non-transient.
+  A dispatch failure before any tool has run now goes through the same
+  classified retry first too, falling back to the full `completeWithTools()`
+  restart only once that retry itself fails, instead of always paying for a full
+  restart on the very first failure. `BudgetExceededException` is unaffected: it
+  still propagates immediately and is never retried, on any path. Also extracted
+  the duplicated `empty_content` `LLMResponse` construction from
+  `SymfonyAiLLMClient::complete()` and `SequentialToolLoop::run()` into a shared
+  `EmptyLLMResponseFactory`
+  (`src/Audit/Infrastructure/LLM/EmptyLLMResponseFactory.php`).
 
 ## [1.11.0] — 2026-06-15 — Tracer
 

@@ -77,7 +77,8 @@ is a `MAJOR` change.
   standalone CLI accept either).
 - The `project-path` argument.
 - The `--format` (`-f`) and `--output` (`-o`) options, including the values
-  accepted by `--format` (`console`, `json`, `sarif`, `html`, `markdown`).
+  accepted by `--format` (`console`, `json`, `sarif`, `html`, `markdown`,
+  `junit`, `github`).
 - The `--baseline` and `--generate-baseline` options (baseline suppression of
   accepted findings).
 - The `--fail-on` option (CI gate threshold; overrides `audit.fail_on`),
@@ -140,11 +141,14 @@ deprecated by the other.
 ### Output schemas
 
 - The **JSON report schema** produced by `--format=json`. Keys present today
-  remain present; new keys may be added in `MINOR` releases.
+  remain present; new keys may be added in `MINOR` releases. The `cwe` key on
+  each finding (added alongside the pre-existing `owasp` key) is one such
+  additive `MINOR` change — no existing key was removed or renamed.
 - The **SARIF 2.1.0 output** produced by `--format=sarif`. The
   `runs[].tool.driver.name`, `informationUri`, and `version` fields are stable.
   The `version` is sourced dynamically from installed Composer metadata, so it
-  tracks the package version automatically.
+  tracks the package version automatically. Each rule's `properties.tags` array
+  additionally carries a `external/cwe/cwe-<n>` tag.
 
 ### Domain ports (extension points)
 

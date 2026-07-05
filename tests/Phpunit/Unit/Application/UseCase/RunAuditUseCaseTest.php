@@ -21,6 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAborte
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\RecordingStage;
 
 final class RunAuditUseCaseTest extends TestCase
@@ -140,6 +141,6 @@ final class RunAuditUseCaseTest extends TestCase
 
     private function makePipeline(?StageInterface $stage = null): AuditPipeline
     {
-        return new AuditPipeline($stage instanceof StageInterface ? [$stage] : [], new NullLogger());
+        return new AuditPipeline($stage instanceof StageInterface ? [$stage] : [], new NullLogger(), new NullProgressReporter());
     }
 }
