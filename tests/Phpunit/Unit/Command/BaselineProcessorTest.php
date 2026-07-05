@@ -81,6 +81,34 @@ final class BaselineProcessorTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */
+    public function test_generate_records_the_attacker_fingerprint_when_the_reviewer_corrected_the_type(): void
+    {
+        $vulnerability = $this->makeVuln('src/A.php');
+        $attackerFingerprint = $vulnerability->fingerprint();
+        $corrected = $vulnerability->withCorrectedType(VulnerabilityType::SSRF)->withReviewerValidation(true);
+        $auditReport = $this->makeReport($corrected);
+
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::once())
+            ->method('save')
+            ->with('/out/baseline.json', [[
+                'fingerprint' => $corrected->fingerprint(),
+                'type' => 'ssrf',
+                'file' => $corrected->filePath(),
+                'title' => $corrected->title(),
+                'added_at' => '2026-07-03',
+                'attacker_fingerprint' => $attackerFingerprint,
+            ]]);
+
+        $baselineProcessor = new BaselineProcessor($baseline, null, new MockClock('2026-07-03 10:00:00'));
+
+        self::assertSame(1, $baselineProcessor->generate($auditReport, '/out/baseline.json'));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_generate_writes_one_entry_per_unique_fingerprint(): void
     {
         $vulnerability = $this->makeVuln('src/A.php');

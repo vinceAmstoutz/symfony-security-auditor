@@ -63,6 +63,22 @@ final class BaselineTest extends TestCase
         self::assertSame(['SSA-AAA', 'SSA-BBB'], $baseline->load($path));
     }
 
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_load_also_accepts_the_attacker_fingerprint_of_a_type_corrected_entry(): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+        $baseline = new Baseline($this->filesystem);
+
+        $baseline->save($path, [
+            [...$this->entry('SSA-CORRECTED'), 'attacker_fingerprint' => 'SSA-ORIGINAL'],
+            $this->entry('SSA-PLAIN'),
+        ]);
+
+        self::assertSame(['SSA-CORRECTED', 'SSA-ORIGINAL', 'SSA-PLAIN'], $baseline->load($path));
+    }
+
     public function test_save_writes_pretty_printed_json(): void
     {
         $path = $this->tmpDir.'/baseline.json';

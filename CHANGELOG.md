@@ -204,12 +204,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `--generate-baseline` now writes one JSON object per finding — `fingerprint`,
   `type`, `file`, `title`, `added_at` — so a baseline diff in code review shows
   _what_ was accepted; add a free-form `reason` key to any entry for posterity.
-  The legacy flat fingerprint array is still read, so existing baseline files
-  keep working unchanged. Note: the post-run "N finding(s) suppressed by the
-  baseline." console note no longer appears for pipeline-skipped findings — the
-  per-finding skip lines replace it. `--format=sarif` opts out of the pre-review
-  skip so baselined findings can be rendered as suppressed results — see the
-  SARIF suppression entry under _Fixed_.
+  A finding whose type the reviewer corrected additionally records the
+  `attacker_fingerprint` it was originally reported under
+  (`Vulnerability::attackerFingerprint()`): the report fingerprint embeds the
+  _corrected_ type, which the attacker's pre-review findings never carry, so
+  without it the pre-review skip silently missed exactly those findings and
+  re-reviewed them (at full LLM cost) on every run. Both fingerprints count as
+  accepted when the baseline is loaded. The legacy flat fingerprint array is
+  still read, so existing baseline files keep working unchanged. Note: the
+  post-run "N finding(s) suppressed by the baseline." console note no longer
+  appears for pipeline-skipped findings — the per-finding skip lines replace it.
+  `--format=sarif` opts out of the pre-review skip so baselined findings can be
+  rendered as suppressed results — see the SARIF suppression entry under
+  _Fixed_.
 - **Committed dotenv files are now part of the default scan surface, with
   deterministic secret markers.** `.env`, `.env.local`, `.env.dev`, `.env.test`,
   `.env.prod`, and `.env.dist` were previously invisible to the auditor twice

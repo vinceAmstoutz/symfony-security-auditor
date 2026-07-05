@@ -425,6 +425,27 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(5, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
     }
 
+    public function test_baseline_skips_findings_whose_type_the_reviewer_corrected(): void
+    {
+        $this->createProjectDir();
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+        $correctingVerdict = '{"accepted": true, "corrected_type": "ssrf"}';
+
+        $this->makeCommandTester($this->criticalAttackerPayload(), $correctingVerdict)->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $baselineFile,
+        ]);
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), $correctingVerdict);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertSame(5, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
+    }
+
     public function test_sarif_format_marks_baselined_findings_as_suppressed_results_and_clears_the_exit_code(): void
     {
         $this->createProjectDir();
