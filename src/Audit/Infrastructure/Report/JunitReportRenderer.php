@@ -28,15 +28,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 final readonly class JunitReportRenderer implements ReportRendererInterface
 {
     /**
-     * XML 1.0 forbids every control character other than tab, CR and LF.
-     *
-     * @var list<string>
+     * Complement of the XML 1.0 Char production: control characters other
+     * than tab/CR/LF, UTF-16 surrogate halves, and the U+FFFE/U+FFFF
+     * non-characters — all valid UTF-8, all rejected by XML parsers.
      */
-    private const array ILLEGAL_XML_CHARACTERS = [
-        "\x00", "\x01", "\x02", "\x03", "\x04", "\x05", "\x06", "\x07", "\x08",
-        "\x0B", "\x0C",
-        "\x0E", "\x0F", "\x10", "\x11", "\x12", "\x13", "\x14", "\x15", "\x16", "\x17", "\x18", "\x19", "\x1A", "\x1B", "\x1C", "\x1D", "\x1E", "\x1F",
-    ];
+    private const string ILLEGAL_XML_CHARACTERS = '/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]/u';
 
     #[Override]
     public function format(): string
@@ -72,13 +68,14 @@ final readonly class JunitReportRenderer implements ReportRendererInterface
     private function testCase(DOMDocument $domDocument, Vulnerability $vulnerability): DOMElement
     {
         $title = $this->stripIllegalXmlCharacters($vulnerability->title());
+        $filePath = $this->stripIllegalXmlCharacters($vulnerability->filePath());
 
         $domElement = $domDocument->createElement('testcase');
         $domElement->setAttribute('classname', $vulnerability->type()->value);
         $domElement->setAttribute('name', \sprintf(
             '%s (%s:%d)',
             $title,
-            $vulnerability->filePath(),
+            $filePath,
             $vulnerability->lineStart(),
         ));
 
@@ -89,7 +86,7 @@ final readonly class JunitReportRenderer implements ReportRendererInterface
             "%s\n\nSeverity: %s\nLocation: %s:%d-%d\nOWASP: %s\nCWE: %s\nRemediation: %s",
             $this->stripIllegalXmlCharacters($vulnerability->description()),
             $vulnerability->severity()->value,
-            $vulnerability->filePath(),
+            $filePath,
             $vulnerability->lineStart(),
             $vulnerability->lineEnd(),
             $vulnerability->type()->owaspReference(),
@@ -102,12 +99,13 @@ final readonly class JunitReportRenderer implements ReportRendererInterface
     }
 
     /**
-     * DOMDocument::saveXML() writes illegal control characters out verbatim
-     * without escaping them — a finding whose LLM-produced text carries one
-     * silently corrupts the document for any consumer that re-parses it.
+     * DOMDocument::saveXML() writes illegal characters out verbatim without
+     * escaping them — a finding whose LLM-produced text carries one silently
+     * corrupts the document for any consumer that re-parses it. A value that
+     * is not valid UTF-8 at all cannot be repaired and is dropped wholesale.
      */
     private function stripIllegalXmlCharacters(string $value): string
     {
-        return str_replace(self::ILLEGAL_XML_CHARACTERS, '', $value);
+        return preg_replace(self::ILLEGAL_XML_CHARACTERS, '', $value) ?? '';
     }
 }

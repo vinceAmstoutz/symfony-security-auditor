@@ -589,7 +589,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   whose narrative happened to reproduce one of those bytes (a plausible outcome
   when the model echoes a raw exploit payload) produced a `.xml` report that
   GitLab, Jenkins, and any standard XML parser rejected outright. Those bytes
-  are now stripped before insertion.
+  are now stripped before insertion. The strip now covers the full complement
+  of the XML 1.0 `Char` production instead of a C0-control byte list — the
+  `U+FFFE`/`U+FFFF` non-characters and surrogate halves are valid UTF-8 that
+  survives `json_decode` yet is equally rejected by every XML parser — and is
+  also applied to the LLM-reported file path, which was previously
+  interpolated into the `name` attribute and failure text unsanitized. A value
+  that is not valid UTF-8 at all is dropped wholesale rather than corrupting
+  the document.
 - **Retryable LLM failures embedding a non-transient status code as a digit
   substring were misclassified as fatal, aborting the audit instead of
   retrying.** `TransientFailureClassifier::isTransient()`
