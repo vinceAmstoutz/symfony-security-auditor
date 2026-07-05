@@ -77,6 +77,7 @@ final readonly class AttackerSkillRegistry
             new RepositoryAttackerSkill(),
             new EntityAttackerSkill(),
             new TemplateAttackerSkill(),
+            new TwigExtensionAttackerSkill(),
             new ConfigAttackerSkill(),
             new PhpAttackerSkill(),
         ];

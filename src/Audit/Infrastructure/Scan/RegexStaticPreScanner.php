@@ -33,7 +33,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 5;
+    public const int CACHE_VERSION = 6;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -172,6 +172,16 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'serializer_groups_attribute' => [
                 'regex' => '/#\[\s*Groups\s*\(|@Groups\s*\(/',
                 'description' => 'Serializer #[Groups] attribute — verify write groups do not expose privileged fields (roles, isAdmin, passwordHash) to mass assignment',
+            ],
+        ],
+        ProjectFileType::TWIG_EXTENSION->value => [
+            'extension_shell_or_file_sink' => [
+                'regex' => '/\b(?:shell_exec|exec|passthru|proc_open|system|popen|file_get_contents|file_put_contents|include|include_once|require|require_once)\s*\(/',
+                'description' => 'Shell/file sink inside a Twig extension — reachable from any template calling this function/filter; verify no template-supplied argument reaches it (RCE/LFI)',
+            ],
+            'extension_is_safe_html' => [
+                'regex' => '/[\'"]is_safe[\'"]\s*=>\s*\[\s*[\'"]html[\'"]\s*\]/',
+                'description' => 'is_safe => [\'html\'] declared — verify the returned string is built only from hardcoded markup or sanitized input, not raw user/DB content (stored XSS otherwise)',
             ],
         ],
         ProjectFileType::TEMPLATE->value => [

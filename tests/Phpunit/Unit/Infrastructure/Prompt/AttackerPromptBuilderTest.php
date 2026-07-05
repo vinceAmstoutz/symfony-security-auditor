@@ -483,6 +483,21 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('LiveProp', $prompt);
     }
 
+    public function test_twig_extension_files_get_the_twig_extension_skill_block(): void
+    {
+        $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: false);
+        $projectFile = ProjectFile::create(
+            'src/Twig/AppExtension.php',
+            '/app/src/Twig/AppExtension.php',
+            "<?php\nclass AppExtension extends AbstractExtension {}",
+        );
+
+        $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('<skills role="twig_extension">', $prompt);
+        self::assertStringContainsString('is_safe', $prompt);
+    }
+
     public function test_stable_mode_emits_every_skill_block_regardless_of_chunk_contents(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: true);
@@ -494,7 +509,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
-        self::assertSame(16, substr_count($prompt, '<skills role="'));
+        self::assertSame(17, substr_count($prompt, '<skills role="'));
     }
 
     public function test_stable_mode_system_prompt_is_byte_identical_across_chunk_types(): void

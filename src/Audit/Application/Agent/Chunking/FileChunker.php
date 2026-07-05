@@ -41,6 +41,7 @@ final readonly class FileChunker
         ProjectFileType::FORM,
         ProjectFileType::SCHEDULER,
         ProjectFileType::TEMPLATE,
+        ProjectFileType::TWIG_EXTENSION,
         ProjectFileType::CONFIG,
         ProjectFileType::PHP,
     ];

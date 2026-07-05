@@ -123,6 +123,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\PhpAt
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\RepositoryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SchedulerAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TemplateAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TwigExtensionAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\VoterAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\WebhookConsumerAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
@@ -265,6 +266,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(RepositoryAttackerSkill::class);
     $defaultsConfigurator->set(SchedulerAttackerSkill::class);
     $defaultsConfigurator->set(TemplateAttackerSkill::class);
+    $defaultsConfigurator->set(TwigExtensionAttackerSkill::class);
     $defaultsConfigurator->set(VoterAttackerSkill::class);
     $defaultsConfigurator->set(WebhookConsumerAttackerSkill::class);
     $defaultsConfigurator->set(AttackerSkillRegistry::class)
