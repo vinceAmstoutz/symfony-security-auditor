@@ -387,7 +387,7 @@ final class ProjectFileTest extends TestCase
         $projectFile = ProjectFile::create(
             'templates/macros/extension.html.twig',
             '/app/templates/macros/extension.html.twig',
-            "{# extends AbstractExtension in a comment #}",
+            '{# extends AbstractExtension in a comment #}',
         );
 
         self::assertSame('template', $projectFile->type());
