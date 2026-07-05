@@ -103,11 +103,19 @@ final readonly class RetryingPlatformInvoker
 
     private function backOffBeforeNextAttempt(Throwable $throwable, int $attempt, int $maxAttempts): void
     {
-        $serverHintSeconds = $this->pauseRateLimiterAndResolveServerHint($throwable);
+        $isRateLimit = $this->transientFailureClassifier->isRateLimit($throwable);
+        $serverHintSeconds = $isRateLimit ? $this->retryAfterHeaderParser->parse($throwable) : null;
 
-        $delay = $this->transientFailureClassifier->isRateLimit($throwable)
+        $delay = $isRateLimit
             ? $this->retryPolicy->rateLimitDelayMs($attempt, $serverHintSeconds)
             : $this->retryPolicy->delayMs($attempt);
+
+        if (null !== $serverHintSeconds) {
+            $this->rateLimiter->pauseUntil(
+                (new DateTimeImmutable())->modify(\sprintf('+%d milliseconds', $delay)),
+            );
+        }
+
         $this->logger->warning('LLM call failed, retrying after backoff', [
             'attempt' => $attempt,
             'max_attempts' => $maxAttempts,
@@ -115,21 +123,5 @@ final readonly class RetryingPlatformInvoker
             'error' => $throwable->getMessage(),
         ]);
         $this->sleeper->sleep($delay);
-    }
-
-    private function pauseRateLimiterAndResolveServerHint(Throwable $throwable): ?int
-    {
-        if (!$this->transientFailureClassifier->isRateLimit($throwable)) {
-            return null;
-        }
-
-        $serverHintSeconds = $this->retryAfterHeaderParser->parse($throwable);
-        if (null !== $serverHintSeconds) {
-            $this->rateLimiter->pauseUntil(
-                (new DateTimeImmutable())->modify(\sprintf('+%d seconds', $serverHintSeconds)),
-            );
-        }
-
-        return $serverHintSeconds;
     }
 }
