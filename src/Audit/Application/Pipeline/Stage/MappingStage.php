@@ -27,36 +27,25 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullControllerAccessControlParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigParser;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/**
+ * `config/services.php` always aliases the four parser ports to their
+ * `PhpParser*`/`SymfonyYamlSecurityConfigParser` implementations, so they are
+ * required here rather than falling back to a Null* default.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
+ */
 final readonly class MappingStage implements StageInterface
 {
-    private ControllerAccessControlParserInterface $controllerAccessControlParser;
-
-    private VoterCapabilityParserInterface $voterCapabilityParser;
-
-    private FormBindingParserInterface $formBindingParser;
-
-    private SecurityConfigParserInterface $securityConfigParser;
-
     public function __construct(
         private LoggerInterface $logger,
-        ?ControllerAccessControlParserInterface $controllerAccessControlParser = null,
-        ?VoterCapabilityParserInterface $voterCapabilityParser = null,
-        ?FormBindingParserInterface $formBindingParser = null,
-        ?SecurityConfigParserInterface $securityConfigParser = null,
-    ) {
-        $this->controllerAccessControlParser = $controllerAccessControlParser ?? new NullControllerAccessControlParser();
-        $this->voterCapabilityParser = $voterCapabilityParser ?? new NullVoterCapabilityParser();
-        $this->formBindingParser = $formBindingParser ?? new NullFormBindingParser();
-        $this->securityConfigParser = $securityConfigParser ?? new NullSecurityConfigParser();
-    }
+        private ControllerAccessControlParserInterface $controllerAccessControlParser,
+        private VoterCapabilityParserInterface $voterCapabilityParser,
+        private FormBindingParserInterface $formBindingParser,
+        private SecurityConfigParserInterface $securityConfigParser,
+    ) {}
 
     #[Override]
     public function name(): string

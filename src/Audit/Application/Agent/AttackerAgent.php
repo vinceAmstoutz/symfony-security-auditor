@@ -27,9 +27,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
@@ -89,13 +86,13 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         $this->leanMode = $attackerAnalysisSettings->leanMode;
         $this->useStructuredCollection = $attackerAnalysisSettings->useStructuredCollection;
         $this->maxConcurrent = $attackerAnalysisSettings->maxConcurrent;
-        $this->staticPreScanner = $attackerScanCollaborators->staticPreScanner ?? new NullStaticPreScanner();
+        $this->staticPreScanner = $attackerScanCollaborators->staticPreScanner;
         $this->fileChunker = $attackerScanCollaborators->fileChunker ?? new FileChunker();
-        $this->progressReporter = $attackerScanCollaborators->progressReporter ?? new NullProgressReporter();
+        $this->progressReporter = $attackerScanCollaborators->progressReporter;
 
         $chunkContextFactory = new ChunkContextFactory(
             $attackerLlmCollaborators->attackerPromptBuilder,
-            $attackerLlmCollaborators->codeSlicer ?? new NullCodeSlicer(),
+            $attackerLlmCollaborators->codeSlicer,
             new AttackerContextPromptRenderer(),
         );
         $attackerChunkCache = new AttackerChunkCache($attackerScanCollaborators->attackerCache, $attackerLlmCollaborators->vulnerabilityFactory, $logger);

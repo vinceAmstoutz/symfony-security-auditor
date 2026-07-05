@@ -46,6 +46,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInte
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullControllerAccessControlParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
@@ -162,7 +169,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_has_correct_name(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
 
         self::assertSame('mapping', $mappingStage->name());
     }
@@ -201,7 +208,7 @@ final class StagesTest extends TestCase
             }
         };
 
-        $mappingStage = new MappingStage(new NullLogger(), $parser);
+        $mappingStage = new MappingStage(new NullLogger(), $parser, new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
 
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([$controllerFile]);
@@ -233,7 +240,7 @@ final class StagesTest extends TestCase
             }
         };
 
-        $mappingStage = new MappingStage(new NullLogger(), $parser);
+        $mappingStage = new MappingStage(new NullLogger(), $parser, new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([$controllerA, $controllerB]);
 
@@ -264,7 +271,7 @@ final class StagesTest extends TestCase
             }
         };
 
-        $mappingStage = new MappingStage(new NullLogger(), null, $parser);
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), $parser, new NullFormBindingParser(), new NullSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([$voterFileA, $voterFileB]);
 
@@ -287,7 +294,7 @@ final class StagesTest extends TestCase
             }
         };
 
-        $mappingStage = new MappingStage(new NullLogger(), null, $parser);
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), $parser, new NullFormBindingParser(), new NullSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([$voterFile]);
 
@@ -319,7 +326,7 @@ final class StagesTest extends TestCase
             }
         };
 
-        $mappingStage = new MappingStage(new NullLogger(), null, null, $parser);
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), $parser, new NullSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([$controllerA, $controllerB]);
 
@@ -333,7 +340,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_creates_mapping_from_project_files(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
 
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
@@ -359,7 +366,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_handles_empty_file_list(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
 
         $auditContext = AuditContext::forProject($this->tmpDir);
         // No files set
@@ -372,7 +379,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_extracts_security_config(): void
     {
-        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
 
         $securityYaml = <<<'YAML'
             security:
@@ -477,7 +484,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_sets_meta_counts(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
             ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', '<?php class UserController {}'),
@@ -496,7 +503,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_sets_no_voter_controllers_to_zero_when_all_secured(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
             ProjectFile::create(
@@ -513,7 +520,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_processes_all_config_files_not_just_first(): void
     {
-        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $security1 = "security:\n    firewalls:\n        main:\n            pattern: ^/api\n";
@@ -536,7 +543,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_merges_access_control_from_multiple_config_files(): void
     {
-        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $config1 = "access_control:\n    - path: ^/admin\n      roles: ROLE_ADMIN\n";
@@ -558,7 +565,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_trims_firewall_pattern_whitespace(): void
     {
-        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $content = "security:\n    firewalls:\n        main:\n            pattern: ^/api  \n";
@@ -576,7 +583,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_returns_empty_access_control_when_not_present(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $auditContext->setProjectFiles([
@@ -592,7 +599,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_skips_path_roles_pairs_outside_access_control_block(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $content = "some_route:\n    path: /admin\n    roles: ROLE_ADMIN\n";
@@ -610,7 +617,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_extracts_multiple_routes_from_access_control(): void
     {
-        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $content = "access_control:\n    - path: ^/admin\n      roles: ROLE_ADMIN\n    - path: ^/api\n      roles: ROLE_USER\n";
@@ -631,7 +638,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_trims_path_whitespace_in_access_control(): void
     {
-        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $content = "access_control:\n    - path: ^/admin   \n      roles: ROLE_ADMIN\n";
@@ -650,7 +657,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_trims_roles_in_access_control(): void
     {
-        $mappingStage = new MappingStage(new NullLogger(), securityConfigParser: new SymfonyYamlSecurityConfigParser());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $content = "access_control:\n    - path: ^/admin\n      roles: ROLE_ADMIN, ROLE_SUPER\n";
@@ -715,7 +722,7 @@ final class StagesTest extends TestCase
             ->with('No files to map');
         $logger->expects(self::never())->method('info');
 
-        $mappingStage = new MappingStage($logger);
+        $mappingStage = new MappingStage($logger, new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $mappingStage->process($auditContext);
@@ -731,7 +738,7 @@ final class StagesTest extends TestCase
             },
         );
 
-        $mappingStage = new MappingStage($logger);
+        $mappingStage = new MappingStage($logger, new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditContext->setProjectFiles([
             ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', '<?php class UserController {}'),
@@ -817,7 +824,7 @@ final class StagesTest extends TestCase
 
     public function test_mapping_stage_returns_immediately_and_sets_empty_mapping_when_no_files(): void
     {
-        $mappingStage = new MappingStage(new NullLogger());
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
         $auditContext = AuditContext::forProject($this->tmpDir);
 
         $mappingStage->process($auditContext);
@@ -870,9 +877,12 @@ final class StagesTest extends TestCase
                     $attackerLlm ?? self::createStub(LLMClientInterface::class),
                     new AttackerPromptBuilder(),
                     new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                    new NullCodeSlicer(),
                 ),
                 new AttackerScanCollaborators(
                     new NullAttackerCache(),
+                    new NullStaticPreScanner(),
+                    new NullProgressReporter(),
                 ),
                 new AttackerAnalysisSettings(),
                 new NullLogger(),
@@ -887,6 +897,7 @@ final class StagesTest extends TestCase
             ),
             logger: new NullLogger(),
             auditLoopSettings: new AuditLoopSettings(),
+            progressReporter: new NullProgressReporter(),
         );
     }
 

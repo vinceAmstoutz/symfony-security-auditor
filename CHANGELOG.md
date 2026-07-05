@@ -330,6 +330,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (e.g. `src/Webhook/config.yaml`) previously had
   `type() === 'webhook_consumer'` while `isWebhookConsumer()` returned `false`.
   Both are fixed in the new classifier.
+- **Constructor ports that DI always resolves are now required instead of
+  silently falling back to a `Null*` default.** `MappingStage`
+  (`src/Audit/Application/Pipeline/Stage/MappingStage.php`), `AuditPipeline`
+  (`src/Audit/Application/Pipeline/AuditPipeline.php`), and `AuditOrchestrator`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) accepted nullable
+  `ControllerAccessControlParserInterface` / `VoterCapabilityParserInterface` /
+  `FormBindingParserInterface` / `SecurityConfigParserInterface` /
+  `ProgressReporterInterface` parameters and defaulted each to `new Null*()`
+  when omitted — but `config/services.php` always aliases every one of them to a
+  concrete implementation, so the fallback was only reachable via manual
+  construction (tests). Likewise
+  `AttackerScanCollaborators::staticPreScanner`/`progressReporter`
+  (`src/Audit/Application/Agent/AttackerScanCollaborators.php`) and
+  `AttackerLlmCollaborators::codeSlicer`
+  (`src/Audit/Application/Agent/AttackerLlmCollaborators.php`) fell back to
+  `NullStaticPreScanner`/`NullProgressReporter`/`NullCodeSlicer` inside
+  `AttackerAgent`, even though `SymfonySecurityAuditorBundle::loadExtension()`
+  unconditionally aliases `StaticPreScannerInterface`/`CodeSlicerInterface` to a
+  `Regex*`-or-`Null*` implementation based on config — the Null-vs-real choice
+  was already made once, correctly, in the container. All of these parameters
+  are now non-nullable, and the dead `?? new Null*()` fallbacks are removed. All
+  classes are `@internal`, and the container always supplies a value, so this is
+  not user-visible.
 - **Prompt building is split behind interfaces so neither builder is a
   monolith.** `AttackerPromptBuilder`
   (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) held all sixteen
