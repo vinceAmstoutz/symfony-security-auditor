@@ -27,6 +27,7 @@ use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Filesystem\Filesystem;
@@ -34,6 +35,8 @@ use Symfony\Component\HttpKernel\Kernel;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
@@ -161,7 +164,14 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     {
         $containerBuilder = $this->loadParameters([
             'model' => 'gpt-4o',
-            'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-4o-mini']],
+            'audit' => [
+                'escalation' => ['enabled' => true, 'cheap_model' => 'gpt-4o-mini'],
+                'tools_enabled' => false,
+                'max_tool_iterations' => 7,
+                'static_prescan' => ['lean_mode' => true],
+                'structured_collection' => false,
+                'attacker_max_concurrent' => 3,
+            ],
         ]);
 
         self::assertTrue($containerBuilder->hasDefinition('security_auditor.cheap_attacker_client'));
@@ -169,13 +179,64 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertTrue($containerBuilder->hasDefinition(EscalatingAttackerAgent::class));
         self::assertTrue($containerBuilder->hasAlias(AttackerAgentInterface::class));
         self::assertSame(EscalatingAttackerAgent::class, (string) $containerBuilder->getAlias(AttackerAgentInterface::class));
-        $cheapAttackerFirstArgument = $containerBuilder->getDefinition('security_auditor.cheap_attacker')->getArgument(0);
-        self::assertInstanceOf(Reference::class, $cheapAttackerFirstArgument);
-        self::assertSame('security_auditor.cheap_attacker_client', (string) $cheapAttackerFirstArgument);
+        $cheapAttackerDefinition = $containerBuilder->getDefinition('security_auditor.cheap_attacker');
+
+        $cheapAttackerLlmCollaborators = $cheapAttackerDefinition->getArgument(0);
+        self::assertInstanceOf(Definition::class, $cheapAttackerLlmCollaborators);
+        self::assertSame(AttackerLlmCollaborators::class, $cheapAttackerLlmCollaborators->getClass());
+        $cheapAttackerClientArgument = $cheapAttackerLlmCollaborators->getArgument(0);
+        self::assertInstanceOf(Reference::class, $cheapAttackerClientArgument);
+        self::assertSame('security_auditor.cheap_attacker_client', (string) $cheapAttackerClientArgument);
+
+        $cheapAttackerAnalysisSettings = $cheapAttackerDefinition->getArgument(2);
+        self::assertInstanceOf(Definition::class, $cheapAttackerAnalysisSettings);
+        self::assertSame(AttackerAnalysisSettings::class, $cheapAttackerAnalysisSettings->getClass());
+        self::assertSame(
+            [false, 7, true, false, 3],
+            $containerBuilder->getParameterBag()->resolveValue($cheapAttackerAnalysisSettings->getArguments()),
+        );
 
         $escalatingAttackerFirstArgument = $containerBuilder->getDefinition(EscalatingAttackerAgent::class)->getArgument(0);
         self::assertInstanceOf(Reference::class, $escalatingAttackerFirstArgument);
         self::assertSame('security_auditor.cheap_attacker', (string) $escalatingAttackerFirstArgument);
+    }
+
+    public function test_bundle_wires_escalation_attacker_agent_from_the_same_argument_shape_as_the_primary_one(): void
+    {
+        $containerBuilder = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-4o-mini']],
+        ]);
+
+        $primaryArguments = $containerBuilder->getDefinition(AttackerAgent::class)->getArguments();
+        $escalationArguments = $containerBuilder->getDefinition('security_auditor.cheap_attacker')->getArguments();
+
+        self::assertCount(4, $primaryArguments);
+        self::assertCount(4, $escalationArguments);
+
+        self::assertInstanceOf(Definition::class, $primaryArguments[0]);
+        self::assertInstanceOf(Definition::class, $escalationArguments[0]);
+        self::assertSame($primaryArguments[0]->getClass(), $escalationArguments[0]->getClass());
+        self::assertEquals(
+            \array_slice($primaryArguments[0]->getArguments(), 1),
+            \array_slice($escalationArguments[0]->getArguments(), 1),
+        );
+
+        self::assertEquals($primaryArguments[1], $escalationArguments[1]);
+        self::assertEquals($primaryArguments[2], $escalationArguments[2]);
+        self::assertEquals($primaryArguments[3], $escalationArguments[3]);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(1500)]
+    public function test_bundle_wires_escalating_attacker_agent_when_escalation_enabled(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-4o-mini']],
+        ]);
+
+        self::assertInstanceOf(EscalatingAttackerAgent::class, $this->getPrivateService($kernel, AttackerAgentInterface::class));
     }
 
     #[RunInSeparateProcess]

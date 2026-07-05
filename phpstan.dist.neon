@@ -2,6 +2,8 @@ includes:
     - vendor/spaze/phpstan-disallowed-calls/disallowed-execution-calls.neon
 
 parameters:
+    bootstrapFiles:
+        - vendor/symfony/dependency-injection/Loader/Configurator/ContainerConfigurator.php
     level: max
     checkTooWideReturnTypesInProtectedAndPublicMethods: true
     checkTooWideParameterOutInProtectedAndPublicMethods: true

@@ -597,6 +597,35 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `RegexStaticPreScanner::CACHE_VERSION` (6 → 7 — the multiline-pattern fix
   above already claimed 6) since this changes scan output for existing chunk
   content and must invalidate stale attacker cache entries.
+- **Enabling `audit.escalation.enabled` crashed the container.**
+  `SymfonySecurityAuditorBundle::registerEscalation()` wired the cheap-model
+  `AttackerAgent` (`security_auditor.cheap_attacker`) with a stale 15-argument
+  flat positional-argument list left over from before `AttackerAgent`'s
+  constructor moved to the `AttackerLlmCollaborators` /
+  `AttackerScanCollaborators` / `AttackerAnalysisSettings` collaborator-bag
+  shape it has used ever since — the two no longer matched, so the container
+  failed to compile/instantiate the service the moment
+  `escalation.enabled: true` was set. Fixed by wiring
+  `security_auditor.cheap_attacker` through the same three inline collaborator
+  bags the primary `AttackerAgent::class` definition already uses in
+  `config/services.php`. New
+  `test_bundle_wires_escalating_attacker_agent_when_escalation_enabled` boots a
+  real kernel with escalation enabled and resolves `AttackerAgentInterface` from
+  the container, which the previous structural-only test did not do and so did
+  not catch this. The existing structural test now also pins the exact scalar
+  values (`toolsEnabled`, `maxToolIterations`, `staticPreScanLeanMode`,
+  `structuredCollection`, `attackerMaxConcurrent`) threaded into the escalation
+  attacker's `AttackerAnalysisSettings`, since PHP's reflection-based DI
+  instantiation weak-coerces `int`/`bool` silently, so a dropped or reordered
+  scalar argument would not otherwise fail loudly. Since the primary and
+  escalation wirings had already drifted apart once, both now build
+  `AttackerAgent`'s constructor arguments from a single new
+  `Audit\Infrastructure\Config\AttackerAgentDefinitionFactory`
+  (`src/Audit/Infrastructure/Config/AttackerAgentDefinitionFactory.php`) instead
+  of each hand-writing the same three-bag shape — there is only one argument
+  list to write now, so the two call sites cannot drift out of sync again. New
+  `test_bundle_wires_escalation_attacker_agent_from_the_same_argument_shape_as_the_primary_one`
+  asserts both definitions produce the identical argument shape.
 
 ### Security
 
