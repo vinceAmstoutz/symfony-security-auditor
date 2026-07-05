@@ -115,6 +115,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\Confi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EventSubscriberAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FormAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\LiveComponentAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\MessengerHandlerAttackerSkill;
@@ -262,6 +263,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(ControllerAttackerSkill::class);
     $defaultsConfigurator->set(EntityAttackerSkill::class);
     $defaultsConfigurator->set(EventSubscriberAttackerSkill::class);
+    $defaultsConfigurator->set(FileUploadAttackerSkill::class);
     $defaultsConfigurator->set(FormAttackerSkill::class);
     $defaultsConfigurator->set(LiveComponentAttackerSkill::class);
     $defaultsConfigurator->set(MessengerHandlerAttackerSkill::class);

@@ -12,6 +12,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **File uploads are now a dedicated attacker skill.** `FormType`s carrying a
+  `FileType`/`VichUploaderBundle` field, and the manual `UploadedFile` handling
+  built on top of them, were only covered by `FormAttackerSkill`'s general
+  mass-assignment/CSRF hunting — extension/MIME spoofing, path traversal via the
+  original filename, and web-root RCE via an uploaded `.php` were invisible to
+  the attacker. A new `FileUploadAttackerSkill`
+  (`src/Audit/Infrastructure/Prompt/Skill/FileUploadAttackerSkill.php`, tagged
+  `symfony_security_auditor.attacker_skill`, `priority()` 115 — right after
+  `FormAttackerSkill`) targets the existing `ProjectFileType::FORM` case and
+  hunts client-trusted `Content-Type`/extension checks, missing size limits,
+  `getClientOriginalName()`-derived paths, public-web-root storage without
+  execution disabled, predictable stored filenames, missing authorization on the
+  upload endpoint, and download routes that don't re-check ownership — with a
+  "do NOT flag" section for allow-listed extensions stored outside the web root
+  and randomized filenames. `AttackerPromptBuilder::PROMPT_VERSION` bumps to 12,
+  invalidating cached attacker responses for chunks containing a form.
 - **New `audit:diff` command compares two JSON reports and shows new, fixed, and
   persisting findings.** Nothing let a user answer "what changed between this
   run and the last one?" without diffing raw JSON by hand — findings shift line
@@ -372,6 +388,32 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `ministral-{3b,8b,14b}-2512`) now resolve to `$0.00` with a warning. The
   default `claude-opus-4-8` and every current model are catalog-present and
   unchanged.
+
+### Fixed
+
+- **`--since` silently dropped changed dotfiles (`.env`, `.github/...`) from
+  incremental audits.** `ProcessGitChangedFilesResolver::mergeAndNormalize()`
+  (`src/Audit/Infrastructure/Diff/ProcessGitChangedFilesResolver.php`) used
+  `trimStart('./')`, which strips a leading **character mask** (every leading
+  `.` and `/`), not the literal prefix `./` — `.env` was mangled to `env` and
+  `.github/workflows/ci.yml` to `github/workflows/ci.yml`. The mangled path then
+  failed the exact-match lookup against real project files, so a changed `.env`
+  (or any dotfile/dot-directory) was excluded from `audit:run --since` scope
+  even though it changed. Now uses `trimPrefix('./')`, which strips only the
+  literal `./` prefix.
+- **Static pre-scan patterns using the `s` (DOTALL) modifier never matched
+  anything.** `RegexStaticPreScanner::matchLines()`
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) explodes file
+  content into lines and matches each pattern against one line at a time, so the
+  two cross-line patterns in the dictionary — `supports_returns_null` (an
+  authenticator's `supports()` silently returning `null`, which Symfony treats
+  as "supports") and `http_client_request` (an `HttpClient` reference followed
+  by `->request(`, an SSRF surface) — could never fire: a real multi-line method
+  body never appears on a single line. Patterns carrying the `s` modifier are
+  now matched against the full file content instead, with the match offset
+  mapped back to a line number; all other (single-line) patterns are unchanged.
+  `RegexStaticPreScanner:: CACHE_VERSION` moves to `6` since this alters scan
+  output for existing chunk content, invalidating stale attacker cache entries.
 
 ### Security
 
