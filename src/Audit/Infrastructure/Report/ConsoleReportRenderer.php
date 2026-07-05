@@ -18,6 +18,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 
+use function Symfony\Component\String\u;
+
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ConsoleReportRenderer implements ReportRendererInterface
 {
@@ -102,7 +104,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
     {
         return implode("\n", array_map(
             static fn (string $chunk): string => \sprintf('    %s', $chunk),
-            str_split($text, 65),
+            explode("\n", u($text)->wordwrap(65, "\n", true)->toString()),
         ));
     }
 }

@@ -576,6 +576,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **The console report no longer corrupts accented text at wrap points.**
+  `ConsoleReportRenderer` wrapped a finding's description, attack vector, and
+  remediation with a byte-based 65-byte split, so multibyte UTF-8 characters
+  landing on a chunk boundary were cut mid-sequence and rendered as `�` mojibake
+  — routine for LLM prose in French, German, or any accented language. Wrapping
+  is now character-safe word wrapping (`symfony/string`), which also stops words
+  from being cut mid-word at every 65th byte.
 - **Machine-readable stdout no longer carries human-facing chrome.** With
   `--format=json|sarif|junit|github` writing to stdout, `audit:run` still
   printed the title header (`Symfony LLM Security Auditor`, project line,
