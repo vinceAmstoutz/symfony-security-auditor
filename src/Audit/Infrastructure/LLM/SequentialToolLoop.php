@@ -48,6 +48,7 @@ final readonly class SequentialToolLoop
         private PlatformResultExtractor $platformResultExtractor,
         private PlatformOptionsFactory $platformOptionsFactory,
         private PromptTokenEstimator $promptTokenEstimator,
+        private EmptyLLMResponseFactory $emptyLLMResponseFactory,
     ) {}
 
     /**
@@ -160,7 +161,7 @@ final readonly class SequentialToolLoop
 
         $this->logEmptyContentResponse($iteration, $context);
 
-        return LLMResponse::of('', $this->model, 'empty_content', $tokenUsageSnapshot);
+        return $this->emptyLLMResponseFactory->create($this->model, $tokenUsageSnapshot);
     }
 
     /**

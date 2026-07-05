@@ -184,6 +184,18 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */
+    public function test_render_lists_the_cwe_reference_alongside_owasp(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln(vulnerabilityType: VulnerabilityType::SQL_INJECTION)));
+
+        self::assertStringContainsString('<dt>CWE</dt>', $output);
+        self::assertStringContainsString('<dd>'.VulnerabilityType::SQL_INJECTION->cweReference().'</dd>', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_summary_table_renders_exactly_one_row_per_present_severity(): void
     {
         $output = $this->renderer->render($this->makeReport(

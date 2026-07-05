@@ -146,14 +146,17 @@ deprecated by the other.
 ### Output schemas
 
 - The **JSON report schema** produced by `--format=json`. Keys present today
-  remain present; new keys may be added in `MINOR` releases. Each entry in
-  `vulnerabilities[]` carries a `fingerprint` key (since 1.13) — the same stable
-  per-finding identity `Vulnerability::fingerprint()` already used by baseline
-  suppression — consumed by `audit:diff` to compare two reports.
+  remain present; new keys may be added in `MINOR` releases. The `cwe` key on
+  each finding (added alongside the pre-existing `owasp` key) is one such
+  additive `MINOR` change — no existing key was removed or renamed. Each entry
+  in `vulnerabilities[]` also carries a `fingerprint` key (since 1.13) — the
+  same stable per-finding identity `Vulnerability::fingerprint()` already used
+  by baseline suppression — consumed by `audit:diff` to compare two reports.
 - The **SARIF 2.1.0 output** produced by `--format=sarif`. The
   `runs[].tool.driver.name`, `informationUri`, and `version` fields are stable.
   The `version` is sourced dynamically from installed Composer metadata, so it
-  tracks the package version automatically.
+  tracks the package version automatically. Each rule's `properties.tags` array
+  additionally carries a `external/cwe/cwe-<n>` tag.
 
 ### Domain ports (extension points)
 

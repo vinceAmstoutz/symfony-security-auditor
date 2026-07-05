@@ -17,7 +17,6 @@ use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityCollector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
@@ -66,7 +65,7 @@ final readonly class ConcurrentChunkAnalyzer
 
         /** @var array<int, VulnerabilityHydrationResult> $cachedResults */
         $cachedResults = [];
-        /** @var array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}> $pending */
+        /** @var array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}> $pending */
         $pending = [];
         $requests = [];
         foreach ($chunks as $index => $chunk) {
@@ -121,28 +120,27 @@ final readonly class ConcurrentChunkAnalyzer
     /**
      * @param list<ProjectFile> $chunk
      *
-     * @return array{pending: array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}, request: array{system: string, user: string, tools: ToolRegistry}}
+     * @return array{pending: array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}, request: array{system: string, user: string, tools: ToolRegistry}}
      */
     private function buildPendingRequest(array $chunk, ChunkContext $chunkContext): array
     {
-        $vulnerabilityCollector = new VulnerabilityCollector();
-        $toolRegistry = new ToolRegistry([$this->recordVulnerabilityToolFactory->create($vulnerabilityCollector)], $this->logger);
+        $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger);
 
         return [
             'pending' => [
                 'chunk' => $chunk,
                 'contextKey' => $chunkContext->contextKey,
                 'cacheable' => $chunkContext->cacheable,
-                'collector' => $vulnerabilityCollector,
+                'session' => $structuredVulnerabilityCollectionSession,
             ],
-            'request' => ['system' => $chunkContext->systemPrompt, 'user' => $chunkContext->userMessage, 'tools' => $toolRegistry],
+            'request' => ['system' => $chunkContext->systemPrompt, 'user' => $chunkContext->userMessage, 'tools' => $structuredVulnerabilityCollectionSession->toolRegistry],
         ];
     }
 
     /**
-     * @param list<list<ProjectFile>>                                                                                             $chunks
-     * @param array<int, VulnerabilityHydrationResult>                                                                            $cachedResults
-     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}> $pending
+     * @param list<list<ProjectFile>>                                                                                                             $chunks
+     * @param array<int, VulnerabilityHydrationResult>                                                                                            $cachedResults
+     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}> $pending
      *
      * @return array{0: list<Vulnerability>, 1: array<string, int>}
      */
@@ -186,8 +184,8 @@ final readonly class ConcurrentChunkAnalyzer
     }
 
     /**
-     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                      $requests
-     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}> $pending
+     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                      $requests
+     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}> $pending
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
@@ -208,7 +206,7 @@ final readonly class ConcurrentChunkAnalyzer
     }
 
     /**
-     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector}> $pending
+     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}> $pending
      */
     private function recordPendingCoverage(array $pending, string $status, CoverageRecorderInterface $coverageRecorder): void
     {
@@ -218,11 +216,11 @@ final readonly class ConcurrentChunkAnalyzer
     }
 
     /**
-     * @param array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, collector: VulnerabilityCollector} $entry
+     * @param array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession} $entry
      */
     private function finalize(array $entry, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
     {
-        $rawData = $entry['collector']->drain();
+        $rawData = $entry['session']->drain();
 
         if ($entry['cacheable']) {
             $this->attackerChunkCache->store($entry['chunk'], $entry['contextKey'], $rawData);
