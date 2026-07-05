@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use JsonException;
 use Override;
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
@@ -81,7 +82,13 @@ final readonly class ReportDiffer implements ReportDifferInterface
         }
 
         try {
-            $decoded = json_decode($this->filesystem->readFile($path), true, flags: \JSON_THROW_ON_ERROR);
+            $content = $this->filesystem->readFile($path);
+        } catch (IOException $ioException) {
+            throw ReportFileNotReadableException::forPath($path, $ioException);
+        }
+
+        try {
+            $decoded = json_decode($content, true, flags: \JSON_THROW_ON_ERROR);
         } catch (JsonException $jsonException) {
             throw MalformedReportFileException::fromJsonException($path, $jsonException);
         }
