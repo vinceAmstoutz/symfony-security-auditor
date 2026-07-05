@@ -119,11 +119,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
 
     private function sarifLevel(VulnerabilitySeverity $vulnerabilitySeverity): string
     {
-        return match ($vulnerabilitySeverity) {
-            VulnerabilitySeverity::CRITICAL, VulnerabilitySeverity::HIGH => 'error',
-            VulnerabilitySeverity::MEDIUM => 'warning',
-            VulnerabilitySeverity::LOW, VulnerabilitySeverity::INFO => 'note',
-        };
+        return SeverityLevelMapper::level($vulnerabilitySeverity, 'note');
     }
 
     /**

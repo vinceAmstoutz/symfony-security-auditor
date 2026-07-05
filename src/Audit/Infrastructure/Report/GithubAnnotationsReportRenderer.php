@@ -57,11 +57,7 @@ final readonly class GithubAnnotationsReportRenderer implements ReportRendererIn
 
     private function annotationLevel(VulnerabilitySeverity $vulnerabilitySeverity): string
     {
-        return match ($vulnerabilitySeverity) {
-            VulnerabilitySeverity::CRITICAL, VulnerabilitySeverity::HIGH => 'error',
-            VulnerabilitySeverity::MEDIUM => 'warning',
-            VulnerabilitySeverity::LOW, VulnerabilitySeverity::INFO => 'notice',
-        };
+        return SeverityLevelMapper::level($vulnerabilitySeverity, 'notice');
     }
 
     private function properties(Vulnerability $vulnerability): string
