@@ -574,6 +574,42 @@ final class TokenBucketRateLimiterTest extends TestCase
     /**
      * @throws RateLimitRequestTooLargeException
      */
+    public function test_concurrent_acquires_are_each_reconciled_against_their_own_estimate(): void
+    {
+        $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
+        $sleeper = $this->createRecordingSleeper($mockClock);
+
+        $tokenBucketRateLimiter = new TokenBucketRateLimiter(
+            rateLimitConfiguration: new RateLimitConfiguration(
+                requestsPerMinute: null,
+                inputTokensPerMinute: 100,
+                outputTokensPerMinute: null,
+            ),
+            clock: $this->boundedClock($mockClock),
+            sleeper: $sleeper,
+        );
+
+        // A batch window acquires for every request before resolving any of
+        // them, so two reservations are pending simultaneously here.
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 40);
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 50);
+        // Reconciling in dispatch order must credit each record() against
+        // its own estimate (40, then 50) — not the last-seen estimate for
+        // both, which would overcharge the bucket by the first estimate.
+        $tokenBucketRateLimiter->record(inputTokens: 20, outputTokens: 0);
+        $tokenBucketRateLimiter->record(inputTokens: 30, outputTokens: 0);
+
+        // Correctly reconciled usage is 20 + 30 = 50, leaving room for 45
+        // more within the ITPM=100 cap; the pre-fix formula left the bucket
+        // at 90, which would block this acquire.
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 45);
+
+        self::assertSame([], $sleeper->sleepsMs);
+    }
+
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_record_zero_input_uses_reconciled_value_not_pending_estimate(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -607,7 +643,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter = new TokenBucketRateLimiter(
             rateLimitConfiguration: new RateLimitConfiguration(
                 requestsPerMinute: null,
-                inputTokensPerMinute: 10,
+                inputTokensPerMinute: 9,
                 outputTokensPerMinute: null,
             ),
             clock: $this->boundedClock($mockClock),
@@ -617,6 +653,32 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
         $tokenBucketRateLimiter->record(inputTokens: 5, outputTokens: 0);
         $tokenBucketRateLimiter->record(inputTokens: 5, outputTokens: 0);
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
+
+        self::assertSame([60_000], $sleeper->sleepsMs);
+    }
+
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
+    public function test_consecutive_records_without_acquire_do_not_over_count_input_tokens(): void
+    {
+        $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
+        $sleeper = $this->createRecordingSleeper($mockClock);
+
+        $tokenBucketRateLimiter = new TokenBucketRateLimiter(
+            rateLimitConfiguration: new RateLimitConfiguration(
+                requestsPerMinute: null,
+                inputTokensPerMinute: 5,
+                outputTokensPerMinute: null,
+            ),
+            clock: $this->boundedClock($mockClock),
+            sleeper: $sleeper,
+        );
+
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
+        $tokenBucketRateLimiter->record(inputTokens: 5, outputTokens: 0);
+        $tokenBucketRateLimiter->record(inputTokens: 0, outputTokens: 0);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
 
         self::assertSame([], $sleeper->sleepsMs);
