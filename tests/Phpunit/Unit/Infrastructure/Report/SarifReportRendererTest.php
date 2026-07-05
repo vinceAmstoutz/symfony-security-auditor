@@ -264,9 +264,6 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
 
         $rules = $decoded['runs'][0]['tool']['driver']['rules'];
         $firstRule = array_values($rules)[0];
-        self::assertArrayHasKey('shortDescription', $firstRule);
-        self::assertIsArray($firstRule['shortDescription']);
-        self::assertArrayHasKey('text', $firstRule['shortDescription']);
         self::assertSame(VulnerabilityType::SQL_INJECTION->category(), $firstRule['shortDescription']['text']);
     }
 
@@ -342,7 +339,6 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         $firstRule = array_values($rules)[0];
         self::assertSame(VulnerabilityType::SQL_INJECTION->owaspReference(), $firstRule['id']);
         self::assertSame(VulnerabilityType::SQL_INJECTION->value, $firstRule['name']);
-        self::assertIsArray($firstRule['shortDescription']);
         self::assertSame(VulnerabilityType::SQL_INJECTION->category(), $firstRule['shortDescription']['text']);
     }
 
