@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   "do NOT flag" section for allow-listed extensions stored outside the web root
   and randomized filenames. `AttackerPromptBuilder::PROMPT_VERSION` bumps to 12,
   invalidating cached attacker responses for chunks containing a form.
+- **Findings now include a CWE reference alongside the existing OWASP Top 10
+  mapping.** `VulnerabilityType::cweReference()` (e.g. `CWE-89`) and
+  `cweReferenceUrl()` (`https://cwe.mitre.org/data/definitions/89.html`)
+  (`src/Audit/Domain/Model/VulnerabilityType.php`) map every case to its MITRE
+  CWE identifier. `Vulnerability::toArray()` gains a `cwe` key next to `owasp`
+  (`src/Audit/Domain/Model/Vulnerability.php`), so `JsonReportRenderer` picks it
+  up for free. `SarifReportRenderer` tags each rule with `external/cwe/cwe-<n>`
+  in `properties.tags`
+  (`src/Audit/Infrastructure/Report/SarifReportRenderer.php`), the format GitHub
+  Code Scanning already recognizes for CWE. `JunitReportRenderer`,
+  `HtmlReportRenderer`, `ConsoleReportRenderer`, and `MarkdownReportRenderer`
+  now render the CWE reference alongside OWASP in their respective output.
+  Additive change — the `cwe` JSON key and the SARIF tag are new; no existing
+  key or field was removed or renamed.
 - **New `--format junit` output renders findings as JUnit XML for CI test-report
   panels.** SARIF gets findings into GitHub Code Scanning and GitLab's security
   dashboard, but GitLab's dashboard requires the Ultimate tier — free-tier users
@@ -330,6 +344,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (e.g. `src/Webhook/config.yaml`) previously had
   `type() === 'webhook_consumer'` while `isWebhookConsumer()` returned `false`.
   Both are fixed in the new classifier.
+- **Constructor ports that DI always resolves are now required instead of
+  silently falling back to a `Null*` default.** `MappingStage`
+  (`src/Audit/Application/Pipeline/Stage/MappingStage.php`), `AuditPipeline`
+  (`src/Audit/Application/Pipeline/AuditPipeline.php`), and `AuditOrchestrator`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) accepted nullable
+  `ControllerAccessControlParserInterface` / `VoterCapabilityParserInterface` /
+  `FormBindingParserInterface` / `SecurityConfigParserInterface` /
+  `ProgressReporterInterface` parameters and defaulted each to `new Null*()`
+  when omitted — but `config/services.php` always aliases every one of them to a
+  concrete implementation, so the fallback was only reachable via manual
+  construction (tests). Likewise
+  `AttackerScanCollaborators::staticPreScanner`/`progressReporter`
+  (`src/Audit/Application/Agent/AttackerScanCollaborators.php`) and
+  `AttackerLlmCollaborators::codeSlicer`
+  (`src/Audit/Application/Agent/AttackerLlmCollaborators.php`) fell back to
+  `NullStaticPreScanner`/`NullProgressReporter`/`NullCodeSlicer` inside
+  `AttackerAgent`, even though `SymfonySecurityAuditorBundle::loadExtension()`
+  unconditionally aliases `StaticPreScannerInterface`/`CodeSlicerInterface` to a
+  `Regex*`-or-`Null*` implementation based on config — the Null-vs-real choice
+  was already made once, correctly, in the container. All of these parameters
+  are now non-nullable, and the dead `?? new Null*()` fallbacks are removed. All
+  classes are `@internal`, and the container always supplies a value, so this is
+  not user-visible.
 - **Prompt building is split behind interfaces so neither builder is a
   monolith.** `AttackerPromptBuilder`
   (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) held all sixteen
@@ -400,6 +437,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `0.5` / `6.25` rates for `claude-opus-4-8` equal the old `5×0.1` / `5×1.25`.
   The default `PricingProviderInterface` service alias now points at
   `ModelsDevPricingProvider`.
+- **The structured-collection wiring shared by five attacker/reviewer analyzers
+  is extracted into one collaborator per domain, instead of being duplicated at
+  every call site.**
+  `SequentialChunkAnalyzer::analyzeChunkViaStructuredCollection()` and
+  `ConcurrentChunkAnalyzer::buildPendingRequest()`
+  (`src/Audit/Application/Agent/Chunk/`) each built their own
+  `VulnerabilityCollector` plus a single-tool `record_vulnerability`
+  `ToolRegistry` inline; `StructuredReviewAnalyzer::reviewSingle()`,
+  `ConcurrentStructuredReviewAnalyzer::buildRequest()`, and
+  `BatchReviewAnalyzer::reviewBatchViaStructuredCollection()`
+  (`src/Audit/Application/Agent/Review/`) duplicated the same pattern for
+  `ReviewCollector` and `record_review`. Both now call a new `begin()` factory —
+  `StructuredVulnerabilityCollectionSession` and
+  `StructuredReviewCollectionSession` — that wires the collector into the
+  registry and exposes `drain()`. Purely internal: every analyzer keeps its
+  existing constructor and `analyze()` signature, so `AttackerAgent` and
+  `ReviewerAgent` needed no changes, and the LLM-facing behavior (prompts, tool
+  schemas, caching, coverage, error handling) is unchanged.
 
 ### Deprecated
 
@@ -463,6 +518,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   when the model echoes a raw exploit payload) produced a `.xml` report that
   GitLab, Jenkins, and any standard XML parser rejected outright. Those bytes
   are now stripped before insertion.
+- **Retryable LLM failures embedding a non-transient status code as a digit
+  substring were misclassified as fatal, aborting the audit instead of
+  retrying.** `TransientFailureClassifier::isTransient()`
+  (`src/Audit/Infrastructure/LLM/TransientFailureClassifier.php`) checked its
+  `400`/`401`/`403`/`404`/`422` "non-transient" hints with a plain substring
+  search, so a genuinely retryable message like `"HTTP 500 (request id 400123)"`
+  or `"cURL error 28: timed out after 1400 ms"` matched `400` and was rethrown
+  as fatal instead of retried. Status-code hints (for `isTransient()` and
+  `isRateLimit()`'s `429`) are now matched as word-bounded tokens instead of raw
+  substrings; the textual hints (`"rate limit"`, `"timed out"`, …) are
+  unchanged.
 - **Unquoted credential values in config files reached the LLM prompt
   unredacted.** `RegexSecretScrubber`'s `inline_assignment` pattern
   (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) required the
@@ -621,6 +687,31 @@ repositories by directory and content, not just filename suffix; and the
   `ProjectFileType` classification, so the mapping counts, feature chunking, and
   route/form analysis all see the full set. Plain `.php` services without these
   signals stay classified as services.
+- **Concurrent tool-using conversations no longer abandon themselves on a
+  transient failure that happens after a tool already ran.**
+  `ToolConversationWavefront::advanceConversation()`
+  (`src/Audit/Infrastructure/LLM/ToolConversationWavefront.php`) caught every
+  dispatch or resolution failure in a bare `catch (Throwable)` and, once
+  `runToolCalls()` had executed a tool, finalized the conversation as an empty
+  `empty_content` response with no retry at all — a single timeout or `5xx`
+  right after a tool call threw the conversation away, even though every other
+  call path classifies and retries the same failure class via
+  `RetryingPlatformInvoker` (`SymfonyAiLLMClient::complete()` and
+  `SequentialToolLoop::run()` both go through it). A conversation that fails
+  after a tool ran now retries the same conversation through
+  `RetryingPlatformInvoker::invoke()` — the same classify-then-retry-or-fail
+  seam the sequential path already uses — via a new
+  `ToolConversationWavefront::retryOrAbortConversation()`, and only finalizes as
+  `empty_content` once that retry is exhausted or the failure is non-transient.
+  A dispatch failure before any tool has run now goes through the same
+  classified retry first too, falling back to the full `completeWithTools()`
+  restart only once that retry itself fails, instead of always paying for a full
+  restart on the very first failure. `BudgetExceededException` is unaffected: it
+  still propagates immediately and is never retried, on any path. Also extracted
+  the duplicated `empty_content` `LLMResponse` construction from
+  `SymfonyAiLLMClient::complete()` and `SequentialToolLoop::run()` into a shared
+  `EmptyLLMResponseFactory`
+  (`src/Audit/Infrastructure/LLM/EmptyLLMResponseFactory.php`).
 
 ## [1.11.0] — 2026-06-15 — Tracer
 
