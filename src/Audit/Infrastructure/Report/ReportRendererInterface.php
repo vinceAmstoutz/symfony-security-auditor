@@ -20,8 +20,8 @@ interface ReportRendererInterface
 {
     /**
      * Wire-format identifier matching the `OutputFormat` enum value
-     * (`console`, `json`, `sarif`, `html`, `markdown`, `junit`); the Command
-     * layer selects the renderer by this key.
+     * (`console`, `json`, `sarif`, `html`, `markdown`, `junit`, `github`); the
+     * Command layer selects the renderer by this key.
      */
     public function format(): string;
 
