@@ -271,6 +271,43 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **`ProjectFile` type detection is now a single source of truth, so its
+  `fileType()` and its `is*()` predicates can no longer disagree.**
+  `ProjectFile::detectType()` and its private `is*Path()`/`looksLike*()`
+  heuristics move verbatim into a new `ProjectFileTypeClassifier`
+  (`src/Audit/Domain/Model/ProjectFileTypeClassifier.php`, pure Domain, no I/O);
+  `ProjectFile::create()` now calls `ProjectFileTypeClassifier::classify()`.
+  Previously `isEntity()`, `isVoter()`, `isRepository()`, `isForm()`,
+  `isAuthenticator()`, `isMessengerHandler()`, `isWebhookConsumer()`, and
+  `isTemplate()` re-ran the same heuristics independently of `detectType()`'s
+  mutually-exclusive `match(true)`, so a file could satisfy more than one
+  predicate even though `fileType()` assigned it exactly one type — e.g. an
+  entity also carrying `#[ApiResource]` reported both `isEntity() === true` and
+  `type() === 'api_resource'`. Every one of those predicates is now a thin
+  `ProjectFileType::X === $this->fileType()` comparison, so
+  `ProjectFileInventory`'s `entities`/`voters`/`repositories`/`forms`/`services`
+  buckets (metadata and summary counts only — LLM scanning is keyed off
+  `fileType()` directly and is unaffected) now agree with `type()` in every
+  case. `isController()` already matched exactly (it is the first `match(true)`
+  arm) so its behavior is unchanged. `isConfiguration()` is deliberately kept
+  independent of `fileType()`: it must catch every `.yaml`/`.yml`/`.xml`/dotenv
+  file regardless of directory (used by `MappingStage` to extract
+  `security:`/firewall config for every config file in the project), which a
+  directory-precedence-sensitive comparison against `fileType()` would silently
+  narrow.
+- **Fixed: `.xml` config files, and non-PHP files living in a `/Webhook/` or
+  `/MessageHandler/` directory, are now classified correctly.**
+  `ProjectFileTypeClassifier`'s `CONFIG` arm was missing `.xml` (already handled
+  by `isConfiguration()`, so XML security config silently fell back to
+  `type() === 'other'` and missed `RegexStaticPreScanner`'s `config` risk
+  markers and `ConfigAttackerSkill`'s attacker prompt block), and its
+  `MESSENGER_HANDLER`/`WEBHOOK_CONSUMER` directory-based arms matched any file
+  under `/MessageHandler/`/`/Webhook/` regardless of extension, unlike their
+  corresponding `isMessengerHandler()`/`isWebhookConsumer()` predicates which
+  always required a `.php` suffix — a non-PHP file in one of those directories
+  (e.g. `src/Webhook/config.yaml`) previously had
+  `type() === 'webhook_consumer'` while `isWebhookConsumer()` returned `false`.
+  Both are fixed in the new classifier.
 - **Prompt building is split behind interfaces so neither builder is a
   monolith.** `AttackerPromptBuilder`
   (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) held all sixteen
