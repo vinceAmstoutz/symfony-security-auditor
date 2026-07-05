@@ -255,6 +255,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **SARIF output now marks baselined findings as suppressed instead of always
+  dropping them.** Every renderer previously received the same baseline-filtered
+  `AuditReport`, so a finding matching `--baseline` / `audit.baseline` was
+  invisible in `--format=sarif` exactly like JSON, console, HTML, Markdown, or
+  JUnit — GitHub Code Scanning / GitLab had no way to show it as a
+  dismissed/suppressed result, it just vanished.
+  `AuditCommand::finalizeAuditRun()` (`src/Command/AuditCommand.php`) now
+  renders `--format=sarif` from the report as returned by the pipeline
+  (`BaselineProcessor::apply()`'s filtering is skipped for that format only) and
+  threads the accepted fingerprints through a new fifth, optional
+  `$baselinedFingerprints` parameter on `ReportWriter::write()`
+  (`src/Command/ReportWriter.php`). `SarifReportRenderer`
+  (`src/Audit/Infrastructure/Report/SarifReportRenderer.php`) implements the new
+  `BaselineSuppressingReportRendererInterface::renderWithSuppressions()`
+  (`src/Audit/Infrastructure/Report/BaselineSuppressingReportRendererInterface.php`),
+  dispatched by `ReportWriter` for any renderer that supports it; a result whose
+  `Vulnerability::fingerprint()` is in the accepted set now gets
+  `"suppressions": [{"kind": "external", "justification": "Accepted via audit baseline"}]`
+  instead of being dropped from `results`. Every other format's output is
+  unchanged. `BaselineResult` (`src/Command/BaselineResult.php`) gained a third
+  `acceptedFingerprints` property alongside the existing filtered report and
+  suppressed count, so `AuditCommand` no longer needs a second baseline-file
+  read to get the matched set.
 - **Prompt building is split behind interfaces so neither builder is a
   monolith.** `AttackerPromptBuilder`
   (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) held all sixteen

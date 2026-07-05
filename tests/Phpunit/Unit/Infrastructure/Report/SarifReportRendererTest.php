@@ -21,6 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BaselineSuppressingReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
@@ -318,6 +319,45 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */
+    public function test_render_result_has_no_suppressions_by_default(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $decoded = $this->decodeSarif($this->makeReport($vulnerability));
+
+        self::assertArrayNotHasKey('suppressions', $decoded['runs'][0]['results'][0]);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_with_suppressions_marks_the_baselined_finding_as_externally_suppressed(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $decoded = $this->decodeSarifWithSuppressions($this->makeReport($vulnerability), [$vulnerability->fingerprint()]);
+
+        self::assertSame(
+            [['kind' => 'external', 'justification' => 'Accepted via audit baseline']],
+            $decoded['runs'][0]['results'][0]['suppressions'],
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_with_suppressions_leaves_a_non_baselined_finding_unsuppressed(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $decoded = $this->decodeSarifWithSuppressions($this->makeReport($vulnerability), ['SSA-UNRELATED']);
+
+        self::assertArrayNotHasKey('suppressions', $decoded['runs'][0]['results'][0]);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_rule_is_not_overwritten_when_same_type_appears_twice(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
@@ -382,6 +422,28 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     private function decodeSarif(AuditReport $auditReport): array
     {
         $decoded = json_decode($this->renderer->render($auditReport), true);
+        $this->assertSarifShape($decoded);
+
+        return $decoded;
+    }
+
+    /**
+     * @param list<string> $baselinedFingerprints
+     *
+     * @return array{
+     *     "$schema": string,
+     *     version: string,
+     *     runs: list<array{
+     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array<string, mixed>>}},
+     *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>, suppressions?: list<array{kind: string, justification: string}>}>,
+     *         properties?: array<string, mixed>
+     *     }>
+     * }
+     */
+    private function decodeSarifWithSuppressions(AuditReport $auditReport, array $baselinedFingerprints): array
+    {
+        self::assertInstanceOf(BaselineSuppressingReportRendererInterface::class, $this->renderer);
+        $decoded = json_decode($this->renderer->renderWithSuppressions($auditReport, $baselinedFingerprints), true);
         $this->assertSarifShape($decoded);
 
         return $decoded;

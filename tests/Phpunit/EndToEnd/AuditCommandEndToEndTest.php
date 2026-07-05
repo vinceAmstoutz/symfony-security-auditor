@@ -404,6 +404,35 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(5, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
     }
 
+    public function test_sarif_format_still_succeeds_when_the_pipeline_already_skipped_every_baselined_finding(): void
+    {
+        $this->createProjectDir();
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+
+        $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}')->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $baselineFile,
+        ]);
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+            '--format' => 'sarif',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+
+        $decoded = json_decode($commandTester->getDisplay(), true);
+        self::assertIsArray($decoded);
+        $runs = $decoded['runs'] ?? null;
+        self::assertIsArray($runs);
+        $firstRun = $runs[0] ?? null;
+        self::assertIsArray($firstRun);
+
+        self::assertSame([], $firstRun['results'] ?? null);
+    }
+
     public function test_command_json_output_written_to_file(): void
     {
         $this->createProjectDir();

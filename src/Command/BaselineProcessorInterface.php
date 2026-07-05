@@ -37,6 +37,8 @@ interface BaselineProcessorInterface
      * Suppresses baselined findings from the report, resolving the CLI
      * `--baseline` override against the configured default path. When no path
      * is set, the report is returned unchanged with a zero suppressed count.
+     * The returned {@see BaselineResult} also carries the matched fingerprints
+     * so callers can render suppressed findings instead of dropping them.
      */
     public function apply(AuditReport $auditReport, ?string $cliBaseline): BaselineResult;
 }

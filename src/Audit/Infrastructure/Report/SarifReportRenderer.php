@@ -15,11 +15,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class SarifReportRenderer implements ReportRendererInterface
+final readonly class SarifReportRenderer implements ReportRendererInterface, BaselineSuppressingReportRendererInterface
 {
     public function __construct(
         private ReportPackage $reportPackage = new ReportPackage(),
@@ -34,32 +35,23 @@ final readonly class SarifReportRenderer implements ReportRendererInterface
     #[Override]
     public function render(AuditReport $auditReport): string
     {
+        return $this->renderWithSuppressions($auditReport, []);
+    }
+
+    /**
+     * @param list<string> $baselinedFingerprints
+     */
+    #[Override]
+    public function renderWithSuppressions(AuditReport $auditReport, array $baselinedFingerprints): string
+    {
         $vulnerabilities = $auditReport->vulnerabilities();
 
         $results = [];
         $types = [];
 
         foreach ($vulnerabilities as $vulnerability) {
-            $type = $vulnerability->type();
-            $types[$type->owaspReference()] = $type;
-
-            $results[] = [
-                'ruleId' => $type->owaspReference(),
-                'level' => $this->sarifLevel($vulnerability->severity()),
-                'message' => ['text' => $vulnerability->title()],
-                'partialFingerprints' => ['symfonySecurityAuditor/v1' => $vulnerability->fingerprint()],
-                'locations' => [
-                    [
-                        'physicalLocation' => [
-                            'artifactLocation' => ['uri' => $vulnerability->filePath()],
-                            'region' => [
-                                'startLine' => $vulnerability->lineStart(),
-                                'endLine' => $vulnerability->lineEnd(),
-                            ],
-                        ],
-                    ],
-                ],
-            ];
+            $types[$vulnerability->type()->owaspReference()] = $vulnerability->type();
+            $results[] = $this->resultFor($vulnerability, $baselinedFingerprints);
         }
 
         $rules = array_values(array_map(
@@ -99,6 +91,38 @@ final readonly class SarifReportRenderer implements ReportRendererInterface
         ];
 
         return json_encode($sarif, \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * @param list<string> $baselinedFingerprints
+     *
+     * @return array<string, mixed>
+     */
+    private function resultFor(Vulnerability $vulnerability, array $baselinedFingerprints): array
+    {
+        $result = [
+            'ruleId' => $vulnerability->type()->owaspReference(),
+            'level' => $this->sarifLevel($vulnerability->severity()),
+            'message' => ['text' => $vulnerability->title()],
+            'partialFingerprints' => ['symfonySecurityAuditor/v1' => $vulnerability->fingerprint()],
+            'locations' => [
+                [
+                    'physicalLocation' => [
+                        'artifactLocation' => ['uri' => $vulnerability->filePath()],
+                        'region' => [
+                            'startLine' => $vulnerability->lineStart(),
+                            'endLine' => $vulnerability->lineEnd(),
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        if (\in_array($vulnerability->fingerprint(), $baselinedFingerprints, true)) {
+            $result['suppressions'] = [['kind' => 'external', 'justification' => 'Accepted via audit baseline']];
+        }
+
+        return $result;
     }
 
     private function sarifLevel(VulnerabilitySeverity $vulnerabilitySeverity): string
