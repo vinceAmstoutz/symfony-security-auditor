@@ -222,17 +222,4 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             $fingerprintCount,
         ));
     }
-
-    #[Override]
-    public function baselineApplied(SymfonyStyle $symfonyStyle, int $suppressedCount): void
-    {
-        if ($suppressedCount < 1) {
-            return;
-        }
-
-        $symfonyStyle->note(\sprintf(
-            '%d finding(s) suppressed by the baseline.',
-            $suppressedCount,
-        ));
-    }
 }

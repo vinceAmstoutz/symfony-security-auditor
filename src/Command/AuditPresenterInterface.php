@@ -50,6 +50,4 @@ interface AuditPresenterInterface
     public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void;
 
     public function baselineGenerated(SymfonyStyle $symfonyStyle, string $path, int $fingerprintCount): void;
-
-    public function baselineApplied(SymfonyStyle $symfonyStyle, int $suppressedCount): void;
 }

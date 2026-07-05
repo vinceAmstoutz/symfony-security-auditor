@@ -546,6 +546,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `ministral-{3b,8b,14b}-2512`) now resolve to `$0.00` with a warning. The
   default `claude-opus-4-8` and every current model are catalog-present and
   unchanged.
+- **`AuditPresenterInterface::baselineApplied()` and its `AuditCommand` call
+  site.** Since `AuditOrchestrator` already strips baseline-accepted findings
+  from the pipeline before they reach the report (see the "skip baselined
+  findings before review" change), `AuditCommand::finalizeAuditRun()`'s own
+  `BaselineProcessor::apply()` pass never had anything left to suppress —
+  `suppressedCount` was always `0`, and the message this method printed could
+  never actually fire. Both were `@internal`, so this is not a public-API break;
+  the CLI's console output is unaffected because the message never appeared in
+  any real run.
 
 ### Fixed
 

@@ -220,10 +220,6 @@ final readonly class AuditCommand
     ): int {
         $baselineResult = $this->baselineProcessor->apply($auditReport, $auditCommandInput->baseline);
 
-        if (!$auditCommandInput->isMachineReadableToStdout()) {
-            $this->auditPresenter->baselineApplied($symfonyStyle, $baselineResult->suppressedCount);
-        }
-
         $reportToRender = OutputFormat::Sarif === $auditCommandInput->format ? $auditReport : $baselineResult->report;
         $this->reportWriter->write($reportToRender, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle, $baselineResult->acceptedFingerprints);
 
