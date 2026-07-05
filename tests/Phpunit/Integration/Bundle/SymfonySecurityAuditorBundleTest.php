@@ -193,7 +193,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame(AttackerAnalysisSettings::class, $cheapAttackerAnalysisSettings->getClass());
         self::assertSame(
             [false, 7, true, false, 3],
-            $cheapAttackerAnalysisSettings->getArguments(),
+            $containerBuilder->getParameterBag()->resolveValue($cheapAttackerAnalysisSettings->getArguments()),
         );
 
         $escalatingAttackerFirstArgument = $containerBuilder->getDefinition(EscalatingAttackerAgent::class)->getArgument(0);
@@ -217,7 +217,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertInstanceOf(Definition::class, $primaryArguments[0]);
         self::assertInstanceOf(Definition::class, $escalationArguments[0]);
         self::assertSame($primaryArguments[0]->getClass(), $escalationArguments[0]->getClass());
-        self::assertSame(
+        self::assertEquals(
             \array_slice($primaryArguments[0]->getArguments(), 1),
             \array_slice($escalationArguments[0]->getArguments(), 1),
         );
