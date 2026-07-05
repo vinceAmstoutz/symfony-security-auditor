@@ -21,6 +21,7 @@ use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
@@ -66,6 +67,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlic
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
+use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
 /**
@@ -219,9 +221,14 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration->llm->attackerMaxOutputTokens(),
             ));
 
+        $this->registerCheapAttackerCache($servicesConfigurator, $bundleConfiguration);
+
         $servicesConfigurator->set('security_auditor.cheap_attacker', AttackerAgent::class)
             ->private()
-            ->args((new AttackerAgentDefinitionFactory())->args('security_auditor.cheap_attacker_client'));
+            ->args((new AttackerAgentDefinitionFactory())->args(
+                'security_auditor.cheap_attacker_client',
+                'security_auditor.cheap_attacker_cache',
+            ));
 
         $servicesConfigurator->set(EscalatingAttackerAgent::class)
             ->private()
@@ -232,6 +239,30 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ]);
 
         $servicesConfigurator->alias(AttackerAgentInterface::class, EscalatingAttackerAgent::class);
+    }
+
+    /**
+     * The cheap attacker must never share cache entries with the primary
+     * attacker: both would otherwise read and write the same keys, and a
+     * cheap-model "no findings" result cached during an escalation run would
+     * later be served to the full-price attacker as its own analysis.
+     */
+    private function registerCheapAttackerCache(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
+    {
+        if (!$bundleConfiguration->cache->enabled) {
+            $servicesConfigurator->alias('security_auditor.cheap_attacker_cache', NullAttackerCache::class);
+
+            return;
+        }
+
+        $servicesConfigurator->set('security_auditor.cheap_attacker_cache', FilesystemAttackerCache::class)
+            ->private()
+            ->args([
+                param('symfony_security_auditor.cache.dir'),
+                service(Filesystem::class),
+                service('logger'),
+                param('symfony_security_auditor.cache.cheap_attacker_key_salt'),
+            ]);
     }
 
     /**

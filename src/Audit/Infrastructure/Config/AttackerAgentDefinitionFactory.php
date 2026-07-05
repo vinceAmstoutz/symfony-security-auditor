@@ -42,7 +42,7 @@ final readonly class AttackerAgentDefinitionFactory
     /**
      * @return list<mixed>
      */
-    public function args(string $llmClientServiceId): array
+    public function args(string $llmClientServiceId, string $attackerCacheServiceId = AttackerCacheInterface::class): array
     {
         return [
             inline_service(AttackerLlmCollaborators::class)->args([
@@ -53,7 +53,7 @@ final readonly class AttackerAgentDefinitionFactory
                 service(RecordVulnerabilityToolFactoryInterface::class),
             ]),
             inline_service(AttackerScanCollaborators::class)->args([
-                service(AttackerCacheInterface::class),
+                service($attackerCacheServiceId),
                 service(StaticPreScannerInterface::class),
                 service(ProgressReporterInterface::class),
                 service(FileChunker::class),

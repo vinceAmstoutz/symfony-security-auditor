@@ -660,6 +660,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   view of the file than the current configuration would actually send. The salt
   now includes a `slice-off` / `slice-on-<min_lines>` segment so any change to
   the slicing configuration invalidates the affected cache entries.
+- **The attacker cache key also ignored the static pre-scan and investigation
+  tool toggles.** The same salt (`ContainerParameterRegistrar`) had no
+  representation of `audit.static_prescan.enabled` — which injects risk-marker
+  preambles into every attacker message — or of `audit.tools_enabled` /
+  `audit.max_tool_iterations`, which change how the attacker may investigate a
+  chunk. Flipping any of them replayed cache entries recorded under the other
+  configuration. The salt now carries `prescan-{on|off}` and
+  `tools-{off|on-<max_iterations>}` segments, closing the remaining known gaps
+  in the "config knob changes attacker input but not its cache key" class.
+- **An escalation run poisoned the primary attacker's response cache with
+  cheap-model results.** `SymfonySecurityAuditorBundle::registerEscalation()`
+  wired the cheap-model `AttackerAgent` with the same `FilesystemAttackerCache`
+  instance as the full-price attacker, whose key salt encodes only
+  `attacker_model`. With `audit.escalation.enabled: true` and caching on, the
+  cheap first pass stored its (weaker, often empty) per-chunk verdicts under
+  the exact keys the expensive attacker computes — a later run with escalation
+  off (or the escalated second pass over a flagged file in a subsequent run)
+  silently served the cheap model's "no findings" as if the configured
+  attacker model had analyzed the chunk, with zero LLM calls and no trace. The
+  cheap attacker now gets a dedicated cache instance salted with the actual
+  cheap model (`cache.cheap_attacker_key_salt`), so the two namespaces can
+  never collide; with caching disabled it degrades to the null cache as
+  before.
 - **A hostile or misbehaving provider's `Retry-After` header could wedge the
   rate limiter for hours, bypassing the documented safety ceiling.**
   `RetryPolicy::rateLimitDelayMs()` already clamped the server-provided hint to

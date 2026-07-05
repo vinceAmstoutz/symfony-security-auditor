@@ -222,9 +222,48 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             \array_slice($escalationArguments[0]->getArguments(), 1),
         );
 
-        self::assertEquals($primaryArguments[1], $escalationArguments[1]);
+        self::assertInstanceOf(Definition::class, $primaryArguments[1]);
+        self::assertInstanceOf(Definition::class, $escalationArguments[1]);
+        self::assertSame($primaryArguments[1]->getClass(), $escalationArguments[1]->getClass());
+        self::assertEquals(
+            \array_slice($primaryArguments[1]->getArguments(), 1),
+            \array_slice($escalationArguments[1]->getArguments(), 1),
+        );
         self::assertEquals($primaryArguments[2], $escalationArguments[2]);
         self::assertEquals($primaryArguments[3], $escalationArguments[3]);
+    }
+
+    public function test_bundle_gives_the_cheap_attacker_its_own_cache_so_cheap_results_never_reach_the_primary_attacker(): void
+    {
+        $containerBuilder = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-4o-mini']],
+        ]);
+
+        $cheapCacheDefinition = $containerBuilder->getDefinition('security_auditor.cheap_attacker_cache');
+        self::assertSame(FilesystemAttackerCache::class, $cheapCacheDefinition->getClass());
+        self::assertSame(
+            '%symfony_security_auditor.cache.cheap_attacker_key_salt%',
+            (string) $cheapCacheDefinition->getArgument(3),
+        );
+
+        $cheapScanCollaborators = $containerBuilder->getDefinition('security_auditor.cheap_attacker')->getArgument(1);
+        self::assertInstanceOf(Definition::class, $cheapScanCollaborators);
+        $cheapCacheReference = $cheapScanCollaborators->getArgument(0);
+        self::assertInstanceOf(Reference::class, $cheapCacheReference);
+        self::assertSame('security_auditor.cheap_attacker_cache', (string) $cheapCacheReference);
+    }
+
+    public function test_bundle_aliases_the_cheap_attacker_cache_to_the_null_cache_when_caching_is_disabled(): void
+    {
+        $containerBuilder = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-4o-mini']],
+            'cache' => ['enabled' => false],
+        ]);
+
+        self::assertTrue($containerBuilder->hasAlias('security_auditor.cheap_attacker_cache'));
+        self::assertSame(NullAttackerCache::class, (string) $containerBuilder->getAlias('security_auditor.cheap_attacker_cache'));
     }
 
     #[RunInSeparateProcess]
@@ -840,13 +879,56 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         $expectedPatternHash = substr(hash('sha256', json_encode([], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)), 0, 16);
         $expectedKeySalt = \sprintf(
-            'gpt-4o|prompt-v%d|prescan-v%d|patterns-%s|collect-tool|skills-full|slice-off',
+            'gpt-4o|prompt-v%d|prescan-v%d|prescan-on|tools-on-8|patterns-%s|collect-tool|skills-full|slice-off',
             AttackerPromptBuilder::PROMPT_VERSION,
             RegexStaticPreScanner::CACHE_VERSION,
             $expectedPatternHash,
         );
 
         self::assertSame($expectedKeySalt, $containerBuilder->getParameter('symfony_security_auditor.cache.key_salt'));
+    }
+
+    public function test_bundle_cache_key_salt_folds_in_the_prescan_toggle(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['static_prescan' => ['enabled' => false]]]);
+
+        $keySalt = $containerBuilder->getParameter('symfony_security_auditor.cache.key_salt');
+        self::assertIsString($keySalt);
+        self::assertStringContainsString('|prescan-off|', $keySalt);
+    }
+
+    public function test_bundle_cache_key_salt_folds_in_the_tool_settings(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['tools_enabled' => false]]);
+
+        $keySalt = $containerBuilder->getParameter('symfony_security_auditor.cache.key_salt');
+        self::assertIsString($keySalt);
+        self::assertStringContainsString('|tools-off|', $keySalt);
+    }
+
+    public function test_bundle_cache_key_salt_folds_in_the_tool_iteration_budget(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['tools_enabled' => true, 'max_tool_iterations' => 7]]);
+
+        $keySalt = $containerBuilder->getParameter('symfony_security_auditor.cache.key_salt');
+        self::assertIsString($keySalt);
+        self::assertStringContainsString('|tools-on-7|', $keySalt);
+    }
+
+    public function test_bundle_cheap_attacker_key_salt_embeds_the_cheap_model_instead_of_the_attacker_model(): void
+    {
+        $containerBuilder = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-4o-mini']],
+        ]);
+
+        $attackerKeySalt = $containerBuilder->getParameter('symfony_security_auditor.cache.key_salt');
+        $cheapKeySalt = $containerBuilder->getParameter('symfony_security_auditor.cache.cheap_attacker_key_salt');
+        self::assertIsString($attackerKeySalt);
+        self::assertIsString($cheapKeySalt);
+        self::assertStringStartsWith('gpt-4o|', $attackerKeySalt);
+        self::assertStringStartsWith('gpt-4o-mini|', $cheapKeySalt);
+        self::assertSame(substr($attackerKeySalt, \strlen('gpt-4o')), substr($cheapKeySalt, \strlen('gpt-4o-mini')));
     }
 
     public function test_bundle_cache_key_salt_folds_in_the_structured_collection_mode(): void

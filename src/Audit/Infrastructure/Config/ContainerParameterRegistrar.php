@@ -102,7 +102,11 @@ final readonly class ContainerParameterRegistrar
             'cache.reviewer_dir' => \sprintf('%s/reviewer', $cache->dir),
             'cache.reviewer_key_salt' => $this->reviewerKeySalt($llm),
             'cache.prompt_caching' => $cache->promptCaching,
-            'cache.key_salt' => $this->attackerKeySalt($bundleConfiguration),
+            'cache.key_salt' => $this->attackerKeySalt($bundleConfiguration, $llm->attackerModel()),
+            'cache.cheap_attacker_key_salt' => $this->attackerKeySalt(
+                $bundleConfiguration,
+                $audit->escalationCheapModel ?? $llm->reviewerModel(),
+            ),
         ];
     }
 
@@ -119,13 +123,15 @@ final readonly class ContainerParameterRegistrar
     /**
      * @throws JsonException
      */
-    private function attackerKeySalt(BundleConfiguration $bundleConfiguration): string
+    private function attackerKeySalt(BundleConfiguration $bundleConfiguration, string $model): string
     {
         return \sprintf(
-            '%s|prompt-v%d|prescan-v%d|patterns-%s|collect-%s|skills-%s|slice-%s',
-            $bundleConfiguration->llm->attackerModel(),
+            '%s|prompt-v%d|prescan-v%d|prescan-%s|tools-%s|patterns-%s|collect-%s|skills-%s|slice-%s',
+            $model,
             AttackerPromptBuilder::PROMPT_VERSION,
             RegexStaticPreScanner::CACHE_VERSION,
+            $bundleConfiguration->audit->staticPreScanEnabled ? 'on' : 'off',
+            $this->attackerToolsSalt($bundleConfiguration),
             substr(
                 hash(
                     'sha256',
@@ -138,6 +144,15 @@ final readonly class ContainerParameterRegistrar
             $bundleConfiguration->audit->stableSystemPrompt ? 'full' : 'lean',
             $this->codeSlicingSalt($bundleConfiguration),
         );
+    }
+
+    private function attackerToolsSalt(BundleConfiguration $bundleConfiguration): string
+    {
+        if (!$bundleConfiguration->audit->toolsEnabled) {
+            return 'off';
+        }
+
+        return \sprintf('on-%d', $bundleConfiguration->audit->maxToolIterations);
     }
 
     private function codeSlicingSalt(BundleConfiguration $bundleConfiguration): string
