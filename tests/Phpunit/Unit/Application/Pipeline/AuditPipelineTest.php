@@ -22,6 +22,7 @@ use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 final class AuditPipelineTest extends TestCase
@@ -44,7 +45,7 @@ final class AuditPipelineTest extends TestCase
             $callOrder[] = 'audit';
         });
 
-        $auditPipeline = new AuditPipeline([$stage1, $stage2, $stage3], new NullLogger());
+        $auditPipeline = new AuditPipeline([$stage1, $stage2, $stage3], new NullLogger(), new NullProgressReporter());
 
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditPipeline->process($auditContext);
@@ -55,14 +56,14 @@ final class AuditPipelineTest extends TestCase
     public function test_it_exposes_injected_stages(): void
     {
         $stage = $this->createNamedStage('test', static function (): void {});
-        $auditPipeline = new AuditPipeline([$stage], new NullLogger());
+        $auditPipeline = new AuditPipeline([$stage], new NullLogger(), new NullProgressReporter());
 
         self::assertCount(1, $auditPipeline->stages());
     }
 
     public function test_it_processes_with_no_stages_without_error(): void
     {
-        $auditPipeline = new AuditPipeline([], new NullLogger());
+        $auditPipeline = new AuditPipeline([], new NullLogger(), new NullProgressReporter());
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditPipeline->process($auditContext);
 
@@ -80,7 +81,7 @@ final class AuditPipelineTest extends TestCase
             $receivedContexts[] = $auditContext;
         });
 
-        $auditPipeline = new AuditPipeline([$stage1, $stage2], new NullLogger());
+        $auditPipeline = new AuditPipeline([$stage1, $stage2], new NullLogger(), new NullProgressReporter());
 
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditPipeline->process($auditContext);
@@ -100,7 +101,7 @@ final class AuditPipelineTest extends TestCase
             },
         );
 
-        $auditPipeline = new AuditPipeline([], $logger);
+        $auditPipeline = new AuditPipeline([], $logger, new NullProgressReporter());
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditPipeline->process($auditContext);
 
@@ -120,7 +121,7 @@ final class AuditPipelineTest extends TestCase
         );
 
         $stage = $this->createNamedStage('my-stage', static function (): void {});
-        $auditPipeline = new AuditPipeline([$stage], $logger);
+        $auditPipeline = new AuditPipeline([$stage], $logger, new NullProgressReporter());
 
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditPipeline->process($auditContext);
@@ -139,7 +140,7 @@ final class AuditPipelineTest extends TestCase
             },
         );
 
-        $auditPipeline = new AuditPipeline([], $logger);
+        $auditPipeline = new AuditPipeline([], $logger, new NullProgressReporter());
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditPipeline->process($auditContext);
 
@@ -161,7 +162,7 @@ final class AuditPipelineTest extends TestCase
         );
 
         $stage = $this->createNamedStage('test-stage', static function (): void {});
-        $auditPipeline = new AuditPipeline([$stage], $logger);
+        $auditPipeline = new AuditPipeline([$stage], $logger, new NullProgressReporter());
 
         $auditContext = AuditContext::forProject($this->tmpDir);
         $auditPipeline->process($auditContext);
@@ -231,17 +232,6 @@ final class AuditPipelineTest extends TestCase
         self::assertSame($auditContext->auditId(), $stageCompletes[0][1]['audit_id']);
     }
 
-    public function test_it_defaults_to_a_silent_progress_reporter_when_none_is_injected(): void
-    {
-        // No reporter argument — should not throw and not require external wiring.
-        $stage = $this->createNamedStage('s', static function (): void {});
-        $auditPipeline = new AuditPipeline([$stage], new NullLogger());
-
-        $auditPipeline->process(AuditContext::forProject($this->tmpDir));
-
-        self::assertCount(1, $auditPipeline->stages());
-    }
-
     public function test_it_accepts_iterable_stages_from_iterator(): void
     {
         $callOrder = [];
@@ -252,7 +242,7 @@ final class AuditPipelineTest extends TestCase
             $callOrder[] = 'b';
         });
 
-        $auditPipeline = new AuditPipeline(new ArrayIterator([$stage1, $stage2]), new NullLogger());
+        $auditPipeline = new AuditPipeline(new ArrayIterator([$stage1, $stage2]), new NullLogger(), new NullProgressReporter());
 
         $auditPipeline->process(AuditContext::forProject($this->tmpDir));
 

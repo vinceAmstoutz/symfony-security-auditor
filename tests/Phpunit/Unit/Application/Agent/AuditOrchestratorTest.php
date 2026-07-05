@@ -45,6 +45,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
@@ -822,7 +825,7 @@ final class AuditOrchestratorTest extends TestCase
             new ReviewerModeConfiguration(),
         );
 
-        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings());
+        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), new NullProgressReporter());
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -862,7 +865,7 @@ final class AuditOrchestratorTest extends TestCase
             new ReviewerModeConfiguration(),
         );
 
-        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings());
+        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), new NullProgressReporter());
         $auditContext = $this->makeContextWithMapping();
 
         $auditOrchestrator->orchestrate($auditContext);
@@ -1058,9 +1061,12 @@ final class AuditOrchestratorTest extends TestCase
                     $attackerLlm,
                     new AttackerPromptBuilder(),
                     new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                    new NullCodeSlicer(),
                 ),
                 new AttackerScanCollaborators(
                     new NullAttackerCache(),
+                    new NullStaticPreScanner(),
+                    new NullProgressReporter(),
                 ),
                 new AttackerAnalysisSettings(),
                 new NullLogger(),
@@ -1078,7 +1084,7 @@ final class AuditOrchestratorTest extends TestCase
                 $overrides['maxIterations'] ?? AuditOrchestrator::DEFAULT_MAX_ITERATIONS,
                 $overrides['minConfidence'] ?? AuditOrchestrator::DEFAULT_MIN_CONFIDENCE,
             ),
-            progressReporter: $overrides['recordingProgressReporter'] ?? null,
+            progressReporter: $overrides['recordingProgressReporter'] ?? new NullProgressReporter(),
         );
     }
 

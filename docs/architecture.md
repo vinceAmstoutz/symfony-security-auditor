@@ -13,7 +13,7 @@ responsibilities, data flow, key design decisions, and extension points.
   - [`AuditReport`](#auditreport--immutable-final-snapshot)
   - [`Vulnerability`](#vulnerability--immutable-copy-on-write-mutations)
   - [`VulnerabilitySeverity`](#vulnerabilityseverity--backed-enum)
-  - [`VulnerabilityType`](#vulnerabilitytype--backed-enum-with-owasp-references)
+  - [`VulnerabilityType`](#vulnerabilitytype--backed-enum-with-owasp-and-cwe-references)
   - [`ProjectFile`](#projectfile--immutable-scanned-file)
   - [`SymfonyMapping`](#symfonymapping--immutable-project-structure-snapshot)
   - [Pipeline ports](#pipeline-ports-domainpipeline)
@@ -252,9 +252,9 @@ Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`,
 `score()` drives the risk calculation. `isExploitable()` is used by
 `Vulnerability::isHighRisk()`.
 
-### `VulnerabilityType` — backed enum with OWASP references
+### `VulnerabilityType` — backed enum with OWASP and CWE references
 
-32 cases in six categories:
+40 cases in six categories:
 
 | Category              | Examples                                                                   |
 | --------------------- | -------------------------------------------------------------------------- |
@@ -266,7 +266,10 @@ Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`,
 | Cryptographic         | `WEAK_CRYPTOGRAPHY`, `HARDCODED_SECRET`, `INSECURE_RANDOM`                 |
 
 `category()` and `owaspReference()` return human-readable strings used in report
-output and LLM prompts.
+output and LLM prompts. `cweReference()` and `cweReferenceUrl()` return the
+matching MITRE CWE identifier (e.g. `CWE-89`) and its
+`https://cwe.mitre.org/data/definitions/<n>.html` definition page, surfaced
+alongside the OWASP mapping in every report renderer.
 
 ### `ProjectFile` — immutable scanned file
 
@@ -431,11 +434,13 @@ prompts (markers + cross-iteration preambles, code slicing) and derives the
 cache key/cacheability into a `ChunkContext`; `AttackerChunkCache` adapts
 `AttackerCacheInterface` (context-aware key when supported) and turns a hit into
 a hydrated result; `SequentialChunkAnalyzer` and `ConcurrentChunkAnalyzer` are
-the two analysis strategies; `ChunkCoverageRecorder` records per-file coverage.
-The chunk-priority ordering above is defined once on `FileChunker` over
-`ProjectFileType` cases. Risk markers are indexed by `RiskMarkerIndex`, and the
-deterministic-marker / prior-findings prompt preambles are rendered by
-`AttackerContextPromptRenderer`.
+the two analysis strategies, and both build their structured-collection round (a
+fresh collector wired into a single-tool `record_vulnerability` registry)
+through the shared `StructuredVulnerabilityCollectionSession::begin()`;
+`ChunkCoverageRecorder` records per-file coverage. The chunk-priority ordering
+above is defined once on `FileChunker` over `ProjectFileType` cases. Risk
+markers are indexed by `RiskMarkerIndex`, and the deterministic-marker /
+prior-findings prompt preambles are rendered by `AttackerContextPromptRenderer`.
 
 Chunks the files (default `feature` strategy; `type` for the legacy
 priority-window). For each chunk: builds prompts via `AttackerPromptBuilder`,
@@ -454,11 +459,12 @@ Identical chunks (same content hash) are short-circuited by
 `audit.attacker_max_concurrent` > 1, the default structured-collection mode
 analyses cache-miss chunks concurrently through
 `ToolBatchCapableLLMClientInterface` (each chunk keeps its own
-`record_vulnerability` registry and `VulnerabilityCollector`); cache hits
-short-circuit first and chunk order, coverage, caching, and drop accounting are
-identical to the sequential path. Chunks carrying cross-iteration context (prior
-validated findings, reviewer-rejected findings) are keyed by chunk + a SHA-256
-of the rendered context preambles through the opt-in
+`StructuredVulnerabilityCollectionSession`, pairing a `record_vulnerability`
+registry with its own `VulnerabilityCollector`); cache hits short-circuit first
+and chunk order, coverage, caching, and drop accounting are identical to the
+sequential path. Chunks carrying cross-iteration context (prior validated
+findings, reviewer-rejected findings) are keyed by chunk + a SHA-256 of the
+rendered context preambles through the opt-in
 `ContextAwareAttackerCacheInterface`, so iterations 2+ are cacheable too; a
 cache that does not implement the context-aware port is simply skipped for those
 chunks.
@@ -476,12 +482,13 @@ any error: returns the vulnerability with `reviewerValidated = false`.
 With `audit.reviewer_structured_collection: true` (the default), the reviewer
 instead records each verdict by calling a schema-enforced `record_review` tool —
 mirroring the attacker's `record_vulnerability` seam — and verdicts are drained
-from a `ReviewCollector`. The explicit opt-in `reviewer_tools_enabled: true`
-takes precedence over the structured mode and keeps the JSON path.
-`reviewer_max_concurrent` > 1 composes with the structured mode when the client
-implements `ToolBatchCapableLLMClientInterface` (each finding records through
-its own `record_review` registry, resolved concurrently); otherwise it falls
-back to the JSON concurrent path.
+from a `StructuredReviewCollectionSession` (the same collector-plus-registry
+pairing the attacker uses, mirrored for review verdicts). The explicit opt-in
+`reviewer_tools_enabled: true` takes precedence over the structured mode and
+keeps the JSON path. `reviewer_max_concurrent` > 1 composes with the structured
+mode when the client implements `ToolBatchCapableLLMClientInterface` (each
+finding records through its own `record_review` registry, resolved
+concurrently); otherwise it falls back to the JSON concurrent path.
 
 In the one-finding-per-call modes (the default — structured, JSON, sequential,
 or concurrent), verdicts for findings with identical content against unchanged
@@ -496,9 +503,14 @@ Like the attacker, the agent itself is a thin orchestrator — mode resolution a
 the start/complete logging — delegating to `Review\` collaborators it builds at
 construction time: `SequentialReviewAnalyzer`, `StructuredReviewAnalyzer`,
 `ConcurrentReviewAnalyzer`, `ConcurrentStructuredReviewAnalyzer`, and
-`BatchReviewAnalyzer` are the five analysis strategies; `VerdictApplier` applies
-one verdict payload to a finding; `BatchVerdictApplier` matches batch verdicts
-to findings by id; `ReviewOutcomeRecorder` turns verdicts, raw responses, and
+`BatchReviewAnalyzer` are the five analysis strategies; the three that collect
+structured verdicts (`StructuredReviewAnalyzer`,
+`ConcurrentStructuredReviewAnalyzer`, and the structured path of
+`BatchReviewAnalyzer`) all build their round through the shared
+`StructuredReviewCollectionSession::begin()` rather than wiring a
+`ReviewCollector` and `ToolRegistry` inline; `VerdictApplier` applies one
+verdict payload to a finding; `BatchVerdictApplier` matches batch verdicts to
+findings by id; `ReviewOutcomeRecorder` turns verdicts, raw responses, and
 failures into the reviewed finding plus its coverage entry;
 `ReviewerVerdictCache` adapts the optional cache port; `CodeContextResolver`
 resolves a finding's source content.
@@ -796,7 +808,8 @@ provider-agnostic.
 `symfony/ai`.
 
 **Add new vulnerability types** — add a case to `VulnerabilityType`, add a
-branch in `category()` and `owaspReference()`. The factory, agents, and report
+branch in `category()`, `owaspReference()`, `owaspReferenceUrl()`,
+`cweReference()`, and `cweReferenceUrl()`. The factory, agents, and report
 serialization require no changes.
 
 **Add new severity levels** — add a case to `VulnerabilitySeverity` with

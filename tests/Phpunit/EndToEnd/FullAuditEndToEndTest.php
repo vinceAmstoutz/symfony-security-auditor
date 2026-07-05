@@ -37,6 +37,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullControllerAccessControlParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
@@ -230,7 +237,7 @@ final class FullAuditEndToEndTest extends TestCase
     private function makeUseCase(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM): RunAuditUseCase
     {
         $auditOrchestrator = new AuditOrchestrator(
-            new AttackerAgent(new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator())), new AttackerScanCollaborators(new NullAttackerCache()), new AttackerAnalysisSettings(), new NullLogger()),
+            new AttackerAgent(new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullCodeSlicer()), new AttackerScanCollaborators(new NullAttackerCache(), new NullStaticPreScanner(), new NullProgressReporter()), new AttackerAnalysisSettings(), new NullLogger()),
             new ReviewerAgent(
                 new ReviewerAgentCollaborators(
                     $reviewerLLM,
@@ -241,15 +248,17 @@ final class FullAuditEndToEndTest extends TestCase
             ),
             new NullLogger(),
             new AuditLoopSettings(),
+            progressReporter: new NullProgressReporter(),
         );
 
         $auditPipeline = new AuditPipeline(
             [
                 new IngestionStage(new ProjectFileScanner(new NullLogger()), new NullLogger()),
-                new MappingStage(new NullLogger()),
+                new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser()),
                 new AuditStage($auditOrchestrator, new NullLogger()),
             ],
             new NullLogger(),
+            new NullProgressReporter(),
         );
 
         return new RunAuditUseCase($auditPipeline, new NullLogger());

@@ -80,7 +80,7 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
         return implode("\n", [
             \sprintf('### %s — %s', $vulnerability->severity()->label(), $vulnerability->title()),
             '',
-            \sprintf('- **Type:** `%s` (%s)', $vulnerability->type()->value, $vulnerability->type()->owaspReference()),
+            \sprintf('- **Type:** `%s` (%s, %s)', $vulnerability->type()->value, $vulnerability->type()->owaspReference(), $vulnerability->type()->cweReference()),
             \sprintf('- **Location:** `%s:%d-%d`', $vulnerability->filePath(), $vulnerability->lineStart(), $vulnerability->lineEnd()),
             \sprintf('- **Confidence:** %s%%', \sprintf('%.0f', $vulnerability->confidence() * 100)),
             '',
