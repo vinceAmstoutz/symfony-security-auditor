@@ -668,7 +668,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   now matches the suffixed variable on either side of `===`. Bumps
   `RegexStaticPreScanner::CACHE_VERSION` (6 → 7 — the multiline-pattern fix
   above already claimed 6) since this changes scan output for existing chunk
-  content and must invalidate stale attacker cache entries.
+  content and must invalidate stale attacker cache entries. The pattern also
+  required at least one character _before_ the suffix, so the canonical bare
+  names — `$signature === $expected`, `$hash === $computed`,
+  `$a === $token` — never matched, and neither this marker nor the webhook
+  bucket's `no_hash_equals` matched the most common guard shape
+  `if ($signature !== $computed)`. Both patterns now accept the bare
+  variable names and the `!==` operator (`CACHE_VERSION` 8 → 9 — 8 was
+  already claimed by the Twig-extension bucket above).
 - **Enabling `audit.escalation.enabled` crashed the container.**
   `SymfonySecurityAuditorBundle::registerEscalation()` wired the cheap-model
   `AttackerAgent` (`security_auditor.cheap_attacker`) with a stale 15-argument
