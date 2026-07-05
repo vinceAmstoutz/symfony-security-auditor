@@ -16,7 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewCollector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -60,7 +59,7 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     {
         $reviewed = [];
         $codeContexts = [];
-        $reviewCollectors = [];
+        $sessions = [];
         $pendingIndexes = [];
         $requests = [];
         foreach ($vulnerabilities as $index => $vulnerability) {
@@ -74,14 +73,14 @@ final readonly class ConcurrentStructuredReviewAnalyzer
                 continue;
             }
 
-            $reviewCollector = new ReviewCollector();
-            $reviewCollectors[$index] = $reviewCollector;
+            $session = StructuredReviewCollectionSession::begin($this->recordReviewToolFactory, $this->logger);
+            $sessions[$index] = $session;
             $pendingIndexes[] = $index;
-            $requests[] = $this->buildRequest($vulnerability, $codeContext, $reviewCollector);
+            $requests[] = $this->buildRequest($vulnerability, $codeContext, $session);
         }
 
         if ([] !== $requests) {
-            $concurrentReviewBatch = new ConcurrentReviewBatch($requests, $pendingIndexes, $reviewCollectors, $vulnerabilities, $codeContexts);
+            $concurrentReviewBatch = new ConcurrentReviewBatch($requests, $pendingIndexes, $sessions, $vulnerabilities, $codeContexts);
             $reviewed = $this->dispatchPending($concurrentReviewBatch, $coverageRecorder, $bypassCache, $reviewed);
         }
 
@@ -93,12 +92,12 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     /**
      * @return array{system: string, user: string, tools: ToolRegistry}
      */
-    private function buildRequest(Vulnerability $vulnerability, string $codeContext, ReviewCollector $reviewCollector): array
+    private function buildRequest(Vulnerability $vulnerability, string $codeContext, StructuredReviewCollectionSession $session): array
     {
         return [
             'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
             'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
-            'tools' => new ToolRegistry([$this->recordReviewToolFactory->create($reviewCollector)], $this->logger),
+            'tools' => $session->toolRegistry,
         ];
     }
 
@@ -131,7 +130,7 @@ final readonly class ConcurrentStructuredReviewAnalyzer
 
     private function recordPendingVerdict(int $index, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): Vulnerability
     {
-        $verdict = $concurrentReviewBatch->reviewCollectors[$index]->drain()[0] ?? null;
+        $verdict = $concurrentReviewBatch->sessions[$index]->drain()[0] ?? null;
         if (!$bypassCache) {
             $this->reviewerVerdictCache->store($concurrentReviewBatch->vulnerabilities[$index], $concurrentReviewBatch->codeContexts[$index], $verdict);
         }

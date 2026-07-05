@@ -19,7 +19,6 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabilityToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityCollector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
@@ -215,13 +214,11 @@ final readonly class SequentialChunkAnalyzer
     {
         \assert($this->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface);
 
-        $vulnerabilityCollector = new VulnerabilityCollector();
-        $recordTool = $this->recordVulnerabilityToolFactory->create($vulnerabilityCollector);
-        $toolRegistry = new ToolRegistry([$recordTool], $this->logger);
+        $session = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger);
 
-        $this->llmClient->completeWithTools($chunkContext->systemPrompt, $chunkContext->userMessage, $toolRegistry, $this->maxToolIterations);
+        $this->llmClient->completeWithTools($chunkContext->systemPrompt, $chunkContext->userMessage, $session->toolRegistry, $this->maxToolIterations);
 
-        $rawData = $vulnerabilityCollector->drain();
+        $rawData = $session->drain();
 
         if ($chunkContext->cacheable) {
             $this->attackerChunkCache->store($chunk, $chunkContext->contextKey, $rawData);

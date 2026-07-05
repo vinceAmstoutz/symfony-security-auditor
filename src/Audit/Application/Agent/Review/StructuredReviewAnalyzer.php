@@ -16,7 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewCollector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -24,7 +23,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
  * Reviews findings one at a time, collecting each verdict through a
@@ -81,13 +79,12 @@ final readonly class StructuredReviewAnalyzer
         $systemPrompt = $this->reviewerPromptBuilder->buildSystemPrompt();
         $userMessage = $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext);
 
-        $reviewCollector = new ReviewCollector();
-        $toolRegistry = new ToolRegistry([$this->recordReviewToolFactory->create($reviewCollector)], $this->logger);
+        $session = StructuredReviewCollectionSession::begin($this->recordReviewToolFactory, $this->logger);
 
         try {
-            $this->llmClient->completeWithTools($systemPrompt, $userMessage, $toolRegistry, $this->maxToolIterations);
+            $this->llmClient->completeWithTools($systemPrompt, $userMessage, $session->toolRegistry, $this->maxToolIterations);
 
-            $verdict = $reviewCollector->drain()[0] ?? null;
+            $verdict = $session->drain()[0] ?? null;
             if (!$bypassCache) {
                 $this->reviewerVerdictCache->store($vulnerability, $codeContext, $verdict);
             }

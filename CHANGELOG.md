@@ -325,6 +325,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `0.5` / `6.25` rates for `claude-opus-4-8` equal the old `5×0.1` / `5×1.25`.
   The default `PricingProviderInterface` service alias now points at
   `ModelsDevPricingProvider`.
+- **The structured-collection wiring shared by five attacker/reviewer analyzers
+  is extracted into one collaborator per domain, instead of being duplicated at
+  every call site.**
+  `SequentialChunkAnalyzer::analyzeChunkViaStructuredCollection()` and
+  `ConcurrentChunkAnalyzer::buildPendingRequest()`
+  (`src/Audit/Application/Agent/Chunk/`) each built their own
+  `VulnerabilityCollector` plus a single-tool `record_vulnerability`
+  `ToolRegistry` inline; `StructuredReviewAnalyzer::reviewSingle()`,
+  `ConcurrentStructuredReviewAnalyzer::buildRequest()`, and
+  `BatchReviewAnalyzer::reviewBatchViaStructuredCollection()`
+  (`src/Audit/Application/Agent/Review/`) duplicated the same pattern for
+  `ReviewCollector` and `record_review`. Both now call a new `begin()` factory —
+  `StructuredVulnerabilityCollectionSession` and
+  `StructuredReviewCollectionSession` — that wires the collector into the
+  registry and exposes `drain()`. Purely internal: every analyzer keeps its
+  existing constructor and `analyze()` signature, so `AttackerAgent` and
+  `ReviewerAgent` needed no changes, and the LLM-facing behavior (prompts, tool
+  schemas, caching, coverage, error handling) is unchanged.
 
 ### Deprecated
 
