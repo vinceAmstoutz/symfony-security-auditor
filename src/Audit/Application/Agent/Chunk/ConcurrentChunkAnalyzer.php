@@ -138,8 +138,8 @@ final readonly class ConcurrentChunkAnalyzer
     }
 
     /**
-     * @param list<list<ProjectFile>>                                                                                          $chunks
-     * @param array<int, VulnerabilityHydrationResult>                                                                         $cachedResults
+     * @param list<list<ProjectFile>>                                                                                                             $chunks
+     * @param array<int, VulnerabilityHydrationResult>                                                                                            $cachedResults
      * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}> $pending
      *
      * @return array{0: list<Vulnerability>, 1: array<string, int>}
@@ -184,7 +184,7 @@ final readonly class ConcurrentChunkAnalyzer
     }
 
     /**
-     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                    $requests
+     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                      $requests
      * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}> $pending
      *
      * @throws BudgetExceededException
