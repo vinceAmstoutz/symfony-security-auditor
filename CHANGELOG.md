@@ -585,6 +585,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `pauseUntil()` target from the same already-clamped delay used for the local
   sleep, so the shared rate limiter can never be paused past the configured
   ceiling.
+- **The `hash_equals_missing` pre-scan marker only flagged one operand order of
+  a non-constant-time signature comparison.** `RegexStaticPreScanner`'s pattern
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) required the
+  `Signature`/`Hash`/`Hmac`/`Token`-suffixed variable to appear on the
+  right-hand side of `===` (`$input === $expectedSignature`). Real code just as
+  commonly writes the comparison the other way around
+  (`$expectedSignature === $input`), which the pattern silently missed — exactly
+  the timing-attack-prone comparison this marker exists to surface. The regex
+  now matches the suffixed variable on either side of `===`. Bumps
+  `RegexStaticPreScanner::CACHE_VERSION` (6 → 7 — the multiline-pattern fix
+  above already claimed 6) since this changes scan output for existing chunk
+  content and must invalidate stale attacker cache entries.
 - **Enabling `audit.escalation.enabled` crashed the container.**
   `SymfonySecurityAuditorBundle::registerEscalation()` wired the cheap-model
   `AttackerAgent` (`security_auditor.cheap_attacker`) with a stale 15-argument
