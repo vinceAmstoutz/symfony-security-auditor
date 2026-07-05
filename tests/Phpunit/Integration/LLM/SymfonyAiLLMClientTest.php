@@ -697,6 +697,33 @@ final class SymfonyAiLLMClientTest extends TestCase
     }
 
     /**
+     * @throws InvalidRetryConfigurationException
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
+    public function test_complete_batch_with_tools_falls_back_to_the_sequential_path_when_the_retry_itself_fails_before_tools_ran(): void
+    {
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new RuntimeException('HTTP 401 Unauthorized'),
+            new TextResult('recovered-via-full-restart'),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 10, backoffMultiplier: 2.0, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
+        );
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 3);
+
+        self::assertSame('recovered-via-full-restart', $responses[0]->content());
+        self::assertSame('end_turn', $responses[0]->stopReason());
+    }
+
+    /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
      */
