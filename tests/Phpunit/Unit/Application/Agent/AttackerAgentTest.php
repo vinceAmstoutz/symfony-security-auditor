@@ -1821,14 +1821,14 @@ final class AttackerAgentTest extends TestCase
                 llmClient: $llmClient,
                 attackerPromptBuilder: $attackerPromptBuilder,
                 vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
                 codeSlicer: new NullCodeSlicer(),
+                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
             ),
             new AttackerScanCollaborators(
                 attackerCache: new NullAttackerCache(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: new NullProgressReporter(),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: true,
@@ -1951,9 +1951,9 @@ final class AttackerAgentTest extends TestCase
             ),
             new AttackerScanCollaborators(
                 attackerCache: new NullAttackerCache(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
-                progressReporter: $recordingProgressReporter,
                 staticPreScanner: new NullStaticPreScanner(),
+                progressReporter: $recordingProgressReporter,
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: false,
@@ -1992,9 +1992,9 @@ final class AttackerAgentTest extends TestCase
             ),
             new AttackerScanCollaborators(
                 attackerCache: new NullAttackerCache(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
-                progressReporter: $recordingProgressReporter,
                 staticPreScanner: new NullStaticPreScanner(),
+                progressReporter: $recordingProgressReporter,
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: false,
@@ -2033,9 +2033,9 @@ final class AttackerAgentTest extends TestCase
             ),
             new AttackerScanCollaborators(
                 attackerCache: new NullAttackerCache(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
-                progressReporter: $recordingProgressReporter,
                 staticPreScanner: new NullStaticPreScanner(),
+                progressReporter: $recordingProgressReporter,
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: false,
@@ -2066,8 +2066,8 @@ final class AttackerAgentTest extends TestCase
                 llmClient: $llmClient,
                 attackerPromptBuilder: new AttackerPromptBuilder(),
                 vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
                 codeSlicer: new NullCodeSlicer(),
+                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
             ),
             new AttackerScanCollaborators(
                 attackerCache: $attackerCache ?? new NullAttackerCache(),
@@ -2273,8 +2273,8 @@ final class AttackerAgentTest extends TestCase
                 llmClient: $llmClient,
                 attackerPromptBuilder: new AttackerPromptBuilder(),
                 vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
                 codeSlicer: new NullCodeSlicer(),
+                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
             ),
             new AttackerScanCollaborators(
                 attackerCache: new NullAttackerCache(),
@@ -2311,8 +2311,8 @@ final class AttackerAgentTest extends TestCase
                 llmClient: $llmClient,
                 attackerPromptBuilder: new AttackerPromptBuilder(),
                 vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
                 codeSlicer: new NullCodeSlicer(),
+                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
             ),
             new AttackerScanCollaborators(
                 attackerCache: new NullAttackerCache(),
@@ -2391,14 +2391,14 @@ final class AttackerAgentTest extends TestCase
                 llmClient: $llmClient,
                 attackerPromptBuilder: new AttackerPromptBuilder(),
                 vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
                 codeSlicer: new NullCodeSlicer(),
+                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
             ),
             new AttackerScanCollaborators(
                 attackerCache: new NullAttackerCache(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
                 staticPreScanner: new NullStaticPreScanner(),
                 progressReporter: new NullProgressReporter(),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: true,
@@ -2450,14 +2450,14 @@ final class AttackerAgentTest extends TestCase
                 llmClient: $llmClient,
                 attackerPromptBuilder: new AttackerPromptBuilder(),
                 vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
-                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
                 codeSlicer: new NullCodeSlicer(),
+                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
             ),
             new AttackerScanCollaborators(
                 attackerCache: $attackerCache ?? new NullAttackerCache(),
-                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
-                progressReporter: $progressReporter ?? new NullProgressReporter(),
                 staticPreScanner: new NullStaticPreScanner(),
+                progressReporter: $progressReporter ?? new NullProgressReporter(),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: true,
@@ -2656,8 +2656,8 @@ final class AttackerAgentTest extends TestCase
             new AttackerScanCollaborators(
                 attackerCache: $overrides['attackerCache'] ?? new NullAttackerCache(),
                 staticPreScanner: $overrides['staticPreScanner'] ?? new NullStaticPreScanner(),
-                toolRegistryFactory: $overrides['toolRegistryFactory'] ?? null,
                 progressReporter: new NullProgressReporter(),
+                toolRegistryFactory: $overrides['toolRegistryFactory'] ?? null,
             ),
             new AttackerAnalysisSettings(
                 toolsEnabled: $overrides['toolsEnabled'] ?? AttackerAgent::DEFAULT_TOOLS_ENABLED,
