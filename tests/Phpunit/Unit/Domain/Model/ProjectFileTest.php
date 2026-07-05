@@ -259,6 +259,7 @@ final class ProjectFileTest extends TestCase
     {
         $projectFile = ProjectFile::create('.env.local.php', '/app/.env.local.php', '<?php return [];');
         self::assertSame('php', $projectFile->type());
+        self::assertFalse($projectFile->isConfiguration());
     }
 
     public function test_it_detects_api_platform_resources_by_attribute(): void

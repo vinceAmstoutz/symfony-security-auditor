@@ -424,6 +424,45 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(5, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
     }
 
+    public function test_baseline_applied_summary_is_printed_for_console_output(): void
+    {
+        $this->createProjectDir();
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+
+        $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}')->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $baselineFile,
+        ]);
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+        ]);
+
+        self::assertStringContainsString('finding(s) suppressed by the baseline.', $commandTester->getDisplay());
+    }
+
+    public function test_baseline_applied_summary_is_omitted_for_machine_readable_output(): void
+    {
+        $this->createProjectDir();
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+
+        $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}')->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $baselineFile,
+        ]);
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+            '--format' => 'json',
+        ]);
+
+        self::assertStringNotContainsString('suppressed by the baseline', $commandTester->getDisplay());
+    }
+
     public function test_sarif_format_still_succeeds_when_the_pipeline_already_skipped_every_baselined_finding(): void
     {
         $this->createProjectDir();
