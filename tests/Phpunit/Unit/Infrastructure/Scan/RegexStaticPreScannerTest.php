@@ -284,6 +284,36 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('dynamic_order_by', $patterns);
     }
 
+    public function test_it_flags_supports_returning_null_across_multiple_lines(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/LoginAuthenticator.php',
+            '/app/src/Security/LoginAuthenticator.php',
+            "\n<?php\nclass LoginAuthenticator {\n    public function supports(Request \$request): ?bool\n    {\n        return null;\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        self::assertCount(1, $markers);
+        self::assertSame('supports_returns_null', $markers[0]->pattern());
+        self::assertSame(4, $markers[0]->line());
+    }
+
+    public function test_it_flags_http_client_request_split_across_lines(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Service/Fetcher.php',
+            '/app/src/Service/Fetcher.php',
+            "\n<?php\nclass Fetcher {\n    public function __construct(private HttpClientInterface \$client) {}\n    public function fetch(string \$url) {\n        return \$this->client->request('GET', \$url);\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        self::assertCount(1, $markers);
+        self::assertSame('http_client_request', $markers[0]->pattern());
+        self::assertSame(4, $markers[0]->line());
+    }
+
     public function test_it_flags_self_validating_passport_in_authenticator(): void
     {
         $projectFile = ProjectFile::create(
@@ -418,5 +448,28 @@ final class RegexStaticPreScannerTest extends TestCase
 
         $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
         self::assertContains('forbidden_host', $patterns);
+    }
+
+    public function test_it_does_not_mistake_a_pattern_ending_in_the_letter_s_for_a_dot_all_pattern(): void
+    {
+        $regexStaticPreScanner = new RegexStaticPreScanner([
+            'php' => [
+                'literal_foos' => ['regex' => '/^foos/', 'description' => 'test'],
+            ],
+        ]);
+        $projectFile = ProjectFile::create(
+            'src/Service/Foo.php',
+            '/app/src/Service/Foo.php',
+            "xfoos\nfoos",
+        );
+
+        $markers = $regexStaticPreScanner->scan([$projectFile]);
+
+        $literalFoosMarkers = array_values(array_filter(
+            $markers,
+            static fn (RiskMarker $riskMarker): bool => 'literal_foos' === $riskMarker->pattern(),
+        ));
+        self::assertCount(1, $literalFoosMarkers);
+        self::assertSame(2, $literalFoosMarkers[0]->line());
     }
 }

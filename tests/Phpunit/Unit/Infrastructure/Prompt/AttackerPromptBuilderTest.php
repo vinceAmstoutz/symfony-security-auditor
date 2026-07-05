@@ -509,7 +509,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
-        self::assertSame(17, substr_count($prompt, '<skills role="'));
+        self::assertSame(18, substr_count($prompt, '<skills role="'));
     }
 
     public function test_stable_mode_system_prompt_is_byte_identical_across_chunk_types(): void
@@ -601,6 +601,20 @@ final class AttackerPromptBuilderTest extends TestCase
         $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
         self::assertStringContainsString('<skills role="form">', $prompt);
+    }
+
+    public function test_it_injects_file_upload_skills_when_form_in_chunk(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Form/AvatarUploadType.php',
+            '/app/src/Form/AvatarUploadType.php',
+            '<?php class AvatarUploadType {}',
+        );
+
+        $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
+
+        self::assertStringContainsString('<skills role="file_upload">', $prompt);
+        self::assertStringContainsString('path traversal', $prompt);
     }
 
     public function test_it_injects_template_skills_when_twig_in_chunk(): void
