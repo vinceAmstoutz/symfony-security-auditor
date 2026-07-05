@@ -590,6 +590,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (or any dotfile/dot-directory) was excluded from `audit:run --since` scope
   even though it changed. Now uses `trimPrefix('./')`, which strips only the
   literal `./` prefix.
+- **`--since` also silently dropped changed files with non-ASCII names.** Git
+  C-quotes any path containing bytes above ASCII by default
+  (`core.quotepath=true`), so a changed `templates/modèle.html.twig` came out
+  of `git diff --name-only` as `"templates/mod\303\250le.html.twig"` — with
+  literal quotes and octal escapes — and never matched the real project file
+  in `IngestionStage`'s changed-set filter, excluding it from the incremental
+  audit with no warning. `ProcessGitChangedFilesResolver` now runs every git
+  invocation with `-c core.quotepath=off` so paths come back verbatim.
 - **Static pre-scan patterns using the `s` (DOTALL) modifier never matched
   anything.** `RegexStaticPreScanner::matchLines()`
   (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) explodes file

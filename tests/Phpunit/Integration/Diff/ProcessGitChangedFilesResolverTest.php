@@ -120,6 +120,21 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     /**
      * @throws GitChangedFilesUnavailableException
      */
+    public function test_it_includes_a_changed_file_with_a_non_ascii_name_unquoted(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // initial', 'init');
+        $this->createBranch('feature');
+        $this->commit('templates/modèle.html.twig', '{{ name }}', 'add template');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+
+        self::assertContains('templates/modèle.html.twig', $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_includes_uncommitted_changes_against_head(): void
     {
         $this->initRepo();
