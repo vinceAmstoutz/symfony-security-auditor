@@ -98,6 +98,7 @@ final readonly class GithubAnnotationsReportRenderer implements ReportRendererIn
     {
         return u($value)
             ->replace('%', '%25')
+            ->replace("\r\n", '%0D%0A')
             ->replace("\r", '%0D')
             ->replace("\n", '%0A')
             ->toString();
