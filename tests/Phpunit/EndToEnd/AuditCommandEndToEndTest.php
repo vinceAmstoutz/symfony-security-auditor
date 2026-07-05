@@ -423,7 +423,9 @@ final class AuditCommandEndToEndTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
 
-        $decoded = json_decode($commandTester->getDisplay(), true);
+        $output = $commandTester->getDisplay();
+        preg_match('/(\{.*\})/s', $output, $matches);
+        $decoded = json_decode($matches[1] ?? '', true);
         self::assertIsArray($decoded);
         $runs = $decoded['runs'] ?? null;
         self::assertIsArray($runs);

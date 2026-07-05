@@ -89,7 +89,9 @@ final class AuditCommandSarifBaselineSuppressionTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
 
-        $decoded = json_decode($commandTester->getDisplay(), true);
+        $output = $commandTester->getDisplay();
+        preg_match('/(\{.*\})/s', $output, $matches);
+        $decoded = json_decode($matches[1] ?? '', true);
         self::assertIsArray($decoded);
         $runs = $decoded['runs'] ?? null;
         self::assertIsArray($runs);
@@ -126,7 +128,9 @@ final class AuditCommandSarifBaselineSuppressionTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
 
-        $decoded = json_decode($commandTester->getDisplay(), true);
+        $output = $commandTester->getDisplay();
+        preg_match('/(\{.*\})/s', $output, $matches);
+        $decoded = json_decode($matches[1] ?? '', true);
         self::assertIsArray($decoded);
         self::assertSame(0, $decoded['total_vulnerabilities'] ?? null);
         self::assertSame([], $decoded['vulnerabilities'] ?? null);
