@@ -14,12 +14,35 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunking;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 
 final class FileChunkerTest extends TestCase
 {
+    public function test_every_project_file_type_except_other_has_an_explicit_chunk_priority(): void
+    {
+        $typePriority = (new ReflectionClass(FileChunker::class))->getConstant('TYPE_PRIORITY');
+        self::assertIsArray($typePriority);
+
+        $casesMissingAPriority = array_map(
+            static fn (ProjectFileType $projectFileType): string => $projectFileType->value,
+            array_values(array_filter(
+                ProjectFileType::cases(),
+                static fn (ProjectFileType $projectFileType): bool => ProjectFileType::OTHER !== $projectFileType
+                    && !\in_array($projectFileType, $typePriority, true),
+            )),
+        );
+
+        self::assertSame(
+            [],
+            $casesMissingAPriority,
+            'Every ProjectFileType case except OTHER must be listed in FileChunker::TYPE_PRIORITY.',
+        );
+    }
+
     public function test_feature_strategy_groups_related_files_together(): void
     {
         $files = [
