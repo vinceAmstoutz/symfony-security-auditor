@@ -78,19 +78,20 @@ final readonly class AuditCommand
         $projectPath = $auditCommandInput->resolvedProjectPath();
         $this->auditedProjectPathHolder->set($projectPath);
 
-        $this->auditPresenter->header($symfonyStyle, $projectPath);
+        $displayStyle = $this->displayStyle($symfonyStyle, $auditCommandInput);
+        $this->auditPresenter->header($displayStyle, $projectPath);
 
-        $this->auditPresenter->preflightWarnings($symfonyStyle, $this->secretScrubbingEnabled, $this->configNotices);
+        $this->auditPresenter->preflightWarnings($displayStyle, $this->secretScrubbingEnabled, $this->configNotices);
 
         $scanPaths = $auditCommandInput->scanPaths();
 
         try {
             if ($auditCommandInput->showScanned) {
-                $this->showScannedFiles($symfonyStyle, $projectPath, $scanPaths);
+                $this->showScannedFiles($displayStyle, $projectPath, $scanPaths);
             }
 
             if ($auditCommandInput->dryRun) {
-                return $this->runDryRun($symfonyStyle, $auditCommandInput, $projectPath, $scanPaths);
+                return $this->runDryRun([$symfonyStyle, $displayStyle], $auditCommandInput, $projectPath, $scanPaths);
             }
 
             if ($auditCommandInput->showScanned) {
@@ -121,6 +122,17 @@ final readonly class AuditCommand
     }
 
     /**
+     * Human-facing presentation (header, warnings, scanned-file listing,
+     * dry-run sections) moves to stderr when stdout carries a
+     * machine-readable document, so `--format=json > report.json` and piping
+     * into `jq` receive the document alone.
+     */
+    private function displayStyle(SymfonyStyle $symfonyStyle, AuditCommandInput $auditCommandInput): SymfonyStyle
+    {
+        return $auditCommandInput->isMachineReadableToStdout() ? $symfonyStyle->getErrorStyle() : $symfonyStyle;
+    }
+
+    /**
      * @param list<string> $scanPaths
      */
     private function showScannedFiles(SymfonyStyle $symfonyStyle, string $projectPath, array $scanPaths): void
@@ -132,30 +144,32 @@ final readonly class AuditCommand
     }
 
     /**
-     * @param list<string> $scanPaths
+     * @param array{SymfonyStyle, SymfonyStyle} $styles stdout style and human-display style
+     * @param list<string>                      $scanPaths
      *
      * @throws UnsupportedOutputFormatException
      */
     private function runDryRun(
-        SymfonyStyle $symfonyStyle,
+        array $styles,
         AuditCommandInput $auditCommandInput,
         string $projectPath,
         array $scanPaths,
     ): int {
-        $this->auditPresenter->estimatingSection($symfonyStyle);
+        [$symfonyStyle, $displayStyle] = $styles;
+        $this->auditPresenter->estimatingSection($displayStyle);
         $auditReport = $this->estimateAuditCostUseCase->execute($projectPath, $scanPaths);
 
-        $this->auditPresenter->unsupportedModelWarnings($symfonyStyle, $auditReport);
+        $this->auditPresenter->unsupportedModelWarnings($displayStyle, $auditReport);
 
         if ($auditCommandInput->isMachineReadableFormat()) {
             $this->reportWriter->write($auditReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
         }
 
         if (!$auditCommandInput->isMachineReadableToStdout()) {
-            $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+            $this->auditPresenter->dryRunResult($displayStyle, $auditReport);
 
             if (!$auditCommandInput->showScanned) {
-                $this->auditPresenter->scannedFilesHint($symfonyStyle, $auditReport->filesScanned());
+                $this->auditPresenter->scannedFilesHint($displayStyle, $auditReport->filesScanned());
             }
         }
 

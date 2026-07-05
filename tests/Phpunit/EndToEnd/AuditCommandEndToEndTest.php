@@ -1129,6 +1129,27 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('No files matched', $commandTester->getDisplay());
     }
 
+    public function test_show_scanned_keeps_machine_readable_stdout_parseable(): void
+    {
+        $this->createProjectDir();
+
+        $llmClient = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($llmClient, $llmClient);
+        $exitCode = $commandTester->execute(
+            [
+                'project-path' => $this->fixtureDir,
+                '--show-scanned' => true,
+                '--dry-run' => true,
+                '--format' => 'json',
+            ],
+            ['capture_stderr_separately' => true],
+        );
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertIsArray(json_decode($commandTester->getDisplay(), true));
+        self::assertStringContainsString('file(s) in scope', $commandTester->getErrorOutput());
+    }
+
     public function test_show_scanned_with_dry_run_lists_files_before_the_cost_estimate(): void
     {
         $this->createProjectDir();
