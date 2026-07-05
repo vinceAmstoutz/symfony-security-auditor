@@ -31,6 +31,7 @@ final class AuditCommandHelp
           <info>html</info>     self-contained HTML report for sharing or archiving
           <info>markdown</info> Markdown report for a PR comment or GitHub step summary
           <info>junit</info>    JUnit XML — findings as failed test cases for CI test-report panels (e.g. GitLab free-tier MR widgets)
+          <info>github</info>   GitHub Actions workflow-command annotations — inline findings on the PR's Files Changed view
 
         Use <info>--output</info> (<info>-o</info>) to write the report to a file:
           <info>%command.full_name% --format=sarif --output=report.sarif</info>
