@@ -779,7 +779,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         $expectedPatternHash = substr(hash('sha256', json_encode([], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)), 0, 16);
         $expectedKeySalt = \sprintf(
-            'gpt-4o|prompt-v%d|prescan-v%d|patterns-%s|collect-tool|skills-full',
+            'gpt-4o|prompt-v%d|prescan-v%d|patterns-%s|collect-tool|skills-full|slice-off',
             AttackerPromptBuilder::PROMPT_VERSION,
             RegexStaticPreScanner::CACHE_VERSION,
             $expectedPatternHash,
@@ -803,7 +803,27 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         $keySalt = $containerBuilder->getParameter('symfony_security_auditor.cache.key_salt');
         self::assertIsString($keySalt);
-        self::assertStringEndsWith('|skills-lean', $keySalt);
+        self::assertStringContainsString('|skills-lean|', $keySalt);
+    }
+
+    public function test_bundle_cache_key_salt_changes_when_code_slicing_is_toggled(): void
+    {
+        $enabledKeySalt = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['enabled' => true]]])
+            ->getParameter('symfony_security_auditor.cache.key_salt');
+        $disabledKeySalt = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['enabled' => false]]])
+            ->getParameter('symfony_security_auditor.cache.key_salt');
+
+        self::assertNotSame($enabledKeySalt, $disabledKeySalt);
+    }
+
+    public function test_bundle_cache_key_salt_changes_when_code_slicing_threshold_changes(): void
+    {
+        $narrowThresholdKeySalt = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['enabled' => true, 'min_lines_before_slicing' => 10]]])
+            ->getParameter('symfony_security_auditor.cache.key_salt');
+        $wideThresholdKeySalt = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['enabled' => true, 'min_lines_before_slicing' => 200]]])
+            ->getParameter('symfony_security_auditor.cache.key_salt');
+
+        self::assertNotSame($narrowThresholdKeySalt, $wideThresholdKeySalt);
     }
 
     public function test_bundle_fast_profile_resolves_cost_levers(): void

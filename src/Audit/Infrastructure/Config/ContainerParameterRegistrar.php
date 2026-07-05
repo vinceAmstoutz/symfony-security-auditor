@@ -122,7 +122,7 @@ final readonly class ContainerParameterRegistrar
     private function attackerKeySalt(BundleConfiguration $bundleConfiguration): string
     {
         return \sprintf(
-            '%s|prompt-v%d|prescan-v%d|patterns-%s|collect-%s|skills-%s',
+            '%s|prompt-v%d|prescan-v%d|patterns-%s|collect-%s|skills-%s|slice-%s',
             $bundleConfiguration->llm->attackerModel(),
             AttackerPromptBuilder::PROMPT_VERSION,
             RegexStaticPreScanner::CACHE_VERSION,
@@ -136,6 +136,16 @@ final readonly class ContainerParameterRegistrar
             ),
             $bundleConfiguration->audit->structuredCollection ? 'tool' : 'json',
             $bundleConfiguration->audit->stableSystemPrompt ? 'full' : 'lean',
+            $this->codeSlicingSalt($bundleConfiguration),
         );
+    }
+
+    private function codeSlicingSalt(BundleConfiguration $bundleConfiguration): string
+    {
+        if (!$bundleConfiguration->audit->codeSlicingEnabled) {
+            return 'off';
+        }
+
+        return \sprintf('on-%d', $bundleConfiguration->audit->codeSlicingMinLines);
     }
 }

@@ -94,13 +94,18 @@ final readonly class BatchWindowResolver
     private function resolveOne(?DeferredResult $deferredResult, array $request): LLMResponse
     {
         if (!$deferredResult instanceof DeferredResult) {
+            $this->rateLimiter->record(0, 0);
+
             return $this->llmClient->complete($request['system'], $request['user']);
         }
+
+        $reconciled = false;
 
         try {
             $content = $deferredResult->asText();
             [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->platformResultExtractor->extractTokens($deferredResult);
             $this->rateLimiter->record($inputTokens, $outputTokens);
+            $reconciled = true;
 
             $llmResponse = LLMResponse::of(
                 $content,
@@ -115,6 +120,10 @@ final readonly class BatchWindowResolver
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (Throwable) {
+            if (!$reconciled) {
+                $this->rateLimiter->record(0, 0);
+            }
+
             return $this->llmClient->complete($request['system'], $request['user']);
         }
     }

@@ -58,7 +58,8 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
 
     private int $outputTokensUsed = 0;
 
-    private int $pendingInputEstimate = 0;
+    /** @var list<int> FIFO queue — one entry per unreconciled acquire(), oldest first */
+    private array $pendingInputEstimates = [];
 
     private ?DateTimeImmutable $pausedUntil = null;
 
@@ -134,7 +135,7 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
 
         ++$this->requestsUsed;
         $this->inputTokensUsed += $estimatedInputTokens;
-        $this->pendingInputEstimate = $estimatedInputTokens;
+        $this->pendingInputEstimates[] = $estimatedInputTokens;
 
         return true;
     }
@@ -142,8 +143,8 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
     #[Override]
     public function record(int $inputTokens, int $outputTokens): void
     {
-        $this->inputTokensUsed = $this->inputTokensUsed - $this->pendingInputEstimate + $inputTokens;
-        $this->pendingInputEstimate = 0;
+        $pendingEstimate = array_shift($this->pendingInputEstimates) ?? 0;
+        $this->inputTokensUsed = $this->inputTokensUsed - $pendingEstimate + $inputTokens;
         $this->outputTokensUsed += $outputTokens;
     }
 

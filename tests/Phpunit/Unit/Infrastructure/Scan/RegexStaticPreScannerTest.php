@@ -61,6 +61,20 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame('src/Service/Dangerous.php', $markers[0]->filePath());
     }
 
+    public function test_it_flags_non_constant_time_compare_regardless_of_operand_order(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Service/Verifier.php',
+            '/app/src/Service/Verifier.php',
+            "<?php\nclass Verifier { public function foo(\$expectedSignature, \$input) { return \$expectedSignature === \$input; } }",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        self::assertCount(1, $markers);
+        self::assertSame('hash_equals_missing', $markers[0]->pattern());
+    }
+
     public function test_it_flags_raw_filter_in_template(): void
     {
         $projectFile = ProjectFile::create(

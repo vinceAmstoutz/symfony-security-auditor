@@ -193,6 +193,8 @@ final readonly class ToolConversationWavefront
     private function advanceConversation(array $state, ?DeferredResult $deferredResult, array $request, int $maxToolIterations): array
     {
         if (!$deferredResult instanceof DeferredResult) {
+            $this->rateLimiter->record(0, 0);
+
             return $this->retryOrAbortConversation($state, $request, $maxToolIterations);
         }
 
@@ -215,8 +217,15 @@ final readonly class ToolConversationWavefront
      */
     private function processDeferredResult(array $state, DeferredResult $deferredResult, array $request): array
     {
-        $platformResult = $deferredResult->getResult();
-        [$callInput, $callOutput, $callCacheRead, $callCacheCreation] = $this->platformResultExtractor->extractTokens($deferredResult);
+        try {
+            $platformResult = $deferredResult->getResult();
+            [$callInput, $callOutput, $callCacheRead, $callCacheCreation] = $this->platformResultExtractor->extractTokens($deferredResult);
+        } catch (Throwable $throwable) {
+            $this->rateLimiter->record(0, 0);
+
+            throw $throwable;
+        }
+
         $state['input'] += $callInput;
         $state['output'] += $callOutput;
         $state['cacheRead'] += $callCacheRead;
