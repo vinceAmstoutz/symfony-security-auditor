@@ -77,7 +77,8 @@ is a `MAJOR` change.
   standalone CLI accept either).
 - The `project-path` argument.
 - The `--format` (`-f`) and `--output` (`-o`) options, including the values
-  accepted by `--format` (`console`, `json`, `sarif`, `html`, `markdown`).
+  accepted by `--format` (`console`, `json`, `sarif`, `html`, `markdown`,
+  `junit`, `github`).
 - The `--baseline` and `--generate-baseline` options (baseline suppression of
   accepted findings).
 - The `--fail-on` option (CI gate threshold; overrides `audit.fail_on`),
