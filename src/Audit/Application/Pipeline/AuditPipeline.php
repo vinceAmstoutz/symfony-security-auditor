@@ -19,16 +19,19 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/**
+ * `config/services.php` always aliases `ProgressReporterInterface` to
+ * `ProgressReporterHolder`, so it is required here rather than falling back to
+ * `NullProgressReporter`.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
+ */
 final readonly class AuditPipeline implements PipelineInterface
 {
     /** @var list<StageInterface> */
     private array $stages;
-
-    private ProgressReporterInterface $progressReporter;
 
     /**
      * @param iterable<StageInterface> $stages
@@ -36,7 +39,7 @@ final readonly class AuditPipeline implements PipelineInterface
     public function __construct(
         iterable $stages,
         private LoggerInterface $logger,
-        ?ProgressReporterInterface $progressReporter = null,
+        private ProgressReporterInterface $progressReporter,
     ) {
         $collected = [];
         foreach ($stages as $stage) {
@@ -44,7 +47,6 @@ final readonly class AuditPipeline implements PipelineInterface
         }
 
         $this->stages = $collected;
-        $this->progressReporter = $progressReporter ?? new NullProgressReporter();
     }
 
     #[Override]

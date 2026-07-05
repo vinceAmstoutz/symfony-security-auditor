@@ -21,7 +21,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFact
 
 /**
  * The scan/chunk/report infrastructure the attacker agent coordinates around
- * LLM analysis. Nullable ports fall back to Null* defaults in the agent.
+ * LLM analysis. `staticPreScanner` and `progressReporter` are always resolved
+ * by DI — `SymfonySecurityAuditorBundle` aliases both to a Null* or real
+ * implementation unconditionally — so they are required here. `fileChunker`
+ * and `toolRegistryFactory` stay nullable with in-agent defaults.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -29,9 +32,9 @@ final readonly class AttackerScanCollaborators
 {
     public function __construct(
         public AttackerCacheInterface $attackerCache,
-        public ?StaticPreScannerInterface $staticPreScanner = null,
+        public StaticPreScannerInterface $staticPreScanner,
+        public ProgressReporterInterface $progressReporter,
         public ?FileChunker $fileChunker = null,
         public ?ToolRegistryFactoryInterface $toolRegistryFactory = null,
-        public ?ProgressReporterInterface $progressReporter = null,
     ) {}
 }
