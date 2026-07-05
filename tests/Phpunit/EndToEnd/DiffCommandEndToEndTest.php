@@ -236,11 +236,10 @@ final class DiffCommandEndToEndTest extends TestCase
             $estimateAuditCostUseCase,
             new ListScannedFilesUseCase($projectFileScanner),
             $progressReporterHolder,
-            new BaselineProcessor(new Baseline(), null),
+            new BaselineProcessor(new Baseline()),
             new UnpricedModelBudgetGuard(
                 new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json'),
                 ['stub'],
-                null,
             ),
             secretScrubbingEnabled: true,
             findingTypeFilter: new FindingTypeFilter([], []),
