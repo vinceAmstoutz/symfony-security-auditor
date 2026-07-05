@@ -145,6 +145,7 @@ final class BaselineProcessorTest extends TestCase
 
         self::assertSame($auditReport, $baselineResult->report);
         self::assertSame(0, $baselineResult->suppressedCount);
+        self::assertSame([], $baselineResult->acceptedFingerprints);
     }
 
     /**
@@ -165,6 +166,23 @@ final class BaselineProcessorTest extends TestCase
         self::assertSame(1, $baselineResult->report->totalVulnerabilities());
         self::assertSame($vulnerability->fingerprint(), $baselineResult->report->vulnerabilities()[0]->fingerprint());
         self::assertSame(1, $baselineResult->suppressedCount);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_apply_exposes_the_matched_fingerprints_on_the_result(): void
+    {
+        $vulnerability = $this->makeVuln('src/Drop.php');
+        $auditReport = $this->makeReport($vulnerability);
+
+        $baseline = self::createStub(BaselineInterface::class);
+        $baseline->method('load')->willReturn([$vulnerability->fingerprint()]);
+
+        $baselineResult = (new BaselineProcessor($baseline))->apply($auditReport, '/baseline.json');
+
+        self::assertSame([$vulnerability->fingerprint()], $baselineResult->acceptedFingerprints);
     }
 
     /**

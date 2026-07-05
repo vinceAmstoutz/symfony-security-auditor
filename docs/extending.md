@@ -458,7 +458,10 @@ each renderer small and independently testable. The bundle ships seven:
   (templates in `Report/Template/*.txt`).
 - `JsonReportRenderer` (`json`) — pretty-printed `AuditReport::toArray()`.
 - `SarifReportRenderer` (`sarif`) — SARIF 2.1.0, consumable by GitHub Code
-  Scanning and GitLab Security Dashboard.
+  Scanning and GitLab Security Dashboard. The only renderer implementing
+  `BaselineSuppressingReportRendererInterface`: a baselined finding is kept in
+  `results` with a `suppressions` entry instead of being dropped — see
+  [Configuration](configuration.md) → `audit.baseline`.
 - `HtmlReportRenderer` (`html`) — self-contained HTML page (templates in
   `Report/Template/*.html`).
 - `MarkdownReportRenderer` (`markdown`) — Markdown suitable for PR comments and
@@ -474,7 +477,11 @@ Each renderer is tagged `symfony_security_auditor.report_renderer` (via the
 `config/services.php`). `Command\ReportWriter` receives the tagged iterator,
 indexes the renderers by their `format()` key, and dispatches the selected
 `--format` to the matching one — throwing `UnsupportedOutputFormatException` if
-no renderer advertises that key.
+no renderer advertises that key. When the resolved renderer additionally
+implements `BaselineSuppressingReportRendererInterface`, `ReportWriter` calls
+`renderWithSuppressions(AuditReport, list<string> $baselinedFingerprints)`
+instead of `render()`, so that format can mark specific findings as suppressed
+rather than relying on the caller to drop them beforehand.
 
 Trigger them via
 `audit:run --format=console|json|sarif|html|markdown|junit|github` (see

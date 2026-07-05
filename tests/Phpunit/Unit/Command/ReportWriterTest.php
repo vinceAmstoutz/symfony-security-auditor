@@ -19,8 +19,16 @@ use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
@@ -166,8 +174,57 @@ final class ReportWriterTest extends TestCase
         $reportWriter->write($this->makeReport(), OutputFormat::Sarif, null, $symfonyStyle);
     }
 
-    private function makeReport(): AuditReport
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_writing_sarif_format_with_baselined_fingerprints_marks_the_matching_result_as_suppressed(): void
     {
-        return AuditReport::fromContext(AuditContext::forProject($this->tmpDir));
+        $vulnerability = $this->makeVuln();
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->reportWriter->write($this->makeReport($vulnerability), OutputFormat::Sarif, null, $symfonyStyle, [$vulnerability->fingerprint()]);
+
+        $decoded = json_decode($bufferedOutput->fetch(), true);
+        self::assertIsArray($decoded);
+        $runs = $decoded['runs'] ?? null;
+        self::assertIsArray($runs);
+        $firstRun = $runs[0] ?? null;
+        self::assertIsArray($firstRun);
+        $results = $firstRun['results'] ?? null;
+        self::assertIsArray($results);
+        $firstResult = $results[0] ?? null;
+        self::assertIsArray($firstResult);
+
+        self::assertSame(
+            [['kind' => 'external', 'justification' => 'Accepted via audit baseline']],
+            $firstResult['suppressions'] ?? null,
+        );
+    }
+
+    private function makeReport(Vulnerability ...$vulnerabilities): AuditReport
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        foreach ($vulnerabilities as $vulnerability) {
+            $auditContext->addVulnerability($vulnerability);
+        }
+
+        return AuditReport::fromContext($auditContext);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    private function makeVuln(): Vulnerability
+    {
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Finding', 0.9),
+            new CodeLocation('src/A.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
     }
 }

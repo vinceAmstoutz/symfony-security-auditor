@@ -11,24 +11,20 @@
 
 declare(strict_types=1);
 
-namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
 /**
- * Outcome of applying a baseline: the (possibly filtered) report, how many
- * findings the baseline suppressed, and the fingerprints that matched it.
+ * Opt-in extension of {@see ReportRendererInterface} for formats that render
+ * baselined findings instead of dropping them, marking each as suppressed.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final readonly class BaselineResult
+interface BaselineSuppressingReportRendererInterface
 {
     /**
-     * @param list<string> $acceptedFingerprints
+     * @param list<string> $baselinedFingerprints
      */
-    public function __construct(
-        public AuditReport $report,
-        public int $suppressedCount,
-        public array $acceptedFingerprints = [],
-    ) {}
+    public function renderWithSuppressions(AuditReport $auditReport, array $baselinedFingerprints): string;
 }
