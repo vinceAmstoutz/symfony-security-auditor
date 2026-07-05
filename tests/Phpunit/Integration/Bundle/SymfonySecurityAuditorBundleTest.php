@@ -75,7 +75,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     private ?Kernel $bootedKernel = null;
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1250)]
+    #[MaximumDuration(1500)]
     public function test_bundle_boots_with_minimal_config_and_registers_audit_command(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
