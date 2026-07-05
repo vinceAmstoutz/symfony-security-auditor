@@ -74,6 +74,7 @@ final readonly class AttackerSkillRegistry
             new NormalizerAttackerSkill(),
             new SchedulerAttackerSkill(),
             new FormAttackerSkill(),
+            new FileUploadAttackerSkill(),
             new RepositoryAttackerSkill(),
             new EntityAttackerSkill(),
             new TemplateAttackerSkill(),
