@@ -76,7 +76,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
 
         $output = $this->renderer->render($this->makeReport($vulnerability));
 
-        self::assertSame("::error file=src/Repo.php,line=12,title=Test Vuln::desc\n\nRemediation: fix", $output);
+        self::assertSame('::error file=src/Repo.php,line=12,title=Test Vuln::desc%0A%0ARemediation: fix', $output);
     }
 
     /**
