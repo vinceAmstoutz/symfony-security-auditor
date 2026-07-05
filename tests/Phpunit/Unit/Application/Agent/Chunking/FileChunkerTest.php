@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunking;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
@@ -20,6 +21,40 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 final class FileChunkerTest extends TestCase
 {
+    #[DataProvider('projectFileTypeCases')]
+    public function test_type_strategy_orders_every_known_type_before_an_unrecognized_file(string $path, string $content): void
+    {
+        $files = [
+            $this->makeFile('README.md'),
+            ProjectFile::create($path, '/app/'.$path, $content),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Type, 10))->chunk($files);
+
+        self::assertSame($path, $chunks[0][0]->relativePath());
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function projectFileTypeCases(): iterable
+    {
+        yield 'controller' => ['src/Controller/UserController.php', '<?php'];
+        yield 'api resource' => ['src/ApiResource/Offer.php', "<?php\n#[ApiResource]\nclass Offer {}"];
+        yield 'live component' => ['src/Twig/Components/SearchBar.php', "<?php\n#[AsLiveComponent]\nclass SearchBar {}"];
+        yield 'entity' => ['src/Entity/User.php', '<?php'];
+        yield 'voter' => ['src/Security/UserVoter.php', '<?php'];
+        yield 'repository' => ['src/Repository/UserRepository.php', '<?php'];
+        yield 'form' => ['src/Form/UserType.php', '<?php'];
+        yield 'authenticator' => ['src/Security/LoginFormAuthenticator.php', '<?php'];
+        yield 'messenger handler' => ['src/Messenger/SendInvoiceMessageHandler.php', '<?php'];
+        yield 'webhook consumer' => ['src/Webhook/StripeWebhookConsumer.php', '<?php'];
+        yield 'event subscriber' => ['src/EventSubscriber/AuditSubscriber.php', '<?php'];
+        yield 'normalizer' => ['src/Serializer/UserNormalizer.php', '<?php'];
+        yield 'scheduler' => ['src/Schedule/CleanupSchedule.php', '<?php'];
+        yield 'template' => ['templates/user/index.html.twig', '{{ user.name }}'];
+        yield 'config' => ['config/security.yaml', 'security:'];
+        yield 'plain php' => ['src/Service/FooService.php', '<?php'];
+    }
+
     public function test_feature_strategy_groups_related_files_together(): void
     {
         $files = [

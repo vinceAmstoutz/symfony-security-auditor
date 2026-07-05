@@ -12,6 +12,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **File uploads are now a dedicated attacker skill.** `FormType`s carrying a
+  `FileType`/`VichUploaderBundle` field, and the manual `UploadedFile` handling
+  built on top of them, were only covered by `FormAttackerSkill`'s general
+  mass-assignment/CSRF hunting — extension/MIME spoofing, path traversal via the
+  original filename, and web-root RCE via an uploaded `.php` were invisible to
+  the attacker. A new `FileUploadAttackerSkill`
+  (`src/Audit/Infrastructure/Prompt/Skill/FileUploadAttackerSkill.php`, tagged
+  `symfony_security_auditor.attacker_skill`, `priority()` 115 — right after
+  `FormAttackerSkill`) targets the existing `ProjectFileType::FORM` case and
+  hunts client-trusted `Content-Type`/extension checks, missing size limits,
+  `getClientOriginalName()`-derived paths, public-web-root storage without
+  execution disabled, predictable stored filenames, missing authorization on the
+  upload endpoint, and download routes that don't re-check ownership — with a
+  "do NOT flag" section for allow-listed extensions stored outside the web root
+  and randomized filenames. `AttackerPromptBuilder::PROMPT_VERSION` bumps to 12,
+  invalidating cached attacker responses for chunks containing a form.
 - **New `--format junit` output renders findings as JUnit XML for CI test-report
   panels.** SARIF gets findings into GitHub Code Scanning and GitLab's security
   dashboard, but GitLab's dashboard requires the Ultimate tier — free-tier users
@@ -255,6 +271,43 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **`ProjectFile` type detection is now a single source of truth, so its
+  `fileType()` and its `is*()` predicates can no longer disagree.**
+  `ProjectFile::detectType()` and its private `is*Path()`/`looksLike*()`
+  heuristics move verbatim into a new `ProjectFileTypeClassifier`
+  (`src/Audit/Domain/Model/ProjectFileTypeClassifier.php`, pure Domain, no I/O);
+  `ProjectFile::create()` now calls `ProjectFileTypeClassifier::classify()`.
+  Previously `isEntity()`, `isVoter()`, `isRepository()`, `isForm()`,
+  `isAuthenticator()`, `isMessengerHandler()`, `isWebhookConsumer()`, and
+  `isTemplate()` re-ran the same heuristics independently of `detectType()`'s
+  mutually-exclusive `match(true)`, so a file could satisfy more than one
+  predicate even though `fileType()` assigned it exactly one type — e.g. an
+  entity also carrying `#[ApiResource]` reported both `isEntity() === true` and
+  `type() === 'api_resource'`. Every one of those predicates is now a thin
+  `ProjectFileType::X === $this->fileType()` comparison, so
+  `ProjectFileInventory`'s `entities`/`voters`/`repositories`/`forms`/`services`
+  buckets (metadata and summary counts only — LLM scanning is keyed off
+  `fileType()` directly and is unaffected) now agree with `type()` in every
+  case. `isController()` already matched exactly (it is the first `match(true)`
+  arm) so its behavior is unchanged. `isConfiguration()` is deliberately kept
+  independent of `fileType()`: it must catch every `.yaml`/`.yml`/`.xml`/dotenv
+  file regardless of directory (used by `MappingStage` to extract
+  `security:`/firewall config for every config file in the project), which a
+  directory-precedence-sensitive comparison against `fileType()` would silently
+  narrow.
+- **Fixed: `.xml` config files, and non-PHP files living in a `/Webhook/` or
+  `/MessageHandler/` directory, are now classified correctly.**
+  `ProjectFileTypeClassifier`'s `CONFIG` arm was missing `.xml` (already handled
+  by `isConfiguration()`, so XML security config silently fell back to
+  `type() === 'other'` and missed `RegexStaticPreScanner`'s `config` risk
+  markers and `ConfigAttackerSkill`'s attacker prompt block), and its
+  `MESSENGER_HANDLER`/`WEBHOOK_CONSUMER` directory-based arms matched any file
+  under `/MessageHandler/`/`/Webhook/` regardless of extension, unlike their
+  corresponding `isMessengerHandler()`/`isWebhookConsumer()` predicates which
+  always required a `.php` suffix — a non-PHP file in one of those directories
+  (e.g. `src/Webhook/config.yaml`) previously had
+  `type() === 'webhook_consumer'` while `isWebhookConsumer()` returned `false`.
+  Both are fixed in the new classifier.
 - **Constructor ports that DI always resolves are now required instead of
   silently falling back to a `Null*` default.** `MappingStage`
   (`src/Audit/Application/Pipeline/Stage/MappingStage.php`), `AuditPipeline`
@@ -374,6 +427,43 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `ministral-{3b,8b,14b}-2512`) now resolve to `$0.00` with a warning. The
   default `claude-opus-4-8` and every current model are catalog-present and
   unchanged.
+
+### Fixed
+
+- **`--since` silently dropped changed dotfiles (`.env`, `.github/...`) from
+  incremental audits.** `ProcessGitChangedFilesResolver::mergeAndNormalize()`
+  (`src/Audit/Infrastructure/Diff/ProcessGitChangedFilesResolver.php`) used
+  `trimStart('./')`, which strips a leading **character mask** (every leading
+  `.` and `/`), not the literal prefix `./` — `.env` was mangled to `env` and
+  `.github/workflows/ci.yml` to `github/workflows/ci.yml`. The mangled path then
+  failed the exact-match lookup against real project files, so a changed `.env`
+  (or any dotfile/dot-directory) was excluded from `audit:run --since` scope
+  even though it changed. Now uses `trimPrefix('./')`, which strips only the
+  literal `./` prefix.
+- **Static pre-scan patterns using the `s` (DOTALL) modifier never matched
+  anything.** `RegexStaticPreScanner::matchLines()`
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) explodes file
+  content into lines and matches each pattern against one line at a time, so the
+  two cross-line patterns in the dictionary — `supports_returns_null` (an
+  authenticator's `supports()` silently returning `null`, which Symfony treats
+  as "supports") and `http_client_request` (an `HttpClient` reference followed
+  by `->request(`, an SSRF surface) — could never fire: a real multi-line method
+  body never appears on a single line. Patterns carrying the `s` modifier are
+  now matched against the full file content instead, with the match offset
+  mapped back to a line number; all other (single-line) patterns are unchanged.
+  `RegexStaticPreScanner:: CACHE_VERSION` moves to `6` since this alters scan
+  output for existing chunk content, invalidating stale attacker cache entries.
+- **`--format junit` could emit XML that no consumer could re-parse.**
+  `JunitReportRenderer`
+  (`src/Audit/Infrastructure/Report/JunitReportRenderer.php`) inserted a
+  finding's LLM-produced title, description, and remediation text directly into
+  DOM attributes and text nodes. `DOMDocument::saveXML()` escapes XML
+  metacharacters (`<`, `&`, `"`) but writes XML-1.0-illegal control bytes
+  (`\x00`-`\x08`, `\x0B`, `\x0C`, `\x0E`-`\x1F`) out verbatim, so a finding
+  whose narrative happened to reproduce one of those bytes (a plausible outcome
+  when the model echoes a raw exploit payload) produced a `.xml` report that
+  GitLab, Jenkins, and any standard XML parser rejected outright. Those bytes
+  are now stripped before insertion.
 
 ### Security
 
