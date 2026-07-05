@@ -180,7 +180,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `requires_channel: https`), firewall rules carry their `security: false` /
   `stateless` flags, `route:`-keyed entries and environment-scoped `when@prod`
   blocks are read, and unparseable YAML degrades to an empty result instead of
-  aborting the audit. Adds `symfony/yaml` to the runtime requirements.
+  aborting the audit. The map also respects Symfony's first-match-wins
+  evaluation for multiple rules on one path: previously two entries for
+  `^/api/orders` (say `methods: [GET], roles: PUBLIC_ACCESS` then
+  `methods: [POST], roles: ROLE_ADMIN`) collapsed to whichever came _last_,
+  inverting the real semantics and telling the attacker/reviewer the route is
+  admin-gated when its GET is public. The first rule's requirements now come
+  first and each later rule for the same path is appended as an explicit `or: …`
+  entry. Adds `symfony/yaml` to the runtime requirements.
 - **Baselined findings now skip the reviewer entirely, and the baseline file is
   human-readable.** Previously the baseline was applied _after_ the audit
   (`BaselineProcessor::apply()` in `src/Command/AuditCommand.php`), so every
