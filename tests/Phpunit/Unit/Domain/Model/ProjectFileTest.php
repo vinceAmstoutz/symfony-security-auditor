@@ -398,7 +398,7 @@ final class ProjectFileTest extends TestCase
         $projectFile = ProjectFile::create(
             'src/Twig/Formatter.php',
             '/app/src/Twig/Formatter.php',
-            '<?php class Formatter { public function format(): string { return \'\'; } }',
+            "<?php class Formatter { public function format(): string { return ''; } }",
         );
 
         self::assertSame('php', $projectFile->type());
