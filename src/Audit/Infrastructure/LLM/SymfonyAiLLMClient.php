@@ -55,6 +55,8 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
 
     private RetryingPlatformInvoker $retryingPlatformInvoker;
 
+    private EmptyLLMResponseFactory $emptyLlmResponseFactory;
+
     private SequentialToolLoop $sequentialToolLoop;
 
     private BatchWindowResolver $batchWindowResolver;
@@ -95,6 +97,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformResilienceConfig->sleeper,
             $platformResilienceConfig->retryAfterHeaderParser,
         );
+        $this->emptyLlmResponseFactory = new EmptyLLMResponseFactory();
 
         $this->sequentialToolLoop = new SequentialToolLoop(
             $platformBinding->model,
@@ -105,6 +108,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $this->platformResultExtractor,
             $platformOptionsFactory,
             $this->promptTokenEstimator,
+            $this->emptyLlmResponseFactory,
         );
 
         $this->batchWindowResolver = new BatchWindowResolver(
@@ -128,6 +132,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformOptionsFactory,
             $this->promptTokenEstimator,
             $this,
+            $this->retryingPlatformInvoker,
         );
     }
 
@@ -253,11 +258,6 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             'error' => $emptyllmResponseException->getMessage(),
         ]);
 
-        return LLMResponse::of(
-            '',
-            $this->model,
-            'empty_content',
-            TokenUsageSnapshot::of(0, 0),
-        );
+        return $this->emptyLlmResponseFactory->create($this->model, TokenUsageSnapshot::of(0, 0));
     }
 }
