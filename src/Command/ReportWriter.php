@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Override;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
@@ -51,7 +52,8 @@ final readonly class ReportWriter implements ReportWriterInterface
         $content = $this->renderContent($outputFormat, $auditReport, $baselinedFingerprints);
 
         if (null === $outputFile) {
-            $symfonyStyle->writeln($content);
+            // OUTPUT_RAW keeps markup-lookalike text in finding titles out of the console formatter.
+            $symfonyStyle->writeln($content, OutputFormat::Console === $outputFormat ? OutputInterface::OUTPUT_NORMAL : OutputInterface::OUTPUT_RAW);
 
             return;
         }

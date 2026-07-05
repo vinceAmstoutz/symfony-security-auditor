@@ -584,7 +584,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   stdout _before_ the document, so `audit:run --format=json | jq` failed to
   parse and redirecting to a file captured the banner along with the report. All
   human-facing presentation now routes to stderr whenever stdout carries a
-  machine-readable document; stdout receives the document alone.
+  machine-readable document; stdout receives the document alone. The document
+  itself is also written in raw output mode (`ReportWriter`, and
+  `audit:diff --format=json` via `DiffPresenter`): the console formatter
+  previously interpreted markup-lookalike text — a finding title quoting
+  `<info>` or `<error>` from audited code — and silently stripped or colorized
+  it inside the JSON payload.
 - **An unexpected failure in a concurrent attacker batch no longer aborts the
   whole audit.** `ConcurrentChunkAnalyzer` only caught budget and provider
   exceptions around the tool-batch dispatch, so with

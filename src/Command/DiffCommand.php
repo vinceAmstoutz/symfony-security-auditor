@@ -16,7 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
-use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
@@ -45,17 +44,11 @@ final readonly class DiffCommand
         } catch (ReportFileNotReadableException|MalformedReportFileException $exception) {
             $symfonyStyle->error($exception->getMessage());
 
-            return Command::FAILURE;
+            return ExitCode::Failure->value;
         }
 
-        if (DiffOutputFormat::Json === $diffOutputFormat) {
-            $symfonyStyle->writeln(json_encode($reportDiff->toArray(), \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR));
+        $this->diffPresenter->present($symfonyStyle, $reportDiff, $diffOutputFormat);
 
-            return Command::SUCCESS;
-        }
-
-        $this->diffPresenter->present($symfonyStyle, $reportDiff);
-
-        return Command::SUCCESS;
+        return ExitCode::Success->value;
     }
 }

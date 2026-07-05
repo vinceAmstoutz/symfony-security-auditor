@@ -144,7 +144,7 @@ final readonly class AuditCommand
     }
 
     /**
-     * @param array{SymfonyStyle, SymfonyStyle} $styles stdout style and human-display style
+     * @param array{SymfonyStyle, SymfonyStyle} $styles    stdout style and human-display style
      * @param list<string>                      $scanPaths
      *
      * @throws UnsupportedOutputFormatException

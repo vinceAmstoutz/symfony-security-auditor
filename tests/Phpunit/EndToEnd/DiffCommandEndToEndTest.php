@@ -126,6 +126,27 @@ final class DiffCommandEndToEndTest extends TestCase
         self::assertStringContainsString('Summary: 1 new, 1 fixed, 1 persisting.', $display);
     }
 
+    public function test_json_diff_output_preserves_console_markup_lookalikes_in_titles(): void
+    {
+        $markupTitle = 'XSS via <info>user-supplied</info> HTML';
+        $previousReport = $this->runAuditAndCapture('previous.json', [$this->finding($markupTitle, 'src/View1.php')]);
+        $currentReport = $this->runAuditAndCapture('current.json', [$this->finding($markupTitle, 'src/View1.php')]);
+
+        $diffCommandTester = new CommandTester(new DiffCommand(new ReportDiffer($this->filesystem), new DiffPresenter()));
+        $diffCommandTester->execute([
+            'previous-report' => $previousReport,
+            'current-report' => $currentReport,
+            '--format' => 'json',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $diffCommandTester->getStatusCode());
+        $decoded = json_decode($diffCommandTester->getDisplay(), true);
+        self::assertIsArray($decoded);
+        self::assertIsArray($decoded['persisting']);
+        self::assertIsArray($decoded['persisting'][0]);
+        self::assertSame($markupTitle, $decoded['persisting'][0]['title']);
+    }
+
     /**
      * @return array{type: string, title: string, file_path: string}
      */
