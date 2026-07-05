@@ -68,6 +68,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface
                 'name' => $vulnerabilityType->value,
                 'shortDescription' => ['text' => $vulnerabilityType->category()],
                 'helpUri' => $vulnerabilityType->owaspReferenceUrl(),
+                'properties' => ['tags' => [self::cweTag($vulnerabilityType)]],
             ],
             $types,
         ));
@@ -108,5 +109,10 @@ final readonly class SarifReportRenderer implements ReportRendererInterface
             VulnerabilitySeverity::MEDIUM => 'warning',
             VulnerabilitySeverity::LOW, VulnerabilitySeverity::INFO => 'note',
         };
+    }
+
+    private static function cweTag(VulnerabilityType $vulnerabilityType): string
+    {
+        return \sprintf('external/cwe/cwe-%s', substr($vulnerabilityType->cweReference(), 4));
     }
 }

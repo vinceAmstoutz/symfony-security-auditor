@@ -462,6 +462,19 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */
+    public function test_render_vulnerability_substitutes_cwe_reference(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('CWE  : '.$vulnerability->type()->cweReference(), $output);
+        self::assertStringNotContainsString('{{cwe}}', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_vulnerability_substitutes_file_location_with_line_range(): void
     {
         $vulnerability = $this->makeValidatedVuln();
