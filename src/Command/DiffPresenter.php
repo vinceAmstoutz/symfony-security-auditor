@@ -45,20 +45,20 @@ final readonly class DiffPresenter implements DiffPresenterInterface
     {
         $symfonyStyle->section(\sprintf('%s (%d)', $title, \count($findings)));
 
-        if ([] === $findings) {
-            $symfonyStyle->writeln('  (none)');
+        if ([] !== $findings) {
+            foreach ($findings as $finding) {
+                $symfonyStyle->writeln(\sprintf(
+                    '  [%s] %s — %s (%s)',
+                    strtoupper($finding->severity),
+                    $finding->type,
+                    $finding->title,
+                    $finding->file,
+                ));
+            }
 
             return;
         }
 
-        foreach ($findings as $finding) {
-            $symfonyStyle->writeln(\sprintf(
-                '  [%s] %s — %s (%s)',
-                strtoupper($finding->severity),
-                $finding->type,
-                $finding->title,
-                $finding->file,
-            ));
-        }
+        $symfonyStyle->writeln('  (none)');
     }
 }
