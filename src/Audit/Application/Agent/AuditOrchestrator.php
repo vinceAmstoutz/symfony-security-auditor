@@ -19,10 +19,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/**
+ * `config/services.php` always aliases `ProgressReporterInterface` to
+ * `ProgressReporterHolder`, so it is required here rather than falling back to
+ * `NullProgressReporter`.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
+ */
 final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 {
     private const string SKIPPED_FINGERPRINTS_META = 'audit.baseline_skipped_fingerprints';
@@ -31,17 +36,13 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
     public const float DEFAULT_MIN_CONFIDENCE = 0.6;
 
-    private ProgressReporterInterface $progressReporter;
-
     public function __construct(
         private AttackerAgentInterface $attackerAgent,
         private ReviewerAgentInterface $reviewerAgent,
         private LoggerInterface $logger,
         private AuditLoopSettings $auditLoopSettings,
-        ?ProgressReporterInterface $progressReporter = null,
-    ) {
-        $this->progressReporter = $progressReporter ?? new NullProgressReporter();
-    }
+        private ProgressReporterInterface $progressReporter,
+    ) {}
 
     #[Override]
     public function orchestrate(AuditContext $auditContext): void

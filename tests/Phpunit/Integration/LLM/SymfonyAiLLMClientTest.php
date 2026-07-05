@@ -697,6 +697,33 @@ final class SymfonyAiLLMClientTest extends TestCase
     }
 
     /**
+     * @throws InvalidRetryConfigurationException
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
+    public function test_complete_batch_with_tools_falls_back_to_the_sequential_path_when_the_retry_itself_fails_before_tools_ran(): void
+    {
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+        $platform = $this->flakyPlatform([
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new RuntimeException('HTTP 401 Unauthorized'),
+            new TextResult('recovered-via-full-restart'),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 10, backoffMultiplier: 2.0, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
+        );
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 3);
+
+        self::assertSame('recovered-via-full-restart', $responses[0]->content());
+        self::assertSame('end_turn', $responses[0]->stopReason());
+    }
+
+    /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
      */
@@ -801,6 +828,108 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertCount(1, $failureLogs);
         self::assertArrayHasKey('input_tokens', $failureLogs[0][1]);
         self::assertArrayHasKey('output_tokens', $failureLogs[0][1]);
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
+    public function test_complete_batch_with_tools_retries_through_the_seam_and_recovers_when_failing_after_tools_ran(): void
+    {
+        $toolCalls = 0;
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd', static function (array $arguments) use (&$toolCalls): string {
+            ++$toolCalls;
+
+            return 'ok';
+        })], new NullLogger());
+
+        $fakeSleeper = new FakeSleeper();
+        $platform = $this->flakyPlatform([
+            new MultiPartResult([new ToolCallResult([new ToolCall('1', 'record')])]),
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new RuntimeException('HTTP 503 Service Unavailable'),
+            new TextResult('recovered-through-retry'),
+        ]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 3, initialDelayMs: 10, backoffMultiplier: 2.0, jitterRatio: 0.0), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: $fakeSleeper),
+        );
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 3);
+
+        self::assertSame('recovered-through-retry', $responses[0]->content());
+        self::assertSame('end_turn', $responses[0]->stopReason());
+        self::assertSame(1, $toolCalls);
+        self::assertSame([10], $fakeSleeper->durations);
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
+    public function test_complete_batch_with_tools_propagates_budget_exceeded_when_a_post_tool_retry_exceeds_it(): void
+    {
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+
+        $platform = new class implements PlatformInterface {
+            private int $invocations = 0;
+
+            #[Override]
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                ++$this->invocations;
+
+                if (1 === $this->invocations) {
+                    return new DeferredResult(
+                        new PlainConverter(new MultiPartResult([new ToolCallResult([new ToolCall('1', 'record')])])),
+                        new InMemoryRawResult(['text' => ''], [], (object) []),
+                        $options,
+                    );
+                }
+
+                if (2 === $this->invocations) {
+                    throw new RuntimeException('HTTP 503 Service Unavailable');
+                }
+
+                if ($this->invocations > 3) {
+                    throw new RuntimeException('platform invoked more times than scripted — invokeWithRetry never returned (a mutation removed a loop-exit branch).');
+                }
+
+                $deferredResult = new DeferredResult(
+                    new PlainConverter(new TextResult('too-expensive')),
+                    new InMemoryRawResult(['text' => ''], [], (object) []),
+                    $options,
+                );
+                $deferredResult->getMetadata()->add('token_usage', new TokenUsage(promptTokens: 500, completionTokens: 0));
+
+                return $deferredResult;
+            }
+
+            #[Override]
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+
+        $budgetTracker = new BudgetTracker(
+            AuditBudget::forTokens(100),
+            new CostCalculator($this->stubPricing(0.0, 0.0)),
+        );
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: new TokenUsageRecorder(), budgetTracker: $budgetTracker),
+        );
+
+        $this->expectException(BudgetExceededException::class);
+
+        $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 3);
     }
 
     /**
