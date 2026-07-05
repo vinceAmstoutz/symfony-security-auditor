@@ -557,6 +557,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   a reservation whose call failed and fell back to a fresh attempt — previously
   that reservation was never reconciled at all, leaking into the window's usage
   for the rest of the minute.
+- **The attacker cache key ignored the code-slicing configuration, serving stale
+  findings after `audit.code_slicing.enabled` or
+  `audit.code_slicing.min_lines_before_slicing` changed.** The cache key
+  (`FilesystemAttackerCache::keyForChunk()`) is derived from each file's
+  unsliced content hash, but `ChunkContextFactory` slices the actual prompt
+  content sent to the LLM (`RegexCodeSlicer`) after that key is computed — the
+  salt in `ContainerParameterRegistrar::attackerKeySalt()` had no representation
+  of the slicer's on/off state or its line threshold. Toggling code slicing, or
+  changing the threshold, left an unchanged file's cache key untouched, so a
+  stale cache hit could serve findings computed against a differently-sliced
+  view of the file than the current configuration would actually send. The salt
+  now includes a `slice-off` / `slice-on-<min_lines>` segment so any change to
+  the slicing configuration invalidates the affected cache entries.
 
 ### Security
 
