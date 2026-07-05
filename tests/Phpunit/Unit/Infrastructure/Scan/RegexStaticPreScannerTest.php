@@ -242,6 +242,34 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('live_action_endpoint', $patterns);
     }
 
+    public function test_it_flags_shell_or_file_sinks_in_twig_extensions(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/ReportExtension.php',
+            '/app/src/Twig/ReportExtension.php',
+            "<?php\nclass ReportExtension extends AbstractExtension {\n    public function readFile(string \$path): string { return file_get_contents(\$path); }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('extension_shell_or_file_sink', $patterns);
+    }
+
+    public function test_it_flags_is_safe_html_declarations_in_twig_extensions(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/MarkupExtension.php',
+            '/app/src/Twig/MarkupExtension.php',
+            "<?php\nclass MarkupExtension extends AbstractExtension {\n    public function getFilters(): array {\n        return [new TwigFilter('badge', [\$this, 'badge'], ['is_safe' => ['html']])];\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('extension_is_safe_html', $patterns);
+    }
+
     public function test_it_flags_voter_default_return_true(): void
     {
         $projectFile = ProjectFile::create(

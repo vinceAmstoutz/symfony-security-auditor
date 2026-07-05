@@ -42,6 +42,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   now render the CWE reference alongside OWASP in their respective output.
   Additive change — the `cwe` JSON key and the SARIF tag are new; no existing
   key or field was removed or renamed.
+- **Twig extensions are now a first-class attack surface.** Classes implementing
+  `Twig\Extension\ExtensionInterface` (or extending `AbstractExtension`)
+  register functions and filters callable from every template in the project — a
+  shell/file sink or an unescaped `is_safe: ['html']` return inside one is
+  reachable wherever a template can call it, but these classes previously
+  classified as plain `php` files, so the attacker had no surface-specific
+  guidance for them. A new `ProjectFileType::TWIG_EXTENSION` case
+  (`src/Audit/Domain/Model/ProjectFile.php` detects
+  `implements ExtensionInterface` or `extends AbstractExtension` anywhere in a
+  `.php` file's content), a dedicated attacker skill block
+  (`TwigExtensionAttackerSkill`, `AttackerPromptBuilder` `PROMPT_VERSION` 13 —
+  12 was already claimed by the file-upload skill above) hunting shell/file
+  sinks reachable from template-supplied arguments, `is_safe: ['html']` declared
+  without justified sanitization, authorization-sensitive lookups missing a
+  security-context check, and sensitive `getGlobals()` entries; plus a
+  `twig_extension` pre-scanner bucket (`RegexStaticPreScanner`, `CACHE_VERSION`
+  8 — 6 and 7 were already claimed by earlier pre-scan fixes) with
+  `extension_shell_or_file_sink` and `extension_is_safe_html` markers, and a
+  chunking priority slot right after templates. Custom markers can target the
+  new bucket via `scan.custom_risk_patterns.twig_extension`. Attacker cache
+  entries are invalidated by the prompt/pre-scan version bumps.
 - **New `--format junit` output renders findings as JUnit XML for CI test-report
   panels.** SARIF gets findings into GitHub Code Scanning and GitLab's security
   dashboard, but GitLab's dashboard requires the Ultimate tier — free-tier users
