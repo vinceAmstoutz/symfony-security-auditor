@@ -915,6 +915,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('recovered', $responses[0]->content());
         self::assertSame([[-1, 0], [5, 2]], $fakeRateLimiter->recorded);
     }
+
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
