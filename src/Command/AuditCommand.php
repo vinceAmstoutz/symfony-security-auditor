@@ -178,13 +178,16 @@ final readonly class AuditCommand
     /**
      * Baseline fingerprints threaded into the pipeline so accepted findings
      * skip the reviewer. Empty while (re)generating a baseline — every
-     * finding must then be collected, not suppressed.
+     * finding must then be collected, not suppressed. Also empty for SARIF
+     * output: a pipeline-skipped finding never reaches the report, so it
+     * could not be rendered as a suppressed result — SARIF trades the
+     * review-skip saving for suppressed results GitHub/GitLab can display.
      *
      * @return list<string>
      */
     private function acceptedFingerprintsFor(AuditCommandInput $auditCommandInput): array
     {
-        if (null !== $auditCommandInput->generateBaseline) {
+        if (null !== $auditCommandInput->generateBaseline || OutputFormat::Sarif === $auditCommandInput->format) {
             return [];
         }
 

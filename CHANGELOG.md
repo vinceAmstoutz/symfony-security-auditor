@@ -200,7 +200,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   The legacy flat fingerprint array is still read, so existing baseline files
   keep working unchanged. Note: the post-run "N finding(s) suppressed by the
   baseline." console note no longer appears for pipeline-skipped findings — the
-  per-finding skip lines replace it.
+  per-finding skip lines replace it. `--format=sarif` opts out of the
+  pre-review skip so baselined findings can be rendered as suppressed results
+  — see the SARIF suppression entry under _Fixed_.
 - **Committed dotenv files are now part of the default scan surface, with
   deterministic secret markers.** `.env`, `.env.local`, `.env.dev`, `.env.test`,
   `.env.prod`, and `.env.dist` were previously invisible to the auditor twice
@@ -439,7 +441,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `Vulnerability::fingerprint()` is in the accepted set now gets
   `"suppressions": [{"kind": "external", "justification": "Accepted via audit baseline"}]`
   instead of being dropped from `results`. Every other format's output is
-  unchanged. `BaselineResult` (`src/Command/BaselineResult.php`) gained a third
+  unchanged. To make this reachable, `--format=sarif` deliberately does not
+  thread the accepted fingerprints into the pipeline
+  (`AuditCommand::acceptedFingerprintsFor()`): a finding the orchestrator
+  skips before review never reaches the report, so nothing would be left to
+  mark as suppressed. SARIF runs therefore pay the reviewer cost for
+  baselined findings — the price of Code Scanning showing them as dismissed
+  instead of vanished; every other format keeps the pre-review skip. `BaselineResult` (`src/Command/BaselineResult.php`) gained a third
   `acceptedFingerprints` property alongside the existing filtered report and
   suppressed count, so `AuditCommand` no longer needs a second baseline-file
   read to get the matched set.

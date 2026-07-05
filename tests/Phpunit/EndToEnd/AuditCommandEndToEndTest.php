@@ -424,7 +424,7 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(5, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
     }
 
-    public function test_sarif_format_still_succeeds_when_the_pipeline_already_skipped_every_baselined_finding(): void
+    public function test_sarif_format_marks_baselined_findings_as_suppressed_results_and_clears_the_exit_code(): void
     {
         $this->createProjectDir();
         $baselineFile = $this->fixtureDir.'/baseline.json';
@@ -452,7 +452,16 @@ final class AuditCommandEndToEndTest extends TestCase
         $firstRun = $runs[0] ?? null;
         self::assertIsArray($firstRun);
 
-        self::assertSame([], $firstRun['results'] ?? null);
+        $results = $firstRun['results'] ?? null;
+        self::assertIsArray($results);
+        self::assertNotSame([], $results);
+        foreach ($results as $result) {
+            self::assertIsArray($result);
+            self::assertSame(
+                [['kind' => 'external', 'justification' => 'Accepted via audit baseline']],
+                $result['suppressions'] ?? null,
+            );
+        }
     }
 
     public function test_command_json_output_written_to_file(): void
