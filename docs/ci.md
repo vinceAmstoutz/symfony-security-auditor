@@ -188,6 +188,54 @@ jobs:
           sarif_file: report.sarif
 ```
 
+### Inline PR annotations (no SARIF upload step)
+
+`--format github` renders each finding as a GitHub Actions workflow-command
+annotation (`::error`/`::warning`/`::notice`). GitHub parses these directly from
+the step's log output, so findings show up inline on the pull request's **Files
+changed** view, next to the vulnerable line — no SARIF upload step, no
+`security-events: write` permission, and no Code Scanning setup required.
+
+```yaml
+# .github/workflows/security-audit.yaml
+name: Security Audit
+
+on:
+  pull_request: ~
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Symfony Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so `since` can diff against the base branch
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3' # Or 8.4 or 8.5
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run security audit
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          php bin/console audit:run --since origin/${{ github.base_ref }} --format github
+```
+
+Critical and high-severity findings become `::error`, medium becomes
+`::warning`, and low/info become `::notice` — the annotation level only affects
+how GitHub displays the finding, not the job's exit code; combine with
+`--fail-on` to also fail the check run. Don't pass `--output` — annotations must
+reach stdout for GitHub to parse them.
+
 ### Reusable GitHub Action
 
 This repository **is** a GitHub Action (published to the
@@ -232,9 +280,9 @@ jobs:
 ```
 
 Inputs (all optional): `project-path` (default `.`), `format`
-(`console`/`json`/`sarif`/`html`, default `sarif`), `output` (default
-`report.sarif`), `baseline`, `generate-baseline`, `since`, `extra-args`,
-`php-version` (default `8.3`), `setup-php` (default `true`),
+(`console`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`, default `sarif`),
+`output` (default `report.sarif`), `baseline`, `generate-baseline`, `since`,
+`extra-args`, `php-version` (default `8.3`), `setup-php` (default `true`),
 `install-dependencies` (default `true`), and `working-directory` (default `.`).
 Set `setup-php: false` / `install-dependencies: false` when your job has already
 done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
