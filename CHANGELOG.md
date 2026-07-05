@@ -330,6 +330,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (e.g. `src/Webhook/config.yaml`) previously had
   `type() === 'webhook_consumer'` while `isWebhookConsumer()` returned `false`.
   Both are fixed in the new classifier.
+- **Constructor ports that DI always resolves are now required instead of
+  silently falling back to a `Null*` default.** `MappingStage`
+  (`src/Audit/Application/Pipeline/Stage/MappingStage.php`), `AuditPipeline`
+  (`src/Audit/Application/Pipeline/AuditPipeline.php`), and `AuditOrchestrator`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) accepted nullable
+  `ControllerAccessControlParserInterface` / `VoterCapabilityParserInterface` /
+  `FormBindingParserInterface` / `SecurityConfigParserInterface` /
+  `ProgressReporterInterface` parameters and defaulted each to `new Null*()`
+  when omitted — but `config/services.php` always aliases every one of them to a
+  concrete implementation, so the fallback was only reachable via manual
+  construction (tests). Likewise
+  `AttackerScanCollaborators::staticPreScanner`/`progressReporter`
+  (`src/Audit/Application/Agent/AttackerScanCollaborators.php`) and
+  `AttackerLlmCollaborators::codeSlicer`
+  (`src/Audit/Application/Agent/AttackerLlmCollaborators.php`) fell back to
+  `NullStaticPreScanner`/`NullProgressReporter`/`NullCodeSlicer` inside
+  `AttackerAgent`, even though `SymfonySecurityAuditorBundle::loadExtension()`
+  unconditionally aliases `StaticPreScannerInterface`/`CodeSlicerInterface` to a
+  `Regex*`-or-`Null*` implementation based on config — the Null-vs-real choice
+  was already made once, correctly, in the container. All of these parameters
+  are now non-nullable, and the dead `?? new Null*()` fallbacks are removed. All
+  classes are `@internal`, and the container always supplies a value, so this is
+  not user-visible.
 - **Prompt building is split behind interfaces so neither builder is a
   monolith.** `AttackerPromptBuilder`
   (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) held all sixteen
@@ -400,6 +423,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `0.5` / `6.25` rates for `claude-opus-4-8` equal the old `5×0.1` / `5×1.25`.
   The default `PricingProviderInterface` service alias now points at
   `ModelsDevPricingProvider`.
+- **The structured-collection wiring shared by five attacker/reviewer analyzers
+  is extracted into one collaborator per domain, instead of being duplicated at
+  every call site.**
+  `SequentialChunkAnalyzer::analyzeChunkViaStructuredCollection()` and
+  `ConcurrentChunkAnalyzer::buildPendingRequest()`
+  (`src/Audit/Application/Agent/Chunk/`) each built their own
+  `VulnerabilityCollector` plus a single-tool `record_vulnerability`
+  `ToolRegistry` inline; `StructuredReviewAnalyzer::reviewSingle()`,
+  `ConcurrentStructuredReviewAnalyzer::buildRequest()`, and
+  `BatchReviewAnalyzer::reviewBatchViaStructuredCollection()`
+  (`src/Audit/Application/Agent/Review/`) duplicated the same pattern for
+  `ReviewCollector` and `record_review`. Both now call a new `begin()` factory —
+  `StructuredVulnerabilityCollectionSession` and
+  `StructuredReviewCollectionSession` — that wires the collector into the
+  registry and exposes `drain()`. Purely internal: every analyzer keeps its
+  existing constructor and `analyze()` signature, so `AttackerAgent` and
+  `ReviewerAgent` needed no changes, and the LLM-facing behavior (prompts, tool
+  schemas, caching, coverage, error handling) is unchanged.
 
 ### Deprecated
 
