@@ -135,7 +135,7 @@ final readonly class ReportDiffer implements ReportDifferInterface
     {
         return array_values(array_filter(
             $findings,
-            static fn (DiffFinding $finding): bool => !isset($excluded[$finding->fingerprint]),
+            static fn (DiffFinding $diffFinding): bool => !isset($excluded[$diffFinding->fingerprint]),
         ));
     }
 
@@ -149,7 +149,7 @@ final readonly class ReportDiffer implements ReportDifferInterface
     {
         return array_values(array_filter(
             $findings,
-            static fn (DiffFinding $finding): bool => isset($other[$finding->fingerprint]),
+            static fn (DiffFinding $diffFinding): bool => isset($other[$diffFinding->fingerprint]),
         ));
     }
 

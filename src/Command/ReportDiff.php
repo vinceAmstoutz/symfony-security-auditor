@@ -54,6 +54,6 @@ final readonly class ReportDiff
      */
     private function toArrayList(array $findings): array
     {
-        return array_map(static fn (DiffFinding $finding): array => $finding->toArray(), $findings);
+        return array_map(static fn (DiffFinding $diffFinding): array => $diffFinding->toArray(), $findings);
     }
 }

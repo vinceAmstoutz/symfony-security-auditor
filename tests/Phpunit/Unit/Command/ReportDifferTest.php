@@ -229,7 +229,7 @@ final class ReportDifferTest extends TestCase
     public function test_diff_throws_when_a_vulnerability_entry_is_missing_a_required_field(array $vulnerability): void
     {
         $previous = $this->tmpDir.'/missing-field.json';
-        $this->filesystem->dumpFile($previous, (string) json_encode(['vulnerabilities' => [$vulnerability]], \JSON_THROW_ON_ERROR));
+        $this->filesystem->dumpFile($previous, json_encode(['vulnerabilities' => [$vulnerability]], \JSON_THROW_ON_ERROR));
         $current = $this->writeReport('current.json', []);
 
         $this->expectException(MalformedReportFileException::class);
@@ -282,7 +282,7 @@ final class ReportDifferTest extends TestCase
     private function writeReport(string $filename, array $vulnerabilities): string
     {
         $path = $this->tmpDir.'/'.$filename;
-        $this->filesystem->dumpFile($path, (string) json_encode(['vulnerabilities' => $vulnerabilities], \JSON_THROW_ON_ERROR));
+        $this->filesystem->dumpFile($path, json_encode(['vulnerabilities' => $vulnerabilities], \JSON_THROW_ON_ERROR));
 
         return $path;
     }

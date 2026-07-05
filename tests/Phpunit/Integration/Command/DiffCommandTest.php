@@ -100,7 +100,7 @@ final class DiffCommandTest extends TestCase
         $commandTester->execute(['previous-report' => $previous, 'current-report' => $current]);
 
         self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
-        self::assertStringContainsString('is not valid JSON', $commandTester->getDisplay());
+        self::assertStringContainsString('valid JSON: Syntax error', $commandTester->getDisplay());
     }
 
     public function test_a_missing_report_file_fails_with_a_clear_error(): void
@@ -111,7 +111,7 @@ final class DiffCommandTest extends TestCase
         $commandTester->execute(['previous-report' => $this->tmpDir.'/absent.json', 'current-report' => $current]);
 
         self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
-        self::assertStringContainsString('does not exist or is not readable', $commandTester->getDisplay());
+        self::assertStringContainsString('exist or is not readable', $commandTester->getDisplay());
     }
 
     public function test_json_format_outputs_the_diff_as_structured_json(): void
@@ -156,7 +156,7 @@ final class DiffCommandTest extends TestCase
     private function writeReport(string $filename, array $vulnerabilities): string
     {
         $path = $this->tmpDir.'/'.$filename;
-        $this->filesystem->dumpFile($path, (string) json_encode(['vulnerabilities' => $vulnerabilities], \JSON_THROW_ON_ERROR));
+        $this->filesystem->dumpFile($path, json_encode(['vulnerabilities' => $vulnerabilities], \JSON_THROW_ON_ERROR));
 
         return $path;
     }

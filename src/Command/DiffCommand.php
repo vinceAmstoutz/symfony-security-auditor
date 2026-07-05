@@ -38,7 +38,7 @@ final readonly class DiffCommand
         SymfonyStyle $symfonyStyle,
         #[Argument(description: 'Path to the earlier JSON report.')] string $previousReport,
         #[Argument(description: 'Path to the later JSON report.')] string $currentReport,
-        #[Option(description: 'Output format: console or json', shortcut: 'f')] DiffOutputFormat $format = DiffOutputFormat::Console,
+        #[Option(description: 'Output format: console or json', shortcut: 'f')] DiffOutputFormat $diffOutputFormat = DiffOutputFormat::Console,
     ): int {
         try {
             $reportDiff = $this->reportDiffer->diff($previousReport, $currentReport);
@@ -48,7 +48,7 @@ final readonly class DiffCommand
             return Command::FAILURE;
         }
 
-        if (DiffOutputFormat::Json === $format) {
+        if (DiffOutputFormat::Json === $diffOutputFormat) {
             $symfonyStyle->writeln(json_encode($reportDiff->toArray(), \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR));
 
             return Command::SUCCESS;
