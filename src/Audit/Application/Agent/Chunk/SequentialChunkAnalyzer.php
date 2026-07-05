@@ -214,11 +214,11 @@ final readonly class SequentialChunkAnalyzer
     {
         \assert($this->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface);
 
-        $session = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger);
+        $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger);
 
-        $this->llmClient->completeWithTools($chunkContext->systemPrompt, $chunkContext->userMessage, $session->toolRegistry, $this->maxToolIterations);
+        $this->llmClient->completeWithTools($chunkContext->systemPrompt, $chunkContext->userMessage, $structuredVulnerabilityCollectionSession->toolRegistry, $this->maxToolIterations);
 
-        $rawData = $session->drain();
+        $rawData = $structuredVulnerabilityCollectionSession->drain();
 
         if ($chunkContext->cacheable) {
             $this->attackerChunkCache->store($chunk, $chunkContext->contextKey, $rawData);

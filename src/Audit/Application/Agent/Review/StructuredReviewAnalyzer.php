@@ -79,12 +79,12 @@ final readonly class StructuredReviewAnalyzer
         $systemPrompt = $this->reviewerPromptBuilder->buildSystemPrompt();
         $userMessage = $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext);
 
-        $session = StructuredReviewCollectionSession::begin($this->recordReviewToolFactory, $this->logger);
+        $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin($this->recordReviewToolFactory, $this->logger);
 
         try {
-            $this->llmClient->completeWithTools($systemPrompt, $userMessage, $session->toolRegistry, $this->maxToolIterations);
+            $this->llmClient->completeWithTools($systemPrompt, $userMessage, $structuredReviewCollectionSession->toolRegistry, $this->maxToolIterations);
 
-            $verdict = $session->drain()[0] ?? null;
+            $verdict = $structuredReviewCollectionSession->drain()[0] ?? null;
             if (!$bypassCache) {
                 $this->reviewerVerdictCache->store($vulnerability, $codeContext, $verdict);
             }

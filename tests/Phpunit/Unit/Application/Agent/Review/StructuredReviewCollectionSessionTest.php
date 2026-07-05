@@ -22,29 +22,29 @@ final class StructuredReviewCollectionSessionTest extends TestCase
 {
     public function test_begin_wires_the_collector_into_a_single_record_review_tool_registry(): void
     {
-        $session = StructuredReviewCollectionSession::begin(new RecordReviewToolFactory(), new NullLogger());
+        $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin(new RecordReviewToolFactory(), new NullLogger());
 
-        self::assertTrue($session->toolRegistry->has('record_review'));
+        self::assertTrue($structuredReviewCollectionSession->toolRegistry->has('record_review'));
     }
 
     public function test_drain_returns_the_verdicts_recorded_through_the_tool_during_the_session(): void
     {
-        $session = StructuredReviewCollectionSession::begin(new RecordReviewToolFactory(), new NullLogger());
+        $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin(new RecordReviewToolFactory(), new NullLogger());
 
         $verdict = ['id' => 'VULN-abc123', 'accepted' => true];
-        $session->toolRegistry->execute('record_review', $verdict);
+        $structuredReviewCollectionSession->toolRegistry->execute('record_review', $verdict);
 
-        self::assertSame([$verdict], $session->drain());
+        self::assertSame([$verdict], $structuredReviewCollectionSession->drain());
     }
 
     public function test_drain_clears_the_collector_so_a_second_drain_is_empty(): void
     {
-        $session = StructuredReviewCollectionSession::begin(new RecordReviewToolFactory(), new NullLogger());
+        $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin(new RecordReviewToolFactory(), new NullLogger());
 
-        $session->toolRegistry->execute('record_review', ['id' => 'VULN-abc123', 'accepted' => true]);
-        $session->drain();
+        $structuredReviewCollectionSession->toolRegistry->execute('record_review', ['id' => 'VULN-abc123', 'accepted' => true]);
+        $structuredReviewCollectionSession->drain();
 
-        self::assertSame([], $session->drain());
+        self::assertSame([], $structuredReviewCollectionSession->drain());
     }
 
     public function test_two_sessions_from_the_same_factory_do_not_share_a_collector(): void

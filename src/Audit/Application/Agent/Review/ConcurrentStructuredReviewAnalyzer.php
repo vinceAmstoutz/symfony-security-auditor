@@ -73,10 +73,10 @@ final readonly class ConcurrentStructuredReviewAnalyzer
                 continue;
             }
 
-            $session = StructuredReviewCollectionSession::begin($this->recordReviewToolFactory, $this->logger);
-            $sessions[$index] = $session;
+            $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin($this->recordReviewToolFactory, $this->logger);
+            $sessions[$index] = $structuredReviewCollectionSession;
             $pendingIndexes[] = $index;
-            $requests[] = $this->buildRequest($vulnerability, $codeContext, $session);
+            $requests[] = $this->buildRequest($vulnerability, $codeContext, $structuredReviewCollectionSession);
         }
 
         if ([] !== $requests) {
@@ -92,12 +92,12 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     /**
      * @return array{system: string, user: string, tools: ToolRegistry}
      */
-    private function buildRequest(Vulnerability $vulnerability, string $codeContext, StructuredReviewCollectionSession $session): array
+    private function buildRequest(Vulnerability $vulnerability, string $codeContext, StructuredReviewCollectionSession $structuredReviewCollectionSession): array
     {
         return [
             'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
             'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
-            'tools' => $session->toolRegistry,
+            'tools' => $structuredReviewCollectionSession->toolRegistry,
         ];
     }
 

@@ -204,12 +204,12 @@ final readonly class BatchReviewAnalyzer
 
         [$systemPrompt, $userMessage] = $this->buildBatchPrompts($batch, $codeContexts);
 
-        $session = StructuredReviewCollectionSession::begin($this->recordReviewToolFactory, $this->logger);
+        $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin($this->recordReviewToolFactory, $this->logger);
 
         try {
-            $this->llmClient->completeWithTools($systemPrompt, $userMessage, $session->toolRegistry, $this->maxToolIterations);
+            $this->llmClient->completeWithTools($systemPrompt, $userMessage, $structuredReviewCollectionSession->toolRegistry, $this->maxToolIterations);
 
-            return $this->batchVerdictApplier->applyBatchReview($batch, $session->drain(), $coverageRecorder, $cacheContexts);
+            return $this->batchVerdictApplier->applyBatchReview($batch, $structuredReviewCollectionSession->drain(), $coverageRecorder, $cacheContexts);
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {

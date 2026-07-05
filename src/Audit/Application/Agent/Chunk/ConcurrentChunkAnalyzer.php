@@ -124,16 +124,16 @@ final readonly class ConcurrentChunkAnalyzer
      */
     private function buildPendingRequest(array $chunk, ChunkContext $chunkContext): array
     {
-        $session = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger);
+        $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger);
 
         return [
             'pending' => [
                 'chunk' => $chunk,
                 'contextKey' => $chunkContext->contextKey,
                 'cacheable' => $chunkContext->cacheable,
-                'session' => $session,
+                'session' => $structuredVulnerabilityCollectionSession,
             ],
-            'request' => ['system' => $chunkContext->systemPrompt, 'user' => $chunkContext->userMessage, 'tools' => $session->toolRegistry],
+            'request' => ['system' => $chunkContext->systemPrompt, 'user' => $chunkContext->userMessage, 'tools' => $structuredVulnerabilityCollectionSession->toolRegistry],
         ];
     }
 
