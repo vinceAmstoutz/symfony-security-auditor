@@ -514,9 +514,12 @@ repositories by directory and content, not just filename suffix; and the
   seam the sequential path already uses — via a new
   `ToolConversationWavefront::retryOrAbortConversation()`, and only finalizes as
   `empty_content` once that retry is exhausted or the failure is non-transient.
-  `BudgetExceededException` is unaffected: it still propagates immediately and
-  is never retried, on either path. Also extracted the duplicated
-  `empty_content` `LLMResponse` construction from
+  A dispatch failure before any tool has run now goes through the same
+  classified retry first too, falling back to the full `completeWithTools()`
+  restart only once that retry itself fails, instead of always paying for a full
+  restart on the very first failure. `BudgetExceededException` is unaffected: it
+  still propagates immediately and is never retried, on any path. Also extracted
+  the duplicated `empty_content` `LLMResponse` construction from
   `SymfonyAiLLMClient::complete()` and `SequentialToolLoop::run()` into a shared
   `EmptyLLMResponseFactory`
   (`src/Audit/Infrastructure/LLM/EmptyLLMResponseFactory.php`).

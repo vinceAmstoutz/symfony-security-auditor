@@ -37,14 +37,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Miss
  * conversation WITHOUT blocking, then resolves them, executes the requested
  * tools against that conversation's own registry, and queues the follow-up
  * round. On an async transport (the symfony/ai DeferredResult contract) the
- * per-round invocations overlap on the wire. A conversation that fails before
- * any of its tools ran falls back to the proven sequential completeWithTools()
- * path (full retry); one that fails after a tool already produced side effects
- * cannot restart from scratch without executing that tool twice, so it retries
- * the same conversation through `RetryingPlatformInvoker` — the same
- * classify-then-retry-or-fail seam the sequential path uses — and finalizes as
- * an empty `empty_content` response only once that retry is exhausted or the
- * failure is non-transient.
+ * per-round invocations overlap on the wire. Any dispatch or resolution
+ * failure first retries the same conversation through
+ * `RetryingPlatformInvoker` — the same classify-then-retry-or-fail seam the
+ * sequential path uses. Only once that retry is exhausted or the failure is
+ * non-transient does it give up: a conversation that hasn't run a tool yet
+ * falls back to the proven sequential completeWithTools() path (full restart);
+ * one that already ran a tool cannot restart from scratch without executing
+ * it twice, so it finalizes as an empty `empty_content` response instead.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -249,12 +249,12 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * Retries a conversation that already ran a tool through the same
-     * classify-then-retry-or-fail seam the sequential path uses, since it
-     * cannot restart from scratch (`abortConversation`'s completeWithTools()
-     * fallback) without executing that tool a second time. Conversations that
-     * have not yet run a tool skip straight to `abortConversation`, which is
-     * free to restart them.
+     * Retries a failed dispatch/resolution through the same
+     * classify-then-retry-or-fail seam the sequential path uses. Falls back to
+     * `abortConversation()` only once that retry itself fails — which restarts
+     * from scratch via completeWithTools() for a conversation that hasn't run
+     * a tool yet, or finalizes as `empty_content` for one that has (it cannot
+     * restart without executing that tool a second time).
      *
      * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
      * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
@@ -265,10 +265,6 @@ final readonly class ToolConversationWavefront
      */
     private function retryOrAbortConversation(array $state, array $request, int $maxToolIterations): array
     {
-        if (!$state['toolsRan']) {
-            return $this->abortConversation($state, $request, $maxToolIterations);
-        }
-
         $estimatedInputTokens = $this->promptTokenEstimator->estimate($request['system'], $request['user']);
 
         try {
