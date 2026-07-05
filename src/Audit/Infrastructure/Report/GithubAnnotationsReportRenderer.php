@@ -68,11 +68,11 @@ final readonly class GithubAnnotationsReportRenderer implements ReportRendererIn
     {
         $properties = [
             'file' => $this->escapeProperty($vulnerability->filePath()),
-            'line' => (string) $vulnerability->lineStart(),
+            'line' => $vulnerability->lineStart(),
         ];
 
         if ($vulnerability->lineEnd() !== $vulnerability->lineStart()) {
-            $properties['endLine'] = (string) $vulnerability->lineEnd();
+            $properties['endLine'] = $vulnerability->lineEnd();
         }
 
         $properties['title'] = $this->escapeProperty($vulnerability->title());
