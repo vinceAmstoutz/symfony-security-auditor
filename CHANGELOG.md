@@ -328,7 +328,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   and resolves `cost.input` / `output` / `cache_read` / `cache_write` per model.
   A bare model id (`claude-opus-4-8`, `gpt-5.5`) resolves against official
   first-party providers only (Anthropic, OpenAI, Google, Mistral, Cohere,
-  DeepSeek, Perplexity, Cerebras) — a version dot never makes it qualified — so
+  DeepSeek, Perplexity, Cerebras, xAI, Moonshot, Alibaba, Z.ai, Meta/Llama,
+  MiniMax, NVIDIA) — a version dot never makes it qualified — so
   aggregator/cloud markups never leak in; a provider-qualified id, namely
   slash-namespaced or one whose dot-delimited prefix is a catalog provider key
   (`anthropic.claude-opus-4-8` and the cloud-region form
@@ -344,21 +345,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Domain/Port/CacheAwarePricingProviderInterface.php`) — an opt-in
   extension of `PricingProviderInterface` exposing
   `cacheReadPricePerMillionTokens()` and `cacheCreationPricePerMillionTokens()`.
-  `CostCalculator` consumes it via `instanceof` and falls back to the base input
-  rate for providers that do not implement it, so it never breaks an existing
-  pricing provider. Listed under the documented extension points in
-  `docs/versioning.md`.
+  `CostCalculator` consumes it via `instanceof`; for providers that do not
+  implement it, Claude models keep the pre-existing Anthropic 0.1x-read /
+  1.25x-write heuristic and other models fall back to the base input rate, so an
+  existing custom `PricingProviderInterface` keeps producing the same
+  cache-traffic estimates as before. Listed under the documented extension
+  points in `docs/versioning.md`.
 - **`audit:run` now warns up front when a configured model is unpriced, and
   refuses to start a budgeted run whose cost it cannot enforce.** The new
   `UnpricedModelBudgetGuard` (`src/Command/UnpricedModelBudgetGuard.php`) runs
   at the start of a real audit: if any configured model (`model`,
-  `attacker_model`, or `reviewer_model`) has no catalog price it prints a
-  one-time `$0.00` notice to stderr (so the `--dry-run` warning now also
-  surfaces on real runs), and when `audit.budget.max_cost_usd` is additionally
-  set — so the budget guard could never trip — it prompts for confirmation on an
-  interactive terminal and fails closed with exit code `2` under
-  `--no-interaction` / CI. When every configured model is priced the run is
-  silent as before.
+  `attacker_model`, `reviewer_model`, or — when escalation is enabled — the
+  effective `escalation.cheap_model`) has no catalog price it prints a one-time
+  `$0.00` notice to stderr (so the `--dry-run` warning now also surfaces on real
+  runs), and when `audit.budget.max_cost_usd` is additionally set — so the
+  budget guard could never trip — it prompts for confirmation on an interactive
+  terminal and fails closed with exit code `2` under `--no-interaction` / CI.
+  When every configured model is priced the run is silent as before.
 
 ### Changed
 

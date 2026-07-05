@@ -91,6 +91,7 @@ final readonly class ContainerParameterRegistrar
             'audit.code_slicing.min_lines_before_slicing' => $audit->codeSlicingMinLines,
             'audit.budget.max_tokens' => $budget->maxTokens,
             'audit.budget.max_cost_usd' => $budget->maxCostUsd,
+            'audit.models_requiring_pricing' => $this->modelsRequiringPricing($bundleConfiguration),
             'audit.retry.max_attempts' => $retry->maxAttempts,
             'audit.retry.initial_delay_ms' => $retry->initialDelayMs,
             'audit.retry.backoff_multiplier' => $retry->backoffMultiplier,
@@ -108,6 +109,23 @@ final readonly class ContainerParameterRegistrar
                 $audit->escalationCheapModel ?? $llm->reviewerModel(),
             ),
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function modelsRequiringPricing(BundleConfiguration $bundleConfiguration): array
+    {
+        $models = [
+            $bundleConfiguration->llm->attackerModel(),
+            $bundleConfiguration->llm->reviewerModel(),
+        ];
+
+        if ($bundleConfiguration->audit->escalationEnabled) {
+            $models[] = $bundleConfiguration->audit->escalationCheapModel ?? $bundleConfiguration->llm->reviewerModel();
+        }
+
+        return array_values(array_unique($models));
     }
 
     private function reviewerKeySalt(LLMConfiguration $llmConfiguration): string

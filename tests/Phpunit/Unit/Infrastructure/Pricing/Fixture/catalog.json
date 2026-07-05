@@ -1,28 +1,84 @@
 {
   "zzz-collides-on-qualified-key": {
     "models": {
-      "anthropic.claude-opus-4-8": { "cost": { "input": 50, "output": 100 } }
+      "anthropic.claude-opus-4-8": {
+        "cost": {
+          "input": 50,
+          "output": 100
+        }
+      }
     }
   },
   "302ai": {
     "models": {
-      "claude-opus-4-8": { "cost": { "input": 99, "output": 199 } },
-      "aggregator-only-model": { "cost": { "input": 42, "output": 84 } },
-      "gpt-5.5": { "cost": { "input": 88, "output": 176 } }
+      "claude-opus-4-8": {
+        "cost": {
+          "input": 99,
+          "output": 199
+        }
+      },
+      "aggregator-only-model": {
+        "cost": {
+          "input": 42,
+          "output": 84
+        }
+      },
+      "gpt-5.5": {
+        "cost": {
+          "input": 88,
+          "output": 176
+        }
+      }
     }
   },
   "amazon-bedrock": {
     "models": {
-      "anthropic.claude-opus-4-8": { "cost": { "input": 7, "output": 28, "cache_read": 0.7, "cache_write": 8 } },
-      "us.anthropic.claude-opus-4-8": { "cost": { "input": 6, "output": 24 } }
+      "anthropic.claude-opus-4-8": {
+        "cost": {
+          "input": 7,
+          "output": 28,
+          "cache_read": 0.7,
+          "cache_write": 8
+        }
+      },
+      "us.anthropic.claude-opus-4-8": {
+        "cost": {
+          "input": 6,
+          "output": 24
+        }
+      }
     }
   },
   "anthropic": {
     "models": {
-      "claude-opus-4-8": { "cost": { "input": 5, "output": 25, "cache_read": 0.5, "cache_write": 6.25 } },
-      "claude-no-cache": { "cost": { "input": 3, "output": 9 } },
-      "claude-weird-cost": { "cost": { "input": "free", "output": "free" } },
-      "claude-bad-cache": { "cost": { "input": 4, "output": 8, "cache_read": "free", "cache_write": null } }
+      "claude-opus-4-8": {
+        "cost": {
+          "input": 5,
+          "output": 25,
+          "cache_read": 0.5,
+          "cache_write": 6.25
+        }
+      },
+      "claude-no-cache": {
+        "cost": {
+          "input": 3,
+          "output": 9
+        }
+      },
+      "claude-weird-cost": {
+        "cost": {
+          "input": "free",
+          "output": "free"
+        }
+      },
+      "claude-bad-cache": {
+        "cost": {
+          "input": 4,
+          "output": 8,
+          "cache_read": "free",
+          "cache_write": null
+        }
+      }
     }
   },
   "google": {
@@ -30,17 +86,51 @@
   },
   "openai": {
     "models": {
-      "gpt-extra-fields": { "cost": { "input": 2, "output": 8, "input_audio": 1, "cache_read": 0.2 } }
+      "gpt-extra-fields": {
+        "cost": {
+          "input": 2,
+          "output": 8,
+          "input_audio": 1,
+          "cache_read": 0.2
+        }
+      }
     }
   },
   "vertex": {
     "models": {
-      "vertex_ai/gemini-flash": { "cost": { "input": 1, "output": 4 } }
+      "vertex_ai/gemini-flash": {
+        "cost": {
+          "input": 1,
+          "output": 4
+        }
+      }
     }
   },
   "ollama": {
     "models": {
-      "llama-local": { "open_weights": true }
+      "llama-local": {
+        "open_weights": true
+      }
+    }
+  },
+  "xai": {
+    "models": {
+      "grok-4": {
+        "cost": {
+          "input": 2,
+          "output": 10
+        }
+      }
+    }
+  },
+  "moonshotai": {
+    "models": {
+      "kimi-k2": {
+        "cost": {
+          "input": 0.6,
+          "output": 2.5
+        }
+      }
     }
   }
 }

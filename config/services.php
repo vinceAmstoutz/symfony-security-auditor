@@ -548,10 +548,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(UnpricedModelBudgetGuard::class)
         ->args([
             service(PricingProviderInterface::class),
-            [
-                param('symfony_security_auditor.attacker_model'),
-                param('symfony_security_auditor.reviewer_model'),
-            ],
+            param('symfony_security_auditor.audit.models_requiring_pricing'),
             param('symfony_security_auditor.audit.budget.max_cost_usd'),
         ]);
     $defaultsConfigurator->alias(UnpricedModelBudgetGuardInterface::class, UnpricedModelBudgetGuard::class);

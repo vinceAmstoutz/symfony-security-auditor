@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Pricing;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Stringable;
@@ -38,6 +39,22 @@ final class ModelsDevPricingProviderTest extends TestCase
 
         self::assertSame(5.0, $modelsDevPricingProvider->pricePerMillionInputTokens('claude-opus-4-8'));
         self::assertSame(25.0, $modelsDevPricingProvider->pricePerMillionOutputTokens('claude-opus-4-8'));
+    }
+
+    #[DataProvider('newerFirstPartyCases')]
+    public function test_it_prices_a_bare_id_from_every_first_party_provider_in_the_catalog(string $model, float $expectedInputPrice): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('catalog.json');
+
+        self::assertTrue($modelsDevPricingProvider->hasModel($model));
+        self::assertSame($expectedInputPrice, $modelsDevPricingProvider->pricePerMillionInputTokens($model));
+    }
+
+    /** @return iterable<string, array{string, float}> */
+    public static function newerFirstPartyCases(): iterable
+    {
+        yield 'xai grok' => ['grok-4', 2.0];
+        yield 'moonshot kimi' => ['kimi-k2', 0.6];
     }
 
     public function test_a_bare_id_found_only_in_an_aggregator_is_not_priced(): void

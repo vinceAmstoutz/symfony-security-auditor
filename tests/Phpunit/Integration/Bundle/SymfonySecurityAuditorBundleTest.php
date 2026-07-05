@@ -152,6 +152,30 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame(6000, $containerBuilder->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
     }
 
+    public function test_the_budget_guard_checks_pricing_for_the_escalation_cheap_model_too(): void
+    {
+        $containerBuilder = $this->loadParameters([
+            'attacker_model' => 'gpt-4o',
+            'reviewer_model' => 'gpt-4o-mini',
+            'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-3.5-turbo']],
+        ]);
+
+        self::assertSame(
+            ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'],
+            $containerBuilder->getParameter('symfony_security_auditor.audit.models_requiring_pricing'),
+        );
+    }
+
+    public function test_the_budget_guard_checks_only_the_distinct_configured_models_without_escalation(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        self::assertSame(
+            ['gpt-4o'],
+            $containerBuilder->getParameter('symfony_security_auditor.audit.models_requiring_pricing'),
+        );
+    }
+
     public function test_bundle_defers_composer_audit_until_the_run_sets_the_audited_project_path(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
