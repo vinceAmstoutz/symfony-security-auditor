@@ -374,7 +374,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `structuredCollection`, `attackerMaxConcurrent`) threaded into the escalation
   attacker's `AttackerAnalysisSettings`, since PHP's reflection-based DI
   instantiation weak-coerces `int`/`bool` silently, so a dropped or reordered
-  scalar argument would not otherwise fail loudly.
+  scalar argument would not otherwise fail loudly. Since the primary and
+  escalation wirings had already drifted apart once, both now build
+  `AttackerAgent`'s constructor arguments from a single new
+  `Audit\Infrastructure\Config\AttackerAgentDefinitionFactory`
+  (`src/Audit/Infrastructure/Config/AttackerAgentDefinitionFactory.php`) instead
+  of each hand-writing the same three-bag shape — there is only one argument
+  list to write now, so the two call sites cannot drift out of sync again. New
+  `test_bundle_wires_escalation_attacker_agent_from_the_same_argument_shape_as_the_primary_one`
+  asserts both definitions produce the identical argument shape.
 
 ### Security
 

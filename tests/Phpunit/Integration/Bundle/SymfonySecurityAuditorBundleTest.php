@@ -201,6 +201,32 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame('security_auditor.cheap_attacker', (string) $escalatingAttackerFirstArgument);
     }
 
+    public function test_bundle_wires_escalation_attacker_agent_from_the_same_argument_shape_as_the_primary_one(): void
+    {
+        $containerBuilder = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-4o-mini']],
+        ]);
+
+        $primaryArguments = $containerBuilder->getDefinition(AttackerAgent::class)->getArguments();
+        $escalationArguments = $containerBuilder->getDefinition('security_auditor.cheap_attacker')->getArguments();
+
+        self::assertCount(4, $primaryArguments);
+        self::assertCount(4, $escalationArguments);
+
+        self::assertInstanceOf(Definition::class, $primaryArguments[0]);
+        self::assertInstanceOf(Definition::class, $escalationArguments[0]);
+        self::assertSame($primaryArguments[0]->getClass(), $escalationArguments[0]->getClass());
+        self::assertSame(
+            \array_slice($primaryArguments[0]->getArguments(), 1),
+            \array_slice($escalationArguments[0]->getArguments(), 1),
+        );
+
+        self::assertEquals($primaryArguments[1], $escalationArguments[1]);
+        self::assertEquals($primaryArguments[2], $escalationArguments[2]);
+        self::assertEquals($primaryArguments[3], $escalationArguments[3]);
+    }
+
     #[RunInSeparateProcess]
     #[MaximumDuration(1500)]
     public function test_bundle_wires_escalating_attacker_agent_when_escalation_enabled(): void

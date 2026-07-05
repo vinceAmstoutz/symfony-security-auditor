@@ -17,9 +17,6 @@ use Symfony\Component\Validator\Validation;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmCollaborators;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerScanCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditLoopSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestratorInterface;
@@ -476,30 +473,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->alias(RecordReviewToolFactoryInterface::class, RecordReviewToolFactory::class);
 
     $defaultsConfigurator->set(AttackerAgent::class)
-        ->args([
-            inline_service(AttackerLlmCollaborators::class)->args([
-                service('security_auditor.attacker_client'),
-                service(AttackerPromptBuilderInterface::class),
-                service(VulnerabilityFactory::class),
-                service(CodeSlicerInterface::class),
-                service(RecordVulnerabilityToolFactoryInterface::class),
-            ]),
-            inline_service(AttackerScanCollaborators::class)->args([
-                service(AttackerCacheInterface::class),
-                service(StaticPreScannerInterface::class),
-                service(FileChunker::class),
-                service(ToolRegistryFactoryInterface::class),
-                service(ProgressReporterInterface::class),
-            ]),
-            inline_service(AttackerAnalysisSettings::class)->args([
-                param('symfony_security_auditor.audit.tools_enabled'),
-                param('symfony_security_auditor.audit.max_tool_iterations'),
-                param('symfony_security_auditor.audit.static_prescan.lean_mode'),
-                param('symfony_security_auditor.audit.structured_collection'),
-                param('symfony_security_auditor.audit.attacker_max_concurrent'),
-            ]),
-            service('logger'),
-        ]);
+        ->args((new AttackerAgentDefinitionFactory())->args('security_auditor.attacker_client'));
 
     $defaultsConfigurator->alias(AttackerAgentInterface::class, AttackerAgent::class);
 
