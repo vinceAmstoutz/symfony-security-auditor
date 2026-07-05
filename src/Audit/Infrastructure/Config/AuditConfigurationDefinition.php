@@ -242,7 +242,7 @@ final readonly class AuditConfigurationDefinition
                             ->children()
                                 ->booleanNode('enabled')
                                     ->defaultFalse()
-                                    ->info('When true, AttackerAgentInterface is wired to the EscalatingAttackerAgent wrapper. Requires `cheap_model` to be set.')
+                                    ->info('When true, AttackerAgentInterface is wired to the EscalatingAttackerAgent wrapper. The cheap first pass uses `cheap_model`, falling back to the reviewer model when unset; a configuration notice warns when the effective cheap model is the attacker model itself (no saving).')
                                 ->end()
                                 ->scalarNode('cheap_model')
                                     ->defaultNull()
