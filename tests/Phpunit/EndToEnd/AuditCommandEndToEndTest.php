@@ -44,6 +44,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullControllerAccessControlParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
@@ -759,8 +765,8 @@ final class AuditCommandEndToEndTest extends TestCase
         $progressReporterHolder = new ProgressReporterHolder(new NullLogger());
         $auditOrchestrator = new AuditOrchestrator(
             new AttackerAgent(
-                new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator())),
-                new AttackerScanCollaborators(new NullAttackerCache(), progressReporter: $progressReporterHolder),
+                new AttackerLlmCollaborators($attackerLLM, new AttackerPromptBuilder(), new VulnerabilityFactory(new NullLogger(), Validation::createValidator()), new NullCodeSlicer()),
+                new AttackerScanCollaborators(new NullAttackerCache(), new NullStaticPreScanner(), progressReporter: $progressReporterHolder),
                 new AttackerAnalysisSettings(),
                 new NullLogger(),
             ),
@@ -780,7 +786,7 @@ final class AuditCommandEndToEndTest extends TestCase
         $auditPipeline = new AuditPipeline(
             [
                 new IngestionStage(new ProjectFileScanner(new NullLogger()), new NullLogger()),
-                new MappingStage(new NullLogger()),
+                new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser()),
                 new AuditStage($auditOrchestrator, new NullLogger()),
             ],
             new NullLogger(),

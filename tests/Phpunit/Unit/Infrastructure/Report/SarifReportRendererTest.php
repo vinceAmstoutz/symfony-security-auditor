@@ -265,9 +265,6 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
 
         $rules = $decoded['runs'][0]['tool']['driver']['rules'];
         $firstRule = array_values($rules)[0];
-        self::assertArrayHasKey('shortDescription', $firstRule);
-        self::assertIsArray($firstRule['shortDescription']);
-        self::assertArrayHasKey('text', $firstRule['shortDescription']);
         self::assertSame(VulnerabilityType::SQL_INJECTION->category(), $firstRule['shortDescription']['text']);
     }
 
@@ -298,6 +295,19 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
 
         $firstRule = array_values($decoded['runs'][0]['tool']['driver']['rules'])[0];
         self::assertSame('https://owasp.org/Top10/2025/A05_2025-Injection/', $firstRule['helpUri']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_rule_properties_tags_include_the_cwe_reference(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION);
+        $decoded = $this->decodeSarif($this->makeReport($vulnerability));
+
+        $firstRule = array_values($decoded['runs'][0]['tool']['driver']['rules'])[0];
+        self::assertSame(['external/cwe/cwe-89'], $firstRule['properties']['tags']);
     }
 
     /**
@@ -369,7 +379,6 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         $firstRule = array_values($rules)[0];
         self::assertSame(VulnerabilityType::SQL_INJECTION->owaspReference(), $firstRule['id']);
         self::assertSame(VulnerabilityType::SQL_INJECTION->value, $firstRule['name']);
-        self::assertIsArray($firstRule['shortDescription']);
         self::assertSame(VulnerabilityType::SQL_INJECTION->category(), $firstRule['shortDescription']['text']);
     }
 
@@ -413,7 +422,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      *     "$schema": string,
      *     version: string,
      *     runs: list<array{
-     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array<string, mixed>>}},
+     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array{id: string, name: string, shortDescription: array{text: string}, helpUri: string, properties: array{tags: list<string>}}>}},
      *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>}>,
      *         properties?: array<string, mixed>
      *     }>
@@ -454,7 +463,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      *     "$schema": string,
      *     version: string,
      *     runs: list<array{
-     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array<string, mixed>>}},
+     *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array{id: string, name: string, shortDescription: array{text: string}, helpUri: string, properties: array{tags: list<string>}}>}},
      *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>}>
      *     }>
      * } $value

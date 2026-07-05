@@ -17,6 +17,7 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 
@@ -78,6 +79,26 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
         self::assertStringContainsString('## Findings', $output);
         self::assertStringContainsString('Test Vuln', $output);
         self::assertStringContainsString('`src/Admin/UserController.php:10-14`', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_finding_type_line_shows_the_owasp_and_cwe_references(): void
+    {
+        $output = $this->renderer->render($this->makeReport(
+            $this->makeValidatedVuln(vulnerabilityType: VulnerabilityType::SQL_INJECTION),
+        ));
+
+        self::assertStringContainsString(
+            \sprintf(
+                '`sql_injection` (%s, %s)',
+                VulnerabilityType::SQL_INJECTION->owaspReference(),
+                VulnerabilityType::SQL_INJECTION->cweReference(),
+            ),
+            $output,
+        );
     }
 
     /**

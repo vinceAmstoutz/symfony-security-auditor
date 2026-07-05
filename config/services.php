@@ -491,9 +491,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             inline_service(AttackerScanCollaborators::class)->args([
                 service(AttackerCacheInterface::class),
                 service(StaticPreScannerInterface::class),
+                service(ProgressReporterInterface::class),
                 service(FileChunker::class),
                 service(ToolRegistryFactoryInterface::class),
-                service(ProgressReporterInterface::class),
             ]),
             inline_service(AttackerAnalysisSettings::class)->args([
                 param('symfony_security_auditor.audit.tools_enabled'),

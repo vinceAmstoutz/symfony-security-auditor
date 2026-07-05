@@ -21,12 +21,10 @@ use function Symfony\Component\String\u;
 final readonly class TransientFailureClassifier
 {
     /** @var list<string> */
+    private const array TRANSIENT_STATUS_CODES = ['429', '500', '502', '503', '504'];
+
+    /** @var list<string> */
     private const array TRANSIENT_HINTS = [
-        '429',
-        '500',
-        '502',
-        '503',
-        '504',
         'too many requests',
         'rate limit',
         'rate_limit',
@@ -44,12 +42,10 @@ final readonly class TransientFailureClassifier
     ];
 
     /** @var list<string> */
+    private const array NON_TRANSIENT_STATUS_CODES = ['400', '401', '403', '404', '422'];
+
+    /** @var list<string> */
     private const array NON_TRANSIENT_HINTS = [
-        '400',
-        '401',
-        '403',
-        '404',
-        '422',
         'invalid api key',
         'authentication',
         'unauthorized',
@@ -59,8 +55,10 @@ final readonly class TransientFailureClassifier
     ];
 
     /** @var list<string> */
+    private const array RATE_LIMIT_STATUS_CODES = ['429'];
+
+    /** @var list<string> */
     private const array RATE_LIMIT_HINTS = [
-        '429',
         'too many requests',
         'rate limit',
         'rate_limit',
@@ -77,11 +75,15 @@ final readonly class TransientFailureClassifier
     {
         $joined = $this->joinMessages($throwable);
 
-        if (u($joined)->containsAny(self::NON_TRANSIENT_HINTS)) {
+        if (u($joined)->containsAny(self::NON_TRANSIENT_HINTS) || $this->containsStatusCode($joined, self::NON_TRANSIENT_STATUS_CODES)) {
             return false;
         }
 
-        return u($joined)->containsAny(self::TRANSIENT_HINTS);
+        if (u($joined)->containsAny(self::TRANSIENT_HINTS)) {
+            return true;
+        }
+
+        return $this->containsStatusCode($joined, self::TRANSIENT_STATUS_CODES);
     }
 
     /**
@@ -106,7 +108,11 @@ final readonly class TransientFailureClassifier
     {
         $joined = $this->joinMessages($throwable);
 
-        return u($joined)->containsAny(self::RATE_LIMIT_HINTS);
+        if (u($joined)->containsAny(self::RATE_LIMIT_HINTS)) {
+            return true;
+        }
+
+        return $this->containsStatusCode($joined, self::RATE_LIMIT_STATUS_CODES);
     }
 
     private function joinMessages(Throwable $throwable): string
@@ -119,5 +125,13 @@ final readonly class TransientFailureClassifier
         }
 
         return implode("\n", $messages);
+    }
+
+    /**
+     * @param list<string> $codes
+     */
+    private function containsStatusCode(string $joined, array $codes): bool
+    {
+        return 1 === preg_match(\sprintf('/\b(?:%s)\b/', implode('|', $codes)), $joined);
     }
 }
