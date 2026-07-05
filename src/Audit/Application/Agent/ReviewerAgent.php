@@ -84,9 +84,9 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         $this->maxConcurrent = $reviewerModeConfiguration->maxConcurrent;
         $this->useStructuredCollection = $reviewerModeConfiguration->useStructuredCollection;
 
-        $verdictApplier = new VerdictApplier($reviewerAgentCollaborators->logger, $reviewerAgentCollaborators->progressReporter);
+        $verdictApplier = new VerdictApplier($reviewerAgentCollaborators->logger);
         $reviewerVerdictCache = new ReviewerVerdictCache($reviewerAgentCollaborators->reviewerCache, $reviewerAgentCollaborators->logger);
-        $reviewOutcomeRecorder = new ReviewOutcomeRecorder($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger);
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger, $reviewerAgentCollaborators->progressReporter);
 
         $this->sequentialReviewAnalyzer = new SequentialReviewAnalyzer(
             $reviewerAgentCollaborators->llmClient,
@@ -134,7 +134,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         $this->batchReviewAnalyzer = new BatchReviewAnalyzer(
             $reviewerAgentCollaborators->llmClient,
             $reviewerAgentCollaborators->reviewerPromptBuilder,
-            new BatchVerdictApplier($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger),
+            new BatchVerdictApplier($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger, $reviewerAgentCollaborators->progressReporter),
             $reviewerVerdictCache,
             $reviewOutcomeRecorder,
             $reviewerAgentCollaborators->logger,

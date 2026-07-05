@@ -15,9 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 
 use Psr\Log\LoggerInterface;
 use Throwable;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
  * Turns a batch review outcome into the reviewed findings plus their reviewer
@@ -32,6 +32,7 @@ final readonly class BatchVerdictApplier
         private VerdictApplier $verdictApplier,
         private ReviewerVerdictCache $reviewerVerdictCache,
         private LoggerInterface $logger,
+        private ProgressReporterInterface $progressReporter,
     ) {}
 
     /**
@@ -106,7 +107,7 @@ final readonly class BatchVerdictApplier
     private function reviewVulnerability(Vulnerability $vulnerability, ?array $review, CoverageRecorderInterface $coverageRecorder, array $codeContexts): Vulnerability
     {
         if (null === $review) {
-            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
+            ReviewerCoverageRecorder::record($vulnerability, 'rejected', $coverageRecorder, $this->progressReporter);
 
             return $vulnerability->withReviewerValidation(false);
         }
@@ -116,10 +117,11 @@ final readonly class BatchVerdictApplier
         }
 
         $applied = $this->verdictApplier->apply($vulnerability, $review);
-        $coverageRecorder->recordCoverage(
-            AgentRole::Reviewer->value,
-            $vulnerability->filePath(),
+        ReviewerCoverageRecorder::record(
+            $applied,
             $applied->isReviewerValidated() ? 'validated' : 'rejected',
+            $coverageRecorder,
+            $this->progressReporter,
         );
 
         return $applied;
@@ -135,7 +137,7 @@ final readonly class BatchVerdictApplier
         $rejected = [];
         foreach ($batch as $vulnerability) {
             $rejected[] = $vulnerability->withReviewerValidation(false);
-            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
+            ReviewerCoverageRecorder::record($vulnerability, 'rejected', $coverageRecorder, $this->progressReporter);
         }
 
         return $rejected;
@@ -151,7 +153,7 @@ final readonly class BatchVerdictApplier
         $errored = [];
         foreach ($batch as $vulnerability) {
             $errored[] = $vulnerability->withReviewerValidation(false);
-            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
+            ReviewerCoverageRecorder::record($vulnerability, 'errored', $coverageRecorder, $this->progressReporter);
         }
 
         return $errored;

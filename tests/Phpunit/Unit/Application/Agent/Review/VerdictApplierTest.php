@@ -24,8 +24,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassif
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 final class VerdictApplierTest extends TestCase
 {
@@ -33,47 +31,9 @@ final class VerdictApplierTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */
-    public function test_it_reports_an_accepted_verdict_as_a_review_finding_event(): void
-    {
-        $progressReporter = $this->createMock(ProgressReporterInterface::class);
-        $progressReporter->expects(self::once())->method('report')->with(
-            'review.finding.reviewed',
-            ['accepted' => true, 'type' => 'sql_injection', 'file' => 'src/A.php', 'line' => 18],
-        );
-
-        $verdictApplier = new VerdictApplier(new NullLogger(), $progressReporter);
-
-        $vulnerability = $verdictApplier->apply($this->vulnerability(), ['accepted' => true]);
-
-        self::assertTrue($vulnerability->isReviewerValidated());
-    }
-
-    /**
-     * @throws InvalidCodeLocationException
-     * @throws InvalidVulnerabilityClassificationException
-     */
-    public function test_it_reports_a_rejected_verdict_as_a_review_finding_event(): void
-    {
-        $progressReporter = $this->createMock(ProgressReporterInterface::class);
-        $progressReporter->expects(self::once())->method('report')->with(
-            'review.finding.reviewed',
-            ['accepted' => false, 'type' => 'sql_injection', 'file' => 'src/A.php', 'line' => 18],
-        );
-
-        $verdictApplier = new VerdictApplier(new NullLogger(), $progressReporter);
-
-        $vulnerability = $verdictApplier->apply($this->vulnerability(), ['accepted' => false]);
-
-        self::assertFalse($vulnerability->isReviewerValidated());
-    }
-
-    /**
-     * @throws InvalidCodeLocationException
-     * @throws InvalidVulnerabilityClassificationException
-     */
     public function test_it_elevates_severity_when_the_verdict_is_accepted(): void
     {
-        $verdictApplier = new VerdictApplier(new NullLogger(), new NullProgressReporter());
+        $verdictApplier = new VerdictApplier(new NullLogger());
 
         $vulnerability = $verdictApplier->apply($this->vulnerability(), ['accepted' => true, 'adjusted_severity' => 'critical']);
 
@@ -86,7 +46,7 @@ final class VerdictApplierTest extends TestCase
      */
     public function test_it_does_not_adjust_severity_when_the_verdict_is_rejected(): void
     {
-        $verdictApplier = new VerdictApplier(new NullLogger(), new NullProgressReporter());
+        $verdictApplier = new VerdictApplier(new NullLogger());
 
         $vulnerability = $verdictApplier->apply($this->vulnerability(), ['accepted' => false, 'adjusted_severity' => 'critical']);
 

@@ -15,11 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 
 use Psr\Log\LoggerInterface;
 use ValueError;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
  * Applies one reviewer verdict payload to a finding: acceptance, optional
@@ -32,7 +30,6 @@ final readonly class VerdictApplier
 {
     public function __construct(
         private LoggerInterface $logger,
-        private ProgressReporterInterface $progressReporter,
     ) {}
 
     /**
@@ -56,19 +53,8 @@ final readonly class VerdictApplier
         }
 
         $this->logReviewDecision($vulnerability, $accepted, $review);
-        $this->reportReviewed($reviewed, $accepted);
 
         return $reviewed;
-    }
-
-    private function reportReviewed(Vulnerability $vulnerability, bool $accepted): void
-    {
-        $this->progressReporter->report(ProgressEvent::ReviewFindingReviewed->value, [
-            'accepted' => $accepted,
-            'type' => $vulnerability->type()->value,
-            'file' => $vulnerability->filePath(),
-            'line' => $vulnerability->lineStart(),
-        ]);
     }
 
     private function applyAdjustedSeverity(Vulnerability $vulnerability, ?string $adjustedSeverity): Vulnerability

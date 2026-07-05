@@ -314,11 +314,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   review of _N_ findings parked the progress bar on the audit stage with no
   visible movement for minutes — `ConsoleProgressReporter` had nothing to redraw
   between the two events. The reviewer now emits a `review.finding.reviewed`
-  progress event per verdict from `VerdictApplier::apply()`, the single
-  chokepoint shared by every review mode (sequential, concurrent, structured,
-  and batched). A decorated terminal prints `⚖ ✓ validated <type> — file:line`
-  (green) and `⚖ ✗ rejected <type> — file:line` (yellow) above the bar and ticks
-  the bar suffix `reviewing i/N`; `PlainProgressReporter` appends
+  progress event per finding from `ReviewerCoverageRecorder`, the single step
+  that also records the finding's reviewer coverage entry — shared by every
+  review mode (sequential, concurrent, structured, and batched) and by every
+  outcome, so a finding whose review errored, whose response carried no verdict,
+  or whose batch entry went unmatched still advances the counter instead of
+  leaving `reviewing i/N` stuck short of _N_. A decorated terminal prints
+  `⚖ ✓ validated <type> — file:line` (green) and
+  `⚖ ✗ rejected <type> — file:line` (yellow) above the bar and ticks the bar
+  suffix `reviewing i/N`; `PlainProgressReporter` appends
   `[VALIDATED]`/`[REJECTED]` lines for non-TTY output. New stable progress-event
   value `review.finding.reviewed`.
 - **LLM pricing is now sourced from the daily `symfony/models-dev` catalog
