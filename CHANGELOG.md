@@ -540,6 +540,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   guard so an already-redacted `***REDACTED:...***` placeholder from an earlier
   pattern (e.g. `env_assignment` on an all-caps `PASSWORD=...` line) is never
   re-matched and double-redacted.
+- **Concurrent LLM calls (batch dispatch, the tool-calling wavefront, and
+  retries) corrupted the rate limiter's input-token accounting, causing
+  premature throttling.** `TokenBucketRateLimiter` tracked exactly one pending
+  estimate as a scalar
+  (`src/Audit/Infrastructure/LLM/RateLimit/TokenBucketRateLimiter.php`), so when
+  `BatchWindowResolver`/`ToolConversationWavefront` called `acquire()` for every
+  request in a window before `record()`-ing any of them, each new `acquire()`
+  silently overwrote the previous one's estimate — only the last request in the
+  window was ever correctly reconciled, permanently inflating the window's
+  used-token count by the sum of every other request's estimate. The pending
+  estimate is now a FIFO queue, one entry per unreconciled `acquire()`, so each
+  `record()` reconciles against its own request's estimate regardless of how
+  many are in flight. `BatchWindowResolver`, `ToolConversationWavefront`, and
+  `RetryingPlatformInvoker`'s retry loop now also call `record(0, 0)` to release
+  a reservation whose call failed and fell back to a fresh attempt — previously
+  that reservation was never reconciled at all, leaking into the window's usage
+  for the rest of the minute.
 
 ### Security
 
