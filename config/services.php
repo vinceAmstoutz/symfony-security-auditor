@@ -65,6 +65,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
@@ -453,10 +454,14 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ]);
     $defaultsConfigurator->alias(ComposerAuditRunnerInterface::class, LockfileHashedAdvisoryCache::class);
 
+    $defaultsConfigurator->set(AuditedProjectPathHolder::class)
+        ->args([param('kernel.project_dir')]);
+
     $defaultsConfigurator->set(ComposerAuditAdvisoryDatabase::class)
+        ->lazy()
         ->args([
             service(ComposerAuditRunnerInterface::class),
-            param('kernel.project_dir'),
+            service(AuditedProjectPathHolder::class),
             service('logger'),
         ]);
 
@@ -560,6 +565,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(EstimateAuditCostUseCase::class),
             service(ListScannedFilesUseCase::class),
             service(ProgressReporterHolder::class),
+            service(AuditedProjectPathHolder::class),
             service(BaselineProcessorInterface::class),
             service(UnpricedModelBudgetGuardInterface::class),
             param('symfony_security_auditor.scan.secret_scrubbing.enabled'),

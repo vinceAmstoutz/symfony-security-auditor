@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\PlainProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
@@ -56,6 +57,7 @@ final readonly class AuditCommand
         private EstimateAuditCostUseCase $estimateAuditCostUseCase,
         private ListScannedFilesUseCase $listScannedFilesUseCase,
         private ProgressReporterHolder $progressReporterHolder,
+        private AuditedProjectPathHolder $auditedProjectPathHolder,
         private BaselineProcessorInterface $baselineProcessor,
         private UnpricedModelBudgetGuardInterface $unpricedModelBudgetGuard,
         private bool $secretScrubbingEnabled,
@@ -74,6 +76,7 @@ final readonly class AuditCommand
         #[MapInput] AuditCommandInput $auditCommandInput,
     ): int {
         $projectPath = $auditCommandInput->resolvedProjectPath();
+        $this->auditedProjectPathHolder->set($projectPath);
 
         $this->auditPresenter->header($symfonyStyle, $projectPath);
 

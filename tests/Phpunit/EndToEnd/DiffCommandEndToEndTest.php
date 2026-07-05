@@ -47,6 +47,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
@@ -236,6 +237,7 @@ final class DiffCommandEndToEndTest extends TestCase
             $estimateAuditCostUseCase,
             new ListScannedFilesUseCase($projectFileScanner),
             $progressReporterHolder,
+            new AuditedProjectPathHolder('/app'),
             new BaselineProcessor(new Baseline()),
             new UnpricedModelBudgetGuard(
                 new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json'),

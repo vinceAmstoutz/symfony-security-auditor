@@ -51,6 +51,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigPar
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
@@ -827,6 +828,7 @@ final class AuditCommandEndToEndTest extends TestCase
             $estimateAuditCostUseCase,
             new ListScannedFilesUseCase($projectFileScanner),
             $progressReporterHolder,
+            new AuditedProjectPathHolder('/app'),
             new BaselineProcessor(new Baseline(), $configuredBaseline),
             new UnpricedModelBudgetGuard(
                 new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json'),

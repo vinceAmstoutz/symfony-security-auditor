@@ -52,6 +52,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
@@ -149,6 +150,17 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         self::assertSame(6000, $containerBuilder->getParameter('symfony_security_auditor.attacker_max_output_tokens'));
         self::assertSame(6000, $containerBuilder->getParameter('symfony_security_auditor.reviewer_max_output_tokens'));
+    }
+
+    public function test_bundle_defers_composer_audit_until_the_run_sets_the_audited_project_path(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        $definition = $containerBuilder->getDefinition(ComposerAuditAdvisoryDatabase::class);
+        self::assertTrue($definition->isLazy());
+        $pathArgument = $definition->getArgument(1);
+        self::assertInstanceOf(Reference::class, $pathArgument);
+        self::assertSame(AuditedProjectPathHolder::class, (string) $pathArgument);
     }
 
     public function test_bundle_does_not_register_escalation_services_by_default(): void

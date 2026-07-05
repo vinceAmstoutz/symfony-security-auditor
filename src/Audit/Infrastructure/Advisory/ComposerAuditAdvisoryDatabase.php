@@ -43,10 +43,10 @@ final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseIn
 
     public function __construct(
         ComposerAuditRunnerInterface $composerAuditRunner,
-        string $projectPath,
+        AuditedProjectPathHolder $auditedProjectPathHolder,
         LoggerInterface $logger,
     ) {
-        $this->entriesByPackage = $this->load($composerAuditRunner, $projectPath, $logger);
+        $this->entriesByPackage = $this->load($composerAuditRunner, $auditedProjectPathHolder->path(), $logger);
     }
 
     #[Override]

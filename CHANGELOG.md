@@ -569,17 +569,41 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
-- **Invokable `#[AsController]` services were not classified as controllers.**
-  A Symfony controller does not have to extend `AbstractController` — an
-  invokable service tagged with `#[AsController]` whose routes are declared in
-  routing configuration (YAML/PHP) rather than `#[Route]` attributes is just
-  as much an HTTP entry point, but `ProjectFileTypeClassifier`'s content
-  heuristic only recognized `extends AbstractController` and `#[Route`, so
-  such an action class outside a `Controller` path classified as plain `php`
-  and never received the controller attack-surface skill or pre-scan markers.
-  The heuristic now also matches the `#[AsController]` attribute. (A plain
-  invokable class with neither attribute nor base class remains detectable
-  only by path convention — content offers nothing to key on.)
+- **`composer audit` advisories now target the audited project instead of the
+  host application (or the standalone binary's working directory).**
+  `ComposerAuditAdvisoryDatabase` received `kernel.project_dir` at
+  container-build time — the Symfony app's own directory in bundle usage, and
+  whatever `getcwd()` happened to be in the standalone binary — so
+  `audit:run /path/to/other-project` looked up advisories against the wrong
+  `composer.lock` (or none, silently disabling `lookup_advisory`). The new
+  `AuditedProjectPathHolder`
+  (`src/Audit/Infrastructure/Advisory/AuditedProjectPathHolder.php`) carries the
+  command's resolved `project-path` argument at runtime, and the advisory
+  database is a lazy service, so the audit executes against the project actually
+  being audited — and only when advisory data is first needed, instead of at
+  container instantiation.
+- **The standalone binary's per-project config resolution no longer depends on
+  the `$PWD` shell export, and project-config lists override user-config lists
+  wholesale.** `.symfony-security-auditor.yaml` was located via
+  `$environment['PWD']`, which is unset on Windows and in cron/CI contexts, so
+  the project-level config was silently ignored there — the process working
+  directory (`getcwd()`) is now the fallback. Separately,
+  `StandaloneConfigLoader` merged the global XDG config and the project config
+  with `array_replace_recursive`, which merges list values index-wise: a user
+  config with `scan.included_paths: [src, config, templates]` and a project
+  config with `[app]` produced the mangled `[app, config, templates]`. List
+  values now replace wholesale; only string-keyed maps merge recursively.
+- **Invokable `#[AsController]` services were not classified as controllers.** A
+  Symfony controller does not have to extend `AbstractController` — an invokable
+  service tagged with `#[AsController]` whose routes are declared in routing
+  configuration (YAML/PHP) rather than `#[Route]` attributes is just as much an
+  HTTP entry point, but `ProjectFileTypeClassifier`'s content heuristic only
+  recognized `extends AbstractController` and `#[Route`, so such an action class
+  outside a `Controller` path classified as plain `php` and never received the
+  controller attack-surface skill or pre-scan markers. The heuristic now also
+  matches the `#[AsController]` attribute. (A plain invokable class with neither
+  attribute nor base class remains detectable only by path convention — content
+  offers nothing to key on.)
 - **`--since` silently dropped changed dotfiles (`.env`, `.github/...`) from
   incremental audits.** `ProcessGitChangedFilesResolver::mergeAndNormalize()`
   (`src/Audit/Infrastructure/Diff/ProcessGitChangedFilesResolver.php`) used
@@ -592,11 +616,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   literal `./` prefix.
 - **`--since` also silently dropped changed files with non-ASCII names.** Git
   C-quotes any path containing bytes above ASCII by default
-  (`core.quotepath=true`), so a changed `templates/modèle.html.twig` came out
-  of `git diff --name-only` as `"templates/mod\303\250le.html.twig"` — with
-  literal quotes and octal escapes — and never matched the real project file
-  in `IngestionStage`'s changed-set filter, excluding it from the incremental
-  audit with no warning. `ProcessGitChangedFilesResolver` now runs every git
+  (`core.quotepath=true`), so a changed `templates/modèle.html.twig` came out of
+  `git diff --name-only` as `"templates/mod\303\250le.html.twig"` — with literal
+  quotes and octal escapes — and never matched the real project file in
+  `IngestionStage`'s changed-set filter, excluding it from the incremental audit
+  with no warning. `ProcessGitChangedFilesResolver` now runs every git
   invocation with `-c core.quotepath=off` so paths come back verbatim.
 - **Static pre-scan patterns using the `s` (DOTALL) modifier never matched
   anything.** `RegexStaticPreScanner::matchLines()`
