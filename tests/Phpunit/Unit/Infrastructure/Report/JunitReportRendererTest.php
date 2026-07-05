@@ -103,6 +103,32 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */
+    public function test_it_strips_xml_illegal_control_characters(): void
+    {
+        $illegalCharacters = implode('', array_map('chr', [...range(0x00, 0x08), 0x0B, 0x0C, ...range(0x0E, 0x1F)]));
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, \sprintf('Bad%sTitle', $illegalCharacters), 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative(\sprintf('Desc%sEnd', $illegalCharacters), 'vector', 'proof', \sprintf('Rem%sEnd', $illegalCharacters)),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $domDocument = $this->decodeJunit($this->makeReport($vulnerability));
+
+        $testcase = $domDocument->getElementsByTagName('testcase')->item(0);
+        self::assertNotNull($testcase);
+        self::assertSame('BadTitle (src/Foo.php:1)', $testcase->getAttribute('name'));
+
+        $failure = $domDocument->getElementsByTagName('failure')->item(0);
+        self::assertNotNull($failure);
+        self::assertStringContainsString('DescEnd', $failure->textContent);
+        self::assertStringContainsString('RemEnd', $failure->textContent);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_it_pretty_prints_the_document(): void
     {
         $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));

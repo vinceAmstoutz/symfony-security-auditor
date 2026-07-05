@@ -288,11 +288,12 @@ bin/console audit:run --dry-run
   [Cost & Performance](docs/cost-and-performance.md#avoiding-rate-limits-429)).
 - **PoC synthesis** — optionally attach a concrete, copy-pasteable reproduction
   (curl/console/payload) to every high-severity finding.
-- **Five output formats** — `console`, `json`, `sarif` (GitHub Code Scanning /
-  GitLab Security Dashboard), `html` (self-contained, shareable), and `markdown`
-  (PR-friendly). Baseline suppression: `--generate-baseline` accepts known
-  findings, `--baseline` drops them from the report and exit code so only new
-  findings fail CI.
+- **Seven output formats** — `console`, `json`, `sarif` (GitHub Code Scanning /
+  GitLab Security Dashboard), `html` (self-contained, shareable), `markdown`
+  (PR-friendly), `junit` (CI test-report panels), and `github` (inline PR
+  annotations, no SARIF upload step). Baseline suppression:
+  `--generate-baseline` accepts known findings, `--baseline` drops them from the
+  report and exit code so only new findings fail CI.
 - **CI-ready** — a reusable
   [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor)
   (`uses: vinceamstoutz/symfony-security-auditor@1.12.0`) plus GitLab CI
