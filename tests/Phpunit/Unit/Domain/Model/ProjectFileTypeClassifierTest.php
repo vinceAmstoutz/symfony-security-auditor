@@ -21,9 +21,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileTypeClass
 final class ProjectFileTypeClassifierTest extends TestCase
 {
     #[DataProvider('classificationCases')]
-    public function test_it_classifies_a_path_and_content_pair(string $path, string $content, ProjectFileType $expected): void
+    public function test_it_classifies_a_path_and_content_pair(string $path, string $content, ProjectFileType $projectFileType): void
     {
-        self::assertSame($expected, ProjectFileTypeClassifier::classify($path, $content));
+        self::assertSame($projectFileType, ProjectFileTypeClassifier::classify($path, $content));
     }
 
     /** @return iterable<string, array{string, string, ProjectFileType}> */
@@ -52,15 +52,15 @@ final class ProjectFileTypeClassifierTest extends TestCase
 
     public function test_a_non_php_file_in_a_webhook_directory_is_not_forced_into_webhook_consumer(): void
     {
-        $type = ProjectFileTypeClassifier::classify('src/Webhook/config.yaml', 'foo: bar');
+        $projectFileType = ProjectFileTypeClassifier::classify('src/Webhook/config.yaml', 'foo: bar');
 
-        self::assertSame(ProjectFileType::CONFIG, $type);
+        self::assertSame(ProjectFileType::CONFIG, $projectFileType);
     }
 
     public function test_a_non_php_file_in_a_message_handler_directory_is_not_forced_into_messenger_handler(): void
     {
-        $type = ProjectFileTypeClassifier::classify('src/MessageHandler/config.yaml', 'foo: bar');
+        $projectFileType = ProjectFileTypeClassifier::classify('src/MessageHandler/config.yaml', 'foo: bar');
 
-        self::assertSame(ProjectFileType::CONFIG, $type);
+        self::assertSame(ProjectFileType::CONFIG, $projectFileType);
     }
 }

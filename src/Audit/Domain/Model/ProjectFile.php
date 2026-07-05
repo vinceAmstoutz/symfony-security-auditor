@@ -204,10 +204,10 @@ final readonly class ProjectFile
         return str_ends_with($this->relativePath, '.yaml')
             || str_ends_with($this->relativePath, '.yml')
             || str_ends_with($this->relativePath, '.xml')
-            || self::isDotenvPath($this->relativePath);
+            || $this->isDotenvPath($this->relativePath);
     }
 
-    private static function isDotenvPath(string $path): bool
+    private function isDotenvPath(string $path): bool
     {
         return str_starts_with(basename($path), '.env')
             && !str_ends_with($path, '.php');
