@@ -10,7 +10,7 @@ jobs:
     name: Version pins match the tag
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Verify every pin points at ${{ github.ref_name }}
         run: |
