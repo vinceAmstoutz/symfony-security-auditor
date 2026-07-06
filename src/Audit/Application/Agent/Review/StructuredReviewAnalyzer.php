@@ -56,11 +56,35 @@ final readonly class StructuredReviewAnalyzer
     public function analyze(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): array
     {
         $reviewed = [];
-        foreach ($vulnerabilities as $vulnerability) {
-            $reviewed[] = $this->reviewSingle($vulnerability, $projectFiles, $coverageRecorder, $bypassCache);
+        foreach ($vulnerabilities as $index => $vulnerability) {
+            try {
+                $reviewed[] = $this->reviewSingle($vulnerability, $projectFiles, $coverageRecorder, $bypassCache);
+            } catch (BudgetExceededException $budgetExceededException) {
+                $this->failRemaining($vulnerabilities, $index + 1, 'aborted', $coverageRecorder);
+
+                throw $budgetExceededException;
+            } catch (LLMProviderException $llmProviderException) {
+                $this->failRemaining($vulnerabilities, $index + 1, 'errored', $coverageRecorder);
+
+                throw $llmProviderException;
+            }
         }
 
         return $reviewed;
+    }
+
+    /**
+     * @param list<Vulnerability> $vulnerabilities
+     */
+    private function failRemaining(array $vulnerabilities, int $fromIndex, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        foreach ($vulnerabilities as $index => $vulnerability) {
+            if ($index < $fromIndex) {
+                continue;
+            }
+
+            $this->reviewOutcomeRecorder->recordUnreached($vulnerability, $status, $coverageRecorder);
+        }
     }
 
     /**
@@ -94,8 +118,12 @@ final readonly class StructuredReviewAnalyzer
 
             return $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $verdict, $coverageRecorder);
         } catch (BudgetExceededException $budgetExceededException) {
+            $this->reviewOutcomeRecorder->recordUnreached($vulnerability, 'aborted', $coverageRecorder);
+
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
+            $this->reviewOutcomeRecorder->recordUnreached($vulnerability, 'errored', $coverageRecorder);
+
             throw $llmProviderException;
         } catch (Throwable $exception) {
             return $this->reviewOutcomeRecorder->recordReviewError($vulnerability, $exception, $coverageRecorder);

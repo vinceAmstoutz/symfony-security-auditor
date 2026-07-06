@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
@@ -21,11 +23,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilder
 
 /**
  * Resolves every single-finding review in concurrency windows via the
- * batch-capable client, then applies each verdict. Budget and non-transient
- * provider failures propagate (the batch client rethrows them); per-finding
- * parse/transient failures degrade to a rejected verdict exactly as the
- * sequential path does. Cached verdicts are served first; only the misses are
- * dispatched.
+ * batch-capable client, then applies each verdict. Findings are dispatched one
+ * `maxConcurrent`-sized window at a time — never as a single oversized batch —
+ * so a budget/provider failure in a later window cannot discard an earlier
+ * window's already-applied verdicts; the failing window and every window not
+ * yet dispatched are marked `aborted`/`errored` before the exception
+ * propagates. Per-finding parse/transient failures degrade to a rejected
+ * verdict exactly as the sequential path does. Cached verdicts are served
+ * first; only the misses are dispatched.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -44,6 +49,9 @@ final readonly class ConcurrentReviewAnalyzer
      * @param list<ProjectFile>   $projectFiles
      *
      * @return list<Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function analyze(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): array
     {
@@ -99,10 +107,18 @@ final readonly class ConcurrentReviewAnalyzer
     }
 
     /**
+     * Dispatches pending findings one `maxConcurrent`-sized window at a time.
+     * Each window is finalized (verdicts applied) as soon as it completes,
+     * before the next window is attempted, so a failure partway through never
+     * discards an earlier window's completed work.
+     *
      * @param list<array{system: string, user: string}>                                        $requests
      * @param list<array{index: int, vulnerability: Vulnerability, cacheContext: string|null}> $pending
      *
      * @return array<int, Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     private function dispatchPending(array $requests, array $pending, CoverageRecorderInterface $coverageRecorder): array
     {
@@ -110,12 +126,66 @@ final readonly class ConcurrentReviewAnalyzer
             return [];
         }
 
-        $responses = $this->batchCapableLLMClient->completeBatch($requests, $this->maxConcurrent);
+        $windowSize = max(1, $this->maxConcurrent);
+        $requestWindows = array_chunk($requests, $windowSize);
+        $pendingWindows = array_chunk($pending, $windowSize);
+
         $reviewed = [];
-        foreach ($pending as $position => $entry) {
+        foreach ($requestWindows as $windowNumber => $requestWindow) {
+            try {
+                $reviewed += $this->dispatchWindow($requestWindow, $pendingWindows[$windowNumber], $coverageRecorder);
+            } catch (BudgetExceededException $budgetExceededException) {
+                $this->failRemainingWindows($pendingWindows, $windowNumber, 'aborted', $coverageRecorder);
+
+                throw $budgetExceededException;
+            } catch (LLMProviderException $llmProviderException) {
+                $this->failRemainingWindows($pendingWindows, $windowNumber, 'errored', $coverageRecorder);
+
+                throw $llmProviderException;
+            }
+        }
+
+        return $reviewed;
+    }
+
+    /**
+     * @param list<array{system: string, user: string}>                                        $requestWindow
+     * @param list<array{index: int, vulnerability: Vulnerability, cacheContext: string|null}> $pendingWindow
+     *
+     * @return array<int, Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    private function dispatchWindow(array $requestWindow, array $pendingWindow, CoverageRecorderInterface $coverageRecorder): array
+    {
+        $responses = $this->batchCapableLLMClient->completeBatch($requestWindow, $this->maxConcurrent);
+
+        $reviewed = [];
+        foreach ($pendingWindow as $position => $entry) {
             $reviewed[$entry['index']] = $this->reviewOutcomeRecorder->applyResponse($entry['vulnerability'], $responses[$position], $coverageRecorder, $entry['cacheContext']);
         }
 
         return $reviewed;
+    }
+
+    /**
+     * Marks every finding in the window that just failed, plus every window
+     * not yet attempted, as failed — without touching windows that already
+     * finalized successfully.
+     *
+     * @param list<list<array{index: int, vulnerability: Vulnerability, cacheContext: string|null}>> $pendingWindows
+     */
+    private function failRemainingWindows(array $pendingWindows, int $fromWindowNumber, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        foreach ($pendingWindows as $windowNumber => $window) {
+            if ($windowNumber < $fromWindowNumber) {
+                continue;
+            }
+
+            foreach ($window as $entry) {
+                $this->reviewOutcomeRecorder->recordUnreached($entry['vulnerability'], $status, $coverageRecorder);
+            }
+        }
     }
 }

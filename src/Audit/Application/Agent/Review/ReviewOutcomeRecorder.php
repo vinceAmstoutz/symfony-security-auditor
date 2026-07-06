@@ -75,6 +75,16 @@ final readonly class ReviewOutcomeRecorder
         return $vulnerability->withReviewerValidation(false);
     }
 
+    /**
+     * Marks a finding the reviewer never reached because a budget/provider
+     * abort unwound the review loop first — no logging, mirroring how
+     * `ChunkCoverageRecorder` marks a chunk the attacker never reached.
+     */
+    public function recordUnreached(Vulnerability $vulnerability, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        ReviewerCoverageRecorder::record($vulnerability, $status, $coverageRecorder, $this->progressReporter);
+    }
+
     public function applyResponse(Vulnerability $vulnerability, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder, ?string $codeContextForCache = null): Vulnerability
     {
         if ($llmResponse->isEmpty()) {

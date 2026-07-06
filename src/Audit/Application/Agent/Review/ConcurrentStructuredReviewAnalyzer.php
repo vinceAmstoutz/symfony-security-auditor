@@ -29,8 +29,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
 /**
  * Resolves every single-finding review in concurrency windows via the
  * tool-batch-capable client, each verdict arriving through its own
- * schema-enforced `record_review` tool. Cached verdicts are served first;
- * only the misses are dispatched.
+ * schema-enforced `record_review` tool. Pending findings are dispatched one
+ * `maxConcurrent`-sized window at a time — never as a single oversized batch —
+ * so a budget/provider failure in a later window cannot discard an earlier
+ * window's already-applied verdicts; the failing window and every window not
+ * yet dispatched are marked `aborted`/`errored` before the exception
+ * propagates. Cached verdicts are served first; only the misses are
+ * dispatched.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -83,7 +88,7 @@ final readonly class ConcurrentStructuredReviewAnalyzer
 
         if ([] !== $requests) {
             $concurrentReviewBatch = new ConcurrentReviewBatch($requests, $pendingIndexes, $sessions, $vulnerabilities, $codeContexts);
-            $reviewed = $this->dispatchPending($concurrentReviewBatch, $coverageRecorder, $bypassCache, $reviewed);
+            $reviewed = $this->dispatchInWindows($concurrentReviewBatch, $bypassCache, $coverageRecorder, $reviewed);
         }
 
         ksort($reviewed);
@@ -101,6 +106,65 @@ final readonly class ConcurrentStructuredReviewAnalyzer
             'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
             'tools' => $structuredReviewCollectionSession->toolRegistry,
         ];
+    }
+
+    /**
+     * Dispatches pending findings one `maxConcurrent`-sized window at a time.
+     * Each window is finalized (verdicts applied) as soon as it completes,
+     * before the next window is attempted, so a failure partway through never
+     * discards an earlier window's completed work.
+     *
+     * @param array<int, Vulnerability> $reviewed
+     *
+     * @return array<int, Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    private function dispatchInWindows(ConcurrentReviewBatch $concurrentReviewBatch, bool $bypassCache, CoverageRecorderInterface $coverageRecorder, array $reviewed): array
+    {
+        $windowSize = max(1, $this->maxConcurrent);
+        $requestWindows = array_chunk($concurrentReviewBatch->requests, $windowSize);
+        $indexWindows = array_chunk($concurrentReviewBatch->pendingIndexes, $windowSize);
+
+        foreach ($requestWindows as $windowNumber => $requestWindow) {
+            $windowBatch = new ConcurrentReviewBatch($requestWindow, $indexWindows[$windowNumber], $concurrentReviewBatch->sessions, $concurrentReviewBatch->vulnerabilities, $concurrentReviewBatch->codeContexts);
+
+            try {
+                $reviewed = $this->dispatchPending($windowBatch, $coverageRecorder, $bypassCache, $reviewed);
+            } catch (BudgetExceededException $budgetExceededException) {
+                $this->failRemainingWindows($indexWindows, $windowNumber, $concurrentReviewBatch->vulnerabilities, 'aborted', $coverageRecorder);
+
+                throw $budgetExceededException;
+            } catch (LLMProviderException $llmProviderException) {
+                $this->failRemainingWindows($indexWindows, $windowNumber, $concurrentReviewBatch->vulnerabilities, 'errored', $coverageRecorder);
+
+                throw $llmProviderException;
+            }
+        }
+
+        return $reviewed;
+    }
+
+    /**
+     * Marks every finding in the window that just failed, plus every window
+     * not yet attempted, as failed — without touching windows that already
+     * finalized successfully.
+     *
+     * @param list<list<int>>     $indexWindows
+     * @param list<Vulnerability> $vulnerabilities
+     */
+    private function failRemainingWindows(array $indexWindows, int $fromWindowNumber, array $vulnerabilities, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        foreach ($indexWindows as $windowNumber => $indexes) {
+            if ($windowNumber < $fromWindowNumber) {
+                continue;
+            }
+
+            foreach ($indexes as $index) {
+                $this->reviewOutcomeRecorder->recordUnreached($vulnerabilities[$index], $status, $coverageRecorder);
+            }
+        }
     }
 
     /**

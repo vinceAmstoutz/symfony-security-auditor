@@ -174,6 +174,26 @@ final readonly class BatchVerdictApplier
     }
 
     /**
+     * Marks every finding in a batch the reviewer never reached because a
+     * budget abort unwound the batch loop first — no logging, mirroring
+     * `markBatchErrored()`.
+     *
+     * @param list<Vulnerability> $batch
+     *
+     * @return list<Vulnerability>
+     */
+    public function markBatchAborted(array $batch, CoverageRecorderInterface $coverageRecorder): array
+    {
+        $aborted = [];
+        foreach ($batch as $vulnerability) {
+            $aborted[] = $vulnerability->withReviewerValidation(false);
+            ReviewerCoverageRecorder::record($vulnerability, 'aborted', $coverageRecorder, $this->progressReporter);
+        }
+
+        return $aborted;
+    }
+
+    /**
      * Logs a failed batch LLM call and marks every finding in the batch
      * errored, so the error log + coverage live in a single tested place for
      * both the JSON batch path and the structured `record_review` batch path.

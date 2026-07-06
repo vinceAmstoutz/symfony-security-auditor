@@ -628,6 +628,31 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **The same missing-coverage-on-abort defect existed on the reviewer side too,
+  across all five review analyzers, and the two concurrent ones also discarded
+  already-applied verdicts from a successful earlier window.**
+  `StructuredReviewAnalyzer`/`SequentialReviewAnalyzer`'s `analyze()` loops and
+  `BatchReviewAnalyzer::reviewMissesInBatches()`'s batch loop had no surrounding
+  `try`/`catch`, so a `BudgetExceededException`/`LLMProviderException` from one
+  finding/batch unwound immediately, leaving every finding/batch after it — and,
+  on the two single-item paths, the failing finding itself — with no reviewer
+  coverage entry at all. `ConcurrentReviewAnalyzer` and
+  `ConcurrentStructuredReviewAnalyzer` were worse: both dispatched every pending
+  finding through a single un-windowed
+  `completeBatch()`/`completeBatchWithTools()` call, so — the same bug the
+  `ConcurrentChunkAnalyzer` fix above closes for the attacker side — a failure
+  partway through the underlying client's own internal windowing discarded the
+  verdicts of findings in earlier windows that had already succeeded, not just
+  the coverage bookkeeping. All five now catch both exceptions: the two
+  single-item analyzers mark the current and every not-yet-reached finding via
+  the new `ReviewOutcomeRecorder::recordUnreached()`; `BatchReviewAnalyzer`
+  marks the current and every not-yet-reached batch via the new
+  `BatchVerdictApplier::markBatchAborted()` (mirroring the existing
+  `markBatchErrored()`); and `ConcurrentReviewAnalyzer`/
+  `ConcurrentStructuredReviewAnalyzer` now dispatch one `maxConcurrent`-sized
+  window at a time (mirroring `ConcurrentChunkAnalyzer::dispatchInWindows()`),
+  finalizing each window's verdicts before the next is attempted so a later
+  window's failure can no longer discard an earlier window's completed work.
 - **A budget/provider abort partway through a sequential attacker run left every
   chunk after the failing one with no coverage entry at all, instead of the
   `aborted`/`errored` status the same failure gets under concurrent analysis.**

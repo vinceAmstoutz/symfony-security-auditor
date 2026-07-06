@@ -118,16 +118,43 @@ final readonly class BatchReviewAnalyzer
      */
     private function reviewMissesInBatches(array $reviewed, array $misses, array $missIndexes, ReviewBatchSettings $reviewBatchSettings, ReviewCacheBuckets $reviewCacheBuckets): array
     {
+        $batches = array_chunk($misses, $reviewBatchSettings->batchSize);
         $position = 0;
-        foreach (array_chunk($misses, $reviewBatchSettings->batchSize) as $batch) {
-            $batchReviewed = $reviewBatchSettings->structured
-                ? $this->reviewBatchViaStructuredCollection($batch, $reviewCacheBuckets->codeContexts, $reviewCacheBuckets->cacheContexts, $reviewBatchSettings->coverageRecorder)
-                : $this->reviewBatch($batch, $reviewCacheBuckets->codeContexts, $reviewCacheBuckets->cacheContexts, $reviewBatchSettings->coverageRecorder, $reviewBatchSettings->toolRegistry);
+        foreach ($batches as $batchNumber => $batch) {
+            try {
+                $batchReviewed = $reviewBatchSettings->structured
+                    ? $this->reviewBatchViaStructuredCollection($batch, $reviewCacheBuckets->codeContexts, $reviewCacheBuckets->cacheContexts, $reviewBatchSettings->coverageRecorder)
+                    : $this->reviewBatch($batch, $reviewCacheBuckets->codeContexts, $reviewCacheBuckets->cacheContexts, $reviewBatchSettings->coverageRecorder, $reviewBatchSettings->toolRegistry);
+            } catch (BudgetExceededException $budgetExceededException) {
+                $this->failRemainingBatches($batches, $batchNumber + 1, 'aborted', $reviewBatchSettings->coverageRecorder);
+
+                throw $budgetExceededException;
+            } catch (LLMProviderException $llmProviderException) {
+                $this->failRemainingBatches($batches, $batchNumber + 1, 'errored', $reviewBatchSettings->coverageRecorder);
+
+                throw $llmProviderException;
+            }
 
             [$reviewed, $position] = $this->mergeBatchIntoReviewed($batchReviewed, $missIndexes, $position, $reviewed);
         }
 
         return $reviewed;
+    }
+
+    /**
+     * @param list<list<Vulnerability>> $batches
+     */
+    private function failRemainingBatches(array $batches, int $fromBatchNumber, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        foreach ($batches as $batchNumber => $batch) {
+            if ($batchNumber < $fromBatchNumber) {
+                continue;
+            }
+
+            'aborted' === $status
+                ? $this->batchVerdictApplier->markBatchAborted($batch, $coverageRecorder)
+                : $this->batchVerdictApplier->markBatchErrored($batch, $coverageRecorder);
+        }
     }
 
     /**
@@ -175,8 +202,12 @@ final readonly class BatchReviewAnalyzer
 
             return $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, $cacheContexts);
         } catch (BudgetExceededException $budgetExceededException) {
+            $this->batchVerdictApplier->markBatchAborted($batch, $coverageRecorder);
+
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
+            $this->batchVerdictApplier->markBatchErrored($batch, $coverageRecorder);
+
             throw $llmProviderException;
         } catch (JsonException $exception) {
             $this->logger->error('Failed to parse reviewer batch response', [
@@ -215,8 +246,12 @@ final readonly class BatchReviewAnalyzer
 
             return $this->batchVerdictApplier->applyBatchReview($batch, $structuredReviewCollectionSession->drain(), $coverageRecorder, $cacheContexts);
         } catch (BudgetExceededException $budgetExceededException) {
+            $this->batchVerdictApplier->markBatchAborted($batch, $coverageRecorder);
+
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
+            $this->batchVerdictApplier->markBatchErrored($batch, $coverageRecorder);
+
             throw $llmProviderException;
         } catch (Throwable $exception) {
             return $this->batchVerdictApplier->recordBatchError($batch, $exception, $coverageRecorder);
