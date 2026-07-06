@@ -180,7 +180,7 @@ final readonly class AuditConfigurationDefinition
                         ->integerNode('attacker_max_concurrent')
                             ->defaultNull()
                             ->min(1)
-                            ->info('Maximum attacker chunk analyses resolved concurrently in the default structured-collection mode (audit.structured_collection: true), when the configured platform exposes an async transport. The attacker phase is usually the longest; setting this to 4-8 (within your provider rate limit) cuts it proportionally. Defaults to the active profile (balanced/thorough: 1 — sequential, fast: 4). Ignored when audit.tools_enabled gives the attacker a cross-file tool registry or structured_collection is off.')
+                            ->info('Maximum attacker chunk analyses resolved concurrently in the default structured-collection mode (audit.structured_collection: true), when the configured platform exposes an async transport. The attacker phase is usually the longest; setting this to 4-8 (within your provider rate limit) cuts it proportionally. Defaults to the active profile (balanced/thorough: 1 — sequential, fast: 4). With audit.tools_enabled on, the investigation tools ride alongside the per-chunk record_vulnerability registry. Ignored when structured_collection is off.')
                         ->end()
                         ->integerNode('reviewer_max_concurrent')
                             ->defaultNull()

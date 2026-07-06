@@ -73,6 +73,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\StubInvestigationTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 final class AttackerAgentTest extends TestCase
@@ -2460,6 +2461,77 @@ final class AttackerAgentTest extends TestCase
             'remediation' => 'x',
             'confidence' => 0.9,
         ];
+    }
+
+    public function test_structured_collection_keeps_the_investigation_tools_available(): void
+    {
+        $files = [$this->makeFile('src/Controller/A.php')];
+
+        $factory = self::createStub(ToolRegistryFactoryInterface::class);
+        $factory->method('forProjectFiles')->willReturn(new ToolRegistry([new StubInvestigationTool()], new NullLogger()));
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
+                self::assertTrue($toolRegistry->has('record_vulnerability'));
+                self::assertTrue($toolRegistry->has('read_file'));
+
+                return LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1));
+            });
+
+        $attackerAgent = $this->makeStructuredAgentWithInvestigationTools($llmClient, $factory);
+
+        self::assertSame([], $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder()));
+    }
+
+    public function test_concurrent_structured_collection_keeps_the_investigation_tools_available(): void
+    {
+        $files = [$this->makeFile('src/Controller/A.php')];
+
+        $factory = self::createStub(ToolRegistryFactoryInterface::class);
+        $factory->method('forProjectFiles')->willReturn(new ToolRegistry([new StubInvestigationTool()], new NullLogger()));
+
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient->expects(self::once())
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests): void {
+                foreach ($requests as $request) {
+                    $toolRegistry = self::registryOf($request);
+                    self::assertTrue($toolRegistry->has('record_vulnerability'));
+                    self::assertTrue($toolRegistry->has('read_file'));
+                }
+            });
+
+        $attackerAgent = $this->makeStructuredAgentWithInvestigationTools($llmClient, $factory, maxConcurrent: 4);
+
+        self::assertSame([], $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder()));
+    }
+
+    private function makeStructuredAgentWithInvestigationTools(LLMClientInterface $llmClient, ToolRegistryFactoryInterface $toolRegistryFactory, int $maxConcurrent = 1): AttackerAgent
+    {
+        return new AttackerAgent(
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                codeSlicer: new NullCodeSlicer(),
+                recordVulnerabilityToolFactory: $this->makeRecordToolFactory(),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: new NullAttackerCache(),
+                staticPreScanner: new NullStaticPreScanner(),
+                progressReporter: new NullProgressReporter(),
+                fileChunker: new FileChunker(ChunkingStrategy::Type, 1),
+                toolRegistryFactory: $toolRegistryFactory,
+            ),
+            new AttackerAnalysisSettings(
+                toolsEnabled: true,
+                useStructuredCollection: true,
+                maxConcurrent: $maxConcurrent,
+            ),
+            new NullLogger(),
+        );
     }
 
     private function makeConcurrentStructuredAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null, ?ProgressReporterInterface $progressReporter = null): AttackerAgent

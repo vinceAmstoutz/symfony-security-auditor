@@ -122,7 +122,7 @@ final readonly class SequentialChunkAnalyzer
 
         try {
             if ($this->useStructuredCollection && $this->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface) {
-                return $this->analyzeChunkViaStructuredCollection($chunk, $chunkContext, $coverageRecorder);
+                return $this->analyzeChunkViaStructuredCollection($chunk, $chunkContext, $coverageRecorder, $toolRegistry);
             }
 
             $response = $toolRegistry instanceof ToolRegistry
@@ -210,11 +210,11 @@ final readonly class SequentialChunkAnalyzer
     /**
      * @param list<ProjectFile> $chunk
      */
-    private function analyzeChunkViaStructuredCollection(array $chunk, ChunkContext $chunkContext, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
+    private function analyzeChunkViaStructuredCollection(array $chunk, ChunkContext $chunkContext, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry): VulnerabilityHydrationResult
     {
         \assert($this->recordVulnerabilityToolFactory instanceof RecordVulnerabilityToolFactoryInterface);
 
-        $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger);
+        $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger, $toolRegistry?->tools() ?? []);
 
         $this->llmClient->completeWithTools($chunkContext->systemPrompt, $chunkContext->userMessage, $structuredVulnerabilityCollectionSession->toolRegistry, $this->maxToolIterations);
 

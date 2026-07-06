@@ -60,7 +60,7 @@ final readonly class ConcurrentChunkAnalyzer
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    public function analyze(array $chunks, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, RiskMarkerIndex $riskMarkerIndex): array
+    public function analyze(array $chunks, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, RiskMarkerIndex $riskMarkerIndex, ?ToolRegistry $toolRegistry = null): array
     {
         $totalChunks = \count($chunks);
 
@@ -81,7 +81,7 @@ final readonly class ConcurrentChunkAnalyzer
                 continue;
             }
 
-            $registered = $this->buildPendingRequest($chunk, $chunkContext);
+            $registered = $this->buildPendingRequest($chunk, $chunkContext, $toolRegistry);
             $pending[$index] = $registered['pending'];
             $requests[] = $registered['request'];
         }
@@ -121,9 +121,9 @@ final readonly class ConcurrentChunkAnalyzer
      *
      * @return array{pending: array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}, request: array{system: string, user: string, tools: ToolRegistry}}
      */
-    private function buildPendingRequest(array $chunk, ChunkContext $chunkContext): array
+    private function buildPendingRequest(array $chunk, ChunkContext $chunkContext, ?ToolRegistry $toolRegistry): array
     {
-        $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger);
+        $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger, $toolRegistry?->tools() ?? []);
 
         return [
             'pending' => [

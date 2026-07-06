@@ -158,7 +158,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         $concurrentChunkAnalyzer = $this->concurrentChunkAnalyzerForConcurrentAnalysis();
 
         [$allVulnerabilities, $totalDropsByReason] = $concurrentChunkAnalyzer instanceof ConcurrentChunkAnalyzer
-            ? $concurrentChunkAnalyzer->analyze($chunks, $attackerAnalysisRequest, $coverageRecorder, $riskMarkerIndex)
+            ? $concurrentChunkAnalyzer->analyze($chunks, $attackerAnalysisRequest, $coverageRecorder, $riskMarkerIndex, $toolRegistry)
             : $this->sequentialChunkAnalyzer->analyze($chunks, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
 
         $this->logger->info('Attacker agent complete', [

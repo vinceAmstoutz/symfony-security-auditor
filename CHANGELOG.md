@@ -590,6 +590,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **`audit.tools_enabled` now actually gives the attacker its investigation
+  tools in the default structured-collection mode.** With
+  `audit.structured_collection: true` (the default), the attacker built the
+  cross-file tool registry (`read_file`, `grep`, `list_files`,
+  `lookup_advisory`) every iteration and then silently dropped it — the
+  structured branch replaced it with a registry containing only
+  `record_vulnerability`, so `tools_enabled: true` paid the setup cost, logged
+  `tools_enabled: true`, and changed nothing. The investigation tools now ride
+  alongside the per-chunk `record_vulnerability` registry
+  (`StructuredVulnerabilityCollectionSession::begin()` accepts them), in both
+  the sequential and the concurrent wavefront paths — which also means
+  `audit.attacker_max_concurrent` > 1 is no longer disabled by `tools_enabled`,
+  and the pre-flight configuration notice now warns only when
+  `structured_collection` is off. `ToolRegistry` gains a `tools()` accessor.
 - **The console report no longer corrupts accented text at wrap points.**
   `ConsoleReportRenderer` wrapped a finding's description, attack vector, and
   remediation with a byte-based 65-byte split, so multibyte UTF-8 characters
