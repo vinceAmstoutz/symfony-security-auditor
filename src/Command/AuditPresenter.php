@@ -199,7 +199,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     {
         if (Command::FAILURE === $exitCode) {
             $symfonyStyle->caution(\sprintf(
-                'Audit completed at or above the fail-on threshold. Risk: %s | Vulnerabilities: %d',
+                'Audit completed at or above the fail-on threshold. Risk: %s. %d vulnerabilities found.',
                 $auditReport->riskLevel(),
                 $auditReport->totalVulnerabilities(),
             ));

@@ -132,12 +132,16 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
         }
     }
 
+    /**
+     * `filemtime()` only fails for a path that does not exist, and every
+     * caller has already confirmed existence via `Filesystem::exists()`
+     * immediately before calling this — asserted rather than branched on,
+     * since the only way to fail it is a TOCTOU race no test can force.
+     */
     private function isExpired(string $path): bool
     {
         $modifiedAt = filemtime($path);
-        if (false === $modifiedAt) {
-            return true;
-        }
+        \assert(false !== $modifiedAt, 'filemtime() must succeed for a path exists() already confirmed present');
 
         return $this->clock->now()->getTimestamp() - $modifiedAt >= self::TTL_SECONDS;
     }

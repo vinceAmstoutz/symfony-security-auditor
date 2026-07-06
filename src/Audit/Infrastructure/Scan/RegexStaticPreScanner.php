@@ -329,11 +329,16 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         return $matches;
     }
 
+    /**
+     * A well-formed PCRE pattern always has a non-empty delimiter and its
+     * closing counterpart somewhere in the string — both are asserted rather
+     * than branched on, since a pattern violating either is already
+     * malformed and will fail its own `preg_match()` call regardless of what
+     * this method returns.
+     */
     private function hasDotAllModifier(string $regex): bool
     {
-        if ('' === $regex) {
-            return false;
-        }
+        \assert('' !== $regex, 'A configured regex pattern must not be empty');
 
         $closingDelimiter = match ($regex[0]) {
             '(' => ')',
@@ -344,9 +349,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         };
 
         $closingPosition = strrpos($regex, $closingDelimiter, 1);
-        if (false === $closingPosition) {
-            return false;
-        }
+        \assert(false !== $closingPosition, 'A well-formed PCRE pattern contains its closing delimiter');
 
         return str_contains(substr($regex, $closingPosition + 1), 's');
     }

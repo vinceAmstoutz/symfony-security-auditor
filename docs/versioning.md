@@ -92,8 +92,8 @@ is a `MAJOR` change.
     because the configured token or cost budget was exceeded (partial report
     still emitted), or it never started because an unpriced model makes
     `audit.budget.max_cost_usd` unenforceable and either the user declined the
-    interactive confirmation or the run is non-interactive (no report emitted
-    in that case).
+    interactive confirmation or the run is non-interactive (no report emitted in
+    that case).
 - The command name `audit:diff` (see
   [CLI Reference → `audit:diff`](configuration.md#auditdiff--comparing-two-reports)),
   its `previous-report` and `current-report` arguments, its `--format` option

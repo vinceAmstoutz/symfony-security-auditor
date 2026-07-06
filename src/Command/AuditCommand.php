@@ -178,7 +178,7 @@ final readonly class AuditCommand
 
     private function beginAuditRun(SymfonyStyle $symfonyStyle, AuditCommandInput $auditCommandInput): void
     {
-        $this->auditPresenter->runningSection($symfonyStyle);
+        $this->auditPresenter->runningSection($this->displayStyle($symfonyStyle, $auditCommandInput));
 
         if ($auditCommandInput->isMachineReadableToStdout()) {
             return;

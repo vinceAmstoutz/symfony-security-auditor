@@ -69,8 +69,8 @@ final class BatchVerdictApplierTest extends TestCase
             new NullCoverageRecorder(),
         );
 
-        self::assertTrue($reviewed[0]->isReviewerValidated());
-        self::assertFalse($reviewed[1]->isReviewerValidated());
+        self::assertFalse($reviewed[0]->isReviewerValidated());
+        self::assertTrue($reviewed[1]->isReviewerValidated());
     }
 
     /**

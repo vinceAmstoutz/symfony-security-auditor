@@ -117,6 +117,15 @@ final class RetryAfterHeaderParserTest extends TestCase
         self::assertNull($retryAfterHeaderParser->parse($runtimeException));
     }
 
+    public function test_a_date_shaped_but_unparseable_http_date_retry_after_is_ignored(): void
+    {
+        $runtimeException = new RuntimeException('retry-after: Xxx, 15 Nov 1994 08:12:31 GMT');
+
+        $retryAfterHeaderParser = new RetryAfterHeaderParser();
+
+        self::assertNull($retryAfterHeaderParser->parse($runtimeException));
+    }
+
     public function test_typed_exception_wins_over_message_text(): void
     {
         // Wrapper's message claims 999 but the typed cause says 5 — typed cause wins.

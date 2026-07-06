@@ -592,4 +592,35 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertCount(1, $markers);
         self::assertSame(2, $markers[0]->line());
     }
+
+    #[DataProvider('bracketDelimiterCases')]
+    public function test_a_bracket_delimited_pattern_with_the_dot_all_modifier_spans_lines(string $regex): void
+    {
+        $regexStaticPreScanner = new RegexStaticPreScanner([
+            'php' => [
+                'spanning_block' => ['regex' => $regex, 'description' => 'test'],
+            ],
+        ]);
+        $projectFile = ProjectFile::create(
+            'src/Service/Span.php',
+            '/app/src/Service/Span.php',
+            "<?php\nBEGIN_BLOCK\nmiddle content\nEND_BLOCK\n",
+        );
+
+        $markers = $regexStaticPreScanner->scan([$projectFile]);
+
+        self::assertCount(1, $markers);
+        self::assertSame(2, $markers[0]->line());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function bracketDelimiterCases(): iterable
+    {
+        yield 'parentheses' => ['(BEGIN_BLOCK.*?END_BLOCK)s'];
+        yield 'curly_braces' => ['{BEGIN_BLOCK.*?END_BLOCK}s'];
+        yield 'square_brackets' => ['[BEGIN_BLOCK.*?END_BLOCK]s'];
+        yield 'angle_brackets' => ['<BEGIN_BLOCK.*?END_BLOCK>s'];
+    }
 }
