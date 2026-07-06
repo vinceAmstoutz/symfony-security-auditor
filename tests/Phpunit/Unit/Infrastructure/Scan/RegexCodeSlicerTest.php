@@ -212,6 +212,33 @@ final class RegexCodeSlicerTest extends TestCase
         yield 'require_once' => ['require_once($bootstrap);'];
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('unanchoredSecurityKeywordCases')]
+    public function test_column_zero_and_tab_indented_security_keywords_are_retained(string $keywordLine): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20).$keywordLine."\n".str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString($keywordLine, $sliced);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function unanchoredSecurityKeywordCases(): iterable
+    {
+        yield 'column-zero exec call' => ['exec($userInput);'];
+        yield 'column-zero rand call' => ['rand();'];
+        yield 'column-zero include statement' => ['include $partial;'];
+        yield 'column-zero include_once call' => ['include_once($partial);'];
+        yield 'column-zero require statement' => ['require $bootstrap;'];
+        yield 'column-zero require_once call' => ['require_once($bootstrap);'];
+        yield 'tab-indented require statement' => ["\trequire \$bootstrap;"];
+        yield 'tab-indented exec call' => ["\texec(\$cmd);"];
+    }
+
     private function largeControllerWithBareIncludes(): string
     {
         $inert = str_repeat("        \$x = INERT_MARKER;\n", 25);

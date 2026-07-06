@@ -98,9 +98,6 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         'system(',
         'popen(',
         'eval(',
-        ' exec(',
-        '(exec(',
-        '=exec(',
         'new Process(',
         'HttpClient',
         '->request(',
@@ -112,9 +109,6 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         '->getContent(',
         'random_int(',
         'mt_rand(',
-        ' rand(',
-        '(rand(',
-        '=rand(',
         'md5(',
         'sha1(',
         'hash_equals(',
@@ -141,23 +135,16 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         '->writeln(',
         'json_decode(',
         'getSession()',
-        ' include(',
-        '(include(',
-        '=include(',
-        ' include_once(',
-        '(include_once(',
-        '=include_once(',
-        ' require(',
-        '(require(',
-        '=require(',
-        ' require_once(',
-        '(require_once(',
-        '=require_once(',
-        ' include ',
-        ' include_once ',
-        ' require ',
-        ' require_once ',
     ];
+
+    /**
+     * Bare-keyword security tokens that must be word-boundary matched rather
+     * than substring matched: a leading-character enumeration (space, `(`,
+     * `=`) misses column-0 statements (e.g. a bootstrap script's first line)
+     * and tab-indented ones — silently eliding a real file-inclusion or
+     * command-execution line instead of retaining it.
+     */
+    private const string BARE_KEYWORD_PATTERN = '/\b(?:exec|rand|include|include_once|require|require_once)\b/';
 
     public function __construct(
         private int $minLinesBeforeSlicing = self::DEFAULT_MIN_LINES_BEFORE_SLICING,
@@ -203,6 +190,10 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
 
     private function containsSecurityToken(string $line): bool
     {
-        return u($line)->containsAny(self::SECURITY_TOKENS);
+        if (u($line)->containsAny(self::SECURITY_TOKENS)) {
+            return true;
+        }
+
+        return 1 === preg_match(self::BARE_KEYWORD_PATTERN, $line);
     }
 }

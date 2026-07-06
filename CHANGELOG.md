@@ -628,6 +628,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A column-0 (e.g. a bootstrap script's first line) or tab-indented
+  `require`/`require_once`/`include`/`include_once`/`exec`/`rand` line was
+  silently elided from a sliced file instead of retained, hiding a real
+  file-inclusion or command-execution vulnerability from the attacker.**
+  `RegexCodeSlicer::SECURITY_TOKENS` (`src/Audit/Infrastructure/Scan/`) matched
+  these bare keywords only when immediately preceded by a space, `(`, or `=` — a
+  leading-character enumeration that a keyword at the very start of a line (no
+  preceding character at all) or indented with a tab (not a space) never
+  satisfies. Replaced the enumeration with a single word-boundary regex
+  (`BARE_KEYWORD_PATTERN`), checked alongside the existing substring list in
+  `containsSecurityToken()`, so these keywords are retained regardless of what
+  precedes them on the line.
 - **A budget/provider abort partway through PoC synthesis silently discarded
   every PoC already generated for earlier findings in the same run.**
   `PoCSynthesizer::synthesize()` (`src/Audit/Application/Agent/`) accumulates
