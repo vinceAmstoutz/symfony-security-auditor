@@ -112,7 +112,7 @@ final readonly class GrepTool implements ToolInterface
     {
         foreach ($newMatches as $newMatch) {
             if (\count($matches) >= self::MAX_MATCHES) {
-                break;
+                return $matches;
             }
 
             $matches[] = $newMatch;

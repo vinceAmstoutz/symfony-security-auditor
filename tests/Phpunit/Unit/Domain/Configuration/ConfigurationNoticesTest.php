@@ -146,6 +146,16 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertSame([], $notices);
     }
 
+    public function test_attacker_concurrency_of_one_with_structured_collection_off_emits_no_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1, 'attackerMaxConcurrent' => 1, 'structuredCollection' => false]),
+            $this->llm(),
+        );
+
+        self::assertSame([], $notices);
+    }
+
     public function test_multiple_simultaneous_footguns_each_emit_their_own_notice(): void
     {
         $notices = ConfigurationNotices::of(

@@ -66,6 +66,20 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         );
     }
 
+    public function test_a_path_after_a_merged_duplicate_is_still_processed(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: ^/api/orders, methods: [GET], roles: PUBLIC_ACCESS }
+                    - { path: ^/api/orders, methods: [POST], roles: ROLE_ADMIN }
+                    - { path: ^/admin, roles: ROLE_ADMIN }
+            YAML);
+
+        self::assertArrayHasKey('^/admin', $accessControl);
+        self::assertSame(['ROLE_ADMIN'], $accessControl['^/admin']);
+    }
+
     public function test_it_surfaces_allow_if_expressions(): void
     {
         $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'

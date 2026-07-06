@@ -2242,6 +2242,24 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    public function test_concurrent_structured_analysis_logs_the_unexpected_failure_message_and_error(): void
+    {
+        $files = [$this->makeFile('src/A.php')];
+
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
+        $llmClient->method('completeBatchWithTools')->willThrowException(new RuntimeException('wavefront tore'));
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with('Concurrent attacker batch failed; its chunks are recorded as errored and the audit continues.', ['error' => 'wavefront tore']);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient, logger: $logger);
+
+        $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+    }
+
     public function test_concurrency_is_ignored_when_the_client_cannot_batch_tools(): void
     {
         $files = [$this->makeFile('src/A.php')];
@@ -2534,7 +2552,7 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
-    private function makeConcurrentStructuredAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null, ?ProgressReporterInterface $progressReporter = null): AttackerAgent
+    private function makeConcurrentStructuredAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null, ?ProgressReporterInterface $progressReporter = null, ?LoggerInterface $logger = null): AttackerAgent
     {
         return new AttackerAgent(
             new AttackerLlmCollaborators(
@@ -2554,7 +2572,7 @@ final class AttackerAgentTest extends TestCase
                 useStructuredCollection: true,
                 maxConcurrent: 4,
             ),
-            new NullLogger(),
+            $logger ?? new NullLogger(),
         );
     }
 

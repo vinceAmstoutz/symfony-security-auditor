@@ -144,6 +144,22 @@ final class StandaloneConfigLoaderTest extends TestCase
      * @throws MissingPlatformException
      * @throws UnresolvableConfigPathException
      */
+    public function test_a_project_config_overriding_one_nested_key_still_merges_sibling_keys(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nscan:\n  included_paths: [src]\n  excluded_paths: [vendor]\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "scan:\n  included_paths: [app]\n");
+
+        $auditConfig = $this->loader($projectConfigFile)->load()->auditConfig;
+
+        self::assertSame(['scan' => ['included_paths' => ['app'], 'excluded_paths' => ['vendor']]], $auditConfig);
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     */
     public function test_a_missing_project_config_leaves_the_user_config_intact(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
