@@ -206,6 +206,13 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame($input, $output);
     }
 
+    public function test_inline_assignment_with_an_empty_value_does_not_swallow_the_next_lines_secret(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("password:\nsecret: hunter2ProdPassword");
+
+        self::assertSame("password:\nsecret: ***REDACTED:inline_assignment***", $output);
+    }
+
     public function test_unquoted_all_caps_key_value_is_only_redacted_once_by_env_assignment(): void
     {
         $output = $this->regexSecretScrubber->scrub('PASSWORD=hunter2supersecure');
@@ -218,6 +225,13 @@ final class RegexSecretScrubberTest extends TestCase
         $output = $this->regexSecretScrubber->scrub('STRIPE_SECRET_KEY=sk_super_secret_value');
 
         self::assertSame('STRIPE_SECRET_KEY=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_env_assignment_with_an_empty_value_does_not_swallow_the_next_lines_secret(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("APP_SECRET=\nDB_PASSWORD=hunter2ProdPassword");
+
+        self::assertSame("APP_SECRET=\nDB_PASSWORD=***REDACTED:env_assignment***", $output);
     }
 
     #[DataProvider('midWordCredentialKeyCases')]

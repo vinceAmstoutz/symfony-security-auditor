@@ -1231,6 +1231,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Security
 
+- **`RegexSecretScrubber`'s `env_assignment` and `inline_assignment` patterns
+  could silently delete or plaintext-leak a real secret on the line _after_ an
+  empty-valued credential key, defeating the class's entire purpose of keeping
+  secrets out of the LLM prompt.** Both patterns used a bare `\s*` between the
+  assignment operator and the value; PCRE's `\s` matches `\n`, so when a key's
+  value was empty (a common `.env` placeholder like `APP_SECRET=` with nothing
+  after it) the quantifier greedily crossed the newline and the value-capturing
+  group started matching on the _next_ line instead of failing. Depending on
+  that next line's shape, this either swallowed a genuine `KEY=value` assignment
+  whole — deleting it, key and all, from what the attacker ever sees — or
+  matched only a short leading fragment of an `InlineAssignment` key phrase,
+  leaving the real secret that followed it on the same line completely
+  unredacted. Both operator-to-value gaps now use `[ \t]*` (horizontal
+  whitespace only), so an empty value simply fails to match instead of absorbing
+  subsequent lines.
 - **The install scripts now fail closed on checksum verification.** Previously
   `install.sh` printed a warning and installed anyway when no SHA-256 tool was
   present; it now **aborts** rather than install an unverified binary.
