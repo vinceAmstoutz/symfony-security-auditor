@@ -296,6 +296,34 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('extension_shell_or_file_sink', $patterns);
     }
 
+    public function test_it_flags_bare_include_and_require_sinks_in_twig_extensions(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/TemplateExtension.php',
+            '/app/src/Twig/TemplateExtension.php',
+            "<?php\nclass TemplateExtension extends AbstractExtension {\n    public function renderPartial(string \$page): void { include \$page; }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('extension_shell_or_file_sink', $patterns);
+    }
+
+    public function test_it_does_not_flag_include_once_as_a_function_call_requiring_parens(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/BootstrapExtension.php',
+            '/app/src/Twig/BootstrapExtension.php',
+            "<?php\nclass BootstrapExtension extends AbstractExtension {\n    public function boot(string \$file): void { require_once \$file; }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('extension_shell_or_file_sink', $patterns);
+    }
+
     public function test_it_flags_is_safe_html_declarations_in_twig_extensions(): void
     {
         $projectFile = ProjectFile::create(
@@ -525,5 +553,43 @@ final class RegexStaticPreScannerTest extends TestCase
         ));
         self::assertCount(1, $literalFoosMarkers);
         self::assertSame(2, $literalFoosMarkers[0]->line());
+    }
+
+    public function test_a_non_slash_delimited_pattern_without_the_dot_all_modifier_is_matched_per_line(): void
+    {
+        $regexStaticPreScanner = new RegexStaticPreScanner([
+            'php' => [
+                'password_hash_call' => ['regex' => '~^password_hash\(.*\)~', 'description' => 'test'],
+            ],
+        ]);
+        $projectFile = ProjectFile::create(
+            'src/Service/Hash.php',
+            '/app/src/Service/Hash.php',
+            "<?php\n\$x = 1;\npassword_hash(\$x);\n",
+        );
+
+        $markers = $regexStaticPreScanner->scan([$projectFile]);
+
+        self::assertCount(1, $markers);
+        self::assertSame(3, $markers[0]->line());
+    }
+
+    public function test_a_non_slash_delimited_pattern_with_the_dot_all_modifier_still_spans_lines(): void
+    {
+        $regexStaticPreScanner = new RegexStaticPreScanner([
+            'php' => [
+                'spanning_block' => ['regex' => '~BEGIN_BLOCK.*?END_BLOCK~s', 'description' => 'test'],
+            ],
+        ]);
+        $projectFile = ProjectFile::create(
+            'src/Service/Span.php',
+            '/app/src/Service/Span.php',
+            "<?php\nBEGIN_BLOCK\nmiddle content\nEND_BLOCK\n",
+        );
+
+        $markers = $regexStaticPreScanner->scan([$projectFile]);
+
+        self::assertCount(1, $markers);
+        self::assertSame(2, $markers[0]->line());
     }
 }

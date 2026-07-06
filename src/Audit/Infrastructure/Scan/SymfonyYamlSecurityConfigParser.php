@@ -52,6 +52,16 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
     }
 
     /**
+     * Public marker recorded for an `access_control` entry that matches but
+     * carries no requirement at all (e.g. an explicit `roles: []`) — a
+     * deliberate "this path is public" rule. Recording it (instead of
+     * skipping the entry) preserves first-match-wins: a later rule for the
+     * same path must not silently present as the sole governing rule when an
+     * earlier, unconditional public rule already claims the path.
+     */
+    private const string PUBLIC_ACCESS_MARKER = 'PUBLIC';
+
+    /**
      * Symfony evaluates `access_control` first-match-wins, so a later rule for
      * an already-seen path applies only to requests the earlier rule's
      * constraints (methods, ips, …) did not match — it is appended as a single
@@ -72,22 +82,21 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
         foreach ($entries as $entry) {
             $entryMap = $this->mapOf($entry);
             $target = $this->targetOf($entryMap);
-            $requirements = $this->requirementsOf($entryMap);
             if (null === $target) {
                 continue;
             }
 
-            if ([] === $requirements) {
-                continue;
-            }
+            $requirements = $this->requirementsOf($entryMap);
 
             if (\array_key_exists($target, $routeAccessMap)) {
-                $routeAccessMap[$target][] = \sprintf('or: %s', implode(', ', $requirements));
+                if ([] !== $requirements) {
+                    $routeAccessMap[$target][] = \sprintf('or: %s', implode(', ', $requirements));
+                }
 
                 continue;
             }
 
-            $routeAccessMap[$target] = $requirements;
+            $routeAccessMap[$target] = [] === $requirements ? [self::PUBLIC_ACCESS_MARKER] : $requirements;
         }
 
         return $routeAccessMap;

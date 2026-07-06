@@ -2260,6 +2260,137 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
     }
 
+    /**
+     * @return list<ProjectFile>
+     */
+    private function makeFiveFiles(): array
+    {
+        return [
+            $this->makeFile('src/A.php'),
+            $this->makeFile('src/B.php'),
+            $this->makeFile('src/C.php'),
+            $this->makeFile('src/D.php'),
+            $this->makeFile('src/E.php'),
+        ];
+    }
+
+    public function test_concurrent_structured_analysis_dispatches_multiple_windows_when_chunks_exceed_max_concurrent(): void
+    {
+        $files = $this->makeFiveFiles();
+
+        $windowSizes = [];
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::exactly(2))
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests) use (&$windowSizes): array {
+                $windowSizes[] = \count($requests);
+                foreach ($requests as $request) {
+                    self::registryOf($request)->execute('record_vulnerability', self::recordedFinding('finding'));
+                }
+
+                return array_fill(0, \count($requests), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient);
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+
+        self::assertSame([4, 1], $windowSizes);
+        self::assertCount(5, $vulnerabilities);
+        self::assertSame(array_fill(0, 5, 'analyzed'), array_column($auditContext->coverage(), 'status'));
+    }
+
+    public function test_concurrent_structured_analysis_keeps_an_earlier_windows_findings_when_a_later_window_fails(): void
+    {
+        $files = $this->makeFiveFiles();
+
+        $cache = $this->createMock(AttackerCacheInterface::class);
+        $cache->method('get')->willReturn(null);
+        $cache->expects(self::exactly(4))->method('store');
+
+        $callCount = 0;
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::exactly(2))
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests) use (&$callCount): array {
+                ++$callCount;
+                if (2 === $callCount) {
+                    throw new RuntimeException('second window tore');
+                }
+
+                foreach ($requests as $request) {
+                    self::registryOf($request)->execute('record_vulnerability', self::recordedFinding('first-window-finding'));
+                }
+
+                return array_fill(0, \count($requests), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient, $cache);
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+
+        self::assertSame(
+            array_fill(0, 4, 'first-window-finding'),
+            array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities),
+        );
+        self::assertSame(
+            [
+                ['stage' => 'attacker', 'file' => 'src/A.php', 'status' => 'analyzed'],
+                ['stage' => 'attacker', 'file' => 'src/B.php', 'status' => 'analyzed'],
+                ['stage' => 'attacker', 'file' => 'src/C.php', 'status' => 'analyzed'],
+                ['stage' => 'attacker', 'file' => 'src/D.php', 'status' => 'analyzed'],
+                ['stage' => 'attacker', 'file' => 'src/E.php', 'status' => 'errored'],
+            ],
+            $auditContext->coverage(),
+        );
+    }
+
+    public function test_concurrent_structured_analysis_marks_only_the_failing_and_later_windows_as_aborted_on_budget_exceeded(): void
+    {
+        $files = $this->makeFiveFiles();
+
+        $callCount = 0;
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::exactly(2))
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests) use (&$callCount): array {
+                ++$callCount;
+                if (2 === $callCount) {
+                    throw BudgetExceededException::forTokens(10, 5);
+                }
+
+                foreach ($requests as $request) {
+                    self::registryOf($request)->execute('record_vulnerability', self::recordedFinding('first-window-finding'));
+                }
+
+                return array_fill(0, \count($requests), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient);
+
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+            self::fail('expected BudgetExceededException');
+        } catch (BudgetExceededException) {
+            self::assertSame(
+                [
+                    ['stage' => 'attacker', 'file' => 'src/A.php', 'status' => 'analyzed'],
+                    ['stage' => 'attacker', 'file' => 'src/B.php', 'status' => 'analyzed'],
+                    ['stage' => 'attacker', 'file' => 'src/C.php', 'status' => 'analyzed'],
+                    ['stage' => 'attacker', 'file' => 'src/D.php', 'status' => 'analyzed'],
+                    ['stage' => 'attacker', 'file' => 'src/E.php', 'status' => 'aborted'],
+                ],
+                $auditContext->coverage(),
+            );
+        }
+    }
+
     public function test_concurrency_is_ignored_when_the_client_cannot_batch_tools(): void
     {
         $files = [$this->makeFile('src/A.php')];

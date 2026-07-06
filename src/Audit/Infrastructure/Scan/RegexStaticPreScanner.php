@@ -33,7 +33,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 9;
+    public const int CACHE_VERSION = 10;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -176,7 +176,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         ],
         ProjectFileType::TWIG_EXTENSION->value => [
             'extension_shell_or_file_sink' => [
-                'regex' => '/\b(?:shell_exec|exec|passthru|proc_open|system|popen|file_get_contents|file_put_contents|include|include_once|require|require_once)\s*\(/',
+                'regex' => '/\b(?:shell_exec|exec|passthru|proc_open|system|popen|file_get_contents|file_put_contents)\s*\(|\b(?:include|include_once|require|require_once)\b/',
                 'description' => 'Shell/file sink inside a Twig extension — reachable from any template calling this function/filter; verify no template-supplied argument reaches it (RCE/LFI)',
             ],
             'extension_is_safe_html' => [
@@ -331,9 +331,24 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
 
     private function hasDotAllModifier(string $regex): bool
     {
-        $segments = explode('/', $regex);
+        if ('' === $regex) {
+            return false;
+        }
 
-        return str_contains(end($segments), 's');
+        $closingDelimiter = match ($regex[0]) {
+            '(' => ')',
+            '{' => '}',
+            '[' => ']',
+            '<' => '>',
+            default => $regex[0],
+        };
+
+        $closingPosition = strrpos($regex, $closingDelimiter, 1);
+        if (false === $closingPosition) {
+            return false;
+        }
+
+        return str_contains(substr($regex, $closingPosition + 1), 's');
     }
 
     /**

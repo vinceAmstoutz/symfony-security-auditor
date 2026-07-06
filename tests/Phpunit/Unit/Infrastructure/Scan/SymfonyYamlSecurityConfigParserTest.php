@@ -66,6 +66,44 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         );
     }
 
+    public function test_an_explicitly_empty_roles_rule_is_recorded_as_public_instead_of_dropped(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: ^/status, roles: [] }
+            YAML);
+
+        self::assertSame(['^/status' => ['PUBLIC']], $accessControl);
+    }
+
+    public function test_a_later_rule_for_a_publicly_matched_path_does_not_override_first_match(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: ^/status, roles: [] }
+                    - { path: ^/status, roles: ROLE_ADMIN }
+            YAML);
+
+        self::assertSame(['^/status' => ['PUBLIC', 'or: ROLE_ADMIN']], $accessControl);
+    }
+
+    public function test_a_public_rule_after_a_restricted_rule_for_the_same_path_is_appended_as_or(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: ^/status, methods: [POST], roles: ROLE_ADMIN }
+                    - { path: ^/status, methods: [GET], roles: [] }
+            YAML);
+
+        self::assertSame(
+            ['^/status' => ['ROLE_ADMIN', 'methods: POST', 'or: methods: GET']],
+            $accessControl,
+        );
+    }
+
     public function test_a_path_after_a_merged_duplicate_is_still_processed(): void
     {
         $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'

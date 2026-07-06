@@ -120,7 +120,7 @@ final class RetryPolicyTest extends TestCase
     {
         $retryPolicy = new RetryPolicy();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidRetryConfigurationException::class);
         $this->expectExceptionMessage('attempt must be >= 1, got 0');
 
         $retryPolicy->delayMs(0);
@@ -130,7 +130,7 @@ final class RetryPolicyTest extends TestCase
     {
         $retryPolicy = new RetryPolicy();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidRetryConfigurationException::class);
         $this->expectExceptionMessage('attempt must be >= 1, got 0');
 
         $retryPolicy->rateLimitDelayMs(0);
@@ -287,11 +287,44 @@ final class RetryPolicyTest extends TestCase
         self::assertSame(60_000, $retryPolicy->rateLimitDelayMs(1));
     }
 
-    public function test_rate_limit_delay_default_is_sixty_seconds(): void
+    public function test_rate_limit_delay_default_is_at_least_sixty_seconds(): void
     {
-        $retryPolicy = new RetryPolicy(jitterSource: static fn (): float => 0.5);
+        $retryPolicy = new RetryPolicy(jitterSource: static fn (): float => 0.0);
 
         self::assertSame(60_000, $retryPolicy->rateLimitDelayMs(1));
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_rate_limit_delay_jitter_never_fires_before_the_window_has_elapsed(): void
+    {
+        $retryPolicyAtFloor = new RetryPolicy(
+            new BackoffSchedule(jitterRatio: 0.2),
+            new RateLimitBackoff(initialDelayMs: 60_000),
+            jitterSource: static fn (): float => 0.0,
+        );
+        $retryPolicyAtCeiling = new RetryPolicy(
+            new BackoffSchedule(jitterRatio: 0.2),
+            new RateLimitBackoff(initialDelayMs: 60_000),
+            jitterSource: static fn (): float => 1.0,
+        );
+
+        self::assertSame(60_000, $retryPolicyAtFloor->rateLimitDelayMs(1));
+        self::assertSame(72_000, $retryPolicyAtCeiling->rateLimitDelayMs(1));
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_regular_delay_jitter_remains_symmetric_around_the_base(): void
+    {
+        $retryPolicyLow = new RetryPolicy(
+            new BackoffSchedule(initialDelayMs: 60_000, jitterRatio: 0.2),
+            jitterSource: static fn (): float => 0.0,
+        );
+
+        self::assertSame(48_000, $retryPolicyLow->delayMs(1));
     }
 
     /**

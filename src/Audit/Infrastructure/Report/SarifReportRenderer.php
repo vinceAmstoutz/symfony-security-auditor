@@ -123,12 +123,20 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
     }
 
     /**
+     * When multiple `VulnerabilityType`s share an OWASP category (they can
+     * have different `category()` values — e.g. `broken_access_control` vs
+     * `path_traversal` both under A01), the representative used for `name`
+     * and `shortDescription` is picked by sorting on the type's own value so
+     * it stays stable across runs instead of following whichever finding
+     * happens to be most severe.
+     *
      * @param non-empty-array<string, VulnerabilityType> $contributingTypes
      *
      * @return array<string, mixed>
      */
     private function ruleFor(array $contributingTypes): array
     {
+        ksort($contributingTypes);
         $vulnerabilityType = reset($contributingTypes);
 
         return [

@@ -85,8 +85,8 @@ src/
       Diff/          # ProcessGitChangedFilesResolver (git diff for --since)
       Prompt/        # AttackerPromptBuilder (+ SymfonyMappingContextRenderer, NumberedFileContextRenderer, Skill/{AttackerSkillInterface, AttackerSkillRegistry, one *AttackerSkill per attack surface}), ReviewerPromptBuilder (+ Reviewer/{ReviewerPromptSectionsInterface, ReviewerPromptSections, ReviewerMessageRendererInterface, ReviewerMessageRenderer})
       Cache/         # FilesystemAttackerCache, NullAttackerCache, FilesystemReviewerCache, NullReviewerCache
-      Advisory/      # ComposerAuditAdvisoryDatabase (default), InMemoryAdvisoryDatabase (fallback), SymfonyProcessComposerAuditRunner
-      Pricing/       # StaticPricingProvider
+      Advisory/      # ComposerAuditAdvisoryDatabase (default) + LockfileHashedAdvisoryCache (TTL-bounded lockfile-hash cache in front of it, wired when cache.enabled), DeferredAdvisoryDatabase (lazy wrapper), InMemoryAdvisoryDatabase (fallback), ComposerAuditRunnerInterface + SymfonyProcessComposerAuditRunner
+      Pricing/       # ModelsDevPricingProvider (default), ModelPrice
       Progress/      # ConsoleProgressReporter (decorated TTY), PlainProgressReporter (CI/non-TTY), LoggerProgressReporter, ProgressReporterHolder, ProgressContext, AuditOverviewLine
       Tool/          # ReadFileTool, GrepTool, ListFilesTool, LookupAdvisoryTool, SymfonyToolRegistryFactory, RecordVulnerabilityTool, RecordVulnerabilityToolFactory, RecordReviewTool, RecordReviewToolFactory
       Report/        # ReportRendererInterface (format/render) + one class per format ({Console,Json,Sarif,Html,Markdown,Junit,GithubAnnotations}ReportRenderer) + ReportPackage + TemplateLoader; + Template/*.txt + *.html stubs

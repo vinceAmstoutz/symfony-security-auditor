@@ -144,6 +144,10 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         ' include(',
         '(include(',
         '=include(',
+        ' include ',
+        ' include_once ',
+        ' require ',
+        ' require_once ',
     ];
 
     public function __construct(

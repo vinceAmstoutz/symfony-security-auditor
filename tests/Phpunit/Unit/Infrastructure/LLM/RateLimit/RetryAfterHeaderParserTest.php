@@ -93,6 +93,30 @@ final class RetryAfterHeaderParserTest extends TestCase
         self::assertNull($retryAfterHeaderParser->parse($runtimeException));
     }
 
+    public function test_parses_http_date_retry_after_when_no_typed_exception(): void
+    {
+        $future = gmdate('D, d M Y H:i:s', time() + 30).' GMT';
+        $runtimeException = new RuntimeException(\sprintf('HTTP 429: retry-after: %s', $future));
+
+        $retryAfterHeaderParser = new RetryAfterHeaderParser();
+
+        $seconds = $retryAfterHeaderParser->parse($runtimeException);
+
+        self::assertNotNull($seconds);
+        self::assertGreaterThanOrEqual(28, $seconds);
+        self::assertLessThanOrEqual(30, $seconds);
+    }
+
+    public function test_http_date_retry_after_in_the_past_is_ignored(): void
+    {
+        $past = gmdate('D, d M Y H:i:s', time() - 30).' GMT';
+        $runtimeException = new RuntimeException(\sprintf('retry-after: %s', $past));
+
+        $retryAfterHeaderParser = new RetryAfterHeaderParser();
+
+        self::assertNull($retryAfterHeaderParser->parse($runtimeException));
+    }
+
     public function test_typed_exception_wins_over_message_text(): void
     {
         // Wrapper's message claims 999 but the typed cause says 5 — typed cause wins.

@@ -50,14 +50,38 @@ final readonly class RetryAfterHeaderParser
     {
         $current = $throwable;
         while ($current instanceof Throwable) {
-            if (1 === preg_match('/retry-after\s*:\s*(\d+)/i', $current->getMessage(), $matches)) {
-                $seconds = (int) $matches[1];
-                if ($seconds > 0) {
-                    return $seconds;
-                }
+            $seconds = $this->secondsFromMessage($current->getMessage());
+            if (null !== $seconds) {
+                return $seconds;
             }
 
             $current = $current->getPrevious();
+        }
+
+        return null;
+    }
+
+    /**
+     * Accepts both RFC 7231 `Retry-After` forms: a delta-seconds integer, or
+     * an HTTP-date, converted to a delta relative to now.
+     */
+    private function secondsFromMessage(string $message): ?int
+    {
+        if (1 === preg_match('/retry-after\s*:\s*(\d+)/i', $message, $matches)) {
+            $seconds = (int) $matches[1];
+
+            return $seconds > 0 ? $seconds : null;
+        }
+
+        if (1 === preg_match('/retry-after\s*:\s*([A-Za-z]{3},\s*\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\s+\d{2}:\d{2}:\d{2}\s+GMT)/i', $message, $matches)) {
+            $timestamp = strtotime($matches[1]);
+            if (false === $timestamp) {
+                return null;
+            }
+
+            $seconds = $timestamp - time();
+
+            return $seconds > 0 ? $seconds : null;
         }
 
         return null;

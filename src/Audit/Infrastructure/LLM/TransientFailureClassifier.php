@@ -21,7 +21,7 @@ use function Symfony\Component\String\u;
 final readonly class TransientFailureClassifier
 {
     /** @var list<string> */
-    private const array TRANSIENT_STATUS_CODES = ['429', '500', '502', '503', '504'];
+    private const array TRANSIENT_STATUS_CODES = ['429', '500', '502', '503', '504', '529'];
 
     /** @var list<string> */
     private const array TRANSIENT_HINTS = [
@@ -35,6 +35,7 @@ final readonly class TransientFailureClassifier
         'internal server error',
         'bad gateway',
         'gateway timeout',
+        'overloaded',
         'connection reset',
         'connection refused',
         'connection aborted',

@@ -34,9 +34,12 @@ use function Symfony\Component\String\u;
  *      since branch point.
  *
  *   2. `git diff --name-only --diff-filter=ACMR HEAD`
- *      — uncommitted changes against HEAD (staged + unstaged + untracked
- *      tracked-paths). Merged into the result so a local dev running
- *      `audit:run --since=main` sees their in-flight work too.
+ *      — uncommitted changes against HEAD: staged changes (including files
+ *      already `git add`ed) plus unstaged edits to already-tracked files.
+ *      `git diff` never reports genuinely untracked files (ones never staged
+ *      at all) — those are invisible to this resolver. Merged into the result
+ *      so a local dev running `audit:run --since=main` sees their staged and
+ *      already-tracked in-flight work too.
  *
  * Both lists are merged, deduplicated, and returned in deterministic order.
  */

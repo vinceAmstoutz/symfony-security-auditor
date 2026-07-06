@@ -29,10 +29,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   and randomized filenames. `AttackerPromptBuilder::PROMPT_VERSION` bumps to 12,
   invalidating cached attacker responses for chunks containing a form.
 - **Findings now include a CWE reference alongside the existing OWASP Top 10
-  mapping.** `VulnerabilityType::cweReference()` (e.g. `CWE-89`) and
-  `cweReferenceUrl()` (`https://cwe.mitre.org/data/definitions/89.html`)
-  (`src/Audit/Domain/Model/VulnerabilityType.php`) map every case to its MITRE
-  CWE identifier. `Vulnerability::toArray()` gains a `cwe` key next to `owasp`
+  mapping.** `VulnerabilityType::cwe(): CweReference`
+  (`src/Audit/Domain/Model/VulnerabilityType.php`) maps every case to its MITRE
+  CWE identifier via the new `CweReference` value object
+  (`src/Audit/Domain/Model/CweReference.php`, constructed via
+  `CweReference::of(89)`), which derives both `label()` (e.g. `'CWE-89'`) and
+  `url()` (e.g. `https://cwe.mitre.org/data/definitions/89.html`) from a single
+  stored ID. `Vulnerability::toArray()` gains a `cwe` key next to `owasp`
   (`src/Audit/Domain/Model/Vulnerability.php`), so `JsonReportRenderer` picks it
   up for free. `SarifReportRenderer` tags each rule with `external/cwe/cwe-<n>`
   in `properties.tags`
@@ -383,19 +386,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
-- **`VulnerabilityType::cweReference()`/`cweReferenceUrl()` are replaced by a
-  single `cwe(): CweReference` method.** The two methods duplicated every CWE
-  identifier as a hand-written `'CWE-89'` /
-  `'https://cwe.mitre.org/data/definitions/89.html'` string pair across two
-  separate `match` expressions, so updating one without the other could silently
-  desynchronize label and URL. The new `CweReference` value object
-  (`src/Audit/Domain/Model/CweReference.php`, constructed via
-  `CweReference::of(89)`) derives both `label()` (`'CWE-89'`) and `url()` from a
-  single stored ID, plus an `id(): int` accessor — `SarifReportRenderer`'s CWE
-  tag now reads `->cwe()->id()` directly instead of
-  `substr($vulnerabilityType->cweReference(), 4)`. `Vulnerability::toArray()`'s
-  `cwe` key and every report renderer's CWE output keep the same `'CWE-<n>'`
-  string shape.
+- **Every raw SPL exception thrown from production code is replaced with a
+  project-defined exception, per the "Custom Exceptions" rule.** A dozen call
+  sites across `Audit\Domain` (`Model\ProjectFile`, `Model\RiskMarker`,
+  `Model\TokenUsageSnapshot`, `Model\AuditCost`, `Model\AuditBudget`,
+  `Model\AuditContext`, `Port\Tool\ToolDefinition`, `Port\Tool\ToolRegistry`,
+  `Configuration\RateLimitConfiguration`), `Audit\Application\Telemetry`
+  (`TokenUsageRecorder`), and `Audit\Infrastructure\LLM`
+  (`RetryPolicy`, `RateLimit\TokenBucketRateLimiter`) threw a bare
+  `\InvalidArgumentException` or `\RuntimeException` directly. Eleven new named
+  exception classes (plus one new factory on the existing
+  `InvalidRetryConfigurationException`), each extending the same SPL base and
+  exposing a named `::for…()` factory, now carry these failures, so a `catch`
+  clause can target the precise failure mode instead of the generic SPL type.
+  Every new class still extends its previous SPL base, so existing
+  `catch (\InvalidArgumentException)` / `catch (\RuntimeException)` call sites
+  keep working unchanged.
 - **`ProjectFile` type detection is now a single source of truth, so its
   `fileType()` and its `is*()` predicates can no longer disagree.**
   `ProjectFile::detectType()` and its private `is*Path()`/`looksLike*()`
@@ -560,7 +566,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   is extracted into one collaborator per domain, instead of being duplicated at
   every call site.**
   `SequentialChunkAnalyzer::analyzeChunkViaStructuredCollection()` and
-  `ConcurrentChunkAnalyzer::buildPendingRequest()`
+  `ConcurrentChunkAnalyzer::buildPendingChunk()`
   (`src/Audit/Application/Agent/Chunk/`) each built their own
   `VulnerabilityCollector` plus a single-tool `record_vulnerability`
   `ToolRegistry` inline; `StructuredReviewAnalyzer::reviewSingle()`,
@@ -611,6 +617,223 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   any real run.
 
 ### Fixed
+
+- **`record_vulnerability` calls could omit `confidence` entirely, letting a
+  malformed-but-schema-valid finding skip the confidence floor instead of
+  being dropped.** `RecordVulnerabilityTool::definition()`
+  (`src/Audit/Infrastructure/Tool/`) listed `confidence` as an input property
+  but not in the JSON-Schema `required` array, so a provider could send a call
+  with no `confidence` field at all and still pass schema validation.
+  `confidence` is now required alongside `type`/`severity`/`description`/`file_path`.
+- **Findings dropped below the confidence floor left no trace in the logs,
+  making a suspiciously low finding count impossible to diagnose.**
+  `AuditOrchestrator::filterByConfidence()`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) silently filtered out
+  any finding under `audit.min_confidence` with no logging at all. A new
+  `passesConfidenceFloor()` now logs a `warning` (type, file, confidence, and
+  the configured floor) for each dropped finding before filtering it out.
+- **A later concurrent-batch window's failure discarded an earlier window's
+  already-completed findings, cache stores, and coverage.**
+  `ConcurrentChunkAnalyzer` (`src/Audit/Application/Agent/Chunk/`) dispatched
+  every cache-miss chunk in a single `completeBatchWithTools()` call;
+  `SymfonyAiLLMClient` internally splits that call into
+  `array_chunk($requests, $maxConcurrent)` windows and resolves them
+  sequentially, but a `BudgetExceededException`/`LLMProviderException`/generic
+  failure from a *later* window propagated out of the whole call, and the
+  analyzer's `catch` blocks then marked **every** pending chunk — including
+  ones from earlier windows that had already run their `record_vulnerability`
+  tool calls — as `aborted`/`errored`, silently discarding real findings and
+  never caching them. `ConcurrentChunkAnalyzer` now chunks its own
+  `maxConcurrent`-sized windows and calls `completeBatchWithTools()` once per
+  window (`dispatchInWindows()`/`dispatchWindow()`), finalizing (caching +
+  recording `analyzed` coverage) each window immediately after it completes,
+  before the next window is attempted. Only the window that actually failed,
+  plus any windows not yet dispatched, are marked `aborted`/`errored`
+  (`failRemainingWindows()`); windows that already succeeded keep their
+  findings, cache entries, and `analyzed` coverage.
+- **The standalone binary crashed with a raw, uncaught PHP exception —
+  instead of a clean CLI error — in any environment missing both `HOME` and
+  the XDG directory variables** (minimal containers, some CI/cron runners).
+  `bin/symfony-security-auditor` called
+  `StandaloneApplicationFactory::bridgeAutoloadFile($environment)` eagerly, at
+  the top level, before the `Application` was even constructed; that call
+  resolves `XdgConfigPathResolver::dataDir()`, which throws
+  `UnresolvableConfigPathException` when neither `XDG_DATA_HOME` nor `HOME`
+  (nor `LOCALAPPDATA`/`USERPROFILE` on Windows) is set — and nothing wrapped
+  it, so even `--version`/`--help` fatally crashed. The resolution is now
+  wrapped in a try/catch that treats an unresolvable path as "no bridge to
+  load" and proceeds; any later command that genuinely needs the XDG
+  directories (e.g. `audit:run` building its container) still surfaces the
+  same exception, but now from inside `Application::run()`, where Symfony
+  Console's own exception handler renders it as a normal CLI error instead of
+  a fatal.
+- **File-upload hunting only fired when the chunk contained a Symfony `Form`
+  class, missing the controller and entity code that most upload
+  vulnerabilities actually live in.** `FileUploadAttackerSkill` is scoped to
+  `ProjectFileType::FORM`, so a manual `$request->files->get()` upload
+  endpoint with no Symfony Form, a `VichUploaderBundle`-mapped entity field,
+  or a download route with no owning-entity check never received any
+  file-upload-specific guidance — `ControllerAttackerSkill`'s existing
+  coverage was a single generic bullet. Two new sibling skills close the gap:
+  `ControllerFileUploadAttackerSkill` (`ProjectFileType::CONTROLLER`, priority
+  15, right after `ControllerAttackerSkill`) hunts manual `UploadedFile`
+  handling, path traversal via `getClientOriginalName()`, public-web-root
+  storage without execution disabled, predictable filenames, and
+  missing-ownership-check download actions; `EntityFileUploadAttackerSkill`
+  (`ProjectFileType::ENTITY`, priority 135, right after `EntityAttackerSkill`)
+  hunts `#[Vich\UploadableField]` mappings with a predictable namer, missing
+  `#[Assert\File]` constraints, and privileged read groups leaking a stored
+  file path. Both are registered in `AttackerSkillRegistry::defaultSkills()`
+  and tagged in `config/services.php`; `AttackerPromptBuilder::PROMPT_VERSION`
+  bumps to 15, invalidating cached attacker responses for chunks containing a
+  controller or entity.
+- **A verdict-cache/reviewer key salt change silently reused stale cached
+  attacker responses across a `reviewer_structured_collection` toggle.**
+  `ContainerParameterRegistrar::reviewerKeySalt()`
+  (`src/Audit/Infrastructure/Config/`) folded in the prompt version and the
+  pre-scanner state but not whether the reviewer runs in structured
+  (tool-call) or JSON-parsing mode, even though `ReviewerPromptBuilder`'s
+  rendered prompt differs between the two. The salt now also folds in a
+  `collect-tool`/`collect-json` token
+  (`'%s|reviewer-v%d|prompt-v%d|collect-%s'`), so flipping
+  `audit.reviewer_structured_collection` invalidates the reviewer cache
+  instead of replaying verdicts produced under the other mode's prompt.
+- **A stray non-object/non-list JSON payload in a batched reviewer response
+  crashed verdict matching instead of being rejected per-finding.**
+  `BatchVerdictApplier::indexReviewsById()`
+  (`src/Audit/Application/Agent/Review/`) assumed the raw decoded payload was
+  always a `list` of per-finding review objects; a provider returning a bare
+  object (`{"id": "...", "verdict": "..."}` instead of `[{"id": "...", ...}]`)
+  for a single-item batch failed to index by id, silently dropping every
+  verdict in the batch. A new `asReviewList()` normalizes both shapes before
+  indexing.
+- **A Retry-After header expressed as an HTTP-date instead of a digit-seconds
+  count was ignored, falling back to the default backoff instead of the
+  provider's requested wait.** `RetryAfterHeaderParser`
+  (`src/Audit/Infrastructure/LLM/RateLimit/`) only matched a plain integer
+  seconds value; RFC 7231 also permits an HTTP-date form
+  (`Retry-After: Tue, 15 Nov 1994 08:12:31 GMT`), which some providers/proxies
+  emit. `secondsFromMessage()` now also parses that form via `strtotime()`,
+  computing the remaining seconds against the current time.
+- **Rate-limit backoff jitter could shorten the wait below the provider's
+  requested delay, defeating the point of respecting `Retry-After`.**
+  `RetryPolicy::computeDelay()` applied the same symmetric ±jitter to every
+  backoff, including the rate-limit path, so a `Retry-After: 30` could jitter
+  down to under 30 seconds and retry too early. A new `$upwardOnlyJitter`
+  parameter (set by `rateLimitDelayMs()`) clamps the jitter to only ever add
+  time, never subtract it, for rate-limit-driven delays; ordinary transient-
+  failure backoff is unaffected.
+- **`529`/"overloaded" responses were classified as fatal instead of
+  transient, aborting the audit instead of retrying.**
+  `TransientFailureClassifier` (`src/Audit/Infrastructure/LLM/`) was missing
+  Anthropic's `529` overloaded-capacity status code and the `"overloaded"`
+  text hint from its transient-match sets, so a temporary capacity error
+  surfaced as a fatal `NonTransientLLMFailureException`. Both are now
+  recognized as transient and retried through the normal backoff path.
+- **A credential environment variable named with the secret keyword in the
+  middle (`DB_TOKEN_STAGING`, `APP_SECRET_KEY`) skipped redaction.**
+  `RegexSecretScrubber`'s `env_assignment` pattern
+  (`src/Audit/Infrastructure/FileSystem/`) only matched keyword-then-suffix
+  names (`TOKEN_STAGING`) or a bare keyword, missing names where the keyword
+  sits between an arbitrary prefix and suffix. The pattern now accepts
+  optional `PREFIX_` segments before **and** `_SUFFIX` segments after the
+  keyword, redacting the value regardless of where the keyword falls in the
+  name, while still requiring the keyword itself to be present (a name like
+  `DB_HOST` still doesn't match).
+- **A SARIF rule shared by multiple vulnerability categories picked its
+  `name`/`shortDescription` from whichever category happened to iterate last,
+  instead of deterministically.** `SarifReportRenderer::ruleFor()`
+  (`src/Audit/Infrastructure/Report/`) built the shared rule's metadata by
+  iterating `$contributingTypes` in insertion order, which depends on finding
+  order within the run — the same two categories could render a different
+  rule name across two audits of the identical codebase. The contributing
+  types are now sorted (`ksort`) before the rule is built, making the choice
+  deterministic regardless of finding order.
+- **The DOTALL-modifier check used to size code slices could misjudge a
+  pattern's modifiers when the pattern body itself contained a `/`.**
+  `RegexStaticPreScanner::hasDotAllModifier()`
+  (`src/Audit/Infrastructure/Scan/`) split the whole regex string on every
+  `/` and inspected the last segment for an `s` flag, so a pattern using `/`
+  as a literal character inside the body (matched via an escaped `\/` or a
+  bracket-delimited alternative) could shift which "segment" was treated as
+  the modifier string. It now locates the actual closing delimiter — handling
+  bracket-style delimiters (`(...)`, `{...}`, `[...]`, `<...>`) as well as the
+  common repeated-character form — and reads modifiers only after it.
+  Relatedly, the Twig-extension `extension_shell_or_file_sink` marker's regex
+  required `include`/`include_once`/`require`/`require_once` to be followed by
+  `(`, missing the common bare-keyword form (`include $path;`) — it now
+  matches the keyword with or without parentheses. `CACHE_VERSION` bumps to
+  10, invalidating cached pre-scan results built under the old regex.
+- **The code slicer dropped bare `include`/`require` statements (no
+  parentheses) from a sliced file, even though they're a file-inclusion sink
+  worth keeping.** `RegexCodeSlicer::SECURITY_TOKENS`
+  (`src/Audit/Infrastructure/Scan/`) only listed the function-call forms
+  (`include(`, `require(`, …); `SECURITY_TOKENS` now also lists the bare
+  keyword forms (`' include '`, `' include_once '`, `' require '`,
+  `' require_once '`), so a line like `require $path . '.php';` is retained
+  instead of elided.
+- **Errors printed to the wrong stream when `--format=json`/`sarif`/… targeted
+  stdout, corrupting the machine-readable document a caller piped
+  downstream.** `AuditCommand`'s generic `catch (Throwable)` block and its
+  `handleBudgetAbort()` path both called `$this->auditPresenter->error($symfonyStyle, ...)`
+  directly, ignoring the same stdout/stderr split every other presentation
+  call already goes through — so an error raised after a machine-readable
+  report had started writing to stdout landed on stdout too, breaking
+  `--format=json > report.json | jq`. Both call sites now route through
+  `$this->displayStyle($symfonyStyle, $auditCommandInput)`, matching the rest
+  of the command.
+- **The CI-failure caution message always said "CRITICAL risk level"
+  regardless of the actual `--fail-on` threshold that tripped it.**
+  `AuditPresenter::result()` (`src/Command/AuditPresenter.php`) hardcoded the
+  word `CRITICAL` in its failure message, so a run configured with
+  `--fail-on=medium` that failed at a `MEDIUM` risk level still reported
+  "Audit completed with CRITICAL risk level" — actively misleading. The
+  message now reports the report's actual `riskLevel()`
+  (`'Audit completed at or above the fail-on threshold. Risk: %s | Vulnerabilities: %d'`).
+- **`security.yaml` access-control entries with no `roles:`/`allow_if:`
+  requirement (a deliberately public route) were silently skipped instead of
+  being recorded as public.** `SymfonyYamlSecurityConfigParser::accessControlOf()`
+  (`src/Audit/Infrastructure/Scan/`) treated an empty requirement list as
+  "nothing to record," so the attacker's access-control map had no entry at
+  all for an intentionally public path — indistinguishable from a path the
+  parser simply never saw. Empty-requirement entries are now recorded with a
+  `PUBLIC` marker, so the map correctly shows the route as explicitly public
+  rather than unknown.
+- **The default (structured-collection) reviewer enforced a stricter
+  rejection bar than the JSON-mode reviewer for the same prompt intent.**
+  `ReviewerPromptSections::STRUCTURED_DECISION_RULES`
+  (`src/Audit/Infrastructure/Prompt/Reviewer/`) carried a stricter rejection
+  bullet than the equivalent `DECISION_RULES` used by JSON mode, so switching
+  `audit.reviewer_structured_collection` off and on changed how findings were
+  judged, not just how verdicts were transported. The structured rules now
+  use the same two lenient bullets as JSON mode, so the two collection modes
+  apply identical judgment criteria; `ReviewerPromptBuilder::PROMPT_VERSION`
+  bumps to invalidate cached verdicts produced under the old stricter wording.
+- **`--dry-run`'s cost estimate scaled with `str_repeat()`-style aggregation
+  instead of summing each file's own token count, overestimating input tokens
+  for chunks of files with uneven sizes.**
+  `EstimateAuditCostUseCase::execute()`
+  (`src/Audit/Application/UseCase/`) now sums `TokenEstimatorInterface::estimateTokens()`
+  per file before multiplying by `max_iterations`, matching how the real
+  attacker loop accumulates tokens per chunk. `--dry-run` also now accepts
+  `--since`, narrowing the estimate to git-changed files the same way a real
+  `audit:run --since` would, via the same `GitChangedFilesResolverInterface`
+  port the real run uses.
+- **The advisory cache never expired, and stayed wired even when
+  `cache.enabled: false` explicitly opted the project out of caching.**
+  `LockfileHashedAdvisoryCache` (`src/Audit/Infrastructure/Advisory/`) keyed
+  its cache purely off the lockfile hash, so a project whose `composer.lock`
+  never changes kept serving the same advisory snapshot forever, even after
+  new CVEs are published upstream — a `Psr\Clock\ClockInterface`-driven
+  24-hour TTL now gates the cached entry, and past the TTL the cache is
+  treated as a miss and `composer audit` runs again. Separately,
+  `config/services.php` aliased `ComposerAuditRunnerInterface` to
+  `LockfileHashedAdvisoryCache` unconditionally, so disabling `cache.enabled`
+  disabled the attacker/reviewer caches but silently left the advisory cache
+  active; the alias now lives in
+  `SymfonySecurityAuditorBundle::registerImplementationAliases()` and switches
+  to the uncached `SymfonyProcessComposerAuditRunner` when `cache.enabled` is
+  `false`, matching every other cache-gated alias in that method.
 
 - **Three `VulnerabilityType` CWE/OWASP mappings are corrected against the
   official MITRE CWE 4.20 catalog and OWASP Top 10:2025 data.**

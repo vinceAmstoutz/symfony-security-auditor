@@ -219,10 +219,23 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      */
     private function filterByConfidence(array $vulnerabilities): array
     {
-        return array_values(array_filter(
-            $vulnerabilities,
-            fn (Vulnerability $vulnerability): bool => $vulnerability->confidence() >= $this->auditLoopSettings->minConfidence,
-        ));
+        return array_values(array_filter($vulnerabilities, $this->passesConfidenceFloor(...)));
+    }
+
+    private function passesConfidenceFloor(Vulnerability $vulnerability): bool
+    {
+        if ($vulnerability->confidence() >= $this->auditLoopSettings->minConfidence) {
+            return true;
+        }
+
+        $this->logger->warning('Dropping finding below the confidence floor', [
+            'type' => $vulnerability->type()->value,
+            'file' => $vulnerability->filePath(),
+            'confidence' => $vulnerability->confidence(),
+            'min_confidence' => $this->auditLoopSettings->minConfidence,
+        ]);
+
+        return false;
     }
 
     /**

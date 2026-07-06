@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Closure;
-use InvalidArgumentException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class RetryPolicy
@@ -58,10 +58,13 @@ final readonly class RetryPolicy
         return $this->backoffSchedule->maxAttempts;
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     public function delayMs(int $attempt): int
     {
         if ($attempt < 1) {
-            throw new InvalidArgumentException(\sprintf('attempt must be >= 1, got %d', $attempt));
+            throw InvalidRetryConfigurationException::forNonPositiveAttempt($attempt);
         }
 
         return $this->computeDelay($this->backoffSchedule->initialDelayMs, $attempt);
@@ -77,24 +80,29 @@ final readonly class RetryPolicy
      * with the same jitter as `delayMs()`. The result is always clamped to
      * `rateLimitMaxDelayMs` so a hostile provider cannot push the wait past
      * a sane ceiling.
+     *
+     * @throws InvalidRetryConfigurationException
      */
     public function rateLimitDelayMs(int $attempt, ?int $serverHintSeconds = null): int
     {
         if ($attempt < 1) {
-            throw new InvalidArgumentException(\sprintf('attempt must be >= 1, got %d', $attempt));
+            throw InvalidRetryConfigurationException::forNonPositiveAttempt($attempt);
         }
 
         if (null !== $serverHintSeconds && $serverHintSeconds > 0) {
             return min($serverHintSeconds * 1_000, $this->rateLimitBackoff->maxDelayMs);
         }
 
-        return min($this->computeDelay($this->rateLimitBackoff->initialDelayMs, $attempt), $this->rateLimitBackoff->maxDelayMs);
+        return min($this->computeDelay($this->rateLimitBackoff->initialDelayMs, $attempt, upwardOnlyJitter: true), $this->rateLimitBackoff->maxDelayMs);
     }
 
-    private function computeDelay(int $baseInitialDelayMs, int $attempt): int
+    private function computeDelay(int $baseInitialDelayMs, int $attempt, bool $upwardOnlyJitter = false): int
     {
         $baseDelay = $baseInitialDelayMs * ($this->backoffSchedule->backoffMultiplier ** ($attempt - 1));
-        $jitterFactor = 1.0 + $this->backoffSchedule->jitterRatio * (2.0 * ($this->jitterSource)() - 1.0);
+        $jitterSample = ($this->jitterSource)();
+        $jitterFactor = $upwardOnlyJitter
+            ? 1.0 + $this->backoffSchedule->jitterRatio * $jitterSample
+            : 1.0 + $this->backoffSchedule->jitterRatio * (2.0 * $jitterSample - 1.0);
 
         return (int) round($baseDelay * $jitterFactor);
     }

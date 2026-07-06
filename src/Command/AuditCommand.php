@@ -115,7 +115,7 @@ final readonly class AuditCommand
         } catch (AuditAbortedByBudgetException $auditAbortedByBudgetException) {
             return $this->handleBudgetAbort($symfonyStyle, $auditCommandInput, $auditAbortedByBudgetException);
         } catch (Throwable $throwable) {
-            $this->auditPresenter->error($symfonyStyle, $throwable);
+            $this->auditPresenter->error($this->displayStyle($symfonyStyle, $auditCommandInput), $throwable);
 
             return ExitCode::Failure->value;
         }
@@ -157,7 +157,7 @@ final readonly class AuditCommand
     ): int {
         [$symfonyStyle, $displayStyle] = $styles;
         $this->auditPresenter->estimatingSection($displayStyle);
-        $auditReport = $this->estimateAuditCostUseCase->execute($projectPath, $scanPaths);
+        $auditReport = $this->estimateAuditCostUseCase->execute($projectPath, $scanPaths, $auditCommandInput->since);
 
         $this->auditPresenter->unsupportedModelWarnings($displayStyle, $auditReport);
 
@@ -266,7 +266,7 @@ final readonly class AuditCommand
             $auditCommandInput->output,
             $symfonyStyle,
         );
-        $this->auditPresenter->error($symfonyStyle, $auditAbortedByBudgetException);
+        $this->auditPresenter->error($this->displayStyle($symfonyStyle, $auditCommandInput), $auditAbortedByBudgetException);
 
         return ExitCode::BudgetAborted->value;
     }

@@ -24,8 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
  * contract — the VOs do. Downstream code that needs to introspect the
  * configuration (e.g. compiler passes) depends on these immutable types
  * instead of magic array keys.
- */
-/**
+ *
  * @phpstan-type BundleConfigArray array{
  *     profile?: string,
  *     model: string,

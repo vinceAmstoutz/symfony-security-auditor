@@ -23,7 +23,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\Attac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AuthenticatorAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfigAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerFileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityFileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EventSubscriberAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FormAttackerSkill;
@@ -61,6 +63,7 @@ final class AttackerSkillRegistryTest extends TestCase
     public static function everySkill(): iterable
     {
         yield 'controller' => [new ControllerAttackerSkill(), ProjectFileType::CONTROLLER, 10, 'controller'];
+        yield 'file_upload_controller' => [new ControllerFileUploadAttackerSkill(), ProjectFileType::CONTROLLER, 15, 'file_upload_controller'];
         yield 'api_resource' => [new ApiResourceAttackerSkill(), ProjectFileType::API_RESOURCE, 20, 'api_resource'];
         yield 'live_component' => [new LiveComponentAttackerSkill(), ProjectFileType::LIVE_COMPONENT, 30, 'live_component'];
         yield 'authenticator' => [new AuthenticatorAttackerSkill(), ProjectFileType::AUTHENTICATOR, 40, 'authenticator'];
@@ -74,6 +77,7 @@ final class AttackerSkillRegistryTest extends TestCase
         yield 'file_upload' => [new FileUploadAttackerSkill(), ProjectFileType::FORM, 115, 'file_upload'];
         yield 'repository' => [new RepositoryAttackerSkill(), ProjectFileType::REPOSITORY, 120, 'repository'];
         yield 'entity' => [new EntityAttackerSkill(), ProjectFileType::ENTITY, 130, 'entity'];
+        yield 'file_upload_entity' => [new EntityFileUploadAttackerSkill(), ProjectFileType::ENTITY, 135, 'file_upload_entity'];
         yield 'template' => [new TemplateAttackerSkill(), ProjectFileType::TEMPLATE, 140, 'template'];
         yield 'twig_extension' => [new TwigExtensionAttackerSkill(), ProjectFileType::TWIG_EXTENSION, 145, 'twig_extension'];
         yield 'config' => [new ConfigAttackerSkill(), ProjectFileType::CONFIG, 150, 'config'];
@@ -97,7 +101,7 @@ final class AttackerSkillRegistryTest extends TestCase
 
         $output = $attackerSkillRegistry->render([], emitAll: true);
 
-        self::assertSame(18, substr_count($output, '<skills role="'));
+        self::assertSame(20, substr_count($output, '<skills role="'));
     }
 
     public function test_it_emits_blocks_in_attack_surface_priority_order(): void
@@ -110,6 +114,7 @@ final class AttackerSkillRegistryTest extends TestCase
 
         self::assertSame([
             'controller',
+            'file_upload_controller',
             'api_resource',
             'live_component',
             'authenticator',
@@ -123,6 +128,7 @@ final class AttackerSkillRegistryTest extends TestCase
             'file_upload',
             'repository',
             'entity',
+            'file_upload_entity',
             'template',
             'twig_extension',
             'config',
@@ -151,7 +157,7 @@ final class AttackerSkillRegistryTest extends TestCase
      */
     public static function everyFileTypeWithASkill(): iterable
     {
-        yield 'controller' => [ProjectFileType::CONTROLLER, ['controller']];
+        yield 'controller' => [ProjectFileType::CONTROLLER, ['controller', 'file_upload_controller']];
         yield 'api_resource' => [ProjectFileType::API_RESOURCE, ['api_resource']];
         yield 'live_component' => [ProjectFileType::LIVE_COMPONENT, ['live_component']];
         yield 'authenticator' => [ProjectFileType::AUTHENTICATOR, ['authenticator']];
@@ -163,7 +169,7 @@ final class AttackerSkillRegistryTest extends TestCase
         yield 'scheduler' => [ProjectFileType::SCHEDULER, ['scheduler']];
         yield 'form' => [ProjectFileType::FORM, ['form', 'file_upload']];
         yield 'repository' => [ProjectFileType::REPOSITORY, ['repository']];
-        yield 'entity' => [ProjectFileType::ENTITY, ['entity']];
+        yield 'entity' => [ProjectFileType::ENTITY, ['entity', 'file_upload_entity']];
         yield 'template' => [ProjectFileType::TEMPLATE, ['template']];
         yield 'twig_extension' => [ProjectFileType::TWIG_EXTENSION, ['twig_extension']];
         yield 'config' => [ProjectFileType::CONFIG, ['config']];

@@ -53,7 +53,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
@@ -605,6 +608,24 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertInstanceOf(NullReviewerCache::class, $this->getPrivateService($kernel, ReviewerCacheInterface::class));
     }
 
+    #[RunInSeparateProcess]
+    #[MaximumDuration(1500)]
+    public function test_bundle_wires_the_ttl_bounded_advisory_cache_when_cache_enabled(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => true]]);
+
+        self::assertInstanceOf(LockfileHashedAdvisoryCache::class, $this->getPrivateService($kernel, ComposerAuditRunnerInterface::class));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(1250)]
+    public function test_bundle_bypasses_the_advisory_cache_when_cache_disabled(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => false]]);
+
+        self::assertInstanceOf(SymfonyProcessComposerAuditRunner::class, $this->getPrivateService($kernel, ComposerAuditRunnerInterface::class));
+    }
+
     public function test_bundle_reviewer_cache_dir_and_salt_derive_from_cache_dir_and_reviewer_model(): void
     {
         $containerBuilder = $this->loadParameters([
@@ -615,9 +636,26 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         self::assertSame('/custom/cache/reviewer', $containerBuilder->getParameter('symfony_security_auditor.cache.reviewer_dir'));
         self::assertSame(
-            \sprintf('claude-haiku-4-5-20251001|reviewer-v%d|prompt-v%d', FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
+            \sprintf('claude-haiku-4-5-20251001|reviewer-v%d|prompt-v%d|collect-tool', FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
             $containerBuilder->getParameter('symfony_security_auditor.cache.reviewer_key_salt'),
         );
+    }
+
+    public function test_bundle_reviewer_key_salt_folds_in_the_structured_collection_mode(): void
+    {
+        $structuredSalt = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['reviewer_structured_collection' => true],
+        ])->getParameter('symfony_security_auditor.cache.reviewer_key_salt');
+
+        $jsonSalt = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['reviewer_structured_collection' => false],
+        ])->getParameter('symfony_security_auditor.cache.reviewer_key_salt');
+
+        self::assertNotSame($structuredSalt, $jsonSalt);
+        self::assertStringEndsWith('|collect-tool', (string) $structuredSalt);
+        self::assertStringEndsWith('|collect-json', (string) $jsonSalt);
     }
 
     public function test_bundle_propagates_secret_scrubbing_config_to_parameters(): void

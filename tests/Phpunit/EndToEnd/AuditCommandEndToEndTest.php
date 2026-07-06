@@ -1064,6 +1064,32 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('[ERROR]', $commandTester->getDisplay());
     }
 
+    public function test_budget_aborted_command_with_machine_readable_stdout_keeps_the_document_valid(): void
+    {
+        $this->createProjectDir();
+
+        $abortingAttacker = self::createStub(LLMClientInterface::class);
+        $abortingAttacker->method('complete')->willThrowException(
+            BudgetExceededException::forCost(1.5, 1.0),
+        );
+        $abortingAttacker->method('completeWithTools')->willThrowException(
+            BudgetExceededException::forCost(1.5, 1.0),
+        );
+        $reviewerLLM = self::createStub(LLMClientInterface::class);
+        $reviewerLLM->method('complete')->willReturn(LLMResponse::of('{}', 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)));
+
+        $commandTester = $this->makeCommandTesterWithLLM($abortingAttacker, $reviewerLLM);
+        $commandTester->execute(
+            ['project-path' => $this->fixtureDir, '--format' => 'json'],
+            ['capture_stderr_separately' => true],
+        );
+
+        self::assertSame(ExitCode::BudgetAborted->value, $commandTester->getStatusCode());
+        json_decode($commandTester->getDisplay(), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertStringContainsString('[ERROR]', $commandTester->getErrorOutput());
+        self::assertStringNotContainsString('[ERROR]', $commandTester->getDisplay());
+    }
+
     public function test_dry_run_emits_estimated_cost_without_invoking_llm(): void
     {
         $this->createProjectDir();

@@ -88,8 +88,12 @@ is a `MAJOR` change.
     (default `critical`, so `SAFE`/`LOW`/`MEDIUM`/`HIGH` by default).
   - `1` — aggregate risk level is at or above the `fail_on` threshold (default
     `critical`), or the audit itself failed.
-  - `2` — audit aborted because the configured token or cost budget was exceeded
-    (partial report still emitted).
+  - `2` — the audit budget could not be honored: either it aborted mid-run
+    because the configured token or cost budget was exceeded (partial report
+    still emitted), or it never started because an unpriced model makes
+    `audit.budget.max_cost_usd` unenforceable and either the user declined the
+    interactive confirmation or the run is non-interactive (no report emitted
+    in that case).
 - The command name `audit:diff` (see
   [CLI Reference → `audit:diff`](configuration.md#auditdiff--comparing-two-reports)),
   its `previous-report` and `current-report` arguments, its `--format` option

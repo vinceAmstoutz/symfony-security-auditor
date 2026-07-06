@@ -121,6 +121,22 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString('Audit complete. Risk:', $display);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_result_for_failure_exit_reflects_the_actual_risk_level_not_a_hardcoded_critical(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->result($symfonyStyle, $this->makeHighRiskReport(), Command::FAILURE);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('Risk: HIGH', $display);
+        self::assertStringNotContainsString('CRITICAL', $display);
+    }
+
     public function test_result_for_success_exit_emits_success_message(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -382,6 +398,27 @@ final class AuditPresenterTest extends TestCase
             $auditContext->addVulnerability(
                 Vulnerability::of(
                     new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'Critical vuln '.$i, 0.9),
+                    new CodeLocation('src/File'.$i.'.php', 1, 5),
+                    new VulnerabilityNarrative('desc', 'inject', "' OR 1", 'fix'),
+                    '$q',
+                )->withReviewerValidation(true),
+            );
+        }
+
+        return AuditReport::fromContext($auditContext);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    private function makeHighRiskReport(): AuditReport
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        for ($i = 1; $i <= 5; ++$i) {
+            $auditContext->addVulnerability(
+                Vulnerability::of(
+                    new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'High vuln '.$i, 0.9),
                     new CodeLocation('src/File'.$i.'.php', 1, 5),
                     new VulnerabilityNarrative('desc', 'inject', "' OR 1", 'fix'),
                     '$q',

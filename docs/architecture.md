@@ -232,8 +232,7 @@ All properties are `readonly`. State changes return new instances:
 - `withElevatedSeverity(VulnerabilitySeverity): self` — called when reviewer
   adjusts severity
 
-The `id` is deterministic:
-`VULN-{sha1(type+filePath+lineStart+microtime)[0..7]}`.
+The `id` is deterministic: `VULN-{sha1(type+filePath+lineStart)[0..7]}`.
 
 Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`,
 `filePath`, `lineStart`, `lineEnd`, `vulnerableCode`, `attackVector`, `proof`,
@@ -266,10 +265,10 @@ Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`,
 | Cryptographic         | `WEAK_CRYPTOGRAPHY`, `HARDCODED_SECRET`, `INSECURE_RANDOM`                 |
 
 `category()` and `owaspReference()` return human-readable strings used in report
-output and LLM prompts. `cweReference()` and `cweReferenceUrl()` return the
-matching MITRE CWE identifier (e.g. `CWE-89`) and its
-`https://cwe.mitre.org/data/definitions/<n>.html` definition page, surfaced
-alongside the OWASP mapping in every report renderer.
+output and LLM prompts. `cwe(): CweReference` returns the matching MITRE CWE
+value object, whose `label()` (e.g. `CWE-89`) and `url()`
+(`https://cwe.mitre.org/data/definitions/<n>.html`) are surfaced alongside the
+OWASP mapping in every report renderer.
 
 ### `ProjectFile` — immutable scanned file
 
@@ -810,9 +809,8 @@ provider-agnostic.
 `symfony/ai`.
 
 **Add new vulnerability types** — add a case to `VulnerabilityType`, add a
-branch in `category()`, `owaspReference()`, `owaspReferenceUrl()`,
-`cweReference()`, and `cweReferenceUrl()`. The factory, agents, and report
-serialization require no changes.
+branch in `category()`, `owaspReference()`, `owaspReferenceUrl()`, and `cwe()`.
+The factory, agents, and report serialization require no changes.
 
 **Add new severity levels** — add a case to `VulnerabilitySeverity` with
 `score()`, `label()`, `isExploitable()` implementations, and update the

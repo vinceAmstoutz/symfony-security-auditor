@@ -20,6 +20,7 @@ use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
@@ -31,8 +32,6 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     public function test_emits_zero_tokens_when_no_files_are_scanned(): void
     {
-        // Pins: `$totalInputChars = 0` (vs -1), `mb_strlen` invocation,
-        // `str_repeat('x', 0)` returning empty string → estimator gets ''.
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [],
             'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 99),
@@ -40,45 +39,25 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        // Attacker share alone: 99 * 3 = 297 input; output = ceil(297 * 0.15) = 45.
-        // Asserting on the attacker breakdown kills the -1 mutation in $perRoundInputTokens.
         $byRole = $auditReport->cost()->byRole();
-        self::assertSame(99 * 3, $byRole['attacker']['input_tokens']);
-        self::assertSame(45, $byRole['attacker']['output_tokens']);
+        self::assertSame(0, $byRole['attacker']['input_tokens']);
+        self::assertSame(0, $byRole['attacker']['output_tokens']);
     }
 
-    public function test_multi_file_content_accumulates_via_addition(): void
+    public function test_per_file_token_estimates_are_summed_via_addition(): void
     {
-        // Pins: `+=` (vs `=`) — last file's length would otherwise override prior files.
-        $measuringTokenEstimator = $this->measuringEstimator();
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [
                 $this->makeProjectFile('a.php', '<?php // ten ch'),     // 15 chars
                 $this->makeProjectFile('b.php', '<?php /* 1 */'),       // 13 chars
             ],
-            'tokenEstimator' => $measuringTokenEstimator,
+            'tokenEstimator' => $this->lengthEchoingEstimator(),
+            'maxIterations' => 1,
         ]);
 
-        $estimateAuditCostUseCase->execute($this->tmpDir);
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
 
-        self::assertSame(28, $measuringTokenEstimator->lastInputLength, 'estimator should see sum (15+13), not last file (13)');
-    }
-
-    public function test_multibyte_content_is_counted_via_mb_strlen_not_strlen(): void
-    {
-        // Pins: `mb_strlen` (vs `strlen`). One 3-byte UTF-8 character has
-        // mb_strlen=1 but strlen=3 — different scrub-down token counts.
-        $measuringTokenEstimator = $this->measuringEstimator();
-        $estimateAuditCostUseCase = $this->makeUseCase([
-            'files' => [
-                $this->makeProjectFile('m.php', '€€€'), // mb_strlen=3, strlen=9
-            ],
-            'tokenEstimator' => $measuringTokenEstimator,
-        ]);
-
-        $estimateAuditCostUseCase->execute($this->tmpDir);
-
-        self::assertSame(3, $measuringTokenEstimator->lastInputLength, 'mb_strlen of "€€€" is 3; strlen would be 9');
+        self::assertSame(28, $auditReport->cost()->byRole()['attacker']['input_tokens'], 'per-file estimates must be summed (15+13), not overwritten by the last file');
     }
 
     public function test_input_token_estimate_scales_with_max_iterations(): void
@@ -128,10 +107,8 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(24, $auditReport->cost()->byRole()['attacker']['output_tokens']);
     }
 
-    public function test_estimate_input_is_str_repeat_x_of_total_chars(): void
+    public function test_full_file_content_length_reaches_the_estimator(): void
     {
-        // Pins: `str_repeat('x', $totalInputChars)` — if mutator unwraps to just 'x',
-        // the estimator receives a single character and produces a much smaller estimate.
         $measuringTokenEstimator = $this->measuringEstimator();
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [$this->makeProjectFile('a.php', str_repeat('a', 1000))],
@@ -199,10 +176,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertCount(1, $readyLogs);
         $context = $readyLogs[0][1];
         self::assertSame(2, $context['files']);
-        // attacker = 100 * 2 = 200, reviewer = ceil(200 * 0.20) = 40, total = 240
-        self::assertSame(240, $context['input_tokens']);
-        // attacker_out = ceil(200 * 0.5) = 100, reviewer_out = ceil(40 * 0.5) = 20, total = 120
-        self::assertSame(120, $context['output_tokens']);
+        // per-round input = 100 (file a) + 100 (file b) = 200; attacker = 200 * 2 = 400,
+        // reviewer = ceil(400 * 0.20) = 80, total = 480
+        self::assertSame(480, $context['input_tokens']);
+        // attacker_out = ceil(400 * 0.5) = 200, reviewer_out = ceil(80 * 0.5) = 40, total = 240
+        self::assertSame(240, $context['output_tokens']);
         self::assertSame(0.0, $context['estimated_cost_usd']);
         self::assertSame(0.0, $context['attacker_cost_usd']);
         self::assertSame(0.0, $context['reviewer_cost_usd']);
@@ -363,6 +341,48 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(2, $measuringTokenEstimator->lastInputLength);
     }
 
+    public function test_diff_since_ref_narrows_the_estimate_to_changed_files(): void
+    {
+        $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
+        $gitChangedFilesResolver->method('changedSince')->willReturn(['src/Changed.php']);
+
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [
+                $this->makeProjectFile('src/Changed.php', 'aa'),      // 2 chars
+                $this->makeProjectFile('src/Unchanged.php', 'bbbbbb'), // 6 chars
+            ],
+            'tokenEstimator' => $this->lengthEchoingEstimator(),
+            'maxIterations' => 1,
+            'gitChangedFilesResolver' => $gitChangedFilesResolver,
+        ]);
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir, [], 'main');
+
+        self::assertSame(2, $auditReport->cost()->byRole()['attacker']['input_tokens'], 'the estimate must reflect only the changed file, not the whole project');
+        self::assertSame(1, $auditReport->filesScanned());
+    }
+
+    public function test_without_a_diff_since_ref_the_estimate_covers_every_file(): void
+    {
+        $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
+        $gitChangedFilesResolver->method('changedSince')->willReturn(['src/Changed.php']);
+
+        $estimateAuditCostUseCase = $this->makeUseCase([
+            'files' => [
+                $this->makeProjectFile('src/Changed.php', 'aa'),      // 2 chars
+                $this->makeProjectFile('src/Unchanged.php', 'bbbbbb'), // 6 chars
+            ],
+            'tokenEstimator' => $this->lengthEchoingEstimator(),
+            'maxIterations' => 1,
+            'gitChangedFilesResolver' => $gitChangedFilesResolver,
+        ]);
+
+        $auditReport = $estimateAuditCostUseCase->execute($this->tmpDir);
+
+        self::assertSame(8, $auditReport->cost()->byRole()['attacker']['input_tokens'], 'without --since, every file must still contribute to the estimate');
+        self::assertSame(2, $auditReport->filesScanned());
+    }
+
     public function test_primary_model_flows_through_to_audit_cost(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase([
@@ -379,7 +399,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     public function test_max_iterations_defaults_to_three(): void
     {
         $estimateAuditCostUseCase = new EstimateAuditCostUseCase(
-            $this->fixedScanner([]),
+            $this->fixedScanner([$this->makeProjectFile('a.php', 'aaa')]),
             $this->fixedEstimator(perRoundTokens: 99),
             new CostCalculator($this->zeroPricing()),
             new NullLogger(),
@@ -402,6 +422,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      *     reviewerModel?: string,
      *     reviewerInputRatio?: float,
      *     pricingProvider?: PricingProviderInterface,
+     *     gitChangedFilesResolver?: GitChangedFilesResolverInterface,
      * } $overrides
      */
     private function makeUseCase(array $overrides = []): EstimateAuditCostUseCase
@@ -415,6 +436,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         $reviewerModel = $overrides['reviewerModel'] ?? '';
         $reviewerInputRatio = $overrides['reviewerInputRatio'] ?? EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO;
         $pricingProvider = $overrides['pricingProvider'] ?? $this->zeroPricing();
+        $gitChangedFilesResolver = $overrides['gitChangedFilesResolver'] ?? null;
 
         return new EstimateAuditCostUseCase(
             $this->fixedScanner($files),
@@ -426,6 +448,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
             $outputRatio,
             $reviewerModel,
             $reviewerInputRatio,
+            $gitChangedFilesResolver,
         );
     }
 
@@ -463,6 +486,18 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     private function measuringEstimator(): MeasuringTokenEstimator
     {
         return new MeasuringTokenEstimator();
+    }
+
+    /** Returns the character length of whatever text it is given, so per-call results can be summed and asserted on. */
+    private function lengthEchoingEstimator(): TokenEstimatorInterface
+    {
+        return new class implements TokenEstimatorInterface {
+            #[Override]
+            public function estimateTokens(string $text, string $model): int
+            {
+                return mb_strlen($text);
+            }
+        };
     }
 
     private function zeroPricing(): PricingProviderInterface

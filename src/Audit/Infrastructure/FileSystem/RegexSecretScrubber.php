@@ -45,7 +45,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
         SecretPatternLabel::PemPrivateKey->value => '/-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/',
         SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]*://)[^:@/\s]*:[^@/\s]+@~i',
-        SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9_]*_(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|API_KEY|DSN)|PASSWORD|SECRET|API_KEY))\s*=\s*(?!\s*\n)([^\s#]+)/m',
+        SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|DSN)(?:_[A-Z0-9]+)*)\s*=\s*(?!\s*\n)([^\s#]+)/m',
         SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=])\s*)(?!\*\*\*REDACTED:)(?:(["\'])([^"\'\n]{4,})\2|([^"\'\s#][^\s#]{3,}))/i',
     ];
 

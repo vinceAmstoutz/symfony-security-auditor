@@ -71,7 +71,7 @@ final readonly class BatchVerdictApplier
     private function indexReviewsById(array $rawData): array
     {
         $reviewsById = [];
-        foreach ($rawData as $entry) {
+        foreach ($this->asReviewList($rawData) as $entry) {
             if (!\is_array($entry)) {
                 continue;
             }
@@ -83,6 +83,20 @@ final readonly class BatchVerdictApplier
         }
 
         return $reviewsById;
+    }
+
+    /**
+     * A batch of one may come back as a bare review object instead of a
+     * one-element array — treat it as a single-entry list rather than
+     * iterating its scalar values.
+     *
+     * @param array<int|string, mixed> $rawData
+     *
+     * @return list<mixed>
+     */
+    private function asReviewList(array $rawData): array
+    {
+        return [] !== $rawData && !array_is_list($rawData) ? [$rawData] : $rawData;
     }
 
     /**

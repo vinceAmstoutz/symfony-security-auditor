@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
 
 use Override;
+use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
@@ -25,9 +26,12 @@ use function Symfony\Component\String\u;
  * Decorator over `ComposerAuditRunnerInterface` that persists the JSON payload
  * across audit runs, keyed by a SHA-256 hash of the project's `composer.lock`.
  *
- * Hit: the cached JSON is returned without ever spawning composer.
- * Miss / no lockfile: delegates to the inner runner, caches the result on
- * success (only when a lockfile exists), and either way returns the raw JSON.
+ * Hit: the cached JSON is returned without ever spawning composer, provided
+ * the entry is younger than `TTL_SECONDS` — the lockfile hash alone cannot
+ * detect newly-disclosed advisories against an unchanged dependency set.
+ * Miss / stale / no lockfile: delegates to the inner runner, caches the
+ * result on success (only when a lockfile exists), and either way returns
+ * the raw JSON.
  *
  * Cache I/O failures degrade gracefully — they are logged and swallowed so the
  * audit never aborts because of a stale or unreadable advisory cache entry.
@@ -36,11 +40,20 @@ use function Symfony\Component\String\u;
  */
 final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerInterface
 {
+    /**
+     * Advisory feeds gain new CVEs over time for an unchanged dependency set,
+     * so even a lockfile-hash hit must expire — 24 hours balances staying
+     * useful within a single working day against missing newly-disclosed
+     * advisories for longer than necessary.
+     */
+    private const int TTL_SECONDS = 86_400;
+
     public function __construct(
         private ComposerAuditRunnerInterface $composerAuditRunner,
         private string $cacheDir,
         private Filesystem $filesystem,
         private LoggerInterface $logger,
+        private ClockInterface $clock,
     ) {}
 
     #[Override]
@@ -101,6 +114,12 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
             return null;
         }
 
+        if ($this->isExpired($path)) {
+            $this->logger->debug('Advisory cache entry expired, falling back to live audit', ['path' => $path]);
+
+            return null;
+        }
+
         try {
             return $this->filesystem->readFile($path);
         } catch (IOException $ioException) {
@@ -111,6 +130,16 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
 
             return null;
         }
+    }
+
+    private function isExpired(string $path): bool
+    {
+        $modifiedAt = filemtime($path);
+        if (false === $modifiedAt) {
+            return true;
+        }
+
+        return $this->clock->now()->getTimestamp() - $modifiedAt >= self::TTL_SECONDS;
     }
 
     private function writeCache(string $hash, string $json): void

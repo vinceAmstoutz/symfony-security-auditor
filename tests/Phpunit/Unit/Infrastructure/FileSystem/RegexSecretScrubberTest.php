@@ -220,6 +220,38 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame('STRIPE_SECRET_KEY=***REDACTED:env_assignment***', $output);
     }
 
+    #[DataProvider('midWordCredentialKeyCases')]
+    public function test_env_assignment_redacts_credential_word_anywhere_in_the_key(string $key, string $value): void
+    {
+        $output = $this->regexSecretScrubber->scrub(\sprintf('%s=%s', $key, $value));
+
+        self::assertSame(\sprintf('%s=***REDACTED:env_assignment***', $key), $output);
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function midWordCredentialKeyCases(): iterable
+    {
+        yield 'secret_as_prefix_segment' => ['SECRET_KEY_BASE', 'zzz999aaa111'];
+        yield 'password_as_middle_segment' => ['MAILER_PASSWORD_ENC', 'qwerty12345'];
+        yield 'token_as_prefix_segment' => ['TOKEN_STORE', 'leakme123456'];
+        yield 'key_as_middle_segment' => ['JWT_PRIVATE_KEY_PATH', '/var/secrets/jwt.pem'];
+        yield 'key_as_suffix_segment_with_prefix' => ['AWS_ACCESS_KEY_ID', 'AKIAABCDEFGHEXAMPLE'];
+    }
+
+    #[DataProvider('nonCredentialKeyContainingCredentialSubstringCases')]
+    public function test_env_assignment_does_not_redact_keys_containing_a_credential_word_as_a_bare_substring(string $line): void
+    {
+        self::assertSame($line, $this->regexSecretScrubber->scrub($line));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function nonCredentialKeyContainingCredentialSubstringCases(): iterable
+    {
+        yield 'monkey_contains_key' => ['MONKEY_COUNT=5'];
+        yield 'keyspace_contains_key' => ['SESSION_KEYSPACE=xyz'];
+        yield 'keyword_contains_key' => ['MY_KEYWORD_VALUE=abc'];
+    }
+
     public function test_connection_uri_redaction_preserves_scheme_and_host(): void
     {
         $output = $this->regexSecretScrubber->scrub('DATABASE_URL=postgres://app_user:s3cr3tValue@db.internal:5432/app');

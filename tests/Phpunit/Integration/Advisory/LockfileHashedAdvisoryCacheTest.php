@@ -15,9 +15,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Advisory;
 
 use Override;
 use PHPUnit\Framework\TestCase;
+use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\Component\Clock\MockClock;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
@@ -68,6 +71,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir,
             new Filesystem(),
             $logger,
+            new NativeClock(),
         );
 
         $lockfileHashedAdvisoryCache->run($this->projectDir);
@@ -119,6 +123,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir,
             new Filesystem(),
             $logger,
+            new NativeClock(),
         );
         $lockfileHashedAdvisoryCache->run($this->projectDir);
 
@@ -216,6 +221,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir,
             $filesystem,
             $logger,
+            new NativeClock(),
         );
 
         $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
@@ -272,6 +278,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir,
             $filesystem,
             $logger,
+            new NativeClock(),
         );
 
         $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
@@ -340,6 +347,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir.'/',
             $filesystem,
             new NullLogger(),
+            new NativeClock(),
         );
         $lockfileHashedAdvisoryCache->run($this->projectDir);
 
@@ -377,6 +385,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir,
             $filesystem,
             $logger,
+            new NativeClock(),
         );
 
         // Must not throw despite the cache write failing.
@@ -417,6 +426,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir,
             new Filesystem(),
             $logger,
+            new NativeClock(),
         );
         $lockfileHashedAdvisoryCache->run($this->projectDir);
 
@@ -426,6 +436,45 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         ));
         self::assertCount(1, $storedLogs);
         self::assertSame($expectedHash, $storedLogs[0][1]['lockfile_hash'] ?? null);
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_cache_entry_within_ttl_is_served_without_invoking_inner(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+        $mockClock = new MockClock();
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {"foo/bar": []}}');
+
+        $lockfileHashedAdvisoryCache = $this->makeCacheWithClock($recordingComposerAuditRunner, $mockClock);
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $mockClock->modify('+23 hours');
+        $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame('{"advisories": {"foo/bar": []}}', $json);
+        self::assertSame(1, $recordingComposerAuditRunner->callCount, 'an entry younger than the TTL must be served from cache');
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_cache_entry_past_ttl_is_treated_as_a_miss(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+        $mockClock = new MockClock();
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {"foo/bar": []}}');
+
+        $lockfileHashedAdvisoryCache = $this->makeCacheWithClock($recordingComposerAuditRunner, $mockClock);
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $mockClock->modify('+25 hours');
+        $recordingComposerAuditRunner->payload = '{"advisories": {"new/cve": []}}';
+        $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame('{"advisories": {"new/cve": []}}', $json);
+        self::assertSame(2, $recordingComposerAuditRunner->callCount, 'an entry past the TTL must not be served from cache');
     }
 
     #[Override]
@@ -452,7 +501,12 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
 
     private function makeCache(ComposerAuditRunnerInterface $composerAuditRunner): LockfileHashedAdvisoryCache
     {
-        return new LockfileHashedAdvisoryCache($composerAuditRunner, $this->cacheDir, new Filesystem(), new NullLogger());
+        return new LockfileHashedAdvisoryCache($composerAuditRunner, $this->cacheDir, new Filesystem(), new NullLogger(), new NativeClock());
+    }
+
+    private function makeCacheWithClock(ComposerAuditRunnerInterface $composerAuditRunner, ClockInterface $clock): LockfileHashedAdvisoryCache
+    {
+        return new LockfileHashedAdvisoryCache($composerAuditRunner, $this->cacheDir, new Filesystem(), new NullLogger(), $clock);
     }
 
     private function recordingRunner(string $payload): RecordingComposerAuditRunner

@@ -145,6 +145,46 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertStringNotContainsString('the class and namespace are fine', $sliced);
     }
 
+    public function test_bare_include_and_require_statements_are_retained(): void
+    {
+        $projectFile = ProjectFile::create('src/Controller/PageController.php', '/app/src/Controller/PageController.php', $this->largeControllerWithBareIncludes());
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('include $partial;', $sliced);
+        self::assertStringContainsString('require_once $bootstrap;', $sliced);
+    }
+
+    private function largeControllerWithBareIncludes(): string
+    {
+        $inert = str_repeat("        \$x = INERT_MARKER;\n", 25);
+
+        return <<<PHP
+            <?php
+
+            namespace App\\Controller;
+
+            use Symfony\\Component\\HttpFoundation\\Response;
+
+            class PageController
+            {
+                public function render(string \$partial): Response
+                {
+                    include \$partial;
+
+                    return new Response('ok');
+                }
+
+                public function bootstrap(string \$bootstrap): Response
+                {
+                    require_once \$bootstrap;
+            {$inert}
+                    return new Response('ok');
+                }
+            }
+            PHP;
+    }
+
     private function largeController(): string
     {
         $inert = str_repeat("        \$x = INERT_MARKER;\n", 25);

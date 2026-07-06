@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\Component\ErrorHandler\BufferingLogger;
 use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
@@ -162,6 +163,26 @@ final class AuditOrchestratorTest extends TestCase
         $auditOrchestrator->orchestrate($auditContext);
 
         self::assertEmpty($auditContext->vulnerabilities());
+    }
+
+    public function test_it_logs_findings_dropped_below_the_confidence_floor(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(
+            $this->attackerResponse([$this->vulnPayload(title: 'low', confidence: 0.3)]),
+        );
+        $reviewerLlm->expects(self::never())->method('complete');
+        $bufferingLogger = new BufferingLogger();
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['logger' => $bufferingLogger]);
+        $auditContext = $this->makeContextWithMapping();
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        $logs = $bufferingLogger->cleanLogs();
+        $messages = array_map(static fn (array $log): string => $log[1], $logs);
+        self::assertContains('Dropping finding below the confidence floor', $messages);
     }
 
     public function test_it_skips_baseline_accepted_findings_before_the_reviewer(): void

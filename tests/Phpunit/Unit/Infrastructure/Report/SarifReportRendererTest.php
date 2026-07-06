@@ -140,6 +140,22 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */
+    public function test_a_rule_shared_across_categories_picks_its_name_and_description_independent_of_severity(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::BROKEN_ACCESS_CONTROL, VulnerabilitySeverity::MEDIUM);
+        $vuln2 = $this->makeValidatedVuln(VulnerabilityType::PATH_TRAVERSAL, VulnerabilitySeverity::CRITICAL, 'src/Bar.php', 10);
+        $decoded = $this->decodeSarif($this->makeReport($vulnerability, $vuln2));
+
+        $rule = array_values($decoded['runs'][0]['tool']['driver']['rules'])[0];
+
+        self::assertSame(VulnerabilityType::BROKEN_ACCESS_CONTROL->value, $rule['name']);
+        self::assertSame(VulnerabilityType::BROKEN_ACCESS_CONTROL->category(), $rule['shortDescription']['text']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_a_rule_does_not_repeat_the_cwe_tag_of_a_recurring_type(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);

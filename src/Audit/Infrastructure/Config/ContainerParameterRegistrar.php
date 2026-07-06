@@ -101,7 +101,7 @@ final readonly class ContainerParameterRegistrar
             'cache.dir' => $cache->dir,
             'cache.advisory_dir' => \sprintf('%s/advisory', $cache->dir),
             'cache.reviewer_dir' => \sprintf('%s/reviewer', $cache->dir),
-            'cache.reviewer_key_salt' => $this->reviewerKeySalt($llm),
+            'cache.reviewer_key_salt' => $this->reviewerKeySalt($llm, $audit->reviewerStructuredCollection),
             'cache.prompt_caching' => $cache->promptCaching,
             'cache.key_salt' => $this->attackerKeySalt($bundleConfiguration, $llm->attackerModel()),
             'cache.cheap_attacker_key_salt' => $this->attackerKeySalt(
@@ -128,13 +128,14 @@ final readonly class ContainerParameterRegistrar
         return array_values(array_unique($models));
     }
 
-    private function reviewerKeySalt(LLMConfiguration $llmConfiguration): string
+    private function reviewerKeySalt(LLMConfiguration $llmConfiguration, bool $reviewerStructuredCollection): string
     {
         return \sprintf(
-            '%s|reviewer-v%d|prompt-v%d',
+            '%s|reviewer-v%d|prompt-v%d|collect-%s',
             $llmConfiguration->reviewerModel(),
             FilesystemReviewerCache::CACHE_VERSION,
             ReviewerPromptBuilder::PROMPT_VERSION,
+            $reviewerStructuredCollection ? 'tool' : 'json',
         );
     }
 
