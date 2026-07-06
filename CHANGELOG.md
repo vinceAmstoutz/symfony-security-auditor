@@ -197,8 +197,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   threaded into the pipeline (`RunAuditUseCase::execute()` fifth parameter →
   `AuditContext::acceptedFingerprints()`), and `AuditOrchestrator` drops
   matching attacker findings _before_ the review phase — each unique skip
-  streams once as `⚖ ⤳ baseline-accepted <type> — file:line (review skipped)` on
-  a decorated terminal or `[BASELINE-SKIPPED] <type> — file:line` in plain
+  streams once as `⚖ ⤳ baseline-accepted <type> — file:line (review skipped)`
+  on a decorated terminal or `[BASELINE-SKIPPED] <type> — file:line` in plain
   output (new stable progress-event value `baseline.finding.skipped`), and the
   total lands in the `audit.baseline_skipped` context metadata.
   `--generate-baseline` now writes one JSON object per finding — `fingerprint`,
@@ -644,9 +644,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `AuditedProjectPathHolder`
   (`src/Audit/Infrastructure/Advisory/AuditedProjectPathHolder.php`) carries the
   command's resolved `project-path` argument at runtime, and the advisory
-  database is a lazy service, so the audit executes against the project actually
-  being audited — and only when advisory data is first needed, instead of at
-  container instantiation.
+  database defers constructing `ComposerAuditAdvisoryDatabase` — and therefore
+  running `composer audit` — until the first lookup (`DeferredAdvisoryDatabase`,
+  replacing a Symfony `->lazy()` service that cannot proxy a `final readonly`
+  class), so the audit executes against the project actually being audited — and
+  only when advisory data is first needed, instead of at container
+  instantiation.
 - **The standalone binary's per-project config resolution no longer depends on
   the `$PWD` shell export, and project-config lists override user-config lists
   wholesale.** `.symfony-security-auditor.yaml` was located via

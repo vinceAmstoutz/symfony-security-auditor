@@ -42,7 +42,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
@@ -194,7 +194,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ? RegexSecretScrubber::class
             : NullSecretScrubber::class);
 
-        $servicesConfigurator->alias(AdvisoryDatabaseInterface::class, ComposerAuditAdvisoryDatabase::class);
+        $servicesConfigurator->alias(AdvisoryDatabaseInterface::class, DeferredAdvisoryDatabase::class);
 
         $servicesConfigurator->alias(StaticPreScannerInterface::class, $bundleConfiguration->audit->staticPreScanEnabled
             ? RegexStaticPreScanner::class

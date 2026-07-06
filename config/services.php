@@ -66,8 +66,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterfa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
@@ -457,8 +457,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(AuditedProjectPathHolder::class)
         ->args([param('kernel.project_dir')]);
 
-    $defaultsConfigurator->set(ComposerAuditAdvisoryDatabase::class)
-        ->lazy()
+    $defaultsConfigurator->set(DeferredAdvisoryDatabase::class)
         ->args([
             service(ComposerAuditRunnerInterface::class),
             service(AuditedProjectPathHolder::class),

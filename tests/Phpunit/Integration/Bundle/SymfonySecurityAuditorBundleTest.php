@@ -53,7 +53,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
@@ -180,8 +180,8 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
 
-        $definition = $containerBuilder->getDefinition(ComposerAuditAdvisoryDatabase::class);
-        self::assertTrue($definition->isLazy());
+        self::assertSame(DeferredAdvisoryDatabase::class, (string) $containerBuilder->getAlias(AdvisoryDatabaseInterface::class));
+        $definition = $containerBuilder->getDefinition(DeferredAdvisoryDatabase::class);
         $pathArgument = $definition->getArgument(1);
         self::assertInstanceOf(Reference::class, $pathArgument);
         self::assertSame(AuditedProjectPathHolder::class, (string) $pathArgument);
@@ -699,7 +699,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
 
-        self::assertInstanceOf(ComposerAuditAdvisoryDatabase::class, $this->getPrivateService($kernel, AdvisoryDatabaseInterface::class));
+        self::assertInstanceOf(DeferredAdvisoryDatabase::class, $this->getPrivateService($kernel, AdvisoryDatabaseInterface::class));
     }
 
     #[RunInSeparateProcess]
