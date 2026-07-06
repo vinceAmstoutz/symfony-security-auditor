@@ -19,6 +19,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 
 final class AuditCostTest extends TestCase
 {
+    /**
+     * @throws InvalidAuditCostException
+     */
     public function test_of_constructs_and_exposes_all_fields(): void
     {
         $auditCost = AuditCost::of(100, 50, 0.0125, 'gpt-4o');
@@ -39,6 +42,9 @@ final class AuditCostTest extends TestCase
         self::assertSame('claude-haiku-4-5-20251001', $auditCost->primaryModel());
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     */
     public function test_cost_is_rounded_to_six_decimal_places(): void
     {
         $auditCost = AuditCost::of(0, 0, 0.0000005, 'm');
@@ -46,6 +52,9 @@ final class AuditCostTest extends TestCase
         self::assertSame(0.000001, $auditCost->estimatedCostUsd());
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     */
     public function test_to_array_emits_canonical_keys(): void
     {
         $auditCost = AuditCost::of(120, 30, 0.04, 'claude-sonnet-4-5');
@@ -60,6 +69,9 @@ final class AuditCostTest extends TestCase
         ], $auditCost->toArray());
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     */
     public function test_to_array_carries_per_role_breakdown_when_provided(): void
     {
         $auditCost = AuditCost::of(
@@ -83,6 +95,9 @@ final class AuditCostTest extends TestCase
         self::assertSame(50, $byRole['reviewer']['input_tokens']);
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     */
     public function test_by_role_getter_returns_constructor_payload(): void
     {
         $byRole = [
@@ -93,18 +108,27 @@ final class AuditCostTest extends TestCase
         self::assertSame($byRole, $auditCost->byRole());
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     */
     public function test_negative_input_tokens_rejected(): void
     {
         $this->expectException(InvalidAuditCostException::class);
         AuditCost::of(-1, 0, 0.0, 'm');
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     */
     public function test_negative_output_tokens_rejected(): void
     {
         $this->expectException(InvalidAuditCostException::class);
         AuditCost::of(0, -1, 0.0, 'm');
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     */
     public function test_negative_cost_rejected(): void
     {
         $this->expectException(InvalidAuditCostException::class);

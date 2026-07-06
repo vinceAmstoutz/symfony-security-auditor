@@ -20,6 +20,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -64,6 +66,8 @@ final readonly class ConcurrentChunkAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
      */
     public function analyze(array $chunks, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, RiskMarkerIndex $riskMarkerIndex, ?ToolRegistry $toolRegistry = null): array
     {
@@ -122,6 +126,8 @@ final readonly class ConcurrentChunkAnalyzer
      * @param list<ProjectFile> $chunk
      *
      * @return array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession, systemPrompt: string, userMessage: string}
+     *
+     * @throws InvalidToolRegistryException
      */
     private function buildPendingChunk(array $chunk, ChunkContext $chunkContext, ?ToolRegistry $toolRegistry): array
     {

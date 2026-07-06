@@ -57,14 +57,14 @@ final class BatchVerdictApplierTest extends TestCase
      */
     public function test_it_matches_a_list_of_review_objects_by_id(): void
     {
-        $first = $this->vulnerability(lineStart: 18);
+        $vulnerability = $this->vulnerability(lineStart: 18);
         $second = $this->vulnerability(lineStart: 40);
 
         $reviewed = $this->applier()->applyBatchReview(
-            [$first, $second],
+            [$vulnerability, $second],
             [
                 ['id' => $second->id(), 'accepted' => true],
-                ['id' => $first->id(), 'accepted' => false],
+                ['id' => $vulnerability->id(), 'accepted' => false],
             ],
             new NullCoverageRecorder(),
         );

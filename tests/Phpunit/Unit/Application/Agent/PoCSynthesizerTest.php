@@ -20,6 +20,7 @@ use Symfony\Component\ErrorHandler\BufferingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -53,6 +54,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
      */
     public function test_it_synthesizes_poc_for_validated_high_severity_finding(): void
     {
@@ -119,6 +121,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
      */
     public function test_it_keeps_original_when_llm_returns_empty(): void
     {
@@ -159,6 +162,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
      */
     public function test_severity_floor_medium_includes_medium_findings(): void
     {
@@ -184,6 +188,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
      */
     public function test_returned_list_preserves_input_order_and_length(): void
     {
@@ -212,6 +217,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
      */
     public function test_it_logs_completion_summary_with_inputs_synthesized_and_skipped_counts(): void
     {
@@ -275,6 +281,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
      */
     public function test_it_continues_to_the_next_finding_after_one_yields_no_poc(): void
     {

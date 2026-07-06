@@ -20,6 +20,7 @@ use Psr\Clock\ClockInterface;
 use RuntimeException;
 use Symfony\Component\Clock\MockClock;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\RateLimitRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Exception\InvalidRateLimiterConfigurationException;
@@ -29,6 +30,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 {
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_acquire_returns_immediately_when_capacity_available(): void
     {
@@ -52,6 +55,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_acquire_sleeps_until_next_window_when_rpm_exhausted(): void
     {
@@ -79,6 +84,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_acquire_sleeps_when_input_tokens_would_exceed_window(): void
     {
@@ -105,6 +112,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_window_resets_when_minute_elapses(): void
     {
@@ -131,6 +140,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_record_reconciles_input_estimate_against_actual(): void
     {
@@ -157,6 +168,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_a_record_for_a_previous_window_call_cannot_credit_the_new_window(): void
     {
@@ -186,6 +199,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_reconciliation_still_frees_capacity_for_calls_acquired_after_the_window_reset(): void
     {
@@ -216,6 +231,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_window_reset_zeroes_pending_estimates_rather_than_crediting_them(): void
     {
@@ -247,6 +264,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_window_reset_zeroes_pending_estimates_rather_than_debiting_them(): void
     {
@@ -278,6 +297,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_output_token_exhaustion_blocks_next_acquire(): void
     {
@@ -305,6 +326,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_output_under_quota_does_not_block(): void
     {
@@ -330,6 +353,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_pause_until_blocks_acquire_until_target(): void
     {
@@ -354,6 +379,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_pause_resumes_into_capacity_check_and_consumes_quota(): void
     {
@@ -380,6 +407,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_pause_spanning_a_window_boundary_resets_the_window_before_reserving(): void
     {
@@ -407,6 +436,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_pause_until_in_the_past_does_not_block(): void
     {
@@ -429,6 +460,10 @@ final class TokenBucketRateLimiterTest extends TestCase
         self::assertSame([], $sleeper->sleepsMs);
     }
 
+    /**
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_construction_throws_when_all_dimensions_null(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
@@ -450,6 +485,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_estimate_larger_than_window_throws(): void
     {
@@ -474,6 +511,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_negative_estimate_is_rejected(): void
     {
@@ -498,6 +537,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_record_accumulates_output_across_multiple_calls(): void
     {
@@ -527,6 +568,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_record_zero_output_does_not_increment_used(): void
     {
@@ -554,6 +597,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_post_reset_request_count_starts_at_zero(): void
     {
@@ -585,6 +630,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_post_reset_input_count_starts_at_zero(): void
     {
@@ -614,6 +661,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_post_reset_output_count_starts_at_zero(): void
     {
@@ -644,6 +693,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_acquire_accumulates_input_tokens_across_calls(): void
     {
@@ -669,6 +720,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_record_reconcile_adds_actual_input_to_bucket(): void
     {
@@ -694,6 +747,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_concurrent_acquires_are_each_reconciled_against_their_own_estimate(): void
     {
@@ -730,6 +785,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_record_zero_input_uses_reconciled_value_not_pending_estimate(): void
     {
@@ -755,6 +812,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_consecutive_records_without_acquire_use_zeroed_pending_estimate(): void
     {
@@ -781,6 +840,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_consecutive_records_without_acquire_do_not_over_count_input_tokens(): void
     {
@@ -807,6 +868,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_ms_until_rounds_sub_millisecond_delta_up_to_one(): void
     {
@@ -833,6 +896,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_ms_until_rounds_exact_one_millisecond_delta_to_one(): void
     {
@@ -859,6 +924,8 @@ final class TokenBucketRateLimiterTest extends TestCase
 
     /**
      * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public function test_ms_until_rounds_just_over_one_millisecond_delta_up_to_two(): void
     {

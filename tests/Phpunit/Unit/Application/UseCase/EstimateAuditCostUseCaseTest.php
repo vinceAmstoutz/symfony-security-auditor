@@ -19,6 +19,9 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
@@ -30,6 +33,10 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 {
     private string $tmpDir;
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_emits_zero_tokens_when_no_files_are_scanned(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase([
@@ -44,6 +51,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(0, $byRole['attacker']['output_tokens']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_per_file_token_estimates_are_summed_via_addition(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase([
@@ -60,6 +72,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(28, $auditReport->cost()->byRole()['attacker']['input_tokens'], 'per-file estimates must be summed (15+13), not overwritten by the last file');
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_input_token_estimate_scales_with_max_iterations(): void
     {
         // Pins: `* maxIterations` (vs `/`). With perRoundTokens=10 and maxIterations=5,
@@ -75,6 +92,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(50, $auditReport->cost()->byRole()['attacker']['input_tokens']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_output_token_estimate_uses_ceil_of_output_ratio(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase([
@@ -91,6 +113,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(16, $byRole['attacker']['output_tokens']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_output_token_estimate_uses_ceil_not_floor(): void
     {
         // 100 * 0.21 = 21.0 exactly — floor=21, ceil=21, round=21. Useless to distinguish.
@@ -107,6 +134,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(24, $auditReport->cost()->byRole()['attacker']['output_tokens']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_full_file_content_length_reaches_the_estimator(): void
     {
         $measuringTokenEstimator = $this->measuringEstimator();
@@ -120,6 +152,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(1000, $measuringTokenEstimator->lastInputLength);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_logs_starting_message_with_project_path_context(): void
     {
         $logCalls = [];
@@ -146,6 +183,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame($this->tmpDir, $startLogs[0][1]['project']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_logs_ready_message_with_estimate_breakdown(): void
     {
         $logCalls = [];
@@ -186,6 +228,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(0.0, $context['reviewer_cost_usd']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_dry_run_emits_attacker_and_reviewer_breakdown(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase([
@@ -208,6 +255,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(25, $byRole['reviewer']['input_tokens']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_attacker_cost_in_breakdown_is_rounded_to_six_decimals(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase([
@@ -224,6 +276,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(0.000123, $auditReport->cost()->byRole()['attacker']['estimated_cost_usd']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_reviewer_cost_in_breakdown_is_rounded_to_six_decimals(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase([
@@ -240,6 +297,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(0.000062, $auditReport->cost()->byRole()['reviewer']['estimated_cost_usd']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_estimated_cost_sums_attacker_and_reviewer_contributions(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase([
@@ -256,6 +318,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(0.000185, $auditReport->cost()->estimatedCostUsd());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_reviewer_input_token_estimate_uses_ceil_not_floor_or_round(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase([
@@ -271,6 +338,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(24, $auditReport->cost()->byRole()['reviewer']['input_tokens']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_reviewer_output_token_estimate_uses_ceil_not_floor_or_round(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase([
@@ -286,6 +358,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(8, $auditReport->cost()->byRole()['reviewer']['output_tokens']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_dry_run_falls_back_to_attacker_model_when_reviewer_model_blank(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase([
@@ -304,6 +381,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame('gpt-4o', $byRole['reviewer']['model']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_scanned_files_are_set_on_the_audit_context(): void
     {
         // Pins: `$auditContext->setProjectFiles($files)` — if removed, the resulting
@@ -322,6 +404,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(3, $auditReport->filesScanned());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_scan_paths_filter_files_before_estimation(): void
     {
         // Pins ScanPathFilter integration: without filter, all three files are
@@ -341,6 +428,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(2, $measuringTokenEstimator->lastInputLength);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_diff_since_ref_narrows_the_estimate_to_changed_files(): void
     {
         $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
@@ -362,6 +454,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(1, $auditReport->filesScanned());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_without_a_diff_since_ref_the_estimate_covers_every_file(): void
     {
         $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
@@ -383,6 +480,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame(2, $auditReport->filesScanned());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_primary_model_flows_through_to_audit_cost(): void
     {
         $estimateAuditCostUseCase = $this->makeUseCase([
@@ -396,6 +498,11 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertSame('claude-opus-4-7', $auditReport->cost()->primaryModel());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_max_iterations_defaults_to_three(): void
     {
         $estimateAuditCostUseCase = new EstimateAuditCostUseCase(
@@ -556,6 +663,9 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         };
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     private function makeProjectFile(string $relative, string $content): ProjectFile
     {
         return ProjectFile::create($relative, $this->tmpDir.'/'.$relative, $content);

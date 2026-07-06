@@ -28,6 +28,9 @@ final class AuditBudgetTest extends TestCase
         self::assertNull($auditBudget->maxCostUsd());
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_for_tokens_sets_only_token_cap(): void
     {
         $auditBudget = AuditBudget::forTokens(50_000);
@@ -37,6 +40,9 @@ final class AuditBudgetTest extends TestCase
         self::assertNull($auditBudget->maxCostUsd());
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_for_cost_sets_only_cost_cap(): void
     {
         $auditBudget = AuditBudget::forCost(2.50);
@@ -46,6 +52,9 @@ final class AuditBudgetTest extends TestCase
         self::assertSame(2.50, $auditBudget->maxCostUsd());
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_for_both_sets_both_caps(): void
     {
         $auditBudget = AuditBudget::forBoth(10_000, 1.00);
@@ -54,6 +63,9 @@ final class AuditBudgetTest extends TestCase
         self::assertSame(1.00, $auditBudget->maxCostUsd());
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_for_tokens_rejects_zero(): void
     {
         $this->expectException(InvalidAuditBudgetException::class);
@@ -62,6 +74,9 @@ final class AuditBudgetTest extends TestCase
         AuditBudget::forTokens(0);
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_for_cost_rejects_zero(): void
     {
         $this->expectException(InvalidAuditBudgetException::class);
@@ -70,6 +85,9 @@ final class AuditBudgetTest extends TestCase
         AuditBudget::forCost(0.0);
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_for_both_rejects_zero_tokens(): void
     {
         $this->expectException(InvalidAuditBudgetException::class);
@@ -78,6 +96,9 @@ final class AuditBudgetTest extends TestCase
         AuditBudget::forBoth(0, 1.0);
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_for_both_rejects_zero_cost(): void
     {
         $this->expectException(InvalidAuditBudgetException::class);
@@ -86,6 +107,9 @@ final class AuditBudgetTest extends TestCase
         AuditBudget::forBoth(100, 0.0);
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_for_tokens_accepts_one_at_boundary(): void
     {
         // Pins `<= 0` boundary — mutation to `< 0` would still accept 1, but
@@ -95,6 +119,9 @@ final class AuditBudgetTest extends TestCase
         self::assertSame(1, $auditBudget->maxTokens());
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_for_cost_accepts_tiny_positive_at_boundary(): void
     {
         // Pins `<= 0.0` boundary — mutation to `> 0.0` would reject this.
@@ -103,6 +130,9 @@ final class AuditBudgetTest extends TestCase
         self::assertSame(0.000001, $auditBudget->maxCostUsd());
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_for_both_accepts_tiny_positives_at_boundary(): void
     {
         $auditBudget = AuditBudget::forBoth(1, 0.000001);
@@ -111,6 +141,9 @@ final class AuditBudgetTest extends TestCase
         self::assertSame(0.000001, $auditBudget->maxCostUsd());
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_for_tokens_rejects_negative(): void
     {
         $this->expectException(InvalidAuditBudgetException::class);
@@ -119,6 +152,9 @@ final class AuditBudgetTest extends TestCase
         AuditBudget::forTokens(-1);
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_for_cost_rejects_negative(): void
     {
         $this->expectException(InvalidAuditBudgetException::class);
@@ -127,6 +163,9 @@ final class AuditBudgetTest extends TestCase
         AuditBudget::forCost(-0.5);
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_is_unlimited_returns_false_when_token_cap_set(): void
     {
         // Pins the logical-and on `null === $maxTokens && null === $maxCostUsd`.
@@ -135,6 +174,9 @@ final class AuditBudgetTest extends TestCase
         self::assertFalse($auditBudget->isUnlimited());
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_is_unlimited_returns_false_when_cost_cap_set(): void
     {
         $auditBudget = AuditBudget::forCost(1.0);
@@ -142,6 +184,9 @@ final class AuditBudgetTest extends TestCase
         self::assertFalse($auditBudget->isUnlimited());
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public function test_is_unlimited_returns_false_when_both_caps_set(): void
     {
         $auditBudget = AuditBudget::forBoth(100, 1.0);

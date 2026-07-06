@@ -14,11 +14,15 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Cache;
 
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 
 final class NullAttackerCacheTest extends TestCase
 {
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_get_always_returns_null(): void
     {
         $nullAttackerCache = new NullAttackerCache();
@@ -27,6 +31,9 @@ final class NullAttackerCacheTest extends TestCase
         self::assertNull($nullAttackerCache->get($chunk));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_store_is_noop_and_does_not_affect_subsequent_get(): void
     {
         $nullAttackerCache = new NullAttackerCache();

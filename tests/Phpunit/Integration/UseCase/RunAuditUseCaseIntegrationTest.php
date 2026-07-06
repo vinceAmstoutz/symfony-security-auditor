@@ -31,12 +31,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -59,6 +63,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_report_contains_correct_project_path(): void
     {
@@ -72,6 +79,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_report_files_scanned_matches_real_file_count(): void
     {
@@ -88,6 +98,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_returns_safe_report_when_no_vulnerabilities_found(): void
     {
@@ -102,6 +115,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_report_contains_vulnerability_found_by_stub_llm(): void
     {
@@ -122,6 +138,10 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws NegativeTokenCountException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_attaches_token_and_cost_telemetry_to_report(): void
     {
@@ -141,6 +161,10 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws NegativeTokenCountException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_includes_cache_tokens_in_the_reported_cost(): void
     {
@@ -157,6 +181,11 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         self::assertGreaterThan(0.0, $auditReport->cost()->estimatedCostUsd());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_execute_wraps_budget_exception_with_partial_report(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
@@ -182,6 +211,10 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_attaches_zero_cost_when_recorder_set_but_calculator_omitted(): void
     {
@@ -242,6 +275,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_propagates_reviewer_budget_exception_as_audit_aborted(): void
     {
@@ -269,6 +305,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_propagates_reviewer_batch_budget_exception(): void
     {
@@ -324,6 +363,11 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         $runAuditUseCase->execute($this->tmpDir);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_execute_warns_logger_when_budget_aborts_the_audit(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
@@ -367,6 +411,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_report_audit_id_is_non_empty(): void
     {
@@ -392,6 +439,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         $this->rmdirRecursive($this->tmpDir);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     private function makeUseCase(string $attackerResponse, string $reviewerResponse): RunAuditUseCase
     {
         $attackerLLM = self::createStub(LLMClientInterface::class);
@@ -450,6 +500,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         return new RunAuditUseCase($auditPipeline, $logger);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     private function makeUseCaseWithTelemetry(
         string $attackerResponse,
         string $reviewerResponse,

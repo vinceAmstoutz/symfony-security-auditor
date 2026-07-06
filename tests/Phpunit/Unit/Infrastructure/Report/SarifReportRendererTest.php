@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
 use Composer\InstalledVersions;
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
@@ -39,6 +41,9 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame('sarif', $this->renderer->format());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_has_required_top_level_keys(): void
     {
         $decoded = $this->decodeSarif($this->makeReport());
@@ -48,6 +53,9 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         self::assertCount(1, $decoded['runs']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_version_is_2_1_0(): void
     {
         $decoded = $this->decodeSarif($this->makeReport());
@@ -55,6 +63,9 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame('2.1.0', $decoded['version']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_driver_name_is_symfony_security_auditor(): void
     {
         $decoded = $this->decodeSarif($this->makeReport());
@@ -62,6 +73,9 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame('Symfony Security Auditor', $decoded['runs'][0]['tool']['driver']['name']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_driver_information_uri_is_the_project_homepage(): void
     {
         $decoded = $this->decodeSarif($this->makeReport());
@@ -69,6 +83,9 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame('https://github.com/vinceamstoutz/symfony-security-auditor', $decoded['runs'][0]['tool']['driver']['informationUri']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_driver_version_matches_installed_package_version(): void
     {
         $decoded = $this->decodeSarif($this->makeReport());
@@ -77,6 +94,9 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame($expected, $decoded['runs'][0]['tool']['driver']['version']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_driver_version_is_non_empty(): void
     {
         $decoded = $this->decodeSarif($this->makeReport());
@@ -84,6 +104,9 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         self::assertNotSame('', $decoded['runs'][0]['tool']['driver']['version']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_runs_contains_tool_and_results_keys(): void
     {
         $decoded = $this->decodeSarif($this->makeReport());
@@ -95,6 +118,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_rules_is_sequential_array_not_object(): void
     {
@@ -110,6 +134,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_two_different_types_produce_two_rules(): void
     {
@@ -124,6 +149,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_a_rule_shared_by_two_types_carries_both_cwe_tags(): void
     {
@@ -139,6 +165,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_a_rule_shared_across_categories_picks_its_name_and_description_independent_of_severity(): void
     {
@@ -155,6 +182,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_a_rule_does_not_repeat_the_cwe_tag_of_a_recurring_type(): void
     {
@@ -169,6 +197,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_a_rule_does_not_repeat_a_cwe_tag_shared_by_two_different_types(): void
     {
@@ -184,6 +213,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_results_contains_one_entry_per_vulnerability(): void
     {
@@ -197,6 +227,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_level_is_error_for_critical(): void
     {
@@ -209,6 +240,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_level_is_error_for_high(): void
     {
@@ -221,6 +253,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_level_is_warning_for_medium(): void
     {
@@ -233,6 +266,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_level_is_note_for_low(): void
     {
@@ -245,6 +279,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_level_is_note_for_info(): void
     {
@@ -257,6 +292,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_result_location_contains_file_and_lines(): void
     {
@@ -269,6 +305,9 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame(5, $location['region']['endLine']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_produces_valid_unescaped_slashes_json(): void
     {
         $decoded = $this->decodeSarif($this->makeReport());
@@ -281,6 +320,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_result_message_text_is_vulnerability_title(): void
     {
@@ -293,6 +333,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_result_ruleid_is_owasp_reference(): void
     {
@@ -305,6 +346,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_artifact_location_uri_is_vulnerability_file_path(): void
     {
@@ -317,6 +359,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_rule_short_description_text_is_type_category(): void
     {
@@ -331,6 +374,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_rule_has_all_required_keys(): void
     {
@@ -347,6 +391,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_rule_help_uri_points_to_the_specific_owasp_category(): void
     {
@@ -360,6 +405,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_rule_properties_tags_include_the_cwe_reference(): void
     {
@@ -373,6 +419,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_result_carries_the_vulnerability_partial_fingerprint(): void
     {
@@ -388,6 +435,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_result_has_no_suppressions_by_default(): void
     {
@@ -400,6 +448,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_with_suppressions_marks_the_baselined_finding_as_externally_suppressed(): void
     {
@@ -415,6 +464,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_with_suppressions_leaves_a_non_baselined_finding_unsuppressed(): void
     {
@@ -427,6 +477,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_rule_is_not_overwritten_when_same_type_appears_twice(): void
     {
@@ -442,6 +493,10 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame(VulnerabilityType::SQL_INJECTION->category(), $firstRule['shortDescription']['text']);
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidAuditContextException
+     */
     public function test_render_properties_block_includes_all_cost_keys_with_exact_values(): void
     {
         $auditReport = $this->makeReportWithCost(AuditCost::of(1234, 567, 1.2345, 'gpt-4o'));

@@ -15,12 +15,16 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use Override;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 
 final class AuditContextDiffTest extends TestCase
 {
     private string $tmpDir;
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_diff_since_ref_is_null_by_default(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -28,6 +32,9 @@ final class AuditContextDiffTest extends TestCase
         self::assertNull($auditContext->diffSinceRef());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_diff_since_ref_is_persisted_when_provided(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir, [], false, 'origin/main');

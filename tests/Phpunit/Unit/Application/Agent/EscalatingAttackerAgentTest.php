@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentIn
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -37,6 +38,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\Re
 
 final class EscalatingAttackerAgentTest extends TestCase
 {
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_expensive_pass_when_cheap_finds_nothing(): void
     {
         $recordingAttackerAgent = $this->makeRecordingAttacker([]);
@@ -58,6 +62,7 @@ final class EscalatingAttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
      */
     public function test_it_runs_expensive_pass_only_on_files_flagged_by_cheap(): void
     {
@@ -84,6 +89,7 @@ final class EscalatingAttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
      */
     public function test_expensive_findings_supersede_cheap_findings_on_overlap(): void
     {
@@ -116,6 +122,7 @@ final class EscalatingAttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
      */
     public function test_cheap_findings_on_files_expensive_did_not_re_flag_are_kept(): void
     {
@@ -142,6 +149,7 @@ final class EscalatingAttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
      */
     public function test_expensive_pass_receives_cheap_findings_as_previous_context(): void
     {
@@ -164,6 +172,7 @@ final class EscalatingAttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
      */
     public function test_it_logs_file_counts_for_both_passes(): void
     {
@@ -187,6 +196,9 @@ final class EscalatingAttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_when_cheap_pass_finds_nothing(): void
     {
         $bufferingLogger = new BufferingLogger();
@@ -200,6 +212,7 @@ final class EscalatingAttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
      */
     public function test_expensive_pass_receives_original_previous_findings_plus_all_cheap_findings(): void
     {
@@ -257,6 +270,9 @@ final class EscalatingAttackerAgentTest extends TestCase
         self::fail(\sprintf('No log entry with message "%s"', $message));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     private function makeFile(string $path): ProjectFile
     {
         return ProjectFile::create($path, '/app/'.$path, '<?php');

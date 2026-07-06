@@ -19,6 +19,7 @@ use Psr\Log\NullLogger;
 use Symfony\Component\ErrorHandler\BufferingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\PoCSynthesisStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -44,6 +45,9 @@ final class PoCSynthesisStageTest extends TestCase
         self::assertSame(BuiltInStageName::PoCSynthesis->value, $poCSynthesisStage->name());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_skips_when_disabled(): void
     {
         $synthesizer = self::createMock(PoCSynthesizerInterface::class);
@@ -56,6 +60,7 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_does_not_call_synthesizer_when_no_validated_findings(): void
     {
@@ -72,6 +77,7 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_replaces_validated_findings_with_enriched_copies(): void
     {
@@ -94,6 +100,7 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_records_count_metadata_in_context(): void
     {
@@ -115,6 +122,7 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_does_not_replace_findings_whose_poc_remained_null(): void
     {
@@ -136,6 +144,7 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_disabled_stage_does_not_synthesize_even_with_validated_findings(): void
     {
@@ -151,6 +160,7 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_stage_is_disabled_by_default_even_with_validated_findings(): void
     {
@@ -163,6 +173,9 @@ final class PoCSynthesisStageTest extends TestCase
         (new PoCSynthesisStage($synthesizer, new NullLogger()))->process($auditContext);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_logs_debug_when_disabled(): void
     {
         $bufferingLogger = new BufferingLogger();
@@ -176,6 +189,7 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_logs_when_there_are_no_validated_findings(): void
     {
@@ -191,6 +205,7 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_logs_completion_with_enriched_and_total_counts(): void
     {

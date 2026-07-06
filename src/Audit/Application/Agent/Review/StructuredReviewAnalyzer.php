@@ -17,6 +17,7 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -50,6 +51,7 @@ final readonly class StructuredReviewAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function analyze(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): array
     {
@@ -66,6 +68,7 @@ final readonly class StructuredReviewAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     private function reviewSingle(Vulnerability $vulnerability, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): Vulnerability
     {

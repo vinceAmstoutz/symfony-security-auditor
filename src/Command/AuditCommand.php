@@ -22,6 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAborte
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
@@ -148,6 +150,8 @@ final readonly class AuditCommand
      * @param list<string>                      $scanPaths
      *
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
      */
     private function runDryRun(
         array $styles,

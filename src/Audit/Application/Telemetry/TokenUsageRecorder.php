@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 
 /**
@@ -67,6 +68,9 @@ final class TokenUsageRecorder
         $this->cacheCreationTokens += $cacheCreationTokens;
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function snapshot(): TokenUsageSnapshot
     {
         return TokenUsageSnapshot::of($this->inputTokens, $this->outputTokens, $this->cacheReadTokens, $this->cacheCreationTokens);

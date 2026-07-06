@@ -17,11 +17,15 @@ use JsonException;
 use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 
 final class LLMResponseTest extends TestCase
 {
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_creates_and_exposes_properties(): void
     {
         $llmResponse = LLMResponse::of('Hello world', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50));
@@ -34,6 +38,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame(150, $llmResponse->totalTokens());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_cache_tokens_default_to_zero_when_not_supplied(): void
     {
         $llmResponse = LLMResponse::of('Hello world', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50));
@@ -42,6 +49,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame(0, $llmResponse->cacheCreationTokens());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_exposes_supplied_cache_tokens(): void
     {
         $llmResponse = LLMResponse::of('Hello world', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50, 30, 12));
@@ -50,6 +60,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame(12, $llmResponse->cacheCreationTokens());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_detects_empty_content(): void
     {
         $llmResponse = LLMResponse::of('  ', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
@@ -59,6 +72,9 @@ final class LLMResponseTest extends TestCase
         self::assertFalse($notEmpty->isEmpty());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_parses_json_content(): void
     {
         $llmResponse = LLMResponse::of('{"vulnerabilities": []}', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
@@ -68,6 +84,9 @@ final class LLMResponseTest extends TestCase
         self::assertEmpty($data['vulnerabilities']);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_strips_markdown_fences_before_parsing(): void
     {
         $content = "```json\n{\"key\": \"value\"}\n```";
@@ -77,6 +96,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame('value', $data['key']);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_extracts_json_array_when_wrapped_in_leading_prose(): void
     {
         $content = "I analyzed the code carefully:\n\n[{\"title\": \"finding\"}]";
@@ -87,6 +109,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame([['title' => 'finding']], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_extracts_json_array_when_followed_by_trailing_prose(): void
     {
         $content = "[{\"title\": \"finding\"}]\n\nThat concludes my analysis.";
@@ -97,6 +122,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame([['title' => 'finding']], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_extracts_balanced_json_array_with_nested_objects_from_prose(): void
     {
         // Validates that the extractor's balanced-brace walker correctly handles
@@ -109,6 +137,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame([['id' => 1, 'meta' => ['score' => 0.9]]], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_ignores_brackets_inside_strings_when_extracting(): void
     {
         // String contents must not affect depth counting — `]` inside a JSON
@@ -121,6 +152,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame([['title' => 'contains ] bracket']], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_treats_escaped_quote_as_part_of_string_during_extraction(): void
     {
         $content = 'prose: [{"title":"x \" ] y","other":"z"}] end';
@@ -131,6 +165,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame([['title' => 'x " ] y', 'other' => 'z']], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_skips_a_leading_quoted_string_with_escaped_bracket_before_the_real_array(): void
     {
         $content = 'note "a \[9,9] b" then [1,2] end';
@@ -141,6 +178,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame([1, 2], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_treats_empty_json_string_as_closed_during_extraction(): void
     {
         $content = 'see [{"a":"","b":9}] end';
@@ -151,6 +191,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame([['a' => '', 'b' => 9]], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_throws_when_content_is_empty_after_stripping_fences(): void
     {
         $llmResponse = LLMResponse::of('```json``` ', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
@@ -160,6 +203,9 @@ final class LLMResponseTest extends TestCase
         $llmResponse->parseJson();
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_locks_extraction_length_to_closing_bracket_position(): void
     {
         $content = '[1,2]{garbage}';
@@ -170,6 +216,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame([1, 2], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_scans_for_opener_from_the_start_not_the_end_of_content(): void
     {
         $content = '[1,2] {';
@@ -180,6 +229,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame([1, 2], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_extracts_json_object_when_braces_are_the_first_opener(): void
     {
         $content = 'prose {"key": "value"} suffix';
@@ -190,6 +242,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame(['key' => 'value'], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_recovers_trailing_empty_array_when_prose_mentions_php_array_access(): void
     {
         $content = "  The controller has a route condition restricting it to dev/test only. No exploitable issue.\n  \n"
@@ -204,6 +259,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame([], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_recovers_trailing_vulnerability_list_when_prose_contains_undecodable_bracket_example(): void
     {
         $content = 'I noticed templates rendering `recommendation.contents[locale]` and'
@@ -233,6 +291,9 @@ final class LLMResponseTest extends TestCase
         ]], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_throws_on_invalid_json(): void
     {
         $llmResponse = LLMResponse::of('not json at all', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
@@ -241,6 +302,9 @@ final class LLMResponseTest extends TestCase
         $llmResponse->parseJson();
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_recovery_is_skipped_when_first_character_is_an_object_opener_spanning_full_content(): void
     {
         $llmResponse = LLMResponse::of('{xyz: [1]}', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
@@ -249,6 +313,9 @@ final class LLMResponseTest extends TestCase
         $llmResponse->parseJson();
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_recovery_is_skipped_when_first_character_opens_a_block_spanning_full_content(): void
     {
         $llmResponse = LLMResponse::of('[xyz, [1,2]]', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
@@ -257,6 +324,9 @@ final class LLMResponseTest extends TestCase
         $llmResponse->parseJson();
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_recovery_invokes_object_branch_only_on_brace_character(): void
     {
         $llmResponse = LLMResponse::of('}{}', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
@@ -266,6 +336,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame([], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_recovery_iterator_starts_at_index_zero_not_minus_one(): void
     {
         $llmResponse = LLMResponse::of('[1,2]"', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
@@ -275,6 +348,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame([1, 2], $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_throws_when_prose_contains_unbalanced_bracket_with_no_closer(): void
     {
         // Prose mentions `[` but no matching `]` ever appears — every opener
@@ -286,6 +362,9 @@ final class LLMResponseTest extends TestCase
         $llmResponse->parseJson();
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_throws_when_prose_surrounds_no_balanced_json_block(): void
     {
         // Unbalanced braces (`{{{` with no matching closers) — extractor returns
@@ -296,6 +375,9 @@ final class LLMResponseTest extends TestCase
         $llmResponse->parseJson();
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_throws_when_json_is_not_array(): void
     {
         $llmResponse = LLMResponse::of('"just a string"', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
@@ -304,6 +386,9 @@ final class LLMResponseTest extends TestCase
         $llmResponse->parseJson();
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_trims_surrounding_whitespace_before_parsing(): void
     {
         $llmResponse = LLMResponse::of('   {"key": "value"}   ', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
@@ -312,6 +397,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame('value', $data['key']);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_parse_json_succeeds_at_511_nesting_levels(): void
     {
         // depth=512 allows up to 511 levels; depth=511 mutant would reject this → kills DecrementInteger
@@ -323,6 +411,9 @@ final class LLMResponseTest extends TestCase
         self::assertCount(1, $data);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_parse_json_throws_at_512_nesting_levels(): void
     {
         // depth=512 rejects 512 levels; depth=513 mutant would accept it → kills IncrementInteger
@@ -333,6 +424,9 @@ final class LLMResponseTest extends TestCase
         $llmResponse->parseJson();
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_parse_json_strips_null_bytes_before_decoding(): void
     {
         // trim() removes \x00 (null byte); json_decode does NOT handle null bytes.
@@ -342,6 +436,9 @@ final class LLMResponseTest extends TestCase
         self::assertSame([1, 2, 3], $llmResponse->parseJson());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_parse_json_trims_non_json_whitespace_around_scalar_to_reach_array_guard(): void
     {
         $llmResponse = LLMResponse::of("\x0b\"scalar\"\x0b", 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
@@ -352,6 +449,8 @@ final class LLMResponseTest extends TestCase
 
     /**
      * @deprecated covers the deprecated {@see LLMResponse::create()} delegator until it is removed in 2.0.
+     *
+     * @throws InvalidTokenUsageException
      */
     #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
     public function test_deprecated_create_maps_every_field(): void

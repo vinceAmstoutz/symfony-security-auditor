@@ -16,6 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
@@ -71,6 +73,9 @@ final readonly class EstimateAuditCostUseCase
      *                                   narrowing the estimate to files changed
      *                                   against this git ref, matching what an
      *                                   `audit:run --since` would actually scan
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
      */
     public function execute(string $projectPath, array $scanPaths = [], ?string $diffSinceRef = null): AuditReport
     {

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
@@ -32,6 +33,9 @@ final readonly class ListFilesTool implements ToolInterface
      */
     public function __construct(private array $files) {}
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     #[Override]
     public function definition(): ToolDefinition
     {

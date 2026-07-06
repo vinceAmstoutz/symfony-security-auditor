@@ -40,6 +40,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\Mappin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
@@ -80,6 +81,9 @@ final class AuditCommandEndToEndTest extends TestCase
 {
     private string $fixtureDir;
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_exits_success_for_safe_project(): void
     {
         $this->createProjectDir();
@@ -90,6 +94,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_output_contains_risk_level(): void
     {
         $this->createProjectDir();
@@ -100,6 +107,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('SAFE', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_streams_a_coherent_attacker_then_reviewer_then_report_narrative(): void
     {
         $this->createProjectDir();
@@ -124,6 +134,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertLessThan($reportPosition, $reviewerStreamPosition);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_streams_rejected_verdicts_in_the_output_when_the_reviewer_rejects(): void
     {
         $this->createProjectDir();
@@ -137,6 +150,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('0 validated, 5 rejected', $display);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_emits_secret_scrubbing_warning_when_scrubbing_disabled(): void
     {
         $this->createProjectDir();
@@ -147,6 +163,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('Secret scrubbing is disabled', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_is_silent_about_scrubbing_when_enabled(): void
     {
         $this->createProjectDir();
@@ -157,6 +176,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('Secret scrubbing is disabled', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_fails_closed_when_a_cost_budget_is_set_but_the_model_is_unpriced(): void
     {
         $this->createProjectDir();
@@ -168,6 +190,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('non-interactive', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_warns_on_a_real_run_when_a_configured_model_is_unpriced(): void
     {
         $this->createProjectDir();
@@ -179,6 +204,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('No published pricing', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_still_emits_scrubbing_warning_for_machine_readable_output_on_stderr(): void
     {
         $this->createProjectDir();
@@ -196,6 +224,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('Secret scrubbing is disabled', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_exits_failure_for_nonexistent_project_path(): void
     {
         $commandTester = $this->makeCommandTester('[]', '{}');
@@ -204,6 +235,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_json_format_outputs_valid_json(): void
     {
         $this->createProjectDir();
@@ -223,6 +257,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertArrayHasKey('risk_level', $decoded);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_sarif_format_outputs_valid_sarif(): void
     {
         $this->createProjectDir();
@@ -243,6 +280,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertArrayHasKey('runs', $decoded);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_html_format_outputs_an_html_document(): void
     {
         $this->createProjectDir();
@@ -259,6 +299,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('Security Audit Report', $output);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_markdown_format_outputs_a_markdown_report(): void
     {
         $this->createProjectDir();
@@ -273,6 +316,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('# Security Audit Report', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_github_format_outputs_workflow_command_annotations(): void
     {
         $this->createProjectDir();
@@ -286,6 +332,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('::error file=src/Repo1.php,line=1,endLine=5,title=Critical SQL Injection', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_generate_baseline_writes_fingerprints_and_exits_zero_despite_critical_findings(): void
     {
         $this->createProjectDir();
@@ -308,6 +357,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('SYMFONY LLM AUDIT REPORT', $display);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_generate_baseline_collects_every_finding_even_when_a_baseline_is_already_configured(): void
     {
         $this->createProjectDir();
@@ -336,6 +388,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertCount(5, $regeneratedEntries);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_baseline_reports_the_exact_number_of_suppressed_findings(): void
     {
         $this->createProjectDir();
@@ -367,6 +422,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(2, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_cli_baseline_option_overrides_the_configured_baseline_path(): void
     {
         $this->createProjectDir();
@@ -388,6 +446,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_configured_baseline_path_is_used_when_no_cli_option_is_given(): void
     {
         $this->createProjectDir();
@@ -405,6 +466,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(5, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_baseline_suppresses_matching_findings_and_clears_the_exit_code(): void
     {
         $this->createProjectDir();
@@ -425,6 +489,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(5, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_baseline_skips_findings_whose_type_the_reviewer_corrected(): void
     {
         $this->createProjectDir();
@@ -446,6 +513,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(5, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_sarif_format_marks_baselined_findings_as_suppressed_results_and_clears_the_exit_code(): void
     {
         $this->createProjectDir();
@@ -486,6 +556,9 @@ final class AuditCommandEndToEndTest extends TestCase
         }
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_json_output_written_to_file(): void
     {
         $this->createProjectDir();
@@ -505,6 +578,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertIsArray(json_decode($content, true));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_exits_failure_for_critical_risk_level(): void
     {
         $this->createProjectDir();
@@ -515,6 +591,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_shows_caution_message_for_critical_risk_level(): void
     {
         $this->createProjectDir();
@@ -527,6 +606,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('vulnerabilities found', $output);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_shows_success_message_for_non_critical_project(): void
     {
         $this->createProjectDir();
@@ -540,6 +622,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('Vulnerabilities:', $output);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_suppresses_success_message_for_machine_readable_json(): void
     {
         $this->createProjectDir();
@@ -555,6 +640,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('Risk:', $output);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_displays_title_and_pipeline_header(): void
     {
         $this->createProjectDir();
@@ -567,6 +655,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('Pipeline:', $output);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_displays_running_audit_pipeline_section(): void
     {
         $this->createProjectDir();
@@ -577,6 +668,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('Running audit pipeline', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_exits_failure_and_shows_error_for_invalid_directory(): void
     {
         $commandTester = $this->makeCommandTester('[]', '{}');
@@ -587,6 +681,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('Project path', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_defaults_project_path_to_cwd_when_argument_omitted(): void
     {
         $this->createProjectDir();
@@ -605,6 +702,9 @@ final class AuditCommandEndToEndTest extends TestCase
         }
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_header_contains_resolved_cwd_when_argument_omitted(): void
     {
         $this->createProjectDir();
@@ -622,6 +722,9 @@ final class AuditCommandEndToEndTest extends TestCase
         }
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_fail_on_default_critical_does_not_fail_high_risk_project(): void
     {
         $this->createProjectDir();
@@ -632,6 +735,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_cli_fail_on_high_fails_a_high_risk_project(): void
     {
         $this->createProjectDir();
@@ -645,6 +751,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_configured_fail_on_high_fails_a_high_risk_project_without_a_cli_option(): void
     {
         $this->createProjectDir();
@@ -655,6 +764,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_cli_fail_on_overrides_a_stricter_configured_fail_on(): void
     {
         $this->createProjectDir();
@@ -668,6 +780,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_excluded_type_is_dropped_from_report_and_clears_the_exit_code(): void
     {
         $this->createProjectDir();
@@ -686,6 +801,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(0, $decoded['total_vulnerabilities']);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_included_types_allowlist_drops_unlisted_types(): void
     {
         $this->createProjectDir();
@@ -765,6 +883,8 @@ final class AuditCommandEndToEndTest extends TestCase
 
     /**
      * @param array{secretScrubbingEnabled?: bool, configuredBaseline?: string|null, riskLevel?: RiskLevel, excludedTypes?: list<string>, includedTypes?: list<string>, maxCostUsd?: float|null} $overrides
+     *
+     * @throws InvalidTokenUsageException
      */
     private function makeCommandTester(string $attackerResponse, string $reviewerResponse, array $overrides = []): CommandTester
     {
@@ -864,6 +984,9 @@ final class AuditCommandEndToEndTest extends TestCase
         return new CommandTester($auditCommand);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_exits_with_budget_exit_code_when_audit_is_aborted_by_budget(): void
     {
         $this->createProjectDir();
@@ -893,6 +1016,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertArrayHasKey('audit_id', $decoded);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_dry_run_with_console_format_shows_success_message(): void
     {
         $this->createProjectDir();
@@ -911,6 +1037,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('RISK LEVEL', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_dry_run_warns_when_configured_model_is_unsupported(): void
     {
         $this->createProjectDir();
@@ -924,6 +1053,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('No published pricing', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_dry_run_model_warning_is_emitted_on_stderr_for_machine_readable_output(): void
     {
         $this->createProjectDir();
@@ -942,6 +1074,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('No published pricing', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_renders_progress_bar_in_decorated_console_output(): void
     {
         $this->createProjectDir();
@@ -952,6 +1087,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('3/3', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_renders_plain_progress_without_a_bar_in_non_decorated_output(): void
     {
         $this->createProjectDir();
@@ -962,6 +1100,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('3/3', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_streams_findings_in_non_decorated_output(): void
     {
         $this->createProjectDir();
@@ -972,6 +1113,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('[CRITICAL] sql_injection', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_suppresses_progress_bar_in_machine_readable_stdout(): void
     {
         $this->createProjectDir();
@@ -985,6 +1129,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('3/3', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_shows_audit_iteration_progress_in_decorated_console_output(): void
     {
         $this->createProjectDir();
@@ -995,6 +1142,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('audit · iteration 1/3', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_shows_audit_iteration_progress_in_non_decorated_output(): void
     {
         $this->createProjectDir();
@@ -1005,6 +1155,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('Iteration 1/3', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_shows_long_run_notice_in_console_format(): void
     {
         $this->createProjectDir();
@@ -1015,6 +1168,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('20+ minutes', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_suppresses_long_run_notice_in_machine_readable_stdout(): void
     {
         $this->createProjectDir();
@@ -1028,6 +1184,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('20+ minutes', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_dry_run_with_machine_readable_json_format_suppresses_success_message(): void
     {
         $this->createProjectDir();
@@ -1044,6 +1203,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('Risk:', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_budget_aborted_command_renders_error_message_to_display(): void
     {
         $this->createProjectDir();
@@ -1064,6 +1226,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringContainsString('[ERROR]', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_budget_aborted_command_with_machine_readable_stdout_keeps_the_document_valid(): void
     {
         $this->createProjectDir();
@@ -1233,6 +1398,9 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertStringNotContainsString('Tip: run with --show-scanned', $commandTester->getDisplay());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_dry_run_alone_emits_the_show_scanned_tip(): void
     {
         $this->createProjectDir();

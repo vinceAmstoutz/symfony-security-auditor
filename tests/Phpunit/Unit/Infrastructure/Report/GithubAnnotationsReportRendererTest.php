@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -39,6 +40,9 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
         self::assertSame('github', $this->renderer->format());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_renders_nothing_when_no_findings(): void
     {
         self::assertSame('', $this->renderer->render($this->makeReport()));
@@ -47,6 +51,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_renders_one_annotation_line_per_finding(): void
     {
@@ -64,6 +69,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_produces_the_documented_annotation_format(): void
     {
@@ -82,6 +88,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_includes_file_and_start_line_properties(): void
     {
@@ -96,6 +103,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_omits_end_line_when_it_matches_start_line(): void
     {
@@ -114,6 +122,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_includes_end_line_when_it_differs_from_start_line(): void
     {
@@ -127,6 +136,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_includes_the_title_property(): void
     {
@@ -140,6 +150,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_includes_description_and_remediation_in_the_message(): void
     {
@@ -153,6 +164,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     #[DataProvider('severityLevelCases')]
     public function test_it_maps_severity_to_the_expected_annotation_level(VulnerabilitySeverity $vulnerabilitySeverity, string $expectedLevel): void
@@ -177,6 +189,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_escapes_comma_colon_newline_and_percent_in_the_title_property(): void
     {
@@ -195,6 +208,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_escapes_newline_and_percent_but_not_comma_or_colon_in_the_message(): void
     {
@@ -213,6 +227,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_escapes_carriage_returns_in_the_title_property(): void
     {
@@ -231,6 +246,7 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_it_escapes_percent_before_encoding_the_newline_it_introduces(): void
     {

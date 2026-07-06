@@ -16,11 +16,15 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Exception;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
 final class AuditAbortedByBudgetExceptionTest extends TestCase
 {
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_from_carries_budget_message_and_partial_report(): void
     {
         $tmpDir = sys_get_temp_dir().'/aabe_'.uniqid('', true);

@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Tool;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
@@ -22,6 +24,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\SymfonyToolRe
 
 final class SymfonyToolRegistryFactoryTest extends TestCase
 {
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
+     */
     public function test_registry_exposes_all_four_built_in_tools(): void
     {
         $symfonyToolRegistryFactory = new SymfonyToolRegistryFactory(new NullLogger(), new InMemoryAdvisoryDatabase());
@@ -36,6 +42,10 @@ final class SymfonyToolRegistryFactoryTest extends TestCase
         self::assertSame(['grep', 'list_files', 'lookup_advisory', 'read_file'], $names);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
+     */
     public function test_read_file_tool_can_access_provided_project_files(): void
     {
         $symfonyToolRegistryFactory = new SymfonyToolRegistryFactory(new NullLogger(), new InMemoryAdvisoryDatabase());
@@ -47,6 +57,10 @@ final class SymfonyToolRegistryFactoryTest extends TestCase
         self::assertSame('<?php echo "marker-7";', $toolRegistry->execute('read_file', ['relative_path' => 'src/A.php']));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
+     */
     public function test_each_call_returns_an_independent_registry(): void
     {
         $symfonyToolRegistryFactory = new SymfonyToolRegistryFactory(new NullLogger(), new InMemoryAdvisoryDatabase());

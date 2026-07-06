@@ -20,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
@@ -29,6 +30,9 @@ final class AuditPipelineTest extends TestCase
 {
     private string $tmpDir;
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_processes_all_stages_in_order(): void
     {
         $callOrder = [];
@@ -61,6 +65,9 @@ final class AuditPipelineTest extends TestCase
         self::assertCount(1, $auditPipeline->stages());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_processes_with_no_stages_without_error(): void
     {
         $auditPipeline = new AuditPipeline([], new NullLogger(), new NullProgressReporter());
@@ -70,6 +77,9 @@ final class AuditPipelineTest extends TestCase
         self::assertEmpty($auditContext->vulnerabilities());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_each_stage_receives_the_same_context(): void
     {
         $receivedContexts = [];
@@ -91,6 +101,9 @@ final class AuditPipelineTest extends TestCase
         self::assertSame($auditContext, $receivedContexts[1]);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_logs_pipeline_start_info(): void
     {
         $infoLogs = [];
@@ -110,6 +123,9 @@ final class AuditPipelineTest extends TestCase
         self::assertSame([], $infoLogs[0][1]['stages']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_logs_pipeline_start_stages_as_array_of_strings(): void
     {
         $infoLogs = [];
@@ -130,6 +146,9 @@ final class AuditPipelineTest extends TestCase
         self::assertSame(['my-stage'], $startLog[1]['stages']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_logs_pipeline_complete_info(): void
     {
         $infoLogs = [];
@@ -150,6 +169,9 @@ final class AuditPipelineTest extends TestCase
         self::assertSame(0, $completeLog[1]['validated']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_logs_stage_running_info_for_each_stage(): void
     {
         $logger = self::createStub(LoggerInterface::class);
@@ -181,6 +203,9 @@ final class AuditPipelineTest extends TestCase
         self::assertLessThan(60.0, $completedLog[1]['elapsed_seconds']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_reports_pipeline_start_and_completion_events_to_the_progress_reporter(): void
     {
         $recordingProgressReporter = new RecordingProgressReporter();
@@ -208,6 +233,9 @@ final class AuditPipelineTest extends TestCase
         self::assertSame($auditContext->auditId(), $completedContext['audit_id']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_reports_stage_started_and_completed_events_for_each_stage(): void
     {
         $recordingProgressReporter = new RecordingProgressReporter();
@@ -232,6 +260,9 @@ final class AuditPipelineTest extends TestCase
         self::assertSame($auditContext->auditId(), $stageCompletes[0][1]['audit_id']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_accepts_iterable_stages_from_iterator(): void
     {
         $callOrder = [];

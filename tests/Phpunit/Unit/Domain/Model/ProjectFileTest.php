@@ -22,6 +22,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 
 final class ProjectFileTest extends TestCase
 {
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_file_type_returns_the_matching_enum_case(): void
     {
         $projectFile = ProjectFile::create(
@@ -33,6 +36,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame(ProjectFileType::CONTROLLER, $projectFile->fileType());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_file_type_falls_back_to_other_for_unrecognized_paths(): void
     {
         $projectFile = ProjectFile::create('README.md', '/app/README.md', '# Docs');
@@ -40,6 +46,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame(ProjectFileType::OTHER, $projectFile->fileType());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_type_string_mirrors_the_file_type_enum_value(): void
     {
         $projectFile = ProjectFile::create(
@@ -59,6 +68,9 @@ final class ProjectFileTest extends TestCase
         yield ['src/Repository/UserRepository.php', 'repository', 'isRepository'];
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_creates_with_valid_data(): void
     {
         $projectFile = ProjectFile::create(
@@ -72,12 +84,18 @@ final class ProjectFileTest extends TestCase
         self::assertSame(1, $projectFile->linesCount());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_throws_on_empty_relative_path(): void
     {
         $this->expectException(InvalidProjectFileException::class);
         ProjectFile::create(relativePath: '  ', absolutePath: '/app/file.php', content: '<?php');
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     #[DataProvider('fileTypeProvider')]
     public function test_it_detects_file_types_correctly(
         string $path,
@@ -97,6 +115,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($checkerResult);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_controller_in_controller_directory_without_suffix(): void
     {
         $projectFile = ProjectFile::create('src/Controller/Homepage.php', '/app/src/Controller/Homepage.php', '<?php');
@@ -105,6 +126,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isController());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_controller_by_route_attribute_outside_controller_directory(): void
     {
         $projectFile = ProjectFile::create(
@@ -117,6 +141,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isController());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_controller_by_abstract_controller_parent(): void
     {
         $projectFile = ProjectFile::create(
@@ -128,6 +155,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isController());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_does_not_treat_non_php_in_controller_directory_as_controller(): void
     {
         $projectFile = ProjectFile::create('src/Controller/config.yaml', '/app/src/Controller/config.yaml', 'foo: bar');
@@ -135,6 +165,9 @@ final class ProjectFileTest extends TestCase
         self::assertFalse($projectFile->isController());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_plain_service_without_route_signals_is_not_a_controller(): void
     {
         $projectFile = ProjectFile::create('src/Service/PaymentService.php', '/app/src/Service/PaymentService.php', '<?php class PaymentService { public function charge() {} }');
@@ -143,6 +176,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_form_files(): void
     {
         $projectFile = ProjectFile::create('src/Form/UserType.php', '/app/src/Form/UserType.php', '<?php');
@@ -150,6 +186,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isForm());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_voter_by_interface_implementation_without_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -162,6 +201,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isVoter());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_voter_in_voter_directory_without_suffix(): void
     {
         $projectFile = ProjectFile::create('src/Security/Voter/Access.php', '/app/src/Security/Voter/Access.php', '<?php');
@@ -169,6 +211,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isVoter());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_form_type_by_abstract_type_parent_outside_form_directory(): void
     {
         $projectFile = ProjectFile::create(
@@ -181,6 +226,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isForm());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_entity_by_orm_attribute_outside_entity_directory(): void
     {
         $projectFile = ProjectFile::create(
@@ -193,6 +241,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isEntity());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_repository_by_service_entity_repository_parent_without_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -205,6 +256,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isRepository());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_repository_in_repository_directory_without_suffix(): void
     {
         $projectFile = ProjectFile::create('src/Repository/UserStore.php', '/app/src/Repository/UserStore.php', '<?php');
@@ -213,6 +267,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isRepository());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_plain_service_is_not_misdetected_as_voter_form_entity_or_repository(): void
     {
         $projectFile = ProjectFile::create('src/Service/Mailer.php', '/app/src/Service/Mailer.php', '<?php class Mailer { public function send() {} }');
@@ -224,6 +281,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_template_files(): void
     {
         $projectFile = ProjectFile::create(
@@ -235,6 +295,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isTemplate());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_config_files(): void
     {
         $projectFile = ProjectFile::create('config/security.yaml', '/app/config/security.yaml', 'security:');
@@ -242,6 +305,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isConfiguration());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_dotenv_files_as_config(): void
     {
         $projectFile = ProjectFile::create('.env', '/app/.env', 'APP_ENV=prod');
@@ -249,12 +315,18 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isConfiguration());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_dotenv_variants_as_config(): void
     {
         $projectFile = ProjectFile::create('.env.dev', '/app/.env.dev', 'APP_ENV=dev');
         self::assertSame('config', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_compiled_dotenv_php_file_stays_php(): void
     {
         $projectFile = ProjectFile::create('.env.local.php', '/app/.env.local.php', '<?php return [];');
@@ -262,6 +334,9 @@ final class ProjectFileTest extends TestCase
         self::assertFalse($projectFile->isConfiguration());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_api_platform_resources_by_attribute(): void
     {
         $projectFile = ProjectFile::create(
@@ -273,6 +348,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('api_resource', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_entity_is_false_for_an_entity_that_is_also_an_api_resource(): void
     {
         $projectFile = ProjectFile::create(
@@ -284,6 +362,9 @@ final class ProjectFileTest extends TestCase
         self::assertFalse($projectFile->isEntity());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_api_platform_resources_outside_entity_directories(): void
     {
         $projectFile = ProjectFile::create(
@@ -295,6 +376,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('api_resource', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_standalone_operation_attributes_as_api_resources(): void
     {
         $projectFile = ProjectFile::create(
@@ -306,6 +390,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('api_resource', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_graphql_operation_attributes_as_api_resources(): void
     {
         $projectFile = ProjectFile::create(
@@ -317,6 +404,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('api_resource', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_non_php_file_with_api_resource_content_is_not_an_api_resource(): void
     {
         $projectFile = ProjectFile::create(
@@ -328,6 +418,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('config', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_live_components_by_attribute(): void
     {
         $projectFile = ProjectFile::create(
@@ -339,6 +432,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('live_component', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_non_php_file_with_live_component_content_is_not_a_live_component(): void
     {
         $projectFile = ProjectFile::create(
@@ -350,6 +446,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('config', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_api_platform_namespace_without_an_operation_attribute_is_not_an_api_resource(): void
     {
         $projectFile = ProjectFile::create(
@@ -361,6 +460,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('php', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_plain_twig_components_without_live_attribute_stay_php(): void
     {
         $projectFile = ProjectFile::create(
@@ -372,6 +474,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('php', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_twig_extension_by_interface_implementation(): void
     {
         $projectFile = ProjectFile::create(
@@ -383,6 +488,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('twig_extension', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_twig_extension_by_abstract_extension_parent(): void
     {
         $projectFile = ProjectFile::create(
@@ -394,6 +502,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('twig_extension', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_non_php_file_with_twig_extension_content_is_not_a_twig_extension(): void
     {
         $projectFile = ProjectFile::create(
@@ -405,6 +516,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('template', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_plain_service_without_twig_extension_signals_stays_php(): void
     {
         $projectFile = ProjectFile::create(
@@ -416,6 +530,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('php', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_operation_attribute_without_api_platform_namespace_is_not_an_api_resource(): void
     {
         $projectFile = ProjectFile::create(
@@ -427,6 +544,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('controller', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_plain_entities_without_api_resource_stay_entities(): void
     {
         $projectFile = ProjectFile::create(
@@ -438,6 +558,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('entity', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_counts_lines_correctly(): void
     {
         $content = "<?php\n\nclass Foo\n{\n    public function bar(): void {}\n}\n";
@@ -445,6 +568,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame(7, $projectFile->linesCount());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_security_annotations(): void
     {
         $projectFile = ProjectFile::create(
@@ -462,6 +588,9 @@ final class ProjectFileTest extends TestCase
         self::assertFalse($withoutAnnotation->hasSecurityAnnotations());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_legacy_at_isgranted_annotation_in_doc_comment(): void
     {
         $projectFile = ProjectFile::create(
@@ -473,6 +602,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->hasSecurityAnnotations());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_deny_access_unless_granted_call(): void
     {
         $projectFile = ProjectFile::create(
@@ -484,6 +616,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->hasSecurityAnnotations());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_security_yaml_key(): void
     {
         $projectFile = ProjectFile::create(
@@ -495,6 +630,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->hasSecurityAnnotations());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_absolute_path_returns_the_absolute_path_passed_at_creation(): void
     {
         $projectFile = ProjectFile::create(
@@ -506,6 +644,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('/srv/app/src/Foo.php', $projectFile->absolutePath());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_keyword_in_content(): void
     {
         $projectFile = ProjectFile::create('src/Repo.php', '/app/src/Repo.php', '<?php $conn->query($input);');
@@ -513,6 +654,9 @@ final class ProjectFileTest extends TestCase
         self::assertFalse($projectFile->containsKeyword('prepare'));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_serializes_to_array(): void
     {
         $projectFile = ProjectFile::create(
@@ -531,48 +675,72 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($array['has_security_annotations']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_service_returns_true_for_plain_php_service(): void
     {
         $projectFile = ProjectFile::create('src/Service/FooService.php', '/app/src/Service/FooService.php', '<?php');
         self::assertTrue($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_service_returns_false_for_controller(): void
     {
         $projectFile = ProjectFile::create('src/Controller/FooController.php', '/app/src/Controller/FooController.php', '<?php');
         self::assertFalse($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_service_returns_false_for_entity(): void
     {
         $projectFile = ProjectFile::create('src/Entity/Foo.php', '/app/src/Entity/Foo.php', '<?php');
         self::assertFalse($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_service_returns_false_for_voter(): void
     {
         $projectFile = ProjectFile::create('src/Security/FooVoter.php', '/app/src/Security/FooVoter.php', '<?php');
         self::assertFalse($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_service_returns_false_for_repository(): void
     {
         $projectFile = ProjectFile::create('src/Repository/FooRepository.php', '/app/src/Repository/FooRepository.php', '<?php');
         self::assertFalse($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_service_returns_false_for_form(): void
     {
         $projectFile = ProjectFile::create('src/Form/FooType.php', '/app/src/Form/FooType.php', '<?php');
         self::assertFalse($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_service_returns_false_for_non_php_file(): void
     {
         $projectFile = ProjectFile::create('templates/foo.twig', '/app/templates/foo.twig', '{{ foo }}');
         self::assertFalse($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_form_requires_form_directory_and_type_suffix_together(): void
     {
         $projectFile = ProjectFile::create('src/Dto/UserType.php', '/app/src/Dto/UserType.php', '<?php');
@@ -582,18 +750,27 @@ final class ProjectFileTest extends TestCase
         self::assertFalse($withDirNoSuffix->isForm());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_entity_detects_entities_directory(): void
     {
         $projectFile = ProjectFile::create('src/Entities/User.php', '/app/src/Entities/User.php', '<?php');
         self::assertTrue($projectFile->isEntity());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_template_detects_plain_twig_extension(): void
     {
         $projectFile = ProjectFile::create('templates/foo.twig', '/app/templates/foo.twig', '{{ foo }}');
         self::assertTrue($projectFile->isTemplate());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_configuration_detects_yml_and_xml(): void
     {
         $projectFile = ProjectFile::create('config/services.yml', '/app/config/services.yml', '');
@@ -603,42 +780,63 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($xml->isConfiguration());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_configuration_detects_yaml_extension(): void
     {
         $projectFile = ProjectFile::create('config/security.yaml', '/app/config/security.yaml', '');
         self::assertTrue($projectFile->isConfiguration());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_configuration_returns_false_for_php_files(): void
     {
         $projectFile = ProjectFile::create('src/Service/FooService.php', '/app/src/Service/FooService.php', '<?php');
         self::assertFalse($projectFile->isConfiguration());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_type_is_config_for_yaml_extension(): void
     {
         $projectFile = ProjectFile::create('config/security.yaml', '/app/config/security.yaml', '');
         self::assertSame('config', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_type_is_config_for_yml_extension(): void
     {
         $projectFile = ProjectFile::create('config/services.yml', '/app/config/services.yml', '');
         self::assertSame('config', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_type_is_config_for_xml_extension(): void
     {
         $projectFile = ProjectFile::create('config/services.xml', '/app/config/services.xml', '');
         self::assertSame('config', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_type_is_php_for_plain_php_service_file(): void
     {
         $projectFile = ProjectFile::create('src/Service/FooService.php', '/app/src/Service/FooService.php', '<?php');
         self::assertSame('php', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_content_hash_is_deterministic_for_identical_content(): void
     {
         $projectFile = ProjectFile::create('a.php', '/app/a.php', '<?php echo "hello";');
@@ -647,6 +845,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame($projectFile->contentHash(), $b->contentHash());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_content_hash_differs_for_different_content(): void
     {
         $projectFile = ProjectFile::create('a.php', '/app/a.php', '<?php echo "hello";');
@@ -655,6 +856,9 @@ final class ProjectFileTest extends TestCase
         self::assertNotSame($projectFile->contentHash(), $b->contentHash());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_content_hash_is_sha256_hex(): void
     {
         $projectFile = ProjectFile::create('a.php', '/app/a.php', 'x');
@@ -662,6 +866,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame(hash('sha256', 'x'), $projectFile->contentHash());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_authenticator_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -674,6 +881,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isAuthenticator());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_messenger_handler_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -686,6 +896,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isMessengerHandler());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_messenger_handler_by_directory(): void
     {
         $projectFile = ProjectFile::create(
@@ -698,6 +911,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isMessengerHandler());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_webhook_consumer_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -710,6 +926,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isWebhookConsumer());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_webhook_parser_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -722,6 +941,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isWebhookConsumer());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_webhook_consumer_suffix_outside_webhook_directory(): void
     {
         $projectFile = ProjectFile::create(
@@ -734,6 +956,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isWebhookConsumer());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_webhook_parser_suffix_outside_webhook_directory(): void
     {
         $projectFile = ProjectFile::create(
@@ -746,6 +971,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isWebhookConsumer());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_plain_php_inside_webhook_directory(): void
     {
         $projectFile = ProjectFile::create(
@@ -758,6 +986,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isWebhookConsumer());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_non_php_inside_webhook_directory_is_not_a_webhook_consumer(): void
     {
         $projectFile = ProjectFile::create(
@@ -770,6 +1001,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('config', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_non_php_inside_message_handler_directory_is_not_a_messenger_handler(): void
     {
         $projectFile = ProjectFile::create(
@@ -782,6 +1016,9 @@ final class ProjectFileTest extends TestCase
         self::assertSame('config', $projectFile->type());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_event_subscriber_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -794,6 +1031,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isEventSubscriber());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_event_listener_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -806,6 +1046,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isEventSubscriber());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_normalizer_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -818,6 +1061,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isNormalizer());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_denormalizer_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -830,6 +1076,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isNormalizer());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_schedule_provider_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -842,6 +1091,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isScheduler());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_schedule_class_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -854,6 +1106,9 @@ final class ProjectFileTest extends TestCase
         self::assertTrue($projectFile->isScheduler());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_service_returns_false_for_authenticator(): void
     {
         $projectFile = ProjectFile::create(
@@ -865,6 +1120,9 @@ final class ProjectFileTest extends TestCase
         self::assertFalse($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_service_returns_false_for_messenger_handler(): void
     {
         $projectFile = ProjectFile::create(
@@ -876,6 +1134,9 @@ final class ProjectFileTest extends TestCase
         self::assertFalse($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_service_returns_false_for_event_subscriber(): void
     {
         $projectFile = ProjectFile::create(
@@ -887,6 +1148,9 @@ final class ProjectFileTest extends TestCase
         self::assertFalse($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_service_returns_false_for_normalizer(): void
     {
         $projectFile = ProjectFile::create(
@@ -898,6 +1162,9 @@ final class ProjectFileTest extends TestCase
         self::assertFalse($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_service_returns_false_for_webhook_consumer(): void
     {
         $projectFile = ProjectFile::create(
@@ -909,6 +1176,9 @@ final class ProjectFileTest extends TestCase
         self::assertFalse($projectFile->isService());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_is_service_returns_false_for_scheduler(): void
     {
         $projectFile = ProjectFile::create(

@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Prompt;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -36,6 +37,9 @@ final class AttackerPromptBuilderTest extends TestCase
         $this->attackerPromptBuilder = new AttackerPromptBuilder();
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_formats_no_voter_controller_list_with_prefix_and_path(): void
     {
         $projectFile = ProjectFile::create(
@@ -54,6 +58,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('  - src/Controller/PublicController.php', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_renders_route_access_control_map_with_lacks_check_marker(): void
     {
         $projectFile = ProjectFile::create(
@@ -86,6 +93,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('LACKS_ACCESS_CHECK', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_route_without_attribute_check_is_marked_covered_when_a_firewall_access_control_matches(): void
     {
         $projectFile = ProjectFile::create(
@@ -119,6 +129,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('LACKS_ACCESS_CHECK', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_route_without_attribute_check_still_lacks_when_no_firewall_access_control_matches(): void
     {
         $projectFile = ProjectFile::create(
@@ -151,6 +164,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('COVERED_BY access_control', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_renders_access_check_labels_for_protected_action(): void
     {
         $projectFile = ProjectFile::create(
@@ -182,6 +198,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('LACKS_ACCESS_CHECK', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_omits_access_control_section_when_no_routes_parsed(): void
     {
         $projectFile = ProjectFile::create(
@@ -200,6 +219,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('Route Access-Control Map', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_renders_any_label_when_route_methods_are_unspecified(): void
     {
         $projectFile = ProjectFile::create(
@@ -228,6 +250,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('ANY /any', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_renders_unresolved_label_when_route_path_is_missing(): void
     {
         $projectFile = ProjectFile::create(
@@ -256,6 +281,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('(unresolved)', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_renders_voter_coverage_when_capabilities_present(): void
     {
         $projectFile = ProjectFile::create(
@@ -283,6 +311,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('subjects: [App\\Entity\\User]', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_omits_voter_coverage_section_when_no_capabilities(): void
     {
         $projectFile = ProjectFile::create(
@@ -301,6 +332,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('Voter Coverage', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_renders_form_bindings_section(): void
     {
         $projectFile = ProjectFile::create(
@@ -326,6 +360,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('App\\Form\\UserType', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_route_access_map_section_ends_with_blank_line_before_voter_coverage(): void
     {
         $projectFile = ProjectFile::create('src/Controller/X.php', '/app/x', '<?php class X {}');
@@ -346,6 +383,9 @@ final class AttackerPromptBuilderTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_voter_coverage_section_ends_with_blank_line_before_form_bindings(): void
     {
         $projectFile = ProjectFile::create('src/Controller/X.php', '/app/x', '<?php class X {}');
@@ -366,6 +406,9 @@ final class AttackerPromptBuilderTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_form_bindings_section_ends_with_blank_line_before_source_code(): void
     {
         $projectFile = ProjectFile::create('src/Controller/X.php', '/app/x', '<?php class X {}');
@@ -385,6 +428,9 @@ final class AttackerPromptBuilderTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_omits_form_bindings_section_when_empty(): void
     {
         $projectFile = ProjectFile::create(
@@ -403,6 +449,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('Form Bindings', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_excludes_secured_controllers_from_no_voter_list(): void
     {
         $projectFile = ProjectFile::create(
@@ -421,6 +470,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('  - src/Controller/SecuredController.php', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_lists_multiple_no_voter_controllers_each_on_own_line(): void
     {
         $projectFile = ProjectFile::create(
@@ -453,6 +505,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('<skills role="', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_api_resource_files_get_the_api_platform_skill_block(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: false);
@@ -468,6 +523,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('securityPostDenormalize', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_live_component_files_get_the_live_component_skill_block(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: false);
@@ -483,6 +541,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('LiveProp', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_twig_extension_files_get_the_twig_extension_skill_block(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: false);
@@ -498,6 +559,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('is_safe', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_stable_mode_emits_every_skill_block_regardless_of_chunk_contents(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: true);
@@ -512,6 +576,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertSame(20, substr_count($prompt, '<skills role="'));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_stable_mode_system_prompt_is_byte_identical_across_chunk_types(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: true);
@@ -524,6 +591,9 @@ final class AttackerPromptBuilderTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_default_mode_emits_only_skills_matching_the_chunk(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: false);
@@ -535,6 +605,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('<skills role="controller">', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_controller_skills_when_controller_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -550,6 +623,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('<skills role="voter">', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_voter_skills_when_voter_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -564,6 +640,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('voteOnAttribute', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_entity_skills_when_entity_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -577,6 +656,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('<skills role="entity">', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_repository_skills_when_repository_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -590,6 +672,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('<skills role="repository">', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_form_skills_when_form_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -603,6 +688,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('<skills role="form">', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_file_upload_skills_when_form_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -617,6 +705,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('path traversal', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_template_skills_when_twig_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -630,6 +721,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('<skills role="template">', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_config_skills_when_yaml_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -643,6 +737,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('<skills role="config">', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_php_skills_when_generic_service_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -656,6 +753,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('<skills role="php">', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_skill_block_is_closed_with_matching_tag(): void
     {
         $projectFile = ProjectFile::create(
@@ -669,6 +769,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('</skills>', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_combines_multiple_skill_blocks_when_chunk_has_mixed_types(): void
     {
         $projectFile = ProjectFile::create(
@@ -688,6 +791,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('<skills role="voter">', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_skill_blocks_are_emitted_in_attack_surface_priority_order(): void
     {
         $projectFile = ProjectFile::create(
@@ -712,6 +818,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertLessThan($voterPos, $controllerPos);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_template_skill_appears_before_config_skill_under_priority_order(): void
     {
         // Under alphabetical sort, config (c) would precede template (t). Priority order flips this.
@@ -736,6 +845,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertLessThan($configPos, $templatePos);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_each_type_skill_block_appears_only_once_when_chunk_has_duplicates(): void
     {
         $projectFile = ProjectFile::create(
@@ -754,6 +866,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertSame(1, substr_count($prompt, '<skills role="controller">'));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_unknown_file_type_does_not_inject_skill_block(): void
     {
         $projectFile = ProjectFile::create(
@@ -776,6 +891,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringEndsWith('causes the response to be discarded as malformed.', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_base_prompt_has_no_trailing_separator_when_files_have_no_matching_skill(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
@@ -790,6 +908,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringEndsWith('causes the response to be discarded as malformed.', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_skill_block_is_separated_from_base_by_exactly_one_blank_line(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
@@ -834,6 +955,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('unauthenticated RCE', $criticalLine);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_wraps_source_files_in_xml_file_tags(): void
     {
         $projectFile = ProjectFile::create(
@@ -854,6 +978,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('</file>', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_does_not_use_legacy_markdown_fence_for_source_files(): void
     {
         $projectFile = ProjectFile::create(
@@ -871,6 +998,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('### src/Controller/UserController.php', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_prompt_starts_with_base_persona_even_when_skills_present(): void
     {
         $projectFile = ProjectFile::create(
@@ -884,6 +1014,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringStartsWith('You are an elite offensive security researcher', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_prepends_line_numbers_to_each_source_line(): void
     {
         $projectFile = ProjectFile::create(
@@ -902,6 +1035,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString("  1 | <?php\n  2 | \n  3 | class Multi {}", $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_explains_line_number_protocol_to_the_model(): void
     {
         $projectFile = ProjectFile::create(
@@ -954,6 +1090,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('Below 0.6: do NOT report', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_skill_block_contains_negative_examples_to_curb_false_positives(): void
     {
         $projectFile = ProjectFile::create(
@@ -967,6 +1106,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('Do NOT flag:', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_php_skill_block_documents_safe_process_invocation(): void
     {
         $projectFile = ProjectFile::create(
@@ -1034,6 +1176,9 @@ final class AttackerPromptBuilderTest extends TestCase
         }
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_structured_collection_user_message_does_not_request_a_json_array(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: true);
@@ -1049,6 +1194,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('record_vulnerability', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_opt_out_user_message_requests_a_json_array(): void
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(useStructuredCollection: false);
@@ -1064,6 +1212,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('record_vulnerability', $message);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_entity_skill_block_mentions_over_permissive_serializer_groups(): void
     {
         $projectFile = ProjectFile::create(
@@ -1078,6 +1229,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('over_permissive_serializer_group', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_authenticator_skills_when_authenticator_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -1092,6 +1246,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('SelfValidatingPassport', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_messenger_handler_skills_when_handler_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -1106,6 +1263,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('AsMessageHandler', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_webhook_consumer_skills_when_webhook_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -1120,6 +1280,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('hash_equals', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_event_subscriber_skills_when_subscriber_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -1134,6 +1297,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('KernelEvents::CONTROLLER', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_normalizer_skills_when_normalizer_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -1148,6 +1314,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('allow_extra_attributes', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_scheduler_skills_when_schedule_in_chunk(): void
     {
         $projectFile = ProjectFile::create(
@@ -1162,6 +1331,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('AsSchedule', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_authenticator_skill_appears_before_voter_under_priority_order(): void
     {
         $projectFile = ProjectFile::create(
@@ -1208,6 +1380,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('RateLimiter', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_controller_skill_block_covers_map_request_payload(): void
     {
         $projectFile = ProjectFile::create(
@@ -1221,6 +1396,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('#[MapRequestPayload]', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_template_skill_block_covers_live_components(): void
     {
         $projectFile = ProjectFile::create(
@@ -1234,6 +1412,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('Live Components', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_php_skill_block_covers_mailer_header_injection(): void
     {
         $projectFile = ProjectFile::create(
@@ -1248,6 +1429,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('header injection', $prompt);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_config_skill_block_covers_messenger_transport_serializer(): void
     {
         $projectFile = ProjectFile::create(

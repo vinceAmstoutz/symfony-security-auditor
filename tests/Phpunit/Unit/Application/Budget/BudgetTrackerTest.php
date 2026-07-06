@@ -18,6 +18,8 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditBudgetException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProviderInterface;
@@ -27,6 +29,7 @@ final class BudgetTrackerTest extends TestCase
 {
     /**
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
      */
     public function test_unlimited_budget_never_throws(): void
     {
@@ -40,6 +43,8 @@ final class BudgetTrackerTest extends TestCase
 
     /**
      * @throws BudgetExceededException
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
      */
     public function test_token_budget_passes_at_cap(): void
     {
@@ -53,6 +58,8 @@ final class BudgetTrackerTest extends TestCase
 
     /**
      * @throws BudgetExceededException
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
      */
     public function test_token_budget_exceeded_throws(): void
     {
@@ -68,6 +75,8 @@ final class BudgetTrackerTest extends TestCase
 
     /**
      * @throws BudgetExceededException
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
      */
     public function test_cost_budget_exceeded_throws(): void
     {
@@ -83,6 +92,8 @@ final class BudgetTrackerTest extends TestCase
 
     /**
      * @throws BudgetExceededException
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
      */
     public function test_for_both_enforces_whichever_cap_is_hit_first(): void
     {
@@ -98,6 +109,8 @@ final class BudgetTrackerTest extends TestCase
 
     /**
      * @throws BudgetExceededException
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
      */
     public function test_multiple_record_calls_accumulate(): void
     {
@@ -110,6 +123,9 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->assertWithinBudget();
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_cost_used_accumulates_from_recorded_calls(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0, outputPrice: 20.0);
@@ -120,6 +136,9 @@ final class BudgetTrackerTest extends TestCase
         self::assertSame(10.0, $budgetTracker->costUsdUsed());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_cost_used_accumulates_across_multiple_calls(): void
     {
         // Pins: `$this->costUsdUsed += ...` — if mutated to `=`, the second call
@@ -134,6 +153,8 @@ final class BudgetTrackerTest extends TestCase
 
     /**
      * @throws BudgetExceededException
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
      */
     public function test_cost_budget_passes_at_exact_cap_and_aborts_above(): void
     {
@@ -149,6 +170,9 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->assertWithinBudget();
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_cost_used_is_rounded_to_six_decimal_places(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 0.7);
@@ -160,6 +184,8 @@ final class BudgetTrackerTest extends TestCase
 
     /**
      * @throws BudgetExceededException
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
      */
     public function test_at_cap_call_completes_next_call_aborts(): void
     {
@@ -175,6 +201,9 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->assertWithinBudget();
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_cache_read_tokens_contribute_to_cost_at_the_cache_read_rate(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), cacheReadPrice: 1.0);
@@ -184,6 +213,9 @@ final class BudgetTrackerTest extends TestCase
         self::assertSame(1.0, $budgetTracker->costUsdUsed());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_cache_creation_tokens_contribute_to_cost_at_the_cache_creation_rate(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), cacheCreationPrice: 12.5);

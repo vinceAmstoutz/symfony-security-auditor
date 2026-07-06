@@ -18,6 +18,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
@@ -50,6 +53,9 @@ final readonly class RunAuditUseCase
      *                                           report
      *
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
      */
     public function execute(string $projectPath, array $scanPaths = [], bool $bypassCache = false, ?string $diffSinceRef = null, array $acceptedFingerprints = []): AuditReport
     {
@@ -87,6 +93,10 @@ final readonly class RunAuditUseCase
         return $auditReport;
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
+     */
     private function buildCost(): ?AuditCost
     {
         if (!$this->tokenUsageRecorder instanceof TokenUsageRecorder) {

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 
@@ -30,6 +31,9 @@ final class JsonReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame('json', $this->renderer->format());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_returns_valid_json_array(): void
     {
         $decoded = json_decode($this->renderer->render($this->makeReport()), true);

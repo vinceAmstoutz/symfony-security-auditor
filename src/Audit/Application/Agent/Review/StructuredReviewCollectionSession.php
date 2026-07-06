@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewCollector;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
@@ -34,6 +35,9 @@ final readonly class StructuredReviewCollectionSession
         public ToolRegistry $toolRegistry,
     ) {}
 
+    /**
+     * @throws InvalidToolRegistryException
+     */
     public static function begin(RecordReviewToolFactoryInterface $recordReviewToolFactory, LoggerInterface $logger): self
     {
         $reviewCollector = new ReviewCollector();

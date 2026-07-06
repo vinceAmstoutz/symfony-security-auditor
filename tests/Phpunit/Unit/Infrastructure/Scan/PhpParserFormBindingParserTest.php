@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use Override;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
 
@@ -28,6 +29,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         $this->phpParserFormBindingParser = new PhpParserFormBindingParser();
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_empty_for_non_controller_file(): void
     {
         $projectFile = ProjectFile::create('src/Service/Mailer.php', '/app/x', '<?php class Mailer {}');
@@ -35,6 +39,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_non_controller_files_even_when_they_call_create_form(): void
     {
         $source = <<<'PHP'
@@ -52,6 +59,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_collects_bindings_from_multiple_methods_in_the_same_controller(): void
     {
         $source = <<<'PHP'
@@ -80,6 +90,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame('App\\Form\\ProfileType', $bindings[1]->formTypeClass());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_collects_bindings_from_multiple_classes_in_the_same_file(): void
     {
         $source = <<<'PHP'
@@ -107,6 +120,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame('App\\Form\\ProfileType', $bindings[1]->formTypeClass());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_unresolvable_create_form_call_but_keeps_subsequent_ones(): void
     {
         $source = <<<'PHP'
@@ -128,6 +144,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame('App\\Form\\UserType', $bindings[0]->formTypeClass());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_continues_past_private_helpers_to_reach_public_create_form(): void
     {
         $source = <<<'PHP'
@@ -150,6 +169,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame('edit', $bindings[0]->controllerMethod());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_empty_for_unparseable_controller(): void
     {
         $projectFile = ProjectFile::create('src/Controller/Broken.php', '/app/x', '<?php class Broken { public function');
@@ -157,6 +179,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_form_type_from_create_form_call(): void
     {
         $source = <<<'PHP'
@@ -179,6 +204,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame('src/Controller/UserController.php', $bindings[0]->controllerFilePath());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_multiple_bindings_from_same_method(): void
     {
         $source = <<<'PHP'
@@ -202,6 +230,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame('App\\Form\\ProfileType', $bindings[1]->formTypeClass());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_ignores_create_form_calls_with_non_class_argument(): void
     {
         $source = <<<'PHP'
@@ -220,6 +251,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame([], $bindings);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_emits_no_bindings_when_controller_has_no_create_form_calls(): void
     {
         $source = <<<'PHP'
@@ -234,6 +268,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_an_abstract_action_without_a_body_then_binds_the_concrete_one(): void
     {
         $source = <<<'PHP'
@@ -257,6 +294,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame('App\\Form\\UserType', $bindings[0]->formTypeClass());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_ignores_method_calls_that_are_not_create_form(): void
     {
         $source = <<<'PHP'
@@ -278,6 +318,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame('App\\Form\\UserType', $bindings[0]->formTypeClass());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_does_not_bind_a_non_create_form_call_that_takes_a_class_constant(): void
     {
         $source = <<<'PHP'
@@ -295,6 +338,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_ignores_create_form_called_on_something_other_than_this(): void
     {
         $source = <<<'PHP'
@@ -311,6 +357,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_ignores_a_dynamic_method_name_call(): void
     {
         $source = <<<'PHP'
@@ -327,6 +376,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_ignores_create_form_with_no_arguments(): void
     {
         $source = <<<'PHP'
@@ -343,6 +395,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_ignores_create_form_with_a_dynamic_constant_name(): void
     {
         $source = <<<'PHP'
@@ -359,6 +414,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_ignores_create_form_with_a_non_class_constant_fetch(): void
     {
         $source = <<<'PHP'
@@ -375,6 +433,9 @@ final class PhpParserFormBindingParserTest extends TestCase
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_ignores_create_form_with_class_const_fetched_on_a_variable(): void
     {
         $source = <<<'PHP'

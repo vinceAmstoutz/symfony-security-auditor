@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -51,11 +52,17 @@ abstract class AbstractReportRendererTestCase extends TestCase
         (new Filesystem())->remove($this->tmpDir);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     protected function makeReport(Vulnerability ...$vulnerabilities): AuditReport
     {
         return AuditReport::fromContext($this->buildContext(...$vulnerabilities));
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     protected function makeReportWithCost(AuditCost $auditCost, Vulnerability ...$vulnerabilities): AuditReport
     {
         return AuditReport::fromContext($this->buildContext(...$vulnerabilities), $auditCost);
@@ -79,6 +86,9 @@ abstract class AbstractReportRendererTestCase extends TestCase
         )->withReviewerValidation(true);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     private function buildContext(Vulnerability ...$vulnerabilities): AuditContext
     {
         $auditContext = AuditContext::forProject($this->tmpDir);

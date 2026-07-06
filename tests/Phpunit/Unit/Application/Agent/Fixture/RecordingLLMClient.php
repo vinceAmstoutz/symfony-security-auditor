@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -33,6 +34,9 @@ final class RecordingLLMClient implements LLMClientInterface
         private readonly string $responseContent = '[]',
     ) {}
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     #[Override]
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
     {
@@ -41,6 +45,9 @@ final class RecordingLLMClient implements LLMClientInterface
         return $this->response();
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     #[Override]
     public function completeWithTools(
         string $systemPrompt,
@@ -59,6 +66,9 @@ final class RecordingLLMClient implements LLMClientInterface
         return 'claude';
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     private function response(): LLMResponse
     {
         return LLMResponse::of($this->responseContent, 'claude', 'end_turn', TokenUsageSnapshot::of(100, 10));

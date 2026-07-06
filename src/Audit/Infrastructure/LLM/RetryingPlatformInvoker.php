@@ -22,6 +22,7 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
@@ -55,6 +56,7 @@ final readonly class RetryingPlatformInvoker
      * @throws TransientLLMFailureException
      * @throws EmptyLLMResponseException
      * @throws NonTransientLLMFailureException
+     * @throws InvalidRetryConfigurationException
      */
     public function invoke(MessageBag $messageBag, array $options, int $estimatedInputTokens): DeferredResult
     {
@@ -101,6 +103,9 @@ final readonly class RetryingPlatformInvoker
         }
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     private function backOffBeforeNextAttempt(Throwable $throwable, int $attempt, int $maxAttempts): void
     {
         $isRateLimit = $this->transientFailureClassifier->isRateLimit($throwable);

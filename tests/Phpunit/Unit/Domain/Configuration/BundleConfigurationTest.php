@@ -15,10 +15,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Configuration;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
 final class BundleConfigurationTest extends TestCase
 {
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_populates_every_typed_field(): void
     {
         $bundleConfiguration = BundleConfiguration::fromArray($this->treeBuilderOutput());
@@ -73,6 +77,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->rateLimit->isEnabled());
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_maps_explicit_fail_on_level(): void
     {
         $config = $this->treeBuilderOutput();
@@ -83,6 +90,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(RiskLevel::High, $bundleConfiguration->audit->failOn);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_defaults_fail_on_to_critical_when_key_omitted_for_bc(): void
     {
         $config = $this->treeBuilderOutput();
@@ -93,6 +103,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(RiskLevel::Critical, $bundleConfiguration->audit->failOn);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_maps_excluded_and_included_types(): void
     {
         $config = $this->treeBuilderOutput();
@@ -105,6 +118,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(['sql_injection'], $bundleConfiguration->audit->includedTypes);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_rate_limit_dimensions_flow_through_when_set(): void
     {
         $config = $this->treeBuilderOutput();
@@ -122,6 +138,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertTrue($bundleConfiguration->rateLimit->isEnabled());
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_attacker_model_falls_back_to_top_level_model_when_override_omitted(): void
     {
         $config = $this->treeBuilderOutput();
@@ -132,6 +151,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame('claude-opus-4-7', $bundleConfiguration->llm->attackerModel());
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_reviewer_model_falls_back_to_top_level_model_when_override_omitted(): void
     {
         $config = $this->treeBuilderOutput();
@@ -142,6 +164,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame('claude-opus-4-7', $bundleConfiguration->llm->reviewerModel());
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_max_output_tokens_defaults_flow_through_to_both_agents_when_overrides_omitted(): void
     {
         $bundleConfiguration = BundleConfiguration::fromArray($this->treeBuilderOutput());
@@ -150,6 +175,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(4096, $bundleConfiguration->llm->reviewerMaxOutputTokens());
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_max_output_tokens_overrides_flow_through_per_agent(): void
     {
         $config = $this->treeBuilderOutput();
@@ -162,6 +190,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(2048, $bundleConfiguration->llm->reviewerMaxOutputTokens());
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_attacker_max_output_tokens_falls_back_to_top_level_when_override_omitted(): void
     {
         $config = $this->treeBuilderOutput();
@@ -175,6 +206,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(6000, $bundleConfiguration->llm->reviewerMaxOutputTokens());
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_budget_is_not_unlimited_when_token_cap_set(): void
     {
         $config = $this->treeBuilderOutput();
@@ -186,6 +220,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(50_000, $bundleConfiguration->budget->maxTokens);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_provider_json_mode_defaults_false_in_tree_output(): void
     {
         $bundleConfiguration = BundleConfiguration::fromArray($this->treeBuilderOutput());
@@ -193,6 +230,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->llm->providerJsonMode);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_provider_json_mode_flows_through_when_enabled(): void
     {
         $config = $this->treeBuilderOutput();
@@ -203,6 +243,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertTrue($bundleConfiguration->llm->providerJsonMode);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_tolerates_omitted_provider_json_mode_key_for_bc(): void
     {
         $config = $this->treeBuilderOutput();
@@ -213,6 +256,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->llm->providerJsonMode);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_defaults_max_output_tokens_to_4096_when_key_omitted_for_bc(): void
     {
         $config = $this->treeBuilderOutput();
@@ -224,6 +270,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(4096, $bundleConfiguration->llm->reviewerMaxOutputTokens());
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_defaults_structured_collection_to_true_when_audit_key_omits_it(): void
     {
         $config = $this->treeBuilderOutput();
@@ -234,6 +283,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertTrue($bundleConfiguration->audit->structuredCollection);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_propagates_structured_collection_opt_out(): void
     {
         $config = $this->treeBuilderOutput();
@@ -244,6 +296,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->audit->structuredCollection);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_defaults_reviewer_structured_collection_to_true_when_audit_key_omits_it(): void
     {
         $config = $this->treeBuilderOutput();
@@ -254,6 +309,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertTrue($bundleConfiguration->audit->reviewerStructuredCollection);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_propagates_reviewer_structured_collection_opt_out(): void
     {
         $config = $this->treeBuilderOutput();
@@ -264,6 +322,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->audit->reviewerStructuredCollection);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_defaults_stable_system_prompt_to_true_when_audit_key_omits_it(): void
     {
         $config = $this->treeBuilderOutput();
@@ -274,6 +335,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertTrue($bundleConfiguration->audit->stableSystemPrompt);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_propagates_stable_system_prompt_opt_out(): void
     {
         $config = $this->treeBuilderOutput();
@@ -284,6 +348,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertFalse($bundleConfiguration->audit->stableSystemPrompt);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_resolves_fast_profile_for_unset_keys(): void
     {
         $config = $this->profileShapedConfig('fast');
@@ -298,6 +365,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(4, $bundleConfiguration->audit->attackerMaxConcurrent);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_resolves_thorough_profile_for_unset_keys(): void
     {
         $config = $this->profileShapedConfig('thorough');
@@ -312,6 +382,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(1, $bundleConfiguration->audit->attackerMaxConcurrent);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_defaults_to_the_balanced_profile_when_the_key_is_absent(): void
     {
         $config = $this->profileShapedConfig(null);
@@ -326,6 +399,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(1, $bundleConfiguration->audit->reviewerMaxConcurrent);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_lets_an_explicit_key_override_the_profile(): void
     {
         $config = $this->profileShapedConfig('fast');
@@ -339,6 +415,9 @@ final class BundleConfigurationTest extends TestCase
         self::assertTrue($bundleConfiguration->audit->staticPreScanLeanMode);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_lets_explicit_boolean_keys_override_the_profile(): void
     {
         $config = $this->profileShapedConfig('fast');

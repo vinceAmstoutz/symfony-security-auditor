@@ -15,11 +15,17 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 
 final class RiskMarkerIndexTest extends TestCase
 {
+    /**
+     * @throws InvalidRiskMarkerException
+     * @throws InvalidProjectFileException
+     */
     public function test_for_chunk_returns_all_markers_of_files_in_the_chunk(): void
     {
         $riskMarkerIndex = new RiskMarkerIndex([
@@ -34,6 +40,10 @@ final class RiskMarkerIndexTest extends TestCase
         self::assertSame([1, 2], [$markers[0]->line(), $markers[1]->line()]);
     }
 
+    /**
+     * @throws InvalidRiskMarkerException
+     * @throws InvalidProjectFileException
+     */
     public function test_for_chunk_excludes_markers_of_files_not_in_the_chunk(): void
     {
         $riskMarkerIndex = new RiskMarkerIndex([
@@ -47,6 +57,10 @@ final class RiskMarkerIndexTest extends TestCase
         self::assertSame('src/A.php', $markers[0]->filePath());
     }
 
+    /**
+     * @throws InvalidRiskMarkerException
+     * @throws InvalidProjectFileException
+     */
     public function test_for_chunk_is_empty_when_no_file_has_markers(): void
     {
         $riskMarkerIndex = new RiskMarkerIndex([RiskMarker::create('src/A.php', 1, 'p', 'd')]);
@@ -54,6 +68,10 @@ final class RiskMarkerIndexTest extends TestCase
         self::assertSame([], $riskMarkerIndex->forChunk([$this->file('src/Other.php')]));
     }
 
+    /**
+     * @throws InvalidRiskMarkerException
+     * @throws InvalidProjectFileException
+     */
     public function test_files_with_markers_keeps_only_flagged_files_in_order(): void
     {
         $riskMarkerIndex = new RiskMarkerIndex([RiskMarker::create('src/B.php', 1, 'p', 'd')]);
@@ -68,6 +86,9 @@ final class RiskMarkerIndexTest extends TestCase
         self::assertSame('src/B.php', $kept[0]->relativePath());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     private function file(string $path): ProjectFile
     {
         return ProjectFile::create($path, '/app/'.$path, '<?php');

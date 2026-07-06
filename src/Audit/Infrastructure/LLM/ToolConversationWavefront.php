@@ -24,6 +24,7 @@ use Symfony\AI\Platform\Result\ToolCall;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -70,6 +71,7 @@ final readonly class ToolConversationWavefront
      *
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
      */
     public function resolveToolWindow(array $window, int $maxToolIterations): array
     {
@@ -117,6 +119,7 @@ final readonly class ToolConversationWavefront
      * @return array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}>
      *
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
      */
     private function runWavefrontRound(PlatformInterface $platform, array $states, array $window, int $maxToolIterations): array
     {
@@ -169,6 +172,8 @@ final readonly class ToolConversationWavefront
      * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}> $states
      *
      * @return list<LLMResponse>
+     *
+     * @throws InvalidTokenUsageException
      */
     private function collectResponses(array $states, int $maxToolIterations): array
     {
@@ -189,6 +194,7 @@ final readonly class ToolConversationWavefront
      * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
      *
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
      */
     private function advanceConversation(array $state, ?DeferredResult $deferredResult, array $request, int $maxToolIterations): array
     {
@@ -214,6 +220,7 @@ final readonly class ToolConversationWavefront
      * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
      *
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
      */
     private function processDeferredResult(array $state, DeferredResult $deferredResult, array $request): array
     {
@@ -271,6 +278,7 @@ final readonly class ToolConversationWavefront
      * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
      *
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
      */
     private function retryOrAbortConversation(array $state, array $request, int $maxToolIterations): array
     {
@@ -310,6 +318,8 @@ final readonly class ToolConversationWavefront
      * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
      *
      * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
+     *
+     * @throws InvalidTokenUsageException
      */
     private function abortConversation(array $state, array $request, int $maxToolIterations): array
     {
@@ -335,6 +345,8 @@ final readonly class ToolConversationWavefront
 
     /**
      * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
+     *
+     * @throws InvalidTokenUsageException
      */
     private function toolIterationCapResponse(array $state, int $maxToolIterations): LLMResponse
     {

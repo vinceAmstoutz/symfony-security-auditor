@@ -19,6 +19,7 @@ use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -71,6 +72,7 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
      */
     public function test_writing_to_file_announces_save_path_via_success_message(): void
     {
@@ -88,6 +90,7 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
      */
     public function test_writing_to_file_persists_content_to_disk(): void
     {
@@ -104,6 +107,7 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
      */
     public function test_writing_without_file_streams_content_to_console(): void
     {
@@ -119,6 +123,7 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
      */
     public function test_writing_html_format_streams_an_html_document(): void
     {
@@ -134,6 +139,7 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
      */
     public function test_writing_junit_format_streams_a_junit_xml_document(): void
     {
@@ -149,6 +155,7 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
      */
     public function test_writing_to_file_creates_missing_parent_directories(): void
     {
@@ -162,6 +169,7 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
      */
     public function test_writing_a_format_without_a_registered_renderer_throws(): void
     {
@@ -178,6 +186,7 @@ final class ReportWriterTest extends TestCase
      * @throws UnsupportedOutputFormatException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_writing_sarif_format_with_baselined_fingerprints_marks_the_matching_result_as_suppressed(): void
     {
@@ -204,6 +213,9 @@ final class ReportWriterTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     private function makeReport(Vulnerability ...$vulnerabilities): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);

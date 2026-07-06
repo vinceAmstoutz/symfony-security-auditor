@@ -21,7 +21,10 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
@@ -107,6 +110,7 @@ final class AuditPresenterTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_result_for_failure_exit_omits_success_message(): void
     {
@@ -124,6 +128,7 @@ final class AuditPresenterTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_result_for_failure_exit_reflects_the_actual_risk_level_not_a_hardcoded_critical(): void
     {
@@ -137,6 +142,9 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString('CRITICAL', $display);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_result_for_success_exit_emits_success_message(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -222,6 +230,9 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString('Running audit pipeline', $display);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_dry_run_result_shows_completion_without_audit_language(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -239,6 +250,10 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString('vulnerabilities found', $display);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_dry_run_result_shows_cost_breakdown_when_cost_present(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -255,6 +270,9 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('0.0123', $display);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_scanned_files_lists_each_file_grouped_by_type(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -299,6 +317,10 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('7 file(s)', $display);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_unsupported_model_warning_names_every_unsupported_model(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -311,6 +333,10 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('made-up-reviewer-model', $display);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_unsupported_model_warning_ignores_supported_models(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -321,6 +347,10 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString('claude-opus-4-7', $bufferedOutput->fetch());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_unsupported_model_warning_is_silent_when_all_models_supported(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -331,6 +361,9 @@ final class AuditPresenterTest extends TestCase
         self::assertSame('', $bufferedOutput->fetch());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_unsupported_model_warning_is_silent_when_no_models_present(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -341,6 +374,10 @@ final class AuditPresenterTest extends TestCase
         self::assertSame('', $bufferedOutput->fetch());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_unsupported_model_warning_names_a_shared_model_only_once(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -351,6 +388,10 @@ final class AuditPresenterTest extends TestCase
         self::assertSame(1, substr_count($bufferedOutput->fetch(), 'made-up-model'));
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidAuditContextException
+     */
     private function reportWithRoleModels(string $attackerModel, string $reviewerModel): AuditReport
     {
         $auditCost = AuditCost::of(1000, 200, 0.0, $attackerModel, [
@@ -390,6 +431,7 @@ final class AuditPresenterTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     private function makeCriticalReport(): AuditReport
     {
@@ -411,6 +453,7 @@ final class AuditPresenterTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     private function makeHighRiskReport(): AuditReport
     {

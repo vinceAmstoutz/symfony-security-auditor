@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
@@ -34,6 +35,9 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame('markdown', $this->renderer->format());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_starts_with_the_report_heading(): void
     {
         $output = $this->renderer->render($this->makeReport());
@@ -41,6 +45,9 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
         self::assertStringContainsString('# Security Audit Report', $output);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_footer_links_to_the_project_homepage(): void
     {
         $output = $this->renderer->render($this->makeReport());
@@ -51,6 +58,9 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_shows_safe_message_when_no_vulnerabilities(): void
     {
         $output = $this->renderer->render($this->makeReport());
@@ -59,6 +69,9 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
         self::assertStringNotContainsString('## Findings', $output);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_includes_the_risk_level(): void
     {
         $output = $this->renderer->render($this->makeReport());
@@ -69,6 +82,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_lists_a_validated_finding_with_its_location(): void
     {
@@ -84,6 +98,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_finding_type_line_shows_the_owasp_and_cwe_references(): void
     {
@@ -104,6 +119,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_finding_shows_confidence_percent_and_indented_proof(): void
     {
@@ -116,6 +132,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_renders_a_severity_summary_table(): void
     {
@@ -131,6 +148,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_render_orders_findings_most_severe_first(): void
     {

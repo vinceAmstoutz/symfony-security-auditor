@@ -20,6 +20,9 @@ use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\RecordingStage;
@@ -43,6 +46,9 @@ final class RunAuditUseCaseTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
      */
     public function test_it_runs_pipeline_against_the_audit_context(): void
     {
@@ -57,6 +63,9 @@ final class RunAuditUseCaseTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
      */
     public function test_it_threads_accepted_fingerprints_into_the_audit_context(): void
     {
@@ -70,6 +79,9 @@ final class RunAuditUseCaseTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
      */
     public function test_it_logs_starting_audit_with_project_path(): void
     {
@@ -92,6 +104,9 @@ final class RunAuditUseCaseTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
      */
     public function test_it_marks_the_audit_context_as_cache_bypassed_when_requested(): void
     {
@@ -105,6 +120,9 @@ final class RunAuditUseCaseTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
      */
     public function test_it_passes_scan_paths_to_the_pipeline_via_audit_context(): void
     {
@@ -118,6 +136,9 @@ final class RunAuditUseCaseTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
      */
     public function test_it_logs_audit_complete_with_exact_context(): void
     {

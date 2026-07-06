@@ -14,11 +14,16 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Tool;
 
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\ListFilesTool;
 
 final class ListFilesToolTest extends TestCase
 {
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_definition_matches_expected_full_schema(): void
     {
         $listFilesTool = new ListFilesTool([]);
@@ -40,6 +45,9 @@ final class ListFilesToolTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_lists_all_files_when_no_filter(): void
     {
         $projectFile = ProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
@@ -54,6 +62,9 @@ final class ListFilesToolTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_filters_by_file_type_when_specified(): void
     {
         $projectFile = ProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
@@ -66,6 +77,9 @@ final class ListFilesToolTest extends TestCase
         self::assertStringNotContainsString('src/Entity/Foo.php', $result);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_continues_past_filtered_files_to_reach_matching_ones(): void
     {
         // Kills Continue_→break: with `break`, iteration stops at first non-matching file and the
@@ -80,6 +94,9 @@ final class ListFilesToolTest extends TestCase
         self::assertStringNotContainsString('src/Entity/Foo.php', $result);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_returns_no_files_match_when_filter_excludes_all(): void
     {
         $projectFile = ProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
@@ -90,6 +107,9 @@ final class ListFilesToolTest extends TestCase
         self::assertSame('No files match.', $result);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_treats_empty_file_type_as_unset(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/x', '<?php');

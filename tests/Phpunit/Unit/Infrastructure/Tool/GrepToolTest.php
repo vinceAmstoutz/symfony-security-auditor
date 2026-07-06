@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Tool;
 
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\GrepTool;
 
@@ -21,6 +23,9 @@ final class GrepToolTest extends TestCase
 {
     private const int MAX_MATCHES = 50;
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_definition_matches_expected_full_schema(): void
     {
         $grepTool = new GrepTool([]);
@@ -47,6 +52,9 @@ final class GrepToolTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_returns_no_matches_message_when_pattern_not_found(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', "line1\nline2\n");
@@ -57,6 +65,9 @@ final class GrepToolTest extends TestCase
         self::assertSame('No matches found.', $result);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_returns_path_line_number_and_trimmed_content_for_each_match(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', "first\n  foo bar  \nthird\nfoo baz\n");
@@ -70,6 +81,9 @@ final class GrepToolTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_filters_by_file_type_when_specified(): void
     {
         $projectFile = ProjectFile::create('src/Controller/AController.php', '/app/x', 'echo foo;');
@@ -83,6 +97,9 @@ final class GrepToolTest extends TestCase
         self::assertStringNotContainsString('src/Entity/User.php', $result);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_continues_past_filtered_files_to_reach_matching_ones(): void
     {
         // Kills Continue_→break mutation: with `break`, the non-matching first file would stop iteration
@@ -98,6 +115,9 @@ final class GrepToolTest extends TestCase
         self::assertStringNotContainsString('src/Entity/User.php', $result);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_ignores_invalid_file_type_filter(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/x', 'echo foo;');
@@ -136,6 +156,9 @@ final class GrepToolTest extends TestCase
         self::assertStringContainsString('Error', $result);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_caps_results_at_max_matches_keeping_earliest_matches_across_files(): void
     {
         $contentA = '';
@@ -158,6 +181,9 @@ final class GrepToolTest extends TestCase
         self::assertStringContainsString('src/A.php:1:', $result);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_treats_empty_file_type_as_unset(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/x', 'foo bar');

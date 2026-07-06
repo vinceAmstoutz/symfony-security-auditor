@@ -14,11 +14,15 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 
 final class NullCodeSlicerTest extends TestCase
 {
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_original_content_unchanged(): void
     {
         $content = "<?php\nclass Foo { /* … */ }";

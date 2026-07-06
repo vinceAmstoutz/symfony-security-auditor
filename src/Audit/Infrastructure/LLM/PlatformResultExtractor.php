@@ -20,6 +20,7 @@ use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
 use Symfony\AI\Platform\TokenUsage\TokenUsageInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 
 /**
@@ -34,7 +35,10 @@ final readonly class PlatformResultExtractor
         private ?TokenUsageRecorder $tokenUsageRecorder,
     ) {}
 
-    /** @return array{0: int, 1: int, 2: int, 3: int} */
+    /** @return array{0: int, 1: int, 2: int, 3: int}
+     *
+     * @throws NegativeTokenCountException
+     */
     public function extractTokens(DeferredResult $deferredResult): array
     {
         $metadata = $deferredResult->getMetadata()->all();

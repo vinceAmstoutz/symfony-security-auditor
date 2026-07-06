@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
@@ -27,6 +28,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 
 final class AttackerContextPromptRendererTest extends TestCase
 {
+    /**
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_renders_each_marker_as_line_pattern_description(): void
     {
         $output = (new AttackerContextPromptRenderer())->renderRiskMarkers([
@@ -36,6 +40,9 @@ final class AttackerContextPromptRendererTest extends TestCase
         self::assertStringContainsString('L42 request_get — Request input read', $output);
     }
 
+    /**
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_groups_markers_under_their_file_path(): void
     {
         $output = (new AttackerContextPromptRenderer())->renderRiskMarkers([
@@ -48,6 +55,9 @@ final class AttackerContextPromptRendererTest extends TestCase
         self::assertStringContainsString('L50 redirect_with_input — B', $output);
     }
 
+    /**
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_indents_marker_lines_with_leading_whitespace(): void
     {
         $output = (new AttackerContextPromptRenderer())->renderRiskMarkers([

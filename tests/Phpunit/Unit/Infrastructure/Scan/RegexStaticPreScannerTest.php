@@ -16,6 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
@@ -30,11 +32,18 @@ final class RegexStaticPreScannerTest extends TestCase
         $this->regexStaticPreScanner = new RegexStaticPreScanner();
     }
 
+    /**
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_returns_empty_array_when_no_files(): void
     {
         self::assertSame([], $this->regexStaticPreScanner->scan([]));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_returns_empty_array_when_no_patterns_match(): void
     {
         $projectFile = ProjectFile::create(
@@ -46,6 +55,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame([], $this->regexStaticPreScanner->scan([$projectFile]));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_unserialize_in_php_file(): void
     {
         $projectFile = ProjectFile::create(
@@ -62,6 +75,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame('src/Service/Dangerous.php', $markers[0]->filePath());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_non_constant_time_compare_regardless_of_operand_order(): void
     {
         $projectFile = ProjectFile::create(
@@ -76,6 +93,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame('hash_equals_missing', $markers[0]->pattern());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     #[DataProvider('nonConstantTimeCompareCases')]
     public function test_it_flags_non_constant_time_compare_on_canonical_variable_names(string $expression): void
     {
@@ -101,6 +122,10 @@ final class RegexStaticPreScannerTest extends TestCase
         yield 'not-identical with suffix on the right' => ['$a !== $expectedHmac'];
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_not_identical_signature_compare_in_webhook_consumer(): void
     {
         $projectFile = ProjectFile::create(
@@ -115,6 +140,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('no_hash_equals', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_raw_filter_in_template(): void
     {
         $projectFile = ProjectFile::create(
@@ -130,6 +159,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame(2, $markers[0]->line());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_groups_attribute_on_entity(): void
     {
         $projectFile = ProjectFile::create(
@@ -144,6 +177,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('serializer_groups_attribute', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_csrf_disabled_in_form(): void
     {
         $projectFile = ProjectFile::create(
@@ -158,6 +195,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('csrf_disabled', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_hardcoded_secret_in_yaml(): void
     {
         $projectFile = ProjectFile::create(
@@ -172,6 +213,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('hardcoded_secret', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_does_not_flag_env_reference_as_hardcoded_secret(): void
     {
         $projectFile = ProjectFile::create(
@@ -186,6 +231,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertNotContains('hardcoded_secret', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_credential_assignment_in_dotenv_file(): void
     {
         $projectFile = ProjectFile::create(
@@ -201,6 +250,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame(2, $markers[0]->line());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_does_not_flag_empty_or_boilerplate_dotenv_values(): void
     {
         $projectFile = ProjectFile::create(
@@ -212,6 +265,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame([], $this->regexStaticPreScanner->scan([$projectFile]));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_scrubbed_secret_placeholder_in_config_file(): void
     {
         $projectFile = ProjectFile::create(
@@ -226,6 +283,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('scrubbed_secret', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_disabled_pagination_on_api_resources(): void
     {
         $projectFile = ProjectFile::create(
@@ -240,6 +301,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('api_pagination_disabled', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_api_filters_for_review(): void
     {
         $projectFile = ProjectFile::create(
@@ -254,6 +319,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('api_filter_declared', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_writable_live_props(): void
     {
         $projectFile = ProjectFile::create(
@@ -268,6 +337,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('live_prop_writable', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_live_actions_for_authorization_review(): void
     {
         $projectFile = ProjectFile::create(
@@ -282,6 +355,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('live_action_endpoint', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_shell_or_file_sinks_in_twig_extensions(): void
     {
         $projectFile = ProjectFile::create(
@@ -296,6 +373,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('extension_shell_or_file_sink', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_bare_include_and_require_sinks_in_twig_extensions(): void
     {
         $projectFile = ProjectFile::create(
@@ -310,6 +391,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('extension_shell_or_file_sink', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_does_not_flag_include_once_as_a_function_call_requiring_parens(): void
     {
         $projectFile = ProjectFile::create(
@@ -324,6 +409,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('extension_shell_or_file_sink', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_is_safe_html_declarations_in_twig_extensions(): void
     {
         $projectFile = ProjectFile::create(
@@ -338,6 +427,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('extension_is_safe_html', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_voter_default_return_true(): void
     {
         $projectFile = ProjectFile::create(
@@ -352,6 +445,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('voter_default_true', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_dynamic_order_by_in_repository(): void
     {
         $projectFile = ProjectFile::create(
@@ -366,6 +463,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('dynamic_order_by', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_supports_returning_null_across_multiple_lines(): void
     {
         $projectFile = ProjectFile::create(
@@ -381,6 +482,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame(4, $markers[0]->line());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_http_client_request_split_across_lines(): void
     {
         $projectFile = ProjectFile::create(
@@ -396,6 +501,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame(4, $markers[0]->line());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_self_validating_passport_in_authenticator(): void
     {
         $projectFile = ProjectFile::create(
@@ -410,6 +519,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('self_validating_passport', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_php_serialize_in_messenger_config(): void
     {
         $projectFile = ProjectFile::create(
@@ -424,6 +537,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('php_serializer_transport', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_skips_buckets_without_patterns(): void
     {
         $projectFile = ProjectFile::create(
@@ -435,6 +552,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame([], $this->regexStaticPreScanner->scan([$projectFile]));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_emits_multiple_markers_when_multiple_patterns_match_same_file(): void
     {
         $projectFile = ProjectFile::create(
@@ -450,6 +571,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('shell_invocation', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_emits_one_marker_per_matching_line_for_the_same_pattern(): void
     {
         $projectFile = ProjectFile::create(
@@ -471,6 +596,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame([2, 3, 4], $unserializeLines);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_custom_patterns_are_merged_into_the_built_in_dictionary(): void
     {
         $regexStaticPreScanner = new RegexStaticPreScanner([
@@ -493,6 +622,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('audit_log_missing', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_custom_patterns_do_not_disable_the_built_in_dictionary(): void
     {
         $regexStaticPreScanner = new RegexStaticPreScanner([
@@ -513,6 +646,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('unserialize_call', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_custom_patterns_target_other_buckets(): void
     {
         $regexStaticPreScanner = new RegexStaticPreScanner([
@@ -532,6 +669,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertContains('forbidden_host', $patterns);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_does_not_mistake_a_pattern_ending_in_the_letter_s_for_a_dot_all_pattern(): void
     {
         $regexStaticPreScanner = new RegexStaticPreScanner([
@@ -555,6 +696,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame(2, $literalFoosMarkers[0]->line());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_a_non_slash_delimited_pattern_without_the_dot_all_modifier_is_matched_per_line(): void
     {
         $regexStaticPreScanner = new RegexStaticPreScanner([
@@ -574,6 +719,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame(3, $markers[0]->line());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_a_non_slash_delimited_pattern_with_the_dot_all_modifier_still_spans_lines(): void
     {
         $regexStaticPreScanner = new RegexStaticPreScanner([
@@ -593,6 +742,10 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertSame(2, $markers[0]->line());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     #[DataProvider('bracketDelimiterCases')]
     public function test_a_bracket_delimited_pattern_with_the_dot_all_modifier_spans_lines(string $regex): void
     {

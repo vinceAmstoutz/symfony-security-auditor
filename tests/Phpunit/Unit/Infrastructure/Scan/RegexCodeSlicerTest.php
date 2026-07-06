@@ -15,11 +15,15 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 
 final class RegexCodeSlicerTest extends TestCase
 {
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_files_shorter_than_threshold_are_returned_unchanged(): void
     {
         $content = "<?php\nclass Tiny { public function foo() { return 1; } }";
@@ -28,6 +32,9 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertSame($content, (new RegexCodeSlicer(80))->slice($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_non_php_files_are_returned_unchanged(): void
     {
         $content = str_repeat("{{ value }}\n", 100);
@@ -36,6 +43,9 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertSame($content, (new RegexCodeSlicer(10))->slice($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_file_at_exactly_the_threshold_is_sliced(): void
     {
         // Pins GreaterThanOrEqualTo (>=) against GreaterThan (>): a file whose line
@@ -50,6 +60,9 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertStringContainsString('// elided', $sliced);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_file_one_line_below_threshold_is_not_sliced(): void
     {
         $lines = array_fill(0, 8, '        $inert = 1;');
@@ -60,6 +73,9 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertSame($content, (new RegexCodeSlicer(10))->slice($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_slicing_preserves_total_line_count(): void
     {
         $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeController());
@@ -72,6 +88,9 @@ final class RegexCodeSlicerTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_lines_with_security_tokens_are_retained(): void
     {
         $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeController());
@@ -82,6 +101,9 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertStringContainsString('unserialize($payload)', $sliced);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_inert_body_lines_are_elided(): void
     {
         $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeController());
@@ -92,6 +114,9 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertStringContainsString('// elided', $sliced);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     #[DataProvider('structuralLineCases')]
     public function test_structural_lines_are_retained(string $structuralLine): void
     {
@@ -121,6 +146,9 @@ final class RegexCodeSlicerTest extends TestCase
         yield 'private member' => ['private int $count = 0;'];
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_indented_structural_line_is_retained(): void
     {
         // Pins the ltrim() call: the method signature is indented, so detection
@@ -133,6 +161,9 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertStringContainsString('public function deeplyIndented(): void', $sliced);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_inert_line_resembling_keyword_mid_line_is_elided(): void
     {
         // A comment mentioning "namespace"/"class" mid-line must NOT be treated as
@@ -145,6 +176,9 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertStringNotContainsString('the class and namespace are fine', $sliced);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_bare_include_and_require_statements_are_retained(): void
     {
         $projectFile = ProjectFile::create('src/Controller/PageController.php', '/app/src/Controller/PageController.php', $this->largeControllerWithBareIncludes());
@@ -155,10 +189,13 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertStringContainsString('require_once $bootstrap;', $sliced);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     #[DataProvider('parenthesizedInclusionCases')]
     public function test_parenthesized_inclusion_calls_are_retained(string $inclusionLine): void
     {
-        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)."        {$inclusionLine}\n".str_repeat("        \$x = 1;\n", 20);
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20).\sprintf('        %s%s', $inclusionLine, \PHP_EOL).str_repeat("        \$x = 1;\n", 20);
         $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
 
         $sliced = (new RegexCodeSlicer(10))->slice($projectFile);

@@ -116,6 +116,9 @@ final class RetryPolicyTest extends TestCase
         self::assertSame(0, $retryPolicy->delayMs(3));
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     public function test_invalid_attempt_is_rejected(): void
     {
         $retryPolicy = new RetryPolicy();
@@ -126,6 +129,9 @@ final class RetryPolicyTest extends TestCase
         $retryPolicy->delayMs(0);
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     public function test_invalid_attempt_is_rejected_for_rate_limit_delay(): void
     {
         $retryPolicy = new RetryPolicy();
@@ -245,6 +251,9 @@ final class RetryPolicyTest extends TestCase
         self::assertSame(100, $retryPolicy->delayMs(5));
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     public function test_constructor_defaults_match_documented_values(): void
     {
         $retryPolicy = new RetryPolicy(jitterSource: static fn (): float => 0.5);
@@ -287,6 +296,9 @@ final class RetryPolicyTest extends TestCase
         self::assertSame(60_000, $retryPolicy->rateLimitDelayMs(1));
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     public function test_rate_limit_delay_default_is_at_least_sixty_seconds(): void
     {
         $retryPolicy = new RetryPolicy(jitterSource: static fn (): float => 0.0);
@@ -319,12 +331,12 @@ final class RetryPolicyTest extends TestCase
      */
     public function test_regular_delay_jitter_remains_symmetric_around_the_base(): void
     {
-        $retryPolicyLow = new RetryPolicy(
+        $retryPolicy = new RetryPolicy(
             new BackoffSchedule(initialDelayMs: 60_000, jitterRatio: 0.2),
             jitterSource: static fn (): float => 0.0,
         );
 
-        self::assertSame(48_000, $retryPolicyLow->delayMs(1));
+        self::assertSame(48_000, $retryPolicy->delayMs(1));
     }
 
     /**

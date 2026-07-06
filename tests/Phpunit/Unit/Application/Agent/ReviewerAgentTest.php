@@ -22,7 +22,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -56,6 +60,7 @@ final class ReviewerAgentTest extends TestCase
     /**
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_returns_empty_array_when_no_vulnerabilities(): void
     {
@@ -73,6 +78,9 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_marks_vulnerability_as_validated_when_accepted(): void
     {
@@ -105,6 +113,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_marks_vulnerability_as_not_validated_when_rejected(): void
     {
@@ -136,6 +146,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_adjusts_severity_when_reviewer_upgrades(): void
     {
@@ -167,6 +179,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_handles_invalid_adjusted_severity_gracefully(): void
     {
@@ -199,6 +213,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_handles_parse_error_by_rejecting(): void
     {
@@ -222,6 +238,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_handles_llm_exception_by_rejecting(): void
     {
@@ -245,6 +262,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_handles_empty_llm_response_by_rejecting(): void
     {
@@ -268,6 +287,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_returns_all_reviewed_vulnerabilities_including_rejected(): void
     {
@@ -296,6 +317,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_handles_nested_array_review_response_format(): void
     {
@@ -327,6 +350,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_uses_empty_context_when_file_not_found_in_project_files(): void
     {
@@ -359,6 +384,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_finds_file_context_for_vulnerability(): void
     {
@@ -394,6 +421,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_logs_info_when_starting_review(): void
     {
@@ -429,6 +458,7 @@ final class ReviewerAgentTest extends TestCase
     /**
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_does_not_log_info_when_no_vulnerabilities(): void
     {
@@ -457,6 +487,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_logs_error_with_specific_message_on_json_parse_failure(): void
     {
@@ -496,6 +528,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_truncates_long_content_in_single_mode_parse_failure_log(): void
     {
@@ -546,6 +580,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_truncates_long_content_in_batch_mode_parse_failure_log(): void
     {
@@ -602,6 +638,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_logs_error_with_specific_message_on_llm_throwable(): void
     {
@@ -640,6 +677,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_logs_info_start_and_complete_with_exact_context(): void
     {
@@ -679,6 +718,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_rejected_count_is_reviewed_minus_accepted(): void
     {
@@ -717,6 +758,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_logs_debug_review_decision_with_exact_context(): void
     {
@@ -761,6 +804,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_does_not_log_error_for_empty_llm_response(): void
     {
@@ -795,6 +840,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_logs_debug_invalid_severity_with_exact_context(): void
     {
@@ -836,6 +883,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_rejects_vulnerability_when_accepted_key_is_missing(): void
     {
@@ -860,6 +909,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_logs_debug_review_decision_when_finding_is_rejected(): void
     {
@@ -908,6 +959,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_logs_debug_review_decision_when_severity_is_elevated(): void
     {
@@ -962,6 +1015,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_includes_actual_file_content_in_llm_message(): void
     {
@@ -1001,6 +1056,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_reports_every_finding_as_reviewed_including_unmatched_ones(): void
     {
@@ -1046,6 +1103,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_a_failed_batch_llm_call_still_reports_each_finding_as_reviewed(): void
     {
@@ -1084,6 +1142,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_sends_single_llm_call_for_multiple_vulnerabilities(): void
     {
@@ -1127,6 +1187,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_chunks_when_vulnerabilities_exceed_batch_size(): void
     {
@@ -1167,6 +1228,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_rejects_vulnerabilities_missing_from_response(): void
     {
@@ -1204,6 +1267,9 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_records_coverage_per_finding(): void
     {
@@ -1249,6 +1315,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_marks_all_batch_vulnerabilities_errored_on_llm_exception(): void
     {
@@ -1291,6 +1359,9 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_marks_all_batch_vulnerabilities_errored_on_json_parse_failure(): void
     {
@@ -1331,6 +1402,9 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_rejects_all_when_response_is_empty(): void
     {
@@ -1373,6 +1447,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_preserves_results_from_first_batch_when_second_batch_is_processed(): void
     {
@@ -1417,6 +1493,9 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_records_coverage_rejected_for_vulnerabilities_missing_from_response(): void
     {
@@ -1461,6 +1540,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_continues_processing_after_missing_response_entry(): void
     {
@@ -1500,6 +1581,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_skips_non_array_entries_in_response(): void
     {
@@ -1542,6 +1625,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_logs_error_with_batch_size_and_error_context_on_json_exception(): void
     {
@@ -1594,6 +1679,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_logs_error_with_batch_size_and_error_context_on_llm_exception(): void
     {
@@ -1645,6 +1731,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_mode_applies_adjusted_severity_when_reviewer_elevates(): void
     {
@@ -1680,6 +1768,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_corrects_type_when_reviewer_reclassifies_accepted_finding(): void
     {
@@ -1714,6 +1804,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_keeps_original_type_when_corrected_type_is_invalid_string(): void
     {
@@ -1743,6 +1835,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_ignores_corrected_type_when_finding_is_rejected(): void
     {
@@ -1771,6 +1865,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_logs_debug_invalid_corrected_type_with_exact_context(): void
     {
@@ -1814,6 +1910,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_ignores_corrected_type_when_value_is_not_a_string(): void
     {
@@ -1838,6 +1936,9 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_records_coverage_validated_when_reviewer_accepts_finding(): void
     {
@@ -1864,6 +1965,9 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_records_coverage_rejected_when_reviewer_rejects_finding(): void
     {
@@ -1890,6 +1994,9 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_records_coverage_rejected_when_reviewer_returns_empty_response(): void
     {
@@ -1916,6 +2023,9 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_records_coverage_errored_on_reviewer_json_parse_failure(): void
     {
@@ -1942,6 +2052,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_records_coverage_errored_on_reviewer_llm_exception(): void
     {
@@ -1968,6 +2080,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_single_review_propagates_llm_provider_exception_instead_of_swallowing_it(): void
     {
@@ -1989,6 +2103,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_single_review_propagates_budget_exceeded_exception_instead_of_swallowing_it(): void
     {
@@ -2009,6 +2125,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_review_propagates_llm_provider_exception_instead_of_swallowing_it(): void
     {
@@ -2039,6 +2157,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_review_propagates_budget_exceeded_exception_instead_of_swallowing_it(): void
     {
@@ -2081,6 +2201,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_reviews_singles_concurrently_when_batch_capable_and_concurrency_configured(): void
     {
@@ -2091,6 +2212,9 @@ final class ReviewerAgentTest extends TestCase
 
             public int $completeCalls = 0;
 
+            /**
+             * @throws InvalidTokenUsageException
+             */
             #[Override]
             public function complete(string $systemPrompt, string $userMessage): LLMResponse
             {
@@ -2099,6 +2223,9 @@ final class ReviewerAgentTest extends TestCase
                 return LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(0, 0));
             }
 
+            /**
+             * @throws InvalidTokenUsageException
+             */
             #[Override]
             public function completeWithTools(string $systemPrompt, string $userMessage, ToolRegistry $toolRegistry, int $maxToolIterations): LLMResponse
             {
@@ -2111,6 +2238,9 @@ final class ReviewerAgentTest extends TestCase
                 return 'm';
             }
 
+            /**
+             * @throws InvalidTokenUsageException
+             */
             #[Override]
             public function completeBatch(array $requests, int $maxConcurrent): array
             {
@@ -2148,6 +2278,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_concurrent_review_skips_the_batch_call_when_every_finding_is_a_cache_hit(): void
     {
@@ -2184,6 +2315,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_batch_json_mode_invokes_the_tool_aware_completion_when_tools_are_enabled(): void
     {
@@ -2224,6 +2357,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_stays_sequential_when_max_concurrent_is_one_even_if_batch_capable(): void
     {
@@ -2234,6 +2368,9 @@ final class ReviewerAgentTest extends TestCase
 
             public int $completeCalls = 0;
 
+            /**
+             * @throws InvalidTokenUsageException
+             */
             #[Override]
             public function complete(string $systemPrompt, string $userMessage): LLMResponse
             {
@@ -2242,6 +2379,9 @@ final class ReviewerAgentTest extends TestCase
                 return LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(0, 0));
             }
 
+            /**
+             * @throws InvalidTokenUsageException
+             */
             #[Override]
             public function completeWithTools(string $systemPrompt, string $userMessage, ToolRegistry $toolRegistry, int $maxToolIterations): LLMResponse
             {
@@ -2285,6 +2425,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_uses_tool_registry_when_tools_enabled_and_factory_provided(): void
     {
@@ -2320,6 +2462,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_falls_back_to_complete_when_tools_disabled(): void
     {
@@ -2355,6 +2499,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_tools_enabled_logs_when_factory_provided(): void
     {
@@ -2409,6 +2555,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_validates_a_finding_via_a_record_review_tool_call(): void
     {
@@ -2455,6 +2602,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_rejects_a_finding_when_no_verdict_is_recorded(): void
     {
@@ -2486,6 +2635,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_rejects_a_finding_when_the_llm_call_fails(): void
     {
@@ -2517,6 +2667,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_batch_rekeys_verdicts_by_id(): void
     {
@@ -2559,6 +2710,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_concurrency_falls_back_to_json_when_the_client_cannot_batch_tools(): void
     {
@@ -2595,6 +2748,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_tools_opt_in_takes_precedence_over_structured_collection(): void
     {
@@ -2638,6 +2792,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_is_the_default_when_a_record_review_factory_is_wired(): void
     {
@@ -2676,6 +2831,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_flag_without_factory_falls_back_to_json_path(): void
     {
@@ -2710,6 +2867,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_single_path_returns_a_verdict_for_every_finding(): void
     {
@@ -2750,6 +2908,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_records_errored_coverage_and_returns_rejected_on_throwable(): void
     {
@@ -2786,6 +2946,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_propagates_llm_provider_exception(): void
     {
@@ -2814,6 +2975,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_propagates_budget_exceeded_exception(): void
     {
@@ -2842,6 +3004,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_batch_marks_errored_on_throwable(): void
     {
@@ -2881,6 +3045,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_batch_propagates_llm_provider_exception(): void
     {
@@ -2910,6 +3075,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_batch_propagates_budget_exceeded_exception(): void
     {
@@ -2939,6 +3105,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_cache_hit_short_circuits_the_llm_call_and_applies_the_stored_verdict(): void
     {
@@ -2972,6 +3139,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_cache_hit_logs_debug_message_with_the_vulnerability_id(): void
     {
@@ -3015,6 +3183,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_cache_miss_calls_the_llm_and_stores_the_parsed_verdict(): void
     {
@@ -3051,6 +3221,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_bypass_cache_skips_both_get_and_store(): void
     {
@@ -3085,6 +3257,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_cache_miss_does_not_store_when_the_response_is_empty(): void
     {
@@ -3117,6 +3291,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_cache_miss_does_not_log_a_cache_hit(): void
     {
@@ -3158,6 +3334,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_opt_out_uses_the_json_path(): void
     {
@@ -3193,6 +3371,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_cache_hit_short_circuits_the_llm_call(): void
     {
@@ -3229,6 +3408,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_cache_miss_stores_the_recorded_verdict(): void
     {
@@ -3272,6 +3452,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_bypass_cache_skips_both_get_and_store(): void
     {
@@ -3313,6 +3494,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_collection_does_not_store_when_no_verdict_is_recorded(): void
     {
@@ -3350,6 +3533,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_reviews_run_concurrently_when_the_client_can_batch_tools(): void
     {
@@ -3398,6 +3582,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_concurrent_structured_path_logs_structured_collection_enabled(): void
     {
@@ -3445,6 +3630,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_concurrent_reviews_serve_cached_verdicts_and_dispatch_only_misses(): void
     {
@@ -3505,6 +3691,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_concurrent_bypass_cache_skips_both_get_and_store(): void
     {
@@ -3548,6 +3735,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_concurrent_reviews_mark_pending_findings_errored_on_throwable(): void
     {
@@ -3584,6 +3772,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_concurrent_reviews_propagate_llm_provider_exceptions(): void
     {
@@ -3615,6 +3804,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_concurrent_reviews_propagate_budget_exceeded(): void
     {
@@ -3646,6 +3836,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_concurrent_json_reviews_serve_cached_verdicts_and_dispatch_only_misses(): void
     {
@@ -3704,6 +3895,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_concurrent_json_reviews_bypass_cache_skips_both_get_and_store(): void
     {
@@ -3740,6 +3933,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_batched_reviews_serve_cached_verdicts_and_batch_only_misses(): void
     {
@@ -3803,6 +3997,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_batched_review_cache_miss_stores_the_matched_verdict(): void
     {
@@ -3841,6 +4037,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_batched_review_bypass_cache_skips_both_get_and_store(): void
     {
@@ -3877,6 +4075,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_batched_review_cache_miss_does_not_store_an_unmatched_finding(): void
     {
@@ -3921,6 +4121,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_reviews_stay_sequential_when_concurrency_is_not_requested(): void
     {
@@ -3959,6 +4160,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_batches_ignore_the_concurrency_opt_in(): void
     {
@@ -4004,6 +4206,8 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
      */
     public function test_structured_opt_out_keeps_the_json_path_even_on_a_tool_batch_capable_client(): void
     {
@@ -4074,6 +4278,9 @@ final class ReviewerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     private function makeFile(string $path): ProjectFile
     {
         return ProjectFile::create($path, '/app/'.$path, '<?php class UserController {}');

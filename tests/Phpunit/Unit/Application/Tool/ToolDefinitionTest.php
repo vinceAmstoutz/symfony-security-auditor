@@ -19,6 +19,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 
 final class ToolDefinitionTest extends TestCase
 {
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_it_exposes_name_description_and_schema(): void
     {
         $toolDefinition = new ToolDefinition('read_file', 'Reads a file', ['type' => 'object']);
@@ -28,24 +31,36 @@ final class ToolDefinitionTest extends TestCase
         self::assertSame(['type' => 'object'], $toolDefinition->parametersSchema);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_it_rejects_empty_name(): void
     {
         $this->expectException(InvalidToolDefinitionException::class);
         new ToolDefinition('', 'desc', []);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_it_rejects_whitespace_only_name(): void
     {
         $this->expectException(InvalidToolDefinitionException::class);
         new ToolDefinition('  ', 'desc', []);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_it_rejects_empty_description(): void
     {
         $this->expectException(InvalidToolDefinitionException::class);
         new ToolDefinition('read_file', '', []);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_it_rejects_whitespace_only_description(): void
     {
         $this->expectException(InvalidToolDefinitionException::class);

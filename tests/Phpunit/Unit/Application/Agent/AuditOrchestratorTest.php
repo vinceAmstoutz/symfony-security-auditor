@@ -30,7 +30,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -64,6 +67,9 @@ final class AuditOrchestratorTest extends TestCase
 {
     private string $tmpDir;
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_skips_audit_when_no_mapping(): void
     {
         $attackerLlm = $this->createMock(LLMClientInterface::class);
@@ -79,6 +85,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertEmpty($auditContext->vulnerabilities());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_runs_attacker_and_reviewer_loop(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -98,6 +109,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertCount(1, $auditContext->validatedVulnerabilities());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_stops_when_attacker_finds_nothing(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -114,6 +130,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame(1, $auditContext->getMeta('audit.iterations'));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_deduplicates_vulnerabilities_across_iterations(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -131,6 +152,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertCount(1, $auditContext->vulnerabilities());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_breaks_early_when_iteration_yields_no_new_unique_findings(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -148,6 +174,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame(2, $auditContext->getMeta('audit.iterations'));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_filters_low_confidence_findings(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -165,6 +196,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertEmpty($auditContext->vulnerabilities());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_findings_dropped_below_the_confidence_floor(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -180,11 +216,20 @@ final class AuditOrchestratorTest extends TestCase
 
         $auditOrchestrator->orchestrate($auditContext);
 
-        $logs = $bufferingLogger->cleanLogs();
-        $messages = array_map(static fn (array $log): string => $log[1], $logs);
+        $messages = [];
+        foreach ($bufferingLogger->cleanLogs() as $log) {
+            self::assertIsArray($log);
+            $messages[] = $log[1];
+        }
+
         self::assertContains('Dropping finding below the confidence floor', $messages);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_baseline_accepted_findings_before_the_reviewer(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -203,6 +248,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame(1, $auditContext->getMeta('audit.baseline_skipped'));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_non_baselined_findings_still_reach_the_reviewer_when_others_are_skipped(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -226,6 +276,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame(1, $auditContext->getMeta('audit.baseline_skipped'));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_emits_a_progress_event_per_baseline_skipped_finding(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -251,6 +306,11 @@ final class AuditOrchestratorTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_baseline_skip_meta_is_zero_when_no_fingerprints_are_accepted(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -265,6 +325,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame(0, $auditContext->getMeta('audit.baseline_skipped'));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_stops_after_one_iteration_when_every_finding_is_baseline_accepted(): void
     {
         $infoLogs = [];
@@ -290,6 +355,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertContains(['Every remaining finding is baseline-accepted, stopping', []], $infoLogs);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_a_baselined_finding_that_follows_a_non_baselined_one(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -313,6 +383,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame('Fresh', array_values($auditContext->vulnerabilities())[0]->title());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_forwards_every_non_baselined_finding_when_a_baseline_is_active(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -334,6 +409,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertCount(2, $auditContext->vulnerabilities());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_the_skipped_finding_with_its_fingerprint_type_and_file(): void
     {
         $infoLogs = [];
@@ -363,6 +443,11 @@ final class AuditOrchestratorTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_stores_audit_metadata_in_context(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -380,6 +465,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertNotNull($auditContext->getMeta('audit.risk_score'));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_runs_exactly_max_iterations_when_new_findings_each_time(): void
     {
         $iterationCount = 0;
@@ -411,6 +501,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame(3, $iterationCount);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_accepts_vulnerability_at_exact_confidence_threshold(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -429,6 +524,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertCount(1, $auditContext->vulnerabilities());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_rejects_vulnerability_just_below_confidence_threshold(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -446,6 +546,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertEmpty($auditContext->vulnerabilities());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_deduplicates_by_overlapping_line_ranges(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -464,6 +569,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertCount(1, $auditContext->vulnerabilities());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_stores_exact_metadata_values_after_orchestration(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -485,6 +595,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame(7, $auditContext->getMeta('audit.risk_score'));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_continues_processing_remaining_reviewed_findings_after_duplicate(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -508,6 +623,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertCount(2, $auditContext->vulnerabilities());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_lines_overlap_detects_touching_ranges(): void
     {
         // linesOverlap: $start1 <= $end2 && $start2 <= $end1
@@ -531,6 +651,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertCount(1, $auditContext->vulnerabilities());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_lines_overlap_does_not_deduplicate_non_overlapping_ranges(): void
     {
         // linesOverlap with &&→|| mutation: would treat ALL pairs as overlapping.
@@ -553,6 +678,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertCount(2, $auditContext->vulnerabilities());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_iteration_complete_with_exact_new_unique_count(): void
     {
         $infoLogs = [];
@@ -587,6 +717,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame(1, $iterationCompleteLogs[0][1]['attacker_found']);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_audit_iteration_with_running_index(): void
     {
         $infoLogs = [];
@@ -614,6 +749,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame('Audit iteration 1/3', $iterationLogs[0][0]);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_attacker_found_no_findings_when_filter_drops_all(): void
     {
         $infoLogs = [];
@@ -641,6 +781,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertCount(1, $stoppedLogs);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_only_validated_findings_in_reviewer_accepted_count(): void
     {
         $infoLogs = [];
@@ -680,6 +825,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame(1, $iterationCompleteLogs[0][1]['reviewer_accepted']);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_starting_attacker_vs_reviewer_loop_with_max_iterations(): void
     {
         $infoLogs = [];
@@ -708,6 +858,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame(['max_iterations' => 3], $startingLogs[0][1]);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_lines_overlap_detects_touching_ranges_on_left_boundary(): void
     {
         // Covers $start1 <= $end2 boundary (mutant: <= → <).
@@ -729,6 +884,9 @@ final class AuditOrchestratorTest extends TestCase
         self::assertCount(1, $auditContext->vulnerabilities());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_logs_warning_when_no_mapping_available(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -745,6 +903,11 @@ final class AuditOrchestratorTest extends TestCase
         $auditOrchestrator->orchestrate($auditContext);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_respects_custom_max_iterations(): void
     {
         $iterationCount = 0;
@@ -779,6 +942,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame(5, $auditContext->getMeta('audit.iterations'));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_respects_custom_min_confidence(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -800,6 +968,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertEmpty($auditContext->vulnerabilities());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_accepts_vulnerability_at_exact_custom_confidence_threshold(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -825,6 +998,9 @@ final class AuditOrchestratorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
      */
     public function test_it_passes_previously_validated_findings_to_next_iteration(): void
     {
@@ -857,6 +1033,8 @@ final class AuditOrchestratorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
      */
     public function test_it_passes_only_reviewer_rejected_findings_to_next_iteration(): void
     {
@@ -897,6 +1075,11 @@ final class AuditOrchestratorTest extends TestCase
         self::assertSame('src/Rejected.php', $recordingAttackerAgent->lastRejectedFindings[0]->filePath());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_starting_loop_with_custom_max_iterations(): void
     {
         $infoLogs = [];
@@ -941,6 +1124,11 @@ final class AuditOrchestratorTest extends TestCase
         rmdir($this->tmpDir);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_reports_each_iteration_start_with_iteration_counts(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -967,6 +1155,11 @@ final class AuditOrchestratorTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_reports_review_start_with_finding_count(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -992,6 +1185,11 @@ final class AuditOrchestratorTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_reports_audit_started_with_file_and_mapping_counts(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -1034,6 +1232,11 @@ final class AuditOrchestratorTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_reports_review_completed_with_accepted_and_rejected_counts(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -1109,7 +1312,11 @@ final class AuditOrchestratorTest extends TestCase
         );
     }
 
-    /** @param list<string> $acceptedFingerprints */
+    /** @param list<string> $acceptedFingerprints
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     private function makeContextWithMapping(array $acceptedFingerprints = []): AuditContext
     {
         $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: $acceptedFingerprints);
@@ -1147,22 +1354,34 @@ final class AuditOrchestratorTest extends TestCase
         ];
     }
 
-    /** @param list<array<string, mixed>> $vulns */
+    /** @param list<array<string, mixed>> $vulns
+     *
+     * @throws InvalidTokenUsageException
+     */
     private function attackerResponse(array $vulns): LLMResponse
     {
         return LLMResponse::of((string) json_encode($vulns), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     private function emptyResponse(): LLMResponse
     {
         return LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     private function reviewerAcceptResponse(): LLMResponse
     {
         return LLMResponse::of((string) json_encode(['accepted' => true]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     private function reviewerRejectResponse(): LLMResponse
     {
         return LLMResponse::of((string) json_encode(['accepted' => false]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));

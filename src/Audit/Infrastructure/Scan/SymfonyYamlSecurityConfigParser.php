@@ -85,23 +85,35 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
         }
 
         foreach ($entries as $entry) {
-            $entryMap = $this->mapOf($entry);
-            $target = $this->targetOf($entryMap);
-            if (null === $target || !$this->hasAnyRequirementKey($entryMap)) {
-                continue;
-            }
-
-            $requirements = $this->requirementsOf($entryMap);
-
-            if (\array_key_exists($target, $routeAccessMap)) {
-                $orRequirements = [] === $requirements ? [self::PUBLIC_ACCESS_MARKER] : $requirements;
-                $routeAccessMap[$target][] = \sprintf('or: %s', implode(', ', $orRequirements));
-
-                continue;
-            }
-
-            $routeAccessMap[$target] = [] === $requirements ? [self::PUBLIC_ACCESS_MARKER] : $requirements;
+            $routeAccessMap = $this->recordAccessControlEntry($this->mapOf($entry), $routeAccessMap);
         }
+
+        return $routeAccessMap;
+    }
+
+    /**
+     * @param array<string, mixed>        $entry
+     * @param array<string, list<string>> $routeAccessMap
+     *
+     * @return array<string, list<string>>
+     */
+    private function recordAccessControlEntry(array $entry, array $routeAccessMap): array
+    {
+        $target = $this->targetOf($entry);
+        if (null === $target || !$this->hasAnyRequirementKey($entry)) {
+            return $routeAccessMap;
+        }
+
+        $requirements = $this->requirementsOf($entry);
+
+        if (\array_key_exists($target, $routeAccessMap)) {
+            $orRequirements = [] === $requirements ? [self::PUBLIC_ACCESS_MARKER] : $requirements;
+            $routeAccessMap[$target][] = \sprintf('or: %s', implode(', ', $orRequirements));
+
+            return $routeAccessMap;
+        }
+
+        $routeAccessMap[$target] = [] === $requirements ? [self::PUBLIC_ACCESS_MARKER] : $requirements;
 
         return $routeAccessMap;
     }

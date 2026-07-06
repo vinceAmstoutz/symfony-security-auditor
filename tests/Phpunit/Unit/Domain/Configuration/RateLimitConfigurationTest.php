@@ -19,6 +19,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimit
 
 final class RateLimitConfigurationTest extends TestCase
 {
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_all_null_means_disabled(): void
     {
         $rateLimitConfiguration = new RateLimitConfiguration(null, null, null);
@@ -26,6 +29,9 @@ final class RateLimitConfigurationTest extends TestCase
         self::assertFalse($rateLimitConfiguration->isEnabled());
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_any_dimension_set_means_enabled(): void
     {
         self::assertTrue((new RateLimitConfiguration(1, null, null))->isEnabled());
@@ -33,6 +39,9 @@ final class RateLimitConfigurationTest extends TestCase
         self::assertTrue((new RateLimitConfiguration(null, null, 1))->isEnabled());
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_zero_requests_per_minute_rejected(): void
     {
         $this->expectException(InvalidRateLimitConfigurationException::class);
@@ -41,6 +50,9 @@ final class RateLimitConfigurationTest extends TestCase
         new RateLimitConfiguration(0, null, null);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_zero_input_tokens_per_minute_rejected(): void
     {
         $this->expectException(InvalidRateLimitConfigurationException::class);
@@ -49,6 +61,9 @@ final class RateLimitConfigurationTest extends TestCase
         new RateLimitConfiguration(null, 0, null);
     }
 
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_zero_output_tokens_per_minute_rejected(): void
     {
         $this->expectException(InvalidRateLimitConfigurationException::class);

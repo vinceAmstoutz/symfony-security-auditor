@@ -18,6 +18,7 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -59,6 +60,7 @@ final readonly class BatchReviewAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function analyze(array $vulnerabilities, array $projectFiles, ReviewBatchSettings $reviewBatchSettings): array
     {
@@ -112,6 +114,7 @@ final readonly class BatchReviewAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     private function reviewMissesInBatches(array $reviewed, array $misses, array $missIndexes, ReviewBatchSettings $reviewBatchSettings, ReviewCacheBuckets $reviewCacheBuckets): array
     {
@@ -197,6 +200,7 @@ final readonly class BatchReviewAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     private function reviewBatchViaStructuredCollection(array $batch, array $codeContexts, array $cacheContexts, CoverageRecorderInterface $coverageRecorder): array
     {

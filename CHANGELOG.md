@@ -401,6 +401,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   instead of the generic SPL type. Every new class still extends its previous
   SPL base, so existing `catch (\InvalidArgumentException)` /
   `catch (\RuntimeException)` call sites keep working unchanged.
+- **Every method and test that can reach one of those eleven new exception
+  classes now declares it via `@throws`.** `phpstan.dist.neon` has long enabled
+  `missingCheckedExceptionInThrows` for the
+  `VinceAmstoutz\SymfonySecurityAuditor\.+\Exception` namespace pattern, but
+  before the exception refactor above, the affected call sites threw bare SPL
+  exceptions that never matched it. Moving them to the new named classes brought
+  the whole call graph — including 86 test files exercising the affected
+  factories as fixtures — under that rule for the first time, and PHPStan's
+  checked-exception check propagates transitively through every caller up to the
+  top of each call chain. `@throws` PHPDoc tags are added at every newly-flagged
+  method (no behavior changes); `phpstan analyse` is clean again.
 - **`ProjectFile` type detection is now a single source of truth, so its
   `fileType()` and its `is*()` predicates can no longer disagree.**
   `ProjectFile::detectType()` and its private `is*Path()`/`looksLike*()`

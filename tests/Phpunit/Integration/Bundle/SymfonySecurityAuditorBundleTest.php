@@ -654,8 +654,10 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         ])->getParameter('symfony_security_auditor.cache.reviewer_key_salt');
 
         self::assertNotSame($structuredSalt, $jsonSalt);
-        self::assertStringEndsWith('|collect-tool', (string) $structuredSalt);
-        self::assertStringEndsWith('|collect-json', (string) $jsonSalt);
+        self::assertIsString($structuredSalt);
+        self::assertIsString($jsonSalt);
+        self::assertStringEndsWith('|collect-tool', $structuredSalt);
+        self::assertStringEndsWith('|collect-json', $jsonSalt);
     }
 
     public function test_bundle_propagates_secret_scrubbing_config_to_parameters(): void

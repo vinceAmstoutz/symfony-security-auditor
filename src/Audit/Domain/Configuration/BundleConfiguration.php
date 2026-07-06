@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
 /**
@@ -53,6 +54,8 @@ final readonly class BundleConfiguration
 
     /**
      * @param BundleConfigArray $config
+     *
+     * @throws InvalidRateLimitConfigurationException
      */
     public static function fromArray(array $config): self
     {

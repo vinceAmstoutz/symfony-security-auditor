@@ -17,6 +17,7 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -50,6 +51,7 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_generate_writes_the_report_fingerprints_and_returns_their_count(): void
     {
@@ -80,6 +82,7 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_generate_records_the_attacker_fingerprint_when_the_reviewer_corrected_the_type(): void
     {
@@ -108,6 +111,7 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_generate_writes_one_entry_per_unique_fingerprint(): void
     {
@@ -161,6 +165,7 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_apply_returns_the_report_unchanged_when_no_baseline_path_is_set(): void
     {
@@ -179,6 +184,7 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_apply_suppresses_matching_findings_and_reports_the_suppressed_count(): void
     {
@@ -199,6 +205,7 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_apply_exposes_the_matched_fingerprints_on_the_result(): void
     {
@@ -216,6 +223,7 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_apply_prefers_the_cli_baseline_over_the_configured_path(): void
     {
@@ -235,6 +243,7 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
      */
     public function test_apply_falls_back_to_the_configured_path_when_no_cli_override(): void
     {
@@ -251,6 +260,9 @@ final class BaselineProcessorTest extends TestCase
         self::assertSame(1, $baselineResult->report->totalVulnerabilities());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     private function makeReport(Vulnerability ...$vulnerabilities): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);

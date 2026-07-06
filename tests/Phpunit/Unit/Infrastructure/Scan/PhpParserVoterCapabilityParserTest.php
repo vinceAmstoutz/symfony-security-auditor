@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use Override;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVoterCapabilityParser;
 
@@ -28,6 +29,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         $this->phpParserVoterCapabilityParser = new PhpParserVoterCapabilityParser();
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_null_for_non_voter_file(): void
     {
         $projectFile = ProjectFile::create('src/Service/Mailer.php', '/app/x', '<?php class Mailer {}');
@@ -35,6 +39,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_null_for_non_voter_file_even_when_it_defines_a_supports_method(): void
     {
         $source = <<<'PHP'
@@ -51,6 +58,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_null_for_unparseable_voter(): void
     {
         $projectFile = ProjectFile::create('src/Security/BrokenVoter.php', '/app/x', '<?php class BrokenVoter { public function');
@@ -58,6 +68,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_null_when_voter_file_declares_no_class(): void
     {
         $projectFile = ProjectFile::create('src/Security/HelperVoter.php', '/app/x', '<?php function supports(): bool { return true; }');
@@ -65,6 +78,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_null_when_voter_has_no_supports_method(): void
     {
         $projectFile = ProjectFile::create('src/Security/BareVoter.php', '/app/x', '<?php class BareVoter { public function hello(): void {} }');
@@ -72,6 +88,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_null_when_supports_is_abstract_without_a_body(): void
     {
         $source = <<<'PHP'
@@ -86,6 +105,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertNull($this->phpParserVoterCapabilityParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_empty_string_literals_in_supports_body(): void
     {
         $source = <<<'PHP'
@@ -105,6 +127,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertSame(['EDIT'], $voterCapability->supportedAttributes());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_instanceof_against_a_dynamic_class_expression(): void
     {
         $source = <<<'PHP'
@@ -126,6 +151,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertSame(['App\\Entity\\Post'], $voterCapability->supportedSubjects());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_empty_class_name_for_an_anonymous_voter_class(): void
     {
         $source = <<<'PHP'
@@ -146,6 +174,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertSame(['VIEW'], $voterCapability->supportedAttributes());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_attributes_from_in_array_call(): void
     {
         $source = <<<'PHP'
@@ -167,6 +198,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertSame(['App\\Entity\\User'], $voterCapability->supportedSubjects());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_attributes_from_match_arms(): void
     {
         $source = <<<'PHP'
@@ -191,6 +225,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertSame(['App\\Entity\\Comment'], $voterCapability->supportedSubjects());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_collects_multiple_subject_types_from_supports_body(): void
     {
         $source = <<<'PHP'
@@ -212,6 +249,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertSame(['App\\Entity\\User', 'App\\Entity\\Comment'], $voterCapability->supportedSubjects());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_deduplicates_repeated_subject_type_in_supports_body_and_continues_to_collect_later_unique_types(): void
     {
         $source = <<<'PHP'
@@ -235,6 +275,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertSame(['App\\Entity\\User', 'App\\Entity\\Comment'], $voterCapability->supportedSubjects());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_deduplicates_repeated_string_literal_in_supports_body_and_continues_to_collect_later_unique_attributes(): void
     {
         $source = <<<'PHP'
@@ -254,6 +297,9 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
         self::assertSame(['EDIT', 'DELETE'], $voterCapability->supportedAttributes());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_class_name_with_namespace(): void
     {
         $source = <<<'PHP'

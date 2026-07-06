@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use Override;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 
@@ -28,6 +29,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         $this->phpParserControllerAccessControlParser = new PhpParserControllerAccessControlParser();
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_empty_for_non_controller_file(): void
     {
         $projectFile = $this->makeFile('src/Service/Mailer.php', '<?php class Mailer { public function send() {} }');
@@ -35,6 +39,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame([], $this->phpParserControllerAccessControlParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_action_with_route_and_no_access_check(): void
     {
         $source = <<<'PHP'
@@ -58,6 +65,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertTrue($entries[0]->lacksAccessCheck());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_method_level_is_granted(): void
     {
         $source = <<<'PHP'
@@ -80,6 +90,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertFalse($entries[0]->lacksAccessCheck());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_class_level_is_granted(): void
     {
         $source = <<<'PHP'
@@ -101,6 +114,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertTrue($entries[0]->hasAccessCheck());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_deny_access_unless_granted_call(): void
     {
         $source = <<<'PHP'
@@ -122,6 +138,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertTrue($entries[0]->hasAccessCheck());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_emits_one_entry_per_public_method(): void
     {
         $source = <<<'PHP'
@@ -147,6 +166,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame('delete', $entries[1]->methodName());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_path_from_positional_route_argument(): void
     {
         $source = <<<'PHP'
@@ -167,6 +189,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['GET'], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_continues_past_private_methods_to_reach_public_action_below(): void
     {
         $source = <<<'PHP'
@@ -188,6 +213,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame('show', $entries[0]->methodName());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_methods_when_route_uses_methods_only(): void
     {
         $source = <<<'PHP'
@@ -208,6 +236,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertNull($entries[0]->routePath());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_multiple_http_methods_from_route_attribute(): void
     {
         $source = <<<'PHP'
@@ -226,6 +257,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['GET', 'POST', 'PATCH'], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_multiple_is_granted_attributes_on_same_method(): void
     {
         $source = <<<'PHP'
@@ -247,6 +281,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['ROLE_USER', 'ROLE_ADMIN'], $entries[0]->methodLevelIsGranted());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_keeps_only_first_string_argument_of_is_granted_attribute(): void
     {
         $source = <<<'PHP'
@@ -267,6 +304,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['PRIMARY_ROLE'], $entries[0]->methodLevelIsGranted());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_finds_is_granted_in_attribute_group_after_a_non_is_granted_attribute(): void
     {
         $source = <<<'PHP'
@@ -286,6 +326,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['ROLE_GROUPED'], $entries[0]->methodLevelIsGranted());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_non_route_attributes_when_extracting_the_route(): void
     {
         $source = <<<'PHP'
@@ -307,6 +350,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertTrue($entries[0]->hasRouteAttribute());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_a_non_route_attribute_listed_before_route_in_the_same_group(): void
     {
         $source = <<<'PHP'
@@ -327,6 +373,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertTrue($entries[0]->hasRouteAttribute());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_resolves_path_from_positional_argument_followed_by_a_named_argument(): void
     {
         $source = <<<'PHP'
@@ -346,6 +395,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['GET'], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_treats_only_the_first_positional_argument_as_the_path(): void
     {
         $source = <<<'PHP'
@@ -365,6 +417,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['GET'], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_resolves_the_first_positional_as_path_even_after_a_leading_named_argument(): void
     {
         // nikic/php-parser tolerates a positional after a named arg (PHP's compile-time ordering rule is not enforced here).
@@ -384,6 +439,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame('/positional-after-named', $entries[0]->routePath());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_resolves_path_from_named_argument_preceded_by_another_named_argument(): void
     {
         $source = <<<'PHP'
@@ -403,6 +461,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['POST'], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_does_not_treat_a_named_first_argument_as_the_positional_path(): void
     {
         $source = <<<'PHP'
@@ -422,6 +483,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['GET'], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_resolves_path_when_methods_argument_precedes_the_named_path(): void
     {
         $source = <<<'PHP'
@@ -441,6 +505,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['GET'], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_reports_no_route_attribute_for_a_public_method_without_one(): void
     {
         $source = <<<'PHP'
@@ -460,6 +527,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame([], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_ignores_is_granted_attribute_with_no_string_argument(): void
     {
         $source = <<<'PHP'
@@ -481,6 +551,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame([], $entries[0]->methodLevelIsGranted());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_treats_an_abstract_action_without_a_body_as_lacking_deny_access(): void
     {
         $source = <<<'PHP'
@@ -500,6 +573,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertFalse($entries[0]->methodHasDenyAccess());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_empty_for_unparseable_source(): void
     {
         $projectFile = $this->makeFile('src/Controller/Broken.php', '<?php class Broken { public function');
@@ -507,6 +583,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame([], $this->phpParserControllerAccessControlParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     private function makeFile(string $relativePath, string $content): ProjectFile
     {
         return ProjectFile::create($relativePath, '/app/'.$relativePath, $content);

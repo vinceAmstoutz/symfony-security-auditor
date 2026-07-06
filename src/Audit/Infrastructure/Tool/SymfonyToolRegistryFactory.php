@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool;
 
 use Override;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
@@ -33,6 +34,9 @@ final readonly class SymfonyToolRegistryFactory implements ToolRegistryFactoryIn
         private AdvisoryDatabaseInterface $advisoryDatabase,
     ) {}
 
+    /**
+     * @throws InvalidToolRegistryException
+     */
     #[Override]
     public function forProjectFiles(array $projectFiles): ToolRegistry
     {
