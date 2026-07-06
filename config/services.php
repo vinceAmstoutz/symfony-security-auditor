@@ -65,8 +65,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
@@ -453,10 +454,13 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ]);
     $defaultsConfigurator->alias(ComposerAuditRunnerInterface::class, LockfileHashedAdvisoryCache::class);
 
-    $defaultsConfigurator->set(ComposerAuditAdvisoryDatabase::class)
+    $defaultsConfigurator->set(AuditedProjectPathHolder::class)
+        ->args([param('kernel.project_dir')]);
+
+    $defaultsConfigurator->set(DeferredAdvisoryDatabase::class)
         ->args([
             service(ComposerAuditRunnerInterface::class),
-            param('kernel.project_dir'),
+            service(AuditedProjectPathHolder::class),
             service('logger'),
         ]);
 
@@ -543,10 +547,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(UnpricedModelBudgetGuard::class)
         ->args([
             service(PricingProviderInterface::class),
-            [
-                param('symfony_security_auditor.attacker_model'),
-                param('symfony_security_auditor.reviewer_model'),
-            ],
+            param('symfony_security_auditor.audit.models_requiring_pricing'),
             param('symfony_security_auditor.audit.budget.max_cost_usd'),
         ]);
     $defaultsConfigurator->alias(UnpricedModelBudgetGuardInterface::class, UnpricedModelBudgetGuard::class);
@@ -560,6 +561,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(EstimateAuditCostUseCase::class),
             service(ListScannedFilesUseCase::class),
             service(ProgressReporterHolder::class),
+            service(AuditedProjectPathHolder::class),
             service(BaselineProcessorInterface::class),
             service(UnpricedModelBudgetGuardInterface::class),
             param('symfony_security_auditor.scan.secret_scrubbing.enabled'),

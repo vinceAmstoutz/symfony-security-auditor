@@ -37,7 +37,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   up for free. `SarifReportRenderer` tags each rule with `external/cwe/cwe-<n>`
   in `properties.tags`
   (`src/Audit/Infrastructure/Report/SarifReportRenderer.php`), the format GitHub
-  Code Scanning already recognizes for CWE. `JunitReportRenderer`,
+  Code Scanning already recognizes for CWE. SARIF rules are keyed by OWASP
+  category, which several vulnerability types can share (e.g. `sql_injection`
+  CWE-89 and `command_injection` CWE-78 are both `A05:2025 - Injection`), so a
+  shared rule aggregates the deduplicated CWE tags of every contributing type
+  instead of carrying only the last type's tag. `JunitReportRenderer`,
   `HtmlReportRenderer`, `ConsoleReportRenderer`, and `MarkdownReportRenderer`
   now render the CWE reference alongside OWASP in their respective output.
   Additive change — the `cwe` JSON key and the SARIF tag are new; no existing
@@ -153,7 +157,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   payloads; plus a `live_component` pre-scanner bucket (`RegexStaticPreScanner`,
   `CACHE_VERSION` 5) with `live_prop_writable` and `live_action_endpoint`
   markers, and a chunking priority slot right after controllers. Custom markers
-  can target the new bucket via `scan.custom_risk_patterns.live_component`.
+  can target the new bucket via `scan.custom_risk_patterns.live_component`. Both
+  attribute signals (`#[ApiResource]`, `#[AsLiveComponent]`) take precedence
+  over the content-based controller heuristics, so a component declared as
+  `#[AsLiveComponent] class Cart extends AbstractController` (the documented
+  pattern for reusing `denyAccessUnlessGranted()`/`addFlash()` helpers) keeps
+  its dedicated skill block and pre-scan markers instead of degrading to a plain
+  controller; an explicit `Controller.php`/`/Controller/` path still wins
+  (`ProjectFileTypeClassifier`, `PROMPT_VERSION` 14).
 - **`security.yaml` is now parsed with `symfony/yaml` instead of single-line
   regexes, so the access-control map the attacker reasons over is finally
   complete.** `MappingStage` previously extracted `access_control` with a
@@ -169,7 +180,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `requires_channel: https`), firewall rules carry their `security: false` /
   `stateless` flags, `route:`-keyed entries and environment-scoped `when@prod`
   blocks are read, and unparseable YAML degrades to an empty result instead of
-  aborting the audit. Adds `symfony/yaml` to the runtime requirements.
+  aborting the audit. The map also respects Symfony's first-match-wins
+  evaluation for multiple rules on one path: previously two entries for
+  `^/api/orders` (say `methods: [GET], roles: PUBLIC_ACCESS` then
+  `methods: [POST], roles: ROLE_ADMIN`) collapsed to whichever came _last_,
+  inverting the real semantics and telling the attacker/reviewer the route is
+  admin-gated when its GET is public. The first rule's requirements now come
+  first and each later rule for the same path is appended as an explicit `or: …`
+  entry. Adds `symfony/yaml` to the runtime requirements.
 - **Baselined findings now skip the reviewer entirely, and the baseline file is
   human-readable.** Previously the baseline was applied _after_ the audit
   (`BaselineProcessor::apply()` in `src/Command/AuditCommand.php`), so every
@@ -186,10 +204,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `--generate-baseline` now writes one JSON object per finding — `fingerprint`,
   `type`, `file`, `title`, `added_at` — so a baseline diff in code review shows
   _what_ was accepted; add a free-form `reason` key to any entry for posterity.
-  The legacy flat fingerprint array is still read, so existing baseline files
-  keep working unchanged. Note: the post-run "N finding(s) suppressed by the
-  baseline." console note no longer appears for pipeline-skipped findings — the
-  per-finding skip lines replace it.
+  A finding whose type the reviewer corrected additionally records the
+  `attacker_fingerprint` it was originally reported under
+  (`Vulnerability::attackerFingerprint()`): the report fingerprint embeds the
+  _corrected_ type, which the attacker's pre-review findings never carry, so
+  without it the pre-review skip silently missed exactly those findings and
+  re-reviewed them (at full LLM cost) on every run. Both fingerprints count as
+  accepted when the baseline is loaded. The legacy flat fingerprint array is
+  still read, so existing baseline files keep working unchanged. Note: the
+  post-run "N finding(s) suppressed by the baseline." console note no longer
+  appears for pipeline-skipped findings — the per-finding skip lines replace it.
+  `--format=sarif` opts out of the pre-review skip so baselined findings can be
+  rendered as suppressed results — see the SARIF suppression entry under
+  _Fixed_.
 - **Committed dotenv files are now part of the default scan surface, with
   deterministic secret markers.** `.env`, `.env.local`, `.env.dev`, `.env.test`,
   `.env.prod`, and `.env.dist` were previously invisible to the auditor twice
@@ -301,11 +328,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   review of _N_ findings parked the progress bar on the audit stage with no
   visible movement for minutes — `ConsoleProgressReporter` had nothing to redraw
   between the two events. The reviewer now emits a `review.finding.reviewed`
-  progress event per verdict from `VerdictApplier::apply()`, the single
-  chokepoint shared by every review mode (sequential, concurrent, structured,
-  and batched). A decorated terminal prints `⚖ ✓ validated <type> — file:line`
-  (green) and `⚖ ✗ rejected <type> — file:line` (yellow) above the bar and
-  ticks the bar suffix `reviewing i/N`; `PlainProgressReporter` appends
+  progress event per finding from `ReviewerCoverageRecorder`, the single step
+  that also records the finding's reviewer coverage entry — shared by every
+  review mode (sequential, concurrent, structured, and batched) and by every
+  outcome, so a finding whose review errored, whose response carried no verdict,
+  or whose batch entry went unmatched still advances the counter instead of
+  leaving `reviewing i/N` stuck short of _N_. A decorated terminal prints
+  `⚖ ✓ validated <type> — file:line` (green) and
+  `⚖ ✗ rejected <type> — file:line` (yellow) above the bar and ticks the bar
+  suffix `reviewing i/N`; `PlainProgressReporter` appends
   `[VALIDATED]`/`[REJECTED]` lines for non-TTY output. New stable progress-event
   value `review.finding.reviewed`.
 - **LLM pricing is now sourced from the daily `symfony/models-dev` catalog
@@ -315,7 +346,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   and resolves `cost.input` / `output` / `cache_read` / `cache_write` per model.
   A bare model id (`claude-opus-4-8`, `gpt-5.5`) resolves against official
   first-party providers only (Anthropic, OpenAI, Google, Mistral, Cohere,
-  DeepSeek, Perplexity, Cerebras) — a version dot never makes it qualified — so
+  DeepSeek, Perplexity, Cerebras, xAI, Moonshot, Alibaba, Z.ai, Meta/Llama,
+  MiniMax, NVIDIA) — a version dot never makes it qualified — so
   aggregator/cloud markups never leak in; a provider-qualified id, namely
   slash-namespaced or one whose dot-delimited prefix is a catalog provider key
   (`anthropic.claude-opus-4-8` and the cloud-region form
@@ -331,24 +363,39 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Domain/Port/CacheAwarePricingProviderInterface.php`) — an opt-in
   extension of `PricingProviderInterface` exposing
   `cacheReadPricePerMillionTokens()` and `cacheCreationPricePerMillionTokens()`.
-  `CostCalculator` consumes it via `instanceof` and falls back to the base input
-  rate for providers that do not implement it, so it never breaks an existing
-  pricing provider. Listed under the documented extension points in
-  `docs/versioning.md`.
+  `CostCalculator` consumes it via `instanceof`; for providers that do not
+  implement it, Claude models keep the pre-existing Anthropic 0.1x-read /
+  1.25x-write heuristic and other models fall back to the base input rate, so an
+  existing custom `PricingProviderInterface` keeps producing the same
+  cache-traffic estimates as before. Listed under the documented extension
+  points in `docs/versioning.md`.
 - **`audit:run` now warns up front when a configured model is unpriced, and
   refuses to start a budgeted run whose cost it cannot enforce.** The new
   `UnpricedModelBudgetGuard` (`src/Command/UnpricedModelBudgetGuard.php`) runs
   at the start of a real audit: if any configured model (`model`,
-  `attacker_model`, or `reviewer_model`) has no catalog price it prints a
-  one-time `$0.00` notice to stderr (so the `--dry-run` warning now also
-  surfaces on real runs), and when `audit.budget.max_cost_usd` is additionally
-  set — so the budget guard could never trip — it prompts for confirmation on an
-  interactive terminal and fails closed with exit code `2` under
-  `--no-interaction` / CI. When every configured model is priced the run is
-  silent as before.
+  `attacker_model`, `reviewer_model`, or — when escalation is enabled — the
+  effective `escalation.cheap_model`) has no catalog price it prints a one-time
+  `$0.00` notice to stderr (so the `--dry-run` warning now also surfaces on real
+  runs), and when `audit.budget.max_cost_usd` is additionally set — so the
+  budget guard could never trip — it prompts for confirmation on an interactive
+  terminal and fails closed with exit code `2` under `--no-interaction` / CI.
+  When every configured model is priced the run is silent as before.
 
 ### Changed
 
+- **`VulnerabilityType::cweReference()`/`cweReferenceUrl()` are replaced by a
+  single `cwe(): CweReference` method.** The two methods duplicated every CWE
+  identifier as a hand-written `'CWE-89'` /
+  `'https://cwe.mitre.org/data/definitions/89.html'` string pair across two
+  separate `match` expressions, so updating one without the other could silently
+  desynchronize label and URL. The new `CweReference` value object
+  (`src/Audit/Domain/Model/CweReference.php`, constructed via
+  `CweReference::of(89)`) derives both `label()` (`'CWE-89'`) and `url()` from a
+  single stored ID, plus an `id(): int` accessor — `SarifReportRenderer`'s CWE
+  tag now reads `->cwe()->id()` directly instead of
+  `substr($vulnerabilityType->cweReference(), 4)`. `Vulnerability::toArray()`'s
+  `cwe` key and every report renderer's CWE output keep the same `'CWE-<n>'`
+  string shape.
 - **`ProjectFile` type detection is now a single source of truth, so its
   `fileType()` and its `is*()` predicates can no longer disagree.**
   `ProjectFile::detectType()` and its private `is*Path()`/`looksLike*()`
@@ -428,10 +475,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `Vulnerability::fingerprint()` is in the accepted set now gets
   `"suppressions": [{"kind": "external", "justification": "Accepted via audit baseline"}]`
   instead of being dropped from `results`. Every other format's output is
-  unchanged. `BaselineResult` (`src/Command/BaselineResult.php`) gained a third
-  `acceptedFingerprints` property alongside the existing filtered report and
-  suppressed count, so `AuditCommand` no longer needs a second baseline-file
-  read to get the matched set.
+  unchanged. To make this reachable, `--format=sarif` deliberately does not
+  thread the accepted fingerprints into the pipeline
+  (`AuditCommand::acceptedFingerprintsFor()`): a finding the orchestrator skips
+  before review never reaches the report, so nothing would be left to mark as
+  suppressed. SARIF runs therefore pay the reviewer cost for baselined findings
+  — the price of Code Scanning showing them as dismissed instead of vanished;
+  every other format keeps the pre-review skip. `BaselineResult`
+  (`src/Command/BaselineResult.php`) gained a third `acceptedFingerprints`
+  property alongside the existing filtered report and suppressed count, so
+  `AuditCommand` no longer needs a second baseline-file read to get the matched
+  set.
 - **Prompt building is split behind interfaces so neither builder is a
   monolith.** `AttackerPromptBuilder`
   (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) held all sixteen
@@ -558,6 +612,103 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Three `VulnerabilityType` CWE/OWASP mappings are corrected against the
+  official MITRE CWE 4.20 catalog and OWASP Top 10:2025 data.**
+  `ROLE_ESCALATION` moves from `CWE-269` (Improper Privilege Management — a
+  Discouraged, Class-level entry whose own MITRE guidance warns it is routinely
+  conflated with the "privilege escalation" technical impact rather than a root
+  cause) to `CWE-266` (Incorrect Privilege Assignment), a precise,
+  `Allowed`-status child of CWE-269 that matches the case's specific intent
+  without colliding with the neighboring `MISSING_VOTER`/`VOTER_BYPASS` cases.
+  `INSECURE_REDIRECT` and `OPEN_REDIRECT` move from
+  `OWASP A02:2025 - Security Misconfiguration` to
+  `OWASP A01:2025 - Broken Access Control` — their shared `CWE-601` is
+  explicitly listed under OWASP's own official A01:2025 mapped-CWE set, not
+  under Security Misconfiguration, and the sibling `SSRF` case (same CWE-610
+  lineage) was already correctly filed under A01. The CWE for
+  `INSECURE_REDIRECT`/`OPEN_REDIRECT` is unchanged (`CWE-601`).
+- **`audit.tools_enabled` now actually gives the attacker its investigation
+  tools in the default structured-collection mode.** With
+  `audit.structured_collection: true` (the default), the attacker built the
+  cross-file tool registry (`read_file`, `grep`, `list_files`,
+  `lookup_advisory`) every iteration and then silently dropped it — the
+  structured branch replaced it with a registry containing only
+  `record_vulnerability`, so `tools_enabled: true` paid the setup cost, logged
+  `tools_enabled: true`, and changed nothing. The investigation tools now ride
+  alongside the per-chunk `record_vulnerability` registry
+  (`StructuredVulnerabilityCollectionSession::begin()` accepts them), in both
+  the sequential and the concurrent wavefront paths — which also means
+  `audit.attacker_max_concurrent` > 1 is no longer disabled by `tools_enabled`,
+  and the pre-flight configuration notice now warns only when
+  `structured_collection` is off. `ToolRegistry` gains a `tools()` accessor.
+- **The console report no longer corrupts accented text at wrap points.**
+  `ConsoleReportRenderer` wrapped a finding's description, attack vector, and
+  remediation with a byte-based 65-byte split, so multibyte UTF-8 characters
+  landing on a chunk boundary were cut mid-sequence and rendered as `�` mojibake
+  — routine for LLM prose in French, German, or any accented language. Wrapping
+  is now character-safe word wrapping (`symfony/string`), which also stops words
+  from being cut mid-word at every 65th byte.
+- **Machine-readable stdout no longer carries human-facing chrome.** With
+  `--format=json|sarif|junit|github` writing to stdout, `audit:run` still
+  printed the title header (`Symfony LLM Security Auditor`, project line,
+  pipeline line) — and, combined with the new `--show-scanned` or `--dry-run`
+  flags, the scanned-file listing and the "Estimating audit cost" section — to
+  stdout _before_ the document, so `audit:run --format=json | jq` failed to
+  parse and redirecting to a file captured the banner along with the report. All
+  human-facing presentation now routes to stderr whenever stdout carries a
+  machine-readable document; stdout receives the document alone. The document
+  itself is also written in raw output mode (`ReportWriter`, and
+  `audit:diff --format=json` via `DiffPresenter`): the console formatter
+  previously interpreted markup-lookalike text — a finding title quoting
+  `<info>` or `<error>` from audited code — and silently stripped or colorized
+  it inside the JSON payload.
+- **An unexpected failure in a concurrent attacker batch no longer aborts the
+  whole audit.** `ConcurrentChunkAnalyzer` only caught budget and provider
+  exceptions around the tool-batch dispatch, so with
+  `audit.attacker_max_concurrent` > 1 any other `Throwable` from the wavefront
+  propagated and killed the run — where the sequential analyzer logs, records
+  the chunk as `errored`, and continues. The concurrent path now does the same:
+  the batch's chunks are recorded as `errored` coverage, yield no findings, are
+  **not** written to the attacker cache (an errored chunk must not be replayed
+  as "no findings"), and the audit continues.
+- **`composer audit` advisories now target the audited project instead of the
+  host application (or the standalone binary's working directory).**
+  `ComposerAuditAdvisoryDatabase` received `kernel.project_dir` at
+  container-build time — the Symfony app's own directory in bundle usage, and
+  whatever `getcwd()` happened to be in the standalone binary — so
+  `audit:run /path/to/other-project` looked up advisories against the wrong
+  `composer.lock` (or none, silently disabling `lookup_advisory`). The new
+  `AuditedProjectPathHolder`
+  (`src/Audit/Infrastructure/Advisory/AuditedProjectPathHolder.php`) carries the
+  command's resolved `project-path` argument at runtime, and the advisory
+  database defers constructing `ComposerAuditAdvisoryDatabase` — and therefore
+  running `composer audit` — until the first lookup (`DeferredAdvisoryDatabase`,
+  replacing a Symfony `->lazy()` service that cannot proxy a `final readonly`
+  class), so the audit executes against the project actually being audited — and
+  only when advisory data is first needed, instead of at container
+  instantiation.
+- **The standalone binary's per-project config resolution no longer depends on
+  the `$PWD` shell export, and project-config lists override user-config lists
+  wholesale.** `.symfony-security-auditor.yaml` was located via
+  `$environment['PWD']`, which is unset on Windows and in cron/CI contexts, so
+  the project-level config was silently ignored there — the process working
+  directory (`getcwd()`) is now the fallback. Separately,
+  `StandaloneConfigLoader` merged the global XDG config and the project config
+  with `array_replace_recursive`, which merges list values index-wise: a user
+  config with `scan.included_paths: [src, config, templates]` and a project
+  config with `[app]` produced the mangled `[app, config, templates]`. List
+  values now replace wholesale; only string-keyed maps merge recursively.
+- **Invokable `#[AsController]` services were not classified as controllers.** A
+  Symfony controller does not have to extend `AbstractController` — an invokable
+  service tagged with `#[AsController]` whose routes are declared in routing
+  configuration (YAML/PHP) rather than `#[Route]` attributes is just as much an
+  HTTP entry point, but `ProjectFileTypeClassifier`'s content heuristic only
+  recognized `extends AbstractController` and `#[Route`, so such an action class
+  outside a `Controller` path classified as plain `php` and never received the
+  controller attack-surface skill or pre-scan markers. The heuristic now also
+  matches the `#[AsController]` attribute. (A plain invokable class with neither
+  attribute nor base class remains detectable only by path convention — content
+  offers nothing to key on.)
 - **`--since` silently dropped changed dotfiles (`.env`, `.github/...`) from
   incremental audits.** `ProcessGitChangedFilesResolver::mergeAndNormalize()`
   (`src/Audit/Infrastructure/Diff/ProcessGitChangedFilesResolver.php`) used
@@ -568,6 +719,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (or any dotfile/dot-directory) was excluded from `audit:run --since` scope
   even though it changed. Now uses `trimPrefix('./')`, which strips only the
   literal `./` prefix.
+- **`--since` also silently dropped changed files with non-ASCII names.** Git
+  C-quotes any path containing bytes above ASCII by default
+  (`core.quotepath=true`), so a changed `templates/modèle.html.twig` came out of
+  `git diff --name-only` as `"templates/mod\303\250le.html.twig"` — with literal
+  quotes and octal escapes — and never matched the real project file in
+  `IngestionStage`'s changed-set filter, excluding it from the incremental audit
+  with no warning. `ProcessGitChangedFilesResolver` now runs every git
+  invocation with `-c core.quotepath=off` so paths come back verbatim.
 - **Static pre-scan patterns using the `s` (DOTALL) modifier never matched
   anything.** `RegexStaticPreScanner::matchLines()`
   (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) explodes file
@@ -591,7 +750,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   whose narrative happened to reproduce one of those bytes (a plausible outcome
   when the model echoes a raw exploit payload) produced a `.xml` report that
   GitLab, Jenkins, and any standard XML parser rejected outright. Those bytes
-  are now stripped before insertion.
+  are now stripped before insertion. The strip now covers the full complement of
+  the XML 1.0 `Char` production instead of a C0-control byte list — the
+  `U+FFFE`/`U+FFFF` non-characters and surrogate halves are valid UTF-8 that
+  survives `json_decode` yet is equally rejected by every XML parser — and is
+  also applied to the LLM-reported file path, which was previously interpolated
+  into the `name` attribute and failure text unsanitized. A value that is not
+  valid UTF-8 at all is dropped wholesale rather than corrupting the document.
 - **Retryable LLM failures embedding a non-transient status code as a digit
   substring were misclassified as fatal, aborting the audit instead of
   retrying.** `TransientFailureClassifier::isTransient()`
@@ -602,7 +767,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   as fatal instead of retried. Status-code hints (for `isTransient()` and
   `isRateLimit()`'s `429`) are now matched as word-bounded tokens instead of raw
   substrings; the textual hints (`"rate limit"`, `"timed out"`, …) are
-  unchanged.
+  unchanged. Word-bounded tokens alone were still fooled by thousands
+  separators: Anthropic's real 429 body (_"This request would exceed your
+  organization's rate limit of 400,000 input tokens per minute"_) matched the
+  non-transient `400` at the `,`-boundary and aborted the audit on an ordinary
+  rate-limit response. A code token directly adjacent to a `,`/`.`-separated
+  digit group (`400,000`, `1,400`, `429.5`) is now ignored, while genuine codes
+  followed by punctuation (`"HTTP 400."`) still match.
 - **Unquoted credential values in config files reached the LLM prompt
   unredacted.** `RegexSecretScrubber`'s `inline_assignment` pattern
   (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) required the
@@ -630,7 +801,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `RetryingPlatformInvoker`'s retry loop now also call `record(0, 0)` to release
   a reservation whose call failed and fell back to a fresh attempt — previously
   that reservation was never reconciled at all, leaking into the window's usage
-  for the rest of the minute.
+  for the rest of the minute. The queue is also window-safe now: a call reserved
+  at `:59` and reconciled at `:01` used to credit its estimate against the _new_
+  window — whose counters the reset had already zeroed — driving
+  `inputTokensUsed` negative and over-admitting the fresh minute into provider
+  429s. The window reset now zeroes the amounts of the pending estimates
+  (keeping their FIFO slots so reconciliation order stays aligned), so a
+  straddling call's actual usage is charged to the current window instead of
+  crediting a reservation it never carried.
 - **The attacker cache key ignored the code-slicing configuration, serving stale
   findings after `audit.code_slicing.enabled` or
   `audit.code_slicing.min_lines_before_slicing` changed.** The cache key
@@ -644,6 +822,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   view of the file than the current configuration would actually send. The salt
   now includes a `slice-off` / `slice-on-<min_lines>` segment so any change to
   the slicing configuration invalidates the affected cache entries.
+- **The attacker cache key also ignored the static pre-scan and investigation
+  tool toggles.** The same salt (`ContainerParameterRegistrar`) had no
+  representation of `audit.static_prescan.enabled` — which injects risk-marker
+  preambles into every attacker message — or of `audit.tools_enabled` /
+  `audit.max_tool_iterations`, which change how the attacker may investigate a
+  chunk. Flipping any of them replayed cache entries recorded under the other
+  configuration. The salt now carries `prescan-{on|off}` and
+  `tools-{off|on-<max_iterations>}` segments, closing the remaining known gaps
+  in the "config knob changes attacker input but not its cache key" class.
+- **An escalation run poisoned the primary attacker's response cache with
+  cheap-model results.** `SymfonySecurityAuditorBundle::registerEscalation()`
+  wired the cheap-model `AttackerAgent` with the same `FilesystemAttackerCache`
+  instance as the full-price attacker, whose key salt encodes only
+  `attacker_model`. With `audit.escalation.enabled: true` and caching on, the
+  cheap first pass stored its (weaker, often empty) per-chunk verdicts under the
+  exact keys the expensive attacker computes — a later run with escalation off
+  (or the escalated second pass over a flagged file in a subsequent run)
+  silently served the cheap model's "no findings" as if the configured attacker
+  model had analyzed the chunk, with zero LLM calls and no trace. The cheap
+  attacker now gets a dedicated cache instance salted with the actual cheap
+  model (`cache.cheap_attacker_key_salt`), so the two namespaces can never
+  collide; with caching disabled it degrades to the null cache as before.
 - **A hostile or misbehaving provider's `Retry-After` header could wedge the
   rate limiter for hours, bypassing the documented safety ceiling.**
   `RetryPolicy::rateLimitDelayMs()` already clamped the server-provided hint to
@@ -670,7 +870,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   now matches the suffixed variable on either side of `===`. Bumps
   `RegexStaticPreScanner::CACHE_VERSION` (6 → 7 — the multiline-pattern fix
   above already claimed 6) since this changes scan output for existing chunk
-  content and must invalidate stale attacker cache entries.
+  content and must invalidate stale attacker cache entries. The pattern also
+  required at least one character _before_ the suffix, so the canonical bare
+  names — `$signature === $expected`, `$hash === $computed`, `$a === $token` —
+  never matched, and neither this marker nor the webhook bucket's
+  `no_hash_equals` matched the most common guard shape
+  `if ($signature !== $computed)`. Both patterns now accept the bare variable
+  names and the `!==` operator (`CACHE_VERSION` 8 → 9 — 8 was already claimed by
+  the Twig-extension bucket above).
 - **Enabling `audit.escalation.enabled` crashed the container.**
   `SymfonySecurityAuditorBundle::registerEscalation()` wired the cheap-model
   `AttackerAgent` (`security_auditor.cheap_attacker`) with a stale 15-argument

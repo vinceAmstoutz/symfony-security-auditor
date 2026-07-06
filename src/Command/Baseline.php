@@ -52,9 +52,24 @@ final readonly class Baseline implements BaselineInterface
         $fingerprints = [];
         foreach ($decoded as $entry) {
             $fingerprints[] = $this->fingerprintOf($entry, $path);
+            $attackerFingerprint = $this->attackerFingerprintOf($entry);
+            if (null !== $attackerFingerprint) {
+                $fingerprints[] = $attackerFingerprint;
+            }
         }
 
         return $fingerprints;
+    }
+
+    private function attackerFingerprintOf(mixed $entry): ?string
+    {
+        if (!\is_array($entry)) {
+            return null;
+        }
+
+        $attackerFingerprint = $entry['attacker_fingerprint'] ?? null;
+
+        return \is_string($attackerFingerprint) ? $attackerFingerprint : null;
     }
 
     #[Override]

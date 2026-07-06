@@ -91,7 +91,8 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
      */
     private function runGit(string $projectPath, array $argv): array
     {
-        $process = new Process(['git', ...$argv], $projectPath);
+        // core.quotepath=off stops git C-quoting non-ASCII paths, which would never match ProjectFile paths.
+        $process = new Process(['git', '-c', 'core.quotepath=off', ...$argv], $projectPath);
 
         try {
             $process->mustRun();

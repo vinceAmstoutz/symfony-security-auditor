@@ -268,6 +268,26 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */
+    public function test_render_wraps_multibyte_text_without_splitting_a_character(): void
+    {
+        $accentedDescription = str_repeat('é', 70);
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Test Vuln', 0.7),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative($accentedDescription, 'short', 'p', 'r'),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertTrue(mb_check_encoding($output, 'UTF-8'));
+        self::assertStringContainsString('    '.str_repeat('é', 65)."\n    ".str_repeat('é', 5), $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_attack_vector_chunks_at_exactly_65_chars(): void
     {
         $longVector = str_repeat('b', 70);
@@ -467,7 +487,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
         $vulnerability = $this->makeValidatedVuln();
         $output = $this->renderer->render($this->makeReport($vulnerability));
 
-        self::assertStringContainsString('CWE  : '.$vulnerability->type()->cweReference(), $output);
+        self::assertStringContainsString('CWE  : '.$vulnerability->type()->cwe()->label(), $output);
         self::assertStringNotContainsString('{{cwe}}', $output);
     }
 

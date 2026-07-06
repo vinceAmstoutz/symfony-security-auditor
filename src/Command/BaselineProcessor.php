@@ -82,16 +82,26 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
     }
 
     /**
+     * A reviewer-corrected finding carries a second, `attacker_fingerprint`
+     * key: the identity the attacker will report on the next run, so the
+     * pre-review baseline skip still matches it.
+     *
      * @return array<string, string>
      */
     private function entryFor(Vulnerability $vulnerability): array
     {
-        return [
+        $entry = [
             'fingerprint' => $vulnerability->fingerprint(),
             'type' => $vulnerability->type()->value,
             'file' => $vulnerability->filePath(),
             'title' => $vulnerability->title(),
             'added_at' => $this->clock->now()->format('Y-m-d'),
         ];
+
+        if ($vulnerability->attackerFingerprint() !== $vulnerability->fingerprint()) {
+            $entry['attacker_fingerprint'] = $vulnerability->attackerFingerprint();
+        }
+
+        return $entry;
     }
 }

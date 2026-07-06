@@ -103,7 +103,7 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
             '{{severityClass}}' => $this->escape($vulnerability->severity()->value),
             '{{title}}' => $this->escape($vulnerability->title()),
             '{{owasp}}' => $this->escape($vulnerability->type()->owaspReference()),
-            '{{cwe}}' => $this->escape($vulnerability->type()->cweReference()),
+            '{{cwe}}' => $this->escape($vulnerability->type()->cwe()->label()),
             '{{type}}' => $this->escape($vulnerability->type()->value),
             '{{location}}' => $this->escape(\sprintf(
                 '%s:%d-%d',

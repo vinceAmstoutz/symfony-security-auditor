@@ -32,6 +32,11 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'controller by directory' => ['src/Controller/UserController.php', '<?php', ProjectFileType::CONTROLLER];
         yield 'api resource by attribute' => ['src/ApiResource/Offer.php', "<?php\n#[ApiResource]\nclass Offer {}", ProjectFileType::API_RESOURCE];
         yield 'live component by attribute' => ['src/Twig/Components/SearchBar.php', "<?php\n#[AsLiveComponent]\nclass SearchBar {}", ProjectFileType::LIVE_COMPONENT];
+        yield 'live component extending abstract controller stays a live component' => ['src/Twig/Components/Cart.php', "<?php\n#[AsLiveComponent]\nclass Cart extends AbstractController {}", ProjectFileType::LIVE_COMPONENT];
+        yield 'api resource with route attribute stays an api resource' => ['src/ApiResource/Offer.php', "<?php\n#[ApiResource]\n#[Route('/offers')]\nclass Offer {}", ProjectFileType::API_RESOURCE];
+        yield 'controller directory wins over api resource attribute' => ['src/Controller/OfferController.php', "<?php\n#[ApiResource]\nclass OfferController {}", ProjectFileType::CONTROLLER];
+        yield 'invokable as-controller service without base class or route attribute' => ['src/Action/CheckoutAction.php', "<?php\n#[AsController]\nclass CheckoutAction { public function __invoke() {} }", ProjectFileType::CONTROLLER];
+        yield 'controller by route attribute without base class' => ['src/Action/ExportAction.php', "<?php\nclass ExportAction { #[Route('/export')]\npublic function __invoke() {} }", ProjectFileType::CONTROLLER];
         yield 'entity by directory' => ['src/Entity/User.php', '<?php', ProjectFileType::ENTITY];
         yield 'voter by suffix' => ['src/Security/UserVoter.php', '<?php', ProjectFileType::VOTER];
         yield 'repository by directory' => ['src/Repository/UserRepository.php', '<?php', ProjectFileType::REPOSITORY];

@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
@@ -157,6 +158,22 @@ final class ReportDifferTest extends TestCase
         $this->expectException(ReportFileNotReadableException::class);
 
         (new ReportDiffer($this->filesystem))->diff($this->tmpDir.'/absent.json', $current);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_throws_when_a_report_path_exists_but_cannot_be_read_as_a_file(): void
+    {
+        $current = $this->writeReport('current.json', []);
+
+        try {
+            (new ReportDiffer($this->filesystem))->diff($this->tmpDir, $current);
+            self::fail('Expected a ReportFileNotReadableException for a directory path.');
+        } catch (ReportFileNotReadableException $reportFileNotReadableException) {
+            self::assertInstanceOf(IOException::class, $reportFileNotReadableException->getPrevious());
+        }
     }
 
     /**

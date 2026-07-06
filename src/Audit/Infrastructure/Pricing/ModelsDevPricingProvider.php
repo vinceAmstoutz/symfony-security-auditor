@@ -42,6 +42,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
      */
     private const array FIRST_PARTY_PROVIDERS = [
         'anthropic', 'openai', 'google', 'mistral', 'cohere', 'deepseek', 'perplexity', 'cerebras',
+        'xai', 'moonshotai', 'alibaba', 'zai', 'llama', 'minimax', 'nvidia',
     ];
 
     /** @var array<string, true> */

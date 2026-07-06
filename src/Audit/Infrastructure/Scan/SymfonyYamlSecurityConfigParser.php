@@ -32,7 +32,7 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
     {
         $routeAccessMap = [];
         foreach ($this->securitySections($configContent) as $section) {
-            $routeAccessMap = array_merge($routeAccessMap, $this->accessControlOf($section));
+            $routeAccessMap = $this->accessControlOf($section, $routeAccessMap);
         }
 
         return $routeAccessMap;
@@ -52,13 +52,18 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
     }
 
     /**
-     * @param array<string, mixed> $section
+     * Symfony evaluates `access_control` first-match-wins, so a later rule for
+     * an already-seen path applies only to requests the earlier rule's
+     * constraints (methods, ips, …) did not match — it is appended as a single
+     * `or: …` requirement instead of silently replacing the earlier rule.
+     *
+     * @param array<string, mixed>        $section
+     * @param array<string, list<string>> $routeAccessMap
      *
      * @return array<string, list<string>>
      */
-    private function accessControlOf(array $section): array
+    private function accessControlOf(array $section, array $routeAccessMap): array
     {
-        $routeAccessMap = [];
         $entries = $section['access_control'] ?? null;
         if (!\is_array($entries)) {
             return $routeAccessMap;
@@ -73,6 +78,12 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
             }
 
             if ([] === $requirements) {
+                continue;
+            }
+
+            if (\array_key_exists($target, $routeAccessMap)) {
+                $routeAccessMap[$target][] = \sprintf('or: %s', implode(', ', $requirements));
+
                 continue;
             }
 

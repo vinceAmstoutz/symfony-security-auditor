@@ -16,10 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 use JsonException;
 use Psr\Log\LoggerInterface;
 use Throwable;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
  * Turns a single-finding review outcome — a verdict payload, a raw LLM
@@ -36,6 +36,7 @@ final readonly class ReviewOutcomeRecorder
         private VerdictApplier $verdictApplier,
         private ReviewerVerdictCache $reviewerVerdictCache,
         private LoggerInterface $logger,
+        private ProgressReporterInterface $progressReporter,
     ) {}
 
     /**
@@ -47,16 +48,17 @@ final readonly class ReviewOutcomeRecorder
     public function recordVerdict(Vulnerability $vulnerability, ?array $review, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
         if (null === $review) {
-            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'rejected');
+            ReviewerCoverageRecorder::record($vulnerability, 'rejected', $coverageRecorder, $this->progressReporter);
 
             return $vulnerability->withReviewerValidation(false);
         }
 
         $reviewed = $this->verdictApplier->apply($vulnerability, $review);
-        $coverageRecorder->recordCoverage(
-            AgentRole::Reviewer->value,
-            $vulnerability->filePath(),
+        ReviewerCoverageRecorder::record(
+            $reviewed,
             $reviewed->isReviewerValidated() ? 'validated' : 'rejected',
+            $coverageRecorder,
+            $this->progressReporter,
         );
 
         return $reviewed;
@@ -68,7 +70,7 @@ final readonly class ReviewOutcomeRecorder
             'vulnerability_id' => $vulnerability->id(),
             'error' => $throwable->getMessage(),
         ]);
-        $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
+        ReviewerCoverageRecorder::record($vulnerability, 'errored', $coverageRecorder, $this->progressReporter);
 
         return $vulnerability->withReviewerValidation(false);
     }
@@ -88,7 +90,7 @@ final readonly class ReviewOutcomeRecorder
                 'error' => $jsonException->getMessage(),
                 'content_preview' => substr($llmResponse->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
             ]);
-            $coverageRecorder->recordCoverage(AgentRole::Reviewer->value, $vulnerability->filePath(), 'errored');
+            ReviewerCoverageRecorder::record($vulnerability, 'errored', $coverageRecorder, $this->progressReporter);
 
             return $vulnerability->withReviewerValidation(false);
         }

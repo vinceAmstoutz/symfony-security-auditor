@@ -36,8 +36,8 @@ final readonly class ConfigurationNotices
             $notices[] = 'audit.reviewer_max_concurrent > 1 has no effect while audit.reviewer_tools_enabled is true: tool-using reviews run sequentially. Drop reviewer_tools_enabled to review concurrently, or set reviewer_max_concurrent: 1 to silence this.';
         }
 
-        if ($auditExecutionConfiguration->attackerMaxConcurrent > 1 && ($auditExecutionConfiguration->toolsEnabled || !$auditExecutionConfiguration->structuredCollection)) {
-            $notices[] = 'audit.attacker_max_concurrent > 1 has no effect unless audit.structured_collection is true and audit.tools_enabled is false: otherwise the attacker analyses chunks sequentially. Adjust those keys to analyse concurrently, or set attacker_max_concurrent: 1 to silence this.';
+        if ($auditExecutionConfiguration->attackerMaxConcurrent > 1 && !$auditExecutionConfiguration->structuredCollection) {
+            $notices[] = 'audit.attacker_max_concurrent > 1 has no effect while audit.structured_collection is false: the JSON-parsing attacker analyses chunks sequentially. Re-enable structured_collection to analyse concurrently, or set attacker_max_concurrent: 1 to silence this.';
         }
 
         return $notices;

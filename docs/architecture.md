@@ -446,9 +446,11 @@ Chunks the files (default `feature` strategy; `type` for the legacy
 priority-window). For each chunk: builds prompts via `AttackerPromptBuilder`,
 then either calls `LLMClientInterface::complete()` (single-shot) or
 `LLMClientInterface::completeWithTools()` (tool-using loop) depending on
-`audit.tools_enabled`. With tools enabled, the attacker can call `read_file`,
-`grep`, `list_files`, and `lookup_advisory` for cross-file investigation,
-bounded by `audit.max_tool_iterations`. JSON output is parsed via
+`audit.tools_enabled` and the collection mode. With tools enabled, the attacker
+can call `read_file`, `grep`, `list_files`, and `lookup_advisory` for cross-file
+investigation, bounded by `audit.max_tool_iterations` — in the default
+structured-collection mode those investigation tools ride alongside each chunk's
+`record_vulnerability` registry. JSON output is parsed via
 `LLMResponse::parseJson()` and hydrated via `VulnerabilityFactory::fromList()`.
 LLM or JSON errors are caught and logged; the chunk returns an empty array
 rather than propagating.

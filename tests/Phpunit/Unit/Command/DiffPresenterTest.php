@@ -19,6 +19,7 @@ use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffFinding;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffOutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiff;
 
@@ -37,7 +38,7 @@ final class DiffPresenterTest extends TestCase
         $bufferedOutput = new BufferedOutput();
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
-        $this->diffPresenter->present($symfonyStyle, new ReportDiff([$this->finding()], [], []));
+        $this->diffPresenter->present($symfonyStyle, new ReportDiff([$this->finding()], [], []), DiffOutputFormat::Console);
 
         self::assertStringContainsString('New (1)', $bufferedOutput->fetch());
     }
@@ -47,7 +48,7 @@ final class DiffPresenterTest extends TestCase
         $bufferedOutput = new BufferedOutput();
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
-        $this->diffPresenter->present($symfonyStyle, new ReportDiff([], [], []));
+        $this->diffPresenter->present($symfonyStyle, new ReportDiff([], [], []), DiffOutputFormat::Console);
 
         self::assertStringContainsString('(none)', $bufferedOutput->fetch());
     }
@@ -57,7 +58,7 @@ final class DiffPresenterTest extends TestCase
         $bufferedOutput = new BufferedOutput();
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
-        $this->diffPresenter->present($symfonyStyle, new ReportDiff([$this->finding()], [$this->finding()], [$this->finding()]));
+        $this->diffPresenter->present($symfonyStyle, new ReportDiff([$this->finding()], [$this->finding()], [$this->finding()]), DiffOutputFormat::Console);
 
         self::assertStringNotContainsString('(none)', $bufferedOutput->fetch());
     }
@@ -67,7 +68,7 @@ final class DiffPresenterTest extends TestCase
         $bufferedOutput = new BufferedOutput();
         $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
 
-        $this->diffPresenter->present($symfonyStyle, new ReportDiff([$this->finding(severity: 'high')], [], []));
+        $this->diffPresenter->present($symfonyStyle, new ReportDiff([$this->finding(severity: 'high')], [], []), DiffOutputFormat::Console);
 
         self::assertStringContainsString('[HIGH]', $bufferedOutput->fetch());
     }

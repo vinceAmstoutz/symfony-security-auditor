@@ -13,19 +13,32 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use JsonException;
 use Override;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * Renders a {@see ReportDiff} as human-readable console sections.
+ * Renders a {@see ReportDiff} as human-readable console sections or as a raw
+ * JSON document.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class DiffPresenter implements DiffPresenterInterface
 {
+    /**
+     * @throws JsonException
+     */
     #[Override]
-    public function present(SymfonyStyle $symfonyStyle, ReportDiff $reportDiff): void
+    public function present(SymfonyStyle $symfonyStyle, ReportDiff $reportDiff, DiffOutputFormat $diffOutputFormat): void
     {
+        if (DiffOutputFormat::Json === $diffOutputFormat) {
+            // OUTPUT_RAW keeps markup-lookalike text in finding titles out of the console formatter.
+            $symfonyStyle->writeln(json_encode($reportDiff->toArray(), \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR), OutputInterface::OUTPUT_RAW);
+
+            return;
+        }
+
         $this->section($symfonyStyle, 'New', $reportDiff->newFindings);
         $this->section($symfonyStyle, 'Fixed', $reportDiff->fixedFindings);
         $this->section($symfonyStyle, 'Persisting', $reportDiff->persistingFindings);

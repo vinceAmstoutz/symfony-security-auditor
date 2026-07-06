@@ -93,6 +93,27 @@ final class CostCalculatorTest extends TestCase
         self::assertEqualsWithDelta(3.0, $costCalculator->costForCall(0, 0, 'model', 0, 1_000_000), 1e-12);
     }
 
+    public function test_cache_read_tokens_fall_back_to_the_anthropic_discount_for_claude_models_without_a_cache_aware_provider(): void
+    {
+        $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
+
+        self::assertEqualsWithDelta(0.3, $costCalculator->costForCall(0, 0, 'claude-opus-4-8', 1_000_000, 0), 1e-12);
+    }
+
+    public function test_cache_creation_tokens_fall_back_to_the_anthropic_surcharge_for_claude_models_without_a_cache_aware_provider(): void
+    {
+        $costCalculator = new CostCalculator($this->fixedPricing(3.0, 15.0));
+
+        self::assertEqualsWithDelta(3.75, $costCalculator->costForCall(0, 0, 'claude-opus-4-8', 0, 1_000_000), 1e-12);
+    }
+
+    public function test_cache_aware_rates_win_over_the_claude_heuristic(): void
+    {
+        $costCalculator = new CostCalculator($this->cacheAwarePricing(3.0, 15.0, 0.5, 6.25));
+
+        self::assertEqualsWithDelta(0.5, $costCalculator->costForCall(0, 0, 'claude-opus-4-8', 1_000_000, 0), 1e-12);
+    }
+
     public function test_cost_sums_input_output_and_both_cache_components_with_cache_aware_rates(): void
     {
         $costCalculator = new CostCalculator($this->cacheAwarePricing(3.0, 15.0, 0.5, 6.25));

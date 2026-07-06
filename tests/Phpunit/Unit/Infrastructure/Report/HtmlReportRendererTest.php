@@ -189,7 +189,7 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
         $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln(vulnerabilityType: VulnerabilityType::SQL_INJECTION)));
 
         self::assertStringContainsString('<dt>CWE</dt>', $output);
-        self::assertStringContainsString('<dd>'.VulnerabilityType::SQL_INJECTION->cweReference().'</dd>', $output);
+        self::assertStringContainsString('<dd>'.VulnerabilityType::SQL_INJECTION->cwe()->label().'</dd>', $output);
     }
 
     /**

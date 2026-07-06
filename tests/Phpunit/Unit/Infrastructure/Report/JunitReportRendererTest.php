@@ -67,7 +67,7 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame('Test Vuln', $failure->getAttribute('message'));
         self::assertStringContainsString('Test description', $failure->textContent);
         self::assertStringContainsString('fix', $failure->textContent);
-        self::assertStringContainsString('CWE: '.VulnerabilityType::SQL_INJECTION->cweReference(), $failure->textContent);
+        self::assertStringContainsString('CWE: '.VulnerabilityType::SQL_INJECTION->cwe()->label(), $failure->textContent);
     }
 
     public function test_it_reports_an_empty_suite_when_no_findings(): void
@@ -123,6 +123,70 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
         self::assertNotNull($failure);
         self::assertStringContainsString('DescEnd', $failure->textContent);
         self::assertStringContainsString('RemEnd', $failure->textContent);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_it_strips_illegal_control_characters_from_the_file_path(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Title', 0.9),
+            new CodeLocation("src/Fo\x08o.php", 1, 5),
+            new VulnerabilityNarrative('desc', 'vector', 'proof', 'fix'),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $domDocument = $this->decodeJunit($this->makeReport($vulnerability));
+
+        $testcase = $domDocument->getElementsByTagName('testcase')->item(0);
+        self::assertNotNull($testcase);
+        self::assertSame('Title (src/Foo.php:1)', $testcase->getAttribute('name'));
+
+        $failure = $domDocument->getElementsByTagName('failure')->item(0);
+        self::assertNotNull($failure);
+        self::assertStringContainsString('Location: src/Foo.php:1-5', $failure->textContent);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_it_strips_non_characters_that_are_valid_utf8_but_illegal_xml(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, "Bad\u{FFFF}Ti\u{FFFE}tle", 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vector', 'proof', 'fix'),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $domDocument = $this->decodeJunit($this->makeReport($vulnerability));
+
+        $testcase = $domDocument->getElementsByTagName('testcase')->item(0);
+        self::assertNotNull($testcase);
+        self::assertSame('BadTitle (src/Foo.php:1)', $testcase->getAttribute('name'));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_it_drops_a_value_that_is_not_valid_utf8_instead_of_corrupting_the_document(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, "Bad\xC3Title", 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vector', 'proof', 'fix'),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $domDocument = $this->decodeJunit($this->makeReport($vulnerability));
+
+        $testcase = $domDocument->getElementsByTagName('testcase')->item(0);
+        self::assertNotNull($testcase);
+        self::assertSame(' (src/Foo.php:1)', $testcase->getAttribute('name'));
     }
 
     /**

@@ -48,6 +48,8 @@ final class TransientFailureClassifierTest extends TestCase
         ];
         yield 'transient_code_with_embedded_non_transient_digits' => [new RuntimeException('HTTP 500 Internal Server Error (request id 400123)')];
         yield 'timeout_message_with_embedded_non_transient_digits' => [new RuntimeException('cURL error 28: timed out after 1400 ms')];
+        yield 'rate_limit_quota_with_thousands_separator' => [new RuntimeException("This request would exceed your organization's rate limit of 400,000 input tokens per minute")];
+        yield 'timeout_with_thousands_separated_duration' => [new RuntimeException('Request timed out after 1,400 ms')];
     }
 
     #[DataProvider('nonTransientCases')]
@@ -90,6 +92,8 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'connection_reset' => [new RuntimeException('Connection reset by peer')];
         yield 'http_401_non_transient' => [new RuntimeException('HTTP 401 Unauthorized')];
         yield 'unknown_error' => [new RuntimeException('Something went wrong')];
+        yield 'thousands_separated_figure_is_not_a_status_code' => [new RuntimeException('elapsed 1,429 ms')];
+        yield 'decimal_figure_is_not_a_status_code' => [new RuntimeException('429.5 units consumed')];
     }
 
     /** @return iterable<string, array{Throwable}> */
@@ -100,6 +104,7 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'http_403_forbidden' => [new RuntimeException('Forbidden: 403')];
         yield 'http_404_not_found' => [new RuntimeException('Not Found (404)')];
         yield 'http_422_validation' => [new RuntimeException('422 Unprocessable Entity')];
+        yield 'http_400_at_sentence_end' => [new RuntimeException('The provider rejected the request with HTTP 400.')];
         yield 'non_transient_code_with_embedded_transient_digits' => [new RuntimeException('HTTP 401 Unauthorized (client waited 5001 ms)')];
         yield 'invalid_api_key' => [new RuntimeException('Invalid API key provided')];
         yield 'authentication_failed' => [new RuntimeException('authentication failed')];

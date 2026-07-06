@@ -45,6 +45,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 final class ReviewerAgentTest extends TestCase
 {
@@ -993,6 +994,89 @@ final class ReviewerAgentTest extends TestCase
         $reviewerAgent->review([$vulnerability], $files, new NullCoverageRecorder());
 
         self::assertStringContainsString('sensitiveAction', (string) $capturedUserMessage);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_batch_mode_reports_every_finding_as_reviewed_including_unmatched_ones(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+        $unmatched = $this->makeVulnerabilityAt('src/B.php');
+
+        $batchResponse = (string) json_encode([
+            ['id' => $vulnerability->id(), 'accepted' => true],
+        ]);
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('complete')
+            ->willReturn(LLMResponse::of($batchResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                progressReporter: $recordingProgressReporter,
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
+        );
+
+        $reviewerAgent->review([$vulnerability, $unmatched], [], new NullCoverageRecorder());
+
+        $reviewedEvents = array_values(array_filter(
+            $recordingProgressReporter->events,
+            static fn (array $event): bool => 'review.finding.reviewed' === $event[0],
+        ));
+        self::assertCount(2, $reviewedEvents);
+        self::assertSame(['accepted' => true, 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1], $reviewedEvents[0][1]);
+        self::assertSame(['accepted' => false, 'type' => 'broken_access_control', 'file' => 'src/B.php', 'line' => 1], $reviewedEvents[1][1]);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_a_failed_batch_llm_call_still_reports_each_finding_as_reviewed(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('complete')
+            ->willThrowException(new RuntimeException('provider blip'));
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+                progressReporter: $recordingProgressReporter,
+            ),
+            new ReviewerModeConfiguration(
+                batchSize: 5,
+            ),
+        );
+
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        $reviewedEvents = array_values(array_filter(
+            $recordingProgressReporter->events,
+            static fn (array $event): bool => 'review.finding.reviewed' === $event[0],
+        ));
+        self::assertSame([['accepted' => false, 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1]], array_column($reviewedEvents, 1));
     }
 
     /**

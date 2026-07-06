@@ -47,23 +47,14 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
         $vulnerabilities = $auditReport->vulnerabilities();
 
         $results = [];
-        $types = [];
+        $typesByRule = [];
 
         foreach ($vulnerabilities as $vulnerability) {
-            $types[$vulnerability->type()->owaspReference()] = $vulnerability->type();
+            $typesByRule[$vulnerability->type()->owaspReference()][$vulnerability->type()->value] = $vulnerability->type();
             $results[] = $this->resultFor($vulnerability, $baselinedFingerprints);
         }
 
-        $rules = array_values(array_map(
-            static fn (VulnerabilityType $vulnerabilityType): array => [
-                'id' => $vulnerabilityType->owaspReference(),
-                'name' => $vulnerabilityType->value,
-                'shortDescription' => ['text' => $vulnerabilityType->category()],
-                'helpUri' => $vulnerabilityType->owaspReferenceUrl(),
-                'properties' => ['tags' => [self::cweTag($vulnerabilityType)]],
-            ],
-            $types,
-        ));
+        $rules = array_values(array_map($this->ruleFor(...), $typesByRule));
 
         $cost = $auditReport->cost();
         $sarif = [
@@ -128,15 +119,29 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
 
     private function sarifLevel(VulnerabilitySeverity $vulnerabilitySeverity): string
     {
-        return match ($vulnerabilitySeverity) {
-            VulnerabilitySeverity::CRITICAL, VulnerabilitySeverity::HIGH => 'error',
-            VulnerabilitySeverity::MEDIUM => 'warning',
-            VulnerabilitySeverity::LOW, VulnerabilitySeverity::INFO => 'note',
-        };
+        return SeverityLevelMapper::level($vulnerabilitySeverity, 'note');
     }
 
-    private static function cweTag(VulnerabilityType $vulnerabilityType): string
+    /**
+     * @param non-empty-array<string, VulnerabilityType> $contributingTypes
+     *
+     * @return array<string, mixed>
+     */
+    private function ruleFor(array $contributingTypes): array
     {
-        return \sprintf('external/cwe/cwe-%s', substr($vulnerabilityType->cweReference(), 4));
+        $vulnerabilityType = reset($contributingTypes);
+
+        return [
+            'id' => $vulnerabilityType->owaspReference(),
+            'name' => $vulnerabilityType->value,
+            'shortDescription' => ['text' => $vulnerabilityType->category()],
+            'helpUri' => $vulnerabilityType->owaspReferenceUrl(),
+            'properties' => ['tags' => array_values(array_unique(array_map($this->cweTag(...), $contributingTypes)))],
+        ];
+    }
+
+    private function cweTag(VulnerabilityType $vulnerabilityType): string
+    {
+        return \sprintf('external/cwe/cwe-%d', $vulnerabilityType->cwe()->id());
     }
 }

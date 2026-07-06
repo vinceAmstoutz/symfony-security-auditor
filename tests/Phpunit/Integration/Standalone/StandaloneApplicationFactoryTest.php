@@ -106,9 +106,15 @@ final class StandaloneApplicationFactoryTest extends TestCase
         );
     }
 
-    public function test_it_has_no_project_config_file_without_a_working_directory(): void
+    public function test_it_falls_back_to_the_process_working_directory_when_pwd_is_not_exported(): void
     {
-        self::assertNull(StandaloneApplicationFactory::projectConfigFile([]));
+        $workingDirectory = getcwd();
+        self::assertIsString($workingDirectory);
+
+        self::assertSame(
+            \sprintf('%s/.symfony-security-auditor.yaml', $workingDirectory),
+            StandaloneApplicationFactory::projectConfigFile([]),
+        );
     }
 
     #[RunInSeparateProcess]

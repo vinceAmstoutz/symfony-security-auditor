@@ -96,27 +96,43 @@ final readonly class GrepTool implements ToolInterface
                 continue;
             }
 
-            $matches = [...$matches, ...$this->matchesInFile($file, $pattern)];
+            $matches = $this->appendUpToCap($matches, $this->matchesInFile($file, $pattern));
         }
 
-        return \array_slice($matches, 0, self::MAX_MATCHES);
+        return $matches;
     }
 
     /**
+     * @param list<string>     $matches
+     * @param iterable<string> $newMatches
+     *
      * @return list<string>
      */
-    private function matchesInFile(ProjectFile $projectFile, string $pattern): array
+    private function appendUpToCap(array $matches, iterable $newMatches): array
     {
-        $matches = [];
+        foreach ($newMatches as $newMatch) {
+            if (\count($matches) >= self::MAX_MATCHES) {
+                return $matches;
+            }
+
+            $matches[] = $newMatch;
+        }
+
+        return $matches;
+    }
+
+    /**
+     * @return iterable<string>
+     */
+    private function matchesInFile(ProjectFile $projectFile, string $pattern): iterable
+    {
         $lines = explode("\n", $projectFile->content());
         foreach ($lines as $lineIndex => $line) {
             if (!u($line)->containsAny($pattern)) {
                 continue;
             }
 
-            $matches[] = \sprintf('%s:%d:%s', $projectFile->relativePath(), $lineIndex + 1, u($line)->trim()->toString());
+            yield \sprintf('%s:%d:%s', $projectFile->relativePath(), $lineIndex + 1, u($line)->trim()->toString());
         }
-
-        return $matches;
     }
 }

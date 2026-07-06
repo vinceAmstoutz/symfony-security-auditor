@@ -47,6 +47,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullFormBindingParser
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
@@ -123,6 +124,27 @@ final class DiffCommandEndToEndTest extends TestCase
         self::assertStringContainsString('Hardcoded Secret', $display);
         self::assertStringContainsString('SQL Injection', $display);
         self::assertStringContainsString('Summary: 1 new, 1 fixed, 1 persisting.', $display);
+    }
+
+    public function test_json_diff_output_preserves_console_markup_lookalikes_in_titles(): void
+    {
+        $markupTitle = 'XSS via <info>user-supplied</info> HTML';
+        $previousReport = $this->runAuditAndCapture('previous.json', [$this->finding($markupTitle, 'src/View1.php')]);
+        $currentReport = $this->runAuditAndCapture('current.json', [$this->finding($markupTitle, 'src/View1.php')]);
+
+        $diffCommandTester = new CommandTester(new DiffCommand(new ReportDiffer($this->filesystem), new DiffPresenter()));
+        $diffCommandTester->execute([
+            'previous-report' => $previousReport,
+            'current-report' => $currentReport,
+            '--format' => 'json',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $diffCommandTester->getStatusCode());
+        $decoded = json_decode($diffCommandTester->getDisplay(), true);
+        self::assertIsArray($decoded);
+        self::assertIsArray($decoded['persisting']);
+        self::assertIsArray($decoded['persisting'][0]);
+        self::assertSame($markupTitle, $decoded['persisting'][0]['title']);
     }
 
     /**
@@ -236,6 +258,7 @@ final class DiffCommandEndToEndTest extends TestCase
             $estimateAuditCostUseCase,
             new ListScannedFilesUseCase($projectFileScanner),
             $progressReporterHolder,
+            new AuditedProjectPathHolder('/app'),
             new BaselineProcessor(new Baseline()),
             new UnpricedModelBudgetGuard(
                 new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json'),

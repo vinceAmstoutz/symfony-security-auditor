@@ -38,7 +38,7 @@ final readonly class StandaloneConfigLoader
      */
     public function load(): StandaloneConfig
     {
-        $rawConfig = array_replace_recursive(
+        $rawConfig = $this->merge(
             $this->read($this->xdgConfigPathResolver->configFile()),
             $this->read($this->projectConfigFile),
         );
@@ -47,6 +47,37 @@ final readonly class StandaloneConfigLoader
         $auditConfig = array_diff_key($rawConfig, array_flip(self::PLATFORM_KEYS));
 
         return new StandaloneConfig($auditConfig, $standalonePlatformConfig);
+    }
+
+    /**
+     * Unlike `array_replace_recursive`, list values are replaced wholesale: a
+     * project config declaring `included_paths: [app]` fully overrides a user
+     * config's `[src, config, templates]` instead of index-merging into
+     * `[app, config, templates]`.
+     *
+     * @param array<array-key, mixed> $base
+     * @param array<array-key, mixed> $override
+     *
+     * @return array<array-key, mixed>
+     */
+    private function merge(array $base, array $override): array
+    {
+        foreach ($override as $key => $value) {
+            $baseValue = $base[$key] ?? null;
+            $base[$key] = $this->isMap($value) && $this->isMap($baseValue)
+                ? $this->merge($baseValue, $value)
+                : $value;
+        }
+
+        return $base;
+    }
+
+    /**
+     * @phpstan-assert-if-true array<array-key, mixed> $value
+     */
+    private function isMap(mixed $value): bool
+    {
+        return \is_array($value) && !array_is_list($value);
     }
 
     /**

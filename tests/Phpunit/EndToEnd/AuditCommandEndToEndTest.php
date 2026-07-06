@@ -51,6 +51,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigPar
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
@@ -424,7 +425,28 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame(5, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
     }
 
-    public function test_sarif_format_still_succeeds_when_the_pipeline_already_skipped_every_baselined_finding(): void
+    public function test_baseline_skips_findings_whose_type_the_reviewer_corrected(): void
+    {
+        $this->createProjectDir();
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+        $correctingVerdict = '{"accepted": true, "corrected_type": "ssrf"}';
+
+        $this->makeCommandTester($this->criticalAttackerPayload(), $correctingVerdict)->execute([
+            'project-path' => $this->fixtureDir,
+            '--generate-baseline' => $baselineFile,
+        ]);
+
+        $commandTester = $this->makeCommandTester($this->criticalAttackerPayload(), $correctingVerdict);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertSame(5, substr_count($commandTester->getDisplay(), '[BASELINE-SKIPPED]'));
+    }
+
+    public function test_sarif_format_marks_baselined_findings_as_suppressed_results_and_clears_the_exit_code(): void
     {
         $this->createProjectDir();
         $baselineFile = $this->fixtureDir.'/baseline.json';
@@ -452,7 +474,16 @@ final class AuditCommandEndToEndTest extends TestCase
         $firstRun = $runs[0] ?? null;
         self::assertIsArray($firstRun);
 
-        self::assertSame([], $firstRun['results'] ?? null);
+        $results = $firstRun['results'] ?? null;
+        self::assertIsArray($results);
+        self::assertNotSame([], $results);
+        foreach ($results as $result) {
+            self::assertIsArray($result);
+            self::assertSame(
+                [['kind' => 'external', 'justification' => 'Accepted via audit baseline']],
+                $result['suppressions'] ?? null,
+            );
+        }
     }
 
     public function test_command_json_output_written_to_file(): void
@@ -818,6 +849,7 @@ final class AuditCommandEndToEndTest extends TestCase
             $estimateAuditCostUseCase,
             new ListScannedFilesUseCase($projectFileScanner),
             $progressReporterHolder,
+            new AuditedProjectPathHolder('/app'),
             new BaselineProcessor(new Baseline(), $configuredBaseline),
             new UnpricedModelBudgetGuard(
                 new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json'),
@@ -1116,6 +1148,27 @@ final class AuditCommandEndToEndTest extends TestCase
         ]);
 
         self::assertStringContainsString('No files matched', $commandTester->getDisplay());
+    }
+
+    public function test_show_scanned_keeps_machine_readable_stdout_parseable(): void
+    {
+        $this->createProjectDir();
+
+        $llmClient = $this->throwingLLMClient();
+        $commandTester = $this->makeCommandTesterWithLLM($llmClient, $llmClient);
+        $exitCode = $commandTester->execute(
+            [
+                'project-path' => $this->fixtureDir,
+                '--show-scanned' => true,
+                '--dry-run' => true,
+                '--format' => 'json',
+            ],
+            ['capture_stderr_separately' => true],
+        );
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertIsArray(json_decode($commandTester->getDisplay(), true));
+        self::assertStringContainsString('file(s) in scope', $commandTester->getErrorOutput());
     }
 
     public function test_show_scanned_with_dry_run_lists_files_before_the_cost_estimate(): void

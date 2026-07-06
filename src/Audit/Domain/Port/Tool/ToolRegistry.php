@@ -58,6 +58,14 @@ final readonly class ToolRegistry
         ));
     }
 
+    /**
+     * @return list<ToolInterface>
+     */
+    public function tools(): array
+    {
+        return array_values($this->tools);
+    }
+
     public function has(string $name): bool
     {
         return \array_key_exists($name, $this->tools);

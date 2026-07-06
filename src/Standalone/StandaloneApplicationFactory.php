@@ -70,11 +70,14 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
+     * `$PWD` is a shell export that is absent on Windows and in cron/CI
+     * contexts; the process working directory is always available.
+     *
      * @param array<string, string> $environment
      */
     public static function projectConfigFile(array $environment): ?string
     {
-        $workingDirectory = $environment['PWD'] ?? null;
+        $workingDirectory = $environment['PWD'] ?? self::processWorkingDirectory();
 
         return null !== $workingDirectory ? \sprintf('%s/%s', $workingDirectory, self::PROJECT_CONFIG_FILENAME) : null;
     }
@@ -96,6 +99,13 @@ final readonly class StandaloneApplicationFactory
         $application->addCommand($this->lazyAuditCommand());
 
         return $application;
+    }
+
+    private static function processWorkingDirectory(): ?string
+    {
+        $workingDirectory = getcwd();
+
+        return false !== $workingDirectory ? $workingDirectory : null;
     }
 
     /**

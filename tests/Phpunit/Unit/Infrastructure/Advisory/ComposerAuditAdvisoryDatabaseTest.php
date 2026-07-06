@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
@@ -27,7 +28,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
     {
         $composerAuditRunner = $this->stubRunner($this->validJson());
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, new AuditedProjectPathHolder('/proj'), new NullLogger());
 
         self::assertCount(1, $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.2.3'));
     }
@@ -36,7 +37,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
     {
         $composerAuditRunner = $this->stubRunner($this->validJson());
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, new AuditedProjectPathHolder('/proj'), new NullLogger());
 
         self::assertSame([], $composerAuditAdvisoryDatabase->lookup('vendor/unknown', '1.0.0'));
     }
@@ -50,7 +51,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
             ],
         ]);
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), new AuditedProjectPathHolder('/proj'), new NullLogger());
 
         self::assertCount(1, $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.5.0'));
         self::assertCount(1, $composerAuditAdvisoryDatabase->lookup('vendor/bar', '2.5.0'));
@@ -60,7 +61,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
     {
         $composerAuditRunner = $this->stubRunner($this->validJson());
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, new AuditedProjectPathHolder('/proj'), new NullLogger());
         $entry = $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.2.3')[0];
 
         self::assertSame('CVE-2024-0001', $entry['cve']);
@@ -75,7 +76,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
         $runner = self::createStub(ComposerAuditRunnerInterface::class);
         $runner->method('run')->willThrowException(AdvisorySourceUnavailableException::forBinaryNotFound());
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($runner, '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($runner, new AuditedProjectPathHolder('/proj'), new NullLogger());
 
         self::assertSame([], $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.2.3'));
     }
@@ -84,7 +85,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
     {
         $composerAuditRunner = $this->stubRunner('not json at all');
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, new AuditedProjectPathHolder('/proj'), new NullLogger());
 
         self::assertSame([], $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.2.3'));
     }
@@ -93,7 +94,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
     {
         $composerAuditRunner = $this->stubRunner('{"abandoned": {}}');
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, new AuditedProjectPathHolder('/proj'), new NullLogger());
 
         self::assertSame([], $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.2.3'));
     }
@@ -103,7 +104,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
         $runner = self::createStub(ComposerAuditRunnerInterface::class);
         $runner->method('run')->willThrowException(new RuntimeException('network blew up'));
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($runner, '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($runner, new AuditedProjectPathHolder('/proj'), new NullLogger());
 
         self::assertSame([], $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.2.3'));
     }
@@ -124,7 +125,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
                 ],
             );
 
-        new ComposerAuditAdvisoryDatabase($runner, '/proj', $logger);
+        new ComposerAuditAdvisoryDatabase($runner, new AuditedProjectPathHolder('/proj'), $logger);
     }
 
     public function test_logger_records_warning_when_payload_malformed(): void
@@ -141,7 +142,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
                 }),
             );
 
-        new ComposerAuditAdvisoryDatabase($this->stubRunner('garbage'), '/proj', $logger);
+        new ComposerAuditAdvisoryDatabase($this->stubRunner('garbage'), new AuditedProjectPathHolder('/proj'), $logger);
     }
 
     public function test_logger_records_warning_on_unexpected_throwable(): void
@@ -160,7 +161,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
                 ],
             );
 
-        new ComposerAuditAdvisoryDatabase($runner, '/proj', $logger);
+        new ComposerAuditAdvisoryDatabase($runner, new AuditedProjectPathHolder('/proj'), $logger);
     }
 
     public function test_lookup_returns_all_advisories_for_package_with_multiple_entries(): void
@@ -175,7 +176,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
             ],
         ]);
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), new AuditedProjectPathHolder('/proj'), new NullLogger());
         $entries = $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.2');
 
         self::assertCount(3, $entries);
@@ -195,7 +196,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
             ],
         ]);
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), new AuditedProjectPathHolder('/proj'), new NullLogger());
         $entries = $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.5.0');
 
         self::assertCount(1, $entries);
@@ -215,7 +216,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
             ],
         ]);
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), new AuditedProjectPathHolder('/proj'), new NullLogger());
 
         self::assertSame([], $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.5.0'));
     }
@@ -233,7 +234,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
             ],
         ]);
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), new AuditedProjectPathHolder('/proj'), new NullLogger());
         $entry = $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.5.0')[0];
 
         self::assertSame('Standalone title', $entry['summary']);
@@ -253,7 +254,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
             ],
         ]);
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), new AuditedProjectPathHolder('/proj'), new NullLogger());
         $entry = $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.5.0')[0];
 
         self::assertNull($entry['cve']);
@@ -273,7 +274,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
             ],
         ]);
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), new AuditedProjectPathHolder('/proj'), new NullLogger());
         $entry = $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.5.0')[0];
 
         self::assertNull($entry['link']);
@@ -293,7 +294,7 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
             ],
         ]);
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), new AuditedProjectPathHolder('/proj'), new NullLogger());
 
         self::assertCount(1, $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.5.0'));
     }
@@ -309,10 +310,22 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
             ],
         ]);
 
-        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), '/proj', new NullLogger());
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($this->stubRunner($json), new AuditedProjectPathHolder('/proj'), new NullLogger());
 
         self::assertSame([], $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.0.0'));
         self::assertCount(1, $composerAuditAdvisoryDatabase->lookup('vendor/bar', '1.0.0'));
+    }
+
+    public function test_the_audit_runs_against_the_path_the_holder_carries(): void
+    {
+        $composerAuditRunner = $this->createMock(ComposerAuditRunnerInterface::class);
+        $composerAuditRunner->expects(self::once())->method('run')->with('/audited/project')->willReturn($this->validJson());
+        $auditedProjectPathHolder = new AuditedProjectPathHolder('/container/default');
+        $auditedProjectPathHolder->set('/audited/project');
+
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, $auditedProjectPathHolder, new NullLogger());
+
+        self::assertCount(1, $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.2.3'));
     }
 
     private function stubRunner(string $json): ComposerAuditRunnerInterface

@@ -14,12 +14,13 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command\Exception;
 
 use RuntimeException;
+use Throwable;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final class ReportFileNotReadableException extends RuntimeException
 {
-    public static function forPath(string $path): self
+    public static function forPath(string $path, ?Throwable $throwable = null): self
     {
-        return new self(\sprintf('Report file "%s" does not exist or is not readable.', $path));
+        return new self(\sprintf('Report file "%s" does not exist or is not readable.', $path), previous: $throwable);
     }
 }

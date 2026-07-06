@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
@@ -73,6 +74,45 @@ final class RegexStaticPreScannerTest extends TestCase
 
         self::assertCount(1, $markers);
         self::assertSame('hash_equals_missing', $markers[0]->pattern());
+    }
+
+    #[DataProvider('nonConstantTimeCompareCases')]
+    public function test_it_flags_non_constant_time_compare_on_canonical_variable_names(string $expression): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Service/Verifier.php',
+            '/app/src/Service/Verifier.php',
+            \sprintf("<?php\nclass Verifier { public function foo(\$a, \$b) { return %s; } }", $expression),
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        self::assertCount(1, $markers);
+        self::assertSame('hash_equals_missing', $markers[0]->pattern());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function nonConstantTimeCompareCases(): iterable
+    {
+        yield 'bare signature on the left' => ['$signature === $a'];
+        yield 'bare hash on the left' => ['$hash === $a'];
+        yield 'bare token on the right' => ['$a === $token'];
+        yield 'not-identical guard' => ['$signature !== $a'];
+        yield 'not-identical with suffix on the right' => ['$a !== $expectedHmac'];
+    }
+
+    public function test_it_flags_not_identical_signature_compare_in_webhook_consumer(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Webhook/PaymentWebhookConsumer.php',
+            '/app/src/Webhook/PaymentWebhookConsumer.php',
+            "<?php\nclass PaymentWebhookConsumer { public function consume(\$signature, \$computed) { if (\$signature !== \$computed) { throw new \RuntimeException('bad'); } } }",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('no_hash_equals', $patterns);
     }
 
     public function test_it_flags_raw_filter_in_template(): void

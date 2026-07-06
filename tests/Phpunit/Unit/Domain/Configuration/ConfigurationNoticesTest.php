@@ -95,15 +95,14 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertSame([], $notices);
     }
 
-    public function test_attacker_concurrency_with_tools_enabled_emits_a_notice(): void
+    public function test_attacker_concurrency_with_tools_enabled_emits_no_notice_now_that_tools_ride_along(): void
     {
         $notices = ConfigurationNotices::of(
             $this->audit(['reviewerBatchSize' => 1, 'attackerMaxConcurrent' => 4, 'toolsEnabled' => true, 'structuredCollection' => true]),
             $this->llm(),
         );
 
-        self::assertCount(1, $notices);
-        self::assertStringContainsString('audit.attacker_max_concurrent', $notices[0]);
+        self::assertSame([], $notices);
     }
 
     public function test_attacker_concurrency_with_structured_collection_off_emits_a_notice(): void
@@ -147,6 +146,16 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertSame([], $notices);
     }
 
+    public function test_attacker_concurrency_of_one_with_structured_collection_off_emits_no_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1, 'attackerMaxConcurrent' => 1, 'structuredCollection' => false]),
+            $this->llm(),
+        );
+
+        self::assertSame([], $notices);
+    }
+
     public function test_multiple_simultaneous_footguns_each_emit_their_own_notice(): void
     {
         $notices = ConfigurationNotices::of(
@@ -155,7 +164,7 @@ final class ConfigurationNoticesTest extends TestCase
                 'reviewerMaxConcurrent' => 4,
                 'reviewerToolsEnabled' => true,
                 'attackerMaxConcurrent' => 4,
-                'toolsEnabled' => true,
+                'structuredCollection' => false,
             ]),
             $this->llm(),
         );

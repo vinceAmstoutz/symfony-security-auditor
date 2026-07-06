@@ -179,6 +179,16 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
         return true;
     }
 
+    /**
+     * The reset also zeroes the *amounts* of the pending estimates while
+     * keeping their FIFO slots: the reservations they credit were wiped with
+     * the window counters, so a straddling call's later `record()` must not
+     * subtract a reservation the new window never carried — that would drive
+     * `inputTokensUsed` negative and over-admit the fresh window. The slot is
+     * kept so reconciliation order stays aligned; the straddling call's
+     * actual usage is charged to the current window, erring on the side of
+     * blocking rather than a provider 429.
+     */
     private function resetWindowIfExpired(DateTimeImmutable $now): void
     {
         if ($now < $this->nextWindowStart()) {
@@ -189,6 +199,7 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
         $this->requestsUsed = 0;
         $this->inputTokensUsed = 0;
         $this->outputTokensUsed = 0;
+        $this->pendingInputEstimates = array_map(static fn (): int => 0, $this->pendingInputEstimates);
     }
 
     private function nextWindowStart(): DateTimeImmutable
