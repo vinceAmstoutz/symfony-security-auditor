@@ -95,7 +95,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
             \sprintf(
                 '`sql_injection` (%s, %s)',
                 VulnerabilityType::SQL_INJECTION->owaspReference(),
-                VulnerabilityType::SQL_INJECTION->cweReference(),
+                VulnerabilityType::SQL_INJECTION->cwe()->label(),
             ),
             $output,
         );

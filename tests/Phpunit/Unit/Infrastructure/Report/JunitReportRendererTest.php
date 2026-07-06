@@ -67,7 +67,7 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame('Test Vuln', $failure->getAttribute('message'));
         self::assertStringContainsString('Test description', $failure->textContent);
         self::assertStringContainsString('fix', $failure->textContent);
-        self::assertStringContainsString('CWE: '.VulnerabilityType::SQL_INJECTION->cweReference(), $failure->textContent);
+        self::assertStringContainsString('CWE: '.VulnerabilityType::SQL_INJECTION->cwe()->label(), $failure->textContent);
     }
 
     public function test_it_reports_an_empty_suite_when_no_findings(): void

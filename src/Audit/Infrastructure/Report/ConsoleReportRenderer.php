@@ -88,7 +88,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
             '{{severity}}' => $vulnerability->severity()->label(),
             '{{title}}' => $vulnerability->title(),
             '{{owasp}}' => $vulnerability->type()->owaspReference(),
-            '{{cwe}}' => $vulnerability->type()->cweReference(),
+            '{{cwe}}' => $vulnerability->type()->cwe()->label(),
             '{{filePath}}' => $vulnerability->filePath(),
             '{{lineStart}}' => $vulnerability->lineStart(),
             '{{lineEnd}}' => $vulnerability->lineEnd(),

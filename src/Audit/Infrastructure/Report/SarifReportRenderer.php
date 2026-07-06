@@ -142,6 +142,6 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
 
     private function cweTag(VulnerabilityType $vulnerabilityType): string
     {
-        return \sprintf('external/cwe/cwe-%s', substr($vulnerabilityType->cweReference(), 4));
+        return \sprintf('external/cwe/cwe-%d', $vulnerabilityType->cwe()->id());
     }
 }

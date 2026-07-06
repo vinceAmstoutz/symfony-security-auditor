@@ -383,6 +383,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **`VulnerabilityType::cweReference()`/`cweReferenceUrl()` are replaced by a
+  single `cwe(): CweReference` method.** The two methods duplicated every CWE
+  identifier as a hand-written `'CWE-89'` /
+  `'https://cwe.mitre.org/data/definitions/89.html'` string pair across two
+  separate `match` expressions, so updating one without the other could silently
+  desynchronize label and URL. The new `CweReference` value object
+  (`src/Audit/Domain/Model/CweReference.php`, constructed via
+  `CweReference::of(89)`) derives both `label()` (`'CWE-89'`) and `url()` from a
+  single stored ID, plus an `id(): int` accessor — `SarifReportRenderer`'s CWE
+  tag now reads `->cwe()->id()` directly instead of
+  `substr($vulnerabilityType->cweReference(), 4)`. `Vulnerability::toArray()`'s
+  `cwe` key and every report renderer's CWE output keep the same `'CWE-<n>'`
+  string shape.
 - **`ProjectFile` type detection is now a single source of truth, so its
   `fileType()` and its `is*()` predicates can no longer disagree.**
   `ProjectFile::detectType()` and its private `is*Path()`/`looksLike*()`

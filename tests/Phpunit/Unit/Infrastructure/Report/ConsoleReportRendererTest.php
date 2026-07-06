@@ -487,7 +487,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
         $vulnerability = $this->makeValidatedVuln();
         $output = $this->renderer->render($this->makeReport($vulnerability));
 
-        self::assertStringContainsString('CWE  : '.$vulnerability->type()->cweReference(), $output);
+        self::assertStringContainsString('CWE  : '.$vulnerability->type()->cwe()->label(), $output);
         self::assertStringNotContainsString('{{cwe}}', $output);
     }
 

@@ -90,7 +90,7 @@ final readonly class JunitReportRenderer implements ReportRendererInterface
             $vulnerability->lineStart(),
             $vulnerability->lineEnd(),
             $vulnerability->type()->owaspReference(),
-            $vulnerability->type()->cweReference(),
+            $vulnerability->type()->cwe()->label(),
             $this->stripIllegalXmlCharacters($vulnerability->remediation()),
         )));
         $domElement->appendChild($failure);
