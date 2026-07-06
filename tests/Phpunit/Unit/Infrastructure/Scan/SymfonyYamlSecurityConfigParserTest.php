@@ -104,6 +104,21 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         );
     }
 
+    public function test_a_fully_public_rule_after_a_restricted_rule_for_the_same_path_is_appended_as_or_public(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: ^/reports, methods: [POST], roles: ROLE_ADMIN }
+                    - { path: ^/reports, roles: [] }
+            YAML);
+
+        self::assertSame(
+            ['^/reports' => ['ROLE_ADMIN', 'methods: POST', 'or: PUBLIC']],
+            $accessControl,
+        );
+    }
+
     public function test_a_path_after_a_merged_duplicate_is_still_processed(): void
     {
         $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'

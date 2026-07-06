@@ -94,9 +94,8 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
             $requirements = $this->requirementsOf($entryMap);
 
             if (\array_key_exists($target, $routeAccessMap)) {
-                if ([] !== $requirements) {
-                    $routeAccessMap[$target][] = \sprintf('or: %s', implode(', ', $requirements));
-                }
+                $orRequirements = [] === $requirements ? [self::PUBLIC_ACCESS_MARKER] : $requirements;
+                $routeAccessMap[$target][] = \sprintf('or: %s', implode(', ', $orRequirements));
 
                 continue;
             }

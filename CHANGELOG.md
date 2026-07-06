@@ -687,7 +687,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   to 15, invalidating cached attacker responses for chunks containing a
   controller or entity.
 - **A verdict-cache/reviewer key salt change silently reused stale cached
-  attacker responses across a `reviewer_structured_collection` toggle.**
+  reviewer verdicts across a `reviewer_structured_collection` toggle.**
   `ContainerParameterRegistrar::reviewerKeySalt()`
   (`src/Audit/Infrastructure/Config/`) folded in the prompt version and the
   pre-scanner state but not whether the reviewer runs in structured (tool-call)
@@ -769,15 +769,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   now also lists the bare keyword forms (`' include '`, `' include_once '`,
   `' require '`, `' require_once '`), so a line like `require $path . '.php';`
   is retained instead of elided.
-- **Errors printed to the wrong stream when `--format=json`/`sarif`/… targeted
-  stdout, corrupting the machine-readable document a caller piped downstream.**
-  `AuditCommand`'s generic `catch (Throwable)` block and its
-  `handleBudgetAbort()` path both called
-  `$this->auditPresenter->error($symfonyStyle, ...)` directly, ignoring the same
-  stdout/stderr split every other presentation call already goes through — so an
-  error raised after a machine-readable report had started writing to stdout
-  landed on stdout too, breaking `--format=json > report.json | jq`. Both call
-  sites now route through
+- **Human-facing output printed to the wrong stream when
+  `--format=json`/`sarif`/… targeted stdout, corrupting the machine-readable
+  document a caller piped downstream.** `AuditCommand`'s generic
+  `catch (Throwable)` block, its `handleBudgetAbort()` path, and
+  `beginAuditRun()`'s `runningSection()` call all wrote to the raw
+  `$symfonyStyle` directly, ignoring the same stdout/stderr split every other
+  presentation call already goes through — so an error raised after a
+  machine-readable report had started writing to stdout landed on stdout too,
+  and the "Running audit pipeline..." header preceded every `--format=json`
+  document written to stdout, both breaking `--format=json > report.json | jq`.
+  All three call sites now route through
   `$this->displayStyle($symfonyStyle, $auditCommandInput)`, matching the rest of
   the command.
 - **The CI-failure caution message always said "CRITICAL risk level" regardless
@@ -787,7 +789,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `--fail-on=medium` that failed at a `MEDIUM` risk level still reported "Audit
   completed with CRITICAL risk level" — actively misleading. The message now
   reports the report's actual `riskLevel()` instead of the hardcoded word, e.g.
-  `Risk: MEDIUM. 3 vulnerabilities found.`
+  for a `MEDIUM`-risk report with 3 findings:
+
+  ```text
+  Audit completed at or above the fail-on threshold. Risk: MEDIUM. 3 vulnerabilities found.
+  ```
+
 - **`security.yaml` access-control entries with no `roles:`/`allow_if:`
   requirement (a deliberately public route) were silently skipped instead of
   being recorded as public.**
