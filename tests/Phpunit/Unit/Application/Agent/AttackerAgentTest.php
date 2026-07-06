@@ -1169,6 +1169,52 @@ final class AttackerAgentTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_records_coverage_aborted_for_chunks_not_yet_reached_when_llm_throws_budget_exceeded_mid_run(): void
+    {
+        $files = $this->makeFiveFiles();
+
+        $callCount = 0;
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturnCallback(static function () use (&$callCount): LLMResponse {
+                ++$callCount;
+                if (2 === $callCount) {
+                    throw BudgetExceededException::forTokens(10, 5);
+                }
+
+                return LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(1, 1));
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['fileChunker' => new FileChunker(ChunkingStrategy::Type, 1)]);
+
+        $budgetExceeded = false;
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The agent must rethrow BudgetExceededException.');
+
+        self::assertSame(
+            [
+                ['stage' => 'attacker', 'file' => 'src/A.php', 'status' => 'analyzed'],
+                ['stage' => 'attacker', 'file' => 'src/B.php', 'status' => 'aborted'],
+                ['stage' => 'attacker', 'file' => 'src/C.php', 'status' => 'aborted'],
+                ['stage' => 'attacker', 'file' => 'src/D.php', 'status' => 'aborted'],
+                ['stage' => 'attacker', 'file' => 'src/E.php', 'status' => 'aborted'],
+            ],
+            $auditContext->coverage(),
+        );
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
@@ -3205,6 +3251,7 @@ final class AttackerAgentTest extends TestCase
      *     maxToolIterations?: int,
      *     staticPreScanner?: StaticPreScannerInterface|null,
      *     leanMode?: bool,
+     *     fileChunker?: FileChunker|null,
      * } $overrides
      */
     private function makeAttackerAgent(LLMClientInterface $llmClient, array $overrides = []): AttackerAgent
@@ -3220,6 +3267,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: $overrides['attackerCache'] ?? new NullAttackerCache(),
                 staticPreScanner: $overrides['staticPreScanner'] ?? new NullStaticPreScanner(),
                 progressReporter: new NullProgressReporter(),
+                fileChunker: $overrides['fileChunker'] ?? null,
                 toolRegistryFactory: $overrides['toolRegistryFactory'] ?? null,
             ),
             new AttackerAnalysisSettings(

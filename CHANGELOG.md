@@ -628,6 +628,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A budget/provider abort partway through a sequential attacker run left every
+  chunk after the failing one with no coverage entry at all, instead of the
+  `aborted`/`errored` status the same failure gets under concurrent analysis.**
+  `SequentialChunkAnalyzer::analyzeChunk()`
+  (`src/Audit/Application/Agent/Chunk/`) already recorded coverage for the chunk
+  that threw `BudgetExceededException`/`LLMProviderException` before rethrowing,
+  but `analyze()`'s `foreach` loop had no surrounding `try`/`catch`, so the
+  exception unwound immediately and every later chunk was simply never visited —
+  not even marked `aborted`. `ConcurrentChunkAnalyzer` already handled this
+  correctly via `failRemainingWindows()`, so identical config
+  (`attacker_max_concurrent` ≤ 1 vs. > 1, e.g. `balanced`/`thorough` vs. `fast`)
+  produced a different `coverage` array in the partial report
+  `RunAuditUseCase`/`AuditCommand` write out on abort. `analyze()` now catches
+  both exceptions, marks every not-yet-reached chunk via the new
+  `failRemainingChunks()` (mirroring `failRemainingWindows()`), then rethrows.
 - **`record_vulnerability` calls could omit `confidence` entirely, letting a
   malformed-but-schema-valid finding skip the confidence floor instead of being
   dropped.** `RecordVulnerabilityTool::definition()`

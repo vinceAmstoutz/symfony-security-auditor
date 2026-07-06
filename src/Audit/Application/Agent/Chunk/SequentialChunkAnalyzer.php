@@ -79,7 +79,18 @@ final readonly class SequentialChunkAnalyzer
             ]);
 
             $start = microtime(true);
-            $chunkResult = $this->analyzeChunk($chunk, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
+            try {
+                $chunkResult = $this->analyzeChunk($chunk, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
+            } catch (BudgetExceededException $budgetExceededException) {
+                $this->failRemainingChunks($chunks, $index + 1, 'aborted', $coverageRecorder);
+
+                throw $budgetExceededException;
+            } catch (LLMProviderException $llmProviderException) {
+                $this->failRemainingChunks($chunks, $index + 1, 'errored', $coverageRecorder);
+
+                throw $llmProviderException;
+            }
+
             ChunkFindingProgress::report($this->progressReporter, $chunkResult->vulnerabilities());
             $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, [
                 'chunk' => $index + 1,
@@ -101,6 +112,24 @@ final readonly class SequentialChunkAnalyzer
         }
 
         return [$allVulnerabilities, $totalDropsByReason];
+    }
+
+    /**
+     * Marks every chunk from `$fromIndex` onward — the ones the loop never
+     * reached because an earlier chunk aborted the run — under the same
+     * status, mirroring `ConcurrentChunkAnalyzer::failRemainingWindows()`.
+     *
+     * @param list<list<ProjectFile>> $chunks
+     */
+    private function failRemainingChunks(array $chunks, int $fromIndex, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        foreach ($chunks as $index => $chunk) {
+            if ($index < $fromIndex) {
+                continue;
+            }
+
+            ChunkCoverageRecorder::record($chunk, $status, $coverageRecorder);
+        }
     }
 
     /**
