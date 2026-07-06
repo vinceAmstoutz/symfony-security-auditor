@@ -77,7 +77,8 @@ final readonly class RetryPolicy
      * `Retry-After` response header via `RetryAfterHeaderParser`), the hint
      * wins over the local exponential schedule. Otherwise the delay is
      * `rateLimitInitialDelayMs` grown by `backoffMultiplier ** (attempt − 1)`
-     * with the same jitter as `delayMs()`. The result is always clamped to
+     * jittered upward-only (unlike `delayMs()`'s symmetric jitter) so it never
+     * undercuts a provider's requested wait. The result is always clamped to
      * `rateLimitMaxDelayMs` so a hostile provider cannot push the wait past
      * a sane ceiling.
      *

@@ -62,6 +62,11 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
     private const string PUBLIC_ACCESS_MARKER = 'PUBLIC';
 
     /**
+     * @var list<string>
+     */
+    private const array REQUIREMENT_KEYS = ['roles', 'role', 'allow_if', 'methods', 'ips', 'requires_channel'];
+
+    /**
      * Symfony evaluates `access_control` first-match-wins, so a later rule for
      * an already-seen path applies only to requests the earlier rule's
      * constraints (methods, ips, …) did not match — it is appended as a single
@@ -82,7 +87,7 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
         foreach ($entries as $entry) {
             $entryMap = $this->mapOf($entry);
             $target = $this->targetOf($entryMap);
-            if (null === $target) {
+            if (null === $target || !$this->hasAnyRequirementKey($entryMap)) {
                 continue;
             }
 
@@ -174,6 +179,25 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
         }
 
         return null;
+    }
+
+    /**
+     * Distinguishes an entry that declares a requirement key but with an
+     * empty value (`roles: []` — a deliberate public rule) from one that
+     * declares no requirement key at all (a degenerate entry with nothing to
+     * record).
+     *
+     * @param array<string, mixed> $entry
+     */
+    private function hasAnyRequirementKey(array $entry): bool
+    {
+        foreach (self::REQUIREMENT_KEYS as $requirementKey) {
+            if (\array_key_exists($requirementKey, $entry)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

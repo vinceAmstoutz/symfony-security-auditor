@@ -509,7 +509,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
-        self::assertSame(18, substr_count($prompt, '<skills role="'));
+        self::assertSame(20, substr_count($prompt, '<skills role="'));
     }
 
     public function test_stable_mode_system_prompt_is_byte_identical_across_chunk_types(): void
