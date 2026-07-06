@@ -729,7 +729,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `NonTransientLLMFailureException`. Both are now recognized as transient and
   retried through the normal backoff path.
 - **A credential environment variable named with the secret keyword in the
-  middle (`DB_TOKEN_STAGING`, `APP_SECRET_KEY`) skipped redaction.**
+  middle (`DB_TOKEN_STAGING`, `MAILER_PASSWORD_ENC`) skipped redaction.**
   `RegexSecretScrubber`'s `env_assignment` pattern
   (`src/Audit/Infrastructure/FileSystem/`) only matched keyword-then-suffix
   names (`TOKEN_STAGING`) or a bare keyword, missing names where the keyword
@@ -815,15 +815,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   the same two lenient bullets as JSON mode, so the two collection modes apply
   identical judgment criteria; `ReviewerPromptBuilder::PROMPT_VERSION` bumps to
   invalidate cached verdicts produced under the old stricter wording.
-- **`--dry-run`'s cost estimate scaled with `str_repeat()`-style aggregation
-  instead of summing each file's own token count, overestimating input tokens
-  for chunks of files with uneven sizes.** `EstimateAuditCostUseCase::execute()`
+- **`--dry-run`'s cost estimate collapsed every file into one synthetic
+  `str_repeat('x', $totalChars)` string instead of summing each file's own token
+  count, so the estimate didn't reflect how the real attacker loop actually
+  accumulates tokens per chunk.** `EstimateAuditCostUseCase::execute()`
   (`src/Audit/Application/UseCase/`) now sums
   `TokenEstimatorInterface::estimateTokens()` per file before multiplying by
-  `max_iterations`, matching how the real attacker loop accumulates tokens per
-  chunk. `--dry-run` also now accepts `--since`, narrowing the estimate to
-  git-changed files the same way a real `audit:run --since` would, via the same
-  `GitChangedFilesResolverInterface` port the real run uses.
+  `max_iterations`, matching the real run's per-chunk accounting instead of one
+  aggregate character count. `--dry-run` also now accepts `--since`, narrowing
+  the estimate to git-changed files the same way a real `audit:run --since`
+  would, via the same `GitChangedFilesResolverInterface` port the real run uses.
 - **The advisory cache never expired, and stayed wired even when
   `cache.enabled: false` explicitly opted the project out of caching.**
   `LockfileHashedAdvisoryCache` (`src/Audit/Infrastructure/Advisory/`) keyed its

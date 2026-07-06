@@ -155,6 +155,26 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertStringContainsString('require_once $bootstrap;', $sliced);
     }
 
+    #[DataProvider('parenthesizedInclusionCases')]
+    public function test_parenthesized_inclusion_calls_are_retained(string $inclusionLine): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)."        {$inclusionLine}\n".str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString($inclusionLine, $sliced);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function parenthesizedInclusionCases(): iterable
+    {
+        yield 'include' => ['include($partial);'];
+        yield 'include_once' => ['include_once($partial);'];
+        yield 'require' => ['require($bootstrap);'];
+        yield 'require_once' => ['require_once($bootstrap);'];
+    }
+
     private function largeControllerWithBareIncludes(): string
     {
         $inert = str_repeat("        \$x = INERT_MARKER;\n", 25);
