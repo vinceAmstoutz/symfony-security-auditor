@@ -264,11 +264,16 @@ final readonly class AuditCommand
         AuditCommandInput $auditCommandInput,
         AuditAbortedByBudgetException $auditAbortedByBudgetException,
     ): int {
+        $auditReport = $this->findingTypeFilter->apply($auditAbortedByBudgetException->partialReport());
+        $baselineResult = $this->baselineProcessor->apply($auditReport, $auditCommandInput->baseline);
+        $reportToWrite = OutputFormat::Sarif === $auditCommandInput->format ? $auditReport : $baselineResult->report;
+
         $this->reportWriter->write(
-            $auditAbortedByBudgetException->partialReport(),
+            $reportToWrite,
             $auditCommandInput->format,
             $auditCommandInput->output,
             $symfonyStyle,
+            $baselineResult->acceptedFingerprints,
         );
         $this->auditPresenter->error($this->displayStyle($symfonyStyle, $auditCommandInput), $auditAbortedByBudgetException);
 

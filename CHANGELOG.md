@@ -628,6 +628,36 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A budget/provider abort partway through PoC synthesis silently discarded
+  every PoC already generated for earlier findings in the same run.**
+  `PoCSynthesizer::synthesize()` (`src/Audit/Application/Agent/`) accumulates
+  enriched findings into a local `$enriched` array only returned once the whole
+  input list is processed; its `foreach` loop had no surrounding `try`/`catch`,
+  so a `BudgetExceededException`/`LLMProviderException` from `synthesizeOne()`
+  on a later finding threw the accumulator away entirely — unlike the
+  attacker/reviewer aborts above, this stage has no coverage bookkeeping at all,
+  so nothing survived. `PoCSynthesisStage::process()`
+  (`src/Audit/Application/Pipeline/Stage/`) now calls `synthesize()` once per
+  finding instead of once for the whole batch, persisting each result to
+  `AuditContext` via `replaceVulnerability()` immediately — `synthesize()`
+  itself is unchanged (it already made one LLM call per finding internally, so
+  this is a pure call-site restructuring, not a behavior or performance change).
+  A budget-aborted partial report's `coverage`/finding list now keeps the PoCs
+  synthesized before the abort instead of losing all of them.
+- **A budget-aborted run's partial report skipped the finding-type filter and
+  baseline suppression every other exit path applies, so an excluded or
+  already-baselined finding could reappear in the partial output.**
+  `AuditCommand::handleBudgetAbort()` (`src/Command/`) wrote
+  `AuditAbortedByBudgetException::partialReport()` straight to
+  `reportWriter->write()`, skipping both the `findingTypeFilter->apply()` call
+  the normal completion path always makes and the
+  `baselineProcessor->apply()`/suppression-fingerprint handling
+  `finalizeAuditRun()` applies before writing. A budget abort mid-run with
+  `audit.excluded_types` configured, or with a baseline file that already
+  accepted some findings, produced a partial JSON/SARIF/etc. report showing
+  those findings as active — for SARIF specifically, re-flagging in GitHub code
+  scanning findings the team had already accepted. `handleBudgetAbort()` now
+  applies both in the same order the completion path does before writing.
 - **The same missing-coverage-on-abort defect existed on the reviewer side too,
   across all five review analyzers, and the two concurrent ones also discarded
   already-applied verdicts from a successful earlier window.**
