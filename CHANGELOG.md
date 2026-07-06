@@ -761,7 +761,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `RetryingPlatformInvoker`'s retry loop now also call `record(0, 0)` to release
   a reservation whose call failed and fell back to a fresh attempt — previously
   that reservation was never reconciled at all, leaking into the window's usage
-  for the rest of the minute.
+  for the rest of the minute. The queue is also window-safe now: a call reserved
+  at `:59` and reconciled at `:01` used to credit its estimate against the _new_
+  window — whose counters the reset had already zeroed — driving
+  `inputTokensUsed` negative and over-admitting the fresh minute into provider
+  429s. The window reset now zeroes the amounts of the pending estimates
+  (keeping their FIFO slots so reconciliation order stays aligned), so a
+  straddling call's actual usage is charged to the current window instead of
+  crediting a reservation it never carried.
 - **The attacker cache key ignored the code-slicing configuration, serving stale
   findings after `audit.code_slicing.enabled` or
   `audit.code_slicing.min_lines_before_slicing` changed.** The cache key

@@ -158,6 +158,63 @@ final class TokenBucketRateLimiterTest extends TestCase
     /**
      * @throws RateLimitRequestTooLargeException
      */
+    public function test_a_record_for_a_previous_window_call_cannot_credit_the_new_window(): void
+    {
+        $mockClock = new MockClock('2026-01-01T12:00:59+00:00');
+        $sleeper = $this->createRecordingSleeper($mockClock);
+
+        $tokenBucketRateLimiter = new TokenBucketRateLimiter(
+            rateLimitConfiguration: new RateLimitConfiguration(
+                requestsPerMinute: null,
+                inputTokensPerMinute: 10_000,
+                outputTokensPerMinute: null,
+            ),
+            clock: $this->boundedClock($mockClock),
+            sleeper: $sleeper,
+        );
+
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 8_000);
+        $mockClock->modify('+2 seconds');
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 5_000);
+        $tokenBucketRateLimiter->record(inputTokens: 1_000, outputTokens: 0);
+
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 9_000);
+
+        self::assertNotSame([], $sleeper->sleepsMs, 'a stale reconciliation must not over-admit the new window');
+    }
+
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
+    public function test_reconciliation_still_frees_capacity_for_calls_acquired_after_the_window_reset(): void
+    {
+        $mockClock = new MockClock('2026-01-01T12:00:59+00:00');
+        $sleeper = $this->createRecordingSleeper($mockClock);
+
+        $tokenBucketRateLimiter = new TokenBucketRateLimiter(
+            rateLimitConfiguration: new RateLimitConfiguration(
+                requestsPerMinute: null,
+                inputTokensPerMinute: 10_000,
+                outputTokensPerMinute: null,
+            ),
+            clock: $this->boundedClock($mockClock),
+            sleeper: $sleeper,
+        );
+
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 8_000);
+        $mockClock->modify('+2 seconds');
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 5_000);
+        $tokenBucketRateLimiter->record(inputTokens: 1_000, outputTokens: 0);
+        $tokenBucketRateLimiter->record(inputTokens: 500, outputTokens: 0);
+
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 8_000);
+
+        self::assertSame([], $sleeper->sleepsMs, 'the new-window reservation must still reconcile down to its actual');
+    }
+
+    /**
+     * @throws RateLimitRequestTooLargeException
+     */
     public function test_output_token_exhaustion_blocks_next_acquire(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
