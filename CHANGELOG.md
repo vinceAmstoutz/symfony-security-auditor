@@ -603,6 +603,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Three `VulnerabilityType` CWE/OWASP mappings are corrected against the
+  official MITRE CWE 4.20 catalog and OWASP Top 10:2025 data.**
+  `ROLE_ESCALATION` moves from `CWE-269` (Improper Privilege Management — a
+  Discouraged, Class-level entry whose own MITRE guidance warns it is routinely
+  conflated with the "privilege escalation" technical impact rather than a root
+  cause) to `CWE-266` (Incorrect Privilege Assignment), a precise,
+  `Allowed`-status child of CWE-269 that matches the case's specific intent
+  without colliding with the neighboring `MISSING_VOTER`/`VOTER_BYPASS` cases.
+  `INSECURE_REDIRECT` and `OPEN_REDIRECT` move from
+  `OWASP A02:2025 - Security Misconfiguration` to
+  `OWASP A01:2025 - Broken Access Control` — their shared `CWE-601` is
+  explicitly listed under OWASP's own official A01:2025 mapped-CWE set, not
+  under Security Misconfiguration, and the sibling `SSRF` case (same CWE-610
+  lineage) was already correctly filed under A01. The CWE for
+  `INSECURE_REDIRECT`/`OPEN_REDIRECT` is unchanged (`CWE-601`).
 - **`audit.tools_enabled` now actually gives the attacker its investigation
   tools in the default structured-collection mode.** With
   `audit.structured_collection: true` (the default), the attacker built the
