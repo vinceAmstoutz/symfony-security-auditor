@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
-use InvalidArgumentException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
 
 final readonly class RiskMarker
 {
@@ -24,18 +24,21 @@ final readonly class RiskMarker
         private string $description,
     ) {}
 
+    /**
+     * @throws InvalidRiskMarkerException
+     */
     public static function create(string $filePath, int $line, string $pattern, string $description): self
     {
         if ('' === trim($filePath)) {
-            throw new InvalidArgumentException('File path cannot be empty');
+            throw InvalidRiskMarkerException::forBlankFilePath();
         }
 
         if ($line < 1) {
-            throw new InvalidArgumentException('Line number must be >= 1');
+            throw InvalidRiskMarkerException::forNonPositiveLine();
         }
 
         if ('' === trim($pattern)) {
-            throw new InvalidArgumentException('Pattern label cannot be empty');
+            throw InvalidRiskMarkerException::forBlankPattern();
         }
 
         return new self($filePath, $line, $pattern, $description);

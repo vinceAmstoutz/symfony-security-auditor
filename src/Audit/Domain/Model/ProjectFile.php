@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
-use InvalidArgumentException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 
 final readonly class ProjectFile
 {
@@ -25,13 +25,16 @@ final readonly class ProjectFile
         private int $linesCount,
     ) {}
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public static function create(
         string $relativePath,
         string $absolutePath,
         string $content,
     ): self {
         if ('' === trim($relativePath)) {
-            throw new InvalidArgumentException('Relative path cannot be empty');
+            throw InvalidProjectFileException::forBlankRelativePath();
         }
 
         return new self(

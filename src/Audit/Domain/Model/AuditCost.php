@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
-use InvalidArgumentException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 
 /**
  * Token + USD cost attribution for an audit run.
@@ -45,19 +45,21 @@ final readonly class AuditCost
      *                                                                                                                      entry's totals must
      *                                                                                                                      not exceed the
      *                                                                                                                      aggregate
+     *
+     * @throws InvalidAuditCostException
      */
     public static function of(int $inputTokens, int $outputTokens, float $estimatedCostUsd, string $primaryModel, array $byRole = []): self
     {
         if ($inputTokens < 0) {
-            throw new InvalidArgumentException(\sprintf('inputTokens must be >= 0, got %d', $inputTokens));
+            throw InvalidAuditCostException::forNegativeInputTokens($inputTokens);
         }
 
         if ($outputTokens < 0) {
-            throw new InvalidArgumentException(\sprintf('outputTokens must be >= 0, got %d', $outputTokens));
+            throw InvalidAuditCostException::forNegativeOutputTokens($outputTokens);
         }
 
         if ($estimatedCostUsd < 0.0) {
-            throw new InvalidArgumentException(\sprintf('estimatedCostUsd must be >= 0.0, got %f', $estimatedCostUsd));
+            throw InvalidAuditCostException::forNegativeCost($estimatedCostUsd);
         }
 
         return new self($inputTokens, $outputTokens, round($estimatedCostUsd, 6), $primaryModel, $byRole);

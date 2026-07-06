@@ -13,8 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 
 final class AuditCostTest extends TestCase
@@ -95,19 +95,19 @@ final class AuditCostTest extends TestCase
 
     public function test_negative_input_tokens_rejected(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidAuditCostException::class);
         AuditCost::of(-1, 0, 0.0, 'm');
     }
 
     public function test_negative_output_tokens_rejected(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidAuditCostException::class);
         AuditCost::of(0, -1, 0.0, 'm');
     }
 
     public function test_negative_cost_rejected(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidAuditCostException::class);
         AuditCost::of(0, 0, -0.01, 'm');
     }
 }

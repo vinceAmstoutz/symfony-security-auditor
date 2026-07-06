@@ -13,9 +13,9 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool;
 
-use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 
 /**
  * Holds the catalog of tools available to the attacker agent and dispatches
@@ -29,6 +29,8 @@ final readonly class ToolRegistry
 
     /**
      * @param iterable<ToolInterface> $tools
+     *
+     * @throws InvalidToolRegistryException
      */
     public function __construct(
         iterable $tools,
@@ -38,7 +40,7 @@ final readonly class ToolRegistry
         foreach ($tools as $tool) {
             $name = $tool->definition()->name;
             if (\array_key_exists($name, $byName)) {
-                throw new InvalidArgumentException(\sprintf('Duplicate tool registered: %s', $name));
+                throw InvalidToolRegistryException::forDuplicateTool($name);
             }
 
             $byName[$name] = $tool;

@@ -1,0 +1,29 @@
+<?php
+
+/*
+ * This file is part of the vinceamstoutz/symfony-security-auditor package.
+ *
+ * (c) Vincent Amstoutz <vincent.amstoutz.dev@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+declare(strict_types=1);
+
+namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception;
+
+use InvalidArgumentException;
+
+final class InvalidAuditBudgetException extends InvalidArgumentException
+{
+    public static function forNonPositiveTokens(int $maxTokens): self
+    {
+        return new self(\sprintf('maxTokens must be > 0, got %d', $maxTokens));
+    }
+
+    public static function forNonPositiveCost(float $maxCostUsd): self
+    {
+        return new self(\sprintf('maxCostUsd must be > 0.0, got %f', $maxCostUsd));
+    }
+}

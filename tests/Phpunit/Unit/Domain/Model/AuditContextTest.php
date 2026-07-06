@@ -13,9 +13,9 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
-use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
@@ -69,7 +69,7 @@ final class AuditContextTest extends TestCase
 
     public function test_it_throws_on_invalid_project_path(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidAuditContextException::class);
         AuditContext::forProject('/nonexistent/path/xyz');
     }
 

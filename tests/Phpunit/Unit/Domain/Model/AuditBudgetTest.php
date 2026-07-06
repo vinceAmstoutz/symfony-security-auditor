@@ -13,8 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditBudgetException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 
 final class AuditBudgetTest extends TestCase
@@ -56,7 +56,7 @@ final class AuditBudgetTest extends TestCase
 
     public function test_for_tokens_rejects_zero(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidAuditBudgetException::class);
         $this->expectExceptionMessage('maxTokens must be > 0, got 0');
 
         AuditBudget::forTokens(0);
@@ -64,7 +64,7 @@ final class AuditBudgetTest extends TestCase
 
     public function test_for_cost_rejects_zero(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidAuditBudgetException::class);
         $this->expectExceptionMessage('maxCostUsd must be > 0.0');
 
         AuditBudget::forCost(0.0);
@@ -72,7 +72,7 @@ final class AuditBudgetTest extends TestCase
 
     public function test_for_both_rejects_zero_tokens(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidAuditBudgetException::class);
         $this->expectExceptionMessage('maxTokens must be > 0');
 
         AuditBudget::forBoth(0, 1.0);
@@ -80,7 +80,7 @@ final class AuditBudgetTest extends TestCase
 
     public function test_for_both_rejects_zero_cost(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidAuditBudgetException::class);
         $this->expectExceptionMessage('maxCostUsd must be > 0.0');
 
         AuditBudget::forBoth(100, 0.0);
@@ -113,7 +113,7 @@ final class AuditBudgetTest extends TestCase
 
     public function test_for_tokens_rejects_negative(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidAuditBudgetException::class);
         $this->expectExceptionMessage('maxTokens must be > 0, got -1');
 
         AuditBudget::forTokens(-1);
@@ -121,7 +121,7 @@ final class AuditBudgetTest extends TestCase
 
     public function test_for_cost_rejects_negative(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidAuditBudgetException::class);
         $this->expectExceptionMessage('maxCostUsd must be > 0.0');
 
         AuditBudget::forCost(-0.5);

@@ -47,4 +47,9 @@ final class InvalidRetryConfigurationException extends InvalidArgumentException
     {
         return new self(\sprintf('rateLimitMaxDelayMs must be >= 0, got %d', $rateLimitMaxDelayMs));
     }
+
+    public static function forNonPositiveAttempt(int $attempt): self
+    {
+        return new self(\sprintf('attempt must be >= 1, got %d', $attempt));
+    }
 }

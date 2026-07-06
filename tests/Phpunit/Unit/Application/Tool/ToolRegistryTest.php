@@ -13,12 +13,12 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Tool;
 
-use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
@@ -95,7 +95,7 @@ final class ToolRegistryTest extends TestCase
 
     public function test_constructor_rejects_duplicate_tool_names(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidToolRegistryException::class);
 
         new ToolRegistry(
             tools: [$this->makeTool('a'), $this->makeTool('a')],

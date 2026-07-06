@@ -13,10 +13,10 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
-use InvalidArgumentException;
 use Iterator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 
@@ -74,7 +74,7 @@ final class ProjectFileTest extends TestCase
 
     public function test_it_throws_on_empty_relative_path(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidProjectFileException::class);
         ProjectFile::create(relativePath: '  ', absolutePath: '/app/file.php', content: '<?php');
     }
 

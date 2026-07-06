@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool;
 
-use InvalidArgumentException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 
 /**
  * Provider-agnostic description of a tool the LLM may call. The infrastructure
@@ -24,6 +24,8 @@ final readonly class ToolDefinition
 {
     /**
      * @param array<string, mixed> $parametersSchema JSON Schema describing the tool's input arguments
+     *
+     * @throws InvalidToolDefinitionException
      */
     public function __construct(
         public string $name,
@@ -31,11 +33,11 @@ final readonly class ToolDefinition
         public array $parametersSchema,
     ) {
         if ('' === trim($name)) {
-            throw new InvalidArgumentException('Tool name cannot be empty');
+            throw InvalidToolDefinitionException::forBlankName();
         }
 
         if ('' === trim($description)) {
-            throw new InvalidArgumentException('Tool description cannot be empty');
+            throw InvalidToolDefinitionException::forBlankDescription();
         }
     }
 }

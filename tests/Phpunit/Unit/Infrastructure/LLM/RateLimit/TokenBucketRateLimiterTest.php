@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM\RateLimit;
 
 use DateTimeImmutable;
-use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
@@ -23,6 +22,7 @@ use Symfony\Component\Clock\MockClock;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\RateLimitRequestTooLargeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Exception\InvalidRateLimiterConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 
 final class TokenBucketRateLimiterTest extends TestCase
@@ -434,7 +434,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
         $sleeper = $this->createRecordingSleeper($mockClock);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidRateLimiterConfigurationException::class);
         $this->expectExceptionMessage('TokenBucketRateLimiter requires at least one rate-limit dimension; wire NullRateLimiter for fully-disabled config.');
 
         new TokenBucketRateLimiter(
@@ -490,7 +490,7 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidRateLimiterConfigurationException::class);
         $this->expectExceptionMessage('estimatedInputTokens must be >= 0, got -1');
 
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: -1);

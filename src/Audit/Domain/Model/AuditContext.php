@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 use DateTimeImmutable;
-use InvalidArgumentException;
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
 final class AuditContext implements CoverageRecorderInterface
@@ -66,11 +66,13 @@ final class AuditContext implements CoverageRecorderInterface
      *                                           baseline fingerprints of accepted
      *                                           findings; matching attacker findings
      *                                           are dropped before the reviewer runs
+     *
+     * @throws InvalidAuditContextException
      */
     public static function forProject(string $projectPath, array $scanPaths = [], bool $cacheBypassed = false, ?string $diffSinceRef = null, array $acceptedFingerprints = []): self
     {
         if (!is_dir($projectPath)) {
-            throw new InvalidArgumentException(\sprintf('Project path "%s" is not a valid directory', $projectPath));
+            throw InvalidAuditContextException::forInvalidProjectPath($projectPath);
         }
 
         return new self(

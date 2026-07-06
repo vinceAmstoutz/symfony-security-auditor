@@ -13,8 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Telemetry;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 
 final class TokenUsageRecorderTest extends TestCase
@@ -126,7 +126,7 @@ final class TokenUsageRecorderTest extends TestCase
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(NegativeTokenCountException::class);
         $this->expectExceptionMessage('Cache read tokens must be >= 0, got -2');
 
         $tokenUsageRecorder->record(0, 0, -2, 0);
@@ -136,7 +136,7 @@ final class TokenUsageRecorderTest extends TestCase
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(NegativeTokenCountException::class);
         $this->expectExceptionMessage('Cache creation tokens must be >= 0, got -7');
 
         $tokenUsageRecorder->record(0, 0, 0, -7);
@@ -146,7 +146,7 @@ final class TokenUsageRecorderTest extends TestCase
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(NegativeTokenCountException::class);
         $this->expectExceptionMessage('Input tokens must be >= 0, got -1');
 
         $tokenUsageRecorder->record(-1, 0);
@@ -156,7 +156,7 @@ final class TokenUsageRecorderTest extends TestCase
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(NegativeTokenCountException::class);
         $this->expectExceptionMessage('Output tokens must be >= 0, got -5');
 
         $tokenUsageRecorder->record(0, -5);
