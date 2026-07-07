@@ -81,7 +81,7 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
             \sprintf('### %s — %s', $vulnerability->severity()->label(), $this->escapeFences($vulnerability->title())),
             '',
             \sprintf('- **Type:** `%s` (%s, %s)', $vulnerability->type()->value, $vulnerability->type()->owaspReference(), $vulnerability->type()->cwe()->label()),
-            \sprintf('- **Location:** `%s:%d-%d`', $this->escapeFences($vulnerability->filePath()), $vulnerability->lineStart(), $vulnerability->lineEnd()),
+            \sprintf('- **Location:** %s', $this->inlineCode(\sprintf('%s:%d-%d', $vulnerability->filePath(), $vulnerability->lineStart(), $vulnerability->lineEnd()))),
             \sprintf('- **Confidence:** %s%%', \sprintf('%.0f', $vulnerability->confidence() * 100)),
             '',
             $this->escapeFences($vulnerability->description()),
@@ -110,6 +110,30 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
     private function escapeFences(string $text): string
     {
         return str_replace(['`', '~', '<', '>'], ['\\`', '\\~', '&lt;', '&gt;'], $text);
+    }
+
+    /**
+     * Backslash escapes do not work inside a CommonMark code span — the
+     * standard way to safely wrap arbitrary text in one is a delimiter longer
+     * than any backtick run the text contains, padded with a leading space if
+     * the text starts with a backtick (the only edge this is ever called with
+     * — a location string always ends in a digit). `<`/`>` need no manual
+     * entity encoding here: CommonMark renders code-span content as literal
+     * text and HTML-escapes it automatically.
+     */
+    private function inlineCode(string $text): string
+    {
+        $delimiter = str_repeat('`', $this->longestBacktickRun($text) + 1);
+        $padding = str_starts_with($text, '`') ? ' ' : '';
+
+        return \sprintf('%s%s%s%s%s', $delimiter, $padding, $text, $padding, $delimiter);
+    }
+
+    private function longestBacktickRun(string $text): int
+    {
+        preg_match_all('/`+/', $text, $matches);
+
+        return [] === $matches[0] ? 0 : max(array_map(\strlen(...), $matches[0]));
     }
 
     private function codeBlock(string $text): string

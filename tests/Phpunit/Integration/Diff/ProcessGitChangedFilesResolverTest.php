@@ -135,6 +135,21 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     /**
      * @throws GitChangedFilesUnavailableException
      */
+    public function test_it_includes_a_changed_file_whose_name_contains_a_double_quote(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // initial', 'init');
+        $this->createBranch('feature');
+        $this->commit('src/weird"quote.php', '<?php // odd name', 'add odd name');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+
+        self::assertContains('src/weird"quote.php', $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_includes_uncommitted_changes_against_head(): void
     {
         $this->initRepo();

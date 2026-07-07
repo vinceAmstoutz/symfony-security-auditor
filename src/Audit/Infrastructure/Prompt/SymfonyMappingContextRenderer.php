@@ -26,6 +26,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
  */
 final readonly class SymfonyMappingContextRenderer
 {
+    private const string DELIMITER_CANDIDATES = '#~!%@';
+
     public static function renderVoterCoverage(SymfonyMapping $symfonyMapping): string
     {
         $voterCapabilities = $symfonyMapping->voterCapabilities();
@@ -118,7 +120,8 @@ final readonly class SymfonyMappingContextRenderer
      * Returns the roles of the first `security.yaml` `access_control` rule whose
      * path pattern matches the route, or null when none matches. Symfony treats
      * the `access_control` `path` as a regular expression, so it is matched as
-     * one; a malformed pattern simply fails to match rather than throwing.
+     * one; a malformed pattern, or one containing every delimiter candidate,
+     * simply fails to match rather than throwing.
      *
      * @param array<string, list<string>> $routeAccessMap
      *
@@ -131,8 +134,26 @@ final readonly class SymfonyMappingContextRenderer
         }
 
         foreach ($routeAccessMap as $pattern => $roles) {
-            if (1 === preg_match(\sprintf('{%s}', $pattern), $routePath)) {
+            $delimiter = self::delimiterAvoiding($pattern);
+            if (null !== $delimiter && 1 === preg_match($delimiter.$pattern.$delimiter, $routePath)) {
                 return $roles;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Picks a PCRE delimiter guaranteed absent from the pattern, so the pattern
+     * can never prematurely close or corrupt the delimited expression — unlike
+     * a fixed delimiter (`#`, `{}`, …), which a sufficiently adversarial pattern
+     * can always collide with.
+     */
+    private static function delimiterAvoiding(string $pattern): ?string
+    {
+        foreach (str_split(self::DELIMITER_CANDIDATES) as $candidate) {
+            if (!str_contains($pattern, $candidate)) {
+                return $candidate;
             }
         }
 

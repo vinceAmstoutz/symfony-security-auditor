@@ -121,8 +121,10 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
      */
     private function runGit(string $projectPath, array $argv): array
     {
-        // core.quotepath=off stops git C-quoting non-ASCII paths, which would never match ProjectFile paths.
-        $process = new Process(['git', '-c', 'core.quotepath=off', ...$argv], $projectPath);
+        // -z NUL-terminates each path instead of newline-terminating it, and disables
+        // git's C-style quoting of non-ASCII bytes AND of literal quotes/backslashes/
+        // control characters alike — core.quotepath=off alone only covers the former.
+        $process = new Process(['git', '-c', 'core.quotepath=off', ...$argv, '-z'], $projectPath);
 
         try {
             $process->mustRun();
@@ -130,11 +132,8 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
             throw GitChangedFilesUnavailableException::fromProcessFailure($argv[\count($argv) - 1] ?? '', $process->getErrorOutput(), $processFailedException);
         }
 
-        $split = preg_split('/\R/', u($process->getOutput())->trim()->toString());
-        $lines = false !== $split ? $split : [];
-
         return array_values(array_filter(
-            $lines,
+            explode("\0", $process->getOutput()),
             static fn (string $line): bool => !u($line)->trim()->isEmpty(),
         ));
     }

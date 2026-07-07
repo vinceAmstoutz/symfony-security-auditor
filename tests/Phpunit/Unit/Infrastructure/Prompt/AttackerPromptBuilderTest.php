@@ -276,6 +276,76 @@ final class AttackerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_an_unbalanced_brace_character_in_the_access_control_pattern_does_not_break_the_firewall_match(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/ReportController.php',
+            '/app/src/Controller/ReportController.php',
+            '<?php class ReportController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/ReportController.php',
+            methodName: 'export',
+            routePath: '/reports/export}',
+            routeMethods: ['GET'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(
+                routeAccessMap: ['^/reports/export}' => ['ROLE_ADMIN']],
+                routeAccessControls: [$routeAccessControl],
+            ),
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('COVERED_BY access_control[ROLE_ADMIN]', $message);
+        self::assertStringNotContainsString('LACKS_ACCESS_CHECK', $message);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_pattern_containing_every_delimiter_candidate_falls_back_to_no_match_instead_of_a_wrong_match(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/ReportController.php',
+            '/app/src/Controller/ReportController.php',
+            '<?php class ReportController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/ReportController.php',
+            methodName: 'export',
+            routePath: '/reports/export',
+            routeMethods: ['GET'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(
+                routeAccessMap: ['#~!%@' => ['ROLE_ADMIN']],
+                routeAccessControls: [$routeAccessControl],
+            ),
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('LACKS_ACCESS_CHECK', $message);
+        self::assertStringNotContainsString('COVERED_BY', $message);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_route_without_attribute_check_is_marked_covered_when_a_route_name_access_control_matches(): void
     {
         $projectFile = ProjectFile::create(

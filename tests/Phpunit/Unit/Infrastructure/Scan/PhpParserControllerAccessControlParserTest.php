@@ -238,6 +238,31 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_records_a_method_level_security_attribute_expression_passed_as_a_named_argument(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\Security;
+            final class AdminController {
+                #[Route(path: '/admin/dashboard')]
+                #[Security(expression: "is_granted('ROLE_ADMIN')", statusCode: 403)]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(["is_granted('ROLE_ADMIN')"], $entries[0]->methodLevelIsGranted());
+        self::assertTrue($entries[0]->hasAccessCheck());
+        self::assertFalse($entries[0]->lacksAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_class_level_is_granted(): void
     {
         $source = <<<'PHP'

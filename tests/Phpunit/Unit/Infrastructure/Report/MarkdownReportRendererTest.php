@@ -104,13 +104,27 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      */
-    public function test_render_escapes_a_backtick_in_the_file_path_so_it_cannot_close_the_location_code_span_early(): void
+    public function test_render_widens_the_location_code_span_delimiter_so_a_backtick_in_the_file_path_cannot_close_it_early(): void
     {
         $output = $this->renderer->render($this->makeReport(
             $this->makeValidatedVuln(filePath: 'src/Foo`) <script>alert(1)</script> (`.php'),
         ));
 
-        self::assertStringContainsString('**Location:** `src/Foo\\`) &lt;script&gt;alert(1)&lt;/script&gt; (\\`.php:1-5`', $output);
+        self::assertStringContainsString('**Location:** ``src/Foo`) <script>alert(1)</script> (`.php:1-5``', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_pads_the_location_code_span_when_the_file_path_starts_with_a_backtick(): void
+    {
+        $output = $this->renderer->render($this->makeReport(
+            $this->makeValidatedVuln(filePath: '`src/Foo.php'),
+        ));
+
+        self::assertStringContainsString('**Location:** `` `src/Foo.php:1-5 ``', $output);
     }
 
     /**

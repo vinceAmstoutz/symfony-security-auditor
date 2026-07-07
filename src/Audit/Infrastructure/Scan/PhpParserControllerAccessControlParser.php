@@ -204,12 +204,12 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     {
         $values = [];
         foreach ($attributes as $attribute) {
-            $shortName = $attribute->name->toString();
-            if (!$this->attributeShortNameMatches($shortName, 'IsGranted') && !$this->attributeShortNameMatches($shortName, 'Security')) {
+            $valueArgName = $this->valueArgNameFor($attribute->name->toString());
+            if (null === $valueArgName) {
                 continue;
             }
 
-            $attributeArg = $this->isGrantedAttributeArgValue($attribute->args);
+            $attributeArg = $this->isGrantedAttributeArgValue($attribute->args, $valueArgName);
             if (null !== $attributeArg) {
                 $values[] = $attributeArg;
             }
@@ -219,22 +219,33 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
-     * `#[IsGranted]`'s first parameter is `$attribute` — resolve it the same
-     * way `resolveRouteArgName()` resolves `Route`'s `path`, so a reordered
+     * `#[IsGranted]`'s first parameter is `$attribute`; `#[Security]`'s is
+     * `$expression` — resolve whichever applies the same way
+     * `resolveRouteArgName()` resolves `Route`'s `path`, so a reordered
      * named-argument call (e.g. `#[IsGranted(subject: $post, attribute:
      * 'EDIT')]`) still yields the attribute, not whichever string argument
      * happens to come first.
-     *
+     */
+    private function valueArgNameFor(string $shortName): ?string
+    {
+        return match (true) {
+            $this->attributeShortNameMatches($shortName, 'IsGranted') => 'attribute',
+            $this->attributeShortNameMatches($shortName, 'Security') => 'expression',
+            default => null,
+        };
+    }
+
+    /**
      * @param list<Arg> $args
      */
-    private function isGrantedAttributeArgValue(array $args): ?string
+    private function isGrantedAttributeArgValue(array $args, string $valueArgName): ?string
     {
         foreach ($args as $index => $arg) {
             if (!$arg->value instanceof String_) {
                 continue;
             }
 
-            if ($this->isIsGrantedAttributeArg($arg, $index)) {
+            if ($this->isIsGrantedAttributeArg($arg, $index, $valueArgName)) {
                 return $arg->value->value;
             }
         }
@@ -242,10 +253,10 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         return null;
     }
 
-    private function isIsGrantedAttributeArg(Arg $arg, int $index): bool
+    private function isIsGrantedAttributeArg(Arg $arg, int $index, string $valueArgName): bool
     {
         return match (true) {
-            $arg->name instanceof Identifier => 'attribute' === $arg->name->toString(),
+            $arg->name instanceof Identifier => $valueArgName === $arg->name->toString(),
             default => 0 === $index,
         };
     }

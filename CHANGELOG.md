@@ -2495,6 +2495,48 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `AuditCommandInput::scanPaths()` (`src/Command/AuditCommandInput.php`) now
   check emptiness after trimming, so a slash-only segment is dropped and treated
   as no filter (scans the whole project) instead of silently scanning nothing.
+- **`NumberedFileContextRenderer` rendered a phantom numbered blank line (`1 |`)
+  for a genuinely empty (0-byte) file**, inconsistent with the sibling
+  `ReviewerMessageRenderer::numberLines()`, which already special-cases an empty
+  file as no lines at all. `numberLines()`
+  (`src/Audit/Infrastructure/Prompt/NumberedFileContextRenderer.php`) now
+  mirrors that convention.
+- **`MarkdownReportRenderer`'s `Location` line broke when a finding's file path
+  contained a backtick**, because backslash escapes — the technique
+  `escapeFences()` uses everywhere else — do not work inside a CommonMark inline
+  code span; the escaped backtick still closed the span early, spilling the rest
+  of the line (including the line-number range) out as unformatted text.
+  `vulnerability()` now wraps the location in a new `inlineCode()` helper
+  (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) that widens the
+  code-span delimiter past the longest backtick run the content contains — the
+  CommonMark-correct way to safely wrap arbitrary text in an inline code span —
+  instead of escaping it.
+- **`PhpParserControllerAccessControlParser` missed a `#[Security(...)]` access
+  check whenever its `expression` argument was passed as a named argument**
+  (e.g. `#[Security(expression: "is_granted('ROLE_ADMIN')", statusCode: 403)]`)
+  — the shared attribute-argument resolver hardcoded `'attribute'`, the correct
+  parameter name for `#[IsGranted]` but not for `#[Security]`, whose parameter
+  is `expression`. A route guarded this way was reported as
+  `LACKS_ACCESS_CHECK`. `valueArgNameFor()`
+  (`src/Audit/Infrastructure/Scan/PhpParserControllerAccessControlParser.php`)
+  now resolves the correct parameter name per attribute.
+- **`SymfonyYamlSecurityConfigParser` silently dropped an `access_control`
+  entry's `host`/`port` constraint**, and dropped a `host`-only entry entirely —
+  misrepresenting a host-scoped rule (e.g.
+  `{ path: ^/admin, roles: ROLE_USER_HOST, host: symfony\.com$ }`) as an
+  unconditional one, or hiding a host-only rule as if the path had no
+  `access_control` coverage at all. `REQUIREMENT_KEYS` and the new
+  `scalarRequirements()`
+  (`src/Audit/Infrastructure/Scan/SymfonyYamlSecurityConfigParser.php`) now
+  surface both.
+- **`ProcessGitChangedFilesResolver` mis-parsed a changed file whose name
+  contained a double quote, backslash, or control character**, silently dropping
+  it from `audit:run --since=<ref>`'s scope — git always C-quotes such
+  characters in `--name-only` output (`core.quotepath=off` only disables quoting
+  of non-ASCII bytes), and the resolver never un-quoted it. `runGit()`
+  (`src/Audit/Infrastructure/Diff/ProcessGitChangedFilesResolver.php`) now
+  passes `-z` to `git diff`, which NUL-terminates each path and disables quoting
+  entirely, and splits the output on `\0` instead of newlines.
 
 ### Security
 
@@ -2582,6 +2624,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   branch; `inline_assignment`'s unquoted branch now also captures subsequent
   alphanumeric-only continuation words, bounded so it cannot extend into
   unrelated trailing syntax like a following `'timeout' => 30`.
+- **The `{`/`}` delimiter fix above for `firewallRolesForPath()` only traded one
+  collision for another**: PHP's bracket-style PCRE delimiters are
+  nesting-aware, so a pattern containing an _unbalanced_ `{` or `}` (e.g.
+  `^/reports/export}`, matching a literal trailing brace) still corrupted the
+  match the same way the original `#` collision did — `preg_match()` returned
+  `false` with an "Internal error", again silently flagging a genuinely
+  firewall-covered route as `LACKS_ACCESS_CHECK`. `firewallRolesForPath()`
+  (`src/Audit/Infrastructure/Prompt/SymfonyMappingContextRenderer.php`) now
+  picks a delimiter dynamically — the first of a small candidate set (`#~!%@`)
+  that does not appear anywhere in the pattern — eliminating delimiter collision
+  as a class of bug rather than trading one fixed delimiter for another; a
+  pattern containing every candidate falls back to "no match" (the same
+  graceful-failure behavior a malformed pattern already had), never a wrong
+  match.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

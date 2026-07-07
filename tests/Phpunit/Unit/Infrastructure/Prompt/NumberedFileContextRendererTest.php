@@ -35,6 +35,18 @@ final class NumberedFileContextRendererTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_an_empty_file_renders_no_numbered_line(): void
+    {
+        $projectFile = ProjectFile::create('src/Empty.php', '/app/src/Empty.php', '');
+
+        $rendered = NumberedFileContextRenderer::render([$projectFile]);
+
+        self::assertSame("<file path=\"src/Empty.php\" type=\"php\">\n\n</file>", $rendered);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_wraps_content_in_a_file_tag_with_path_and_type(): void
     {
         $projectFile = ProjectFile::create('src/Foo.php', '/app/src/Foo.php', '<?php');

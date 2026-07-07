@@ -166,6 +166,53 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         );
     }
 
+    public function test_it_surfaces_a_host_constraint_alongside_roles(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - path: ^/admin
+                      roles: ROLE_USER_HOST
+                      host: symfony\.com$
+            YAML);
+
+        self::assertSame(
+            ['^/admin' => ['ROLE_USER_HOST', 'host: symfony\.com$']],
+            $accessControl,
+        );
+    }
+
+    public function test_it_records_a_host_only_access_control_entry_instead_of_dropping_it(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - path: ^/internal-admin
+                      host: admin\.internal\.example\.com
+            YAML);
+
+        self::assertSame(
+            ['^/internal-admin' => ['host: admin\.internal\.example\.com']],
+            $accessControl,
+        );
+    }
+
+    public function test_it_surfaces_a_port_constraint(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - path: ^/admin
+                      roles: ROLE_ADMIN
+                      port: 8000
+            YAML);
+
+        self::assertSame(
+            ['^/admin' => ['ROLE_ADMIN', 'port: 8000']],
+            $accessControl,
+        );
+    }
+
     public function test_it_reads_access_control_inside_when_env_blocks(): void
     {
         $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'

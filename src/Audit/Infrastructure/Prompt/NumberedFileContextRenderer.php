@@ -54,6 +54,10 @@ final readonly class NumberedFileContextRenderer
 
     private static function numberLines(string $content): string
     {
+        if ('' === $content) {
+            return '';
+        }
+
         $lines = explode("\n", $content);
         $numbered = [];
         foreach ($lines as $index => $line) {

@@ -64,7 +64,7 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
     /**
      * @var list<string>
      */
-    private const array REQUIREMENT_KEYS = ['roles', 'role', 'allow_if', 'methods', 'ips', 'requires_channel'];
+    private const array REQUIREMENT_KEYS = ['roles', 'role', 'allow_if', 'methods', 'ips', 'requires_channel', 'host', 'port'];
 
     /**
      * Symfony evaluates `access_control` first-match-wins, so a later rule for
@@ -227,6 +227,17 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
             $requirements[] = \sprintf('allow_if: %s', $entry['allow_if']);
         }
 
+        return [...$requirements, ...$this->listedRequirements($entry), ...$this->scalarRequirements($entry)];
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     *
+     * @return list<string>
+     */
+    private function listedRequirements(array $entry): array
+    {
+        $requirements = [];
         foreach (['methods' => '|', 'ips' => ', '] as $key => $separator) {
             $values = $this->stringListOf($entry[$key] ?? null);
             if ([] !== $values) {
@@ -234,11 +245,26 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
             }
         }
 
-        if (\is_string($entry['requires_channel'] ?? null)) {
-            $requirements[] = \sprintf('requires_channel: %s', $entry['requires_channel']);
-        }
-
         return $requirements;
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     *
+     * @return list<string>
+     */
+    private function scalarRequirements(array $entry): array
+    {
+        $scalarValues = array_filter(
+            ['requires_channel' => $entry['requires_channel'] ?? null, 'host' => $entry['host'] ?? null, 'port' => $entry['port'] ?? null],
+            static fn (mixed $value): bool => \is_string($value) || \is_int($value),
+        );
+
+        return array_map(
+            static fn (string $key, string|int $value): string => \sprintf('%s: %s', $key, $value),
+            array_keys($scalarValues),
+            $scalarValues,
+        );
     }
 
     /**
