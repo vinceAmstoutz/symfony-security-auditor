@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge;
 
 use Closure;
 use Override;
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Exception\ExceptionInterface;
 use Symfony\Component\Process\Process;
@@ -78,11 +79,20 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         }
     }
 
+    /**
+     * @throws BridgeInstallationFailedException
+     */
     private function ensureComposerProject(string $targetDirectory): void
     {
         $manifest = \sprintf('%s/%s', $targetDirectory, self::MANIFEST_FILENAME);
-        if (!$this->filesystem->exists($manifest)) {
+        if ($this->filesystem->exists($manifest)) {
+            return;
+        }
+
+        try {
             $this->filesystem->dumpFile($manifest, self::EMPTY_MANIFEST);
+        } catch (IOException $ioException) {
+            throw BridgeInstallationFailedException::forManifestWriteFailure($targetDirectory, $ioException);
         }
     }
 }

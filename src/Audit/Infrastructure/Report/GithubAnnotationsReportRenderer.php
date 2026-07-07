@@ -92,7 +92,7 @@ final readonly class GithubAnnotationsReportRenderer implements ReportRendererIn
 
     private function escapeData(string $value): string
     {
-        return u($value)
+        return u(mb_scrub($value, 'UTF-8'))
             ->replace('%', '%25')
             ->replace("\r\n", '%0D%0A')
             ->replace("\r", '%0D')

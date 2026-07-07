@@ -185,6 +185,26 @@ final class RegexCodeSlicerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_a_closing_paren_inside_a_string_literal_default_value_does_not_break_continuation_tracking(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function process(\n"
+            ."        string \$label = 'Confirm)',\n"
+            ."        AdminOnlyDataMapper \$dataMapper,\n"
+            ."        int \$retries = 3,\n"
+            ."    ): void {\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('AdminOnlyDataMapper $dataMapper,', $sliced);
+        self::assertStringContainsString('int $retries = 3,', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_line_after_a_closed_multiline_signature_is_still_elided(): void
     {
         $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)

@@ -77,7 +77,7 @@ final readonly class RetryPolicy
             throw InvalidRetryConfigurationException::forNonPositiveAttempt($attempt);
         }
 
-        return min($this->computeDelay($this->backoffSchedule->initialDelayMs, $attempt), self::DEFAULT_MAX_DELAY_MS);
+        return (int) round(min($this->computeDelay($this->backoffSchedule->initialDelayMs, $attempt), (float) self::DEFAULT_MAX_DELAY_MS));
     }
 
     /**
@@ -104,10 +104,18 @@ final readonly class RetryPolicy
             return min($serverHintSeconds * 1_000, $this->rateLimitBackoff->maxDelayMs);
         }
 
-        return min($this->computeDelay($this->rateLimitBackoff->initialDelayMs, $attempt, upwardOnlyJitter: true), $this->rateLimitBackoff->maxDelayMs);
+        return (int) round(min($this->computeDelay($this->rateLimitBackoff->initialDelayMs, $attempt, upwardOnlyJitter: true), (float) $this->rateLimitBackoff->maxDelayMs));
     }
 
-    private function computeDelay(int $baseInitialDelayMs, int $attempt, bool $upwardOnlyJitter = false): int
+    /**
+     * Returns the unclamped, unrounded delay so callers can clamp against
+     * their own ceiling in float space before rounding — clamping after an
+     * `(int)` cast is too late: the exponential term can exceed `PHP_INT_MAX`
+     * long before any realistic ceiling, and casting an out-of-range float to
+     * int is undefined (observed as a nonsensical negative value), which
+     * `min()` would then wrongly treat as "smaller than the ceiling".
+     */
+    private function computeDelay(int $baseInitialDelayMs, int $attempt, bool $upwardOnlyJitter = false): float
     {
         $baseDelay = $baseInitialDelayMs * ($this->backoffSchedule->backoffMultiplier ** ($attempt - 1));
         $jitterSample = ($this->jitterSource)();
@@ -115,6 +123,6 @@ final readonly class RetryPolicy
             ? 1.0 + $this->backoffSchedule->jitterRatio * $jitterSample
             : 1.0 + $this->backoffSchedule->jitterRatio * (2.0 * $jitterSample - 1.0);
 
-        return (int) round($baseDelay * $jitterFactor);
+        return $baseDelay * $jitterFactor;
     }
 }

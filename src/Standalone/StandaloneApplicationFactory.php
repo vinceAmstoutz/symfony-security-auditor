@@ -19,6 +19,7 @@ use Symfony\Component\Console\Command\LazyCommand;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
@@ -145,6 +146,7 @@ final readonly class StandaloneApplicationFactory
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
      * @throws UnresolvableAuditCommandException
+     * @throws MalformedProjectConfigException
      */
     private function loadAuditCommand(): Command
     {
@@ -158,6 +160,7 @@ final readonly class StandaloneApplicationFactory
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
+     * @throws MalformedProjectConfigException
      */
     private function buildContainer(): ContainerBuilder
     {

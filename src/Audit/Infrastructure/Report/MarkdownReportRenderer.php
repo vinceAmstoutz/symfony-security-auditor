@@ -78,22 +78,34 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
     private function vulnerability(Vulnerability $vulnerability): string
     {
         return implode("\n", [
-            \sprintf('### %s — %s', $vulnerability->severity()->label(), $vulnerability->title()),
+            \sprintf('### %s — %s', $vulnerability->severity()->label(), $this->escapeFences($vulnerability->title())),
             '',
             \sprintf('- **Type:** `%s` (%s, %s)', $vulnerability->type()->value, $vulnerability->type()->owaspReference(), $vulnerability->type()->cwe()->label()),
             \sprintf('- **Location:** `%s:%d-%d`', $vulnerability->filePath(), $vulnerability->lineStart(), $vulnerability->lineEnd()),
             \sprintf('- **Confidence:** %s%%', \sprintf('%.0f', $vulnerability->confidence() * 100)),
             '',
-            $vulnerability->description(),
+            $this->escapeFences($vulnerability->description()),
             '',
-            \sprintf('**Attack vector:** %s', $vulnerability->attackVector()),
+            \sprintf('**Attack vector:** %s', $this->escapeFences($vulnerability->attackVector())),
             '',
             '**Proof:**',
             '',
             $this->codeBlock($vulnerability->proof()),
             '',
-            \sprintf('**Remediation:** %s', $vulnerability->remediation()),
+            \sprintf('**Remediation:** %s', $this->escapeFences($vulnerability->remediation())),
         ]);
+    }
+
+    /**
+     * LLM-produced narrative text is rendered as raw Markdown; an unescaped
+     * run of backticks (e.g. a ``` fence quoted mid-description) would open
+     * a code block that only closes at the next such run — silently
+     * swallowing every subsequent finding as inert code text once rendered.
+     * Backslash-escaping each backtick keeps it a literal character instead.
+     */
+    private function escapeFences(string $text): string
+    {
+        return str_replace('`', '\\`', $text);
     }
 
     private function codeBlock(string $text): string

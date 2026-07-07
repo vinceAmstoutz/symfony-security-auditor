@@ -652,6 +652,32 @@ final class StagesTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      */
+    public function test_mapping_stage_appends_conflicting_access_control_rules_across_config_files_instead_of_overwriting(): void
+    {
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $config1 = "access_control:\n    - path: ^/admin\n      roles: ROLE_ADMIN\n";
+        $config2 = "access_control:\n    - path: ^/admin\n      ips: 10.0.0.0/8\n";
+
+        $auditContext->setProjectFiles([
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', $config1),
+            ProjectFile::create('config/packages/dev/security.yaml', '/app/config/packages/dev/security.yaml', $config2),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        $rule = $mapping->routeAccessMap()['^/admin'];
+        self::assertContains('ROLE_ADMIN', $rule);
+        self::assertContains('or: ips: 10.0.0.0/8', $rule);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_trims_firewall_pattern_whitespace(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());

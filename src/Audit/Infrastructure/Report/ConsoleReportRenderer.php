@@ -104,7 +104,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
     {
         return implode("\n", array_map(
             static fn (string $chunk): string => \sprintf('    %s', $chunk),
-            explode("\n", u($text)->wordwrap(65, "\n", true)->toString()),
+            explode("\n", u(mb_scrub($text, 'UTF-8'))->wordwrap(65, "\n", true)->toString()),
         ));
     }
 }

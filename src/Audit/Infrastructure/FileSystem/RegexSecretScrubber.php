@@ -41,10 +41,10 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         SecretPatternLabel::GithubToken->value => '/\bgh[pousr]_[A-Za-z0-9]{36,255}\b/',
         SecretPatternLabel::StripeKey->value => '/\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,99}\b/',
         SecretPatternLabel::SlackToken->value => '/\bxox[abprs]-[A-Za-z0-9-]{10,72}\b/',
-        SecretPatternLabel::GoogleApiKey->value => '/\bAIza[0-9A-Za-z_\-]{35}\b/',
+        SecretPatternLabel::GoogleApiKey->value => '/\bAIza[0-9A-Za-z_\-]{35}(?![0-9A-Za-z_\-])/',
         SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
         SecretPatternLabel::PemPrivateKey->value => '/-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/',
-        SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]*://)[^:@/\s]*:[^@/\s]+@~i',
+        SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]*://)[^:@/\s]*:[^/\s]+@~i',
         SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|DSN)(?:_[A-Z0-9]+)*)\s*=[ \t]*(?!\s*\n)([^\s#]+)/m',
         SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])([^"\'\n]{4,})\2|([^"\'\s#][^\s#]{3,}))/i',
     ];

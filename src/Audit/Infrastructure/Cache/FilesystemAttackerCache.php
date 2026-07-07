@@ -144,13 +144,22 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
     }
 
     /**
+     * A scanned file's path comes from the audited project's filesystem, not
+     * from us — a crafted relative path embedding another file's own
+     * `path=hash` signature plus a newline can make a single-file chunk's
+     * raw signature string byte-identical to a real multi-file chunk's
+     * joined signatures. Hashing each file's signature individually first
+     * fixes every field to 64 hex characters, which can never contain the
+     * `=`/newline separators, so no crafted path can bleed into another
+     * file's field or forge an extra one.
+     *
      * @param list<ProjectFile> $chunk
      */
     private function keyForChunk(array $chunk, string $contextKey): string
     {
         $signatures = [];
         foreach ($chunk as $file) {
-            $signatures[] = \sprintf('%s=%s', $file->relativePath(), $file->contentHash());
+            $signatures[] = hash('sha256', \sprintf('%s=%s', $file->relativePath(), $file->contentHash()));
         }
 
         sort($signatures);

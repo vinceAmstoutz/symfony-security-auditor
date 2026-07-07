@@ -17,6 +17,10 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
@@ -93,6 +97,27 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
         self::assertStringContainsString('## Findings', $output);
         self::assertStringContainsString('Test Vuln', $output);
         self::assertStringContainsString('`src/Admin/UserController.php:10-14`', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_neutralizes_an_unterminated_code_fence_in_a_description_so_it_does_not_swallow_later_findings(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::HEADER_INJECTION, VulnerabilitySeverity::CRITICAL, 'Header leak', 0.7),
+            new CodeLocation('src/Low.php', 5, 6),
+            new VulnerabilityNarrative("Description ends with an unterminated fence:\n\n```php\n// truncated on purpose", 'n/a', 'n/a', 'n/a'),
+            'n/a',
+        )->withReviewerValidation(true);
+        $secondFinding = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'src/Admin.php', 88);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability, $secondFinding));
+
+        self::assertStringNotContainsString('```', $output);
+        self::assertStringContainsString('\\`\\`\\`', $output);
     }
 
     /**

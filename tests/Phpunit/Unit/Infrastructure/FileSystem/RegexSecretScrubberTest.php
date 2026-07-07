@@ -273,6 +273,22 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame('DATABASE_URL=postgres://***REDACTED:connection_uri***@db.internal:5432/app', $output);
     }
 
+    public function test_connection_uri_redaction_covers_a_password_containing_an_at_sign(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('DATABASE_URL=postgres://appuser:p@ssw0rd@db.example.com:5432/appdb');
+
+        self::assertSame('DATABASE_URL=postgres://***REDACTED:connection_uri***@db.example.com:5432/appdb', $output);
+    }
+
+    public function test_google_api_key_ending_in_a_non_word_character_is_still_redacted(): void
+    {
+        $key = self::GOOGLE.str_repeat('a', 34).'-';
+        $output = $this->regexSecretScrubber->scrub("analytics_key: {$key}\nnext_line: unrelated");
+
+        self::assertStringNotContainsString($key, $output);
+        self::assertStringContainsString('***REDACTED:google_api_key***', $output);
+    }
+
     public function test_it_leaves_credential_free_urls_unmodified(): void
     {
         $url = 'see https://example.com:8080/docs?token=public for details';

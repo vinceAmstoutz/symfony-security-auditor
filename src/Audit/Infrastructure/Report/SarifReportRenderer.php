@@ -82,7 +82,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
             ],
         ];
 
-        return json_encode($sarif, \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
+        return json_encode($sarif, \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES | \JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     /**

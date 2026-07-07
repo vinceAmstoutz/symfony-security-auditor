@@ -169,10 +169,36 @@ final readonly class MappingStage implements StageInterface
             }
 
             $content = $file->content();
-            $routeAccessMap = array_merge($routeAccessMap, $this->securityConfigParser->parseAccessControl($content));
+            $routeAccessMap = $this->mergeRouteAccessMaps($routeAccessMap, $this->securityConfigParser->parseAccessControl($content));
             $firewallRules = [...$firewallRules, ...$this->securityConfigParser->parseFirewallRules($content)];
         }
 
         return [$routeAccessMap, $firewallRules];
+    }
+
+    /**
+     * Mirrors {@see SymfonyYamlSecurityConfigParser::recordAccessControlEntry()}'s
+     * first-match-wins semantics across config files: a rule for a path already
+     * covered by an earlier file is appended as an `or: …` requirement instead of
+     * replacing it, so no file's rule is silently dropped.
+     *
+     * @param array<string, list<string>> $routeAccessMap
+     * @param array<string, list<string>> $incoming
+     *
+     * @return array<string, list<string>>
+     */
+    private function mergeRouteAccessMaps(array $routeAccessMap, array $incoming): array
+    {
+        foreach ($incoming as $target => $requirements) {
+            if (\array_key_exists($target, $routeAccessMap)) {
+                $routeAccessMap[$target][] = \sprintf('or: %s', implode(', ', $requirements));
+
+                continue;
+            }
+
+            $routeAccessMap[$target] = $requirements;
+        }
+
+        return $routeAccessMap;
     }
 }

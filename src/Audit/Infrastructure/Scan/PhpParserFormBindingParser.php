@@ -156,12 +156,12 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
 
     private function resolveFirstArgumentClassName(MethodCall $methodCall): ?string
     {
-        $firstArgument = $methodCall->args[0] ?? null;
-        if (!$firstArgument instanceof Arg) {
+        $typeArgument = $this->typeArgument(array_values($methodCall->args));
+        if (!$typeArgument instanceof Arg) {
             return null;
         }
 
-        $value = $firstArgument->value;
+        $value = $typeArgument->value;
         if (!$value instanceof ClassConstFetch) {
             return null;
         }
@@ -179,5 +179,33 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
         }
 
         return $value->class->toString();
+    }
+
+    /**
+     * `createForm(string $type, mixed $data = null, array $options = [])`'s
+     * `$type` is conventionally the first positional argument, but a caller
+     * may name every argument and reorder them (e.g. `createForm(data: ...,
+     * type: ...)`) — resolve `type` the same way `Route`'s `path` and
+     * `IsGranted`'s `attribute` are resolved elsewhere in this scanner.
+     *
+     * @param list<Arg|Node\VariadicPlaceholder> $args
+     */
+    private function typeArgument(array $args): ?Arg
+    {
+        foreach ($args as $index => $arg) {
+            if ($arg instanceof Arg && $this->isTypeArg($arg, $index)) {
+                return $arg;
+            }
+        }
+
+        return null;
+    }
+
+    private function isTypeArg(Arg $arg, int $index): bool
+    {
+        return match (true) {
+            $arg->name instanceof Identifier => 'type' === $arg->name->toString(),
+            default => 0 === $index,
+        };
     }
 }

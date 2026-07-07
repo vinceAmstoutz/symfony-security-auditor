@@ -223,11 +223,28 @@ final readonly class FileChunker
 
     private function fileBelongsToFeature(string $baseName, string $relativePath, string $featureName): bool
     {
-        if (u($baseName)->startsWith($featureName)) {
+        if ($this->baseNameStartsAtFeatureBoundary($baseName, $featureName)) {
             return true;
         }
 
         return u($relativePath)->ignoreCase()->containsAny(\sprintf('/%s/', $featureName));
+    }
+
+    /**
+     * `startsWith()` alone would let `UsersController` match feature `User` —
+     * the prefix stops mid-word instead of at a CamelCase boundary. Requiring
+     * the remainder to be empty or start with an uppercase letter rejects that
+     * false match while still matching `UserController`, `UserRepository`, ….
+     */
+    private function baseNameStartsAtFeatureBoundary(string $baseName, string $featureName): bool
+    {
+        if (!u($baseName)->startsWith($featureName)) {
+            return false;
+        }
+
+        $remainder = u($baseName)->slice(u($featureName)->length())->toString();
+
+        return '' === $remainder || ctype_upper($remainder[0]);
     }
 
     private function priority(ProjectFile $projectFile): int

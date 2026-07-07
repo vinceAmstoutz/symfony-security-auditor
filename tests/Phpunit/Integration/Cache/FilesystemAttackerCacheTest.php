@@ -118,7 +118,7 @@ final class FilesystemAttackerCacheTest extends TestCase
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
 
-        $expectedKey = hash('sha256', 'src/A.php='.hash('sha256', 'X')."\0context:ctx-42");
+        $expectedKey = hash('sha256', hash('sha256', 'src/A.php='.hash('sha256', 'X'))."\0context:ctx-42");
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
 
         $this->filesystemAttackerCache->storeForContext([$projectFile], 'ctx-42', [['type' => 'sql_injection']]);
@@ -341,7 +341,7 @@ final class FilesystemAttackerCacheTest extends TestCase
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
 
-        $expectedSignature = 'src/A.php='.hash('sha256', 'X');
+        $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
         $expectedKey = hash('sha256', $expectedSignature);
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
 
@@ -363,6 +363,21 @@ final class FilesystemAttackerCacheTest extends TestCase
 
         self::assertSame([['type' => 'sql_injection', 'title' => 'a-finding']], $this->filesystemAttackerCache->get([$projectFile]));
         self::assertSame([['type' => 'sql_injection', 'title' => 'b-finding']], $this->filesystemAttackerCache->get([$b]));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_crafted_relative_path_cannot_collide_with_an_unrelated_multi_file_chunk(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'A-content');
+        $fileB = ProjectFile::create('src/B.php', '/app/src/B.php', 'B-content');
+        $this->filesystemAttackerCache->store([$projectFile, $fileB], [['type' => 'sql_injection', 'title' => 'real-two-file-chunk']]);
+
+        $craftedRelativePath = 'src/A.php='.hash('sha256', 'A-content')."\nsrc/B.php";
+        $craftedFile = ProjectFile::create($craftedRelativePath, '/app/'.$craftedRelativePath, 'B-content');
+
+        self::assertNull($this->filesystemAttackerCache->get([$craftedFile]));
     }
 
     /**
@@ -407,7 +422,7 @@ final class FilesystemAttackerCacheTest extends TestCase
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
 
-        $expectedKey = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
+        $expectedKey = hash('sha256', hash('sha256', 'src/A.php='.hash('sha256', 'X')));
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
 
         $this->filesystemAttackerCache->store([$projectFile], [['type' => 'sql_injection']]);
@@ -422,7 +437,7 @@ final class FilesystemAttackerCacheTest extends TestCase
     public function test_salted_key_concatenates_salt_null_byte_and_signatures_in_that_order(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
-        $signatures = 'src/A.php='.hash('sha256', 'X');
+        $signatures = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
         $expectedKey = hash('sha256', "claude-opus-4-7\0".$signatures);
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
 

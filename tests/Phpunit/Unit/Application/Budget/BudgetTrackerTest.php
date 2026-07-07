@@ -171,6 +171,24 @@ final class BudgetTrackerTest extends TestCase
     }
 
     /**
+     * @throws BudgetExceededException
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_cost_budget_is_not_falsely_exceeded_by_floating_point_accumulation_error(): void
+    {
+        $budgetTracker = $this->budgetTracker(AuditBudget::forCost(0.3), inputPrice: 10.0);
+
+        for ($i = 0; $i < 3; ++$i) {
+            $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(10_000, 0)));
+        }
+
+        $budgetTracker->assertWithinBudget();
+
+        self::assertSame(0.3, $budgetTracker->costUsdUsed());
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      */
     public function test_cost_used_is_rounded_to_six_decimal_places(): void

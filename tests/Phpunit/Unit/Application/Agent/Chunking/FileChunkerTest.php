@@ -341,7 +341,7 @@ final class FileChunkerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
-    public function test_feature_strategy_skips_a_feature_whose_files_were_all_claimed_by_an_earlier_prefix_feature(): void
+    public function test_feature_strategy_keeps_prefix_colliding_controllers_in_separate_chunks(): void
     {
         $files = [
             $this->makeFile('src/Controller/UserController.php'),
@@ -350,19 +350,37 @@ final class FileChunkerTest extends TestCase
 
         $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
 
-        $allPaths = $this->allPaths($chunks);
-        self::assertContains('src/Controller/UserController.php', $allPaths);
-        self::assertContains('src/Controller/UsersController.php', $allPaths);
-        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UsersController.php');
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        $usersChunk = $this->findChunkContaining($chunks, 'src/Controller/UsersController.php');
         self::assertNotNull($userChunk);
+        self::assertNotNull($usersChunk);
         $userChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
-        self::assertContains('src/Controller/UserController.php', $userChunkPaths);
+        self::assertNotContains('src/Controller/UsersController.php', $userChunkPaths);
     }
 
     /**
      * @throws InvalidProjectFileException
      */
-    public function test_feature_strategy_continues_past_an_emptied_feature_to_chunk_later_features(): void
+    public function test_feature_strategy_leaves_a_feature_with_no_chunk_when_a_shorter_earlier_feature_claims_all_its_files(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/Controller/UserAddressController.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        self::assertNotNull($userChunk);
+        $userChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
+        self::assertContains('src/Controller/UserAddressController.php', $userChunkPaths);
+        self::assertCount(1, $chunks);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_feature_strategy_chunks_later_features_correctly_alongside_prefix_colliding_ones(): void
     {
         $files = [
             $this->makeFile('src/Controller/UserController.php'),

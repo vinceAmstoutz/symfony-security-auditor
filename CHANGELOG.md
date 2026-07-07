@@ -628,6 +628,228 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A crafted file path or LLM-reported `file` field could break out of the
+  `<file path="...">` prompt delimiter or the reviewer's `File: <path>` line and
+  inject fabricated instructions into the attacker/reviewer prompt.**
+  `NumberedFileContextRenderer::render()`
+  (`src/Audit/Infrastructure/Prompt/NumberedFileContextRenderer.php`)
+  interpolated `$file->relativePath()` into `<file path="...">` unescaped — a
+  path containing a `"` closed the attribute early, letting the rest of the path
+  (or content immediately after, on a git-tracked file with an
+  attacker-controlled name) be parsed as new prompt structure.
+  `ReviewerMessageRenderer::renderSingle()`/`renderBatch()`
+  (`src/Audit/Infrastructure/Prompt/Reviewer/ReviewerMessageRenderer.php`)
+  interpolated the LLM-reported `file` field the same way into a plain
+  `File: <path>` line, where an embedded newline let the reported path forge
+  additional prompt lines. Both renderers now sanitize the path
+  (`sanitizePathAttribute()`/`sanitizeFilePath()`) before interpolation,
+  neutralizing the delimiter/newline characters that let attacker-influenced
+  text escape its intended slot.
+- **A finding whose title, description, or narrative contained invalid UTF-8
+  bytes (plausible from an LLM echoing raw file content back) crashed report
+  generation instead of producing a report.** `JsonReportRenderer::render()`
+  (`src/Audit/Infrastructure/Report/JsonReportRenderer.php`) and
+  `SarifReportRenderer::render()`
+  (`src/Audit/Infrastructure/Report/SarifReportRenderer.php`) called
+  `json_encode(..., JSON_THROW_ON_ERROR)` with no `JSON_INVALID_UTF8_SUBSTITUTE`
+  flag, so a single malformed byte anywhere in the report threw `JsonException`
+  and aborted the whole run rather than degrading gracefully. Both renderers now
+  also pass `JSON_INVALID_UTF8_SUBSTITUTE`, replacing invalid sequences with the
+  Unicode replacement character instead of failing.
+  `GithubAnnotationsReportRenderer`
+  (`src/Audit/Infrastructure/Report/GithubAnnotationsReportRenderer.php`) and
+  `ConsoleReportRenderer::indentChunks()`
+  (`src/Audit/Infrastructure/Report/ConsoleReportRenderer.php`) had the same
+  exposure through `symfony/string`'s `u()`, which throws on invalid UTF-8; both
+  now run the value through `mb_scrub($value, 'UTF-8')` first.
+- **A finding's title, description, attack vector, or remediation containing an
+  unterminated or nested Markdown code fence (` ``` `) could swallow every
+  subsequent finding into what looks like one code block, or terminate the
+  report's own structure early** — plausible whenever an LLM echoes a snippet of
+  the audited file's content verbatim. `MarkdownReportRenderer::render()`
+  (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) interpolated
+  these four fields directly into the Markdown body with no escaping. A new
+  `escapeFences()` helper backslash-escapes every literal ` ``` ` in these
+  fields before interpolation, so an attacker-influenced fence can no longer
+  alter the rendered report's structure.
+- **`PhpParserControllerAccessControlParser` missed access-control attributes
+  reachable only through PHP-Parser's AST quirks**: an aliased `Route` import
+  (`use Route as Get;` then `#[Get(path: '/x')]`) was invisible because
+  short-name matching compared against the alias, not the resolved class; a
+  method with two stacked `#[Route(...)]` attributes (a common way to expose the
+  same action under multiple paths) only ever reported the first; the
+  `#[Security(...)]` attribute — functionally equivalent to `#[IsGranted(...)]`
+  — was not recognised at all; and a first-class-callable reference to
+  `denyAccessUnlessGranted(...)` (a value, never actually invoked) was counted
+  as if the method called it. `parseToAst()` now runs a `NodeTraverser` with
+  `NameResolver` before matching, resolving aliases to their FQCN; a new
+  `RouteAttributeParser` collaborator
+  (`src/Audit/Infrastructure/Scan/RouteAttributeParser.php`, extracted to keep
+  the parser's cognitive complexity under budget) returns every stacked
+  `#[Route(...)]` on a method instead of only the first;
+  `isGrantedValuesFromAttributes()` also matches the `Security` short name; and
+  `methodInvokesDenyAccess()` skips call sites where
+  `MethodCall::isFirstClassCallable()` is true. Each of these previously meant a
+  real access-control check was invisible to the mapping stage, risking a
+  false-positive `broken_access_control` finding on an already-protected route.
+- **`PhpParserFormBindingParser` missed a `createForm()` call whose arguments
+  were fully named and reordered** (e.g.
+  `createForm(data: $x, type: MyType::class)`), because
+  `resolveFirstArgumentClassName()`
+  (`src/Audit/Infrastructure/Scan/PhpParserFormBindingParser.php`) always read
+  `$methodCall->args[0]` — the first _positional_ array slot — regardless of
+  whether that argument was actually named `type`. A new `typeArgument()` helper
+  resolves the `type` argument by name when present, falling back to position
+  only when no argument is named, mirroring the same positional-or-named
+  resolution already used for `Route`'s `path` and `IsGranted`'s `attribute`.
+- **A multi-line method signature whose default value was a string literal
+  containing a closing parenthesis (e.g. `function foo(string $path = 'a)b')`)
+  lost its continuation lines when a large file was sliced for the attacker
+  prompt** — the very defect the round-8 multi-line-signature fix introduced.
+  `RegexCodeSlicer::parenDelta()`
+  (`src/Audit/Infrastructure/Scan/RegexCodeSlicer.php`) counted every `(`/`)` on
+  a line including ones inside string literals, so the `)` in `'a)b'` registered
+  as closing the signature's own opening paren early, and the real continuation
+  lines were dropped as if the signature had already ended. `parenDelta()` now
+  strips string literals (a new `STRING_LITERAL_PATTERN` constant) before
+  counting parens.
+- **The `GoogleApiKey` secret pattern could either truncate a valid key or fail
+  to redact one embedded in a longer token, and the `ConnectionUri` pattern
+  dropped a password containing an `@` character.**
+  `RegexSecretScrubber::PATTERNS`
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) matched
+  `GoogleApiKey` with a trailing `\b` word boundary, which — being a zero-width
+  assertion between a word and non-word character — does not fire when the
+  fixed-length `{35}` match already ends on a non-word character followed by
+  another non-word character (no backtracking possible), so a key embedded in
+  e.g. `AIza...------` was left unredacted. The trailing assertion is now a
+  negative lookahead (`(?![0-9A-Za-z_\-])`), which correctly rejects the match
+  without relying on a word/non-word transition. Separately, `ConnectionUri`'s
+  password group (`[^@/\s]+`) excluded `@` entirely, so a password itself
+  containing `@` (URL-encoded or not) truncated the match and left the remainder
+  of the credential unredacted; the group now excludes only `/` and whitespace,
+  keeping `@` as part of the greedy password match (the final `@` separating
+  credentials from host still anchors correctly via backtracking).
+- **The `no_hash_equals` webhook static-pre-scan marker (`signature`/`hmac`/
+  `hash` compared with `===`/`!==` instead of `hash_equals()`) missed the
+  anti-pattern whenever the comparison operator landed on a different line than
+  the `signature`/`hmac`/`hash` keyword** — plausible with any reasonably long
+  variable name or an intervening line break before the operator.
+  `RegexStaticPreScanner`'s pattern for `ProjectFileType::WEBHOOK_CONSUMER`
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) carried only the
+  `i` modifier, and this scanner uses the presence of the `s` (dotall) modifier
+  as the explicit signal to dispatch a pattern to cross-line matching
+  (`matchAcrossLines()`) instead of per-line matching (`matchLines()`) — without
+  it, `[^;]{0,80}` could never span a newline, silently confining the pattern to
+  a single physical line. The regex now also carries `s`, restoring detection
+  for the multi-line form. `CACHE_VERSION` bumps 10 → 11, invalidating pre-scan
+  results computed under the narrower pattern.
+- **A sequence of retries approaching `retry.max_attempts` could compute a
+  nonsensical, effectively-unbounded backoff delay instead of respecting the
+  configured ceiling.** `RetryPolicy::computeDelay()`
+  (`src/Audit/Infrastructure/LLM/RetryPolicy.php`) computed the exponential
+  backoff in a `float`, then `delayMs()`/`rateLimitDelayMs()` cast the result to
+  `int` _before_ clamping it to the configured ceiling — for a high enough
+  attempt count, the float overflows the range an `int` cast can represent,
+  producing an arbitrary (potentially negative) integer that `min()` cannot
+  meaningfully clamp against the ceiling. `computeDelay()` now returns `float`,
+  and both callers clamp against the ceiling in float space
+  (`min(computeDelay(...), (float) $ceiling)`) before the final `(int) round()`
+  cast, so the ceiling is always respected regardless of attempt count.
+- **A budget configured with a cost cap could abort an audit one call early (or
+  late) due to floating-point accumulation error**, e.g. three $0.10 calls
+  against a $0.30 cap could compare as `0.30000000000000004 > 0.30` and throw
+  `BudgetExceededException` even though the true total is exactly at the cap.
+  `BudgetTracker::assertWithinBudget()`
+  (`src/Audit/Application/Budget/BudgetTracker.php`) compared the raw
+  accumulated `float` against the cap but reported a separately-rounded value in
+  the exception message, so the abort decision and the reported figure could
+  even disagree with each other. It now computes `costUsdUsed()` (the rounded
+  getter) once and uses that same value for both the comparison and the
+  exception, matching the precision a user configuring `max_cost_usd` actually
+  sees.
+- **Enabling `reviewer_tools_enabled`, changing `reviewer_max_tool_iterations`,
+  or changing `reviewer_batch_size` did not invalidate the reviewer verdict
+  cache**, so a cached JSON-mode verdict could be silently served back under a
+  tool-mode configuration (or vice versa), and a cached single-review verdict
+  could be served under a different batch size. `reviewerKeySalt()`
+  (`src/Audit/Infrastructure/Config/ContainerParameterRegistrar.php`) folded in
+  the structured-collection mode and prompt/cache versions but never these three
+  settings. The salt format now appends `tools-<on|off>[-<iterations>]` and
+  `batch-<size>`, so changing any of them produces a new cache key instead of
+  reusing a stale verdict computed under different reviewer behavior.
+- **Two files with an identical concatenated relative-path signature but
+  different actual paths/content could collide on the same attacker cache key**,
+  e.g. a crafted or coincidentally-repeated file whose `path=hash` text matches
+  another chunk's serialized signature byte-for-byte once joined by `\n`.
+  `FilesystemAttackerCache::keyForChunk()`
+  (`src/Audit/Infrastructure/Cache/FilesystemAttackerCache.php`) built the cache
+  key by joining each file's raw `path=contentHash` string with `\n` before a
+  single final hash — a delimiter-injection-style collision, since a
+  `relativePath()` containing a literal `\n` or `=` could make two structurally
+  different chunks serialize to the same string. Each file's signature is now
+  hashed individually before joining, so the final key is a hash of hashes and
+  no per-file delimiter character can cross a signature boundary.
+- **A malformed `symfony-security-auditor.yaml`/`.yml` standalone config file
+  crashed the CLI with a raw Symfony `ParseException`** instead of the project's
+  own exception hierarchy. `StandaloneConfigLoader::read()`
+  (`src/Audit/Infrastructure/Config/StandaloneConfigLoader.php`) called
+  `Yaml::parseFile()` with no try/catch. It now wraps `ParseException` into the
+  new `MalformedProjectConfigException`
+  (`src/Audit/Infrastructure/Config/Exception/MalformedProjectConfigException.php`),
+  and `StandaloneApplicationFactory::buildContainer()`/`loadAuditCommand()`
+  (`src/Standalone/StandaloneApplicationFactory.php`) propagate it, consistent
+  with this project's rule that no raw SPL/Symfony exception may leak from an
+  Infrastructure adapter.
+- **Writing the standalone config file (e.g. `audit:init`) could leak a raw
+  Symfony `IOException`** on a filesystem failure (unwritable parent directory,
+  disk full) instead of a project-defined exception.
+  `YamlStandaloneConfigWriter::write()`
+  (`src/Audit/Infrastructure/Config/YamlStandaloneConfigWriter.php`) now wraps
+  `Filesystem::dumpFile()`/`chmod()` failures into the new
+  `StandaloneConfigWriteException`
+  (`src/Audit/Infrastructure/Config/Exception/StandaloneConfigWriteException.php`).
+- **Installing a provider bridge into a target directory whose `composer.json`
+  needed to be created, but where directory creation failed (e.g. read-only
+  filesystem), could leak a raw Symfony `IOException`.**
+  `ComposerBridgeInstaller::ensureComposerProject()`
+  (`src/Audit/Infrastructure/Bridge/ComposerBridgeInstaller.php`) now wraps
+  `Filesystem::dumpFile()` failures into
+  `BridgeInstallationFailedException::forManifestWriteFailure()`
+  (`src/Audit/Infrastructure/Bridge/Exception/BridgeInstallationFailedException.php`),
+  consistent with how the same class already wraps a failed `composer require`.
+- **A project with more than one Symfony config file declaring an
+  `access_control` rule for the same route path had every rule but the
+  last-scanned one silently dropped**, e.g. a base `security.yaml` requiring
+  `ROLE_ADMIN` for `^/admin` and an environment override adding an `ips:`
+  restriction for the same path resulted in the `ROLE_ADMIN` requirement
+  vanishing entirely from what the attacker LLM sees.
+  `MappingStage::extractSecurityConfig()`
+  (`src/Audit/Application/Pipeline/Stage/MappingStage.php`) combined each config
+  file's `parseAccessControl()` result with a plain `array_merge()`, which
+  replaces a string-keyed value from a later array rather than merging it —
+  silently undoing
+  `SymfonyYamlSecurityConfigParser::recordAccessControlEntry()`'s own documented
+  **within-file** semantics, where a repeated path is appended as an `or: …`
+  requirement instead of replacing the earlier rule. A new
+  `mergeRouteAccessMaps()` helper replicates that same `or:`-append behavior
+  **across** files, so no config file's rule for an already-seen path is lost.
+- **Two controllers whose names share a CamelCase prefix — most commonly a
+  singular/plural pair like `UserController` and `UsersController` — had the
+  second controller's entire file set silently merged into the first
+  controller's "feature" chunk instead of getting its own**, meaning the
+  attacker LLM analyzing the `Users` feature never saw its own controller in
+  context, and the `User`-feature chunk grew to contain two unrelated
+  controllers' worth of files. `FileChunker::fileBelongsToFeature()`
+  (`src/Audit/Application/Agent/Chunking/FileChunker.php`) matched a file's base
+  name against a feature name with a plain `startsWith()`, which matches
+  `UsersController` against feature `User` because the prefix stops mid-word
+  rather than at a word boundary. A new `baseNameStartsAtFeatureBoundary()`
+  helper additionally requires the remainder after the shared prefix to be empty
+  or start with an uppercase letter, so `UsersController` (remainder
+  `sController`, lowercase) no longer matches feature `User`, while
+  `UserController`/`UserRepository` (remainder starts uppercase, or is empty)
+  still do.
 - **The console report either crashed outright or silently rendered
   attacker-influenced text as live terminal markup — including fabricated color
   codes able to visually mask a critical finding.** `ReportWriter::write()`

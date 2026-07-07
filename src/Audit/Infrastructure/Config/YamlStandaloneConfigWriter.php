@@ -14,8 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 use Override;
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\StandaloneConfigWriteException;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
@@ -26,10 +28,17 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
         private Filesystem $filesystem = new Filesystem(),
     ) {}
 
+    /**
+     * @throws StandaloneConfigWriteException
+     */
     #[Override]
     public function write(string $configFile, array $config): void
     {
-        $this->filesystem->dumpFile($configFile, Yaml::dump($config));
-        $this->filesystem->chmod($configFile, 0o600);
+        try {
+            $this->filesystem->dumpFile($configFile, Yaml::dump($config));
+            $this->filesystem->chmod($configFile, 0o600);
+        } catch (IOException $ioException) {
+            throw StandaloneConfigWriteException::fromIOException($configFile, $ioException);
+        }
     }
 }

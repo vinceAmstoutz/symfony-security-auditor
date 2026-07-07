@@ -42,6 +42,32 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_recognizes_route_and_is_granted_attributes_imported_under_an_alias(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route as Get;
+            use Symfony\Component\Security\Http\Attribute\IsGranted as RequiresRole;
+            final class AdminController {
+                #[Get('/admin/dashboard', name: 'admin_dashboard')]
+                #[RequiresRole('ROLE_ADMIN')]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertTrue($entries[0]->hasRouteAttribute());
+        self::assertSame('/admin/dashboard', $entries[0]->routePath());
+        self::assertSame(['ROLE_ADMIN'], $entries[0]->methodLevelIsGranted());
+        self::assertTrue($entries[0]->hasAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_action_with_route_and_no_access_check(): void
     {
         $source = <<<'PHP'
@@ -63,6 +89,32 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['DELETE'], $entries[0]->routeMethods());
         self::assertTrue($entries[0]->hasRouteAttribute());
         self::assertTrue($entries[0]->lacksAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_extracts_one_entry_per_stacked_route_attribute(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class ItemController {
+                #[Route('/items', name: 'items_list', methods: ['GET'])]
+                #[Route('/items', name: 'items_delete', methods: ['DELETE'])]
+                public function items(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/ItemController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertCount(2, $entries);
+        self::assertSame('items_list', $entries[0]->routeName());
+        self::assertSame(['GET'], $entries[0]->routeMethods());
+        self::assertSame('items_delete', $entries[1]->routeName());
+        self::assertSame(['DELETE'], $entries[1]->routeMethods());
     }
 
     /**
@@ -135,6 +187,31 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_records_a_method_level_security_attribute_expression_as_an_access_check(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\Security;
+            final class AdminController {
+                #[Route(path: '/admin/dashboard')]
+                #[Security("is_granted('ROLE_ADMIN')")]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(["is_granted('ROLE_ADMIN')"], $entries[0]->methodLevelIsGranted());
+        self::assertTrue($entries[0]->hasAccessCheck());
+        self::assertFalse($entries[0]->lacksAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_class_level_is_granted(): void
     {
         $source = <<<'PHP'
@@ -178,6 +255,31 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         self::assertTrue($entries[0]->methodHasDenyAccess());
         self::assertTrue($entries[0]->hasAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_first_class_callable_reference_to_deny_access_unless_granted_does_not_count_as_an_access_check(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/dashboard')]
+                public function dashboard(): void {
+                    $callback = $this->denyAccessUnlessGranted(...);
+                    unset($callback);
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertFalse($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->lacksAccessCheck());
     }
 
     /**

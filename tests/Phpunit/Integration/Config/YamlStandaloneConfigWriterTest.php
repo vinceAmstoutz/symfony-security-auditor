@@ -17,6 +17,7 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\StandaloneConfigWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
 
 final class YamlStandaloneConfigWriterTest extends TestCase
@@ -35,6 +36,9 @@ final class YamlStandaloneConfigWriterTest extends TestCase
         (new Filesystem())->remove(\dirname($this->configFile));
     }
 
+    /**
+     * @throws StandaloneConfigWriteException
+     */
     public function test_it_writes_the_configuration_as_parseable_yaml(): void
     {
         $config = ['provider' => 'anthropic', 'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']], 'model' => 'claude-opus-4-8'];
@@ -44,6 +48,9 @@ final class YamlStandaloneConfigWriterTest extends TestCase
         self::assertSame($config, Yaml::parseFile($this->configFile));
     }
 
+    /**
+     * @throws StandaloneConfigWriteException
+     */
     public function test_it_restricts_the_config_file_to_owner_only_permissions(): void
     {
         (new YamlStandaloneConfigWriter())->write($this->configFile, ['model' => 'claude-opus-4-8']);
@@ -51,5 +58,20 @@ final class YamlStandaloneConfigWriterTest extends TestCase
         $permissions = fileperms($this->configFile);
         self::assertNotFalse($permissions);
         self::assertSame('0600', substr(\sprintf('%o', $permissions), -4));
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     */
+    public function test_it_wraps_an_io_failure_as_a_standalone_config_write_exception(): void
+    {
+        $filesystem = new Filesystem();
+        $blockingFile = \dirname($this->configFile).'/not-a-directory';
+        $filesystem->mkdir(\dirname($blockingFile));
+        $filesystem->dumpFile($blockingFile, 'x');
+
+        $this->expectException(StandaloneConfigWriteException::class);
+
+        (new YamlStandaloneConfigWriter())->write($blockingFile.'/config.yaml', ['model' => 'claude-opus-4-8']);
     }
 }

@@ -151,6 +151,14 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
      */
     private const string BARE_KEYWORD_PATTERN = '/\b(?:exec|rand|include|include_once|require|require_once)\b/';
 
+    /**
+     * Matches single- or double-quoted string literals (with basic
+     * backslash-escape handling) so their contents can be stripped before
+     * counting parentheses — a default value like `'Confirm)'` must not be
+     * mistaken for a real closing paren that ends a multi-line signature.
+     */
+    private const string STRING_LITERAL_PATTERN = '/\'(?:\\\\.|[^\'\\\\])*\'|"(?:\\\\.|[^"\\\\])*"/';
+
     public function __construct(
         private int $minLinesBeforeSlicing = self::DEFAULT_MIN_LINES_BEFORE_SLICING,
     ) {}
@@ -210,6 +218,8 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
 
     private function parenDelta(string $line): int
     {
-        return substr_count($line, '(') - substr_count($line, ')');
+        $withoutStringLiterals = preg_replace(self::STRING_LITERAL_PATTERN, '', $line) ?? $line;
+
+        return substr_count($withoutStringLiterals, '(') - substr_count($withoutStringLiterals, ')');
     }
 }

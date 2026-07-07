@@ -144,6 +144,24 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    public function test_it_flags_a_signature_compare_split_across_lines_with_a_leading_operator(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Webhook/PaymentWebhookConsumer.php',
+            '/app/src/Webhook/PaymentWebhookConsumer.php',
+            "<?php\nclass PaymentWebhookConsumer { public function consume(\$signature, \$computed) { if (\$signature\n !== \$computed) { throw new \RuntimeException('bad'); } } }",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('no_hash_equals', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_raw_filter_in_template(): void
     {
         $projectFile = ProjectFile::create(

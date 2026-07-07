@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use JsonException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use UnitEnum;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\AuditExecutionConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ConfigurationNotices;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
@@ -101,7 +102,7 @@ final readonly class ContainerParameterRegistrar
             'cache.dir' => $cache->dir,
             'cache.advisory_dir' => \sprintf('%s/advisory', $cache->dir),
             'cache.reviewer_dir' => \sprintf('%s/reviewer', $cache->dir),
-            'cache.reviewer_key_salt' => $this->reviewerKeySalt($llm, $audit->reviewerStructuredCollection),
+            'cache.reviewer_key_salt' => $this->reviewerKeySalt($llm, $audit),
             'cache.prompt_caching' => $cache->promptCaching,
             'cache.key_salt' => $this->attackerKeySalt($bundleConfiguration, $llm->attackerModel()),
             'cache.cheap_attacker_key_salt' => $this->attackerKeySalt(
@@ -128,15 +129,26 @@ final readonly class ContainerParameterRegistrar
         return array_values(array_unique($models));
     }
 
-    private function reviewerKeySalt(LLMConfiguration $llmConfiguration, bool $reviewerStructuredCollection): string
+    private function reviewerKeySalt(LLMConfiguration $llmConfiguration, AuditExecutionConfiguration $auditExecutionConfiguration): string
     {
         return \sprintf(
-            '%s|reviewer-v%d|prompt-v%d|collect-%s',
+            '%s|reviewer-v%d|prompt-v%d|collect-%s|tools-%s|batch-%d',
             $llmConfiguration->reviewerModel(),
             FilesystemReviewerCache::CACHE_VERSION,
             ReviewerPromptBuilder::PROMPT_VERSION,
-            $reviewerStructuredCollection ? 'tool' : 'json',
+            $auditExecutionConfiguration->reviewerStructuredCollection ? 'tool' : 'json',
+            $this->reviewerToolsSalt($auditExecutionConfiguration),
+            $auditExecutionConfiguration->reviewerBatchSize,
         );
+    }
+
+    private function reviewerToolsSalt(AuditExecutionConfiguration $auditExecutionConfiguration): string
+    {
+        if (!$auditExecutionConfiguration->reviewerToolsEnabled) {
+            return 'off';
+        }
+
+        return \sprintf('on-%d', $auditExecutionConfiguration->reviewerMaxToolIterations);
     }
 
     /**

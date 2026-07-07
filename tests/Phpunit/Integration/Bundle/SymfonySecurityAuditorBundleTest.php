@@ -636,9 +636,43 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         self::assertSame('/custom/cache/reviewer', $containerBuilder->getParameter('symfony_security_auditor.cache.reviewer_dir'));
         self::assertSame(
-            \sprintf('claude-haiku-4-5-20251001|reviewer-v%d|prompt-v%d|collect-tool', FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
+            \sprintf('claude-haiku-4-5-20251001|reviewer-v%d|prompt-v%d|collect-tool|tools-off|batch-1', FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
             $containerBuilder->getParameter('symfony_security_auditor.cache.reviewer_key_salt'),
         );
+    }
+
+    public function test_bundle_reviewer_key_salt_folds_in_reviewer_tools_enabled_and_max_iterations(): void
+    {
+        $toolsOffSalt = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['reviewer_tools_enabled' => false],
+        ])->getParameter('symfony_security_auditor.cache.reviewer_key_salt');
+
+        $toolsOnSalt = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['reviewer_tools_enabled' => true, 'reviewer_max_tool_iterations' => 7],
+        ])->getParameter('symfony_security_auditor.cache.reviewer_key_salt');
+
+        self::assertIsString($toolsOffSalt);
+        self::assertIsString($toolsOnSalt);
+        self::assertStringContainsString('tools-off', $toolsOffSalt);
+        self::assertStringContainsString('tools-on-7', $toolsOnSalt);
+        self::assertNotSame($toolsOffSalt, $toolsOnSalt);
+    }
+
+    public function test_bundle_reviewer_key_salt_folds_in_reviewer_batch_size(): void
+    {
+        $batchOneSalt = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['reviewer_batch_size' => 1],
+        ])->getParameter('symfony_security_auditor.cache.reviewer_key_salt');
+
+        $batchFiveSalt = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['reviewer_batch_size' => 5],
+        ])->getParameter('symfony_security_auditor.cache.reviewer_key_salt');
+
+        self::assertNotSame($batchOneSalt, $batchFiveSalt);
     }
 
     public function test_bundle_reviewer_key_salt_folds_in_the_structured_collection_mode(): void
@@ -656,8 +690,8 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertNotSame($structuredSalt, $jsonSalt);
         self::assertIsString($structuredSalt);
         self::assertIsString($jsonSalt);
-        self::assertStringEndsWith('|collect-tool', $structuredSalt);
-        self::assertStringEndsWith('|collect-json', $jsonSalt);
+        self::assertStringContainsString('|collect-tool|', $structuredSalt);
+        self::assertStringContainsString('|collect-json|', $jsonSalt);
     }
 
     public function test_bundle_propagates_secret_scrubbing_config_to_parameters(): void

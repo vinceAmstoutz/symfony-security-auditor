@@ -62,8 +62,9 @@ final class BudgetTracker
         }
 
         $maxCostUsd = $this->auditBudget->maxCostUsd();
-        if (null !== $maxCostUsd && $this->costUsdUsed > $maxCostUsd) {
-            throw BudgetExceededException::forCost($this->costUsdUsed, $maxCostUsd);
+        $costUsdUsed = $this->costUsdUsed();
+        if (null !== $maxCostUsd && $costUsdUsed > $maxCostUsd) {
+            throw BudgetExceededException::forCost($costUsdUsed, $maxCostUsd);
         }
     }
 

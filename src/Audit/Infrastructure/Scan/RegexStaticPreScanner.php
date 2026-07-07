@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 10;
+    public const int CACHE_VERSION = 11;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -251,7 +251,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         ],
         ProjectFileType::WEBHOOK_CONSUMER->value => [
             'no_hash_equals' => [
-                'regex' => '/(?:signature|hmac|hash)[^;]{0,80}[!=]==/i',
+                'regex' => '/(?:signature|hmac|hash)[^;]{0,80}[!=]==/is',
                 'description' => 'Signature/HMAC compared with === — use hash_equals() for constant-time',
             ],
         ],

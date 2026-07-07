@@ -207,6 +207,29 @@ final class PhpParserFormBindingParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_extracts_form_type_when_named_arguments_reorder_type_after_data(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Form\UserType;
+            final class UserController {
+                public function edit(): void {
+                    $form = $this->createForm(data: $this->getUser(), type: UserType::class);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+
+        $bindings = $this->phpParserFormBindingParser->parse($projectFile);
+
+        self::assertCount(1, $bindings);
+        self::assertSame('App\\Form\\UserType', $bindings[0]->formTypeClass());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_multiple_bindings_from_same_method(): void
     {
         $source = <<<'PHP'

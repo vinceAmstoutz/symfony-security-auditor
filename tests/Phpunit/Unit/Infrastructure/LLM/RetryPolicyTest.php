@@ -132,6 +132,19 @@ final class RetryPolicyTest extends TestCase
     /**
      * @throws InvalidRetryConfigurationException
      */
+    public function test_delay_stays_clamped_to_max_even_when_the_exponential_term_would_overflow_an_int(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            new BackoffSchedule(maxAttempts: 100, initialDelayMs: 500, backoffMultiplier: 2.0, jitterRatio: 0.0),
+            jitterSource: static fn (): float => 0.0,
+        );
+
+        self::assertSame(300_000, $retryPolicy->delayMs(56));
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     public function test_invalid_attempt_is_rejected(): void
     {
         $retryPolicy = new RetryPolicy();
