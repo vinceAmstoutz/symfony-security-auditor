@@ -43,6 +43,7 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'form by directory and suffix' => ['src/Form/UserType.php', '<?php', ProjectFileType::FORM];
         yield 'authenticator by suffix' => ['src/Security/LoginFormAuthenticator.php', '<?php', ProjectFileType::AUTHENTICATOR];
         yield 'messenger handler by suffix' => ['src/Messenger/SendInvoiceMessageHandler.php', '<?php', ProjectFileType::MESSENGER_HANDLER];
+        yield 'messenger handler by attribute' => ['src/Handler/ProcessPaymentAction.php', "<?php\n#[AsMessageHandler]\nclass ProcessPaymentAction {}", ProjectFileType::MESSENGER_HANDLER];
         yield 'webhook consumer by suffix' => ['src/Webhook/StripeWebhookConsumer.php', '<?php', ProjectFileType::WEBHOOK_CONSUMER];
         yield 'event subscriber by suffix' => ['src/EventSubscriber/AuditSubscriber.php', '<?php', ProjectFileType::EVENT_SUBSCRIBER];
         yield 'normalizer by suffix' => ['src/Serializer/UserNormalizer.php', '<?php', ProjectFileType::NORMALIZER];

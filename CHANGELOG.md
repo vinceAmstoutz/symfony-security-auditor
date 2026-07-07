@@ -628,6 +628,41 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A finding's narrative text containing an unterminated tilde-style code fence
+  (`~~~`) could still swallow every subsequent finding into inert code text**,
+  the identical bug already fixed for backtick fences.
+  `MarkdownReportRenderer::escapeFences()`
+  (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) only
+  backslash-escaped literal backticks; CommonMark (and GitHub-flavored Markdown)
+  accepts **either** three-or-more backticks **or** three-or-more tildes as a
+  fence marker, so an LLM-echoed description/attack-vector/ remediation
+  containing a line starting with `~~~` opened an equally unterminated fence
+  that any CommonMark-compliant renderer treats as open through the rest of the
+  document. `escapeFences()` now also escapes `~`.
+- **A class using the modern `#[AsMessageHandler]` attribute with a
+  non-conventional class name/path (e.g. `ProcessPaymentAction` instead of
+  `...MessageHandler`) was classified as plain `php` instead of
+  `messenger_handler`**, silently losing `MessengerHandlerAttackerSkill`'s
+  dedicated hunting guidance (queue-to-shell injection via unserialized
+  payloads, missing idempotency/replay protection, PHP-native transport
+  serializer RCE) for that file.
+  `ProjectFileTypeClassifier::isMessengerHandlerPath()`
+  (`src/Audit/Domain/Model/ProjectFileTypeClassifier.php`) was purely
+  filename/directory-based, unlike the attribute-aware classification already
+  used for `#[ApiResource]`, `#[AsLiveComponent]`, and Twig extensions. A new
+  `looksLikeMessengerHandler()` content check recognizes `#[AsMessageHandler`
+  regardless of the class's name or location, matching the established pattern
+  for the other attribute-driven types.
+- **`--show-scanned` crashed the CLI on a real, on-disk file whose relative path
+  happened to look like console markup** (e.g. `src/PwnController<fg=grey>.php`
+  — a legitimate filename on Linux, which permits any byte except `/` and NUL) —
+  the same console-markup-injection class already fixed repeatedly elsewhere,
+  but never applied to this feature. `AuditPresenter::scannedFiles()`
+  (`src/Command/AuditPresenter.php`) passed each file's relative path straight
+  into `SymfonyStyle::listing()`, which `writeln()`s every element with no
+  `OutputInterface::OUTPUT_RAW`. Each path is now escaped with
+  `Symfony\Component\Console\Formatter\OutputFormatter::escape()` before
+  listing.
 - **A crafted `file_path` in an LLM-reported finding could crash the entire
   audit mid-run — losing every finding already discovered — or forge a fake
   status line in the live progress narration.**

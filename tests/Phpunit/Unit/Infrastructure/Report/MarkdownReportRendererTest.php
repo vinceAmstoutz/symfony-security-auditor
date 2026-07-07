@@ -139,6 +139,27 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      */
+    public function test_render_neutralizes_an_unterminated_tilde_code_fence_in_a_description_so_it_does_not_swallow_later_findings(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::HEADER_INJECTION, VulnerabilitySeverity::CRITICAL, 'Header leak', 0.7),
+            new CodeLocation('src/Low.php', 5, 6),
+            new VulnerabilityNarrative("Description ends with an unterminated tilde fence:\n\n~~~php\n// truncated on purpose", 'n/a', 'n/a', 'n/a'),
+            'n/a',
+        )->withReviewerValidation(true);
+        $secondFinding = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'src/Admin.php', 88);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability, $secondFinding));
+
+        self::assertStringNotContainsString('~~~', $output);
+        self::assertStringContainsString('\\~\\~\\~', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     */
     public function test_render_finding_type_line_shows_the_owasp_and_cwe_references(): void
     {
         $output = $this->renderer->render($this->makeReport(

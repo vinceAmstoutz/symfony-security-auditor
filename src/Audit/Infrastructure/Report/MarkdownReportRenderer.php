@@ -98,14 +98,15 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
 
     /**
      * LLM-produced narrative text is rendered as raw Markdown; an unescaped
-     * run of backticks (e.g. a ``` fence quoted mid-description) would open
-     * a code block that only closes at the next such run — silently
-     * swallowing every subsequent finding as inert code text once rendered.
-     * Backslash-escaping each backtick keeps it a literal character instead.
+     * run of backticks OR tildes (CommonMark allows either as a fence marker,
+     * e.g. a ``` or ~~~ fence quoted mid-description) would open a code block
+     * that only closes at the next such run — silently swallowing every
+     * subsequent finding as inert code text once rendered. Backslash-escaping
+     * each backtick/tilde keeps it a literal character instead.
      */
     private function escapeFences(string $text): string
     {
-        return str_replace('`', '\\`', $text);
+        return str_replace(['`', '~'], ['\\`', '\\~'], $text);
     }
 
     private function codeBlock(string $text): string

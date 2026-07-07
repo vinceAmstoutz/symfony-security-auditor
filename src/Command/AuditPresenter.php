@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use InvalidArgumentException;
 use Override;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
@@ -154,7 +155,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
         foreach ($this->relativePathsByType($projectFiles) as $type => $relativePaths) {
             $symfonyStyle->writeln(\sprintf(' <info>%s</info> (%d)', $type, \count($relativePaths)));
-            $symfonyStyle->listing($relativePaths);
+            $symfonyStyle->listing(array_map(OutputFormatter::escape(...), $relativePaths));
         }
 
         $symfonyStyle->success(\sprintf('%d file(s) in scope.', \count($projectFiles)));

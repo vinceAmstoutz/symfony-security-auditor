@@ -292,6 +292,21 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('2 file(s) in scope.', $flattened);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_does_not_render_a_crafted_file_path_as_console_markup(): void
+    {
+        $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/PwnController<fg=grey>.php', '/p/src/PwnController<fg=grey>.php', '<?php'),
+        ]);
+
+        self::assertStringContainsString('src/PwnController<fg=grey>.php', $bufferedOutput->fetch());
+    }
+
     public function test_scanned_files_warns_when_nothing_matched(): void
     {
         $bufferedOutput = new BufferedOutput();

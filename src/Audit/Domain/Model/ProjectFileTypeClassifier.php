@@ -27,7 +27,7 @@ final readonly class ProjectFileTypeClassifier
             self::isRepositoryPath($path), self::looksLikeRepository($path, $content) => ProjectFileType::REPOSITORY,
             self::isFormPath($path), self::looksLikeForm($path, $content) => ProjectFileType::FORM,
             str_ends_with($path, 'Authenticator.php') => ProjectFileType::AUTHENTICATOR,
-            self::isMessengerHandlerPath($path) => ProjectFileType::MESSENGER_HANDLER,
+            self::isMessengerHandlerPath($path), self::looksLikeMessengerHandler($path, $content) => ProjectFileType::MESSENGER_HANDLER,
             self::isWebhookConsumerPath($path) => ProjectFileType::WEBHOOK_CONSUMER,
             str_ends_with($path, 'Subscriber.php') || str_ends_with($path, 'EventListener.php') => ProjectFileType::EVENT_SUBSCRIBER,
             str_ends_with($path, 'Normalizer.php') || str_ends_with($path, 'Denormalizer.php') => ProjectFileType::NORMALIZER,
@@ -136,6 +136,12 @@ final readonly class ProjectFileTypeClassifier
     {
         return str_ends_with($path, 'MessageHandler.php')
             || (str_contains($path, '/MessageHandler/') && str_ends_with($path, '.php'));
+    }
+
+    private static function looksLikeMessengerHandler(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && str_contains($content, '#[AsMessageHandler');
     }
 
     private static function isWebhookConsumerPath(string $path): bool
