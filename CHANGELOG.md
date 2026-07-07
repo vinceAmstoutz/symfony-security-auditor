@@ -628,6 +628,114 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A non-provider exception during concurrent JSON-mode review (e.g. a
+  transport error mid-batch) crashed the entire audit with no report at all**,
+  instead of degrading the affected findings to a rejected verdict like every
+  other review path already does. `ConcurrentReviewAnalyzer::dispatchWindow()`
+  (`src/Audit/Application/Agent/Review/ConcurrentReviewAnalyzer.php`) only
+  caught `BudgetExceededException`/`LLMProviderException` around
+  `completeBatch()` — contradicting its own docblock's claim that "per-finding
+  parse/transient failures degrade to a rejected verdict exactly as the
+  sequential path does" — while `SequentialReviewAnalyzer::reviewSingle()` and
+  `ConcurrentStructuredReviewAnalyzer::dispatchPending()` both already catch the
+  generic case and mark the affected findings `errored` via
+  `ReviewOutcomeRecorder::recordReviewError()`. A new `recordWindowErrors()`
+  helper gives `ConcurrentReviewAnalyzer` the same behavior: a non-provider
+  exception now marks every pending finding in the failing window as errored and
+  the audit completes with a report instead of aborting.
+- **`audit:diff`'s console output rendered finding titles as live terminal
+  markup**, the identical crash/spoofing class already fixed for the main report
+  renderer. `DiffPresenter::section()` (`src/Command/DiffPresenter.php`) called
+  `writeln()` on each finding line without `OutputInterface::OUTPUT_RAW` —
+  unlike the JSON branch three lines above it, which already carries a comment
+  explaining why it needs the flag. A title containing a fabricated
+  `<fg=grey>...</>` tag crashed the command with
+  `InvalidArgumentException: Invalid "grey" color`; one containing
+  `</> <fg=green>[report clean]</>` rendered real ANSI codes capable of visually
+  forging a clean-diff line. `section()` now also passes
+  `OutputInterface::OUTPUT_RAW`.
+- **The Markdown report's `**Location:**` line did not escape the finding's file
+  path**, unlike its title/description/attack-vector/remediation fields, which
+  already run through `escapeFences()`.
+  `MarkdownReportRenderer::vulnerability()`
+  (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) interpolated
+  `$vulnerability->filePath()` raw between literal backticks — a file path
+  containing a backtick (LLM-reported, not validated against the actual scan
+  results) closed the inline code span early, letting arbitrary following text
+  (e.g. an HTML tag) render as live Markdown instead of inert code-span content.
+  `filePath()` is now escaped the same way as the other four fields.
+- **The secret scrubber only redacted a credential value up to its first literal
+  `#` character, leaking the remainder in plaintext** — a real risk for
+  generated passwords that happen to contain `#`.
+  `RegexSecretScrubber::DEFAULT_PATTERNS`
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) excluded `#`
+  from both the `env_assignment` value group and `inline_assignment`'s unquoted
+  branch — e.g. `APP_SECRET=abc#def123` redacted only `abc`, leaving `#def123`
+  exposed to the LLM prompt. Both groups now match the full non-whitespace token
+  (`\S+`), so a value is only cut short at real whitespace; a `#`-prefixed
+  inline comment with **no** preceding space (a genuine edge case, rare in
+  practice) is now over-redacted along with the value rather than
+  under-redacting the secret — the safer failure direction for a
+  security-scrubbing tool.
+- **A method declared with no visibility modifier (implicitly `public`, valid
+  PHP) was silently elided from the attacker prompt when slicing a large file**,
+  hiding its name, parameters, and return type from the LLM entirely.
+  `RegexCodeSlicer::STRUCTURAL_PREFIXES`
+  (`src/Audit/Infrastructure/Scan/RegexCodeSlicer.php`) listed `'public '`,
+  `'protected '`, `'private '` but no bare `'function '`, so a signature like
+  `function delete(Request $request, string $id): Response` matched no
+  structural prefix and, absent a security token on the same line, was replaced
+  with `// elided`. A bare `'function '` prefix is now included.
+- **`PhpParserVoterCapabilityParser` returned no capability at all for a voter
+  file whose voter class was not the first class declared in the file** — e.g. a
+  small attribute-constants helper class declared before the actual voter —
+  losing that voter's entire "Voter Coverage" entry for the attacker prompt and
+  risking a false-positive `missing_voter` finding on every action it guards.
+  `parse()` (`src/Audit/Infrastructure/Scan/PhpParserVoterCapabilityParser.php`)
+  used `findFirstInstanceOf($ast, Class_::class)`, unlike the sibling
+  controller/form parsers, which already iterate every class in the file. A new
+  `findVoterClass()` helper iterates every class declared in the file and picks
+  whichever one actually has a `supports()` method, regardless of declaration
+  order.
+- **The Mistral, OpenAI, and Llama token estimators missed several real,
+  currently-priced model families**, silently falling back to the generic
+  3.2-chars-per-token ratio instead of each provider's more accurate ratio —
+  inflating `--dry-run` cost estimates and the rate limiter's pre-call token
+  reservation for these models. `MistralTokenEstimator::PREFIXES`
+  (`src/Audit/Infrastructure/LLM/TokenEstimator/MistralTokenEstimator.php`)
+  recognised only `mistral-`/`codestral-`, missing `devstral-`, `magistral-`,
+  `ministral-`, `open-mistral-`, `open-mixtral-`, and `pixtral-`.
+  `OpenAiTokenEstimator::PREFIXES`
+  (`src/Audit/Infrastructure/LLM/TokenEstimator/OpenAiTokenEstimator.php`)
+  missed the `o1`/`o1-pro` reasoning models. `LlamaTokenEstimator::PREFIXES`
+  (`src/Audit/Infrastructure/LLM/TokenEstimator/LlamaTokenEstimator.php`) missed
+  the `cerebras-llama-*`/`groq-llama-*` hosted-variant IDs. All three prefix
+  lists are now widened to match the bundled `models-dev` catalog.
+- **A malformed but clearly-intended `%env(...)%` placeholder in the standalone
+  config (e.g. a mixed-case environment variable name from `audit:init`'s
+  free-text prompt) silently passed through as a literal string instead of
+  failing with a clear error** — deferring an opaque provider authentication
+  failure to much later in the run instead of failing fast at config-resolve
+  time. `StandalonePlatformConfigResolver::ENV_PLACEHOLDER`
+  (`src/Audit/Infrastructure/Config/StandalonePlatformConfigResolver.php`) only
+  matched a strictly uppercase/digit/underscore variable name (`[A-Z0-9_]+`); a
+  name like `openaiApiKey` didn't match, so `resolveValue()` returned the
+  placeholder text itself as the literal `api_key` value rather than throwing
+  `MissingEnvironmentVariableException`. The regex now matches any
+  `%env(...)%`-shaped string regardless of the captured name's casing, so every
+  such placeholder either resolves or fails clearly.
+- **A freshly-created standalone config file was briefly world/group-readable
+  (`0644`) between being written and its intended `0600` permissions being
+  applied** — a real, deterministic exposure window for a file holding a
+  plaintext platform API key. `YamlStandaloneConfigWriter::write()`
+  (`src/Audit/Infrastructure/Config/YamlStandaloneConfigWriter.php`) called
+  `Filesystem::dumpFile()` before its own `chmod(0600)`; Symfony's `dumpFile()`
+  falls back to `0666 & ~umask()` (typically `0644`) for a file that doesn't yet
+  exist, and that permission briefly applies to the real, content-bearing file
+  once its temp file is renamed into place. `write()` now creates and
+  `chmod(0600)`s an empty file first (when it doesn't already exist), so
+  `dumpFile()`'s own internal permission handling — which preserves an existing
+  file's mode — sees `0600` already in place before any content is written.
 - **A crafted file path or LLM-reported `file` field could break out of the
   `<file path="...">` prompt delimiter or the reviewer's `File: <path>` line and
   inject fabricated instructions into the attacker/reviewer prompt.**

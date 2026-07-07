@@ -35,6 +35,12 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
     public function write(string $configFile, array $config): void
     {
         try {
+            if (!$this->filesystem->exists($configFile)) {
+                $this->filesystem->mkdir(\dirname($configFile));
+                $this->filesystem->touch($configFile);
+                $this->filesystem->chmod($configFile, 0o600);
+            }
+
             $this->filesystem->dumpFile($configFile, Yaml::dump($config));
             $this->filesystem->chmod($configFile, 0o600);
         } catch (IOException $ioException) {

@@ -73,6 +73,17 @@ final class DiffPresenterTest extends TestCase
         self::assertStringContainsString('[HIGH]', $bufferedOutput->fetch());
     }
 
+    public function test_console_output_renders_finding_title_literally_instead_of_as_console_markup(): void
+    {
+        $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $diffFinding = new DiffFinding('fingerprint', 'sql_injection', 'src/Foo.php', 'Bad <fg=grey>debug</> title', 'high');
+
+        $this->diffPresenter->present($symfonyStyle, new ReportDiff([$diffFinding], [], []), DiffOutputFormat::Console);
+
+        self::assertStringContainsString('Bad <fg=grey>debug</> title', $bufferedOutput->fetch());
+    }
+
     private function finding(string $severity = 'high'): DiffFinding
     {
         return new DiffFinding('fingerprint', 'sql_injection', 'src/Foo.php', 'SQL Injection', $severity);

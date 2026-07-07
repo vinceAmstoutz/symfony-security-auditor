@@ -66,7 +66,7 @@ final readonly class DiffPresenter implements DiffPresenterInterface
                     $finding->type,
                     $finding->title,
                     $finding->file,
-                ));
+                ), OutputInterface::OUTPUT_RAW);
             }
 
             return;

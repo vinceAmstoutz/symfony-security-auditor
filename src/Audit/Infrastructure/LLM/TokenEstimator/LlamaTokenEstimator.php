@@ -23,7 +23,7 @@ final readonly class LlamaTokenEstimator implements ProviderTokenEstimatorInterf
     public const float CHARS_PER_TOKEN = 3.6;
 
     /** @var list<string> */
-    private const array PREFIXES = ['llama-', 'llama3', 'llama4', 'meta-llama'];
+    private const array PREFIXES = ['llama-', 'llama3', 'llama4', 'meta-llama', 'cerebras-llama', 'groq-llama'];
 
     public function __construct(private CharacterRatioCounter $characterRatioCounter = new CharacterRatioCounter()) {}
 

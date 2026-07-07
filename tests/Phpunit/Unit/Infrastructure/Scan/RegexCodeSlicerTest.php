@@ -144,6 +144,7 @@ final class RegexCodeSlicerTest extends TestCase
         yield 'public method signature' => ['public function show(): void'];
         yield 'protected member' => ['protected string $name;'];
         yield 'private member' => ['private int $count = 0;'];
+        yield 'method signature with no visibility modifier' => ['function delete(Request $request, string $id): Response'];
     }
 
     /**

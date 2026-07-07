@@ -131,4 +131,17 @@ final class StandalonePlatformConfigResolverTest extends TestCase
         (new StandalonePlatformConfigResolver())
             ->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]]);
     }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     */
+    public function test_it_rejects_a_mixed_case_env_placeholder_instead_of_passing_it_through_as_a_literal(): void
+    {
+        $this->expectException(MissingEnvironmentVariableException::class);
+        $this->expectExceptionMessage('"openaiApiKey"');
+
+        (new StandalonePlatformConfigResolver())
+            ->resolve(['platform' => ['openai' => ['api_key' => '%env(openaiApiKey)%']]]);
+    }
 }

@@ -201,6 +201,33 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_finds_the_voter_class_when_it_is_not_the_first_class_declared_in_the_file(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            use App\Entity\Post;
+            final class PostVoterAttributes {
+                public const string EDIT = 'EDIT';
+            }
+            final class PostVoter {
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, ['EDIT', 'DELETE'], true) && $subject instanceof Post;
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame('App\\Security\\PostVoter', $voterCapability->className());
+        self::assertSame(['EDIT', 'DELETE'], $voterCapability->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_attributes_from_match_arms(): void
     {
         $source = <<<'PHP'

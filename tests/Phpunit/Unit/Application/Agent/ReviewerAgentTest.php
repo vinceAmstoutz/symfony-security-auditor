@@ -2711,6 +2711,41 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_concurrent_review_marks_pending_findings_errored_on_throwable(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+        $second = $this->makeVulnerabilityAt('src/B.php');
+
+        $llmClient = self::createStub(BatchCapableLLMClientInterface::class);
+        $llmClient->method('completeBatch')->willThrowException(new RuntimeException('boom'));
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+            ),
+        );
+
+        $result = $reviewerAgent->review([$vulnerability, $second], [], new NullCoverageRecorder());
+
+        self::assertCount(2, $result);
+        self::assertSame('src/A.php', $result[0]->filePath());
+        self::assertFalse($result[0]->isReviewerValidated());
+        self::assertSame('src/B.php', $result[1]->filePath());
+        self::assertFalse($result[1]->isReviewerValidated());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      * @throws InvalidTokenUsageException
      * @throws InvalidToolRegistryException
      */

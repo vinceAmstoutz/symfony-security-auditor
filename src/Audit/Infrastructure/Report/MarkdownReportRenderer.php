@@ -81,7 +81,7 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
             \sprintf('### %s — %s', $vulnerability->severity()->label(), $this->escapeFences($vulnerability->title())),
             '',
             \sprintf('- **Type:** `%s` (%s, %s)', $vulnerability->type()->value, $vulnerability->type()->owaspReference(), $vulnerability->type()->cwe()->label()),
-            \sprintf('- **Location:** `%s:%d-%d`', $vulnerability->filePath(), $vulnerability->lineStart(), $vulnerability->lineEnd()),
+            \sprintf('- **Location:** `%s:%d-%d`', $this->escapeFences($vulnerability->filePath()), $vulnerability->lineStart(), $vulnerability->lineEnd()),
             \sprintf('- **Confidence:** %s%%', \sprintf('%.0f', $vulnerability->confidence() * 100)),
             '',
             $this->escapeFences($vulnerability->description()),

@@ -63,6 +63,30 @@ final class YamlStandaloneConfigWriterTest extends TestCase
     /**
      * @throws StandaloneConfigWriteException
      */
+    public function test_the_config_file_already_has_owner_only_permissions_before_its_content_is_written(): void
+    {
+        $filesystem = new class extends Filesystem {
+            public ?int $permissionsAtDumpFileStart = null;
+
+            /**
+             * @param resource|string $content
+             */
+            #[Override]
+            public function dumpFile(string $filename, $content): void
+            {
+                $this->permissionsAtDumpFileStart = file_exists($filename) ? fileperms($filename) & 0o777 : null;
+                parent::dumpFile($filename, $content);
+            }
+        };
+
+        (new YamlStandaloneConfigWriter($filesystem))->write($this->configFile, ['model' => 'claude-opus-4-8']);
+
+        self::assertSame(0o600, $filesystem->permissionsAtDumpFileStart);
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     */
     public function test_it_wraps_an_io_failure_as_a_standalone_config_write_exception(): void
     {
         $filesystem = new Filesystem();

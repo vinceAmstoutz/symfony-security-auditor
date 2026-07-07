@@ -23,7 +23,7 @@ final readonly class OpenAiTokenEstimator implements ProviderTokenEstimatorInter
     public const float CHARS_PER_TOKEN = 4.0;
 
     /** @var list<string> */
-    private const array PREFIXES = ['gpt-', 'o3', 'o4'];
+    private const array PREFIXES = ['gpt-', 'o1', 'o3', 'o4'];
 
     public function __construct(private CharacterRatioCounter $characterRatioCounter = new CharacterRatioCounter()) {}
 

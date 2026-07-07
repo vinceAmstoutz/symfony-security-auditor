@@ -32,6 +32,8 @@ final class LlamaTokenEstimatorTest extends TestCase
         yield 'concatenated llama3' => ['llama3'];
         yield 'concatenated llama4' => ['llama4-scout'];
         yield 'meta-llama namespace' => ['meta-llama/Llama-3.3-70B-Instruct'];
+        yield 'cerebras-hosted llama' => ['cerebras-llama-4-maverick-17b-128e-instruct'];
+        yield 'groq-hosted llama' => ['groq-llama-4-maverick-17b-128e-instruct'];
     }
 
     public function test_it_does_not_support_a_non_llama_model(): void

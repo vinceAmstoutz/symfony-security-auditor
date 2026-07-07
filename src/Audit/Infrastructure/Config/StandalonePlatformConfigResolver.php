@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
  */
 final readonly class StandalonePlatformConfigResolver
 {
-    private const string ENV_PLACEHOLDER = '/^%env\(([A-Z0-9_]+)\)%$/';
+    private const string ENV_PLACEHOLDER = '/^%env\(([^)]+)\)%$/';
 
     /**
      * @param array<string, string> $environment

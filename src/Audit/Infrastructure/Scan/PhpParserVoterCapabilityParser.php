@@ -64,15 +64,12 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
         }
 
         $nodeFinder = new NodeFinder();
-        $class = $nodeFinder->findFirstInstanceOf($ast, Class_::class);
-        if (!$class instanceof Class_) {
+        $voter = $this->findVoterClass($nodeFinder->findInstanceOf($ast, Class_::class));
+        if (null === $voter) {
             return null;
         }
 
-        $supportsMethod = $this->findSupportsMethod($class);
-        if (!$supportsMethod instanceof ClassMethod) {
-            return null;
-        }
+        [$class, $supportsMethod] = $voter;
 
         $body = $supportsMethod->stmts;
         if (null === $body) {
@@ -91,6 +88,27 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
             supportedAttributes: $attributes,
             supportedSubjects: $subjects,
         );
+    }
+
+    /**
+     * A voter file may declare helper classes alongside the voter itself
+     * (e.g. a small attribute-constants holder); the voter is whichever class
+     * actually has a `supports()` method, not necessarily the first one.
+     *
+     * @param array<Class_> $classes
+     *
+     * @return array{Class_, ClassMethod}|null
+     */
+    private function findVoterClass(array $classes): ?array
+    {
+        foreach ($classes as $class) {
+            $supportsMethod = $this->findSupportsMethod($class);
+            if ($supportsMethod instanceof ClassMethod) {
+                return [$class, $supportsMethod];
+            }
+        }
+
+        return null;
     }
 
     private function findSupportsMethod(Class_ $class): ?ClassMethod

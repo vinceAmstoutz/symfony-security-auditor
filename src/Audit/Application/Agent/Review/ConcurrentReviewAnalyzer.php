@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -159,11 +160,32 @@ final readonly class ConcurrentReviewAnalyzer
      */
     private function dispatchWindow(array $requestWindow, array $pendingWindow, CoverageRecorderInterface $coverageRecorder): array
     {
-        $responses = $this->batchCapableLLMClient->completeBatch($requestWindow, $this->maxConcurrent);
+        try {
+            $responses = $this->batchCapableLLMClient->completeBatch($requestWindow, $this->maxConcurrent);
+        } catch (BudgetExceededException|LLMProviderException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            return $this->recordWindowErrors($pendingWindow, $exception, $coverageRecorder);
+        }
 
         $reviewed = [];
         foreach ($pendingWindow as $position => $entry) {
             $reviewed[$entry['index']] = $this->reviewOutcomeRecorder->applyResponse($entry['vulnerability'], $responses[$position], $coverageRecorder, $entry['cacheContext']);
+        }
+
+        return $reviewed;
+    }
+
+    /**
+     * @param list<array{index: int, vulnerability: Vulnerability, cacheContext: string|null}> $pendingWindow
+     *
+     * @return array<int, Vulnerability>
+     */
+    private function recordWindowErrors(array $pendingWindow, Throwable $throwable, CoverageRecorderInterface $coverageRecorder): array
+    {
+        $reviewed = [];
+        foreach ($pendingWindow as $entry) {
+            $reviewed[$entry['index']] = $this->reviewOutcomeRecorder->recordReviewError($entry['vulnerability'], $throwable, $coverageRecorder);
         }
 
         return $reviewed;

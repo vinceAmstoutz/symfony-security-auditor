@@ -234,6 +234,20 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame("APP_SECRET=\nDB_PASSWORD=***REDACTED:env_assignment***", $output);
     }
 
+    public function test_env_assignment_redacts_a_value_containing_a_literal_hash_character(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('APP_SECRET=abc#def123whichshouldstillberedacted');
+
+        self::assertSame('APP_SECRET=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_unquoted_inline_assignment_redacts_a_value_containing_a_literal_hash_character(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('password: correcthorse#batterystaple');
+
+        self::assertSame('password: ***REDACTED:inline_assignment***', $output);
+    }
+
     #[DataProvider('midWordCredentialKeyCases')]
     public function test_env_assignment_redacts_credential_word_anywhere_in_the_key(string $key, string $value): void
     {

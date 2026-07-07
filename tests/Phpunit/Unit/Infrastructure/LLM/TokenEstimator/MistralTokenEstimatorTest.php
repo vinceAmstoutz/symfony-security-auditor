@@ -30,6 +30,12 @@ final class MistralTokenEstimatorTest extends TestCase
     {
         yield 'mistral prefix' => ['mistral-large-2'];
         yield 'codestral prefix' => ['codestral-25.01'];
+        yield 'devstral prefix' => ['devstral-medium-latest'];
+        yield 'magistral prefix' => ['magistral-medium-latest'];
+        yield 'ministral prefix' => ['ministral-8b-latest'];
+        yield 'open-mistral prefix' => ['open-mistral-7b'];
+        yield 'open-mixtral prefix' => ['open-mixtral-8x22b'];
+        yield 'pixtral prefix' => ['pixtral-large-latest'];
     }
 
     public function test_it_does_not_support_a_non_mistral_model(): void

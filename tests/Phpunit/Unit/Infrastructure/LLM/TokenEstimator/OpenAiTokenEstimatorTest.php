@@ -29,6 +29,7 @@ final class OpenAiTokenEstimatorTest extends TestCase
     public static function supportedModelCases(): iterable
     {
         yield 'gpt prefix' => ['gpt-4o'];
+        yield 'o1 reasoning model' => ['o1-pro'];
         yield 'o3 reasoning model' => ['o3'];
         yield 'o4 reasoning model' => ['o4-mini'];
     }

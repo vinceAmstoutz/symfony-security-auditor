@@ -23,7 +23,7 @@ final readonly class MistralTokenEstimator implements ProviderTokenEstimatorInte
     public const float CHARS_PER_TOKEN = 3.7;
 
     /** @var list<string> */
-    private const array PREFIXES = ['mistral-', 'codestral-'];
+    private const array PREFIXES = ['mistral-', 'codestral-', 'devstral-', 'magistral-', 'ministral-', 'open-mistral-', 'open-mixtral-', 'pixtral-'];
 
     public function __construct(private CharacterRatioCounter $characterRatioCounter = new CharacterRatioCounter()) {}
 
