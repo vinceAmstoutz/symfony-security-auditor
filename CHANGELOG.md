@@ -2441,6 +2441,60 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/Advisory/ComposerAuditAdvisoryDatabase.php`) now
   checks `is_array($decoded)` first and throws a new
   `MalformedAdvisoryPayloadException::forNonArrayPayload()`.
+- **`SymfonyAiLLMClient::complete()` left a rate-limiter reservation unreleased
+  when the platform result had no text** (e.g. a tool-call-only result reaching
+  the non-tool `complete()` path), because `asText()` was called outside the
+  try/catch that already guarded `extractTokens()`'s own failure modes.
+  `asText()` now runs inside that same try/catch
+  (`src/Audit/Infrastructure/LLM/SymfonyAiLLMClient.php`), recording `(0, 0)`
+  before rethrowing.
+- **`AuditOrchestrator` never drained the reviewer's pending-verdicts buffer on
+  a normal, non-abort iteration**, mirroring the attacker-side buffer-drain bug
+  fixed above — a finding recorded via `record_review` before its own
+  conversation swallowed a generic (non-abort) `Throwable` stayed in
+  `AuditContext::drainReviewedFindings()`'s buffer forever unless a later
+  `BudgetExceededException`/`LLMProviderException` happened to drain it, and sat
+  there re-appearing as if unreviewed on every subsequent drain. `orchestrate()`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) now drains and merges
+  this buffer via the existing `mergeRecoveredFindings()` helper after every
+  successful `review()` call, not only on abort.
+- **Every `sprintf('%.Nf', ...)` call formatting a decimal number for
+  user-facing output rendered a locale-dependent decimal separator** (e.g.
+  `12,0` instead of `12.0` under a `de_DE`-family `LC_NUMERIC` locale) because
+  PHP's `%f` conversion is locale-sensitive, corrupting the audit duration in
+  `ConsoleReportRenderer`/`HtmlReportRenderer` and the cost figures in
+  `AuditPresenter::dryRunResult()` and `BudgetExceededException::forCost()`'s
+  message. All four
+  (`src/Audit/Infrastructure/Report/ConsoleReportRenderer.php`,
+  `src/Audit/Infrastructure/Report/HtmlReportRenderer.php`,
+  `src/Command/AuditPresenter.php`,
+  `src/Audit/Application/Budget/Exception/BudgetExceededException.php`) now use
+  `number_format($value, $decimals, '.', '')`, which is locale-independent.
+- **`PhpParserVoterCapabilityParser` missed a voter's supported attributes when
+  they were declared as a single array class constant** (e.g.
+  `private const array SUPPORTED_ATTRIBUTES = ['edit', 'view', 'delete'];` used
+  via `in_array($attribute, self::SUPPORTED_ATTRIBUTES, true)`) — its
+  self-constant resolution only handled a bare string constant, not an array
+  one. `resolveOwnConstants()` and the new `resolvedConstantValues()`/
+  `stringValuesFromConstExpr()`
+  (`src/Audit/Infrastructure/Scan/PhpParserVoterCapabilityParser.php`) now
+  resolve both shapes, reusing the same array-literal string extraction
+  `RouteAttributeParser` already relies on.
+- **`RegexCodeSlicer` elided every enum `case` line** (e.g.
+  `case ROLE_ADMIN = 'ROLE_ADMIN';`) as non-structural, so a security-relevant
+  backed enum case could be sliced out of the code sent to the attacker.
+  `STRUCTURAL_PREFIXES` (`src/Audit/Infrastructure/Scan/RegexCodeSlicer.php`)
+  now includes `'case '`.
+- **`ScanPathFilter` and `AuditCommandInput::scanPaths()` silently scanned zero
+  files when a `--path` value was a slash-only segment (e.g. `/`)** — both
+  checked for an empty string _before_ trimming the trailing separator, so `/`
+  passed the emptiness check, was then reduced to `''` by `trimEnd('/')`, and
+  entered the filter list as an unmatchable empty-string prefix that matches no
+  file. `ScanPathFilter::normalizePrefixes()`
+  (`src/Audit/Application/Scan/ScanPathFilter.php`) and
+  `AuditCommandInput::scanPaths()` (`src/Command/AuditCommandInput.php`) now
+  check emptiness after trimming, so a slash-only segment is dropped and treated
+  as no filter (scans the whole project) instead of silently scanning nothing.
 
 ### Security
 
@@ -2495,6 +2549,39 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/Prompt/SymfonyMappingContextRenderer.php`) now run
   `sanitizeLine()` over the route methods, path, and firewall roles the same way
   the other fields already were.
+- **`SymfonyMappingContextRenderer::firewallRolesForPath()` used `#` as the PCRE
+  delimiter for a configured `access_control` path regex, colliding with a
+  literal `#` inside the pattern** (e.g. a PCRE inline comment
+  `^/admin(?#internal)`) and corrupting the match — PHP read the `#` inside the
+  pattern as the delimiter's closing character, leaving `(?internal)` as a bogus
+  trailing modifier string and raising a `preg_match(): Unknown modifier`
+  warning, so the route's genuine `access_control` role coverage silently
+  stopped being recognized and the attacker prompt fell back to flagging the
+  route as `LACKS_ACCESS_CHECK`. `firewallRolesForPath()`
+  (`src/Audit/Infrastructure/Prompt/SymfonyMappingContextRenderer.php`) now uses
+  `{`/`}` delimiters, matching Symfony's own `PathRequestMatcher`.
+- **`RegexSecretScrubber` failed to redact a secret value wrapped onto the line
+  after its key** (a common line-length-limited config style, e.g.
+  `password:\n  "SuperSecretValue1234"`), sending the plaintext value to the LLM
+  provider verbatim — the existing `EnvAssignment`/`InlineAssignment` patterns
+  only match a value on the same line as the key. A new, entirely separate
+  `MultilineAssignment` pattern/label
+  (`src/Audit/Domain/Model/SecretPatternLabel.php`,
+  `src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) requires a
+  genuine newline immediately after the key's assignment operator before
+  matching a quoted value on the next line — structurally unable to overlap with
+  the existing same-line-only patterns, so it carries no regression risk to the
+  newline-crossing fix those patterns already rely on.
+- **`RegexSecretScrubber`'s `env_assignment` and `inline_assignment` patterns
+  only redacted up to the first space in a value, leaking the remainder of a
+  multi-word secret** (e.g. a quoted value containing spaces, or an unquoted
+  multi-word passphrase like `hunter2 secret pass phrase`) verbatim to the LLM
+  provider. `env_assignment`'s value capture
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) is now
+  quote-aware, mirroring `inline_assignment`'s already-proven quoted-value
+  branch; `inline_assignment`'s unquoted branch now also captures subsequent
+  alphanumeric-only continuation words, bounded so it cannot extend into
+  unrelated trailing syntax like a following `'timeout' => 30`.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

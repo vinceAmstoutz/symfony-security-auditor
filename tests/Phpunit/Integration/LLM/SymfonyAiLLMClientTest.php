@@ -21,6 +21,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\AI\Platform\Exception\RateLimitExceededException;
+use Symfony\AI\Platform\Exception\UnexpectedResultTypeException;
 use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
@@ -685,6 +686,37 @@ final class SymfonyAiLLMClientTest extends TestCase
         try {
             $symfonyAiLLMClient->complete('s', 'u');
         } catch (NegativeTokenCountException) {
+            $threw = true;
+        }
+
+        self::assertTrue($threw);
+        self::assertCount(1, $fakeRateLimiter->acquired);
+        self::assertSame([[0, 0]], $fakeRateLimiter->recorded);
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_releases_the_rate_limiter_reservation_when_the_result_has_no_text(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $platform = $this->scriptedPlatform([new MultiPartResult([new ToolCallResult([new ToolCall('1', 'someTool')])])]);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
+        );
+
+        $threw = false;
+        try {
+            $symfonyAiLLMClient->complete('s', 'u');
+        } catch (UnexpectedResultTypeException) {
             $threw = true;
         }
 

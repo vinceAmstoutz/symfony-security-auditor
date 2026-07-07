@@ -131,7 +131,7 @@ final readonly class SymfonyMappingContextRenderer
         }
 
         foreach ($routeAccessMap as $pattern => $roles) {
-            if (1 === preg_match(\sprintf('#%s#', $pattern), $routePath)) {
+            if (1 === preg_match(\sprintf('{%s}', $pattern), $routePath)) {
                 return $roles;
             }
         }

@@ -115,7 +115,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
                 throw $exception;
             }
 
-            $newFindings = $this->persistReviewedFindings($reviewed, $auditContext);
+            $newFindings = $this->persistReviewedFindings($this->mergeRecoveredFindings($reviewed, $auditContext->drainReviewedFindings()), $auditContext);
 
             $acceptedCount = \count(array_filter(
                 $reviewed,
@@ -180,14 +180,15 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * A chunk whose own conversation swallowed a generic (non-abort)
-     * `Throwable` after a partial `record_vulnerability` success records that
-     * finding via the coverage recorder, but `AttackerAgent::analyze()` still
-     * returns normally with it missing from `$rawFindings` — draining and
-     * merging by id here recovers it. Draining unconditionally (not only on
-     * an abort) also keeps the coverage recorder's buffer from accumulating
-     * findings across iterations that a later abort would otherwise
-     * re-review as if they were never persisted.
+     * Shared by both the attacker and reviewer recovery paths. A chunk/finding
+     * whose own conversation swallowed a generic (non-abort) `Throwable` after
+     * a partial `record_vulnerability`/`record_review` success records that
+     * finding via the coverage recorder, but the agent's own return value can
+     * still come back missing it — draining and merging by id here recovers
+     * it. Draining unconditionally (not only on an abort) also keeps the
+     * coverage recorder's buffer from accumulating findings across iterations
+     * that a later abort would otherwise re-review as if they were never
+     * persisted.
      *
      * @param list<Vulnerability> $rawFindings
      * @param list<Vulnerability> $recoveredFindings

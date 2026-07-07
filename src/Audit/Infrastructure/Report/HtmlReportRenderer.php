@@ -43,7 +43,7 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
             '{{packageUrl}}' => $this->escape(ReportPackage::HOMEPAGE_URL),
             '{{projectPath}}' => $this->escape($auditReport->projectPath()),
             '{{startedAt}}' => $this->escape($auditReport->startedAt()->format('Y-m-d H:i:s')),
-            '{{duration}}' => $this->escape(\sprintf('%.1fs', $auditReport->durationSeconds())),
+            '{{duration}}' => $this->escape(\sprintf('%ss', number_format($auditReport->durationSeconds(), 1, '.', ''))),
             '{{filesScanned}}' => $auditReport->filesScanned(),
             '{{tokens}}' => $this->escape(\sprintf('%s in / %s out', number_format($cost->inputTokens()), number_format($cost->outputTokens()))),
             '{{primaryModel}}' => $this->escape('' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel()),

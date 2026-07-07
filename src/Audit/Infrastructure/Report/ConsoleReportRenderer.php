@@ -44,7 +44,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
             '{{packageUrl}}' => ReportPackage::HOMEPAGE_URL,
             '{{projectPath}}' => $auditReport->projectPath(),
             '{{startedAt}}' => $auditReport->startedAt()->format('Y-m-d H:i:s'),
-            '{{duration}}' => \sprintf('%.1fs', $auditReport->durationSeconds()),
+            '{{duration}}' => \sprintf('%ss', number_format($auditReport->durationSeconds(), 1, '.', '')),
             '{{filesScanned}}' => $auditReport->filesScanned(),
             '{{tokens}}' => \sprintf('%s in / %s out', number_format($cost->inputTokens()), number_format($cost->outputTokens())),
             '{{primaryModel}}' => '' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel(),

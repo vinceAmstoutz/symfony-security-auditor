@@ -234,6 +234,43 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame("APP_SECRET=\nDB_PASSWORD=***REDACTED:env_assignment***", $output);
     }
 
+    public function test_env_assignment_redacts_a_double_quoted_value_containing_spaces(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('APP_SECRET="correct horse battery staple"');
+
+        self::assertSame('APP_SECRET=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_env_assignment_redacts_a_single_quoted_value_containing_spaces(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("MAIL_PASSWORD='super secret passphrase here'");
+
+        self::assertSame('MAIL_PASSWORD=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_unquoted_inline_assignment_redacts_a_multi_word_value(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('password: hunter2 secret pass phrase');
+
+        self::assertSame('password: ***REDACTED:inline_assignment***', $output);
+    }
+
+    public function test_a_value_wrapped_to_the_next_line_is_still_redacted(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("\$config = [\n    'password' =>\n        'SuperSecretValue1234',\n];");
+
+        self::assertSame("\$config = [\n    'password' => '***REDACTED:multiline_assignment***',\n];", $output);
+    }
+
+    public function test_a_symfony_placeholder_wrapped_to_the_next_line_is_left_unmodified(): void
+    {
+        $input = "\$config = [\n    'password' =>\n        '%env(APP_SECRET)%',\n];";
+
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame($input, $output);
+    }
+
     public function test_env_assignment_redacts_a_value_containing_a_literal_hash_character(): void
     {
         $output = $this->regexSecretScrubber->scrub('APP_SECRET=abc#def123whichshouldstillberedacted');

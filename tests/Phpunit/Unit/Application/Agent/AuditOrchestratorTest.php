@@ -1303,6 +1303,44 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws InvalidTokenUsageException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_it_drains_the_reviewed_findings_buffer_on_every_successful_iteration_not_only_on_abort(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'First', 0.9),
+            new CodeLocation('src/A.php', 1, 2),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            'c',
+        );
+
+        // Returns the same finding every iteration, so the reviewer is called
+        // twice (iteration 2's re-find is a duplicate that stops the loop) -
+        // each call records into the coverage recorder's pending buffer.
+        $recordingAttackerAgent = new RecordingAttackerAgent([$vulnerability]);
+
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
+            new ReviewerModeConfiguration(),
+        );
+
+        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), new NullProgressReporter());
+        $auditContext = $this->makeContextWithMapping();
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertSame([], $auditContext->drainReviewedFindings());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */

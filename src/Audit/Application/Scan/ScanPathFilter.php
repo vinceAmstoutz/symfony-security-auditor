@@ -65,12 +65,12 @@ final readonly class ScanPathFilter
     {
         $normalized = [];
         foreach ($scanPaths as $scanPath) {
-            $trimmed = u($scanPath)->trim();
+            $trimmed = u($scanPath)->trim()->replace('\\', '/')->trimEnd('/');
             if ($trimmed->isEmpty()) {
                 continue;
             }
 
-            $normalized[] = $trimmed->replace('\\', '/')->trimEnd('/')->toString();
+            $normalized[] = $trimmed->toString();
         }
 
         return $normalized;

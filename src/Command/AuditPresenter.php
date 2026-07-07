@@ -122,14 +122,14 @@ final readonly class AuditPresenter implements AuditPresenterInterface
                 number_format($cost->outputTokens()),
                 number_format($cost->totalTokens()),
             );
-            $lines[] = \sprintf('Cost  : $%.4f (estimate)', $cost->estimatedCostUsd());
+            $lines[] = \sprintf('Cost  : $%s (estimate)', number_format($cost->estimatedCostUsd(), 4, '.', ''));
 
             foreach ($cost->byRole() as $role => $entry) {
                 $lines[] = \sprintf(
-                    '  %-8s (%s): $%.4f — %s in / %s out',
+                    '  %-8s (%s): $%s — %s in / %s out',
                     $role,
                     $entry['model'],
-                    $entry['estimated_cost_usd'],
+                    number_format($entry['estimated_cost_usd'], 4, '.', ''),
                     number_format($entry['input_tokens']),
                     number_format($entry['output_tokens']),
                 );

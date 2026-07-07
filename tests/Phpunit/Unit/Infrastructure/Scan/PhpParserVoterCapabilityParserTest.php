@@ -352,6 +352,30 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_resolves_a_self_constant_fetch_naming_an_array_of_string_attributes(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            use App\Entity\Post;
+            final class PostVoter {
+                private const array SUPPORTED_ATTRIBUTES = ['edit', 'view', 'delete'];
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, self::SUPPORTED_ATTRIBUTES, true) && $subject instanceof Post;
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['edit', 'view', 'delete'], $voterCapability->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_ignores_a_dynamic_constant_fetch(): void
     {
         $source = <<<'PHP'

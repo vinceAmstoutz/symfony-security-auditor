@@ -91,6 +91,33 @@ final class BudgetTrackerTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_cost_budget_exceeded_message_formats_amounts_with_a_period_regardless_of_the_process_numeric_locale(): void
+    {
+        $budgetTracker = $this->budgetTracker(AuditBudget::forCost(0.01), inputPrice: 100.0, outputPrice: 100.0);
+
+        $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(1_000, 0)));
+
+        $previousLocale = setlocale(\LC_NUMERIC, '0');
+        setlocale(\LC_NUMERIC, 'de_DE.UTF-8');
+
+        try {
+            $message = '';
+            try {
+                $budgetTracker->assertWithinBudget();
+            } catch (BudgetExceededException $budgetExceededException) {
+                $message = $budgetExceededException->getMessage();
+            }
+        } finally {
+            setlocale(\LC_NUMERIC, false !== $previousLocale ? $previousLocale : 'C');
+        }
+
+        self::assertStringContainsString('$0.1000 / $0.0100 USD', $message);
+    }
+
+    /**
      * @throws BudgetExceededException
      * @throws InvalidAuditBudgetException
      * @throws InvalidTokenUsageException

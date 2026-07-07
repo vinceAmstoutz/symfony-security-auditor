@@ -45,8 +45,9 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
         SecretPatternLabel::PemPrivateKey->value => '/-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/',
         SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]*://)[^:@/\s]*:[^/\s]+@~i',
-        SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|DSN)(?:_[A-Z0-9]+)*)\s*=[ \t]*(?!\s*\n)(\S+)/m',
-        SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])([^"\'\n]{4,})\2|([^"\'\s]\S{3,}))/i',
+        SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|DSN)(?:_[A-Z0-9]+)*)\s*=[ \t]*(?!\s*\n)(?:(["\'])[^"\'\n]*\2|\S+)/m',
+        SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])([^"\'\n]{4,})\2|([^"\'\s]\S{3,}(?:[ \t]+[A-Za-z0-9]+)*))/i',
+        SecretPatternLabel::MultilineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])([^"\'\n]{4,})\2/mi',
     ];
 
     /**
@@ -80,9 +81,11 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     public function scrub(string $content): string
     {
         foreach ($this->patterns as $label => $pattern) {
-            $result = SecretPatternLabel::InlineAssignment->value === $label
-                ? preg_replace_callback($pattern, $this->redactInlineAssignment(...), $content)
-                : preg_replace($pattern, $this->replacementFor($label), $content);
+            $result = match (SecretPatternLabel::tryFrom($label)) {
+                SecretPatternLabel::InlineAssignment => preg_replace_callback($pattern, $this->redactInlineAssignment(...), $content),
+                SecretPatternLabel::MultilineAssignment => preg_replace_callback($pattern, $this->redactMultilineAssignment(...), $content),
+                default => preg_replace($pattern, $this->replacementFor($label), $content),
+            };
 
             if (null === $result) {
                 continue;
@@ -116,6 +119,21 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         }
 
         return \sprintf('%s%s***REDACTED:%s***%s', $match[1], $quote, SecretPatternLabel::InlineAssignment->value, $quote);
+    }
+
+    /**
+     * @param array<int|string, string> $match
+     */
+    private function redactMultilineAssignment(array $match): string
+    {
+        $quote = $match[2] ?? '';
+        $value = $match[3] ?? '';
+
+        if ($this->isConfigPlaceholder($value)) {
+            return $match[0];
+        }
+
+        return \sprintf('%s %s***REDACTED:%s***%s', $match[1], $quote, SecretPatternLabel::MultilineAssignment->value, $quote);
     }
 
     /**

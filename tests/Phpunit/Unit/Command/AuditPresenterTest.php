@@ -282,6 +282,34 @@ final class AuditPresenterTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_formats_cost_with_a_period_regardless_of_the_process_numeric_locale(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 1234.5, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 800, 'output_tokens' => 150, 'estimated_cost_usd' => 567.25],
+        ]));
+
+        $previousLocale = setlocale(\LC_NUMERIC, '0');
+        setlocale(\LC_NUMERIC, 'de_DE.UTF-8');
+
+        try {
+            $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+        } finally {
+            setlocale(\LC_NUMERIC, false !== $previousLocale ? $previousLocale : 'C');
+        }
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('1234.5000', $display);
+        self::assertStringContainsString('567.2500', $display);
+    }
+
+    /**
      * @throws InvalidProjectFileException
      */
     public function test_scanned_files_lists_each_file_grouped_by_type(): void

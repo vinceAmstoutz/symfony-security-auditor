@@ -429,6 +429,24 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_render_formats_duration_with_a_period_regardless_of_the_process_numeric_locale(): void
+    {
+        $previousLocale = setlocale(\LC_NUMERIC, '0');
+        setlocale(\LC_NUMERIC, 'de_DE.UTF-8');
+
+        try {
+            $auditReport = $this->makeReport();
+            $output = $this->renderer->render($auditReport);
+        } finally {
+            setlocale(\LC_NUMERIC, false !== $previousLocale ? $previousLocale : 'C');
+        }
+
+        self::assertStringContainsString(number_format($auditReport->durationSeconds(), 1, '.', '').'s', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_substitutes_files_scanned_count(): void
     {
         $auditReport = $this->makeReport();

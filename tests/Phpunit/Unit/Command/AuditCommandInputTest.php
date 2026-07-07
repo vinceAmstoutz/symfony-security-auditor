@@ -212,6 +212,14 @@ final class AuditCommandInputTest extends TestCase
         self::assertSame(['apps/api/src', 'libs/shared'], $auditCommandInput->scanPaths());
     }
 
+    public function test_scan_paths_drops_a_slash_only_entry(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->paths = ['/', 'apps/api/src'];
+
+        self::assertSame(['apps/api/src'], $auditCommandInput->scanPaths());
+    }
+
     public function test_default_no_cache_is_false(): void
     {
         $auditCommandInput = new AuditCommandInput();

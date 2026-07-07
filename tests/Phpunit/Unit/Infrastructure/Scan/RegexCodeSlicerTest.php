@@ -147,6 +147,7 @@ final class RegexCodeSlicerTest extends TestCase
         yield 'method signature with no visibility modifier' => ['function delete(Request $request, string $id): Response'];
         yield 'static method signature with no visibility modifier' => ['static function fromRequest(Request $request): self'];
         yield 'static property with no visibility modifier' => ['static $instance;'];
+        yield 'enum case' => ["case ROLE_ADMIN = 'ROLE_ADMIN';"];
     }
 
     /**

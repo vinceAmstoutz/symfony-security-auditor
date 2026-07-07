@@ -68,6 +68,7 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         'interface ',
         'trait ',
         'enum ',
+        'case ',
         'final ',
         'abstract ',
         'readonly ',

@@ -25,5 +25,6 @@ enum SecretPatternLabel: string
     case PemPrivateKey = 'pem_private_key';
     case EnvAssignment = 'env_assignment';
     case InlineAssignment = 'inline_assignment';
+    case MultilineAssignment = 'multiline_assignment';
     case ConnectionUri = 'connection_uri';
 }

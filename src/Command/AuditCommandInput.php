@@ -89,12 +89,12 @@ final class AuditCommandInput
     {
         $normalized = [];
         foreach ($this->paths as $path) {
-            $trimmed = u($path)->trim();
+            $trimmed = u($path)->trim()->trimEnd('/');
             if ($trimmed->isEmpty()) {
                 continue;
             }
 
-            $normalized[] = $trimmed->trimEnd('/')->toString();
+            $normalized[] = $trimmed->toString();
         }
 
         return $normalized;
