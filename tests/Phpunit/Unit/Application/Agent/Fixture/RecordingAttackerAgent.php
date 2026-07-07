@@ -29,7 +29,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
  * every returned finding is pushed through the coverage recorder's
  * `recordFoundVulnerability()` side channel before the call resolves; an
  * optional `$throwsBeforeReturning` lets a test simulate a mid-run abort after
- * those findings were already recorded.
+ * those findings were already recorded. `$hiddenRecordedFindings` additionally
+ * simulates a chunk whose own conversation swallowed a generic (non-abort)
+ * `Throwable` after a partial `record_vulnerability` success: recorded via the
+ * coverage recorder like any other finding, but deliberately excluded from the
+ * returned list — a real chunk analyzer never surfaces it there either.
  */
 final class RecordingAttackerAgent implements AttackerAgentInterface
 {
@@ -51,11 +55,13 @@ final class RecordingAttackerAgent implements AttackerAgentInterface
     public array $rejectedFindingsCountPerCall = [];
 
     /**
-     * @param list<Vulnerability> $returnFindings findings returned on every call
+     * @param list<Vulnerability> $returnFindings         findings returned on every call
+     * @param list<Vulnerability> $hiddenRecordedFindings findings recorded via the coverage recorder but omitted from the returned list
      */
     public function __construct(
         private readonly array $returnFindings = [],
         private readonly ?Throwable $throwable = null,
+        private readonly array $hiddenRecordedFindings = [],
     ) {}
 
     #[Override]
@@ -68,7 +74,7 @@ final class RecordingAttackerAgent implements AttackerAgentInterface
         $this->lastRejectedFindings = $attackerAnalysisRequest->rejectedFindings;
         $this->rejectedFindingsCountPerCall[] = \count($attackerAnalysisRequest->rejectedFindings);
 
-        foreach ($this->returnFindings as $returnFinding) {
+        foreach ([...$this->returnFindings, ...$this->hiddenRecordedFindings] as $returnFinding) {
             $coverageRecorder->recordFoundVulnerability($returnFinding);
         }
 

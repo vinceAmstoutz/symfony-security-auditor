@@ -239,6 +239,7 @@ final class FilesystemReviewerCacheTest extends TestCase
     public function test_constructor_rejects_empty_cache_dir(): void
     {
         $this->expectException(InvalidCacheConfigurationException::class);
+        $this->expectExceptionMessage('Reviewer cache dir cannot be empty');
         new FilesystemReviewerCache('   ', new Filesystem(), new NullLogger());
     }
 

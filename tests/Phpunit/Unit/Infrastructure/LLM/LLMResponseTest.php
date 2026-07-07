@@ -294,6 +294,38 @@ final class LLMResponseTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_it_recovers_a_json_block_after_an_unpaired_quote_in_the_preceding_prose(): void
+    {
+        $content = 'The vulnerability report follows. Note: user input is 5" from validation. '
+            .'[{"type":"sql_injection","severity":"high","title":"X","confidence":0.9}]';
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
+
+        $data = $llmResponse->parseJson();
+
+        self::assertSame([[
+            'type' => 'sql_injection',
+            'severity' => 'high',
+            'title' => 'X',
+            'confidence' => 0.9,
+        ]], $data);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_recovers_a_json_object_after_an_unpaired_quote_in_the_preceding_prose(): void
+    {
+        $content = 'The pipe is 5" long: { "key": "value" }';
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
+
+        $data = $llmResponse->parseJson();
+
+        self::assertSame(['key' => 'value'], $data);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_throws_on_invalid_json(): void
     {
         $llmResponse = LLMResponse::of('not json at all', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));

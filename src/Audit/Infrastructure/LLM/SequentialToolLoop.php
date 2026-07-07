@@ -18,6 +18,7 @@ use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
@@ -90,7 +91,14 @@ final readonly class SequentialToolLoop
             }
 
             $platformResult = $deferredResult->getResult();
-            [$callInput, $callOutput, $callCacheRead, $callCacheCreation] = $this->platformResultExtractor->extractTokens($deferredResult);
+            try {
+                [$callInput, $callOutput, $callCacheRead, $callCacheCreation] = $this->platformResultExtractor->extractTokens($deferredResult);
+            } catch (Throwable $throwable) {
+                $this->rateLimiter->record(0, 0);
+
+                throw $throwable;
+            }
+
             $totalInputTokens += $callInput;
             $totalOutputTokens += $callOutput;
             $totalCacheReadTokens += $callCacheRead;

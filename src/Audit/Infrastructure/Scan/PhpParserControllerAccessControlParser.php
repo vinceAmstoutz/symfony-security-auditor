@@ -104,6 +104,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     private function entriesForClass(string $filePath, Class_ $class, NodeFinder $nodeFinder): array
     {
         $classHasIsGranted = $this->hasIsGrantedAttribute($class->attrGroups);
+        $classRouteData = $this->routeAttributeParser->extract($class->attrGroups)[0];
 
         $entries = [];
         foreach ($class->getMethods() as $classMethod) {
@@ -111,7 +112,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
                 continue;
             }
 
-            foreach ($this->buildEntries($filePath, $classMethod, $classHasIsGranted, $nodeFinder) as $entry) {
+            foreach ($this->buildEntries($filePath, $classMethod, $classHasIsGranted, $classRouteData, $nodeFinder) as $entry) {
                 $entries[] = $entry;
             }
         }
@@ -120,9 +121,18 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
+     * A class-level `#[Route('/admin', name: 'admin_')]` acts as a path and
+     * name prefix for every action's own `#[Route]` — Symfony's own attribute
+     * route loader concatenates them, so a security.yaml `access_control`
+     * rule keyed on the full `/admin/dashboard` path or `admin_dashboard`
+     * route name must be matched against the same joined values, not the
+     * method's own attribute in isolation.
+     *
+     * @param array{present: bool, path: ?string, methods: list<string>, name: ?string} $classRouteData
+     *
      * @return list<RouteAccessControl>
      */
-    private function buildEntries(string $filePath, ClassMethod $classMethod, bool $classHasIsGranted, NodeFinder $nodeFinder): array
+    private function buildEntries(string $filePath, ClassMethod $classMethod, bool $classHasIsGranted, array $classRouteData, NodeFinder $nodeFinder): array
     {
         $methodLevelIsGranted = $this->extractIsGrantedValues($classMethod->attrGroups);
         $methodHasDenyAccess = $this->methodInvokesDenyAccess($classMethod, $nodeFinder);
@@ -132,17 +142,40 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
             $entries[] = new RouteAccessControl(
                 filePath: $filePath,
                 methodName: $classMethod->name->toString(),
-                routePath: $routeData['path'],
+                routePath: $this->prefixedRoutePath($classRouteData['path'], $routeData['path']),
                 routeMethods: $routeData['methods'],
                 hasRouteAttribute: $routeData['present'],
                 methodLevelIsGranted: $methodLevelIsGranted,
                 methodHasDenyAccess: $methodHasDenyAccess,
                 classHasIsGranted: $classHasIsGranted,
-                routeName: $routeData['name'],
+                routeName: $this->prefixedRouteName($classRouteData['name'], $routeData['name']),
             );
         }
 
         return $entries;
+    }
+
+    private function prefixedRoutePath(?string $classPathPrefix, ?string $methodPath): ?string
+    {
+        if (null === $methodPath || null === $classPathPrefix) {
+            return $methodPath;
+        }
+
+        $trimmedPrefix = rtrim($classPathPrefix, '/');
+        if ('' === $methodPath || '/' === $methodPath) {
+            return '' === $trimmedPrefix ? '/' : $trimmedPrefix;
+        }
+
+        return \sprintf('%s/%s', $trimmedPrefix, ltrim($methodPath, '/'));
+    }
+
+    private function prefixedRouteName(?string $classNamePrefix, ?string $methodName): ?string
+    {
+        if (null === $methodName || null === $classNamePrefix) {
+            return $methodName;
+        }
+
+        return $classNamePrefix.$methodName;
     }
 
     /**

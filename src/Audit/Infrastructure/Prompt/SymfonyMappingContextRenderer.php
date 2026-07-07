@@ -73,8 +73,8 @@ final readonly class SymfonyMappingContextRenderer
         $lines[] = 'Each line describes a controller action: HTTP method(s), route path, source location, and the access-control surface (class- and method-level `#[IsGranted]`, `denyAccessUnlessGranted()` body calls). A line whose surface is empty is tagged at the end: routes with no enforcement at all carry the LACKS marker — treat those as primary candidates for `broken_access_control` and `missing_voter`. Routes with no attribute or body check that nonetheless match a `security.yaml` `access_control` rule on their path carry a firewall-covered marker listing the gating roles — the firewall already protects them, so do NOT report `broken_access_control` there unless the gating role is too permissive for the action.';
 
         foreach ($routeAccessControls as $routeAccessControl) {
-            $methods = [] === $routeAccessControl->routeMethods() ? 'ANY' : implode(',', $routeAccessControl->routeMethods());
-            $path = $routeAccessControl->routePath() ?? '(unresolved)';
+            $methods = [] === $routeAccessControl->routeMethods() ? 'ANY' : implode(',', array_map(self::sanitizeLine(...), $routeAccessControl->routeMethods()));
+            $path = self::sanitizeLine($routeAccessControl->routePath() ?? '(unresolved)');
             $checks = [];
             if ($routeAccessControl->classHasIsGranted()) {
                 $checks[] = 'class:#[IsGranted]';
@@ -108,7 +108,7 @@ final readonly class SymfonyMappingContextRenderer
         $firewallRoles = self::firewallRolesForPath($routeAccessControl->routePath(), $routeAccessMap)
             ?? self::firewallRolesForRouteName($routeAccessControl->routeName(), $routeAccessMap);
         if (null !== $firewallRoles) {
-            return \sprintf('COVERED_BY access_control[%s]', implode(',', $firewallRoles));
+            return \sprintf('COVERED_BY access_control[%s]', implode(',', array_map(self::sanitizeLine(...), $firewallRoles)));
         }
 
         return 'LACKS_ACCESS_CHECK';

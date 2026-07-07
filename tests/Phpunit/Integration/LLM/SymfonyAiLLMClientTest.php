@@ -665,6 +665,70 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_releases_the_rate_limiter_reservation_when_token_extraction_fails(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $platform = $this->scriptedPlatformWithTokenUsage(new TextResult('a'), new TokenUsage(promptTokens: -1, completionTokens: 0));
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: new TokenUsageRecorder()),
+        );
+
+        $threw = false;
+        try {
+            $symfonyAiLLMClient->complete('s', 'u');
+        } catch (NegativeTokenCountException) {
+            $threw = true;
+        }
+
+        self::assertTrue($threw);
+        self::assertCount(1, $fakeRateLimiter->acquired);
+        self::assertSame([[0, 0]], $fakeRateLimiter->recorded);
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     * @throws InvalidToolRegistryException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_with_tools_releases_the_rate_limiter_reservation_when_token_extraction_fails(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+        $platform = $this->scriptedPlatformWithTokenUsage(new TextResult('a'), new TokenUsage(promptTokens: -1, completionTokens: 0));
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: new TokenUsageRecorder()),
+        );
+
+        $threw = false;
+        try {
+            $symfonyAiLLMClient->completeWithTools('s', 'u', $toolRegistry, 3);
+        } catch (NegativeTokenCountException) {
+            $threw = true;
+        }
+
+        self::assertTrue($threw);
+        self::assertCount(1, $fakeRateLimiter->acquired);
+        self::assertSame([[0, 0]], $fakeRateLimiter->recorded);
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
      */
     public function test_complete_batch_releases_exactly_the_failed_reservation_before_falling_back_to_complete(): void
     {

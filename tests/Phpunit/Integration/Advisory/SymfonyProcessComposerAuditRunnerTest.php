@@ -78,6 +78,21 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
         }
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_it_reports_a_missing_binary_distinctly_instead_of_a_generic_failed_process(): void
+    {
+        $symfonyProcessComposerAuditRunner = new SymfonyProcessComposerAuditRunner(
+            processBuilder: static fn (string $path): Process => new Process(['definitely-not-a-real-binary-composer-xyz']),
+        );
+
+        $this->expectException(AdvisorySourceUnavailableException::class);
+        $this->expectExceptionMessage('composer binary not found on PATH; cannot run advisory audit');
+
+        $symfonyProcessComposerAuditRunner->run('/some/path');
+    }
+
     public function test_default_process_builder_uses_composer_audit_command_with_required_flags(): void
     {
         $process = (SymfonyProcessComposerAuditRunner::defaultProcessBuilder())('/some/path');

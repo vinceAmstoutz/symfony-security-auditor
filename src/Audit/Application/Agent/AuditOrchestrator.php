@@ -160,7 +160,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     private function analyzeWithRecovery(SymfonyMapping $symfonyMapping, array $files, array $previousFindings, array $rejectedFindings, AuditContext $auditContext): array
     {
         try {
-            return $this->attackerAgent->analyze(
+            $rawFindings = $this->attackerAgent->analyze(
                 new AttackerAnalysisRequest(
                     files: $files,
                     symfonyMapping: $symfonyMapping,
@@ -175,6 +175,33 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
             throw $attackerException;
         }
+
+        return $this->mergeRecoveredFindings($rawFindings, $auditContext->drainFoundVulnerabilities());
+    }
+
+    /**
+     * A chunk whose own conversation swallowed a generic (non-abort)
+     * `Throwable` after a partial `record_vulnerability` success records that
+     * finding via the coverage recorder, but `AttackerAgent::analyze()` still
+     * returns normally with it missing from `$rawFindings` — draining and
+     * merging by id here recovers it. Draining unconditionally (not only on
+     * an abort) also keeps the coverage recorder's buffer from accumulating
+     * findings across iterations that a later abort would otherwise
+     * re-review as if they were never persisted.
+     *
+     * @param list<Vulnerability> $rawFindings
+     * @param list<Vulnerability> $recoveredFindings
+     *
+     * @return list<Vulnerability>
+     */
+    private function mergeRecoveredFindings(array $rawFindings, array $recoveredFindings): array
+    {
+        $byId = [];
+        foreach ([...$rawFindings, ...$recoveredFindings] as $vulnerability) {
+            $byId[$vulnerability->id()] = $vulnerability;
+        }
+
+        return array_values($byId);
     }
 
     /**

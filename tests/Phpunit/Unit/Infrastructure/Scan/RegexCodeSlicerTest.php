@@ -145,6 +145,8 @@ final class RegexCodeSlicerTest extends TestCase
         yield 'protected member' => ['protected string $name;'];
         yield 'private member' => ['private int $count = 0;'];
         yield 'method signature with no visibility modifier' => ['function delete(Request $request, string $id): Response'];
+        yield 'static method signature with no visibility modifier' => ['static function fromRequest(Request $request): self'];
+        yield 'static property with no visibility modifier' => ['static $instance;'];
     }
 
     /**

@@ -195,7 +195,7 @@ final readonly class ConcurrentStructuredReviewAnalyzer
         } catch (LLMProviderException $llmProviderException) {
             throw $llmProviderException;
         } catch (Throwable $exception) {
-            return $this->recordPendingErrors($concurrentReviewBatch->pendingIndexes, $concurrentReviewBatch->vulnerabilities, $exception, $coverageRecorder, $reviewed);
+            return $this->recordPendingErrors($concurrentReviewBatch, $exception, $coverageRecorder, $reviewed);
         }
     }
 
@@ -211,18 +211,31 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     }
 
     /**
-     * @param list<int>                 $pendingIndexes
-     * @param list<Vulnerability>       $vulnerabilities
+     * A finding whose `record_review` tool call already landed in an earlier
+     * round of this same window's batch call keeps its verdict instead of
+     * being overwritten as errored — mirrors the recovery
+     * `failRemainingWindows()` already applies for a Budget/LLMProviderException
+     * abort, extended to every other `Throwable` this window's dispatch can
+     * throw.
+     *
      * @param array<int, Vulnerability> $reviewed
      *
      * @return array<int, Vulnerability>
      */
-    private function recordPendingErrors(array $pendingIndexes, array $vulnerabilities, Throwable $throwable, CoverageRecorderInterface $coverageRecorder, array $reviewed): array
+    private function recordPendingErrors(ConcurrentReviewBatch $concurrentReviewBatch, Throwable $throwable, CoverageRecorderInterface $coverageRecorder, array $reviewed): array
     {
-        foreach ($pendingIndexes as $pendingIndex) {
-            $reviewed[$pendingIndex] = $this->reviewOutcomeRecorder->recordReviewError($vulnerabilities[$pendingIndex], $throwable, $coverageRecorder);
+        foreach ($concurrentReviewBatch->pendingIndexes as $pendingIndex) {
+            $reviewed[$pendingIndex] = $this->recoveredOrErroredVerdict($pendingIndex, $concurrentReviewBatch, $throwable, $coverageRecorder);
         }
 
         return $reviewed;
+    }
+
+    private function recoveredOrErroredVerdict(int $index, ConcurrentReviewBatch $concurrentReviewBatch, Throwable $throwable, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    {
+        $vulnerability = $concurrentReviewBatch->vulnerabilities[$index];
+        $recovered = $this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $concurrentReviewBatch->sessions[$index], $coverageRecorder);
+
+        return $recovered ?? $this->reviewOutcomeRecorder->recordReviewError($vulnerability, $throwable, $coverageRecorder);
     }
 }

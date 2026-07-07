@@ -4649,6 +4649,49 @@ final class ReviewerAgentTest extends TestCase
      * @throws LLMProviderException
      * @throws InvalidToolRegistryException
      */
+    public function test_structured_concurrent_reviews_preserve_a_verdict_recorded_before_a_generic_throwable_aborts_the_window(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+        $second = $this->makeVulnerabilityAt('src/B.php');
+
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests) use ($vulnerability): array {
+                self::registryOf($requests[0])->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
+
+                throw new RuntimeException('boom');
+            });
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+                useStructuredCollection: true,
+            ),
+        );
+
+        $result = $reviewerAgent->review([$vulnerability, $second], [], new NullCoverageRecorder());
+
+        self::assertCount(2, $result);
+        self::assertSame('src/A.php', $result[0]->filePath());
+        self::assertTrue($result[0]->isReviewerValidated());
+        self::assertSame('src/B.php', $result[1]->filePath());
+        self::assertFalse($result[1]->isReviewerValidated());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
     public function test_structured_concurrent_reviews_propagate_llm_provider_exceptions(): void
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');

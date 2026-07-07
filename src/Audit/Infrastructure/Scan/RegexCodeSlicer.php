@@ -74,6 +74,7 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         'public ',
         'protected ',
         'private ',
+        'static ',
         'function ',
     ];
 

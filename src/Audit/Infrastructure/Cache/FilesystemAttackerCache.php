@@ -38,7 +38,7 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
         private string $keySalt = '',
     ) {
         if (u($cacheDir)->trim()->isEmpty()) {
-            throw InvalidCacheConfigurationException::forEmptyCacheDir();
+            throw InvalidCacheConfigurationException::forEmptyCacheDir('Attacker');
         }
     }
 

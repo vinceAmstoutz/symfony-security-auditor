@@ -17,6 +17,7 @@ use Override;
 use Psr\Log\LoggerInterface;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
@@ -172,7 +173,13 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         }
 
         $content = $deferredResult->asText();
-        [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->platformResultExtractor->extractTokens($deferredResult);
+        try {
+            [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->platformResultExtractor->extractTokens($deferredResult);
+        } catch (Throwable $throwable) {
+            $this->rateLimiter->record(0, 0);
+
+            throw $throwable;
+        }
 
         $this->rateLimiter->record($inputTokens, $outputTokens);
 

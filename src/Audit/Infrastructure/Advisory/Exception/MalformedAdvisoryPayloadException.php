@@ -31,4 +31,9 @@ final class MalformedAdvisoryPayloadException extends RuntimeException
     {
         return new self('composer audit JSON is missing the expected "advisories" key');
     }
+
+    public static function forNonArrayPayload(mixed $decoded): self
+    {
+        return new self(\sprintf('composer audit JSON top-level value must be an object/array, got %s', get_debug_type($decoded)));
+    }
 }

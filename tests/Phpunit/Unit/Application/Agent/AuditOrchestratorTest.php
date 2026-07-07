@@ -242,6 +242,47 @@ final class AuditOrchestratorTest extends TestCase
     }
 
     /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidTokenUsageException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_it_recovers_a_finding_recorded_by_the_attacker_but_omitted_from_its_return_value(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Hidden', 0.9),
+            new CodeLocation('src/A.php', 1, 2),
+            new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+            'c',
+        );
+
+        // Simulates a chunk whose conversation swallowed a generic (non-abort)
+        // Throwable after a partial record_vulnerability success: the finding
+        // reached the coverage recorder, but AttackerAgent::analyze() still
+        // returns normally with it missing from the aggregate list.
+        $recordingAttackerAgent = new RecordingAttackerAgent([], null, [$vulnerability]);
+
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators($reviewerLlm, new ReviewerPromptBuilder(), new NullLogger()),
+            new ReviewerModeConfiguration(),
+        );
+
+        $auditOrchestrator = new AuditOrchestrator($recordingAttackerAgent, $reviewerAgent, new NullLogger(), new AuditLoopSettings(), new NullProgressReporter());
+        $auditContext = $this->makeContextWithMapping();
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertCount(1, $auditContext->vulnerabilities());
+        self::assertCount(1, $auditContext->validatedVulnerabilities());
+        self::assertSame('Hidden', current($auditContext->validatedVulnerabilities())->title());
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException

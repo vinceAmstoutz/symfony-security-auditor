@@ -99,6 +99,32 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
         self::assertSame([], $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.2.3'));
     }
 
+    public function test_lookup_returns_empty_when_payload_top_level_is_not_an_object_or_array(): void
+    {
+        $composerAuditRunner = $this->stubRunner('null');
+
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, new AuditedProjectPathHolder('/proj'), new NullLogger());
+
+        self::assertSame([], $composerAuditAdvisoryDatabase->lookup('vendor/foo', '1.2.3'));
+    }
+
+    public function test_logger_records_warning_as_malformed_payload_when_top_level_is_not_an_object_or_array(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                self::stringContains('unparseable'),
+                self::callback(static function (array $context): bool {
+                    return '/proj' === $context['project']
+                        && \is_string($context['error'])
+                        && str_contains($context['error'], 'object/array');
+                }),
+            );
+
+        new ComposerAuditAdvisoryDatabase($this->stubRunner('42'), new AuditedProjectPathHolder('/proj'), $logger);
+    }
+
     public function test_lookup_returns_empty_when_runner_throws_unexpected_exception(): void
     {
         $runner = self::createStub(ComposerAuditRunnerInterface::class);

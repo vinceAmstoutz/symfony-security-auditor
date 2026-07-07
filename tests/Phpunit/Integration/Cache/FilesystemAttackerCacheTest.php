@@ -224,6 +224,7 @@ final class FilesystemAttackerCacheTest extends TestCase
     public function test_constructor_rejects_empty_cache_dir(): void
     {
         $this->expectException(InvalidCacheConfigurationException::class);
+        $this->expectExceptionMessage('Attacker cache dir cannot be empty');
         new FilesystemAttackerCache('   ', new Filesystem(), new NullLogger());
     }
 

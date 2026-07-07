@@ -2338,6 +2338,109 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   in a try/catch that converts any `ExceptionInterface` into a new
   `GitChangedFilesUnavailableException::forProcessFailure()`
   (`src/Audit/Domain/Exception/GitChangedFilesUnavailableException.php`).
+- **`InvalidCacheConfigurationException::forEmptyCacheDir()` always reported an
+  empty cache directory as an "Attacker cache dir" problem, even when
+  `FilesystemReviewerCache` was the one throwing it**, misdirecting anyone
+  troubleshooting a misconfigured reviewer-cache directory. The factory
+  (`src/Audit/Infrastructure/Cache/Exception/InvalidCacheConfigurationException.php`)
+  now takes a `$cacheLabel` parameter; `FilesystemAttackerCache` and
+  `FilesystemReviewerCache` each pass their own label.
+- **`ReportDiffer::indexByFingerprint()` collapsed two distinct findings that
+  happen to share a fingerprint (same type/file/title, different line) into a
+  single map entry, silently dropping one — `audit:diff` could under-report both
+  new and fixed findings whenever this collision occurred.**
+  `src/Command/ReportDiffer.php` now groups findings into a
+  `array<string, list<DiffFinding>>` per fingerprint instead of overwriting;
+  `only()`/`intersect()` pair off each fingerprint's groups by count (the shared
+  portion is "persisting", the excess on either side is "new"/"fixed"), so a
+  collision never hides an entry that a naive single-value map would have
+  overwritten.
+- **`PhpParserControllerAccessControlParser` ignored a class-level `#[Route]`
+  attribute's path/name prefix entirely**, so a controller action declared as
+  `#[Route('/dashboard')]` inside a class carrying `#[Route('/admin')]` was
+  recorded with `routePath() === '/dashboard'` instead of Symfony's real,
+  concatenated `/admin/dashboard` — the exact path a `security.yaml`
+  `access_control` rule like `{ path: ^/admin, roles: ROLE_ADMIN }` is written
+  against. A route genuinely covered by that firewall rule was therefore
+  mislabeled `LACKS_ACCESS_CHECK` instead of
+  `COVERED_BY access_control[ROLE_ADMIN]` in the attacker prompt, risking a
+  false-positive `broken_access_control`/`missing_voter` finding on a route the
+  application already protects. `entriesForClass()` now also extracts the
+  class-level `#[Route]` data and `buildEntries()` joins it onto each method's
+  own path (normalizing the slash between prefix and suffix) and prepends it to
+  the route name, before constructing each `RouteAccessControl`.
+- **`RegexCodeSlicer`'s `STRUCTURAL_PREFIXES` list omitted bare `'static '`, so
+  a method declared `static function foo()` with no visibility modifier (a
+  common named-constructor/factory pattern) — or a bare `static $prop;` property
+  — was elided from the sliced attacker prompt**, the same bug class already
+  fixed once for a bare `'function '` signature. `'static '` is now a retained
+  structural prefix alongside `'function '`.
+- **`ConcurrentStructuredReviewAnalyzer`'s generic `Throwable` catch
+  unconditionally marked every pending finding in the window as errored,
+  overwriting a verdict a `record_review` tool call had already recorded in an
+  earlier round of that same window's batch call** — the recovery
+  `failRemainingWindows()` already applies for a `BudgetExceededException`/
+  `LLMProviderException` abort was never extended to this catch.
+  `dispatchPending()`'s generic-`Throwable` branch now recovers a drained
+  verdict per pending finding first, falling back to `recordReviewError()` only
+  when nothing was recorded.
+- **A finding an attacker chunk recorded via `record_vulnerability` before its
+  own conversation swallowed a generic (non-abort) `Throwable` was permanently
+  lost whenever no later `BudgetExceededException`/ `LLMProviderException`
+  occurred during the rest of the audit run.** The chunk analyzers already push
+  a recovered finding into the coverage recorder's pending buffer on this path,
+  but `AuditOrchestrator` only ever drained that buffer inside its own
+  Budget/LLMProviderException catch — a chunk that recovered-then-swallowed left
+  its finding sitting in the buffer with nothing left to drain it, since
+  `AttackerAgent::analyze()` itself returns normally (by design, so one bad
+  chunk never aborts the audit). `analyzeWithRecovery()`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) now drains and merges
+  the buffer by finding id after every call, not only on abort — which also
+  stops the buffer from accumulating stale cross-iteration entries that a later,
+  unrelated abort would otherwise re-review as if they were never persisted.
+- **`LLMResponse::parseJson()`'s prose-recovery heuristic desynced on a single
+  unpaired literal double-quote in the surrounding prose (e.g. a measurement
+  like `5"`), permanently hiding every `[`/`{` opener after it — including the
+  real JSON — and turning a chunk the LLM genuinely reported correctly into a
+  silent false negative.** The heuristic toggles "inside a string" on every
+  unescaped `"` to skip a bracket embedded in quoted prose, which only holds
+  when every quote in the content is genuinely paired; an odd, unpaired quote
+  flips the toggle permanently instead of resetting. `recoverDecodedJsonBlock()`
+  (`src/Audit/Domain/Port/LLMResponse.php`) now checks via a new
+  `hasBalancedQuotes()` whether the content's quotes are actually balanced
+  before relying on the toggle, falling back to trying every opener candidate
+  directly when they aren't.
+- **`SymfonyAiLLMClient::complete()` and `SequentialToolLoop::run()` (backing
+  `completeWithTools()`) left a rate-limiter reservation unreleased whenever
+  token extraction failed after a successful platform call** — e.g. a provider
+  reporting a negative token count throws `NegativeTokenCountException` from
+  `extractTokens()`, which was never guarded, unlike the sibling
+  concurrent/batch-window paths that already wrap the same call in a
+  `record(0, 0)` recovery. A second call afterward then reconciled against the
+  wrong, stale `acquire()` estimate, corrupting `input_tokens_per_minute`
+  throttling accuracy for the rest of the run. Both methods now wrap
+  `extractTokens()` in a try/catch that records `(0, 0)` before rethrowing,
+  mirroring the existing concurrent-path guard.
+- **`AdvisorySourceUnavailableException::forBinaryNotFound()` was unreachable
+  dead code** — a genuinely missing `composer` binary never throws a process
+  exception; `Process::run()` returns normally with a non-zero exit code and the
+  "command not found" message on stderr, always falling into the generic
+  `forFailedProcess()` branch instead of the dedicated, documented "composer not
+  in PATH" message `docs/troubleshooting.md` promises. `run()`
+  (`src/Audit/Infrastructure/Advisory/SymfonyProcessComposerAuditRunner.php`)
+  now checks for the POSIX "command not found" exit code (127) before falling
+  back to the generic failure message.
+- **`ComposerAuditAdvisoryDatabase::parse()` could leak a raw `TypeError`
+  instead of the documented `MalformedAdvisoryPayloadException`** when a
+  syntactically valid JSON payload's top-level value wasn't an object/array
+  (e.g. a bare `null`, number, or string) — `array_key_exists()` requires its
+  second argument to be an array, which `json_decode()` doesn't guarantee.
+  Already caught gracefully by a broader fallback so `lookup()` never crashed,
+  but with a misleading "Unexpected composer audit failure" log message.
+  `parse()`
+  (`src/Audit/Infrastructure/Advisory/ComposerAuditAdvisoryDatabase.php`) now
+  checks `is_array($decoded)` first and throws a new
+  `MalformedAdvisoryPayloadException::forNonArrayPayload()`.
 
 ### Security
 
@@ -2374,6 +2477,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/FileSystem/ProjectFileScanner.php`) now checks
   `SplFileInfo::isLink()` first and skips the file (with a logged warning)
   before any content is read.
+- **`SymfonyMappingContextRenderer::renderRouteAccessControlMap()` left three
+  raw, attacker-controlled strings unsanitized, reopening the newline
+  prompt-injection class the same method's `filePath`/`methodLevelIsGranted`
+  fields were fixed against in 1.12.0**: a route's HTTP method list and path
+  (from `#[Route(methods: [...], path: "...")]` string-literal arguments, which
+  can carry a real embedded newline via a `\n` escape) and a firewall-covered
+  route's `security.yaml` `access_control` roles (YAML scalars can embed
+  newlines the same way) were rendered without the `sanitizeLine()` call every
+  other field in the same method already gets. A crafted `#[Route]` or
+  `access_control` role could forge a fake `## Source Code` heading with
+  attacker-chosen instruction text further down the attacker prompt — and, via
+  the `COVERED_BY access_control[...]` marker specifically, could simultaneously
+  suppress a genuine `broken_access_control`/`missing_voter` finding the prompt
+  explicitly instructs the LLM to trust on that route.
+  `renderRouteAccessControlMap()` and `checkLabelFor()`
+  (`src/Audit/Infrastructure/Prompt/SymfonyMappingContextRenderer.php`) now run
+  `sanitizeLine()` over the route methods, path, and firewall roles the same way
+  the other fields already were.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

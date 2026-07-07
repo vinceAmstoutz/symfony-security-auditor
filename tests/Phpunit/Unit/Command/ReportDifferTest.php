@@ -131,6 +131,42 @@ final class ReportDifferTest extends TestCase
      * @throws ReportFileNotReadableException
      * @throws MalformedReportFileException
      */
+    public function test_diff_treats_an_extra_current_finding_sharing_a_fingerprint_as_new_not_hidden(): void
+    {
+        $collidingLow = $this->vulnerability('SQL Injection', 'low');
+        $collidingHigh = $this->vulnerability('SQL Injection', 'high');
+        $previous = $this->writeReport('previous.json', [$collidingLow]);
+        $current = $this->writeReport('current.json', [$collidingLow, $collidingHigh]);
+
+        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+
+        self::assertCount(1, $reportDiff->newFindings);
+        self::assertCount(1, $reportDiff->persistingFindings);
+        self::assertSame([], $reportDiff->fixedFindings);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_treats_an_extra_previous_finding_sharing_a_fingerprint_as_fixed_not_hidden(): void
+    {
+        $collidingLow = $this->vulnerability('SQL Injection', 'low');
+        $collidingHigh = $this->vulnerability('SQL Injection', 'high');
+        $previous = $this->writeReport('previous.json', [$collidingLow, $collidingHigh]);
+        $current = $this->writeReport('current.json', [$collidingLow]);
+
+        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+
+        self::assertSame([], $reportDiff->newFindings);
+        self::assertCount(1, $reportDiff->fixedFindings);
+        self::assertCount(1, $reportDiff->persistingFindings);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
     public function test_diff_recomputes_the_fingerprint_when_the_key_is_absent(): void
     {
         $vulnerability = $this->vulnerability('SQL Injection');
@@ -283,13 +319,13 @@ final class ReportDifferTest extends TestCase
     /**
      * @return array{type: string, file: string, title: string, severity: string, fingerprint: string}
      */
-    private function vulnerability(string $title): array
+    private function vulnerability(string $title, string $severity = 'high'): array
     {
         return [
             'type' => 'sql_injection',
             'file' => 'src/Foo.php',
             'title' => $title,
-            'severity' => 'high',
+            'severity' => $severity,
             'fingerprint' => Vulnerability::fingerprintOf('sql_injection', 'src/Foo.php', $title),
         ];
     }

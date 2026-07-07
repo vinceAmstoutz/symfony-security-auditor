@@ -53,7 +53,7 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
         private string $keySalt = '',
     ) {
         if (u($cacheDir)->trim()->isEmpty()) {
-            throw InvalidCacheConfigurationException::forEmptyCacheDir();
+            throw InvalidCacheConfigurationException::forEmptyCacheDir('Reviewer');
         }
     }
 
