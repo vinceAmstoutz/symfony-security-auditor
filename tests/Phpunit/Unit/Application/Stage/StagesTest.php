@@ -61,6 +61,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParser
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyYamlSecurityConfigParser;
 
 final class StagesTest extends TestCase
@@ -454,6 +456,45 @@ final class StagesTest extends TestCase
         $mapping = $auditContext->mapping();
         self::assertNotNull($mapping);
         self::assertNotEmpty($mapping->firewallRules());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_stage_maps_route_access_control_and_form_bindings_for_a_live_component_extending_abstract_controller(): void
+    {
+        $mappingStage = new MappingStage(new NullLogger(), new PhpParserControllerAccessControlParser(), new NullVoterCapabilityParser(), new PhpParserFormBindingParser(), new NullSecurityConfigParser());
+
+        $source = <<<'PHP'
+            <?php
+            namespace App\Twig\Components;
+            use App\Form\CartCheckoutType;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            #[AsLiveComponent]
+            final class Cart extends AbstractController {
+                #[Route('/cart/checkout')]
+                public function checkout(): void {
+                    $this->denyAccessUnlessGranted('ROLE_ADMIN');
+                    $form = $this->createForm(CartCheckoutType::class);
+                }
+            }
+            PHP;
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('src/Twig/Components/Cart.php', '/app/src/Twig/Components/Cart.php', $source),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertCount(1, $mapping->routeAccessControls());
+        self::assertSame('checkout', $mapping->routeAccessControls()[0]->methodName());
+        self::assertCount(1, $mapping->formBindingsForController('src/Twig/Components/Cart.php'));
     }
 
     public function test_audit_stage_has_correct_name(): void

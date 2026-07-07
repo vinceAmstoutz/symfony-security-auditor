@@ -628,6 +628,63 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A `#[AsLiveComponent]`/`#[ApiResource]` class that also extends
+  `AbstractController` (the documented pattern for reusing
+  `denyAccessUnlessGranted()`/`addFlash()`) had every `#[Route]`-mapped action
+  and `createForm()` call invisible to the access-control and form-binding
+  maps**, even though the class is a real, HTTP-reachable controller.
+  `ProjectFile::isController()` and `ProjectFileInventory::controllers()`
+  correctly classify such a file as `LIVE_COMPONENT`/`API_RESOURCE` (to keep its
+  own dedicated attacker-skill treatment — see the `LIVE_COMPONENT` entry
+  above), but `MappingStage::process()`
+  (`src/Audit/Application/Pipeline/Stage/MappingStage.php`) only ever fed
+  `ProjectFileInventory::controllers()` — strictly `CONTROLLER`-typed files — to
+  `PhpParserControllerAccessControlParser`/`PhpParserFormBindingParser`, and
+  both parsers independently re-gated on the same strict type. A route guarded
+  by `#[IsGranted]` on such a hybrid class was therefore reported neither as
+  `COVERED_BY access_control[...]` nor `LACKS_ACCESS_CHECK` to the attacker — it
+  simply never appeared in the deterministic mapping context at all, and its
+  `mapping.routes`/`mapping.routes_without_access_check`/
+  `mapping.form_bindings` counts silently excluded it. A new
+  `ProjectFileType::isControllerLike()`
+  (`src/Audit/Domain/Model/ ProjectFileType.php`) recognises `CONTROLLER`,
+  `LIVE_COMPONENT`, and `API_RESOURCE` alike; `MappingStage` now scans every
+  controller-like file for access control and form bindings
+  (`src/Audit/Infrastructure/Scan/ PhpParserControllerAccessControlParser.php`,
+  `PhpParserFormBindingParser.php` gate on the same predicate), while
+  `ProjectFileInventory::controllers()` itself — and the plain "Controllers: N"
+  count it backs — is unchanged.
+- **A finding whose `file_path` or `description` key was entirely absent from
+  the LLM's response (rather than present-but-blank) bypassed the `NotBlank`
+  validation meant to reject it, producing a `Vulnerability` with an empty file
+  path** — reachable via JSON-mode (non-tool) attacker/reviewer parsing, which
+  has no provider-side schema enforcement at all.
+  `VulnerabilityFactory::validateRawData()`
+  (`src/Audit/Application/Agent/VulnerabilityFactory.php`) relies on Symfony
+  Validator's `Assert\Collection` with `allowMissingFields: true` — which, by
+  design, skips a field's own constraints entirely when its key is absent rather
+  than treating the absence as blank, so `NotBlank()` only ever fired for a key
+  that was present-but-empty. `file_path`/`description` are now coalesced to
+  `''` before validation when absent, so an omitted key is correctly rejected
+  exactly like an explicitly blank one.
+- **Every `enum`, `minimum`/`maximum`, and `maxLength` constraint declared on a
+  tool's JSON-Schema input (e.g. `record_vulnerability`'s `type`/`severity`
+  enums, `confidence`'s 0–1 range, every text field's `maxLength`) was silently
+  stripped before the schema reached the LLM provider** — directly contradicting
+  `RecordVulnerabilityTool`'s own docblock and `.claude/rules/llm-seam.md`'s
+  documented invariant that "the provider validates each call before
+  invocation." `PlatformToolsMapper::normalizePropertySpec()`
+  (`src/Audit/Infrastructure/LLM/PlatformToolsMapper.php`) — the sole
+  Domain-to-platform schema translation point, used by both the sequential tool
+  loop and the concurrent tool-batch wavefront — carried over only `type` and
+  `description`, discarding every other JSON-Schema keyword. A provider was
+  therefore free to emit an invalid enum value or an out-of-range number that
+  the schema silently approved, catching the problem only later via the Domain
+  layer's own post-hoc validation (`VulnerabilityType::from()`, range checks in
+  `VulnerabilityClassification`/ `CodeLocation`) — dropping the whole finding
+  instead of the provider self-correcting within the same tool call as
+  originally intended. `normalizePropertySpec()` now also passes through `enum`,
+  `minimum`, `maximum`, and `maxLength` when the source schema declares them.
 - **A finding's narrative text containing an unterminated tilde-style code fence
   (`~~~`) could still swallow every subsequent finding into inert code text**,
   the identical bug already fixed for backtick fences.

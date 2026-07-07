@@ -94,6 +94,32 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_extracts_route_and_access_check_from_a_live_component_that_also_extends_abstract_controller(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Twig\Components;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            #[AsLiveComponent]
+            final class Cart extends AbstractController {
+                #[Route('/cart/admin-export')]
+                public function adminExport(): void { $this->denyAccessUnlessGranted('ROLE_ADMIN'); }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Twig/Components/Cart.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertCount(1, $entries);
+        self::assertSame('adminExport', $entries[0]->methodName());
+        self::assertTrue($entries[0]->methodHasDenyAccess());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_one_entry_per_stacked_route_attribute(): void
     {
         $source = <<<'PHP'

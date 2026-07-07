@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
+use Symfony\AI\Platform\Contract\JsonSchema\Factory;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Tool\ExecutionReference;
 use Symfony\AI\Platform\Tool\Tool;
@@ -21,6 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 /**
  * Maps Domain {@see ToolDefinition}s to symfony/ai platform {@see Tool}s,
  * normalizing each JSON schema to the strict object shape providers validate.
+ *
+ * @phpstan-import-type JsonSchema from Factory
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -47,7 +50,7 @@ final readonly class PlatformToolsMapper
     /**
      * @param array<string, mixed> $schema
      *
-     * @return array{type: 'object', properties: array<string, array{type: string, description: string}>, required: list<string>, additionalProperties: false}
+     * @return JsonSchema
      */
     private static function normalizeSchema(array $schema): array
     {
@@ -60,7 +63,7 @@ final readonly class PlatformToolsMapper
     }
 
     /**
-     * @return array<string, array{type: string, description: string}>
+     * @return array<string, array{type: string, description: string, enum?: list<string>, minimum?: int|float, maximum?: int|float, maxLength?: int}>
      */
     private static function normalizeProperties(mixed $rawProperties): array
     {
@@ -87,17 +90,39 @@ final readonly class PlatformToolsMapper
     /**
      * @param array<array-key, mixed> $spec
      *
-     * @return array{type: string, description: string}
+     * @return array{type: string, description: string, enum?: list<string>, minimum?: int|float, maximum?: int|float, maxLength?: int}
      */
     private static function normalizePropertySpec(array $spec): array
     {
         $type = $spec['type'] ?? 'string';
         $description = $spec['description'] ?? '';
 
-        return [
+        $normalized = [
             'type' => \is_string($type) ? $type : 'string',
             'description' => \is_string($description) ? $description : '',
         ];
+
+        $minimum = $spec['minimum'] ?? null;
+        if (\is_int($minimum) || \is_float($minimum)) {
+            $normalized['minimum'] = $minimum;
+        }
+
+        $maximum = $spec['maximum'] ?? null;
+        if (\is_int($maximum) || \is_float($maximum)) {
+            $normalized['maximum'] = $maximum;
+        }
+
+        $maxLength = $spec['maxLength'] ?? null;
+        if (\is_int($maxLength)) {
+            $normalized['maxLength'] = $maxLength;
+        }
+
+        $enum = $spec['enum'] ?? null;
+        if (\is_array($enum)) {
+            $normalized['enum'] = array_values(array_filter($enum, 'is_string'));
+        }
+
+        return $normalized;
     }
 
     /**

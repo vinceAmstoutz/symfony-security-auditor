@@ -30,24 +30,25 @@ use PhpParser\ParserFactory;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  *
- * Walks each public controller method body looking for
+ * Walks each public controller-like method body looking for
  * `$this->createForm(SomeFormType::class)` call sites. Only literal
  * `FooType::class` arguments are recorded — dynamic class names (variables,
  * method calls returning class strings) are intentionally ignored because the
- * binding cannot be resolved statically.
+ * binding cannot be resolved statically. "Controller-like" also covers
+ * `#[AsLiveComponent]`/`#[ApiResource]` classes that also extend
+ * `AbstractController`.
  */
 final readonly class PhpParserFormBindingParser implements FormBindingParserInterface
 {
     #[Override]
     public function parse(ProjectFile $projectFile): array
     {
-        if (ProjectFileType::CONTROLLER !== $projectFile->fileType()) {
+        if (!$projectFile->fileType()->isControllerLike()) {
             return [];
         }
 

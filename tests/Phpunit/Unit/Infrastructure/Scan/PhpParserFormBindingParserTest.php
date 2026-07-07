@@ -62,6 +62,32 @@ final class PhpParserFormBindingParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_collects_a_binding_from_a_live_component_that_also_extends_abstract_controller(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Twig\Components;
+            use App\Form\CartCheckoutType;
+            use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            #[AsLiveComponent]
+            final class Cart extends AbstractController {
+                public function checkout(): void {
+                    $form = $this->createForm(CartCheckoutType::class);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Twig/Components/Cart.php', '/app/x', $source);
+
+        $bindings = $this->phpParserFormBindingParser->parse($projectFile);
+
+        self::assertCount(1, $bindings);
+        self::assertSame('App\\Form\\CartCheckoutType', $bindings[0]->formTypeClass());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_collects_bindings_from_multiple_methods_in_the_same_controller(): void
     {
         $source = <<<'PHP'

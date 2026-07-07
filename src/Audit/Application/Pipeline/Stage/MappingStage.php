@@ -66,11 +66,12 @@ final readonly class MappingStage implements StageInterface
         }
 
         $projectFileInventory = ProjectFileInventory::fromFiles($files);
+        $controllerLikeFiles = $this->controllerLikeFiles($files);
 
         [$routeAccessMap, $firewallRules] = $this->extractSecurityConfig($files);
-        $routeAccessControls = $this->parseControllerAccessControls($projectFileInventory->controllers());
+        $routeAccessControls = $this->parseControllerAccessControls($controllerLikeFiles);
         $voterCapabilities = $this->parseVoterCapabilities($projectFileInventory->voters());
-        $formBindings = $this->parseFormBindings($projectFileInventory->controllers());
+        $formBindings = $this->parseFormBindings($controllerLikeFiles);
 
         $symfonyMapping = SymfonyMapping::of(
             $projectFileInventory,
@@ -100,6 +101,25 @@ final readonly class MappingStage implements StageInterface
             'voter_capabilities' => \count($voterCapabilities),
             'form_bindings' => \count($formBindings),
         ]);
+    }
+
+    /**
+     * A `#[AsLiveComponent]`/`#[ApiResource]` file classifies as its own
+     * dedicated {@see ProjectFileType} (to keep its specialized attacker-skill
+     * treatment) even when it also extends `AbstractController` — so
+     * `ProjectFileInventory::controllers()` alone would miss its routed,
+     * access-controlled actions.
+     *
+     * @param list<ProjectFile> $files
+     *
+     * @return list<ProjectFile>
+     */
+    private function controllerLikeFiles(array $files): array
+    {
+        return array_values(array_filter(
+            $files,
+            static fn (ProjectFile $projectFile): bool => $projectFile->fileType()->isControllerLike(),
+        ));
     }
 
     /**

@@ -29,23 +29,24 @@ use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\ParserFactory;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  *
- * Walks a controller's AST to extract one RouteAccessControl per stacked
- * `#[Route(path:, methods:)]` attribute on each public action method (via
- * {@see RouteAttributeParser}), plus `#[IsGranted(...)]`/`#[Security(...)]`
+ * Walks a controller-like file's AST to extract one RouteAccessControl per
+ * stacked `#[Route(path:, methods:)]` attribute on each public action method
+ * (via {@see RouteAttributeParser}), plus `#[IsGranted(...)]`/`#[Security(...)]`
  * on both class and method level and `denyAccessUnlessGranted()` calls in
  * method bodies (a first-class callable reference to it does not count — it
  * is never actually invoked). Attribute names are resolved against their
  * imports (`NameResolver`) before short-name matching, so an aliased import
- * (`use Route as Get;`) is still recognised. Returns [] for any non-controller
- * file or any parse error — the mapping stage must never abort because of a
- * single broken file.
+ * (`use Route as Get;`) is still recognised. "Controller-like" also covers
+ * `#[AsLiveComponent]`/`#[ApiResource]` classes ({@see
+ * ProjectFileType::isControllerLike()}), which may still declare routed,
+ * access-controlled actions. Returns [] for any other file type or any parse
+ * error — the mapping stage must never abort because of a single broken file.
  */
 final readonly class PhpParserControllerAccessControlParser implements ControllerAccessControlParserInterface
 {
@@ -56,7 +57,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     #[Override]
     public function parse(ProjectFile $projectFile): array
     {
-        if (ProjectFileType::CONTROLLER !== $projectFile->fileType()) {
+        if (!$projectFile->fileType()->isControllerLike()) {
             return [];
         }
 
