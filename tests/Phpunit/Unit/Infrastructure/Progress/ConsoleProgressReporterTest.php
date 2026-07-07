@@ -237,6 +237,40 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertStringContainsString('🟠 HIGH sql_injection — src/X.php:42', $this->bufferedOutput->fetch());
     }
 
+    public function test_a_forged_console_tag_in_a_reported_file_path_does_not_crash_the_audit(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+
+        $this->consoleProgressReporter->report('attacker.finding.recorded', [
+            'severity' => 'critical',
+            'type' => 'sql_injection',
+            'file' => 'src/Foo.php</> <fg=grey>injected</>',
+            'line' => 10,
+        ]);
+
+        self::assertStringContainsString('src/Foo.php</> <fg=grey>injected</>', $this->bufferedOutput->fetch());
+    }
+
+    public function test_a_forged_console_tag_in_a_reported_file_path_is_not_rendered_as_console_markup(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $consoleProgressReporter = new ConsoleProgressReporter($bufferedOutput);
+        $consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+
+        $consoleProgressReporter->report('attacker.finding.recorded', [
+            'severity' => 'critical',
+            'type' => 'sql_injection',
+            'file' => 'src/Foo.php</> <fg=green>[ALL CLEAR]</>',
+            'line' => 10,
+        ]);
+
+        $rendered = $bufferedOutput->fetch();
+        self::assertStringContainsString('[ALL CLEAR]', $rendered);
+        self::assertStringNotContainsString("\033[32m", $rendered);
+    }
+
     public function test_it_falls_back_to_raw_severity_when_the_severity_is_unknown(): void
     {
         $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
@@ -329,6 +363,21 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertStringContainsString('⚖ ⤳ baseline-accepted sql_injection — src/X.php:18 (review skipped)', $this->bufferedOutput->fetch());
     }
 
+    public function test_a_forged_console_tag_in_a_baseline_skipped_file_path_does_not_crash_the_audit(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+
+        $this->consoleProgressReporter->report('baseline.finding.skipped', [
+            'type' => 'sql_injection',
+            'file' => 'src/Foo.php</> <fg=grey>injected</>',
+            'line' => 18,
+            'title' => 'Vuln',
+        ]);
+
+        self::assertStringContainsString('src/Foo.php</> <fg=grey>injected</>', $this->bufferedOutput->fetch());
+    }
+
     public function test_it_streams_a_rejected_verdict_above_the_bar(): void
     {
         $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
@@ -370,6 +419,22 @@ final class ConsoleProgressReporterTest extends TestCase
         $this->consoleProgressReporter->report('review.finding.reviewed', ['accepted' => true, 'type' => 'xss', 'file' => 'a.php', 'line' => 1]);
 
         self::assertSame('', $this->bufferedOutput->fetch());
+    }
+
+    public function test_a_forged_console_tag_in_a_reviewed_finding_file_path_does_not_crash_the_audit(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('review.started', ['findings' => 1]);
+
+        $this->consoleProgressReporter->report('review.finding.reviewed', [
+            'accepted' => true,
+            'type' => 'xss',
+            'file' => 'src/Foo.php</> <fg=grey>injected</>',
+            'line' => 1,
+        ]);
+
+        self::assertStringContainsString('src/Foo.php</> <fg=grey>injected</>', $this->bufferedOutput->fetch());
     }
 
     public function test_it_colors_a_validated_verdict_green_in_a_decorated_terminal(): void

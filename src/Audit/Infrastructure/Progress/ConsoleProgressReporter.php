@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress;
 
 use Override;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Output\OutputInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
@@ -104,7 +105,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
             '  ⚔ %s %s — %s:%d',
             $label,
             ProgressContext::string($context, 'type'),
-            ProgressContext::string($context, 'file'),
+            OutputFormatter::escape(ProgressContext::string($context, 'file')),
             ProgressContext::int($context, 'line'),
         );
 
@@ -209,7 +210,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
         $this->writeAboveBar(\sprintf(
             '<fg=gray>  ⚖ ⤳ baseline-accepted %s — %s:%d (review skipped)</>',
             ProgressContext::string($context, 'type'),
-            ProgressContext::string($context, 'file'),
+            OutputFormatter::escape(ProgressContext::string($context, 'file')),
             ProgressContext::int($context, 'line'),
         ));
     }
@@ -225,7 +226,7 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
             '  ⚖ %s %s — %s:%d',
             $accepted ? '✓ validated' : '✗ rejected',
             ProgressContext::string($context, 'type'),
-            ProgressContext::string($context, 'file'),
+            OutputFormatter::escape(ProgressContext::string($context, 'file')),
             ProgressContext::int($context, 'line'),
         );
 

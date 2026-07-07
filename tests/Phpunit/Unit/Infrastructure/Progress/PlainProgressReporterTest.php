@@ -83,6 +83,42 @@ final class PlainProgressReporterTest extends TestCase
         self::assertSame("  [HIGH] sql_injection — src/X.php:42\n", $this->bufferedOutput->fetch());
     }
 
+    public function test_a_forged_console_tag_in_a_reported_file_path_does_not_crash_the_audit(): void
+    {
+        $this->plainProgressReporter->report('attacker.finding.recorded', [
+            'severity' => 'high',
+            'type' => 'sql_injection',
+            'file' => 'src/Foo.php</> <fg=grey>injected</>',
+            'line' => 42,
+        ]);
+
+        self::assertSame("  [HIGH] sql_injection — src/Foo.php</> <fg=grey>injected</>:42\n", $this->bufferedOutput->fetch());
+    }
+
+    public function test_a_forged_console_tag_in_a_baseline_skipped_file_path_does_not_crash_the_audit(): void
+    {
+        $this->plainProgressReporter->report('baseline.finding.skipped', [
+            'type' => 'sql_injection',
+            'file' => 'src/Foo.php</> <fg=grey>injected</>',
+            'line' => 18,
+            'title' => 'Vuln',
+        ]);
+
+        self::assertSame("  [BASELINE-SKIPPED] sql_injection — src/Foo.php</> <fg=grey>injected</>:18\n", $this->bufferedOutput->fetch());
+    }
+
+    public function test_a_forged_console_tag_in_a_reviewed_finding_file_path_does_not_crash_the_audit(): void
+    {
+        $this->plainProgressReporter->report('review.finding.reviewed', [
+            'accepted' => true,
+            'type' => 'sql_injection',
+            'file' => 'src/Foo.php</> <fg=grey>injected</>',
+            'line' => 18,
+        ]);
+
+        self::assertSame("  [VALIDATED] sql_injection — src/Foo.php</> <fg=grey>injected</>:18\n", $this->bufferedOutput->fetch());
+    }
+
     public function test_it_defaults_missing_finding_strings_to_empty(): void
     {
         $this->plainProgressReporter->report('attacker.finding.recorded', ['line' => 7]);

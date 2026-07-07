@@ -628,6 +628,37 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A crafted `file_path` in an LLM-reported finding could crash the entire
+  audit mid-run — losing every finding already discovered — or forge a fake
+  status line in the live progress narration.**
+  `ConsoleProgressReporter::onAttackerFindingRecorded()`/
+  `onBaselineFindingSkipped()`/`onReviewFindingReviewed()`
+  (`src/Audit/Infrastructure/Progress/ConsoleProgressReporter.php`) and
+  `PlainProgressReporter`'s equivalent line builders
+  (`src/Audit/Infrastructure/Progress/PlainProgressReporter.php`) interpolate
+  `Vulnerability::filePath()` — validated only for non-blank/max-length, never
+  for character content — directly into a line streamed via `writeln()`.
+  `ConsoleProgressReporter` wraps that line in a legitimate `<fg=...>` tag for
+  severity coloring, so Symfony's `OutputFormatter` parses the _entire_ line
+  including the untrusted file path; a `file_path` containing a fabricated
+  `<fg=grey>...</>` (a real, easy color-name typo) threw
+  `InvalidArgumentException: Invalid "grey" color`, and neither
+  `SequentialChunkAnalyzer`/`ConcurrentChunkAnalyzer` (attacker side) nor
+  `ReviewerCoverageRecorder`/`AuditOrchestrator` (reviewer/baseline side) wrap
+  this call in a try/catch — the exception propagated all the way to
+  `AuditCommand`'s top-level handler, aborting the run with **no report
+  produced** even when real, already-discovered critical findings existed at the
+  moment of the crash. A `file_path` containing `</> <fg=green>[ALL CLEAR]</>`
+  instead rendered real ANSI codes mid-run, capable of visually forging a fake
+  "all clear" line next to a genuine finding. The three
+  `ConsoleProgressReporter` call sites now escape the file path with
+  `Symfony\Component\Console\Formatter\OutputFormatter::escape()` before
+  interpolation, preserving the legitimate severity-color tag while neutralizing
+  any tag embedded in the untrusted text. `PlainProgressReporter` (the
+  non-decorated CI/log counterpart, which builds no legitimate markup of its
+  own) now routes every line through a single `writeln()` helper that always
+  passes `OutputInterface::OUTPUT_RAW`, the same fix already applied to
+  `ReportWriter`/`DiffPresenter`.
 - **A non-provider exception during concurrent JSON-mode review (e.g. a
   transport error mid-batch) crashed the entire audit with no report at all**,
   instead of degrading the affected findings to a rejected verdict like every

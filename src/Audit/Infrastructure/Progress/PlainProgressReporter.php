@@ -39,17 +39,22 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     public function report(string $event, array $context = []): void
     {
         match (ProgressEvent::tryFrom($event)) {
-            ProgressEvent::AuditStarted => $this->output->writeln(AuditOverviewLine::from($context)),
-            ProgressEvent::AuditIterationStarted => $this->output->writeln($this->iterationLine($context)),
-            ProgressEvent::AttackerChunkStarted => $this->output->writeln($this->chunkLine($context)),
-            ProgressEvent::AttackerChunkCompleted => $this->output->writeln($this->chunkDoneLine($context)),
-            ProgressEvent::AttackerFindingRecorded => $this->output->writeln($this->findingLine($context)),
-            ProgressEvent::ReviewStarted => $this->output->writeln($this->reviewStartLine($context)),
-            ProgressEvent::ReviewFindingReviewed => $this->output->writeln($this->reviewedLine($context)),
-            ProgressEvent::BaselineFindingSkipped => $this->output->writeln($this->baselineSkippedLine($context)),
-            ProgressEvent::ReviewCompleted => $this->output->writeln($this->reviewSummaryLine($context)),
+            ProgressEvent::AuditStarted => $this->writeln(AuditOverviewLine::from($context)),
+            ProgressEvent::AuditIterationStarted => $this->writeln($this->iterationLine($context)),
+            ProgressEvent::AttackerChunkStarted => $this->writeln($this->chunkLine($context)),
+            ProgressEvent::AttackerChunkCompleted => $this->writeln($this->chunkDoneLine($context)),
+            ProgressEvent::AttackerFindingRecorded => $this->writeln($this->findingLine($context)),
+            ProgressEvent::ReviewStarted => $this->writeln($this->reviewStartLine($context)),
+            ProgressEvent::ReviewFindingReviewed => $this->writeln($this->reviewedLine($context)),
+            ProgressEvent::BaselineFindingSkipped => $this->writeln($this->baselineSkippedLine($context)),
+            ProgressEvent::ReviewCompleted => $this->writeln($this->reviewSummaryLine($context)),
             default => null,
         };
+    }
+
+    private function writeln(string $line): void
+    {
+        $this->output->writeln($line, OutputInterface::OUTPUT_RAW);
     }
 
     /** @param array<string, mixed> $context */
