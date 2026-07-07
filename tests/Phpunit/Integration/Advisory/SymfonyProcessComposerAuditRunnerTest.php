@@ -107,7 +107,7 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
     /**
      * @throws AdvisorySourceUnavailableException
      */
-    public function test_it_wraps_process_exception_as_binary_not_found_when_setup_throws(): void
+    public function test_it_reports_the_real_reason_when_process_setup_throws_for_a_cause_other_than_a_timeout(): void
     {
         $symfonyProcessComposerAuditRunner = new SymfonyProcessComposerAuditRunner(
             timeoutSeconds: -1,
@@ -115,7 +115,23 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
         );
 
         $this->expectException(AdvisorySourceUnavailableException::class);
-        $this->expectExceptionMessage('composer binary not found on PATH');
+        $this->expectExceptionMessage('The timeout value must be a valid positive integer or float number.');
+
+        $symfonyProcessComposerAuditRunner->run('/app');
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_it_reports_a_timeout_distinctly_instead_of_mislabeling_it_as_a_missing_binary(): void
+    {
+        $symfonyProcessComposerAuditRunner = new SymfonyProcessComposerAuditRunner(
+            timeoutSeconds: 1,
+            processBuilder: static fn (string $path): Process => Process::fromShellCommandline('sleep 5'),
+        );
+
+        $this->expectException(AdvisorySourceUnavailableException::class);
+        $this->expectExceptionMessage('composer audit timed out after 1 seconds');
 
         $symfonyProcessComposerAuditRunner->run('/app');
     }

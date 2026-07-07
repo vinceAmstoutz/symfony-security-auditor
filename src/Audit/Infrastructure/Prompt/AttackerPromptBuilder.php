@@ -68,7 +68,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
         $summary = $symfonyMapping->toSummary();
 
         $noVoterList = implode("\n", array_map(
-            static fn (ProjectFile $projectFile): string => \sprintf('  - %s', $projectFile->relativePath()),
+            static fn (ProjectFile $projectFile): string => \sprintf('  - %s', self::sanitizePathLine($projectFile->relativePath())),
             $symfonyMapping->controllersWithoutVoters(),
         ));
 
@@ -100,6 +100,18 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
         }
 
         return 'Return a JSON array of all vulnerabilities found.';
+    }
+
+    /**
+     * A scanned file's path comes from the audited project's filesystem, not
+     * from us — a POSIX filename may contain a raw newline, which would
+     * otherwise let a crafted filename forge a fake `##`-prefixed section
+     * (e.g. the literal `## Source Code` heading further down this prompt)
+     * as unguarded top-level prompt text.
+     */
+    private static function sanitizePathLine(string $path): string
+    {
+        return str_replace("\n", ' ', $path);
     }
 
     private function basePrompt(): string

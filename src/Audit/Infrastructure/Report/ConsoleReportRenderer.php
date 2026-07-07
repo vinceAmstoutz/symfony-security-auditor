@@ -94,7 +94,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
             '{{lineEnd}}' => $vulnerability->lineEnd(),
             '{{description}}' => $this->indentChunks($vulnerability->description()),
             '{{attackVector}}' => $this->indentChunks($vulnerability->attackVector()),
-            '{{proof}}' => $vulnerability->proof(),
+            '{{proof}}' => $this->indentLines($vulnerability->proof()),
             '{{remediation}}' => $this->indentChunks($vulnerability->remediation()),
             '{{confidence}}' => \sprintf('%.0f', $vulnerability->confidence() * 100),
         ]);
@@ -105,6 +105,19 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
         return implode("\n", array_map(
             static fn (string $chunk): string => \sprintf('    %s', $chunk),
             explode("\n", u(mb_scrub($text, 'UTF-8'))->wordwrap(65, "\n", true)->toString()),
+        ));
+    }
+
+    /**
+     * Unlike {@see self::indentChunks()}, this does not word-wrap: `proof` is
+     * often a literal command or request that would be corrupted by
+     * mid-line wrapping, so every existing line is simply prefixed as-is.
+     */
+    private function indentLines(string $text): string
+    {
+        return implode("\n", array_map(
+            static fn (string $line): string => \sprintf('    %s', $line),
+            explode("\n", mb_scrub($text, 'UTF-8')),
         ));
     }
 }

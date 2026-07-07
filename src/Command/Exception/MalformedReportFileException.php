@@ -33,4 +33,9 @@ final class MalformedReportFileException extends RuntimeException
     {
         return new self(\sprintf('Report file "%s" has an invalid vulnerability entry at index %d: "type", "file", "title", and "severity" must all be strings.', $path, $index));
     }
+
+    public static function vulnerabilityEntryNotAnObject(string $path, int $index): self
+    {
+        return new self(\sprintf('Report file "%s" has a vulnerability entry at index %d that is not a JSON object.', $path, $index));
+    }
 }

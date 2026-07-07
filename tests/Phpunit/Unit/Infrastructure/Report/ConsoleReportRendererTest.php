@@ -648,6 +648,25 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      */
+    public function test_render_vulnerability_indents_every_line_of_a_multi_line_proof(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Test Vuln', 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', "GET /admin/users HTTP/1.1\nHost: victim.example\nCookie: session=abc", 'fix'),
+            "\$x = ' OR 1=1",
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString("    GET /admin/users HTTP/1.1\n    Host: victim.example\n    Cookie: session=abc", $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     */
     public function test_render_vulnerability_substitutes_remediation(): void
     {
         $vulnerability = $this->makeValidatedVuln();

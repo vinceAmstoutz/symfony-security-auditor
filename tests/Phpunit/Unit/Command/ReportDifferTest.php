@@ -232,6 +232,7 @@ final class ReportDifferTest extends TestCase
         $current = $this->writeReport('current.json', []);
 
         $this->expectException(MalformedReportFileException::class);
+        $this->expectExceptionMessage('has a vulnerability entry at index 0 that is not a JSON object');
 
         (new ReportDiffer($this->filesystem))->diff($previous, $current);
     }

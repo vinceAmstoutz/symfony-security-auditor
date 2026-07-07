@@ -628,6 +628,94 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A non-transient LLM provider failure (misconfigured platform, auth error,
+  retired model) discarded the entire in-progress audit — including
+  already-validated findings — instead of surfacing a partial report the way a
+  budget abort already does.** `RunAuditUseCase::execute()`
+  (`src/Audit/Application/UseCase/RunAuditUseCase.php`) only caught
+  `BudgetExceededException` to build a partial `AuditReport` before rethrowing;
+  `LLMProviderException` propagated raw, so `AuditCommand`'s generic
+  `catch (Throwable)` branch rendered a bare error and exited without ever
+  calling the report writer — even though `AuditOrchestrator` and
+  `PoCSynthesisStage` already go to deliberate lengths to persist validated
+  findings into `AuditContext` before rethrowing exactly this exception.
+  `execute()` now also catches `LLMProviderException` and throws a new
+  `AuditAbortedByProviderException`
+  (`src/Audit/Application/Exception/AuditAbortedByProviderException.php`)
+  carrying the partial report; `AuditCommand` handles it (and the existing
+  budget-abort exception) through a single `handleAbort()` method keyed off a
+  new internal `AuditAbortedExceptionInterface` shared by both, writing the
+  partial report and returning the generic failure exit code (`1`) — this is not
+  a budget abort, so it does not reuse that dedicated exit code (`2`).
+- **The reviewer prompt builder (`AttackerPromptBuilder`'s "Controllers WITHOUT
+  Security Annotations" list) and every section `SymfonyMappingContextRenderer`
+  renders (voter coverage, form bindings, route access-control map) interpolated
+  file paths, class names, and raw `#[IsGranted("...")]` attribute-argument
+  string literals with zero escaping**, the same delimiter-injection class
+  already fixed for
+  `ReviewerMessageRenderer`/`PoCSynthesizer`/`MarkdownReportRenderer` in earlier
+  rounds. Since PHP string/attribute-argument literals may contain a raw
+  embedded newline, a crafted value forged a fake `##`-prefixed section (e.g.
+  the literal `## Source Code` heading that follows these blocks in the attacker
+  prompt) as unguarded top-level prompt text —
+  `AttackerPromptBuilder::sanitizePathLine()`
+  (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) and
+  `SymfonyMappingContextRenderer::sanitizeLine()`
+  (`src/Audit/Infrastructure/Prompt/SymfonyMappingContextRenderer.php`) now
+  replace embedded newlines with spaces before interpolating any of these
+  values.
+- **`DeferredAdvisoryDatabase` permanently memoized the first audited project's
+  `composer audit` snapshot, so reusing the same service instance for a second
+  audit against a different project silently kept serving the first project's
+  stale advisories instead of re-running `composer audit`.** `innerDatabase()`
+  (`src/Audit/Infrastructure/Advisory/DeferredAdvisoryDatabase.php`) used a bare
+  `??=` to build the inner `ComposerAuditAdvisoryDatabase` exactly once per
+  service instance, reading `AuditedProjectPathHolder::path()` only on that
+  first call. It now also rebuilds whenever the holder's current path differs
+  from the path used to build the memoized instance.
+- **`SymfonyProcessComposerAuditRunner` labeled every process setup/run failure
+  — including a genuine timeout — as "composer binary not found on PATH",
+  contradicting the distinguishable causes `docs/troubleshooting.md` documents
+  for `lookup_advisory` returning empty.** `run()`
+  (`src/Audit/Infrastructure/Advisory/SymfonyProcessComposerAuditRunner.php`)
+  caught any `Symfony\Component\Process\Exception\ExceptionInterface` —
+  including `ProcessTimedOutException` — and unconditionally wrapped it as
+  `AdvisorySourceUnavailableException::forBinaryNotFound()`, whose fixed message
+  is what `ComposerAuditAdvisoryDatabase::load()` logs, misdirecting operators
+  toward checking Composer's installation for an unrelated timeout. `run()` now
+  catches `ProcessTimedOutException` separately and reports it via a new
+  `AdvisorySourceUnavailableException::forTimeout()`; every other setup failure
+  is reported via a new `forProcessSetupFailure()`, which includes the real
+  underlying exception's message instead of a fixed string.
+- **`ConsoleReportRenderer` only indented the first line of a multi-line `proof`
+  field, leaving every subsequent line flush-left.** The `vulnerability.txt`
+  template hardcoded a single 4-space prefix on the `{{proof}}` placeholder's
+  own line, while `description`/`attackVector`/ `remediation` are indented on
+  every line via `indentChunks()`. A multi-line proof-of-concept (an HTTP
+  request, a multi-step exploit) rendered with only its first line inside the
+  finding block, breaking the report's visual structure. A new `indentLines()`
+  helper (`src/Audit/Infrastructure/Report/ConsoleReportRenderer.php`) —
+  deliberately skipping `indentChunks()`'s word-wrap, which would corrupt a
+  literal command — now prefixes every line of `proof`, and the template's
+  hardcoded prefix is removed.
+- **`SarifReportRenderer` placed a finding's raw file path into
+  `artifactLocation.uri` without percent-encoding, violating the SARIF 2.1.0
+  spec's requirement that the field be a valid RFC 3986 URI reference.** A path
+  containing `#` or `?` — reachable, since `VulnerabilityFactory` only validates
+  `file_path` for non-blank/max-length — is parsed by any spec-compliant SARIF
+  consumer as a fragment/query delimiter rather than literal path content,
+  resolving to the wrong (truncated) artifact location. A new
+  `encodeArtifactUri()` helper
+  (`src/Audit/Infrastructure/Report/SarifReportRenderer.php`) percent-encodes
+  each path segment while preserving `/` as the separator.
+- **`ReportDiffer` reported a misleading message for a `vulnerabilities` array
+  entry that isn't a JSON object at all** — reusing
+  `MalformedReportFileException::invalidVulnerabilityEntry()`'s "type", "file",
+  "title", and "severity" must all be strings" message, which describes the
+  wrong-field-type case, not the entirely-not-an-object case (e.g. a bare `42`
+  in the array — a plausible hand-editing mistake). `loadFindings()`
+  (`src/Command/ReportDiffer.php`) now reports that case via a new, accurately
+  worded `MalformedReportFileException::vulnerabilityEntryNotAnObject()`.
 - **The reviewer-verdict cache never actually hit across two audit runs, only
   within a single run.** `FilesystemReviewerCache::keyFor()`
   (`src/Audit/Infrastructure/Cache/FilesystemReviewerCache.php`) hashed

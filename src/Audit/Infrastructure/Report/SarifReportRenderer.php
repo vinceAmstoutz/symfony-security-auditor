@@ -100,7 +100,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
             'locations' => [
                 [
                     'physicalLocation' => [
-                        'artifactLocation' => ['uri' => $vulnerability->filePath()],
+                        'artifactLocation' => ['uri' => $this->encodeArtifactUri($vulnerability->filePath())],
                         'region' => [
                             'startLine' => $vulnerability->lineStart(),
                             'endLine' => $vulnerability->lineEnd(),
@@ -115,6 +115,18 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
         }
 
         return $result;
+    }
+
+    /**
+     * The SARIF spec requires `artifactLocation.uri` to be a valid RFC 3986
+     * URI reference; a raw file path can contain `#`/`?`, which a
+     * spec-compliant consumer would parse as a fragment/query delimiter
+     * rather than literal path content. Percent-encoding each segment (while
+     * preserving `/` as the path separator) keeps the path intact.
+     */
+    private function encodeArtifactUri(string $filePath): string
+    {
+        return implode('/', array_map(rawurlencode(...), explode('/', $filePath)));
     }
 
     private function sarifLevel(VulnerabilitySeverity $vulnerabilitySeverity): string

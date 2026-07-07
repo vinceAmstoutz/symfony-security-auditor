@@ -60,7 +60,7 @@ final readonly class ReportDiffer implements ReportDifferInterface
         $findings = [];
         foreach ($this->decodeVulnerabilities($path) as $index => $vulnerability) {
             if (!\is_array($vulnerability)) {
-                throw MalformedReportFileException::invalidVulnerabilityEntry($path, (int) $index);
+                throw MalformedReportFileException::vulnerabilityEntryNotAnObject($path, (int) $index);
             }
 
             $findings[] = $this->toDiffFinding($vulnerability, $path, (int) $index);

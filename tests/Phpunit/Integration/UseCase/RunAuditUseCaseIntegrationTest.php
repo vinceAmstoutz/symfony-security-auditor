@@ -17,6 +17,7 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use RuntimeException;
 use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
@@ -31,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
@@ -53,6 +55,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
@@ -63,6 +66,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidAuditContextException
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditCostException
@@ -79,6 +83,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidAuditContextException
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditCostException
@@ -98,6 +103,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidAuditContextException
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditCostException
@@ -115,6 +121,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidAuditContextException
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditCostException
@@ -138,6 +145,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws NegativeTokenCountException
      * @throws InvalidAuditContextException
      * @throws InvalidTokenUsageException
@@ -161,6 +169,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws NegativeTokenCountException
      * @throws InvalidAuditContextException
      * @throws InvalidTokenUsageException
@@ -182,6 +191,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
     }
 
     /**
+     * @throws AuditAbortedByProviderException
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
@@ -211,6 +221,37 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_execute_wraps_llm_provider_exception_with_partial_report(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php class App {}');
+
+        $abortingAttacker = self::createStub(LLMClientInterface::class);
+        $abortingAttacker->method('complete')->willThrowException(NonTransientLLMFailureException::from(new RuntimeException('model retired')));
+        $abortingAttacker->method('completeWithTools')->willThrowException(NonTransientLLMFailureException::from(new RuntimeException('model retired')));
+        $reviewerLLM = self::createStub(LLMClientInterface::class);
+        $reviewerLLM->method('complete')->willReturn(LLMResponse::of('{}', 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)));
+
+        $runAuditUseCase = $this->makeUseCaseWithLLM($abortingAttacker, $reviewerLLM);
+
+        try {
+            $runAuditUseCase->execute($this->tmpDir);
+            self::fail('Expected AuditAbortedByProviderException');
+        } catch (AuditAbortedByProviderException $auditAbortedByProviderException) {
+            self::assertSame('LLM call failed with non-transient error: model retired', $auditAbortedByProviderException->getMessage());
+            self::assertSame(1, $auditAbortedByProviderException->partialReport()->filesScanned());
+            self::assertSame(0, $auditAbortedByProviderException->partialReport()->totalVulnerabilities());
+        }
+    }
+
+    /**
+     * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException
      * @throws InvalidAuditContextException
@@ -275,6 +316,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
@@ -305,6 +347,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
@@ -364,6 +407,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
     }
 
     /**
+     * @throws AuditAbortedByProviderException
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
@@ -411,6 +455,7 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidAuditContextException
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditCostException

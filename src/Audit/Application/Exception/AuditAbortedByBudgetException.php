@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception;
 
+use Override;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
@@ -24,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final class AuditAbortedByBudgetException extends RuntimeException
+final class AuditAbortedByBudgetException extends RuntimeException implements AuditAbortedExceptionInterface
 {
     private function __construct(string $message, private readonly AuditReport $auditReport, BudgetExceededException $budgetExceededException)
     {
@@ -36,6 +37,7 @@ final class AuditAbortedByBudgetException extends RuntimeException
         return new self($budgetExceededException->getMessage(), $auditReport, $budgetExceededException);
     }
 
+    #[Override]
     public function partialReport(): AuditReport
     {
         return $this->auditReport;

@@ -17,6 +17,7 @@ use Closure;
 use Override;
 use Symfony\Component\Process\Exception\ExceptionInterface;
 use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
 
@@ -61,8 +62,10 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
         try {
             $process->setTimeout((float) $this->timeoutSeconds);
             $process->run();
+        } catch (ProcessTimedOutException $processTimedOutException) {
+            throw AdvisorySourceUnavailableException::forTimeout($this->timeoutSeconds, $processTimedOutException);
         } catch (ExceptionInterface $exception) {
-            throw AdvisorySourceUnavailableException::forBinaryNotFound($exception);
+            throw AdvisorySourceUnavailableException::forProcessSetupFailure($exception);
         }
 
         $stdout = $process->getOutput();

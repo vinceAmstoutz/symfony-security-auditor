@@ -28,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCo
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
@@ -64,6 +65,7 @@ final class FullAuditEndToEndTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
@@ -101,6 +103,7 @@ final class FullAuditEndToEndTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
@@ -125,6 +128,7 @@ final class FullAuditEndToEndTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
@@ -150,6 +154,7 @@ final class FullAuditEndToEndTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException

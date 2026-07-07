@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
@@ -46,6 +47,7 @@ final class RunAuditUseCaseTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      * @throws InvalidTokenUsageException
@@ -63,6 +65,7 @@ final class RunAuditUseCaseTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      * @throws InvalidTokenUsageException
@@ -79,6 +82,7 @@ final class RunAuditUseCaseTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      * @throws InvalidTokenUsageException
@@ -104,6 +108,7 @@ final class RunAuditUseCaseTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      * @throws InvalidTokenUsageException
@@ -120,6 +125,7 @@ final class RunAuditUseCaseTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      * @throws InvalidTokenUsageException
@@ -136,6 +142,7 @@ final class RunAuditUseCaseTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      * @throws InvalidTokenUsageException

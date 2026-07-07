@@ -36,9 +36,9 @@ final readonly class SymfonyMappingContextRenderer
         $lines = ['## Voter Coverage'];
         $lines[] = 'Each line summarises a `Voter::supports()` body: the attributes it accepts and the subject types it gates. Use this to spot `#[IsGranted(\'ATTR\', $subject)]` calls referencing an attribute or subject type that no voter actually covers — that is a `missing_voter` finding.';
         foreach ($voterCapabilities as $voterCapability) {
-            $attributes = [] === $voterCapability->supportedAttributes() ? '(none)' : implode(',', $voterCapability->supportedAttributes());
-            $subjects = [] === $voterCapability->supportedSubjects() ? '(none)' : implode(',', $voterCapability->supportedSubjects());
-            $lines[] = \sprintf('- %s — attributes: [%s] — subjects: [%s] — %s', $voterCapability->className(), $attributes, $subjects, $voterCapability->filePath());
+            $attributes = [] === $voterCapability->supportedAttributes() ? '(none)' : implode(',', array_map(self::sanitizeLine(...), $voterCapability->supportedAttributes()));
+            $subjects = [] === $voterCapability->supportedSubjects() ? '(none)' : implode(',', array_map(self::sanitizeLine(...), $voterCapability->supportedSubjects()));
+            $lines[] = \sprintf('- %s — attributes: [%s] — subjects: [%s] — %s', self::sanitizeLine($voterCapability->className()), $attributes, $subjects, self::sanitizeLine($voterCapability->filePath()));
         }
 
         return \sprintf("%s\n\n", implode("\n", $lines));
@@ -54,7 +54,7 @@ final readonly class SymfonyMappingContextRenderer
         $lines = ['## Form Bindings'];
         $lines[] = 'Each line records a `$this->createForm(FormType::class)` call site. Cross-reference with the form type to spot mass-assignment vectors (`allow_extra_fields: true`, unbounded `EntityType` choices, missing CSRF on state-changing actions).';
         foreach ($formBindings as $formBinding) {
-            $lines[] = \sprintf('- %s::%s — %s', $formBinding->controllerFilePath(), $formBinding->controllerMethod(), $formBinding->formTypeClass());
+            $lines[] = \sprintf('- %s::%s — %s', self::sanitizeLine($formBinding->controllerFilePath()), $formBinding->controllerMethod(), $formBinding->formTypeClass());
         }
 
         return \sprintf("%s\n\n", implode("\n", $lines));
@@ -81,7 +81,7 @@ final readonly class SymfonyMappingContextRenderer
             }
 
             if ([] !== $routeAccessControl->methodLevelIsGranted()) {
-                $checks[] = \sprintf('method:#[IsGranted(%s)]', implode(',', $routeAccessControl->methodLevelIsGranted()));
+                $checks[] = \sprintf('method:#[IsGranted(%s)]', implode(',', array_map(self::sanitizeLine(...), $routeAccessControl->methodLevelIsGranted())));
             }
 
             if ($routeAccessControl->methodHasDenyAccess()) {
@@ -89,7 +89,7 @@ final readonly class SymfonyMappingContextRenderer
             }
 
             $checkLabel = self::checkLabelFor($checks, $routeAccessControl, $routeAccessMap);
-            $lines[] = \sprintf('- %s %s — %s::%s — %s', $methods, $path, $routeAccessControl->filePath(), $routeAccessControl->methodName(), $checkLabel);
+            $lines[] = \sprintf('- %s %s — %s::%s — %s', $methods, $path, self::sanitizeLine($routeAccessControl->filePath()), $routeAccessControl->methodName(), $checkLabel);
         }
 
         return \sprintf("%s\n\n", implode("\n", $lines));
@@ -156,5 +156,18 @@ final readonly class SymfonyMappingContextRenderer
         }
 
         return $routeAccessMap[\sprintf('route: %s', $routeName)] ?? null;
+    }
+
+    /**
+     * Every value rendered here — a file path, a class name, or a raw
+     * `#[IsGranted("...")]` attribute-argument string literal collected by
+     * the AST parsers — comes from the audited (untrusted) project, not from
+     * us. A raw embedded newline would let a crafted value forge a fake
+     * `##`-prefixed section (e.g. the literal `## Source Code` heading
+     * further down the attacker prompt) as unguarded top-level prompt text.
+     */
+    private static function sanitizeLine(string $value): string
+    {
+        return str_replace("\n", ' ', $value);
     }
 }

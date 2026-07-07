@@ -17,10 +17,12 @@ use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
@@ -53,6 +55,7 @@ final readonly class RunAuditUseCase
      *                                           report
      *
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      * @throws InvalidTokenUsageException
@@ -79,6 +82,14 @@ final readonly class RunAuditUseCase
             ]);
 
             throw AuditAbortedByBudgetException::from($budgetExceededException, $partialReport);
+        } catch (LLMProviderException $llmProviderException) {
+            $partialReport = AuditReport::fromContext($auditContext, $this->buildCost());
+            $this->logger->warning('Audit aborted by LLM provider failure', [
+                'audit_id' => $partialReport->auditId(),
+                'error' => $llmProviderException->getMessage(),
+            ]);
+
+            throw AuditAbortedByProviderException::from($llmProviderException, $partialReport);
         }
 
         $auditReport = AuditReport::fromContext($auditContext, $this->buildCost());

@@ -384,6 +384,21 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      */
+    public function test_render_percent_encodes_reserved_uri_characters_in_the_artifact_location(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(filePath: 'src/Controller/Foo#Bar.php');
+        $decoded = $this->decodeSarif($this->makeReport($vulnerability));
+
+        $uri = $decoded['runs'][0]['results'][0]['locations'][0]['physicalLocation']['artifactLocation']['uri'];
+
+        self::assertSame('src/Controller/Foo%23Bar.php', $uri);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     */
     public function test_render_rule_short_description_text_is_type_category(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION);
