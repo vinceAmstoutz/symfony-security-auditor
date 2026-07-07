@@ -34,6 +34,9 @@ final class AuditContext implements CoverageRecorderInterface
     /** @var list<array{stage: string, file: string, status: string}> */
     private array $coverage = [];
 
+    /** @var list<Vulnerability> */
+    private array $pendingReviewedFindings = [];
+
     private DateTimeImmutable $startedAt;
 
     /**
@@ -211,5 +214,20 @@ final class AuditContext implements CoverageRecorderInterface
     public function coverage(): array
     {
         return $this->coverage;
+    }
+
+    #[Override]
+    public function recordReviewedFinding(Vulnerability $vulnerability): void
+    {
+        $this->pendingReviewedFindings[] = $vulnerability;
+    }
+
+    #[Override]
+    public function drainReviewedFindings(): array
+    {
+        $drained = $this->pendingReviewedFindings;
+        $this->pendingReviewedFindings = [];
+
+        return $drained;
     }
 }

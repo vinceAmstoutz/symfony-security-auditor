@@ -151,9 +151,7 @@ final readonly class BatchReviewAnalyzer
                 continue;
             }
 
-            'aborted' === $status
-                ? $this->batchVerdictApplier->markBatchAborted($batch, $coverageRecorder)
-                : $this->batchVerdictApplier->markBatchErrored($batch, $coverageRecorder);
+            $this->batchVerdictApplier->markBatchUnreached($batch, $status, $coverageRecorder);
         }
     }
 
@@ -202,11 +200,11 @@ final readonly class BatchReviewAnalyzer
 
             return $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, $cacheContexts);
         } catch (BudgetExceededException $budgetExceededException) {
-            $this->batchVerdictApplier->markBatchAborted($batch, $coverageRecorder);
+            $this->batchVerdictApplier->markBatchUnreached($batch, 'aborted', $coverageRecorder);
 
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
-            $this->batchVerdictApplier->markBatchErrored($batch, $coverageRecorder);
+            $this->batchVerdictApplier->markBatchUnreached($batch, 'errored', $coverageRecorder);
 
             throw $llmProviderException;
         } catch (JsonException $exception) {
@@ -246,11 +244,11 @@ final readonly class BatchReviewAnalyzer
 
             return $this->batchVerdictApplier->applyBatchReview($batch, $structuredReviewCollectionSession->drain(), $coverageRecorder, $cacheContexts);
         } catch (BudgetExceededException $budgetExceededException) {
-            $this->batchVerdictApplier->markBatchAborted($batch, $coverageRecorder);
+            $this->batchVerdictApplier->markBatchUnreached($batch, 'aborted', $coverageRecorder);
 
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
-            $this->batchVerdictApplier->markBatchErrored($batch, $coverageRecorder);
+            $this->batchVerdictApplier->markBatchUnreached($batch, 'errored', $coverageRecorder);
 
             throw $llmProviderException;
         } catch (Throwable $exception) {

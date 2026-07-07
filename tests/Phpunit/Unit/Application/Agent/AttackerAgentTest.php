@@ -134,6 +134,15 @@ final class AttackerAgentTest extends TestCase
             {
                 $this->statuses[] = $status;
             }
+
+            #[Override]
+            public function recordReviewedFinding(Vulnerability $vulnerability): void {}
+
+            #[Override]
+            public function drainReviewedFindings(): array
+            {
+                return [];
+            }
         };
 
         $result = $attackerAgent->analyze(
@@ -2204,6 +2213,15 @@ final class AttackerAgentTest extends TestCase
             public function recordCoverage(string $stage, string $filePath, string $status): void
             {
                 $this->records[] = ['stage' => $stage, 'file' => $filePath, 'status' => $status];
+            }
+
+            #[Override]
+            public function recordReviewedFinding(Vulnerability $vulnerability): void {}
+
+            #[Override]
+            public function drainReviewedFindings(): array
+            {
+                return [];
             }
         };
 

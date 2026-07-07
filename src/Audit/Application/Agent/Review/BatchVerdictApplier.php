@@ -122,8 +122,10 @@ final readonly class BatchVerdictApplier
     {
         if (null === $review) {
             ReviewerCoverageRecorder::record($vulnerability, 'rejected', $coverageRecorder, $this->progressReporter);
+            $rejected = $vulnerability->withReviewerValidation(false);
+            $coverageRecorder->recordReviewedFinding($rejected);
 
-            return $vulnerability->withReviewerValidation(false);
+            return $rejected;
         }
 
         if (\array_key_exists($vulnerability->id(), $codeContexts)) {
@@ -137,6 +139,7 @@ final readonly class BatchVerdictApplier
             $coverageRecorder,
             $this->progressReporter,
         );
+        $coverageRecorder->recordReviewedFinding($applied);
 
         return $applied;
     }
@@ -150,8 +153,10 @@ final readonly class BatchVerdictApplier
     {
         $rejected = [];
         foreach ($batch as $vulnerability) {
-            $rejected[] = $vulnerability->withReviewerValidation(false);
+            $withVerdict = $vulnerability->withReviewerValidation(false);
+            $rejected[] = $withVerdict;
             ReviewerCoverageRecorder::record($vulnerability, 'rejected', $coverageRecorder, $this->progressReporter);
+            $coverageRecorder->recordReviewedFinding($withVerdict);
         }
 
         return $rejected;
@@ -166,8 +171,10 @@ final readonly class BatchVerdictApplier
     {
         $errored = [];
         foreach ($batch as $vulnerability) {
-            $errored[] = $vulnerability->withReviewerValidation(false);
+            $withVerdict = $vulnerability->withReviewerValidation(false);
+            $errored[] = $withVerdict;
             ReviewerCoverageRecorder::record($vulnerability, 'errored', $coverageRecorder, $this->progressReporter);
+            $coverageRecorder->recordReviewedFinding($withVerdict);
         }
 
         return $errored;
@@ -175,22 +182,17 @@ final readonly class BatchVerdictApplier
 
     /**
      * Marks every finding in a batch the reviewer never reached because a
-     * budget abort unwound the batch loop first — no logging, mirroring
-     * `markBatchErrored()`.
+     * budget/provider abort unwound the batch loop before a verdict for it
+     * was produced — no logging, no persisted verdict, unlike
+     * `markBatchErrored()`, whose findings did get a (failed) verdict.
      *
      * @param list<Vulnerability> $batch
-     *
-     * @return list<Vulnerability>
      */
-    public function markBatchAborted(array $batch, CoverageRecorderInterface $coverageRecorder): array
+    public function markBatchUnreached(array $batch, string $status, CoverageRecorderInterface $coverageRecorder): void
     {
-        $aborted = [];
         foreach ($batch as $vulnerability) {
-            $aborted[] = $vulnerability->withReviewerValidation(false);
-            ReviewerCoverageRecorder::record($vulnerability, 'aborted', $coverageRecorder, $this->progressReporter);
+            ReviewerCoverageRecorder::record($vulnerability, $status, $coverageRecorder, $this->progressReporter);
         }
-
-        return $aborted;
     }
 
     /**

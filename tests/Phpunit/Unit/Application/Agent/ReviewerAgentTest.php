@@ -2168,6 +2168,10 @@ final class ReviewerAgentTest extends TestCase
             ],
             $auditContext->coverage(),
         );
+        self::assertSame(
+            [['file' => 'src/A.php', 'validated' => true]],
+            array_map($this->reviewedFindingShape(...), $auditContext->drainReviewedFindings()),
+        );
     }
 
     /**
@@ -2217,6 +2221,10 @@ final class ReviewerAgentTest extends TestCase
                 ['stage' => 'reviewer', 'file' => 'src/C.php', 'status' => 'errored'],
             ],
             $auditContext->coverage(),
+        );
+        self::assertSame(
+            [['file' => 'src/A.php', 'validated' => true]],
+            array_map($this->reviewedFindingShape(...), $auditContext->drainReviewedFindings()),
         );
     }
 
@@ -2345,6 +2353,13 @@ final class ReviewerAgentTest extends TestCase
             ],
             $auditContext->coverage(),
         );
+        self::assertSame(
+            [
+                ['file' => 'src/A.php', 'validated' => true],
+                ['file' => 'src/B.php', 'validated' => true],
+            ],
+            array_map($this->reviewedFindingShape(...), $auditContext->drainReviewedFindings()),
+        );
     }
 
     /**
@@ -2408,6 +2423,13 @@ final class ReviewerAgentTest extends TestCase
                 ['stage' => 'reviewer', 'file' => 'src/F.php', 'status' => 'errored'],
             ],
             $auditContext->coverage(),
+        );
+        self::assertSame(
+            [
+                ['file' => 'src/A.php', 'validated' => true],
+                ['file' => 'src/B.php', 'validated' => true],
+            ],
+            array_map($this->reviewedFindingShape(...), $auditContext->drainReviewedFindings()),
         );
     }
 
@@ -2602,6 +2624,13 @@ final class ReviewerAgentTest extends TestCase
             ],
             $auditContext->coverage(),
         );
+        self::assertSame(
+            [
+                ['file' => 'src/A.php', 'validated' => true],
+                ['file' => 'src/B.php', 'validated' => true],
+            ],
+            array_map($this->reviewedFindingShape(...), $auditContext->drainReviewedFindings()),
+        );
     }
 
     /**
@@ -2667,6 +2696,13 @@ final class ReviewerAgentTest extends TestCase
                 ['stage' => 'reviewer', 'file' => 'src/D.php', 'status' => 'errored'],
             ],
             $auditContext->coverage(),
+        );
+        self::assertSame(
+            [
+                ['file' => 'src/A.php', 'validated' => true],
+                ['file' => 'src/B.php', 'validated' => true],
+            ],
+            array_map($this->reviewedFindingShape(...), $auditContext->drainReviewedFindings()),
         );
     }
 
@@ -3420,6 +3456,10 @@ final class ReviewerAgentTest extends TestCase
             ],
             $auditContext->coverage(),
         );
+        self::assertSame(
+            [['file' => 'src/A.php', 'validated' => true]],
+            array_map($this->reviewedFindingShape(...), $auditContext->drainReviewedFindings()),
+        );
     }
 
     /**
@@ -3482,6 +3522,10 @@ final class ReviewerAgentTest extends TestCase
                 ['stage' => 'reviewer', 'file' => 'src/C.php', 'status' => 'errored'],
             ],
             $auditContext->coverage(),
+        );
+        self::assertSame(
+            [['file' => 'src/A.php', 'validated' => true]],
+            array_map($this->reviewedFindingShape(...), $auditContext->drainReviewedFindings()),
         );
     }
 
@@ -4379,6 +4423,13 @@ final class ReviewerAgentTest extends TestCase
             ],
             $auditContext->coverage(),
         );
+        self::assertSame(
+            [
+                ['file' => 'src/A.php', 'validated' => true],
+                ['file' => 'src/B.php', 'validated' => true],
+            ],
+            array_map($this->reviewedFindingShape(...), $auditContext->drainReviewedFindings()),
+        );
     }
 
     /**
@@ -4442,6 +4493,13 @@ final class ReviewerAgentTest extends TestCase
                 ['stage' => 'reviewer', 'file' => 'src/D.php', 'status' => 'errored'],
             ],
             $auditContext->coverage(),
+        );
+        self::assertSame(
+            [
+                ['file' => 'src/A.php', 'validated' => true],
+                ['file' => 'src/B.php', 'validated' => true],
+            ],
+            array_map($this->reviewedFindingShape(...), $auditContext->drainReviewedFindings()),
         );
     }
 
@@ -4859,6 +4917,14 @@ final class ReviewerAgentTest extends TestCase
         self::assertInstanceOf(ToolRegistry::class, $toolRegistry);
 
         return $toolRegistry;
+    }
+
+    /**
+     * @return array{file: string, validated: bool}
+     */
+    private function reviewedFindingShape(Vulnerability $vulnerability): array
+    {
+        return ['file' => $vulnerability->filePath(), 'validated' => $vulnerability->isReviewerValidated()];
     }
 
     /**

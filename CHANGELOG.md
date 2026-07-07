@@ -200,8 +200,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   threaded into the pipeline (`RunAuditUseCase::execute()` fifth parameter →
   `AuditContext::acceptedFingerprints()`), and `AuditOrchestrator` drops
   matching attacker findings _before_ the review phase — each unique skip
-  streams once as `⚖ ⤳ baseline-accepted <type> — file:line (review skipped)`
-  on a decorated terminal or `[BASELINE-SKIPPED] <type> — file:line` in plain
+  streams once as `⚖ ⤳ baseline-accepted <type> — file:line (review skipped)` on
+  a decorated terminal or `[BASELINE-SKIPPED] <type> — file:line` in plain
   output (new stable progress-event value `baseline.finding.skipped`), and the
   total lands in the `audit.baseline_skipped` context metadata.
   `--generate-baseline` now writes one JSON object per finding — `fingerprint`,
@@ -628,6 +628,41 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A reviewer verdict already produced before a mid-run budget/provider abort
+  was recorded as `validated`/`rejected`/`errored` in `coverage()` but never
+  reached `AuditContext::vulnerabilities()`, so a partial report built after the
+  abort silently dropped confirmed findings the coverage log claimed were
+  there.** The earlier fix that gave every reviewer analyzer an
+  `aborted`/`errored` coverage entry for not-yet-reached findings (see below)
+  only repaired the diagnostic `coverage()` array — persisting a genuine verdict
+  into `AuditContext::vulnerabilities()` still happened exclusively in
+  `AuditOrchestrator::persistReviewedFindings($reviewed, ...)`, called only
+  after `ReviewerAgent::review()` **returns**. When `review()` throws instead —
+  which is exactly the abort case — that call is never reached, so every finding
+  already validated/rejected/errored earlier in the same `review()` call was
+  discarded no matter what `coverage()` said about it.
+  `CoverageRecorderInterface` (`src/Audit/Domain/Pipeline/`) gains
+  `recordReviewedFinding(Vulnerability)`/`drainReviewedFindings(): list<Vulnerability>`,
+  an append-only side channel implemented by `AuditContext` (a real buffer) and
+  `NullCoverageRecorder` (no-op). Every call site that produces a genuine
+  verdict —
+  `ReviewOutcomeRecorder::recordVerdict()`/`recordReviewError()`/`applyResponse()`'s
+  parse-failure branch, and
+  `BatchVerdictApplier::reviewVulnerability()`/`rejectBatch()`/`markBatchErrored()`
+  — now also pushes the verdicted finding into this buffer, covering all five
+  reviewer analyzer strategies (sequential, structured-single, batch,
+  concurrent, structured-concurrent). `AuditOrchestrator::orchestrate()`
+  (`src/Audit/Application/Agent/`) now wraps the `review()` call in a
+  `try`/`catch` for `BudgetExceededException`/`LLMProviderException` and, in the
+  catch block, persists `$auditContext->drainReviewedFindings()` through the
+  existing `persistReviewedFindings()` — preserving its file+type+line-overlap
+  deduplication — before rethrowing. Fixing this also surfaced a pre-existing
+  ambiguity from the earlier fix: `BatchVerdictApplier::markBatchErrored()` was
+  reused both for a genuine (now persisted) per-batch error outcome and for a
+  batch that never got a verdict at all before a provider-exception abort; the
+  abort paths in `BatchReviewAnalyzer` now call a new `markBatchUnreached()`
+  (coverage-only, no persisted verdict), leaving `markBatchErrored()`
+  exclusively for the genuine case.
 - **A column-0 (e.g. a bootstrap script's first line) or tab-indented
   `require`/`require_once`/`include`/`include_once`/`exec`/`rand` line was
   silently elided from a sliced file instead of retained, hiding a real

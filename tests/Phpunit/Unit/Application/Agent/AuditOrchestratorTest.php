@@ -30,11 +30,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCollaborators;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -69,6 +71,8 @@ final class AuditOrchestratorTest extends TestCase
 
     /**
      * @throws InvalidAuditContextException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_skips_audit_when_no_mapping(): void
     {
@@ -89,6 +93,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_runs_attacker_and_reviewer_loop(): void
     {
@@ -113,6 +119,48 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws LLMProviderException
+     */
+    public function test_it_persists_a_finding_validated_before_a_mid_review_budget_abort(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn($this->attackerResponse([
+            $this->vulnPayload(title: 'v1', lineStart: 10, lineEnd: 15),
+            $this->vulnPayload(title: 'v2', lineStart: 30, lineEnd: 40),
+        ]));
+        $callCount = 0;
+        $reviewerLlm->method('complete')->willReturnCallback(function () use (&$callCount): LLMResponse {
+            ++$callCount;
+            if (2 === $callCount) {
+                throw BudgetExceededException::forTokens(500, 100);
+            }
+
+            return $this->reviewerAcceptResponse();
+        });
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping();
+
+        $budgetExceeded = false;
+        try {
+            $auditOrchestrator->orchestrate($auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow BudgetExceededException.');
+        self::assertCount(1, $auditContext->vulnerabilities());
+        self::assertCount(1, $auditContext->validatedVulnerabilities());
+        self::assertSame('v1', current($auditContext->validatedVulnerabilities())->title());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_stops_when_attacker_finds_nothing(): void
     {
@@ -134,6 +182,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_deduplicates_vulnerabilities_across_iterations(): void
     {
@@ -156,6 +206,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_breaks_early_when_iteration_yields_no_new_unique_findings(): void
     {
@@ -178,6 +230,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_filters_low_confidence_findings(): void
     {
@@ -200,6 +254,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_logs_findings_dropped_below_the_confidence_floor(): void
     {
@@ -229,6 +285,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_skips_baseline_accepted_findings_before_the_reviewer(): void
     {
@@ -252,6 +310,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_non_baselined_findings_still_reach_the_reviewer_when_others_are_skipped(): void
     {
@@ -280,6 +340,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_emits_a_progress_event_per_baseline_skipped_finding(): void
     {
@@ -310,6 +372,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_baseline_skip_meta_is_zero_when_no_fingerprints_are_accepted(): void
     {
@@ -329,6 +393,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_stops_after_one_iteration_when_every_finding_is_baseline_accepted(): void
     {
@@ -359,6 +425,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_skips_a_baselined_finding_that_follows_a_non_baselined_one(): void
     {
@@ -387,6 +455,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_forwards_every_non_baselined_finding_when_a_baseline_is_active(): void
     {
@@ -413,6 +483,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_logs_the_skipped_finding_with_its_fingerprint_type_and_file(): void
     {
@@ -447,6 +519,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_stores_audit_metadata_in_context(): void
     {
@@ -469,6 +543,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_runs_exactly_max_iterations_when_new_findings_each_time(): void
     {
@@ -505,6 +581,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_accepts_vulnerability_at_exact_confidence_threshold(): void
     {
@@ -528,6 +606,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_rejects_vulnerability_just_below_confidence_threshold(): void
     {
@@ -550,6 +630,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_deduplicates_by_overlapping_line_ranges(): void
     {
@@ -573,6 +655,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_stores_exact_metadata_values_after_orchestration(): void
     {
@@ -599,6 +683,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_continues_processing_remaining_reviewed_findings_after_duplicate(): void
     {
@@ -627,6 +713,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_lines_overlap_detects_touching_ranges(): void
     {
@@ -655,6 +743,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_lines_overlap_does_not_deduplicate_non_overlapping_ranges(): void
     {
@@ -682,6 +772,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_logs_iteration_complete_with_exact_new_unique_count(): void
     {
@@ -721,6 +813,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_logs_audit_iteration_with_running_index(): void
     {
@@ -753,6 +847,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_logs_attacker_found_no_findings_when_filter_drops_all(): void
     {
@@ -785,6 +881,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_records_only_validated_findings_in_reviewer_accepted_count(): void
     {
@@ -829,6 +927,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_logs_starting_attacker_vs_reviewer_loop_with_max_iterations(): void
     {
@@ -862,6 +962,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_lines_overlap_detects_touching_ranges_on_left_boundary(): void
     {
@@ -886,6 +988,8 @@ final class AuditOrchestratorTest extends TestCase
 
     /**
      * @throws InvalidAuditContextException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_logs_warning_when_no_mapping_available(): void
     {
@@ -907,6 +1011,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_respects_custom_max_iterations(): void
     {
@@ -946,6 +1052,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_respects_custom_min_confidence(): void
     {
@@ -972,6 +1080,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_accepts_vulnerability_at_exact_custom_confidence_threshold(): void
     {
@@ -1001,6 +1111,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_passes_previously_validated_findings_to_next_iteration(): void
     {
@@ -1035,6 +1147,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_passes_only_reviewer_rejected_findings_to_next_iteration(): void
     {
@@ -1079,6 +1193,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_logs_starting_loop_with_custom_max_iterations(): void
     {
@@ -1128,6 +1244,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_reports_each_iteration_start_with_iteration_counts(): void
     {
@@ -1159,6 +1277,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_reports_review_start_with_finding_count(): void
     {
@@ -1189,6 +1309,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      * @throws InvalidTokenUsageException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_reports_audit_started_with_file_and_mapping_counts(): void
     {
@@ -1236,6 +1358,8 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      */
     public function test_it_reports_review_completed_with_accepted_and_rejected_counts(): void
     {

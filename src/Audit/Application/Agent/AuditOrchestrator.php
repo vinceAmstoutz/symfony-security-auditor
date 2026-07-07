@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 use Override;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
@@ -44,6 +46,10 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         private ProgressReporterInterface $progressReporter,
     ) {}
 
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     #[Override]
     public function orchestrate(AuditContext $auditContext): void
     {
@@ -108,7 +114,15 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             $this->progressReporter->report(ProgressEvent::ReviewStarted->value, [
                 'findings' => \count($filtered),
             ]);
-            $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed());
+
+            try {
+                $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed());
+            } catch (BudgetExceededException|LLMProviderException $exception) {
+                $this->persistReviewedFindings($auditContext->drainReviewedFindings(), $auditContext);
+
+                throw $exception;
+            }
+
             $newFindings = $this->persistReviewedFindings($reviewed, $auditContext);
 
             $acceptedCount = \count(array_filter(

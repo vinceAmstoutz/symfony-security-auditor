@@ -49,8 +49,10 @@ final readonly class ReviewOutcomeRecorder
     {
         if (null === $review) {
             ReviewerCoverageRecorder::record($vulnerability, 'rejected', $coverageRecorder, $this->progressReporter);
+            $rejected = $vulnerability->withReviewerValidation(false);
+            $coverageRecorder->recordReviewedFinding($rejected);
 
-            return $vulnerability->withReviewerValidation(false);
+            return $rejected;
         }
 
         $reviewed = $this->verdictApplier->apply($vulnerability, $review);
@@ -60,6 +62,7 @@ final readonly class ReviewOutcomeRecorder
             $coverageRecorder,
             $this->progressReporter,
         );
+        $coverageRecorder->recordReviewedFinding($reviewed);
 
         return $reviewed;
     }
@@ -71,8 +74,10 @@ final readonly class ReviewOutcomeRecorder
             'error' => $throwable->getMessage(),
         ]);
         ReviewerCoverageRecorder::record($vulnerability, 'errored', $coverageRecorder, $this->progressReporter);
+        $errored = $vulnerability->withReviewerValidation(false);
+        $coverageRecorder->recordReviewedFinding($errored);
 
-        return $vulnerability->withReviewerValidation(false);
+        return $errored;
     }
 
     /**
@@ -101,8 +106,10 @@ final readonly class ReviewOutcomeRecorder
                 'content_preview' => substr($llmResponse->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
             ]);
             ReviewerCoverageRecorder::record($vulnerability, 'errored', $coverageRecorder, $this->progressReporter);
+            $errored = $vulnerability->withReviewerValidation(false);
+            $coverageRecorder->recordReviewedFinding($errored);
 
-            return $vulnerability->withReviewerValidation(false);
+            return $errored;
         }
 
         if (null !== $codeContextForCache) {
