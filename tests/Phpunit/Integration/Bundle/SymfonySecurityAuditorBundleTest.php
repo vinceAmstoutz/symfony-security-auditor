@@ -1215,6 +1215,21 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     #[RunInSeparateProcess]
     #[MaximumDuration(500)]
+    public function test_bundle_rejects_max_cost_usd_below_its_minimum(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->boot(['model' => 'gpt-4o', 'audit' => ['budget' => ['max_cost_usd' => 0.0]]]);
+    }
+
+    public function test_bundle_accepts_max_cost_usd_at_its_minimum(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['budget' => ['max_cost_usd' => 0.01]]]);
+
+        self::assertSame(0.01, $containerBuilder->getParameter('symfony_security_auditor.audit.budget.max_cost_usd'));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(500)]
     public function test_bundle_rejects_max_iterations_below_one(): void
     {
         $this->expectException(Throwable::class);

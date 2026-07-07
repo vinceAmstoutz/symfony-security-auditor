@@ -118,13 +118,14 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
             methodLevelIsGranted: $methodLevelIsGranted,
             methodHasDenyAccess: $methodHasDenyAccess,
             classHasIsGranted: $classHasIsGranted,
+            routeName: $routeData['name'],
         );
     }
 
     /**
      * @param array<AttributeGroup> $attributeGroups
      *
-     * @return array{present: bool, path: ?string, methods: list<string>}
+     * @return array{present: bool, path: ?string, methods: list<string>, name: ?string}
      */
     private function extractRouteAttribute(array $attributeGroups): array
     {
@@ -138,18 +139,19 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
             }
         }
 
-        return ['present' => false, 'path' => null, 'methods' => []];
+        return ['present' => false, 'path' => null, 'methods' => [], 'name' => null];
     }
 
     /**
      * @param array<Arg> $args
      *
-     * @return array{present: bool, path: ?string, methods: list<string>}
+     * @return array{present: bool, path: ?string, methods: list<string>, name: ?string}
      */
     private function routeDataFromArgs(array $args): array
     {
         $path = null;
         $methods = [];
+        $name = null;
         $firstPositionalConsumed = false;
         foreach ($args as $arg) {
             $argName = $this->resolveRouteArgName($arg->name?->toString(), $firstPositionalConsumed);
@@ -157,9 +159,10 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
 
             $path = $this->routePathFromArg($argName, $arg, $path);
             $methods = $this->routeMethodsFromArg($argName, $arg) ?? $methods;
+            $name = $this->routeNameFromArg($argName, $arg, $name);
         }
 
-        return ['present' => true, 'path' => $path, 'methods' => $methods];
+        return ['present' => true, 'path' => $path, 'methods' => $methods, 'name' => $name];
     }
 
     private function routePathFromArg(?string $argName, Arg $arg, ?string $currentPath): ?string
@@ -171,16 +174,26 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         return $currentPath;
     }
 
+    private function routeNameFromArg(?string $argName, Arg $arg, ?string $currentName): ?string
+    {
+        if ('name' === $argName && $arg->value instanceof String_) {
+            return $arg->value->value;
+        }
+
+        return $currentName;
+    }
+
     /**
      * @return list<string>|null
      */
     private function routeMethodsFromArg(?string $argName, Arg $arg): ?array
     {
-        if ('methods' === $argName && $arg->value instanceof Array_) {
-            return $this->stringValuesFromArray($arg->value);
-        }
-
-        return null;
+        return match (true) {
+            'methods' !== $argName => null,
+            $arg->value instanceof Array_ => $this->stringValuesFromArray($arg->value),
+            $arg->value instanceof String_ => [$arg->value->value],
+            default => null,
+        };
     }
 
     private function resolveRouteArgName(?string $argName, bool $firstPositionalConsumed): ?string

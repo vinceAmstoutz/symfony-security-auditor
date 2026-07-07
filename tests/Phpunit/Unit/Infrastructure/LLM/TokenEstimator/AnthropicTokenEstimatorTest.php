@@ -31,6 +31,8 @@ final class AnthropicTokenEstimatorTest extends TestCase
         yield 'claude opus' => ['claude-opus-4-7'];
         yield 'claude fable' => ['claude-fable-5'];
         yield 'claude mythos' => ['claude-mythos-5'];
+        yield 'bedrock claude' => ['anthropic.claude-opus-4-8'];
+        yield 'bedrock cross-region claude' => ['us.anthropic.claude-opus-4-8'];
     }
 
     public function test_it_does_not_support_a_non_claude_model(): void
@@ -50,5 +52,6 @@ final class AnthropicTokenEstimatorTest extends TestCase
         yield 'standard claude uses the 3.5 ratio' => ['claude-opus-4-7', 29];
         yield 'creative fable uses the denser 2.7 ratio' => ['claude-fable-5', 38];
         yield 'creative mythos uses the denser 2.7 ratio' => ['claude-mythos-5', 38];
+        yield 'bedrock creative fable uses the denser 2.7 ratio' => ['anthropic.claude-fable-5', 38];
     }
 }

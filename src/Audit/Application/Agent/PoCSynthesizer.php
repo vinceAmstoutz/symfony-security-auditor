@@ -34,6 +34,8 @@ use function Symfony\Component\String\u;
  */
 final readonly class PoCSynthesizer implements PoCSynthesizerInterface
 {
+    private const string NO_POC_SENTINEL = 'NO_POC:';
+
     public function __construct(
         private LLMClientInterface $llmClient,
         private LoggerInterface $logger,
@@ -104,7 +106,7 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
             $response = $this->llmClient->complete($systemPrompt, $userMessage);
             $content = u($response->content())->trim()->toString();
 
-            return '' === $content ? null : $content;
+            return $this->isUsablePoC($content) ? $content : null;
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
@@ -117,6 +119,11 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
 
             return null;
         }
+    }
+
+    private function isUsablePoC(string $content): bool
+    {
+        return '' !== $content && !u($content)->startsWith(self::NO_POC_SENTINEL);
     }
 
     private function buildSystemPrompt(): string

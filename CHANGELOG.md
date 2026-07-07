@@ -628,6 +628,144 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **The console report either crashed outright or silently rendered
+  attacker-influenced text as live terminal markup — including fabricated color
+  codes able to visually mask a critical finding.** `ReportWriter::write()`
+  (`src/Command/ReportWriter.php`) streamed the console format through
+  `SymfonyStyle::writeln($content, OutputInterface::OUTPUT_NORMAL)` while every
+  other format used `OUTPUT_RAW`; `OUTPUT_NORMAL` routes the string through
+  Symfony's console `OutputFormatter`, which interprets any `<tag>`-shaped
+  substring as markup. Finding titles/descriptions/proofs are LLM summaries of
+  the _audited_ codebase's own content, so a vulnerable file that happens to
+  quote something like a `#[AsCommand(help: '...<fg=grey>debug</>...')]` help
+  string (a real, easy `grey`/`gray` typo) made the formatter throw
+  `InvalidArgumentException: Invalid "grey" color`, crashing report generation
+  entirely — the audit succeeds, finds a real critical finding, and the operator
+  gets nothing but a generic failure. Worse, a title containing
+  `</> <fg=green>[report clean]</>` rendered as real green ANSI text overwriting
+  the finding's own title on a TTY, since `ConsoleReportRenderer` never emits
+  genuine Symfony tags itself — every `<...>` in its output is untrusted data.
+  `ReportWriter::write()` now always writes with `OUTPUT_RAW`, regardless of
+  format, so no renderer's content is ever interpreted as console markup.
+- **Auditing a project that lives in a subdirectory of a larger git repository
+  (a monorepo layout) with `--since` silently scanned nothing.**
+  `ProcessGitChangedFilesResolver::changedSince()`
+  (`src/Audit/Infrastructure/Diff/`) ran `git diff --name-only` with the audited
+  project path as the process `cwd`; git resolves relative paths against the
+  **repository root**, not the invocation directory, so the returned paths (e.g.
+  `backend/src/Bar.php`) never matched `ProjectFile::relativePath()`'s
+  project-root-relative paths (e.g. `src/Bar.php`) that
+  `IngestionStage::filterByGitDiff()` compares them against — every changed file
+  was silently dropped from the audit. Both `git diff` invocations now pass
+  `--relative`, which rewrites paths relative to the invocation directory (and,
+  as a side effect, correctly excludes changes outside the audited subtree
+  instead of returning them as noise never matched by any scanned file).
+- **A multi-line method signature or attribute argument list lost its parameter
+  types/names when a large file was sliced for the attacker prompt**, e.g. a
+  parameter typed `AdminOnlyDataMapper $dataMapper` on its own continuation line
+  vanished entirely. `RegexCodeSlicer::slice()`
+  (`src/Audit/Infrastructure/Scan/`) classified every line independently by its
+  own left-trimmed prefix, so only the first physical line of a signature
+  spanning several lines (`public function import(` retained,
+  `Request $request,` / `): Response` elided) was kept — a privilege-relevant
+  parameter type could disappear from what the attacker LLM sees without any
+  visible sign of loss. `slice()` now tracks open-paren depth across lines: a
+  retained line with an unclosed `(` keeps every continuation line until its
+  parentheses close, even when a continuation line matches neither the
+  structural nor the security-token rule on its own.
+- **The `supports_returns_null` static-pre-scan marker missed the single most
+  common shape of the anti-pattern it exists to catch: a `supports()` with an
+  earlier, unrelated guard clause before the `return null;`.**
+  `RegexStaticPreScanner`'s pattern
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) required zero `}`
+  characters between the method's opening brace and `return null;` (`[^}]*`), so
+  any authenticator with a prior `if (...) { return false; }` guard — the
+  idiomatic way to write this exact anti-pattern — broke the match and the
+  marker never fired. The regex now allows up to 500 characters of anything
+  (including nested braces) between the opening brace and `return null;`,
+  catching the guard-clause form the marker was written for.
+- **A route protected by a name-keyed `security.yaml` `access_control` rule
+  (`- { route: admin_dashboard, roles: ROLE_ADMIN }`) was reported to the
+  attacker LLM as `LACKS_ACCESS_CHECK` even though the firewall already covers
+  it**, risking a false-positive `broken_access_control` finding on an
+  already-protected route. `SymfonyYamlSecurityConfigParser` has always recorded
+  route-name-keyed rules under a `route: <name>` map key (`targetOf()`,
+  `src/Audit/Infrastructure/Scan/`), but
+  `SymfonyMappingContextRenderer::firewallRolesForPath()`
+  (`src/Audit/Infrastructure/Prompt/`) only ever tried matching a route's
+  **path** against every map key as a regex — a `route: <name>` key can never
+  match a path pattern, so these rules were parsed but never consulted.
+  `PhpParserControllerAccessControlParser` now also extracts the
+  `#[Route(..., name: '...')]` argument into a new
+  `RouteAccessControl::routeName()`
+  (`src/Audit/Domain/Model/RouteAccessControl.php`, a backward-compatible
+  optional trailing constructor parameter), and the renderer falls back to an
+  exact `route: <name>` map lookup when the path-pattern match finds nothing.
+- **A concurrent chunk that hit a 429 with a long `Retry-After` could have its
+  wait silently shortened by another chunk's shorter `Retry-After`, sending the
+  next request back into the still-active rate limit.**
+  `TokenBucketRateLimiter::pauseUntil()`
+  (`src/Audit/Infrastructure/LLM/RateLimit/`) unconditionally overwrote
+  `$pausedUntil` with whatever target it was last called with, with no regard
+  for a longer pause already in effect — under `attacker_max_concurrent > 1`, a
+  chunk queuing a 5-second `Retry-After` after another chunk had already queued
+  a 300-second one collapsed the effective pause to 5 seconds. `pauseUntil()`
+  now only extends the pause, never shortens an already-established later one.
+- **`Baseline::load()`/`save()` could leak a raw Symfony `IOException` instead
+  of the documented `MalformedBaselineFileException`** on a filesystem-level
+  failure (e.g. the configured baseline path is a directory, or a parent segment
+  of the save path is a plain file blocking directory creation) — an uncaught
+  third-party exception type from a class whose own contract promises a
+  project-defined failure type. `Baseline::load()`/`save()`
+  (`src/Command/Baseline.php`) now also catch
+  `Symfony\Component\Filesystem\Exception\IOException` and wrap it via a new
+  `MalformedBaselineFileException::fromIOException()` factory
+  (`src/Command/Exception/MalformedBaselineFileException.php`).
+- **Token/cost estimation used the wrong, less accurate ratio for Claude models
+  deployed via AWS Bedrock** (`anthropic.claude-opus-4-8`,
+  `us.anthropic.claude-opus-4-8` — both explicitly priced by this project's own
+  `ModelsDevPricingProvider` catalog), silently degrading budget/cost estimates
+  for that deployment even though `CostCalculator::isClaudeModel()` already
+  recognized them correctly via a substring check.
+  `AnthropicTokenEstimator::supports()`
+  (`src/Audit/Infrastructure/LLM/TokenEstimator/`) checked
+  `startsWith('claude-')`, which a Bedrock-qualified ID never satisfies, so
+  `ResolvingTokenEstimator` fell through to the generic 3.2 chars/token fallback
+  instead of Anthropic's dedicated 3.5 (or 2.7 for the `-fable`/ `-mythos`
+  creative variants, which had the identical `startsWith` mismatch in
+  `charsPerToken()`). Both checks now use a substring match, matching
+  `CostCalculator`'s existing, already-correct heuristic.
+- **`PoCSynthesizer` never checked for the `NO_POC:` sentinel its own system
+  prompt instructs the model to emit when a finding cannot be reproduced from
+  outside the running app**, so a well-behaved model response like
+  `NO_POC: internal race condition with no triggerable entrypoint` was attached
+  to the finding via `withSynthesizedPoC()` and rendered in the report as if it
+  were a real reproduction artifact. `PoCSynthesizer::synthesizeOne()`
+  (`src/Audit/Application/Agent/PoCSynthesizer.php`) now treats a response
+  starting with the `NO_POC:` sentinel the same as an empty response — the
+  original attacker `proof` is kept and no synthesized PoC is attached.
+- **`audit.budget.max_cost_usd` accepted `0.0` and negative values at
+  config-validation time, only failing much later — with a different exception
+  type — whenever the `AuditBudget` service was actually resolved**, unlike its
+  sibling `max_tokens` (`->min(1)`), which is rejected immediately at boot with
+  a clear `InvalidConfigurationException`. A broken `max_cost_usd` could
+  therefore pass `cache:warmup` and any other command that never touches the
+  budget service, only surfacing as `InvalidAuditBudgetException` from deep
+  inside the audit loop. `AuditConfigurationDefinition`
+  (`src/Audit/Infrastructure/Config/AuditConfigurationDefinition.php`) now
+  declares `->min(0.01)` on the `max_cost_usd` node, so an invalid value is
+  rejected at the same config-validation stage as every other budget/rate-limit
+  minimum.
+- **`#[Route(methods: 'DELETE')]`'s single-string form — valid per the `Route`
+  attribute's own `array|string $methods` signature — yielded an empty
+  `routeMethods()` list, rendered to the attacker LLM as `ANY` instead of
+  `DELETE`.** `PhpParserControllerAccessControlParser::routeMethodsFromArg()`
+  (`src/Audit/Infrastructure/Scan/`) only handled the array form
+  (`methods: ['DELETE']`); the single-string form fell through to `null` and the
+  route's actual HTTP-method restriction was lost from the "Route Access-Control
+  Map" the attacker cross-references for verb-tampering findings.
+  `routeMethodsFromArg()` now also recognizes a bare `String_` value and wraps
+  it into a single-element list.
 - **A reviewer-cache lookup or store crashed the entire audit run instead of
   degrading a single finding, whenever a finding's `vulnerable_code`,
   `description`, or `proof` contained non-UTF-8 bytes** (e.g. an LLM echoing a

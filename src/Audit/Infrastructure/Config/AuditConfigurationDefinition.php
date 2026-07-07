@@ -291,6 +291,7 @@ final readonly class AuditConfigurationDefinition
                                 ->end()
                                 ->floatNode('max_cost_usd')
                                     ->defaultNull()
+                                    ->min(0.01)
                                     ->info('Maximum estimated cost (USD) before the audit aborts. Computed via the configured `PricingProviderInterface`. `null` (default) = unlimited.')
                                 ->end()
                             ->end()

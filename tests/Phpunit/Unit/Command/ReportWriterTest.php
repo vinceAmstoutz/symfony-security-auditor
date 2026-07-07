@@ -124,6 +124,30 @@ final class ReportWriterTest extends TestCase
     /**
      * @throws UnsupportedOutputFormatException
      * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_console_output_renders_finding_text_literally_instead_of_as_console_markup(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'Finding </> <fg=green>[report clean]</>', 0.9),
+            new CodeLocation('src/A.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'quoted from source: <fg=grey>debug</>', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+        $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->reportWriter->write($this->makeReport($vulnerability), OutputFormat::Console, null, $symfonyStyle);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('Finding </> <fg=green>[report clean]</>', $display);
+        self::assertStringContainsString('quoted from source: <fg=grey>debug</>', $display);
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
      */
     public function test_writing_html_format_streams_an_html_document(): void
     {

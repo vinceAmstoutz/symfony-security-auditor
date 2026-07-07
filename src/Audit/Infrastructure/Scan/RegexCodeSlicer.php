@@ -33,6 +33,11 @@ use function Symfony\Component\String\u;
  *     access, Doctrine query builder, unserialize, shell exec, mailer setters,
  *     HttpClient request, weak crypto, …).
  *
+ * A retained line with an unclosed `(` (a multi-line method signature or
+ * attribute argument list) keeps every continuation line until its
+ * parentheses close, even if a continuation line matches neither rule on its
+ * own — otherwise parameter types/names would be silently dropped mid-signature.
+ *
  * Because elided lines are replaced one-for-one (never removed), the file's
  * total line count is preserved and the attacker prompt's `line_start` /
  * `line_end` numbering protocol stays accurate against the original source.
@@ -158,8 +163,14 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         }
 
         $output = [];
+        $openParenDepth = 0;
         foreach (explode("\n", $projectFile->content()) as $line) {
-            $output[] = $this->shouldRetain($line) ? $line : self::ELIDED_PLACEHOLDER;
+            $retain = $openParenDepth > 0 || $this->shouldRetain($line);
+            $output[] = $retain ? $line : self::ELIDED_PLACEHOLDER;
+
+            if ($retain) {
+                $openParenDepth = max(0, $openParenDepth + $this->parenDelta($line));
+            }
         }
 
         return implode("\n", $output);
@@ -195,5 +206,10 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         }
 
         return 1 === preg_match(self::BARE_KEYWORD_PATTERN, $line);
+    }
+
+    private function parenDelta(string $line): int
+    {
+        return substr_count($line, '(') - substr_count($line, ')');
     }
 }

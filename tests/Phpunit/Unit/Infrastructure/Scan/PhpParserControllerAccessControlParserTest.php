@@ -68,6 +68,48 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_extracts_the_route_name(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/dashboard', name: 'admin_dashboard')]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('admin_dashboard', $entries[0]->routeName());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_extracts_a_single_string_methods_value(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/users/{id}', methods: 'DELETE')]
+                public function deleteUser(int $id): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['DELETE'], $entries[0]->routeMethods());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_method_level_is_granted(): void
     {
         $source = <<<'PHP'

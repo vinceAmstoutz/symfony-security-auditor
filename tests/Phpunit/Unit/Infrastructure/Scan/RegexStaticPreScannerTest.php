@@ -486,6 +486,24 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    public function test_it_flags_supports_returning_null_after_an_earlier_guard_clause(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/LoginAuthenticator.php',
+            '/app/src/Security/LoginAuthenticator.php',
+            "\n<?php\nclass LoginAuthenticator {\n    public function supports(Request \$request): ?bool\n    {\n        if (!\$request->hasSession()) {\n            return false;\n        }\n\n        if (!\$request->attributes->has('_login')) {\n            return null;\n        }\n\n        return true;\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('supports_returns_null', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_http_client_request_split_across_lines(): void
     {
         $projectFile = ProjectFile::create(

@@ -72,6 +72,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
@@ -359,6 +360,7 @@ final class AuditCommandEndToEndTest extends TestCase
 
     /**
      * @throws InvalidTokenUsageException
+     * @throws MalformedBaselineFileException
      */
     public function test_generate_baseline_collects_every_finding_even_when_a_baseline_is_already_configured(): void
     {
@@ -390,6 +392,7 @@ final class AuditCommandEndToEndTest extends TestCase
 
     /**
      * @throws InvalidTokenUsageException
+     * @throws MalformedBaselineFileException
      */
     public function test_baseline_reports_the_exact_number_of_suppressed_findings(): void
     {
@@ -424,6 +427,7 @@ final class AuditCommandEndToEndTest extends TestCase
 
     /**
      * @throws InvalidTokenUsageException
+     * @throws MalformedBaselineFileException
      */
     public function test_cli_baseline_option_overrides_the_configured_baseline_path(): void
     {

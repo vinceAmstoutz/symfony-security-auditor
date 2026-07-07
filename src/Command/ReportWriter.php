@@ -52,8 +52,10 @@ final readonly class ReportWriter implements ReportWriterInterface
         $content = $this->renderContent($outputFormat, $auditReport, $baselinedFingerprints);
 
         if (null === $outputFile) {
-            // OUTPUT_RAW keeps markup-lookalike text in finding titles out of the console formatter.
-            $symfonyStyle->writeln($content, OutputFormat::Console === $outputFormat ? OutputInterface::OUTPUT_NORMAL : OutputInterface::OUTPUT_RAW);
+            // OUTPUT_RAW keeps markup-lookalike text in finding titles/proofs out of the console
+            // formatter for every format, including console: no renderer emits real Symfony tags,
+            // so any `<...>` in that content is untrusted data from the audited codebase, not markup.
+            $symfonyStyle->writeln($content, OutputInterface::OUTPUT_RAW);
 
             return;
         }

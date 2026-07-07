@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 
 /**
@@ -87,7 +88,7 @@ final readonly class SymfonyMappingContextRenderer
                 $checks[] = 'body:denyAccessUnlessGranted()';
             }
 
-            $checkLabel = self::checkLabelFor($checks, $routeAccessControl->routePath(), $routeAccessMap);
+            $checkLabel = self::checkLabelFor($checks, $routeAccessControl, $routeAccessMap);
             $lines[] = \sprintf('- %s %s — %s::%s — %s', $methods, $path, $routeAccessControl->filePath(), $routeAccessControl->methodName(), $checkLabel);
         }
 
@@ -98,13 +99,14 @@ final readonly class SymfonyMappingContextRenderer
      * @param list<string>                $checks
      * @param array<string, list<string>> $routeAccessMap
      */
-    private static function checkLabelFor(array $checks, ?string $routePath, array $routeAccessMap): string
+    private static function checkLabelFor(array $checks, RouteAccessControl $routeAccessControl, array $routeAccessMap): string
     {
         if ([] !== $checks) {
             return implode(' + ', $checks);
         }
 
-        $firewallRoles = self::firewallRolesForPath($routePath, $routeAccessMap);
+        $firewallRoles = self::firewallRolesForPath($routeAccessControl->routePath(), $routeAccessMap)
+            ?? self::firewallRolesForRouteName($routeAccessControl->routeName(), $routeAccessMap);
         if (null !== $firewallRoles) {
             return \sprintf('COVERED_BY access_control[%s]', implode(',', $firewallRoles));
         }
@@ -135,5 +137,24 @@ final readonly class SymfonyMappingContextRenderer
         }
 
         return null;
+    }
+
+    /**
+     * Returns the roles of the `security.yaml` `access_control` rule keyed by
+     * `route: <name>` — {@see SymfonyYamlSecurityConfigParser::targetOf()} —
+     * matching this route's name, or null when the route has no name or no
+     * such rule exists.
+     *
+     * @param array<string, list<string>> $routeAccessMap
+     *
+     * @return list<string>|null
+     */
+    private static function firewallRolesForRouteName(?string $routeName, array $routeAccessMap): ?array
+    {
+        if (null === $routeName) {
+            return null;
+        }
+
+        return $routeAccessMap[\sprintf('route: %s', $routeName)] ?? null;
     }
 }

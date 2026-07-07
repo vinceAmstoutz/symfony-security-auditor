@@ -382,6 +382,33 @@ final class TokenBucketRateLimiterTest extends TestCase
      * @throws InvalidRateLimiterConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
+    public function test_a_shorter_pause_does_not_shrink_an_already_established_longer_pause(): void
+    {
+        $mockClock = new MockClock('2026-01-01T12:00:00+00:00');
+        $sleeper = $this->createRecordingSleeper($mockClock);
+
+        $tokenBucketRateLimiter = new TokenBucketRateLimiter(
+            rateLimitConfiguration: new RateLimitConfiguration(
+                requestsPerMinute: 100,
+                inputTokensPerMinute: null,
+                outputTokensPerMinute: null,
+            ),
+            clock: $this->boundedClock($mockClock),
+            sleeper: $sleeper,
+        );
+
+        $tokenBucketRateLimiter->pauseUntil(new DateTimeImmutable('2026-01-01T12:05:00+00:00'));
+        $tokenBucketRateLimiter->pauseUntil(new DateTimeImmutable('2026-01-01T12:00:05+00:00'));
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
+
+        self::assertSame([300_000], $sleeper->sleepsMs);
+    }
+
+    /**
+     * @throws RateLimitRequestTooLargeException
+     * @throws InvalidRateLimiterConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_pause_resumes_into_capacity_check_and_consumes_quota(): void
     {
         $mockClock = new MockClock('2026-01-01T12:00:00+00:00');

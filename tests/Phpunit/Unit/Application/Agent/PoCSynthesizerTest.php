@@ -142,6 +142,32 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_keeps_original_when_llm_declines_with_the_no_poc_sentinel(): void
+    {
+        $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH)->withReviewerValidation(true);
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::of(
+            'NO_POC: internal race condition with no triggerable entrypoint',
+            'test',
+            'end_turn',
+            TokenUsageSnapshot::of(0, 0),
+        ));
+
+        $poCSynthesizer = new PoCSynthesizer($llmClient, new NullLogger());
+
+        $enriched = $poCSynthesizer->synthesize([$vulnerability]);
+
+        self::assertNull($enriched[0]->synthesizedPoC());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws LLMProviderException
      */
     public function test_it_keeps_original_when_llm_throws_generic_exception(): void
     {

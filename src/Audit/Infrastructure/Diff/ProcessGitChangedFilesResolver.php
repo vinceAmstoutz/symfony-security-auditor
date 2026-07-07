@@ -27,19 +27,24 @@ use function Symfony\Component\String\u;
  *
  * Resolves the set of changed files via two git invocations:
  *
- *   1. `git diff --name-only --diff-filter=ACMR <ref>...HEAD`
+ *   1. `git diff --relative --name-only --diff-filter=ACMR <ref>...HEAD`
  *      — committed changes that diverge from the ref's merge base. The triple
  *      dot semantics handle topic branches diverged from the ref correctly:
  *      only changes ON the branch are returned, not changes the ref accrued
  *      since branch point.
  *
- *   2. `git diff --name-only --diff-filter=ACMR HEAD`
+ *   2. `git diff --relative --name-only --diff-filter=ACMR HEAD`
  *      — uncommitted changes against HEAD: staged changes (including files
  *      already `git add`ed) plus unstaged edits to already-tracked files.
  *      `git diff` never reports genuinely untracked files (ones never staged
  *      at all) — those are invisible to this resolver. Merged into the result
  *      so a local dev running `audit:run --since=main` sees their staged and
  *      already-tracked in-flight work too.
+ *
+ * `--relative` rewrites paths relative to `$projectPath` instead of the git
+ * root, and excludes changes outside it — required so the result lines up
+ * with `ProjectFile::relativePath()` when the audited project is a
+ * subdirectory of a larger repository (a monorepo layout).
  *
  * Both lists are merged, deduplicated, and returned in deterministic order.
  */
@@ -63,8 +68,8 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
             throw GitChangedFilesUnavailableException::forUnknownRef($ref, $projectPath);
         }
 
-        $committed = $this->runGit($projectPath, ['diff', '--name-only', '--diff-filter=ACMR', \sprintf('%s...HEAD', $ref)]);
-        $uncommitted = $this->runGit($projectPath, ['diff', '--name-only', '--diff-filter=ACMR', 'HEAD']);
+        $committed = $this->runGit($projectPath, ['diff', '--relative', '--name-only', '--diff-filter=ACMR', \sprintf('%s...HEAD', $ref)]);
+        $uncommitted = $this->runGit($projectPath, ['diff', '--relative', '--name-only', '--diff-filter=ACMR', 'HEAD']);
 
         return $this->mergeAndNormalize([...$committed, ...$uncommitted]);
     }

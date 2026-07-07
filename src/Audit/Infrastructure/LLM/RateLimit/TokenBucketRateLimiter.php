@@ -156,6 +156,11 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
     #[Override]
     public function pauseUntil(DateTimeImmutable $until): void
     {
+        $pausedUntil = $this->pausedUntil;
+        if ($pausedUntil instanceof DateTimeImmutable && $pausedUntil > $until) {
+            return;
+        }
+
         $this->pausedUntil = $until;
     }
 

@@ -235,7 +235,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'SelfValidatingPassport — skips credential check; verify the flow is OAuth/token, not password',
             ],
             'supports_returns_null' => [
-                'regex' => '/public\s+function\s+supports\s*\([^)]*\)\s*:\s*\??bool\s*\{[^}]*return\s+null\s*;/s',
+                'regex' => '/public\s+function\s+supports\s*\([^)]*\)\s*:\s*\??bool\s*\{[\s\S]{0,500}?return\s+null\s*;/s',
                 'description' => 'supports() returning null — Symfony treats null as "supports", silently letting non-matching paths through',
             ],
         ],

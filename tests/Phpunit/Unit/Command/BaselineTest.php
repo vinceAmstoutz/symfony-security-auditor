@@ -79,6 +79,9 @@ final class BaselineTest extends TestCase
         self::assertSame(['SSA-CORRECTED', 'SSA-ORIGINAL', 'SSA-PLAIN'], $baseline->load($path));
     }
 
+    /**
+     * @throws MalformedBaselineFileException
+     */
     public function test_save_writes_pretty_printed_json(): void
     {
         $path = $this->tmpDir.'/baseline.json';
@@ -179,6 +182,32 @@ final class BaselineTest extends TestCase
         $this->expectException(MalformedBaselineFileException::class);
 
         (new Baseline($this->filesystem))->load($path);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_load_wraps_an_io_failure_as_a_malformed_baseline_file_exception(): void
+    {
+        $path = $this->tmpDir.'/unreadable-dir';
+        $this->filesystem->mkdir($path);
+
+        $this->expectException(MalformedBaselineFileException::class);
+
+        (new Baseline($this->filesystem))->load($path);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_save_wraps_an_io_failure_as_a_malformed_baseline_file_exception(): void
+    {
+        $blockingFile = $this->tmpDir.'/not-a-directory';
+        $this->filesystem->dumpFile($blockingFile, 'x');
+
+        $this->expectException(MalformedBaselineFileException::class);
+
+        (new Baseline($this->filesystem))->save($blockingFile.'/baseline.json', [$this->entry('SSA-AAA')]);
     }
 
     /**

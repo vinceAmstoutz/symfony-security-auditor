@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use JsonException;
 use Override;
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 
@@ -43,6 +44,8 @@ final readonly class Baseline implements BaselineInterface
             $decoded = json_decode($this->filesystem->readFile($path), true, flags: \JSON_THROW_ON_ERROR);
         } catch (JsonException $jsonException) {
             throw MalformedBaselineFileException::fromJsonException($path, $jsonException);
+        } catch (IOException $ioException) {
+            throw MalformedBaselineFileException::fromIOException($path, $ioException);
         }
 
         if (!\is_array($decoded)) {
@@ -72,13 +75,20 @@ final readonly class Baseline implements BaselineInterface
         return \is_string($attackerFingerprint) ? $attackerFingerprint : null;
     }
 
+    /**
+     * @throws MalformedBaselineFileException
+     */
     #[Override]
     public function save(string $path, array $entries): void
     {
-        $this->filesystem->dumpFile(
-            $path,
-            json_encode($entries, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR).\PHP_EOL,
-        );
+        try {
+            $this->filesystem->dumpFile(
+                $path,
+                json_encode($entries, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR).\PHP_EOL,
+            );
+        } catch (IOException $ioException) {
+            throw MalformedBaselineFileException::fromIOException($path, $ioException);
+        }
     }
 
     /**

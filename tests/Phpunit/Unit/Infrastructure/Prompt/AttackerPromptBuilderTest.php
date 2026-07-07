@@ -132,6 +132,42 @@ final class AttackerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_route_without_attribute_check_is_marked_covered_when_a_route_name_access_control_matches(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/AdminController.php',
+            '/app/src/Controller/AdminController.php',
+            '<?php class AdminController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'dashboard',
+            routePath: '/admin/dashboard',
+            routeMethods: ['GET'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+            routeName: 'admin_dashboard',
+        );
+
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(
+                routeAccessMap: ['route: admin_dashboard' => ['ROLE_ADMIN']],
+                routeAccessControls: [$routeAccessControl],
+            ),
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('COVERED_BY access_control[ROLE_ADMIN]', $message);
+        self::assertStringNotContainsString('LACKS_ACCESS_CHECK', $message);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_route_without_attribute_check_still_lacks_when_no_firewall_access_control_matches(): void
     {
         $projectFile = ProjectFile::create(

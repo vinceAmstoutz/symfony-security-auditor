@@ -43,6 +43,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
@@ -74,6 +75,7 @@ final class AuditCommandSarifBaselineSuppressionTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws MalformedBaselineFileException
      */
     public function test_sarif_format_renders_a_baselined_finding_with_a_suppression_entry(): void
     {
@@ -113,6 +115,7 @@ final class AuditCommandSarifBaselineSuppressionTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws MalformedBaselineFileException
      */
     public function test_json_format_still_drops_the_same_baselined_finding(): void
     {

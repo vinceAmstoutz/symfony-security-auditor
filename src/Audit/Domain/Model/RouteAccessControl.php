@@ -28,6 +28,7 @@ final readonly class RouteAccessControl
         private array $methodLevelIsGranted,
         private bool $methodHasDenyAccess,
         private bool $classHasIsGranted,
+        private ?string $routeName = null,
     ) {}
 
     public function filePath(): string
@@ -43,6 +44,11 @@ final readonly class RouteAccessControl
     public function routePath(): ?string
     {
         return $this->routePath;
+    }
+
+    public function routeName(): ?string
+    {
+        return $this->routeName;
     }
 
     /**

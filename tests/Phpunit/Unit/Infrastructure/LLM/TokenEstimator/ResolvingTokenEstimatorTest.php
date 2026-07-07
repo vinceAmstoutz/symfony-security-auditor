@@ -34,6 +34,8 @@ final class ResolvingTokenEstimatorTest extends TestCase
         yield 'claude routes to anthropic' => ['claude-opus-4-7', 29];
         yield 'claude fable routes to anthropic creative ratio' => ['claude-fable-5', 38];
         yield 'claude mythos routes to anthropic creative ratio' => ['claude-mythos-5', 38];
+        yield 'bedrock claude routes to anthropic' => ['anthropic.claude-opus-4-8', 29];
+        yield 'bedrock cross-region claude routes to anthropic' => ['us.anthropic.claude-opus-4-8', 29];
         yield 'gpt routes to openai' => ['gpt-4o', 25];
         yield 'o3 routes to openai' => ['o3', 25];
         yield 'o4 routes to openai' => ['o4-mini', 25];

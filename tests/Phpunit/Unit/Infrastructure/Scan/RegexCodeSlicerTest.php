@@ -164,6 +164,46 @@ final class RegexCodeSlicerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_multiline_method_signature_parameters_are_retained(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function import(\n"
+            ."        Request \$request,\n"
+            ."        AdminOnlyDataMapper \$dataMapper\n"
+            ."    ): Response\n"
+            ."    {\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('Request $request,', $sliced);
+        self::assertStringContainsString('AdminOnlyDataMapper $dataMapper', $sliced);
+        self::assertStringContainsString('): Response', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_line_after_a_closed_multiline_signature_is_still_elided(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function import(\n"
+            ."        Request \$request\n"
+            ."    ): Response\n"
+            ."    {\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_inert_line_resembling_keyword_mid_line_is_elided(): void
     {
         // A comment mentioning "namespace"/"class" mid-line must NOT be treated as

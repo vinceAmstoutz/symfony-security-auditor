@@ -179,7 +179,25 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         // throwing. Any mutation that breaks that detection makes this throw.
         $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir.'/src', 'main');
 
-        self::assertContains('src/sub/Bar.php', $changed);
+        self::assertContains('sub/Bar.php', $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_excludes_a_changed_file_outside_the_audited_subdirectory(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // initial', 'init');
+        $this->createBranch('feature');
+        $this->commit('src/Bar.php', '<?php // new', 'add bar');
+        $this->commit('other/Outside.php', '<?php // outside audited dir', 'add outside');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir.'/src', 'main');
+
+        self::assertContains('Bar.php', $changed);
+        self::assertNotContains('Outside.php', $changed);
+        self::assertNotContains('../other/Outside.php', $changed);
     }
 
     /**
