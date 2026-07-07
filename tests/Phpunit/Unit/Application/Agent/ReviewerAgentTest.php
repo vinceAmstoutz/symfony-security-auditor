@@ -38,6 +38,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassif
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
@@ -2746,6 +2747,46 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_concurrent_review_errors_a_single_finding_instead_of_crashing_the_run_when_recording_its_verdict_throws(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+        $second = $this->makeVulnerabilityAt('src/B.php');
+
+        $llmClient = self::createStub(BatchCapableLLMClientInterface::class);
+        $llmClient->method('completeBatch')->willReturnCallback(
+            static fn (array $requests): array => array_map(
+                static fn (): LLMResponse => LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)),
+                $requests,
+            ),
+        );
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                new NullLogger(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+            ),
+        );
+
+        $result = $reviewerAgent->review([$vulnerability, $second], [], $this->coverageRecorderThrowingOnValidated('src/B.php'));
+
+        self::assertCount(2, $result);
+        self::assertSame('src/A.php', $result[0]->filePath());
+        self::assertTrue($result[0]->isReviewerValidated());
+        self::assertSame('src/B.php', $result[1]->filePath());
+        self::assertFalse($result[1]->isReviewerValidated());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      * @throws InvalidTokenUsageException
      * @throws InvalidToolRegistryException
      */
@@ -4692,6 +4733,50 @@ final class ReviewerAgentTest extends TestCase
      * @throws LLMProviderException
      * @throws InvalidToolRegistryException
      */
+    public function test_structured_concurrent_reviews_preserve_an_earlier_findings_verdict_when_recording_a_later_findings_verdict_throws_in_the_same_window(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+        $second = $this->makeVulnerabilityAt('src/B.php');
+
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests) use ($vulnerability, $second): array {
+                self::registryOf($requests[0])->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
+                self::registryOf($requests[1])->execute('record_review', ['id' => $second->id(), 'accepted' => true]);
+
+                return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
+            });
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+                useStructuredCollection: true,
+            ),
+        );
+
+        $result = $reviewerAgent->review([$vulnerability, $second], [], $this->coverageRecorderThrowingOnValidated('src/B.php'));
+
+        self::assertCount(2, $result);
+        self::assertSame('src/A.php', $result[0]->filePath());
+        self::assertTrue($result[0]->isReviewerValidated());
+        self::assertSame('src/B.php', $result[1]->filePath());
+        self::assertFalse($result[1]->isReviewerValidated());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
     public function test_structured_concurrent_reviews_propagate_llm_provider_exceptions(): void
     {
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
@@ -5313,6 +5398,25 @@ final class ReviewerAgentTest extends TestCase
     private function reviewedFindingShape(Vulnerability $vulnerability): array
     {
         return ['file' => $vulnerability->filePath(), 'validated' => $vulnerability->isReviewerValidated()];
+    }
+
+    private function coverageRecorderThrowingOnValidated(string $filePath): CoverageRecorderInterface
+    {
+        $hasThrown = false;
+        $coverageRecorder = self::createStub(CoverageRecorderInterface::class);
+        $coverageRecorder->method('recordCoverage')->willReturnCallback(
+            static function (string $stage, string $recordedFilePath, string $status) use ($filePath, &$hasThrown): void {
+                if ($hasThrown || $filePath !== $recordedFilePath) {
+                    return;
+                }
+
+                $hasThrown = true;
+
+                throw new RuntimeException('coverage sink unavailable');
+            },
+        );
+
+        return $coverageRecorder;
     }
 
     /**

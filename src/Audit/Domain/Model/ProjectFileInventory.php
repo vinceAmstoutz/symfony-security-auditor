@@ -110,8 +110,9 @@ final readonly class ProjectFileInventory
 
     public function hasVoterForEntity(string $entityName): bool
     {
+        $pattern = \sprintf('/\b%s\b/', preg_quote($entityName, '/'));
         foreach ($this->byRole['voters'] as $voter) {
-            if (str_contains($voter->content(), $entityName)) {
+            if (1 === preg_match($pattern, $voter->content())) {
                 return true;
             }
         }

@@ -150,6 +150,21 @@ final class ReadFileToolTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_execute_truncation_does_not_split_a_multi_byte_character_straddling_the_limit(): void
+    {
+        $content = str_repeat('a', self::MAX_BYTES - 1).'é'.str_repeat('b', 100);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+        $readFileTool = new ReadFileTool([$projectFile]);
+
+        $result = $readFileTool->execute(['relative_path' => 'src/Big.php']);
+
+        [$truncatedContent] = explode("\n\n... [truncated to ", $result);
+        self::assertTrue(mb_check_encoding($truncatedContent, 'UTF-8'));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_does_not_truncate_when_file_fits_in_limit(): void
     {
         $smallContent = str_repeat('x', 1024);

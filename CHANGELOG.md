@@ -2580,6 +2580,89 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   not the schema. Both renderers now pass `JSON_PRESERVE_ZERO_FRACTION`
   (`src/Audit/Infrastructure/Report/JsonReportRenderer.php`,
   `src/Audit/Infrastructure/Report/SarifReportRenderer.php`).
+- **`ReviewerMessageRenderer`'s confidence percentage used a bare
+  `sprintf('...%.2f', ...)`, rendering a locale-dependent decimal separator** —
+  the same bug class fixed elsewhere, missed here because it lives in a
+  reviewer-facing prompt template rather than an exception message. Both the
+  single-finding and batch heredoc templates
+  (`src/Audit/Infrastructure/Prompt/Reviewer/ReviewerMessageRenderer.php`) now
+  use `number_format($data['confidence'], 2, '.', '')`.
+- **`AuditContext::forProject('/')` collapsed the filesystem root to an empty
+  project path.** `rtrim($projectPath, '/')` on an all-slash input consumes
+  every character, since the entire string is in the trim charlist — even though
+  `is_dir('/')` legitimately passes upstream validation. `forProject()`
+  (`src/Audit/Domain/Model/AuditContext.php`) now falls back to `'/'` when the
+  trimmed result is empty.
+- **`ProjectFileInventory::hasVoterForEntity()` matched an entity name as an
+  unanchored substring, so a voter written only for `AdminUser` was misreported
+  as also covering the unrelated `User` entity** (`User` is a literal substring
+  of `AdminUserVoter`/`AdminUser`). `hasVoterForEntity()`
+  (`src/Audit/Domain/Model/ProjectFileInventory.php`) now matches with `\b` word
+  boundaries via `preg_match()` instead of `str_contains()`.
+- **`ReadFileTool` could truncate a file exactly mid multi-byte UTF-8
+  character**, producing invalid UTF-8 in the truncated tool response — a
+  byte-offset `substr()` has no awareness of character boundaries. `execute()`
+  (`src/Audit/Infrastructure/Tool/ReadFileTool.php`) now truncates with
+  `mb_strcut()`, which backs off to the nearest character boundary.
+- **`RegexCodeSlicer`'s multi-line-signature continuation tracking permanently
+  defeated elision for the rest of the file when a continuation line contained a
+  `//` comment with an apostrophe** (e.g. `int $id, // don't remove this`) — the
+  comment's apostrophe was indistinguishable from a genuine unterminated string
+  open, latching `openStringDelimiter` onto a quote that no later line ever
+  closes, so every remaining line was force-retained instead of elided,
+  defeating the token-cost reduction the slicer exists for. `parenDelta()` now
+  strips a trailing `//` comment via the new `stripTrailingComment()`
+  (`src/Audit/Infrastructure/Scan/RegexCodeSlicer.php`) before scanning for a
+  dangling quote — truncating unconditionally at the first `//` is still correct
+  for a genuine unterminated string containing `//` (e.g. a URL split across
+  lines), since its opening quote sits before the `//` and is unaffected by the
+  truncation.
+- **A non-transient LLM provider failure (auth error, retired model) that struck
+  after a concurrent tool-using conversation had already executed a tool call
+  was silently swallowed into an empty `empty_content` response instead of
+  surfacing, producing a false-negative SAFE result** —
+  `ToolConversationWavefront` cannot restart such a conversation from scratch
+  (that would execute the tool a second time), but the recovery path caught
+  every retry failure indiscriminately, including one the retry seam had already
+  classified as non-transient and therefore guaranteed to repeat.
+  `retryOrAbortConversation()`
+  (`src/Audit/Infrastructure/LLM/ToolConversationWavefront.php`) now rethrows a
+  `NonTransientLLMFailureException` instead of finalizing it, but only once a
+  tool has actually run — a conversation that hasn't still falls back to the
+  proven sequential `completeWithTools()` restart, which already classifies and
+  handles the failure correctly on its own.
+- **`ConcurrentReviewAnalyzer` and `ConcurrentStructuredReviewAnalyzer` crashed
+  the entire reviewer pass, or clobbered an already-correct sibling verdict in
+  the same window, whenever recording one finding's verdict threw** (e.g. a
+  custom `ReviewerCacheInterface`/`CoverageRecorderInterface` implementation
+  raising an I/O error) — the per-finding verdict-recording loop for a
+  successfully-dispatched batch sat outside any per-entry error boundary, so one
+  entry's failure either propagated uncaught past every layer that only catches
+  `BudgetExceededException`/`LLMProviderException` (crashing `audit:run` with no
+  report at all), or, in the structured-collection variant, triggered a
+  batch-wide recovery pass that re-drained every sibling's already-emptied
+  session and downgraded its correct verdict to errored.
+  `applyResponseOrRecordError()`
+  (`src/Audit/Application/Agent/Review/ConcurrentReviewAnalyzer.php`) and
+  `recordPendingVerdictOrError()`
+  (`src/Audit/Application/Agent/Review/ConcurrentStructuredReviewAnalyzer.php`)
+  now isolate each finding's post-dispatch recording to that finding alone,
+  mirroring `SequentialReviewAnalyzer`'s existing per-finding isolation.
+- **A reviewer- or attacker-cache write failure discarded an already-confirmed
+  finding instead of merely failing to cache it** —
+  `ReviewOutcomeRecorder:: applyResponse()` and the chunk analyzers'
+  `finalize()` methods parsed/drained the finding's data, then called the
+  cache's `store()` before converting that data into the finding actually
+  returned to the caller; a `store()` exception therefore unwound past the
+  conversion step, losing a finding whose only problem was an unrelated
+  cache-write error. `ReviewerVerdictCache::store()`
+  (`src/Audit/Application/Agent/Review/ReviewerVerdictCache.php`) and
+  `AttackerChunkCache::store()`
+  (`src/Audit/Application/Agent/Chunk/AttackerChunkCache.php`) now catch and log
+  a store failure instead of propagating it, matching the exception-safety the
+  default `FilesystemReviewerCache`/`FilesystemAttackerCache` implementations
+  already provide for their own I/O — now guaranteed for any custom cache
+  implementation too.
 
 ### Security
 
@@ -2705,6 +2788,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) now treat a
   backslash-escaped character as part of the value instead of a candidate
   closing quote.
+- **`RegexSecretScrubber`'s `multiline_assignment` pattern had the same
+  backslash-escaped-quote blind spot as `env_assignment`/`inline_assignment`
+  above, missed in that fix's own sweep because it lives in a separate pattern**
+  — a secret wrapped onto the next line with an escaped quote inside it (e.g.
+  `password:\n  "abcd\"efgh"`) redacted only the portion before the escaped
+  quote, leaking the rest verbatim to the LLM provider. The
+  `multiline_assignment` value capture
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) now uses the
+  same escape-aware capture as its same-line siblings.
+- **`MarkdownReportRenderer` spliced a finding's `title` directly into a
+  single-line `###` heading with no surrounding code fence or paragraph break to
+  contain it, so an embedded newline in the title could forge a fake heading or
+  horizontal rule as unguarded top-level Markdown** — unlike
+  `description`/`attack_vector`/`remediation`, which are legitimately
+  multi-paragraph and rendered inside a fenced/quoted block, a heading has no
+  such containment. `vulnerability()` now runs the title through a new
+  `escapeHeading()`
+  (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`), which
+  collapses embedded newlines to spaces before the existing fence-escaping runs
+  — `description` and friends keep their newlines, since those fields are meant
+  to be multi-paragraph.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

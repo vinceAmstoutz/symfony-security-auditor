@@ -219,6 +219,23 @@ final class SymfonyMappingTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_does_not_match_an_entity_name_that_is_only_a_substring_of_an_unrelated_identifier(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/AdminUserVoter.php',
+            '/app/src/Security/AdminUserVoter.php',
+            '<?php class AdminUserVoter extends Voter { protected function supports(string $attribute, mixed $subject): bool { return $subject instanceof AdminUser; } }',
+        );
+
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['voters' => [$projectFile]]), new AccessControlMap());
+
+        self::assertFalse($symfonyMapping->hasVoterForEntity('User'));
+        self::assertTrue($symfonyMapping->hasVoterForEntity('AdminUser'));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_finds_controllers_without_security_annotations(): void
     {
         $projectFile = ProjectFile::create(

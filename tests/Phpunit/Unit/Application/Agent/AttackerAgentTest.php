@@ -2918,15 +2918,6 @@ final class AttackerAgentTest extends TestCase
     {
         $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];
 
-        $cache = $this->createMock(AttackerCacheInterface::class);
-        $cache->method('get')->willReturn(null);
-        $cache->method('store')->willReturnCallback(static function (array $chunk): void {
-            $failingChunk = $chunk[0] instanceof ProjectFile && 'src/B.php' === $chunk[0]->relativePath();
-            if ($failingChunk) {
-                throw new RuntimeException('disk full');
-            }
-        });
-
         $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
         $llmClient
             ->expects(self::once())
@@ -2939,9 +2930,46 @@ final class AttackerAgentTest extends TestCase
             });
 
         $auditContext = AuditContext::forProject($this->tmpDir);
-        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient, $cache);
+        $coverageRecorder = new class($auditContext) implements CoverageRecorderInterface {
+            public function __construct(private AuditContext $auditContext) {}
 
-        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+            #[Override]
+            public function recordCoverage(string $stage, string $filePath, string $status): void
+            {
+                if ('src/B.php' === $filePath && 'analyzed' === $status) {
+                    throw new RuntimeException('coverage sink unavailable');
+                }
+
+                $this->auditContext->recordCoverage($stage, $filePath, $status);
+            }
+
+            #[Override]
+            public function recordReviewedFinding(Vulnerability $vulnerability): void
+            {
+                $this->auditContext->recordReviewedFinding($vulnerability);
+            }
+
+            #[Override]
+            public function drainReviewedFindings(): array
+            {
+                return $this->auditContext->drainReviewedFindings();
+            }
+
+            #[Override]
+            public function recordFoundVulnerability(Vulnerability $vulnerability): void
+            {
+                $this->auditContext->recordFoundVulnerability($vulnerability);
+            }
+
+            #[Override]
+            public function drainFoundVulnerabilities(): array
+            {
+                return $this->auditContext->drainFoundVulnerabilities();
+            }
+        };
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient);
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $coverageRecorder);
 
         self::assertSame(['finding-a'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
         self::assertSame(

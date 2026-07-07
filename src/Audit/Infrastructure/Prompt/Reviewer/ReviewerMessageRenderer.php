@@ -53,7 +53,7 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
                 %s
 
                 ### Confidence
-                %.2f
+                %s
 
                 ## Full File Context
                 <file path="%s">
@@ -74,7 +74,7 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
             $this->escapeFences($data['attack_vector']),
             $this->escapeFences($data['proof']),
             $this->escapeFences($data['remediation']),
-            $data['confidence'],
+            number_format($data['confidence'], 2, '.', ''),
             $filePath,
             $this->numberLines($codeContext),
             $this->singleClosingInstruction($useStructuredCollection),
@@ -120,7 +120,7 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
                     %s
 
                     #### Confidence
-                    %.2f
+                    %s
 
                     #### Full File Context
                     <file path="%s">
@@ -140,7 +140,7 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
                 $this->escapeFences($data['attack_vector']),
                 $this->escapeFences($data['proof']),
                 $this->escapeFences($data['remediation']),
-                $data['confidence'],
+                number_format($data['confidence'], 2, '.', ''),
                 $filePath,
                 $this->numberLines($codeContext),
             );

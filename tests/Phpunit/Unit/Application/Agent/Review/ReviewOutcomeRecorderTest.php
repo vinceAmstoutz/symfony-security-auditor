@@ -21,16 +21,20 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewOu
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\StructuredReviewCollectionSession;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\VerdictApplier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
 
@@ -118,6 +122,33 @@ final class ReviewOutcomeRecorderTest extends TestCase
 
         self::assertNotNull($result);
         self::assertTrue($result->isReviewerValidated());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_apply_response_still_applies_the_verdict_when_the_cache_store_throws(): void
+    {
+        $reviewerCache = self::createStub(ReviewerCacheInterface::class);
+        $reviewerCache->method('store')->willThrowException(new RuntimeException('disk full'));
+
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder(
+            new VerdictApplier(new NullLogger()),
+            new ReviewerVerdictCache($reviewerCache, new NullLogger()),
+            new NullLogger(),
+            self::createStub(ProgressReporterInterface::class),
+        );
+
+        $vulnerability = $reviewOutcomeRecorder->applyResponse(
+            $this->vulnerability(),
+            LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)),
+            new NullCoverageRecorder(),
+            'code-context',
+        );
+
+        self::assertTrue($vulnerability->isReviewerValidated());
     }
 
     private function expectingReviewedEvent(bool $accepted): ProgressReporterInterface

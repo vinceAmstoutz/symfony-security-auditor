@@ -101,6 +101,16 @@ final class AuditContextTest extends TestCase
 
     /**
      * @throws InvalidAuditContextException
+     */
+    public function test_the_filesystem_root_does_not_collapse_to_an_empty_project_path(): void
+    {
+        $auditContext = AuditContext::forProject('/');
+
+        self::assertSame('/', $auditContext->projectPath());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      */
     public function test_it_accepts_and_returns_project_files(): void

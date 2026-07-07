@@ -31,6 +31,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 
 /**
  * Runs every tool-using conversation in a concurrency window as a wavefront:
@@ -41,11 +42,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Miss
  * per-round invocations overlap on the wire. Any dispatch or resolution
  * failure first retries the same conversation through
  * `RetryingPlatformInvoker` — the same classify-then-retry-or-fail seam the
- * sequential path uses. Only once that retry is exhausted or the failure is
- * non-transient does it give up: a conversation that hasn't run a tool yet
- * falls back to the proven sequential completeWithTools() path (full restart);
- * one that already ran a tool cannot restart from scratch without executing
- * it twice, so it finalizes as an empty `empty_content` response instead.
+ * sequential path uses. Once that retry gives up, a conversation that hasn't
+ * run a tool yet always falls back to the proven sequential
+ * completeWithTools() path (full restart) — safe to retry from scratch
+ * regardless of why the retry failed. One that already ran a tool cannot
+ * restart without executing it twice, so it finalizes as an empty
+ * `empty_content` response instead — unless the retry's own failure was
+ * classified non-transient, which is rethrown instead of masked, per the LLM
+ * seam's contract that non-transient provider failures must never be
+ * swallowed into a false-negative SAFE result.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -72,6 +77,7 @@ final readonly class ToolConversationWavefront
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
      */
     public function resolveToolWindow(array $window, int $maxToolIterations): array
     {
@@ -120,6 +126,7 @@ final readonly class ToolConversationWavefront
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
      */
     private function runWavefrontRound(PlatformInterface $platform, array $states, array $window, int $maxToolIterations): array
     {
@@ -195,6 +202,7 @@ final readonly class ToolConversationWavefront
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
      */
     private function advanceConversation(array $state, ?DeferredResult $deferredResult, array $request, int $maxToolIterations): array
     {
@@ -267,10 +275,13 @@ final readonly class ToolConversationWavefront
     /**
      * Retries a failed dispatch/resolution through the same
      * classify-then-retry-or-fail seam the sequential path uses. Falls back to
-     * `abortConversation()` only once that retry itself fails — which restarts
+     * `abortConversation()` once that retry itself fails — which restarts
      * from scratch via completeWithTools() for a conversation that hasn't run
      * a tool yet, or finalizes as `empty_content` for one that has (it cannot
-     * restart without executing that tool a second time).
+     * restart without executing that tool a second time). The one exception:
+     * a tool-ran conversation whose retry failure is classified non-transient
+     * is rethrown rather than finalized, since a restart can't happen and
+     * masking the failure would produce a false-negative SAFE result.
      *
      * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
      * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
@@ -279,6 +290,7 @@ final readonly class ToolConversationWavefront
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
      */
     private function retryOrAbortConversation(array $state, array $request, int $maxToolIterations): array
     {
@@ -286,6 +298,12 @@ final readonly class ToolConversationWavefront
 
         try {
             $deferredResult = $this->retryingPlatformInvoker->invoke($state['bag'], $state['options'], $estimatedInputTokens);
+        } catch (NonTransientLLMFailureException $nonTransientLLMFailureException) {
+            if ($state['toolsRan']) {
+                throw $nonTransientLLMFailureException;
+            }
+
+            return $this->abortConversation($state, $request, $maxToolIterations);
         } catch (Throwable) {
             return $this->abortConversation($state, $request, $maxToolIterations);
         }

@@ -184,18 +184,27 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     {
         try {
             $this->toolBatchCapableLLMClient->completeBatchWithTools($concurrentReviewBatch->requests, $this->maxConcurrent, $this->maxToolIterations);
-
-            foreach ($concurrentReviewBatch->pendingIndexes as $index) {
-                $reviewed[$index] = $this->recordPendingVerdict($index, $concurrentReviewBatch, $coverageRecorder, $bypassCache);
-            }
-
-            return $reviewed;
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
             throw $llmProviderException;
         } catch (Throwable $exception) {
             return $this->recordPendingErrors($concurrentReviewBatch, $exception, $coverageRecorder, $reviewed);
+        }
+
+        foreach ($concurrentReviewBatch->pendingIndexes as $index) {
+            $reviewed[$index] = $this->recordPendingVerdictOrError($index, $concurrentReviewBatch, $coverageRecorder, $bypassCache);
+        }
+
+        return $reviewed;
+    }
+
+    private function recordPendingVerdictOrError(int $index, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): Vulnerability
+    {
+        try {
+            return $this->recordPendingVerdict($index, $concurrentReviewBatch, $coverageRecorder, $bypassCache);
+        } catch (Throwable $throwable) {
+            return $this->recoveredOrErroredVerdict($index, $concurrentReviewBatch, $throwable, $coverageRecorder);
         }
     }
 

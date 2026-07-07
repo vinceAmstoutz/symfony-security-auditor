@@ -47,7 +47,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]*://)[^:@/\s]*:[^/\s]+@~i',
         SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|DSN)(?:_[A-Z0-9]+)*)\s*=[ \t]*(?!\s*\n)(?:(["\'])(?:\\\\.|[^"\'\n])*\2|\S+)/m',
         SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|[^"\'\n]){4,})\2|([^"\'\s]\S{3,}(?:[ \t]+[A-Za-z0-9]+)*))/i',
-        SecretPatternLabel::MultilineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])([^"\'\n]{4,})\2/mi',
+        SecretPatternLabel::MultilineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|[^"\'\n]){4,})\2/mi',
     ];
 
     /**

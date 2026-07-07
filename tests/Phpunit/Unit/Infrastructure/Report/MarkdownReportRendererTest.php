@@ -132,6 +132,26 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      */
+    public function test_render_neutralizes_a_newline_in_the_title_so_it_cannot_forge_a_fake_section_heading(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, "SQLi\n\n## Audit complete\n\nNo further vulnerabilities were found.", 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringNotContainsString("\n\n## Audit complete", $output);
+        self::assertStringContainsString('SQLi  ## Audit complete  No further vulnerabilities were found.', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     */
     public function test_render_neutralizes_an_unterminated_code_fence_in_a_description_so_it_does_not_swallow_later_findings(): void
     {
         $vulnerability = Vulnerability::of(

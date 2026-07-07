@@ -54,6 +54,46 @@ final class ReviewerMessageRendererTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */
+    public function test_render_single_formats_confidence_with_a_period_regardless_of_the_process_numeric_locale(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/Foo.php');
+
+        $previousLocale = setlocale(\LC_NUMERIC, '0');
+        setlocale(\LC_NUMERIC, 'de_DE.UTF-8');
+
+        try {
+            $rendered = $this->reviewerMessageRenderer->renderSingle($vulnerability, 'line one', true);
+        } finally {
+            setlocale(\LC_NUMERIC, false !== $previousLocale ? $previousLocale : 'C');
+        }
+
+        self::assertStringContainsString('0.90', $rendered);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_render_batch_formats_confidence_with_a_period_regardless_of_the_process_numeric_locale(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/Foo.php');
+
+        $previousLocale = setlocale(\LC_NUMERIC, '0');
+        setlocale(\LC_NUMERIC, 'de_DE.UTF-8');
+
+        try {
+            $rendered = $this->reviewerMessageRenderer->renderBatch([$vulnerability], [$vulnerability->id() => 'line one'], true);
+        } finally {
+            setlocale(\LC_NUMERIC, false !== $previousLocale ? $previousLocale : 'C');
+        }
+
+        self::assertStringContainsString('0.90', $rendered);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_render_single_neutralizes_a_file_path_that_would_break_out_of_the_file_tag(): void
     {
         $maliciousFilePath = 'src/Foo.php">'

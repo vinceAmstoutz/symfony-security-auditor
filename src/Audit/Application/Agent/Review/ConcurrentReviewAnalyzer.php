@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BatchCapableLLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 
 /**
@@ -170,10 +171,22 @@ final readonly class ConcurrentReviewAnalyzer
 
         $reviewed = [];
         foreach ($pendingWindow as $position => $entry) {
-            $reviewed[$entry['index']] = $this->reviewOutcomeRecorder->applyResponse($entry['vulnerability'], $responses[$position], $coverageRecorder, $entry['cacheContext']);
+            $reviewed[$entry['index']] = $this->applyResponseOrRecordError($entry, $responses[$position], $coverageRecorder);
         }
 
         return $reviewed;
+    }
+
+    /**
+     * @param array{index: int, vulnerability: Vulnerability, cacheContext: string|null} $entry
+     */
+    private function applyResponseOrRecordError(array $entry, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    {
+        try {
+            return $this->reviewOutcomeRecorder->applyResponse($entry['vulnerability'], $llmResponse, $coverageRecorder, $entry['cacheContext']);
+        } catch (Throwable $throwable) {
+            return $this->reviewOutcomeRecorder->recordReviewError($entry['vulnerability'], $throwable, $coverageRecorder);
+        }
     }
 
     /**

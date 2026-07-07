@@ -78,7 +78,7 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
     private function vulnerability(Vulnerability $vulnerability): string
     {
         return implode("\n", [
-            \sprintf('### %s — %s', $vulnerability->severity()->label(), $this->escapeFences($vulnerability->title())),
+            \sprintf('### %s — %s', $vulnerability->severity()->label(), $this->escapeHeading($vulnerability->title())),
             '',
             \sprintf('- **Type:** `%s` (%s, %s)', $vulnerability->type()->value, $vulnerability->type()->owaspReference(), $vulnerability->type()->cwe()->label()),
             \sprintf('- **Location:** %s', $this->inlineCode(\sprintf('%s:%d-%d', $vulnerability->filePath(), $vulnerability->lineStart(), $vulnerability->lineEnd()))),
@@ -110,6 +110,17 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
     private function escapeFences(string $text): string
     {
         return str_replace(['`', '~', '<', '>'], ['\\`', '\\~', '&lt;', '&gt;'], $text);
+    }
+
+    /**
+     * A finding's title is spliced directly into a single-line `###` heading,
+     * with no surrounding code fence or paragraph break to contain it — an
+     * embedded newline could forge a fake heading or horizontal rule as
+     * unguarded top-level Markdown right where the title was expected.
+     */
+    private function escapeHeading(string $text): string
+    {
+        return $this->escapeFences(str_replace(["\r\n", "\r", "\n"], ' ', $text));
     }
 
     /**

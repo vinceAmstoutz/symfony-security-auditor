@@ -81,8 +81,10 @@ final class AuditContext implements CoverageRecorderInterface
             throw InvalidAuditContextException::forInvalidProjectPath($projectPath);
         }
 
+        $trimmedProjectPath = rtrim($projectPath, '/');
+
         return new self(
-            projectPath: rtrim($projectPath, '/'),
+            projectPath: '' === $trimmedProjectPath ? '/' : $trimmedProjectPath,
             auditId: \sprintf('AUDIT-%s', strtoupper(bin2hex(random_bytes(4)))),
             scanPaths: $scanPaths,
             cacheBypassed: $cacheBypassed,

@@ -248,6 +248,7 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         }
 
         $withoutStringLiterals = preg_replace(self::STRING_LITERAL_PATTERN, '', $line) ?? $line;
+        $withoutStringLiterals = $this->stripTrailingComment($withoutStringLiterals);
 
         $danglingQuoteOffset = $this->danglingQuoteOffset($withoutStringLiterals);
         $nextOpenStringDelimiter = null;
@@ -279,5 +280,23 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         }
 
         return $matches[0][1];
+    }
+
+    /**
+     * An apostrophe inside a `//` line comment (e.g. `// don't remove this`)
+     * is indistinguishable from a genuine unterminated string open once
+     * {@see self::STRING_LITERAL_PATTERN} has already stripped every complete
+     * same-line pair — left unhandled, {@see self::danglingQuoteOffset()}
+     * would latch onto it and desync paren tracking for the rest of the file.
+     * Truncating unconditionally at the first `//` is still correct for a
+     * genuine unterminated string containing `//` (e.g. a URL split across
+     * lines, `'http://`): its opening quote sits before the `//` and survives
+     * the truncation, so {@see self::danglingQuoteOffset()} still finds it.
+     */
+    private function stripTrailingComment(string $text): string
+    {
+        $commentOffset = strpos($text, '//');
+
+        return false === $commentOffset ? $text : substr($text, 0, $commentOffset);
     }
 }

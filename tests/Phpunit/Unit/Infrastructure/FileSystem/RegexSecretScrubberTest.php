@@ -285,6 +285,13 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame($input, $output);
     }
 
+    public function test_a_value_wrapped_to_the_next_line_containing_an_escaped_quote_is_fully_redacted(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("password:\n  \"abcd\\\"efgh\"\n");
+
+        self::assertSame("password:\n\"***REDACTED:multiline_assignment***\"\n", $output);
+    }
+
     public function test_redacting_a_value_wrapped_to_the_next_line_preserves_the_total_line_count(): void
     {
         $input = "\$config = [\n    'password' =>\n        'SuperSecretValue1234',\n];";

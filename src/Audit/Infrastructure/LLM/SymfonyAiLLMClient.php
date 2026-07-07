@@ -228,6 +228,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
      */
     #[Override]
     public function completeBatchWithTools(array $requests, int $maxConcurrent, int $maxToolIterations): array
