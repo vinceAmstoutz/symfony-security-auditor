@@ -2198,6 +2198,67 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   list to write now, so the two call sites cannot drift out of sync again. New
   `test_bundle_wires_escalation_attacker_agent_from_the_same_argument_shape_as_the_primary_one`
   asserts both definitions produce the identical argument shape.
+- **`PhpParserFormBindingParser` missed every `$this?->createForm(...)` call
+  site written with the nullsafe operator**, silently under-reporting form
+  bindings for a controller action that guards the call with `?->` (e.g. after a
+  nullable service lookup). `bindingsForMethod()`
+  (`src/Audit/Infrastructure/Scan/PhpParserFormBindingParser.php`) only searched
+  for `PhpParser\Node\Expr\MethodCall` nodes; `$this?->createForm(...)` parses
+  to a sibling `NullsafeMethodCall` node, a different class entirely (not a
+  subclass), so it was invisible to the scan. A new `createFormCallSites()`
+  helper now merges `NodeFinder::findInstanceOf()` results for both node
+  classes, sorted back into source order by token position, and
+  `isThisCreateFormCall()`/`resolveFirstArgumentClassName()` accept either type.
+- **`FileChunker`'s feature-matching picked the first matching feature name
+  instead of the most specific one, so a controller whose name is a prefix of
+  another feature (e.g. `UserAddressController` alongside `UserController`) was
+  silently absorbed into the shorter, unrelated feature's chunk instead of
+  getting its own.** `findFeatureForFile()`
+  (`src/Audit/Application/Agent/Chunking/FileChunker.php`) returned as soon as
+  any `$featureNames` entry matched; it now scans every match and keeps the
+  longest (most specific) one.
+- **`FileChunker`'s CamelCase feature-boundary check used `ctype_upper()` on a
+  raw UTF-8 byte, so a feature boundary starting with a non-ASCII uppercase
+  letter (e.g. French `É`) was never recognized, splitting genuinely-related
+  files into separate chunks.** `baseNameStartsAtFeatureBoundary()` now compares
+  the first Unicode grapheme's `symfony/string` `upper()`/`lower()` forms
+  instead of checking a single byte, matching multibyte uppercase letters
+  correctly.
+- **`ChunkContextFactory::sliceChunk()` rebuilt a sliced file via
+  `ProjectFile::create()`, which reclassifies `fileType()` from the _sliced_
+  content — so a component only detected by a content marker (e.g. a voter
+  matched via `implements VoterInterface`, not by path) silently downgraded to a
+  plain PHP file the moment `CodeSlicer` elided the telltale line, losing its
+  surface-specific attacker prompt guidance for that chunk.** A new
+  `ProjectFile::withContent()` (`src/Audit/Domain/Model/ProjectFile.php`) copies
+  a file with new content while preserving the original `fileType()`;
+  `sliceChunk()` now uses it instead of reclassifying.
+- **`ConcurrentChunkAnalyzer::dispatchWindow()` finalized every entry in a
+  window with no per-entry isolation, so one entry's `finalize()` failure (e.g.
+  an `AttackerChunkCache::store()` I/O error) discarded the entire window's
+  already-computed results — including sibling chunks that had already finalized
+  successfully — via the outer `catch (Throwable)` in `dispatchInWindows()`,
+  which marks every entry in the current window as `errored`.** A new
+  `finalizeOrRecordErrored()` helper
+  (`src/Audit/Application/Agent/Chunk/ConcurrentChunkAnalyzer.php`) now wraps
+  each entry's `finalize()` call individually, mirroring
+  `SequentialChunkAnalyzer`'s existing per-chunk isolation — a sibling entry
+  that already finalized keeps its result.
+- **`BaselineProcessor::entriesFor()` deduplicated baseline entries by
+  `fingerprint()` alone, so two distinct findings that happen to share a
+  post-review fingerprint (e.g. one reviewer-corrected onto the same
+  type/file/title as an untouched finding) silently overwrote each other, losing
+  the discarded entry's `attacker_fingerprint` and, with it, its pre-review
+  cache/baseline skip on the next run.** `entriesFor()`
+  (`src/Command/BaselineProcessor.php`) now keys by `fingerprint()` combined
+  with `attackerFingerprint()`, so both entries survive whenever their
+  attacker-reported identity differs.
+- **The HTML report's summary table applied a `severity-*` class to each row
+  with no matching CSS rule, so the class had no visual effect at all** — only
+  `article.severity-*` (used by the per-finding cards) was styled;
+  `table.summary tr.severity-*` was never defined.
+  `src/Audit/Infrastructure/Report/Template/report.html` now styles each summary
+  row with the same severity color, applied as a left border on its `<th>`.
 
 ### Security
 

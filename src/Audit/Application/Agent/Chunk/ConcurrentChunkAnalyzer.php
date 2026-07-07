@@ -20,7 +20,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
@@ -66,7 +65,6 @@ final readonly class ConcurrentChunkAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
-     * @throws InvalidProjectFileException
      * @throws InvalidToolRegistryException
      */
     public function analyze(array $chunks, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, RiskMarkerIndex $riskMarkerIndex, ?ToolRegistry $toolRegistry = null): array
@@ -253,10 +251,32 @@ final readonly class ConcurrentChunkAnalyzer
 
         $results = [];
         foreach ($window as $index => $entry) {
-            $results[$index] = $this->finalize($entry, $coverageRecorder);
+            $results[$index] = $this->finalizeOrRecordErrored($entry, $coverageRecorder);
         }
 
         return $results;
+    }
+
+    /**
+     * Isolates a single entry's `finalize()` failure (e.g. a cache-store I/O
+     * error) to that entry alone, mirroring `SequentialChunkAnalyzer`'s
+     * per-chunk isolation — a sibling entry in the same window that already
+     * finalized successfully must keep its result.
+     *
+     * @param array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession, systemPrompt: string, userMessage: string} $entry
+     */
+    private function finalizeOrRecordErrored(array $entry, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
+    {
+        try {
+            return $this->finalize($entry, $coverageRecorder);
+        } catch (Throwable $throwable) {
+            $this->logger->warning('Finalizing an attacker chunk result failed; the chunk is recorded as errored and its siblings in the same window are preserved.', [
+                'error' => $throwable->getMessage(),
+            ]);
+            ChunkCoverageRecorder::record($entry['chunk'], 'errored', $coverageRecorder);
+
+            return $this->vulnerabilityFactory->fromList([]);
+        }
     }
 
     /**

@@ -18,6 +18,7 @@ use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\NullsafeMethodCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
@@ -125,8 +126,7 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
         }
 
         $bindings = [];
-        $methodCalls = $nodeFinder->findInstanceOf($body, MethodCall::class);
-        foreach ($methodCalls as $methodCall) {
+        foreach ($this->createFormCallSites($body, $nodeFinder) as $methodCall) {
             if (!$this->isThisCreateFormCall($methodCall)) {
                 continue;
             }
@@ -142,7 +142,24 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
         return $bindings;
     }
 
-    private function isThisCreateFormCall(MethodCall $methodCall): bool
+    /**
+     * @param array<Node> $body
+     *
+     * @return list<MethodCall|NullsafeMethodCall>
+     */
+    private function createFormCallSites(array $body, NodeFinder $nodeFinder): array
+    {
+        $methodCalls = [
+            ...$nodeFinder->findInstanceOf($body, MethodCall::class),
+            ...$nodeFinder->findInstanceOf($body, NullsafeMethodCall::class),
+        ];
+
+        usort($methodCalls, static fn (MethodCall|NullsafeMethodCall $a, MethodCall|NullsafeMethodCall $b): int => $a->getStartTokenPos() <=> $b->getStartTokenPos());
+
+        return $methodCalls;
+    }
+
+    private function isThisCreateFormCall(MethodCall|NullsafeMethodCall $methodCall): bool
     {
         if (!$methodCall->name instanceof Identifier) {
             return false;
@@ -155,7 +172,7 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
         return $methodCall->var instanceof Variable && 'this' === $methodCall->var->name;
     }
 
-    private function resolveFirstArgumentClassName(MethodCall $methodCall): ?string
+    private function resolveFirstArgumentClassName(MethodCall|NullsafeMethodCall $methodCall): ?string
     {
         $typeArgument = $this->typeArgument(array_values($methodCall->args));
         if (!$typeArgument instanceof Arg) {

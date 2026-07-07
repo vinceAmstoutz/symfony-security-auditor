@@ -571,6 +571,36 @@ final class ProjectFileTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_with_content_preserves_the_original_file_type_even_when_the_new_content_would_classify_differently(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/AccessChecker.php',
+            '/app/src/Security/AccessChecker.php',
+            '<?php class AccessChecker implements VoterInterface {}',
+        );
+        self::assertSame(ProjectFileType::VOTER, $projectFile->fileType());
+
+        $sliced = $projectFile->withContent('<?php // elided');
+
+        self::assertSame(ProjectFileType::VOTER, $sliced->fileType());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_with_content_replaces_the_content_and_recomputes_line_count(): void
+    {
+        $projectFile = ProjectFile::create('src/Foo.php', '/app/src/Foo.php', '<?php');
+
+        $sliced = $projectFile->withContent("<?php\n// elided\n");
+
+        self::assertSame("<?php\n// elided\n", $sliced->content());
+        self::assertSame(3, $sliced->linesCount());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_security_annotations(): void
     {
         $projectFile = ProjectFile::create(

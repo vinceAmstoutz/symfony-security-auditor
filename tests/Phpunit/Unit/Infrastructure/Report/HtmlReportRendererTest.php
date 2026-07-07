@@ -140,6 +140,20 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      */
+    public function test_render_styles_every_summary_row_severity_class(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        foreach (VulnerabilitySeverity::cases() as $severity) {
+            self::assertStringContainsString('table.summary tr.severity-'.$severity->value, $output);
+        }
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     */
     public function test_render_escapes_finding_content_to_prevent_report_xss(): void
     {
         $vulnerability = Vulnerability::of(

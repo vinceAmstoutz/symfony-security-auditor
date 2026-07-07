@@ -16,7 +16,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
@@ -40,8 +39,6 @@ final readonly class ChunkContextFactory
 
     /**
      * @param list<ProjectFile> $chunk
-     *
-     * @throws InvalidProjectFileException
      */
     public function create(array $chunk, AttackerAnalysisRequest $attackerAnalysisRequest, RiskMarkerIndex $riskMarkerIndex, bool $cacheIsContextAware): ChunkContext
     {
@@ -121,8 +118,6 @@ final readonly class ChunkContextFactory
      * @param list<ProjectFile> $chunk
      *
      * @return list<ProjectFile>
-     *
-     * @throws InvalidProjectFileException
      */
     private function sliceChunk(array $chunk): array
     {
@@ -136,11 +131,7 @@ final readonly class ChunkContextFactory
                 continue;
             }
 
-            $sliced[] = ProjectFile::create(
-                relativePath: $file->relativePath(),
-                absolutePath: $file->absolutePath(),
-                content: $newContent,
-            );
+            $sliced[] = $file->withContent($newContent);
         }
 
         return $sliced;

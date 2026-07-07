@@ -61,6 +61,23 @@ final readonly class ProjectFile
         return $this->content;
     }
 
+    /**
+     * Preserves the original `fileType()` instead of reclassifying — a
+     * `CodeSlicer`-elided version of a content-detected component (e.g. a
+     * voter matched via `implements VoterInterface`) must not lose its type
+     * just because the slicer dropped the telltale line.
+     */
+    public function withContent(string $content): self
+    {
+        return new self(
+            relativePath: $this->relativePath,
+            absolutePath: $this->absolutePath,
+            content: $content,
+            projectFileType: $this->projectFileType,
+            linesCount: substr_count($content, "\n") + 1,
+        );
+    }
+
     public function type(): string
     {
         return $this->projectFileType->value;

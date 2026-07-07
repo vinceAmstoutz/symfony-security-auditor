@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking;
 
+use Symfony\Component\String\UnicodeString;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 
@@ -212,13 +213,18 @@ final readonly class FileChunker
         $baseName = basename(basename($projectFile->relativePath(), '.php'), '.twig');
         $relativePath = $projectFile->relativePath();
 
+        $matchedFeature = null;
         foreach ($featureNames as $featureName) {
-            if ($this->fileBelongsToFeature($baseName, $relativePath, $featureName)) {
-                return $featureName;
+            if (!$this->fileBelongsToFeature($baseName, $relativePath, $featureName)) {
+                continue;
+            }
+
+            if (null === $matchedFeature || \strlen($featureName) > \strlen($matchedFeature)) {
+                $matchedFeature = $featureName;
             }
         }
 
-        return null;
+        return $matchedFeature;
     }
 
     private function fileBelongsToFeature(string $baseName, string $relativePath, string $featureName): bool
@@ -242,9 +248,17 @@ final readonly class FileChunker
             return false;
         }
 
-        $remainder = u($baseName)->slice(u($featureName)->length())->toString();
+        $remainder = u($baseName)->slice(u($featureName)->length());
+        if (0 === $remainder->length()) {
+            return true;
+        }
 
-        return '' === $remainder || ctype_upper($remainder[0]);
+        return $this->isUppercaseLetter($remainder->slice(0, 1));
+    }
+
+    private function isUppercaseLetter(UnicodeString $unicodeString): bool
+    {
+        return $unicodeString->upper()->equalsTo($unicodeString) && !$unicodeString->lower()->equalsTo($unicodeString);
     }
 
     private function priority(ProjectFile $projectFile): int

@@ -69,13 +69,21 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
     }
 
     /**
+     * Deduplicates by `fingerprint()` + `attackerFingerprint()` combined —
+     * not `fingerprint()` alone — so two distinct findings that happen to
+     * share a post-review fingerprint (e.g. one reviewer-corrected onto the
+     * same type/file/title as an untouched finding) each keep their own
+     * baseline entry instead of one silently overwriting the other's
+     * `attacker_fingerprint`.
+     *
      * @return list<array<string, string>>
      */
     private function entriesFor(AuditReport $auditReport): array
     {
         $entries = [];
         foreach ($auditReport->vulnerabilities() as $vulnerability) {
-            $entries[$vulnerability->fingerprint()] = $this->entryFor($vulnerability);
+            $key = \sprintf('%s|%s', $vulnerability->fingerprint(), $vulnerability->attackerFingerprint());
+            $entries[$key] = $this->entryFor($vulnerability);
         }
 
         return array_values($entries);

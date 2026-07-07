@@ -21,7 +21,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
@@ -64,7 +63,6 @@ final readonly class SequentialChunkAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
-     * @throws InvalidProjectFileException
      */
     public function analyze(array $chunks, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, RiskMarkerIndex $riskMarkerIndex): array
     {
@@ -141,7 +139,6 @@ final readonly class SequentialChunkAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
-     * @throws InvalidProjectFileException
      */
     private function analyzeChunk(array $chunk, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry, RiskMarkerIndex $riskMarkerIndex): VulnerabilityHydrationResult
     {

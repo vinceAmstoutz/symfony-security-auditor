@@ -128,6 +128,36 @@ final class BaselineProcessorTest extends TestCase
         self::assertSame(1, $count);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     */
+    public function test_generate_keeps_separate_entries_for_two_findings_that_share_a_fingerprint_but_have_different_attacker_fingerprints(): void
+    {
+        $vulnerability = $this->makeVuln('src/A.php');
+        $correctedFromSsrf = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SSRF, VulnerabilitySeverity::HIGH, 'Finding src/A.php', 0.9),
+            new CodeLocation('src/A.php', 20, 25),
+            new VulnerabilityNarrative('desc2', 'vec2', 'proof2', 'fix2'),
+            'code2',
+        )->withReviewerValidation(true)->withCorrectedType(VulnerabilityType::SQL_INJECTION);
+
+        self::assertSame($vulnerability->fingerprint(), $correctedFromSsrf->fingerprint());
+        self::assertNotSame($vulnerability->attackerFingerprint(), $correctedFromSsrf->attackerFingerprint());
+
+        $auditReport = $this->makeReport($vulnerability, $correctedFromSsrf);
+
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::once())
+            ->method('save')
+            ->with('/out/baseline.json', self::countOf(2));
+
+        $count = (new BaselineProcessor($baseline))->generate($auditReport, '/out/baseline.json');
+
+        self::assertSame(2, $count);
+    }
+
     public function test_accepted_fingerprints_returns_empty_when_no_path_is_configured(): void
     {
         $baseline = $this->createMock(BaselineInterface::class);

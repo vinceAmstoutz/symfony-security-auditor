@@ -2770,6 +2770,49 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      */
+    public function test_concurrent_structured_analysis_keeps_a_sibling_chunks_finding_when_one_chunk_fails_to_finalize_in_the_same_window(): void
+    {
+        $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];
+
+        $cache = $this->createMock(AttackerCacheInterface::class);
+        $cache->method('get')->willReturn(null);
+        $cache->method('store')->willReturnCallback(static function (array $chunk): void {
+            $failingChunk = $chunk[0] instanceof ProjectFile && 'src/B.php' === $chunk[0]->relativePath();
+            if ($failingChunk) {
+                throw new RuntimeException('disk full');
+            }
+        });
+
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests): array {
+                self::registryOf($requests[0])->execute('record_vulnerability', self::recordedFinding('finding-a'));
+                self::registryOf($requests[1])->execute('record_vulnerability', self::recordedFinding('finding-b'));
+
+                return array_fill(0, \count($requests), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient, $cache);
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+
+        self::assertSame(['finding-a'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
+        self::assertSame(
+            [
+                ['stage' => 'attacker', 'file' => 'src/A.php', 'status' => 'analyzed'],
+                ['stage' => 'attacker', 'file' => 'src/B.php', 'status' => 'errored'],
+            ],
+            $auditContext->coverage(),
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_concurrent_structured_analysis_marks_only_the_failing_and_later_windows_as_aborted_on_budget_exceeded(): void
     {
         $files = $this->makeFiveFiles();

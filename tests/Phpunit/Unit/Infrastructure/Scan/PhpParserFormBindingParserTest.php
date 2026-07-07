@@ -198,6 +198,29 @@ final class PhpParserFormBindingParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_collects_a_binding_from_a_nullsafe_create_form_call(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Form\UserType;
+            final class UserController {
+                public function edit(): void {
+                    $form = $this?->createForm(UserType::class);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+
+        $bindings = $this->phpParserFormBindingParser->parse($projectFile);
+
+        self::assertCount(1, $bindings);
+        self::assertSame('App\\Form\\UserType', $bindings[0]->formTypeClass());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_empty_for_unparseable_controller(): void
     {
         $projectFile = ProjectFile::create('src/Controller/Broken.php', '/app/x', '<?php class Broken { public function');
