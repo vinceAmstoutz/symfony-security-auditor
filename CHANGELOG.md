@@ -628,6 +628,38 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A validated finding could be silently and permanently dropped from the
+  report because an earlier iteration's _rejected_ finding at an overlapping
+  line range was mistaken for the same finding.**
+  `AuditOrchestrator::isDuplicate()`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) scanned
+  `AuditContext::vulnerabilities()` — every persisted finding, validated and
+  rejected alike — for a same-file/same-type/overlapping-line match. When the
+  reviewer rejected an early attacker report at, say, lines 10-12, and a later
+  iteration surfaced a genuinely distinct, reviewer-validated finding of the
+  same type at an overlapping range (e.g. lines 11-13), the fuzzy match falsely
+  matched it against the rejected entry and discarded it before it ever reached
+  `AuditContext`. `isDuplicate()` now keeps an exact-`id()` fast path against
+  every persisted finding (so an attacker literally re-reporting the identical
+  finding still short-circuits the loop the same way as before), but the fuzzy
+  file+type+line-overlap match is now scoped to
+  `AuditContext::validatedVulnerabilities()` only, so an
+  overlapping-but-distinct finding is no longer blocked by an earlier rejection.
+- **PoC synthesis interpolated untrusted, LLM-echoed finding text directly into
+  its own ` ``` `-fenced code block and `###`-prefixed section headers, letting
+  a vulnerable file's content forge a fake top-level prompt section.**
+  `PoCSynthesizer::buildUserMessage()`
+  (`src/Audit/Application/Agent/PoCSynthesizer.php`) placed `title`, `file`,
+  `vulnerable_code`, `attack_vector`, `proof`, and `remediation` — all
+  ultimately sourced from code under audit — into the PoC-synthesis prompt
+  without escaping backticks. A vulnerable file whose surrounding code contained
+  a literal ` ``` ` closed the "Vulnerable code" fence early, letting the
+  remaining text (e.g. a fabricated `### SYSTEM OVERRIDE` header) read as
+  unguarded top-level prompt instructions to the LLM, mirroring the same class
+  of delimiter-injection already fixed for `MarkdownReportRenderer`. A new
+  `escapeFences()` helper (`str_replace('`', '\\`', $text)`) now escapes every
+  one of those six fields before interpolation, matching
+  `MarkdownReportRenderer::escapeFences()`'s established pattern.
 - **A blank (or whitespace-only) `path` in a `security.yaml` `access_control`
   entry silently falsely marked every route in the entire project as
   firewall-covered, suppressing `broken_access_control` detection

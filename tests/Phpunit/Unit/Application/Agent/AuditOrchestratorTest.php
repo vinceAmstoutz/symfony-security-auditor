@@ -744,6 +744,35 @@ final class AuditOrchestratorTest extends TestCase
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
+    public function test_a_rejected_finding_does_not_block_a_later_validated_finding_at_an_overlapping_line_range(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'first', lineStart: 10, lineEnd: 12)]),
+            $this->attackerResponse([$this->vulnPayload(title: 'second', lineStart: 11, lineEnd: 13)]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->reviewerRejectResponse(),
+            $this->reviewerAcceptResponse(),
+        );
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping();
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertCount(1, $auditContext->validatedVulnerabilities());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     public function test_it_stores_exact_metadata_values_after_orchestration(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);

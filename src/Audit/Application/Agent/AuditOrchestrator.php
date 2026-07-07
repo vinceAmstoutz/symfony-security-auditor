@@ -324,7 +324,11 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
     private function isDuplicate(Vulnerability $vulnerability, AuditContext $auditContext): bool
     {
-        foreach ($auditContext->vulnerabilities() as $existing) {
+        if (\array_key_exists($vulnerability->id(), $auditContext->vulnerabilities())) {
+            return true;
+        }
+
+        foreach ($auditContext->validatedVulnerabilities() as $existing) {
             if ($existing->filePath() === $vulnerability->filePath()
                 && $existing->type() === $vulnerability->type()
                 && $this->linesOverlap(

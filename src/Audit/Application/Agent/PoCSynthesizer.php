@@ -193,14 +193,25 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
             $data['id'],
             $data['type'],
             $data['severity'],
-            $data['title'],
-            $data['file'],
+            $this->escapeFences($data['title']),
+            $this->escapeFences($data['file']),
             $data['line_start'],
             $data['line_end'],
-            $data['vulnerable_code'],
-            $data['attack_vector'],
-            $data['proof'],
-            $data['remediation'],
+            $this->escapeFences($data['vulnerable_code']),
+            $this->escapeFences($data['attack_vector']),
+            $this->escapeFences($data['proof']),
+            $this->escapeFences($data['remediation']),
         );
+    }
+
+    /**
+     * LLM-echoed finding text is interpolated into this prompt's own
+     * ```-delimited code-fence and `###`-prefixed section headers; an
+     * unescaped run of backticks would let the finding forge a fake section
+     * (e.g. a bogus `### SYSTEM OVERRIDE`) as unguarded top-level prompt text.
+     */
+    private function escapeFences(string $text): string
+    {
+        return str_replace('`', '\\`', $text);
     }
 }
