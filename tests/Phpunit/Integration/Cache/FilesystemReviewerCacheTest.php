@@ -124,6 +124,24 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */
+    public function test_get_hits_across_runs_despite_a_different_detected_at_timestamp(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php', title: 'same');
+        $review = ['accepted' => true];
+        $this->filesystemReviewerCache->store($vulnerability, 'code', $review);
+
+        usleep(1_100_000);
+
+        $secondRun = $this->makeVulnerability('src/A.php', title: 'same');
+
+        self::assertNotEquals($vulnerability->toArray()['detected_at'], $secondRun->toArray()['detected_at']);
+        self::assertSame($review, $this->filesystemReviewerCache->get($secondRun, 'code'));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     public function test_get_returns_null_when_cache_file_is_invalid_json(): void
     {
         $vulnerability = $this->makeVulnerability('src/A.php');
@@ -343,7 +361,7 @@ final class FilesystemReviewerCacheTest extends TestCase
         $codeContext = '<?php echo 1;';
 
         $finding = $vulnerability->toArray();
-        unset($finding['id']);
+        unset($finding['id'], $finding['detected_at']);
         $signature = "claude-haiku-4-5\0".json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext;
         $expectedKey = hash('sha256', $signature);
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
@@ -383,7 +401,7 @@ final class FilesystemReviewerCacheTest extends TestCase
         $codeContext = 'ctx';
 
         $finding = $vulnerability->toArray();
-        unset($finding['id']);
+        unset($finding['id'], $finding['detected_at']);
         $expectedKey = hash('sha256', json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext);
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
 

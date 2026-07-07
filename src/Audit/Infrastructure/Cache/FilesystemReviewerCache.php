@@ -27,10 +27,10 @@ use function Symfony\Component\String\u;
 
 /**
  * Filesystem-backed reviewer-verdict cache. The key is the SHA-256 of the
- * finding's stable content (its `toArray()` minus the non-deterministic `id`)
- * plus the reviewed code context, folded behind an optional key salt
- * (reviewer model + cache version) so a model or contract change invalidates
- * every stored verdict.
+ * finding's stable content (its `toArray()` minus the non-deterministic `id`
+ * and `detected_at`) plus the reviewed code context, folded behind an
+ * optional key salt (reviewer model + cache version) so a model or contract
+ * change invalidates every stored verdict.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -132,6 +132,8 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
     {
         $finding = $vulnerability->toArray();
         unset($finding['id']);
+        // detected_at is stamped fresh on every construction — keeping it in the key would make every cache entry a same-run-only hit.
+        unset($finding['detected_at']);
 
         $signature = \sprintf("%s\0%s", json_encode($finding, \JSON_THROW_ON_ERROR), $codeContext);
         if ('' !== $this->keySalt) {

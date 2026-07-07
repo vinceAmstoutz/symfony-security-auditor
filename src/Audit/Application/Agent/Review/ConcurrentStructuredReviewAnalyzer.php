@@ -196,7 +196,8 @@ final readonly class ConcurrentStructuredReviewAnalyzer
 
     private function recordPendingVerdict(int $index, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): Vulnerability
     {
-        $verdict = $concurrentReviewBatch->sessions[$index]->drain()[0] ?? null;
+        $verdicts = $concurrentReviewBatch->sessions[$index]->drain();
+        $verdict = array_pop($verdicts);
         if (!$bypassCache) {
             $this->reviewerVerdictCache->store($concurrentReviewBatch->vulnerabilities[$index], $concurrentReviewBatch->codeContexts[$index], $verdict);
         }

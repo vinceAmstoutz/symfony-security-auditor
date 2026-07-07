@@ -207,11 +207,12 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
     /**
      * LLM-echoed finding text is interpolated into this prompt's own
      * ```-delimited code-fence and `###`-prefixed section headers; an
-     * unescaped run of backticks would let the finding forge a fake section
-     * (e.g. a bogus `### SYSTEM OVERRIDE`) as unguarded top-level prompt text.
+     * unescaped run of backticks would let the finding forge a fake fence,
+     * and an unescaped `#` would let it forge a fake section header (e.g. a
+     * bogus `### SYSTEM OVERRIDE`) as unguarded top-level prompt text.
      */
     private function escapeFences(string $text): string
     {
-        return str_replace('`', '\\`', $text);
+        return str_replace(['`', '#'], ['\\`', '\\#'], $text);
     }
 }

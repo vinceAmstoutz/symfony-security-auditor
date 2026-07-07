@@ -102,11 +102,14 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
      * e.g. a ``` or ~~~ fence quoted mid-description) would open a code block
      * that only closes at the next such run — silently swallowing every
      * subsequent finding as inert code text once rendered. Backslash-escaping
-     * each backtick/tilde keeps it a literal character instead.
+     * each backtick/tilde keeps it a literal character instead. CommonMark
+     * also passes raw inline HTML through verbatim, so `<`/`>` are entity-
+     * encoded too — otherwise a payload like `<img onerror=...>` survives
+     * into any downstream Markdown-to-HTML rendering of this report.
      */
     private function escapeFences(string $text): string
     {
-        return str_replace(['`', '~'], ['\\`', '\\~'], $text);
+        return str_replace(['`', '~', '<', '>'], ['\\`', '\\~', '&lt;', '&gt;'], $text);
     }
 
     private function codeBlock(string $text): string

@@ -136,6 +136,21 @@ final readonly class ProjectFile
         return ProjectFileType::SCHEDULER === $this->projectFileType;
     }
 
+    public function isApiResource(): bool
+    {
+        return ProjectFileType::API_RESOURCE === $this->projectFileType;
+    }
+
+    public function isLiveComponent(): bool
+    {
+        return ProjectFileType::LIVE_COMPONENT === $this->projectFileType;
+    }
+
+    public function isTwigExtension(): bool
+    {
+        return ProjectFileType::TWIG_EXTENSION === $this->projectFileType;
+    }
+
     public function isService(): bool
     {
         return !$this->matchesKnownComponentType()
@@ -148,12 +163,24 @@ final readonly class ProjectFile
             return true;
         }
 
-        return $this->matchesMessagingComponentType();
+        if ($this->matchesMessagingComponentType()) {
+            return true;
+        }
+
+        return $this->isTwigExtension();
     }
 
     private function matchesDomainComponentType(): bool
     {
         if ($this->isController()) {
+            return true;
+        }
+
+        if ($this->isApiResource()) {
+            return true;
+        }
+
+        if ($this->isLiveComponent()) {
             return true;
         }
 

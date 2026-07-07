@@ -110,7 +110,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
             $this->makeValidatedVuln(filePath: 'src/Foo`) <script>alert(1)</script> (`.php'),
         ));
 
-        self::assertStringContainsString('**Location:** `src/Foo\\`) <script>alert(1)</script> (\\`.php:1-5`', $output);
+        self::assertStringContainsString('**Location:** `src/Foo\\`) &lt;script&gt;alert(1)&lt;/script&gt; (\\`.php:1-5`', $output);
     }
 
     /**

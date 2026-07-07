@@ -111,7 +111,8 @@ final readonly class StructuredReviewAnalyzer
         try {
             $this->llmClient->completeWithTools($systemPrompt, $userMessage, $structuredReviewCollectionSession->toolRegistry, $this->maxToolIterations);
 
-            $verdict = $structuredReviewCollectionSession->drain()[0] ?? null;
+            $verdicts = $structuredReviewCollectionSession->drain();
+            $verdict = array_pop($verdicts);
             if (!$bypassCache) {
                 $this->reviewerVerdictCache->store($vulnerability, $codeContext, $verdict);
             }

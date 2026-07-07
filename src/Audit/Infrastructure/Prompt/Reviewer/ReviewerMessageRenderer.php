@@ -65,15 +65,15 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
             $data['id'],
             $data['type'],
             $data['severity'],
-            $data['title'],
+            $this->escapeFences($data['title']),
             $filePath,
             $data['line_start'],
             $data['line_end'],
-            $data['description'],
-            $data['vulnerable_code'],
-            $data['attack_vector'],
-            $data['proof'],
-            $data['remediation'],
+            $this->escapeFences($data['description']),
+            $this->escapeFences($data['vulnerable_code']),
+            $this->escapeFences($data['attack_vector']),
+            $this->escapeFences($data['proof']),
+            $this->escapeFences($data['remediation']),
             $data['confidence'],
             $filePath,
             $this->numberLines($codeContext),
@@ -131,15 +131,15 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
                 $data['id'],
                 $data['type'],
                 $data['severity'],
-                $data['title'],
+                $this->escapeFences($data['title']),
                 $filePath,
                 $data['line_start'],
                 $data['line_end'],
-                $data['description'],
-                $data['vulnerable_code'],
-                $data['attack_vector'],
-                $data['proof'],
-                $data['remediation'],
+                $this->escapeFences($data['description']),
+                $this->escapeFences($data['vulnerable_code']),
+                $this->escapeFences($data['attack_vector']),
+                $this->escapeFences($data['proof']),
+                $this->escapeFences($data['remediation']),
                 $data['confidence'],
                 $filePath,
                 $this->numberLines($codeContext),
@@ -177,6 +177,18 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
     private function sanitizeFilePath(string $filePath): string
     {
         return str_replace(["\n", '"'], [' ', "'"], $filePath);
+    }
+
+    /**
+     * The attacker LLM's narrative fields are interpolated into this prompt's
+     * own ```-delimited code fence and `###`-prefixed section headers; an
+     * unescaped backtick would break out of the fence, and an unescaped `#`
+     * would let the finding forge a fake section (e.g. a bogus
+     * `### SYSTEM OVERRIDE`) as unguarded top-level prompt text.
+     */
+    private function escapeFences(string $text): string
+    {
+        return str_replace(['`', '#'], ['\\`', '\\#'], $text);
     }
 
     private function numberLines(string $content): string

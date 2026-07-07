@@ -34,7 +34,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     {
         $symfonyStyle->title('Symfony LLM Security Auditor');
         $symfonyStyle->text([
-            \sprintf('Project: <info>%s</info>', $projectPath),
+            \sprintf('Project: <info>%s</info>', OutputFormatter::escape($projectPath)),
             'Pipeline: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer)',
             '',
         ]);

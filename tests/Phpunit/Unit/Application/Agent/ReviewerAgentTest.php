@@ -3033,6 +3033,55 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_structured_collection_keeps_the_last_verdict_when_the_model_self_corrects(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/A.php');
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient->expects(self::never())->method('complete');
+        $llmClient
+            ->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry) use ($vulnerability): LLMResponse {
+                $toolRegistry->execute('record_review', [
+                    'id' => $vulnerability->id(),
+                    'accepted' => true,
+                    'reviewer_notes' => 'first pass',
+                ]);
+                $toolRegistry->execute('record_review', [
+                    'id' => $vulnerability->id(),
+                    'accepted' => false,
+                    'reviewer_notes' => 'corrected: false positive',
+                ]);
+
+                return LLMResponse::of('', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
+            });
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                useStructuredCollection: true,
+            ),
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertCount(1, $result);
+        self::assertFalse($result[0]->isReviewerValidated());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
      * @throws InvalidTokenUsageException
      * @throws InvalidToolRegistryException
      */
@@ -4140,6 +4189,48 @@ final class ReviewerAgentTest extends TestCase
         self::assertTrue($result[0]->isReviewerValidated());
         self::assertSame('src/Second.php', $result[1]->filePath());
         self::assertFalse($result[1]->isReviewerValidated());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_concurrent_structured_reviews_keep_the_last_verdict_when_the_model_self_corrects(): void
+    {
+        $vulnerability = $this->makeVulnerabilityAt('src/First.php');
+
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(
+                static function (array $requests) use ($vulnerability): array {
+                    self::registryOf($requests[0])->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true, 'reviewer_notes' => 'first pass']);
+                    self::registryOf($requests[0])->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => false, 'reviewer_notes' => 'corrected: false positive']);
+
+                    return [LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1))];
+                });
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(useStructuredCollection: true),
+                new NullLogger(),
+                recordReviewToolFactory: new RecordReviewToolFactory(),
+            ),
+            new ReviewerModeConfiguration(
+                maxConcurrent: 4,
+                useStructuredCollection: true,
+            ),
+        );
+
+        $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertCount(1, $result);
+        self::assertFalse($result[0]->isReviewerValidated());
     }
 
     /**

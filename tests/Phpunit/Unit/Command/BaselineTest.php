@@ -139,6 +139,19 @@ final class BaselineTest extends TestCase
     /**
      * @throws MalformedBaselineFileException
      */
+    public function test_load_throws_when_the_json_is_a_bare_object_of_string_values(): void
+    {
+        $path = $this->tmpDir.'/bare-object.json';
+        $this->filesystem->dumpFile($path, '{"type": "sql_injection", "file": "src/Foo.php"}');
+
+        $this->expectException(MalformedBaselineFileException::class);
+
+        (new Baseline($this->filesystem))->load($path);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
     public function test_load_throws_when_an_entry_is_not_a_string(): void
     {
         $path = $this->tmpDir.'/mixed.json';

@@ -107,6 +107,17 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('Pipeline:', $display);
     }
 
+    public function test_header_neutralizes_console_markup_in_the_project_path(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->header($symfonyStyle, '/var/www/<fg=grey>oops</>');
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('/var/www/<fg=grey>oops</>', $display);
+    }
+
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException

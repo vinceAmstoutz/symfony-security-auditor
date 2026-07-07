@@ -225,6 +225,45 @@ final class RegexCodeSlicerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_a_multi_line_string_literal_with_an_unbalanced_paren_does_not_defeat_elision_for_the_rest_of_the_file(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function process(\n"
+            ."        string \$default = \"opening paren example (\n"
+            ."        unbalanced\"\n"
+            ."    ) {\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_string_literal_spanning_three_lines_does_not_defeat_elision_for_the_rest_of_the_file(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function process(\n"
+            ."        string \$default = \"opening line (\n"
+            ."        middle line with parens ( and ) but no quote\n"
+            ."        closing line\"\n"
+            ."    ) {\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_inert_line_resembling_keyword_mid_line_is_elided(): void
     {
         // A comment mentioning "namespace"/"class" mid-line must NOT be treated as

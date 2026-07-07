@@ -173,12 +173,15 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
 
         $output = [];
         $openParenDepth = 0;
+        $openStringDelimiter = null;
         foreach (explode("\n", $projectFile->content()) as $line) {
             $retain = $openParenDepth > 0 || $this->shouldRetain($line);
             $output[] = $retain ? $line : self::ELIDED_PLACEHOLDER;
 
             if ($retain) {
-                $openParenDepth = max(0, $openParenDepth + $this->parenDelta($line));
+                $parenState = $this->parenDelta($line, $openStringDelimiter);
+                $openParenDepth = max(0, $openParenDepth + $parenState['delta']);
+                $openStringDelimiter = $parenState['open_string_delimiter'];
             }
         }
 
@@ -217,10 +220,62 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         return 1 === preg_match(self::BARE_KEYWORD_PATTERN, $line);
     }
 
-    private function parenDelta(string $line): int
+    /**
+     * A retained line's `(`/`)` count drives the multi-line-signature
+     * continuation in {@see self::slice()}. A string literal that opens on
+     * this line but only closes on a later one (a raw newline inside a
+     * single- or double-quoted string, legal PHP) is invisible to
+     * `STRING_LITERAL_PATTERN`, which only matches a pair on the same line —
+     * an unbalanced `(` inside such a literal would otherwise never be
+     * stripped, permanently desyncing `openParenDepth` and forcing every
+     * remaining line in the file to be retained. The returned
+     * `open_string_delimiter` carries the open quote character forward until
+     * its match closes on a later line.
+     *
+     * @return array{delta: int, open_string_delimiter: ?string}
+     */
+    private function parenDelta(string $line, ?string $openStringDelimiter): array
     {
+        if (null !== $openStringDelimiter) {
+            $closingQuoteOffset = $this->closingQuoteOffset($line, $openStringDelimiter);
+            if (null === $closingQuoteOffset) {
+                return ['delta' => 0, 'open_string_delimiter' => $openStringDelimiter];
+            }
+
+            $line = substr($line, $closingQuoteOffset + 1);
+        }
+
         $withoutStringLiterals = preg_replace(self::STRING_LITERAL_PATTERN, '', $line) ?? $line;
 
-        return substr_count($withoutStringLiterals, '(') - substr_count($withoutStringLiterals, ')');
+        $danglingQuoteOffset = $this->danglingQuoteOffset($withoutStringLiterals);
+        $nextOpenStringDelimiter = null;
+        if (null !== $danglingQuoteOffset) {
+            $nextOpenStringDelimiter = $withoutStringLiterals[$danglingQuoteOffset];
+            $withoutStringLiterals = substr($withoutStringLiterals, 0, $danglingQuoteOffset);
+        }
+
+        return [
+            'delta' => substr_count($withoutStringLiterals, '(') - substr_count($withoutStringLiterals, ')'),
+            'open_string_delimiter' => $nextOpenStringDelimiter,
+        ];
+    }
+
+    private function closingQuoteOffset(string $line, string $quoteChar): ?int
+    {
+        $pattern = \sprintf('/^(?:\\\\.|[^%s\\\\])*%s/', $quoteChar, $quoteChar);
+        if (1 !== preg_match($pattern, $line, $matches)) {
+            return null;
+        }
+
+        return \strlen($matches[0]) - 1;
+    }
+
+    private function danglingQuoteOffset(string $text): ?int
+    {
+        if (1 !== preg_match('/[\'"]/', $text, $matches, \PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        return $matches[0][1];
     }
 }

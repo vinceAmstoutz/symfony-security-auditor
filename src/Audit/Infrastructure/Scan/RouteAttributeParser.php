@@ -24,7 +24,8 @@ use PhpParser\Node\Scalar\String_;
  * Extracts every `#[Route(path:, methods:, name:)]` attribute on a method —
  * one entry per stacked attribute, so a verb restricted to a second, stacked
  * route is never invisible to the caller. Positional and named arguments
- * resolve identically: the first unnamed argument is `path`.
+ * resolve identically: the first unnamed argument is `path`, matching
+ * Symfony's own `Route::__construct()` order, the second is `name`.
  */
 final readonly class RouteAttributeParser
 {
@@ -61,10 +62,12 @@ final readonly class RouteAttributeParser
         $path = null;
         $methods = [];
         $name = null;
-        $firstPositionalConsumed = false;
+        $positionalIndex = 0;
         foreach ($args as $arg) {
-            $argName = $this->resolveRouteArgName($arg->name?->toString(), $firstPositionalConsumed);
-            $firstPositionalConsumed = $firstPositionalConsumed || null === $arg->name;
+            $argName = $this->resolveRouteArgName($arg->name?->toString(), $positionalIndex);
+            if (null === $arg->name) {
+                ++$positionalIndex;
+            }
 
             $path = $this->routePathFromArg($argName, $arg, $path);
             $methods = $this->routeMethodsFromArg($argName, $arg) ?? $methods;
@@ -105,13 +108,17 @@ final readonly class RouteAttributeParser
         };
     }
 
-    private function resolveRouteArgName(?string $argName, bool $firstPositionalConsumed): ?string
+    private function resolveRouteArgName(?string $argName, int $positionalIndex): ?string
     {
-        if (null === $argName && !$firstPositionalConsumed) {
-            return 'path';
+        if (null !== $argName) {
+            return $argName;
         }
 
-        return $argName;
+        return match ($positionalIndex) {
+            0 => 'path',
+            1 => 'name',
+            default => null,
+        };
     }
 
     private function attributeShortNameMatches(string $fullyQualifiedName, string $expectedShortName): bool

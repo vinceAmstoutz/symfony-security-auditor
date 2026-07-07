@@ -637,7 +637,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
-    public function test_it_treats_only_the_first_positional_argument_as_the_path(): void
+    public function test_it_treats_the_first_positional_argument_as_the_path_and_the_second_as_the_name(): void
     {
         $source = <<<'PHP'
             <?php
@@ -653,6 +653,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
         self::assertSame('/two-positional', $entries[0]->routePath());
+        self::assertSame('the_route_name', $entries[0]->routeName());
         self::assertSame(['GET'], $entries[0]->routeMethods());
     }
 

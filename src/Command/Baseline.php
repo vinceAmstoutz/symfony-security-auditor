@@ -48,7 +48,7 @@ final readonly class Baseline implements BaselineInterface
             throw MalformedBaselineFileException::fromIOException($path, $ioException);
         }
 
-        if (!\is_array($decoded)) {
+        if (!\is_array($decoded) || !array_is_list($decoded)) {
             throw MalformedBaselineFileException::notAJsonArrayOfStrings($path);
         }
 

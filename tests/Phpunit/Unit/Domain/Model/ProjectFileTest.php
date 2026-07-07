@@ -1189,4 +1189,46 @@ final class ProjectFileTest extends TestCase
 
         self::assertFalse($projectFile->isService());
     }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_is_service_returns_false_for_api_resource(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/ApiResource/Book.php',
+            '/app/src/ApiResource/Book.php',
+            "<?php\n#[ApiResource]\nclass Book {}",
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_is_service_returns_false_for_live_component(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/Components/Counter.php',
+            '/app/src/Twig/Components/Counter.php',
+            "<?php\n#[AsLiveComponent]\nclass Counter {}",
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_is_service_returns_false_for_twig_extension(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/AppExtension.php',
+            '/app/src/Twig/AppExtension.php',
+            "<?php\nclass AppExtension extends AbstractExtension {}",
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
 }
