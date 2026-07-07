@@ -91,6 +91,10 @@ final readonly class SequentialChunkAnalyzer
                 throw $llmProviderException;
             }
 
+            foreach ($chunkResult->vulnerabilities() as $vulnerability) {
+                $coverageRecorder->recordFoundVulnerability($vulnerability);
+            }
+
             ChunkFindingProgress::report($this->progressReporter, $chunkResult->vulnerabilities());
             $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, [
                 'chunk' => $index + 1,

@@ -390,6 +390,48 @@ final class AuditContextTest extends TestCase
         self::assertSame([], $auditContext->drainReviewedFindings());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_drain_found_vulnerabilities_starts_empty(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        self::assertSame([], $auditContext->drainFoundVulnerabilities());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_drain_found_vulnerabilities_returns_every_recorded_candidate_in_order(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $vulnerability = $this->makeVulnerability('v1', VulnerabilitySeverity::HIGH);
+        $second = $this->makeVulnerability('v2', VulnerabilitySeverity::HIGH);
+
+        $auditContext->recordFoundVulnerability($vulnerability);
+        $auditContext->recordFoundVulnerability($second);
+
+        self::assertSame([$vulnerability, $second], $auditContext->drainFoundVulnerabilities());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_drain_found_vulnerabilities_clears_the_buffer(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordFoundVulnerability($this->makeVulnerability('v1', VulnerabilitySeverity::HIGH));
+
+        $auditContext->drainFoundVulnerabilities();
+
+        self::assertSame([], $auditContext->drainFoundVulnerabilities());
+    }
+
     #[Override]
     protected function tearDown(): void
     {

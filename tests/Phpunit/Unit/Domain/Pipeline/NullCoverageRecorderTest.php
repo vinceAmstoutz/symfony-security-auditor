@@ -59,6 +59,26 @@ final class NullCoverageRecorderTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */
+    public function test_record_found_vulnerability_does_not_populate_the_drain(): void
+    {
+        $nullCoverageRecorder = new NullCoverageRecorder();
+
+        $nullCoverageRecorder->recordFoundVulnerability($this->makeVulnerability());
+
+        self::assertSame([], $nullCoverageRecorder->drainFoundVulnerabilities());
+    }
+
+    public function test_drain_found_vulnerabilities_always_returns_empty(): void
+    {
+        $nullCoverageRecorder = new NullCoverageRecorder();
+
+        self::assertSame([], $nullCoverageRecorder->drainFoundVulnerabilities());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
     private function makeVulnerability(): Vulnerability
     {
         return Vulnerability::of(

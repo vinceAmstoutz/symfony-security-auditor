@@ -159,6 +159,92 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
+     * @throws LLMProviderException
+     */
+    public function test_it_reviews_and_persists_a_candidate_found_before_a_mid_attacker_budget_abort(): void
+    {
+        $files = [];
+        for ($i = 1; $i <= 11; ++$i) {
+            $files[] = ProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
+        }
+
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $callCount = 0;
+        $attackerLlm->method('complete')->willReturnCallback(function () use (&$callCount): LLMResponse {
+            ++$callCount;
+            if (2 === $callCount) {
+                throw BudgetExceededException::forTokens(500, 100);
+            }
+
+            return $this->attackerResponse([$this->vulnPayload(title: 'v1', filePath: 'src/Service/Service1.php')]);
+        });
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles($files);
+        $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
+
+        $budgetExceeded = false;
+        try {
+            $auditOrchestrator->orchestrate($auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow BudgetExceededException.');
+        self::assertCount(1, $auditContext->vulnerabilities());
+        self::assertCount(1, $auditContext->validatedVulnerabilities());
+        self::assertSame('v1', current($auditContext->validatedVulnerabilities())->title());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws LLMProviderException
+     */
+    public function test_it_swallows_a_second_abort_while_reviewing_a_recovered_candidate(): void
+    {
+        $files = [];
+        for ($i = 1; $i <= 11; ++$i) {
+            $files[] = ProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
+        }
+
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $callCount = 0;
+        $attackerLlm->method('complete')->willReturnCallback(function () use (&$callCount): LLMResponse {
+            ++$callCount;
+            if (2 === $callCount) {
+                throw BudgetExceededException::forTokens(500, 100);
+            }
+
+            return $this->attackerResponse([$this->vulnPayload(title: 'v1', filePath: 'src/Service/Service1.php')]);
+        });
+        $reviewerLlm->method('complete')->willThrowException(BudgetExceededException::forTokens(500, 100));
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles($files);
+        $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
+
+        $budgetExceeded = false;
+        try {
+            $auditOrchestrator->orchestrate($auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow the original attacker abort.');
+        self::assertCount(0, $auditContext->vulnerabilities());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */

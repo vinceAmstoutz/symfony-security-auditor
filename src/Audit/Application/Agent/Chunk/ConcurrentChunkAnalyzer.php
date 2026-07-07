@@ -85,6 +85,9 @@ final readonly class ConcurrentChunkAnalyzer
             $cached = $this->servedCachedResult($chunk, $chunkContext, $coverageRecorder);
             if ($cached instanceof VulnerabilityHydrationResult) {
                 $cachedResults[$index] = $cached;
+                foreach ($cached->vulnerabilities() as $vulnerability) {
+                    $coverageRecorder->recordFoundVulnerability($vulnerability);
+                }
 
                 continue;
             }
@@ -295,6 +298,11 @@ final readonly class ConcurrentChunkAnalyzer
 
         ChunkCoverageRecorder::record($entry['chunk'], 'analyzed', $coverageRecorder);
 
-        return $this->vulnerabilityFactory->fromList($rawData);
+        $vulnerabilityHydrationResult = $this->vulnerabilityFactory->fromList($rawData);
+        foreach ($vulnerabilityHydrationResult->vulnerabilities() as $vulnerability) {
+            $coverageRecorder->recordFoundVulnerability($vulnerability);
+        }
+
+        return $vulnerabilityHydrationResult;
     }
 }

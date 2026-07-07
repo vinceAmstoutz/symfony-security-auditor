@@ -222,9 +222,9 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
                 continue;
             }
 
-            $firstStringArg = $this->firstStringArgValue($attribute->args);
-            if (null !== $firstStringArg) {
-                $values[] = $firstStringArg;
+            $attributeArg = $this->isGrantedAttributeArgValue($attribute->args);
+            if (null !== $attributeArg) {
+                $values[] = $attributeArg;
             }
         }
 
@@ -232,17 +232,35 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
-     * @param array<Arg> $args
+     * `#[IsGranted]`'s first parameter is `$attribute` — resolve it the same
+     * way `resolveRouteArgName()` resolves `Route`'s `path`, so a reordered
+     * named-argument call (e.g. `#[IsGranted(subject: $post, attribute:
+     * 'EDIT')]`) still yields the attribute, not whichever string argument
+     * happens to come first.
+     *
+     * @param list<Arg> $args
      */
-    private function firstStringArgValue(array $args): ?string
+    private function isGrantedAttributeArgValue(array $args): ?string
     {
-        foreach ($args as $arg) {
-            if ($arg->value instanceof String_) {
+        foreach ($args as $index => $arg) {
+            if (!$arg->value instanceof String_) {
+                continue;
+            }
+
+            if ($this->isIsGrantedAttributeArg($arg, $index)) {
                 return $arg->value->value;
             }
         }
 
         return null;
+    }
+
+    private function isIsGrantedAttributeArg(Arg $arg, int $index): bool
+    {
+        return match (true) {
+            $arg->name instanceof Identifier => 'attribute' === $arg->name->toString(),
+            default => 0 === $index,
+        };
     }
 
     /**
@@ -255,12 +273,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
 
     private function methodInvokesDenyAccess(ClassMethod $classMethod, NodeFinder $nodeFinder): bool
     {
-        $stmts = $classMethod->stmts;
-        if (null === $stmts) {
-            return false;
-        }
-
-        $methodCalls = $nodeFinder->findInstanceOf($stmts, MethodCall::class);
+        $methodCalls = $nodeFinder->findInstanceOf($classMethod->stmts ?? [], MethodCall::class);
         foreach ($methodCalls as $methodCall) {
             if ($methodCall->name instanceof Identifier && 'denyAccessUnlessGranted' === $methodCall->name->toString()) {
                 return true;

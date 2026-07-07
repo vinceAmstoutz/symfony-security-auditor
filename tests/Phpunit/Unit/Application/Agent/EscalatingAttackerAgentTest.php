@@ -19,10 +19,13 @@ use Symfony\Component\ErrorHandler\BufferingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
@@ -57,6 +60,36 @@ final class EscalatingAttackerAgentTest extends TestCase
         self::assertSame([], $result);
         self::assertSame(1, $recordingAttackerAgent->callCount);
         self::assertSame(0, $expensive->callCount);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_cheap_findings_survive_an_expensive_pass_abort(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/Controller/A.php', title: 'cheap');
+        $recordingAttackerAgent = $this->makeRecordingAttacker([$vulnerability]);
+        $expensive = new RecordingAttackerAgent([], BudgetExceededException::forTokens(500, 100));
+
+        $escalatingAttackerAgent = new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger());
+        $auditContext = AuditContext::forProject(sys_get_temp_dir());
+
+        $budgetExceeded = false;
+        try {
+            $this->callAnalyze($escalatingAttackerAgent,
+                [$this->makeFile('src/Controller/A.php')],
+                SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
+                $auditContext,
+            );
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The escalating agent must rethrow BudgetExceededException.');
+        self::assertSame([$vulnerability], $auditContext->drainFoundVulnerabilities());
     }
 
     /**

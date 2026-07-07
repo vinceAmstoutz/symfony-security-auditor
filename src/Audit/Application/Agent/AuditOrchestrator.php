@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\Budg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
@@ -85,16 +86,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
             $previousFindings = array_values($auditContext->validatedVulnerabilities());
             $rejectedFindings = $this->rejectedFindings($auditContext);
-            $rawFindings = $this->attackerAgent->analyze(
-                new AttackerAnalysisRequest(
-                    files: $files,
-                    symfonyMapping: $mapping,
-                    bypassCache: $auditContext->isCacheBypassed(),
-                    previousFindings: $previousFindings,
-                    rejectedFindings: $rejectedFindings,
-                ),
-                $auditContext,
-            );
+            $rawFindings = $this->analyzeWithRecovery($mapping, $files, $previousFindings, $rejectedFindings, $auditContext);
             $filtered = $this->filterByConfidence($rawFindings);
 
             if ([] === $filtered) {
@@ -153,6 +145,65 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         $auditContext->setMeta('audit.total_findings', \count($auditContext->vulnerabilities()));
         $auditContext->setMeta('audit.validated', \count($auditContext->validatedVulnerabilities()));
         $auditContext->setMeta('audit.risk_score', $auditContext->riskScore());
+    }
+
+    /**
+     * @param list<Vulnerability> $previousFindings
+     * @param list<Vulnerability> $rejectedFindings
+     * @param list<ProjectFile>   $files
+     *
+     * @return list<Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    private function analyzeWithRecovery(SymfonyMapping $symfonyMapping, array $files, array $previousFindings, array $rejectedFindings, AuditContext $auditContext): array
+    {
+        try {
+            return $this->attackerAgent->analyze(
+                new AttackerAnalysisRequest(
+                    files: $files,
+                    symfonyMapping: $symfonyMapping,
+                    bypassCache: $auditContext->isCacheBypassed(),
+                    previousFindings: $previousFindings,
+                    rejectedFindings: $rejectedFindings,
+                ),
+                $auditContext,
+            );
+        } catch (BudgetExceededException|LLMProviderException $attackerException) {
+            $this->reviewRecoveredFindings($auditContext->drainFoundVulnerabilities(), $files, $auditContext);
+
+            throw $attackerException;
+        }
+    }
+
+    /**
+     * Gives raw attacker candidates found before a mid-run abort a chance to
+     * reach the report: filters and reviews them exactly like a completed
+     * iteration would. A further abort from this review attempt is swallowed
+     * after persisting whatever verdicts it managed to reach, so the
+     * caller-visible exception is always the original attacker abort.
+     *
+     * @param list<Vulnerability> $rawFindings
+     * @param list<ProjectFile>   $files
+     */
+    private function reviewRecoveredFindings(array $rawFindings, array $files, AuditContext $auditContext): void
+    {
+        $filtered = $this->withoutBaselineAccepted($this->filterByConfidence($rawFindings), $auditContext);
+
+        if ([] === $filtered) {
+            return;
+        }
+
+        try {
+            $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed());
+        } catch (BudgetExceededException|LLMProviderException) {
+            $this->persistReviewedFindings($auditContext->drainReviewedFindings(), $auditContext);
+
+            return;
+        }
+
+        $this->persistReviewedFindings($reviewed, $auditContext);
     }
 
     /**

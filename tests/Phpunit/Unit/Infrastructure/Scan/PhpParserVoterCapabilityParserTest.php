@@ -300,6 +300,148 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_resolves_self_and_static_class_constant_fetches_to_their_string_values(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            use App\Entity\Post;
+            final class PostVoter {
+                const EDIT = 'edit';
+                const VIEW = 'view';
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, [self::EDIT, static::VIEW], true) && $subject instanceof Post;
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['edit', 'view'], $voterCapability->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_ignores_a_dynamic_constant_fetch(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class DynamicConstVoter {
+                const EDIT = 'edit';
+                public function supports(string $attribute, mixed $subject): bool {
+                    $name = $attribute;
+                    return in_array($attribute, [self::{$name}], true);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/DynamicConstVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame([], $voterCapability->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_ignores_a_constant_fetch_on_a_variable_class_expression(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class VariableClassConstVoter {
+                const EDIT = 'edit';
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, [$subject::EDIT], true);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/VariableClassConstVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame([], $voterCapability->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_deduplicates_two_own_constants_that_share_the_same_string_value(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class AliasedConstVoter {
+                const EDIT = 'edit';
+                const ALIAS = 'edit';
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, [self::EDIT, self::ALIAS], true);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/AliasedConstVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['edit'], $voterCapability->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_does_not_duplicate_a_value_reachable_as_both_a_literal_and_a_constant_fetch(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class MixedAttrVoter {
+                const EDIT = 'EDIT';
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, ['EDIT', self::EDIT, 'DELETE'], true);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/MixedAttrVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['EDIT', 'DELETE'], $voterCapability->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_ignores_a_constant_fetch_that_does_not_resolve_to_an_own_string_constant(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class UnresolvedConstVoter {
+                const LIMIT = 5;
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, [self::LIMIT, self::MISSING, parent::SHARED], true);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/UnresolvedConstVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame([], $voterCapability->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_class_name_with_namespace(): void
     {
         $source = <<<'PHP'

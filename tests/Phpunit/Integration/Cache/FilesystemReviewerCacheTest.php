@@ -154,6 +154,68 @@ final class FilesystemReviewerCacheTest extends TestCase
     }
 
     /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_get_returns_null_instead_of_throwing_when_finding_content_is_not_valid_utf8(): void
+    {
+        $vulnerability = $this->makeVulnerabilityWithCode('src/A.php', "\xB1\xB2 legacy latin1 snippet");
+
+        self::assertNull($this->filesystemReviewerCache->get($vulnerability, 'code'));
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_get_logs_warning_when_finding_content_is_not_valid_utf8(): void
+    {
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('debug');
+
+        $filesystemReviewerCache = new FilesystemReviewerCache($this->cacheDir, new Filesystem(), $logger);
+        $vulnerability = $this->makeVulnerabilityWithCode('src/A.php', "\xB1\xB2 legacy latin1 snippet");
+
+        self::assertNull($filesystemReviewerCache->get($vulnerability, 'code'));
+        self::assertCount(1, $warnings);
+        self::assertSame('Reviewer cache entry was unreadable, ignoring', $warnings[0][0]);
+        self::assertNull($warnings[0][1]['path']);
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_store_logs_warning_instead_of_throwing_when_finding_content_is_not_valid_utf8(): void
+    {
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('debug');
+
+        $filesystemReviewerCache = new FilesystemReviewerCache($this->cacheDir, new Filesystem(), $logger);
+        $vulnerability = $this->makeVulnerabilityWithCode('src/A.php', "\xB1\xB2 legacy latin1 snippet");
+
+        $filesystemReviewerCache->store($vulnerability, 'code', ['accepted' => true]);
+
+        self::assertCount(1, $warnings);
+        self::assertSame('Failed to write reviewer cache entry', $warnings[0][0]);
+        self::assertNull($warnings[0][1]['path']);
+    }
+
+    /**
      * @throws InvalidCacheConfigurationException
      */
     public function test_constructor_rejects_empty_cache_dir(): void
@@ -432,11 +494,20 @@ final class FilesystemReviewerCacheTest extends TestCase
      */
     private function makeVulnerability(string $filePath, string $title = 'Finding'): Vulnerability
     {
+        return $this->makeVulnerabilityWithCode($filePath, 'code', $title);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    private function makeVulnerabilityWithCode(string $filePath, string $vulnerableCode, string $title = 'Finding'): Vulnerability
+    {
         return Vulnerability::of(
             new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, $title, 0.9),
             new CodeLocation($filePath, 1, 5),
             new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
-            'code',
+            $vulnerableCode,
         );
     }
 

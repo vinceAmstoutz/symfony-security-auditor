@@ -307,6 +307,75 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_resolves_the_attribute_named_argument_when_it_is_not_listed_first(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            final class ReorderedNamedArgsController {
+                #[Route(path: '/edit')]
+                #[IsGranted(subject: 'post', attribute: 'EDIT')]
+                public function edit(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/ReorderedNamedArgsController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['EDIT'], $entries[0]->methodLevelIsGranted());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_resolves_the_attribute_named_argument_in_natural_order(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            final class NamedArgsController {
+                #[Route(path: '/edit')]
+                #[IsGranted(attribute: 'EDIT', subject: 'post')]
+                public function edit(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/NamedArgsController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['EDIT'], $entries[0]->methodLevelIsGranted());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_ignores_a_named_argument_that_is_not_attribute_when_no_attribute_arg_is_present(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            final class SubjectOnlyController {
+                #[Route(path: '/edit')]
+                #[IsGranted(subject: 'post')]
+                public function edit(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/SubjectOnlyController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame([], $entries[0]->methodLevelIsGranted());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_finds_is_granted_in_attribute_group_after_a_non_is_granted_attribute(): void
     {
         $source = <<<'PHP'

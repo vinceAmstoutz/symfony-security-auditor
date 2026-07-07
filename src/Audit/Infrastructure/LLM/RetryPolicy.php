@@ -41,6 +41,16 @@ final readonly class RetryPolicy
      */
     public const int DEFAULT_RATE_LIMIT_MAX_DELAY_MS = 300_000;
 
+    /**
+     * Upper bound applied to a transient-failure retry delay, mirroring
+     * {@see DEFAULT_RATE_LIMIT_MAX_DELAY_MS} — without it, a high
+     * `max_attempts` combined with the default `backoff_multiplier` grows the
+     * delay exponentially without limit (e.g. attempt 19 computes to roughly
+     * a day), wedging the audit exactly as the rate-limit ceiling above was
+     * introduced to prevent.
+     */
+    public const int DEFAULT_MAX_DELAY_MS = 300_000;
+
     /** @var Closure(): float */
     private Closure $jitterSource;
 
@@ -67,7 +77,7 @@ final readonly class RetryPolicy
             throw InvalidRetryConfigurationException::forNonPositiveAttempt($attempt);
         }
 
-        return $this->computeDelay($this->backoffSchedule->initialDelayMs, $attempt);
+        return min($this->computeDelay($this->backoffSchedule->initialDelayMs, $attempt), self::DEFAULT_MAX_DELAY_MS);
     }
 
     /**

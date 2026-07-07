@@ -35,4 +35,16 @@ final readonly class NullCoverageRecorder implements CoverageRecorderInterface
     {
         return [];
     }
+
+    #[Override]
+    public function recordFoundVulnerability(Vulnerability $vulnerability): void
+    {
+        // intentionally noop
+    }
+
+    #[Override]
+    public function drainFoundVulnerabilities(): array
+    {
+        return [];
+    }
 }

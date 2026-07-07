@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture;
 
 use Override;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -24,7 +25,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
  * Test fake: a real AttackerAgentInterface implementation that returns a fixed
  * finding set on every call and records what it was invoked with, so tests can
  * assert on call count, the files passed, and the previousFindings context
- * without mocking an internal Application collaborator.
+ * without mocking an internal Application collaborator. Like a real attacker,
+ * every returned finding is pushed through the coverage recorder's
+ * `recordFoundVulnerability()` side channel before the call resolves; an
+ * optional `$throwsBeforeReturning` lets a test simulate a mid-run abort after
+ * those findings were already recorded.
  */
 final class RecordingAttackerAgent implements AttackerAgentInterface
 {
@@ -50,6 +55,7 @@ final class RecordingAttackerAgent implements AttackerAgentInterface
      */
     public function __construct(
         private readonly array $returnFindings = [],
+        private readonly ?Throwable $throwable = null,
     ) {}
 
     #[Override]
@@ -61,6 +67,14 @@ final class RecordingAttackerAgent implements AttackerAgentInterface
         $this->previousFindingsCountPerCall[] = \count($attackerAnalysisRequest->previousFindings);
         $this->lastRejectedFindings = $attackerAnalysisRequest->rejectedFindings;
         $this->rejectedFindingsCountPerCall[] = \count($attackerAnalysisRequest->rejectedFindings);
+
+        foreach ($this->returnFindings as $returnFinding) {
+            $coverageRecorder->recordFoundVulnerability($returnFinding);
+        }
+
+        if ($this->throwable instanceof Throwable) {
+            throw $this->throwable;
+        }
 
         return $this->returnFindings;
     }

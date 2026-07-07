@@ -628,6 +628,92 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A reviewer-cache lookup or store crashed the entire audit run instead of
+  degrading a single finding, whenever a finding's `vulnerable_code`,
+  `description`, or `proof` contained non-UTF-8 bytes** (e.g. an LLM echoing a
+  verbatim snippet from a legacy Latin-1-encoded source file).
+  `FilesystemReviewerCache::keyFor()` (`src/Audit/Infrastructure/Cache/`) calls
+  `json_encode($finding, JSON_THROW_ON_ERROR)` to hash the finding's stable
+  content into a cache key, and `json_encode` throws `JsonException` on
+  malformed UTF-8; both `get()` and `store()` called `keyFor()` (via
+  `pathFor()`) **before** their own `try`/`catch` began, so the exception
+  propagated uncaught through `ReviewerVerdictCache` and every review analyzer's
+  cache lookup — none of which sit inside a `catch (Throwable)` either — all the
+  way to `AuditCommand`'s top-level handler, aborting the whole run with no
+  report at all. `get()` and `store()` now compute the path inside their
+  existing `try` block, so a hashing failure degrades to a cache miss (`get()`)
+  or a logged, skipped write (`store()`) exactly like any other
+  unreadable/unwritable cache entry.
+- **`#[IsGranted]`'s attribute name was read from whichever argument happened to
+  be listed first, not the one actually named `attribute`, so a reordered
+  named-argument call reported the wrong access-control attribute to the
+  attacker LLM.** `firstStringArgValue()`
+  (`src/Audit/Infrastructure/Scan/PhpParserControllerAccessControlParser.php`)
+  returned the first string-valued argument regardless of its name — for
+  `#[IsGranted(subject: 'post', attribute: 'EDIT')]` (legal PHP, `subject`
+  listed first) it returned `'post'` instead of `'EDIT'`. `Route`'s sibling
+  parser already resolved named arguments correctly (`resolveRouteArgName()`);
+  `isGrantedAttributeArgValue()` now applies the same resolution — the argument
+  named `attribute`, or the first positional (unnamed) argument if none is named
+  — so cross-referencing a controller action's required attribute against actual
+  voter coverage no longer feeds the LLM the wrong attribute name for a
+  reordered call.
+- **A voter using the canonical Symfony pattern —
+  `const EDIT = 'edit'; ... in_array($attribute, [self::EDIT, ...])` — reported
+  zero supported attributes, risking a false-positive `missing_voter` finding
+  against every controller action it actually guards.**
+  `PhpParserVoterCapabilityParser::collectStringLiterals()`
+  (`src/Audit/Infrastructure/Scan/`) only visited bare `String_` AST nodes
+  inside `supports()`; a class-constant fetch like `self::EDIT` has no string
+  literal at all for it to find. `collectSelfConstantFetches()` now resolves
+  `self::`/`static::` fetches against the voter's own `const` declarations
+  (`resolveOwnConstants()`), merged with the existing literal-collection result,
+  so the "Voter Coverage" prompt block the attacker LLM cross-checks
+  `#[IsGranted]`/`denyAccessUnlessGranted()` calls against reflects what the
+  voter's `supports()` method actually accepts.
+- **A misconfigured `retry.max_attempts` could wedge the audit for hours on a
+  single transient-failure retry.** `RetryPolicy::delayMs()`
+  (`src/Audit/Infrastructure/LLM/`) computes an exponentially growing delay with
+  no upper bound — unlike its sibling `rateLimitDelayMs()`, whose docblock
+  explicitly clamps to `DEFAULT_RATE_LIMIT_MAX_DELAY_MS` "so a misbehaving
+  provider cannot wedge the audit for hours." With the default
+  `backoff_multiplier` (2.0) and `initial_delay_ms` (500), attempt 19 alone
+  computes to roughly a day-long sleep. `delayMs()` now clamps to the same new
+  `DEFAULT_MAX_DELAY_MS` (300 000 ms) constant, mirroring the rate-limit path
+  exactly.
+- **Attacker candidates already found before a mid-run budget/provider abort
+  were discarded outright instead of getting a chance to be reviewed — the same
+  defect class as the reviewer-side fix below, one stage earlier.**
+  `SequentialChunkAnalyzer::analyze()` and `ConcurrentChunkAnalyzer`'s cache-hit
+  loop and `finalize()` (`src/Audit/Application/Agent/Chunk/`) accumulate found
+  `Vulnerability` objects into a local array only returned once every
+  chunk/window is processed; when a later chunk/window threw
+  `BudgetExceededException`/`LLMProviderException`, the accumulator was thrown
+  away with the stack unwind, and neither `AttackerAgent::analyze()` nor
+  `AuditOrchestrator::orchestrate()` caught the exception to recover it — so a
+  chunk `coverage()` correctly marked `analyzed` could still contribute zero
+  vulnerabilities to the report. `EscalatingAttackerAgent::analyze()`
+  (`src/Audit/Application/Agent/`) compounded this: a **fully successful**
+  cheap-model pass's findings sat in a local `$cheapFindings` variable with no
+  `try`/`catch` around the subsequent expensive-model call, so an abort there
+  discarded already-obtained, uninvolved data too. `CoverageRecorderInterface`
+  gains `recordFoundVulnerability(Vulnerability)`/
+  `drainFoundVulnerabilities(): list<Vulnerability>`, the same append-only
+  side-channel pattern as `recordReviewedFinding()`/`drainReviewedFindings()`
+  below, implemented by `AuditContext` and `NullCoverageRecorder`. Both chunk
+  analyzers now push every found candidate into this buffer at the moment it's
+  produced (cache-served or freshly analyzed), which fixes
+  `EscalatingAttackerAgent` for free — its two passes share the same
+  `CoverageRecorderInterface` instance, so the cheap pass's findings are already
+  buffered before the expensive pass ever runs.
+  `AuditOrchestrator::orchestrate()` now catches both exceptions around the
+  attacker call (`analyzeWithRecovery()`) and, on abort, drains the buffer and
+  runs the recovered candidates through the same confidence-filter →
+  baseline-filter → review → persist pipeline a completed iteration would
+  (`reviewRecoveredFindings()`), so a candidate found just before the abort can
+  still end up validated in the partial report. A further abort from that
+  recovery review is swallowed after persisting whatever verdicts it reached, so
+  the exception the caller sees is always the original attacker abort.
 - **A reviewer verdict already produced before a mid-run budget/provider abort
   was recorded as `validated`/`rejected`/`errored` in `coverage()` but never
   reached `AuditContext::vulnerabilities()`, so a partial report built after the

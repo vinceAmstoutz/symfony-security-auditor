@@ -15,7 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
 use Override;
 use PhpParser\Node;
+use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\Instanceof_;
+use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Class_;
@@ -77,7 +79,10 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
             return null;
         }
 
-        $attributes = $this->collectStringLiterals($body, $nodeFinder);
+        $attributes = $this->mergeUnique(
+            $this->collectStringLiterals($body, $nodeFinder),
+            $this->collectSelfConstantFetches($body, $nodeFinder, $this->resolveOwnConstants($class)),
+        );
         $subjects = $this->collectInstanceofClassNames($body, $nodeFinder);
 
         return new VoterCapability(
@@ -122,6 +127,83 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
         }
 
         return $values;
+    }
+
+    /**
+     * Resolves `self::EDIT`/`static::EDIT` fetches in `$body` against the
+     * voter's own class constants — the canonical Symfony voter pattern
+     * (`const EDIT = 'edit'; ... in_array($attribute, [self::EDIT, ...])`)
+     * has no bare string literal for `collectStringLiterals()` to find.
+     *
+     * @param array<Node>           $body
+     * @param array<string, string> $constantValues
+     *
+     * @return list<string>
+     */
+    private function collectSelfConstantFetches(array $body, NodeFinder $nodeFinder, array $constantValues): array
+    {
+        $values = [];
+        $constFetchNodes = $nodeFinder->findInstanceOf($body, ClassConstFetch::class);
+        foreach ($constFetchNodes as $constFetchNode) {
+            if (!$constFetchNode->class instanceof Name) {
+                continue;
+            }
+
+            if (!\in_array($constFetchNode->class->toString(), ['self', 'static'], true)) {
+                continue;
+            }
+
+            if (!$constFetchNode->name instanceof Identifier) {
+                continue;
+            }
+
+            $value = $constantValues[$constFetchNode->name->toString()] ?? null;
+            if (null === $value) {
+                continue;
+            }
+
+            if (\in_array($value, $values, true)) {
+                continue;
+            }
+
+            $values[] = $value;
+        }
+
+        return $values;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function resolveOwnConstants(Class_ $class): array
+    {
+        $constantValues = [];
+        foreach ($class->getConstants() as $classConst) {
+            foreach ($classConst->consts as $const) {
+                if ($const->value instanceof String_) {
+                    $constantValues[$const->name->toString()] = $const->value->value;
+                }
+            }
+        }
+
+        return $constantValues;
+    }
+
+    /**
+     * @param list<string> $first
+     * @param list<string> $second
+     *
+     * @return list<string>
+     */
+    private function mergeUnique(array $first, array $second): array
+    {
+        foreach ($second as $value) {
+            if (!\in_array($value, $first, true)) {
+                $first[] = $value;
+            }
+        }
+
+        return $first;
     }
 
     /**

@@ -60,13 +60,15 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
     #[Override]
     public function get(Vulnerability $vulnerability, string $codeContext): ?array
     {
-        $path = $this->pathFor($vulnerability, $codeContext);
-
-        if (!$this->filesystem->exists($path)) {
-            return null;
-        }
+        $path = null;
 
         try {
+            $path = $this->pathFor($vulnerability, $codeContext);
+
+            if (!$this->filesystem->exists($path)) {
+                return null;
+            }
+
             $decoded = json_decode($this->filesystem->readFile($path), true, flags: \JSON_THROW_ON_ERROR);
             if (!\is_array($decoded)) {
                 return null;
@@ -75,17 +77,10 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
             $this->logger->debug('Reviewer cache hit', ['path' => $path]);
 
             return $this->coerceToReview($decoded);
-        } catch (IOException $ioException) {
+        } catch (IOException|JsonException $exception) {
             $this->logger->warning('Reviewer cache entry was unreadable, ignoring', [
                 'path' => $path,
-                'error' => $ioException->getMessage(),
-            ]);
-
-            return null;
-        } catch (JsonException $jsonException) {
-            $this->logger->warning('Reviewer cache entry was unreadable, ignoring', [
-                'path' => $path,
-                'error' => $jsonException->getMessage(),
+                'error' => $exception->getMessage(),
             ]);
 
             return null;
@@ -95,9 +90,10 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
     #[Override]
     public function store(Vulnerability $vulnerability, string $codeContext, array $review): void
     {
-        $path = $this->pathFor($vulnerability, $codeContext);
+        $path = null;
 
         try {
+            $path = $this->pathFor($vulnerability, $codeContext);
             $encoded = json_encode($review, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
             $this->filesystem->mkdir(\dirname($path));
             $this->filesystem->dumpFile($path, $encoded);

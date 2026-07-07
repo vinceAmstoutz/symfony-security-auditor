@@ -143,6 +143,15 @@ final class AttackerAgentTest extends TestCase
             {
                 return [];
             }
+
+            #[Override]
+            public function recordFoundVulnerability(Vulnerability $vulnerability): void {}
+
+            #[Override]
+            public function drainFoundVulnerabilities(): array
+            {
+                return [];
+            }
         };
 
         $result = $attackerAgent->analyze(
@@ -1224,6 +1233,59 @@ final class AttackerAgentTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_preserves_a_finding_found_before_a_mid_run_budget_abort(): void
+    {
+        $files = $this->makeFiveFiles();
+        $firstChunkResponse = (string) json_encode([[
+            'type' => 'sql_injection',
+            'severity' => 'high',
+            'title' => 'SQL Injection in A',
+            'description' => 'desc',
+            'file_path' => 'src/A.php',
+            'line_start' => 10,
+            'line_end' => 15,
+            'vulnerable_code' => '$q',
+            'attack_vector' => 'inject',
+            'proof' => "' OR 1",
+            'remediation' => 'fix',
+            'confidence' => 0.9,
+        ]]);
+
+        $callCount = 0;
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturnCallback(static function () use (&$callCount, $firstChunkResponse): LLMResponse {
+                ++$callCount;
+                if (2 === $callCount) {
+                    throw BudgetExceededException::forTokens(10, 5);
+                }
+
+                return LLMResponse::of($firstChunkResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(1, 1));
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['fileChunker' => new FileChunker(ChunkingStrategy::Type, 1)]);
+
+        $budgetExceeded = false;
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The agent must rethrow BudgetExceededException.');
+
+        $survived = $auditContext->drainFoundVulnerabilities();
+        self::assertCount(1, $survived);
+        self::assertSame('src/A.php', $survived[0]->filePath());
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
@@ -2223,6 +2285,15 @@ final class AttackerAgentTest extends TestCase
             {
                 return [];
             }
+
+            #[Override]
+            public function recordFoundVulnerability(Vulnerability $vulnerability): void {}
+
+            #[Override]
+            public function drainFoundVulnerabilities(): array
+            {
+                return [];
+            }
         };
 
         $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient);
@@ -2738,6 +2809,7 @@ final class AttackerAgentTest extends TestCase
                 ],
                 $auditContext->coverage(),
             );
+            self::assertCount(4, $auditContext->drainFoundVulnerabilities());
         }
     }
 
