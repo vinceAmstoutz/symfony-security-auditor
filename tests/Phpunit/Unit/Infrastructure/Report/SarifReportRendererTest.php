@@ -547,6 +547,16 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame('gpt-4o', $decoded['primary_model']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_preserves_the_float_type_of_a_whole_number_cost(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+
+        self::assertStringContainsString('"estimated_cost_usd": 0.0', $output);
+    }
+
     /** @return array{input_tokens: int, output_tokens: int, total_tokens: int, estimated_cost_usd: float, primary_model: string} */
     private function decodeSarifProperties(AuditReport $auditReport): array
     {

@@ -45,8 +45,8 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
         SecretPatternLabel::PemPrivateKey->value => '/-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/',
         SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]*://)[^:@/\s]*:[^/\s]+@~i',
-        SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|DSN)(?:_[A-Z0-9]+)*)\s*=[ \t]*(?!\s*\n)(?:(["\'])[^"\'\n]*\2|\S+)/m',
-        SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])([^"\'\n]{4,})\2|([^"\'\s]\S{3,}(?:[ \t]+[A-Za-z0-9]+)*))/i',
+        SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|DSN)(?:_[A-Z0-9]+)*)\s*=[ \t]*(?!\s*\n)(?:(["\'])(?:\\\\.|[^"\'\n])*\2|\S+)/m',
+        SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|[^"\'\n]){4,})\2|([^"\'\s]\S{3,}(?:[ \t]+[A-Za-z0-9]+)*))/i',
         SecretPatternLabel::MultilineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])([^"\'\n]{4,})\2/mi',
     ];
 
@@ -84,6 +84,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             $result = match (SecretPatternLabel::tryFrom($label)) {
                 SecretPatternLabel::InlineAssignment => preg_replace_callback($pattern, $this->redactInlineAssignment(...), $content),
                 SecretPatternLabel::MultilineAssignment => preg_replace_callback($pattern, $this->redactMultilineAssignment(...), $content),
+                SecretPatternLabel::PemPrivateKey => preg_replace_callback($pattern, $this->redactPreservingLineCount(...), $content),
                 default => preg_replace($pattern, $this->replacementFor($label), $content),
             };
 
@@ -133,7 +134,20 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             return $match[0];
         }
 
-        return \sprintf('%s %s***REDACTED:%s***%s', $match[1], $quote, SecretPatternLabel::MultilineAssignment->value, $quote);
+        return \sprintf('%s%s%s***REDACTED:%s***%s', $match[1], str_repeat("\n", substr_count($match[0], "\n")), $quote, SecretPatternLabel::MultilineAssignment->value, $quote);
+    }
+
+    /**
+     * Replaces a multi-line match (the PEM key block) with a single placeholder
+     * line followed by enough blank lines to keep the file's total line count
+     * unchanged — otherwise every subsequent line number the attacker/reviewer
+     * reports would be off by the number of lines the key spanned.
+     *
+     * @param array<int|string, string> $match
+     */
+    private function redactPreservingLineCount(array $match): string
+    {
+        return \sprintf('***REDACTED:%s***%s', SecretPatternLabel::PemPrivateKey->value, str_repeat("\n", substr_count($match[0], "\n")));
     }
 
     /**

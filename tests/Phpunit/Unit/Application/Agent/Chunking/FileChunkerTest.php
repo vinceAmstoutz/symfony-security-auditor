@@ -87,6 +87,26 @@ final class FileChunkerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_feature_strategy_groups_an_api_resource_with_its_repository(): void
+    {
+        $files = [
+            $this->makeFileWithContent('src/ApiResource/Offer.php', "<?php\n#[ApiResource]\nclass Offer {}"),
+            $this->makeFile('src/Repository/OfferRepository.php'),
+            $this->makeFile('src/Entity/Order.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $offerChunk = $this->findChunkContaining($chunks, 'src/ApiResource/Offer.php');
+        self::assertNotNull($offerChunk);
+        $offerChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $offerChunk);
+        self::assertContains('src/Repository/OfferRepository.php', $offerChunkPaths);
+        self::assertNotContains('src/Entity/Order.php', $offerChunkPaths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_strategy_groups_templates_under_matching_directory(): void
     {
         $files = [
@@ -456,6 +476,14 @@ final class FileChunkerTest extends TestCase
     private function makeFile(string $path): ProjectFile
     {
         return ProjectFile::create($path, '/app/'.$path, '<?php');
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    private function makeFileWithContent(string $path, string $content): ProjectFile
+    {
+        return ProjectFile::create($path, '/app/'.$path, $content);
     }
 
     /**

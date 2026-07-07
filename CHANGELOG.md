@@ -2537,6 +2537,49 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/Diff/ProcessGitChangedFilesResolver.php`) now
   passes `-z` to `git diff`, which NUL-terminates each path and disables quoting
   entirely, and splits the output on `\0` instead of newlines.
+- **Four more exception factories formatted a decimal value with a bare
+  `sprintf('...%f', ...)`, rendering a locale-dependent decimal separator** —
+  the same bug class fixed for `%.Nf` call sites previously, but missed there
+  because that sweep searched only for the explicit-precision form.
+  `InvalidRetryConfigurationException::forLowBackoffMultiplier()`/
+  `forOutOfRangeJitterRatio()`
+  (`src/Audit/Infrastructure/LLM/Exception/InvalidRetryConfigurationException.php`),
+  `InvalidAuditBudgetException::forNonPositiveCost()`
+  (`src/Audit/Domain/Exception/InvalidAuditBudgetException.php`),
+  `InvalidVulnerabilityClassificationException::forOutOfRangeConfidence()`
+  (`src/Audit/Domain/Exception/InvalidVulnerabilityClassificationException.php`),
+  and `InvalidAuditCostException::forNegativeCost()`
+  (`src/Audit/Domain/Exception/InvalidAuditCostException.php`) now use
+  `number_format($value, 6, '.', '')`.
+- **`AttackerAgent`'s lean-mode partial-filter left a filtered-out file with no
+  coverage entry at all**, unlike the all-filtered case, which explicitly
+  records every file as `skipped`. A mix of marked and unmarked files (the
+  common case) silently dropped the unmarked ones from the report's `coverage`
+  array instead of recording them as `skipped` — indistinguishable from a
+  coverage-tracking bug rather than an intentional lean-mode exclusion.
+  `analyze()` and the new `droppedByLeanFilter()`
+  (`src/Audit/Application/Agent/AttackerAgent.php`) now record every file lean
+  mode excluded, not only in the all-excluded case.
+- **`FileChunker`'s default `Feature` chunking strategy never seeded a feature
+  from an API Platform `#[ApiResource]` or `#[AsLiveComponent]` class** —
+  `extractFeatureNames()` only recognized `ProjectFileType::CONTROLLER`, so a
+  project exposing resources solely through these first-class "front door" types
+  (no literal `*Controller.php`) never grouped a resource with its own
+  entity/repository/voter; every one of those files fell into flat type-priority
+  leftover chunks instead, splitting a resource from its data layer across LLM
+  calls. `extractFeatureNames()` and `featureNameOf()`
+  (`src/Audit/Application/Agent/Chunking/FileChunker.php`) now seed a feature
+  from any `ProjectFileType::isControllerLike()` file, using the bare class name
+  (no suffix to strip) for non-controller types.
+- **`JsonReportRenderer` and `SarifReportRenderer` silently changed a `float`
+  field's JSON literal type to a bare integer whenever its value had no
+  fractional part** (e.g. the documented `AuditCost::zero()` fallback's
+  `estimated_cost_usd: 0` instead of `0.0`) — PHP's `json_encode()` omits the
+  decimal point for a whole-number float unless told otherwise, so the same
+  schema field's JSON type shape flipped at runtime based purely on the value,
+  not the schema. Both renderers now pass `JSON_PRESERVE_ZERO_FRACTION`
+  (`src/Audit/Infrastructure/Report/JsonReportRenderer.php`,
+  `src/Audit/Infrastructure/Report/SarifReportRenderer.php`).
 
 ### Security
 
@@ -2638,6 +2681,30 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   pattern containing every candidate falls back to "no match" (the same
   graceful-failure behavior a malformed pattern already had), never a wrong
   match.
+- **`RegexSecretScrubber`'s multi-line redactions (a PEM private key block, a
+  value wrapped onto the next line) collapsed every matched line into a single
+  placeholder line, permanently shrinking the file's line count** — unlike
+  `RegexCodeSlicer`, which explicitly preserves line count so the attacker
+  prompt's `line_start`/`line_end` numbering protocol stays accurate against the
+  original source. Every line after a redacted secret shifted up by however many
+  lines were collapsed, so a finding's reported location silently desynced from
+  the real file — a GitHub Actions annotation or SARIF result could point tens
+  of lines away from the actual vulnerable code. `redactPreservingLineCount()`
+  (new) and `redactMultilineAssignment()`
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) now pad the
+  placeholder with the same number of newlines the match consumed.
+- **`RegexSecretScrubber`'s quoted-value patterns had no awareness of a
+  backslash-escaped quote inside the value, letting the scrubber mistake it for
+  the closing quote** — a secret like `PASSWORD="ab\"cd1234"` redacted only
+  `ab`, leaking `cd1234` verbatim; a shorter pre-escape prefix could fail the
+  pattern's own length minimum entirely and leave the whole value untouched.
+  Real-world credentials containing an escaped quote (JSON-embedded secrets, PHP
+  double-quoted strings, YAML flow scalars) reached the LLM provider partially
+  or fully in plaintext. The `env_assignment` and `inline_assignment`
+  quoted-value captures
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) now treat a
+  backslash-escaped character as part of the value instead of a candidate
+  closing quote.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

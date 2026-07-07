@@ -223,6 +223,25 @@ final class RetryPolicyTest extends TestCase
         new BackoffSchedule(jitterRatio: -0.01);
     }
 
+    public function test_invalid_configuration_messages_format_the_value_with_a_period_regardless_of_the_process_numeric_locale(): void
+    {
+        $previousLocale = setlocale(\LC_NUMERIC, '0');
+        setlocale(\LC_NUMERIC, 'de_DE.UTF-8');
+
+        try {
+            $message = '';
+            try {
+                new BackoffSchedule(backoffMultiplier: 0.5);
+            } catch (InvalidArgumentException $invalidArgumentException) {
+                $message = $invalidArgumentException->getMessage();
+            }
+        } finally {
+            setlocale(\LC_NUMERIC, false !== $previousLocale ? $previousLocale : 'C');
+        }
+
+        self::assertStringContainsString('got 0.500000', $message);
+    }
+
     /**
      * @throws InvalidRetryConfigurationException
      */

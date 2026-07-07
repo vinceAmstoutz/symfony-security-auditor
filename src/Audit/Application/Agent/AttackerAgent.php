@@ -151,6 +151,8 @@ final readonly class AttackerAgent implements AttackerAgentInterface
             return $this->skipLeanFilteredAnalysis($files, $coverageRecorder);
         }
 
+        ChunkCoverageRecorder::record($this->droppedByLeanFilter($files, $effectiveFiles), 'skipped', $coverageRecorder);
+
         $this->logStartingAnalysis($files, $effectiveFiles, $markers, $useTools, $attackerAnalysisRequest);
 
         $toolRegistry = $useTools ? $this->toolRegistryFactory->forProjectFiles($effectiveFiles) : null;
@@ -186,6 +188,22 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         ChunkCoverageRecorder::record($files, 'skipped', $coverageRecorder);
 
         return [];
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     * @param list<ProjectFile> $effectiveFiles
+     *
+     * @return list<ProjectFile>
+     */
+    private function droppedByLeanFilter(array $files, array $effectiveFiles): array
+    {
+        $effectivePaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $effectiveFiles);
+
+        return array_values(array_filter(
+            $files,
+            static fn (ProjectFile $projectFile): bool => !\in_array($projectFile->relativePath(), $effectivePaths, true),
+        ));
     }
 
     /**

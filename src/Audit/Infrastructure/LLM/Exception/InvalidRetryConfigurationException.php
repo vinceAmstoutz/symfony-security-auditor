@@ -30,12 +30,12 @@ final class InvalidRetryConfigurationException extends InvalidArgumentException
 
     public static function forLowBackoffMultiplier(float $backoffMultiplier): self
     {
-        return new self(\sprintf('backoffMultiplier must be >= 1.0, got %f', $backoffMultiplier));
+        return new self(\sprintf('backoffMultiplier must be >= 1.0, got %s', number_format($backoffMultiplier, 6, '.', '')));
     }
 
     public static function forOutOfRangeJitterRatio(float $jitterRatio): self
     {
-        return new self(\sprintf('jitterRatio must be in [0.0, 1.0], got %f', $jitterRatio));
+        return new self(\sprintf('jitterRatio must be in [0.0, 1.0], got %s', number_format($jitterRatio, 6, '.', '')));
     }
 
     public static function forNegativeRateLimitInitialDelay(int $rateLimitInitialDelayMs): self

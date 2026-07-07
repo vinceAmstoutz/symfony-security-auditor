@@ -134,4 +134,23 @@ final class AuditCostTest extends TestCase
         $this->expectException(InvalidAuditCostException::class);
         AuditCost::of(0, 0, -0.01, 'm');
     }
+
+    public function test_negative_cost_message_formats_the_value_with_a_period_regardless_of_the_process_numeric_locale(): void
+    {
+        $previousLocale = setlocale(\LC_NUMERIC, '0');
+        setlocale(\LC_NUMERIC, 'de_DE.UTF-8');
+
+        try {
+            $message = '';
+            try {
+                AuditCost::of(0, 0, -0.01, 'm');
+            } catch (InvalidAuditCostException $invalidAuditCostException) {
+                $message = $invalidAuditCostException->getMessage();
+            }
+        } finally {
+            setlocale(\LC_NUMERIC, false !== $previousLocale ? $previousLocale : 'C');
+        }
+
+        self::assertStringContainsString('got -0.010000', $message);
+    }
 }

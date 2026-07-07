@@ -29,6 +29,6 @@ final class InvalidAuditCostException extends InvalidArgumentException
 
     public static function forNegativeCost(float $estimatedCostUsd): self
     {
-        return new self(\sprintf('estimatedCostUsd must be >= 0.0, got %f', $estimatedCostUsd));
+        return new self(\sprintf('estimatedCostUsd must be >= 0.0, got %s', number_format($estimatedCostUsd, 6, '.', '')));
     }
 }

@@ -28,6 +28,6 @@ final readonly class JsonReportRenderer implements ReportRendererInterface
     #[Override]
     public function render(AuditReport $auditReport): string
     {
-        return json_encode($auditReport->toArray(), \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE);
+        return json_encode($auditReport->toArray(), \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_PRESERVE_ZERO_FRACTION);
     }
 }

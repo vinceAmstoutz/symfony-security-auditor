@@ -1966,6 +1966,71 @@ final class AttackerAgentTest extends TestCase
     }
 
     /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_lean_mode_records_skipped_coverage_for_a_file_filtered_out_of_a_partial_match(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
+
+        $scanner = new class implements StaticPreScannerInterface {
+            /**
+             * @throws InvalidRiskMarkerException
+             */
+            #[Override]
+            public function scan(array $files): array
+            {
+                return [
+                    RiskMarker::create(
+                        'src/Service/Risky.php',
+                        3,
+                        'eval_call',
+                        'eval() on dynamic input',
+                    ),
+                ];
+            }
+        };
+
+        $projectFile = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
+        $clean = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['staticPreScanner' => $scanner, 'leanMode' => true]);
+
+        $coverageRecorder = new class implements CoverageRecorderInterface {
+            /** @var array<string, string> */
+            public array $statusByPath = [];
+
+            #[Override]
+            public function recordCoverage(string $stage, string $filePath, string $status): void
+            {
+                $this->statusByPath[$filePath] = $status;
+            }
+
+            #[Override]
+            public function recordReviewedFinding(Vulnerability $vulnerability): void {}
+
+            #[Override]
+            public function drainReviewedFindings(): array
+            {
+                return [];
+            }
+
+            #[Override]
+            public function recordFoundVulnerability(Vulnerability $vulnerability): void {}
+
+            #[Override]
+            public function drainFoundVulnerabilities(): array
+            {
+                return [];
+            }
+        };
+
+        $this->callAnalyze($attackerAgent, [$projectFile, $clean], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $coverageRecorder);
+
+        self::assertSame('skipped', $coverageRecorder->statusByPath['src/Service/Clean.php'] ?? null);
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      * @throws InvalidProjectFileException
      */

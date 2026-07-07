@@ -53,6 +53,16 @@ final class JsonReportRendererTest extends AbstractReportRendererTestCase
 
     /**
      * @throws InvalidAuditContextException
+     */
+    public function test_render_preserves_the_float_type_of_a_whole_number_cost(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+
+        self::assertStringContainsString('"estimated_cost_usd": 0.0', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */

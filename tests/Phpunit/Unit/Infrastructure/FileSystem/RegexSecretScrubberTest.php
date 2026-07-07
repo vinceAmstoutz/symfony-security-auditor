@@ -248,6 +248,20 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame('MAIL_PASSWORD=***REDACTED:env_assignment***', $output);
     }
 
+    public function test_env_assignment_redacts_a_double_quoted_value_containing_an_escaped_quote(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('PASSWORD="ab\"cd1234"');
+
+        self::assertSame('PASSWORD=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_inline_assignment_redacts_a_double_quoted_value_containing_an_escaped_quote(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('password: "abcd\"ef1234"');
+
+        self::assertSame('password: "***REDACTED:inline_assignment***"', $output);
+    }
+
     public function test_unquoted_inline_assignment_redacts_a_multi_word_value(): void
     {
         $output = $this->regexSecretScrubber->scrub('password: hunter2 secret pass phrase');
@@ -259,7 +273,7 @@ final class RegexSecretScrubberTest extends TestCase
     {
         $output = $this->regexSecretScrubber->scrub("\$config = [\n    'password' =>\n        'SuperSecretValue1234',\n];");
 
-        self::assertSame("\$config = [\n    'password' => '***REDACTED:multiline_assignment***',\n];", $output);
+        self::assertSame("\$config = [\n    'password' =>\n'***REDACTED:multiline_assignment***',\n];", $output);
     }
 
     public function test_a_symfony_placeholder_wrapped_to_the_next_line_is_left_unmodified(): void
@@ -269,6 +283,27 @@ final class RegexSecretScrubberTest extends TestCase
         $output = $this->regexSecretScrubber->scrub($input);
 
         self::assertSame($input, $output);
+    }
+
+    public function test_redacting_a_value_wrapped_to_the_next_line_preserves_the_total_line_count(): void
+    {
+        $input = "\$config = [\n    'password' =>\n        'SuperSecretValue1234',\n];";
+
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame(substr_count($input, "\n"), substr_count($output, "\n"));
+    }
+
+    public function test_redacting_a_pem_private_key_preserves_the_total_line_count(): void
+    {
+        $pem = "-----BEGIN RSA PRIVATE KEY-----\n".implode("\n", array_fill(0, 5, 'MIIEowIBAAKCAQEAxYZ'))."\n-----END RSA PRIVATE KEY-----\n";
+        $input = "<?php\n\$key = <<<PEM\n{$pem}PEM;\n\$dangerous = eval(\$_GET['code']);\n";
+
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        $outputLines = explode("\n", $output);
+        self::assertSame(substr_count($input, "\n"), substr_count($output, "\n"));
+        self::assertStringContainsString('eval(', $outputLines[10]);
     }
 
     public function test_env_assignment_redacts_a_value_containing_a_literal_hash_character(): void

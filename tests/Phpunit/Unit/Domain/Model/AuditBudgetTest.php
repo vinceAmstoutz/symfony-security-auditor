@@ -163,6 +163,25 @@ final class AuditBudgetTest extends TestCase
         AuditBudget::forCost(-0.5);
     }
 
+    public function test_for_cost_rejects_negative_and_formats_the_value_with_a_period_regardless_of_the_process_numeric_locale(): void
+    {
+        $previousLocale = setlocale(\LC_NUMERIC, '0');
+        setlocale(\LC_NUMERIC, 'de_DE.UTF-8');
+
+        try {
+            $message = '';
+            try {
+                AuditBudget::forCost(-0.5);
+            } catch (InvalidAuditBudgetException $invalidAuditBudgetException) {
+                $message = $invalidAuditBudgetException->getMessage();
+            }
+        } finally {
+            setlocale(\LC_NUMERIC, false !== $previousLocale ? $previousLocale : 'C');
+        }
+
+        self::assertStringContainsString('got -0.500000', $message);
+    }
+
     /**
      * @throws InvalidAuditBudgetException
      */

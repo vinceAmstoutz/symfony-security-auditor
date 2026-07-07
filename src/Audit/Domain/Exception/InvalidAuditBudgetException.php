@@ -24,6 +24,6 @@ final class InvalidAuditBudgetException extends InvalidArgumentException
 
     public static function forNonPositiveCost(float $maxCostUsd): self
     {
-        return new self(\sprintf('maxCostUsd must be > 0.0, got %f', $maxCostUsd));
+        return new self(\sprintf('maxCostUsd must be > 0.0, got %s', number_format($maxCostUsd, 6, '.', '')));
     }
 }

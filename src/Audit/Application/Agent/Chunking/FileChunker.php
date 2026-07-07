@@ -157,7 +157,7 @@ final readonly class FileChunker
     {
         $names = [];
         foreach ($files as $file) {
-            if (ProjectFileType::CONTROLLER !== $file->fileType()) {
+            if (!$file->fileType()->isControllerLike()) {
                 continue;
             }
 
@@ -173,7 +173,10 @@ final readonly class FileChunker
 
     private function featureNameOf(ProjectFile $projectFile): ?string
     {
-        $featureName = u(basename($projectFile->relativePath(), '.php'))->beforeLast('Controller')->toString();
+        $baseName = basename($projectFile->relativePath(), '.php');
+        $featureName = ProjectFileType::CONTROLLER === $projectFile->fileType()
+            ? u($baseName)->beforeLast('Controller')->toString()
+            : $baseName;
 
         return '' === $featureName ? null : $featureName;
     }
