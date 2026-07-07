@@ -636,7 +636,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         self::assertSame('/custom/cache/reviewer', $containerBuilder->getParameter('symfony_security_auditor.cache.reviewer_dir'));
         self::assertSame(
-            \sprintf('claude-haiku-4-5-20251001|reviewer-v%d|prompt-v%d|collect-tool|tools-off|batch-1', FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
+            \sprintf('claude-haiku-4-5-20251001|reviewer-v%d|prompt-v%d|collect-tool|tools-off|batch-1|max-output-4096', FilesystemReviewerCache::CACHE_VERSION, ReviewerPromptBuilder::PROMPT_VERSION),
             $containerBuilder->getParameter('symfony_security_auditor.cache.reviewer_key_salt'),
         );
     }
@@ -989,7 +989,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         $expectedPatternHash = substr(hash('sha256', json_encode([], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)), 0, 16);
         $expectedKeySalt = \sprintf(
-            'gpt-4o|prompt-v%d|prescan-v%d|prescan-on|tools-on-8|patterns-%s|collect-tool|skills-full|slice-off',
+            'gpt-4o|prompt-v%d|prescan-v%d|prescan-on|tools-on-8|patterns-%s|collect-tool|skills-full|slice-off|max-output-4096',
             AttackerPromptBuilder::PROMPT_VERSION,
             RegexStaticPreScanner::CACHE_VERSION,
             $expectedPatternHash,
@@ -1077,6 +1077,26 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
             ->getParameter('symfony_security_auditor.cache.key_salt');
 
         self::assertNotSame($narrowThresholdKeySalt, $wideThresholdKeySalt);
+    }
+
+    public function test_bundle_cache_key_salt_changes_when_attacker_max_output_tokens_changes(): void
+    {
+        $defaultKeySalt = $this->loadParameters(['model' => 'gpt-4o'])
+            ->getParameter('symfony_security_auditor.cache.key_salt');
+        $raisedKeySalt = $this->loadParameters(['model' => 'gpt-4o', 'attacker_max_output_tokens' => 8192])
+            ->getParameter('symfony_security_auditor.cache.key_salt');
+
+        self::assertNotSame($defaultKeySalt, $raisedKeySalt);
+    }
+
+    public function test_bundle_reviewer_key_salt_changes_when_reviewer_max_output_tokens_changes(): void
+    {
+        $defaultKeySalt = $this->loadParameters(['model' => 'gpt-4o'])
+            ->getParameter('symfony_security_auditor.cache.reviewer_key_salt');
+        $raisedKeySalt = $this->loadParameters(['model' => 'gpt-4o', 'reviewer_max_output_tokens' => 8192])
+            ->getParameter('symfony_security_auditor.cache.reviewer_key_salt');
+
+        self::assertNotSame($defaultKeySalt, $raisedKeySalt);
     }
 
     public function test_bundle_fast_profile_resolves_cost_levers(): void

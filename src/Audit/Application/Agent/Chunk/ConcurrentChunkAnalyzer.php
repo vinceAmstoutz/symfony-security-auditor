@@ -298,11 +298,27 @@ final readonly class ConcurrentChunkAnalyzer
 
             foreach ($window as $index => $entry) {
                 ChunkCoverageRecorder::record($entry['chunk'], $status, $coverageRecorder);
+                $this->recordDrainedFindings($entry['session'], $coverageRecorder);
                 $results[$index] = $this->vulnerabilityFactory->fromList([]);
             }
         }
 
         return $results;
+    }
+
+    /**
+     * Recovers findings the LLM already recorded via `record_vulnerability`
+     * tool calls before the batch call carrying this entry's window aborted
+     * — otherwise they vanish with the exception even though
+     * `drainFoundVulnerabilities()` exists precisely to let a caller recover
+     * candidates found before a mid-run abort. A window that was never
+     * dispatched drains empty, which is harmless.
+     */
+    private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, CoverageRecorderInterface $coverageRecorder): void
+    {
+        foreach ($this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain())->vulnerabilities() as $vulnerability) {
+            $coverageRecorder->recordFoundVulnerability($vulnerability);
+        }
     }
 
     /**

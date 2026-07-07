@@ -290,7 +290,13 @@ final readonly class ToolConversationWavefront
             return $this->abortConversation($state, $request, $maxToolIterations);
         }
 
-        return $this->processDeferredResult($state, $deferredResult, $request);
+        try {
+            return $this->processDeferredResult($state, $deferredResult, $request);
+        } catch (BudgetExceededException $budgetExceededException) {
+            throw $budgetExceededException;
+        } catch (Throwable) {
+            return $this->abortConversation($state, $request, $maxToolIterations);
+        }
     }
 
     /**

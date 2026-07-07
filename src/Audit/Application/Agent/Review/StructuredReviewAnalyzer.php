@@ -119,15 +119,23 @@ final readonly class StructuredReviewAnalyzer
 
             return $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $verdict, $coverageRecorder);
         } catch (BudgetExceededException $budgetExceededException) {
-            $this->reviewOutcomeRecorder->recordUnreached($vulnerability, 'aborted', $coverageRecorder);
+            $this->recordAbortOrRecoveredVerdict($vulnerability, $structuredReviewCollectionSession, 'aborted', $coverageRecorder);
 
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
-            $this->reviewOutcomeRecorder->recordUnreached($vulnerability, 'errored', $coverageRecorder);
+            $this->recordAbortOrRecoveredVerdict($vulnerability, $structuredReviewCollectionSession, 'errored', $coverageRecorder);
 
             throw $llmProviderException;
         } catch (Throwable $exception) {
-            return $this->reviewOutcomeRecorder->recordReviewError($vulnerability, $exception, $coverageRecorder);
+            return $this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $structuredReviewCollectionSession, $coverageRecorder)
+                ?? $this->reviewOutcomeRecorder->recordReviewError($vulnerability, $exception, $coverageRecorder);
+        }
+    }
+
+    private function recordAbortOrRecoveredVerdict(Vulnerability $vulnerability, StructuredReviewCollectionSession $structuredReviewCollectionSession, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        if (!$this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $structuredReviewCollectionSession, $coverageRecorder) instanceof Vulnerability) {
+            $this->reviewOutcomeRecorder->recordUnreached($vulnerability, $status, $coverageRecorder);
         }
     }
 }

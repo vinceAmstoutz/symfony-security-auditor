@@ -18,8 +18,10 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewerVerdictCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewOutcomeRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\StructuredReviewCollectionSession;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\VerdictApplier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -30,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
 
 final class ReviewOutcomeRecorderTest extends TestCase
 {
@@ -83,6 +86,38 @@ final class ReviewOutcomeRecorderTest extends TestCase
         $vulnerability = $this->recorder($progressReporter)->recordReviewError($this->vulnerability(), new RuntimeException('llm down'), new NullCoverageRecorder());
 
         self::assertFalse($vulnerability->isReviewerValidated());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_recover_drained_verdict_returns_null_when_nothing_was_recorded(): void
+    {
+        $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin(new RecordReviewToolFactory(), new NullLogger());
+
+        $result = $this->recorder(self::createStub(ProgressReporterInterface::class))->recoverDrainedVerdict($this->vulnerability(), $structuredReviewCollectionSession, new NullCoverageRecorder());
+
+        self::assertNull($result);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_recover_drained_verdict_applies_the_last_recorded_verdict(): void
+    {
+        $vulnerability = $this->vulnerability();
+        $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin(new RecordReviewToolFactory(), new NullLogger());
+        $structuredReviewCollectionSession->toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
+
+        $progressReporter = $this->expectingReviewedEvent(true);
+        $result = $this->recorder($progressReporter)->recoverDrainedVerdict($vulnerability, $structuredReviewCollectionSession, new NullCoverageRecorder());
+
+        self::assertNotNull($result);
+        self::assertTrue($result->isReviewerValidated());
     }
 
     private function expectingReviewedEvent(bool $accepted): ProgressReporterInterface

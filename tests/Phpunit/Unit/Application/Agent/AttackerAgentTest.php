@@ -2104,6 +2104,54 @@ final class AttackerAgentTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_structured_collection_preserves_a_finding_recorded_before_a_later_round_of_the_same_chunk_aborts(): void
+    {
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
+                $toolRegistry->execute('record_vulnerability', [
+                    'type' => 'broken_access_control',
+                    'severity' => 'high',
+                    'title' => 'IDOR on user show',
+                    'description' => 'No ownership check on the controller.',
+                    'file_path' => 'src/Controller/UserController.php',
+                    'line_start' => 12,
+                    'line_end' => 14,
+                    'vulnerable_code' => '$repo->find($id);',
+                    'attack_vector' => 'GET /user/9999',
+                    'proof' => '200 OK leaking other tenant data',
+                    'remediation' => "Add denyAccessUnlessGranted('VIEW', \$user).",
+                    'confidence' => 0.9,
+                ]);
+
+                throw BudgetExceededException::forTokens(10, 5);
+            });
+
+        $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $budgetExceeded = false;
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The agent must rethrow BudgetExceededException.');
+
+        $survived = $auditContext->drainFoundVulnerabilities();
+        self::assertCount(1, $survived);
+        self::assertSame('IDOR on user show', $survived[0]->title());
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      * @throws InvalidProjectFileException
      */
@@ -2594,6 +2642,37 @@ final class AttackerAgentTest extends TestCase
                 [['stage' => 'attacker', 'file' => 'src/A.php', 'status' => 'aborted']],
                 $auditContext->coverage(),
             );
+        }
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_concurrent_structured_analysis_preserves_a_finding_recorded_before_the_whole_batch_call_aborts_on_budget_exceeded(): void
+    {
+        $files = [$this->makeFile('src/A.php')];
+
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests): array {
+                self::registryOf($requests[0])->execute('record_vulnerability', self::recordedFinding('finding-a'));
+
+                throw BudgetExceededException::forTokens(10, 5);
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient);
+
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+            self::fail('expected BudgetExceededException');
+        } catch (BudgetExceededException) {
+            $survived = $auditContext->drainFoundVulnerabilities();
+            self::assertCount(1, $survived);
+            self::assertSame('finding-a', $survived[0]->title());
         }
     }
 

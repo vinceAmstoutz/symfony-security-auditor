@@ -133,11 +133,11 @@ final readonly class ConcurrentStructuredReviewAnalyzer
             try {
                 $reviewed = $this->dispatchPending($windowBatch, $coverageRecorder, $bypassCache, $reviewed);
             } catch (BudgetExceededException $budgetExceededException) {
-                $this->failRemainingWindows($indexWindows, $windowNumber, $concurrentReviewBatch->vulnerabilities, 'aborted', $coverageRecorder);
+                $this->failRemainingWindows($indexWindows, $windowNumber, $concurrentReviewBatch, 'aborted', $coverageRecorder);
 
                 throw $budgetExceededException;
             } catch (LLMProviderException $llmProviderException) {
-                $this->failRemainingWindows($indexWindows, $windowNumber, $concurrentReviewBatch->vulnerabilities, 'errored', $coverageRecorder);
+                $this->failRemainingWindows($indexWindows, $windowNumber, $concurrentReviewBatch, 'errored', $coverageRecorder);
 
                 throw $llmProviderException;
             }
@@ -149,12 +149,13 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     /**
      * Marks every finding in the window that just failed, plus every window
      * not yet attempted, as failed — without touching windows that already
-     * finalized successfully.
+     * finalized successfully. A finding whose `record_review` tool call
+     * already landed in an earlier round of the same failed window's batch
+     * call keeps its verdict instead of being marked unreached.
      *
-     * @param list<list<int>>     $indexWindows
-     * @param list<Vulnerability> $vulnerabilities
+     * @param list<list<int>> $indexWindows
      */
-    private function failRemainingWindows(array $indexWindows, int $fromWindowNumber, array $vulnerabilities, string $status, CoverageRecorderInterface $coverageRecorder): void
+    private function failRemainingWindows(array $indexWindows, int $fromWindowNumber, ConcurrentReviewBatch $concurrentReviewBatch, string $status, CoverageRecorderInterface $coverageRecorder): void
     {
         foreach ($indexWindows as $windowNumber => $indexes) {
             if ($windowNumber < $fromWindowNumber) {
@@ -162,7 +163,11 @@ final readonly class ConcurrentStructuredReviewAnalyzer
             }
 
             foreach ($indexes as $index) {
-                $this->reviewOutcomeRecorder->recordUnreached($vulnerabilities[$index], $status, $coverageRecorder);
+                $vulnerability = $concurrentReviewBatch->vulnerabilities[$index];
+                $recovered = $this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $concurrentReviewBatch->sessions[$index], $coverageRecorder);
+                if (!$recovered instanceof Vulnerability) {
+                    $this->reviewOutcomeRecorder->recordUnreached($vulnerability, $status, $coverageRecorder);
+                }
             }
         }
     }

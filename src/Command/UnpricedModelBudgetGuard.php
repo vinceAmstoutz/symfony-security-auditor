@@ -52,7 +52,7 @@ final readonly class UnpricedModelBudgetGuard implements UnpricedModelBudgetGuar
         ));
 
         if ($input->isInteractive()) {
-            return $symfonyStyle->confirm('Continue anyway, knowing the cost budget will not be enforced?', false);
+            return $errorStyle->confirm('Continue anyway, knowing the cost budget will not be enforced?', false);
         }
 
         $errorStyle->error('Refusing to start a budgeted audit with an unpriceable model in non-interactive mode. Configure a model with published pricing, or remove audit.budget.max_cost_usd.');

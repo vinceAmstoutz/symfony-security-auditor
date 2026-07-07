@@ -216,6 +216,12 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
      */
     private function buildProjectFile(SplFileInfo $splFile, string $projectPath, Closure $reader): ?ProjectFile
     {
+        if ($splFile->isLink()) {
+            $this->logger->warning('Skipped symlinked file', ['path' => $splFile->getPathname()]);
+
+            return null;
+        }
+
         try {
             $content = $reader($splFile);
             if ($this->secretScrubber instanceof SecretScrubberInterface) {

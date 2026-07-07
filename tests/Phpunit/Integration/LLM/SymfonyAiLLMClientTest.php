@@ -1213,6 +1213,66 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      */
+    public function test_complete_batch_with_tools_finalizes_as_empty_content_when_the_retry_itself_fails_after_tools_ran(): void
+    {
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+
+        $platform = new class implements PlatformInterface {
+            private int $invocations = 0;
+
+            #[Override]
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                ++$this->invocations;
+
+                if (1 === $this->invocations) {
+                    return new DeferredResult(
+                        new PlainConverter(new MultiPartResult([new ToolCallResult([new ToolCall('1', 'record')])])),
+                        new InMemoryRawResult(['text' => ''], [], (object) []),
+                        $options,
+                    );
+                }
+
+                if (2 === $this->invocations) {
+                    throw new RuntimeException('HTTP 503 Service Unavailable');
+                }
+
+                $deferredResult = new DeferredResult(
+                    new PlainConverter(new TextResult('should never surface')),
+                    new InMemoryRawResult(['text' => ''], [], (object) []),
+                    $options,
+                );
+                $deferredResult->getMetadata()->add('token_usage', new TokenUsage(promptTokens: -1, completionTokens: 0));
+
+                return $deferredResult;
+            }
+
+            #[Override]
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: new TokenUsageRecorder()),
+        );
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 3);
+
+        self::assertSame('empty_content', $responses[0]->stopReason());
+        self::assertSame('', $responses[0]->content());
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     */
     public function test_complete_batch_with_tools_accumulates_tokens_across_rounds(): void
     {
         $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());

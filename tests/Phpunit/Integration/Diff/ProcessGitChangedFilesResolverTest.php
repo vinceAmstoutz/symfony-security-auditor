@@ -249,6 +249,33 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     /**
      * @throws GitChangedFilesUnavailableException
      */
+    public function test_it_wraps_a_process_setup_failure_while_verifying_the_ref(): void
+    {
+        $this->initRepo();
+
+        $this->expectException(GitChangedFilesUnavailableException::class);
+        $this->expectExceptionMessage('Could not verify git ref "main"');
+
+        (new ProcessGitChangedFilesResolver(timeoutSeconds: -1))->changedSince($this->tmpDir, 'main');
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_wraps_a_process_setup_failure_while_checking_the_work_tree(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php', 'init');
+
+        $this->expectException(GitChangedFilesUnavailableException::class);
+        $this->expectExceptionMessage('Could not determine whether "'.$this->tmpDir.'/src" is a git working tree');
+
+        (new ProcessGitChangedFilesResolver(timeoutSeconds: -1))->changedSince($this->tmpDir.'/src', 'main');
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_wraps_a_git_diff_process_failure_when_the_ref_resolves_but_has_no_merge_base(): void
     {
         $this->initRepo();

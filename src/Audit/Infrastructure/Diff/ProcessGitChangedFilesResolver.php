@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff;
 
 use Override;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Process\Exception\ExceptionInterface;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\GitChangedFilesUnavailableException;
@@ -50,8 +51,11 @@ use function Symfony\Component\String\u;
  */
 final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesResolverInterface
 {
+    public const int DEFAULT_TIMEOUT_SECONDS = 60;
+
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
+        private int $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,
     ) {}
 
     /**
@@ -74,18 +78,36 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
         return $this->mergeAndNormalize([...$committed, ...$uncommitted]);
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     private function isInsideGitTree(string $projectPath): bool
     {
         $process = new Process(['git', 'rev-parse', '--is-inside-work-tree'], $projectPath);
-        $process->run();
+
+        try {
+            $process->setTimeout((float) $this->timeoutSeconds);
+            $process->run();
+        } catch (ExceptionInterface $exception) {
+            throw GitChangedFilesUnavailableException::forProcessFailure(\sprintf('determine whether "%s" is a git working tree', $projectPath), $exception);
+        }
 
         return $process->isSuccessful() && 'true' === u($process->getOutput())->trim()->toString();
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     private function refExists(string $projectPath, string $ref): bool
     {
         $process = new Process(['git', 'rev-parse', '--verify', '--quiet', $ref], $projectPath);
-        $process->run();
+
+        try {
+            $process->setTimeout((float) $this->timeoutSeconds);
+            $process->run();
+        } catch (ExceptionInterface $exception) {
+            throw GitChangedFilesUnavailableException::forProcessFailure(\sprintf('verify git ref "%s"', $ref), $exception);
+        }
 
         return $process->isSuccessful();
     }

@@ -252,7 +252,13 @@ final readonly class SequentialChunkAnalyzer
 
         $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger, $toolRegistry?->tools() ?? []);
 
-        $this->llmClient->completeWithTools($chunkContext->systemPrompt, $chunkContext->userMessage, $structuredVulnerabilityCollectionSession->toolRegistry, $this->maxToolIterations);
+        try {
+            $this->llmClient->completeWithTools($chunkContext->systemPrompt, $chunkContext->userMessage, $structuredVulnerabilityCollectionSession->toolRegistry, $this->maxToolIterations);
+        } catch (Throwable $throwable) {
+            $this->recordDrainedFindings($structuredVulnerabilityCollectionSession, $coverageRecorder);
+
+            throw $throwable;
+        }
 
         $rawData = $structuredVulnerabilityCollectionSession->drain();
 
@@ -263,5 +269,19 @@ final readonly class SequentialChunkAnalyzer
         ChunkCoverageRecorder::record($chunk, 'analyzed', $coverageRecorder);
 
         return $this->vulnerabilityFactory->fromList($rawData);
+    }
+
+    /**
+     * Recovers findings the LLM already recorded via `record_vulnerability`
+     * tool calls in an earlier round of this chunk's own conversation before
+     * a later round aborted it — otherwise they vanish with the exception
+     * even though `drainFoundVulnerabilities()` exists precisely to let a
+     * caller recover candidates found before a mid-run abort.
+     */
+    private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, CoverageRecorderInterface $coverageRecorder): void
+    {
+        foreach ($this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain())->vulnerabilities() as $vulnerability) {
+            $coverageRecorder->recordFoundVulnerability($vulnerability);
+        }
     }
 }

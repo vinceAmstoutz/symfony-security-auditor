@@ -36,4 +36,15 @@ final class GitChangedFilesUnavailableExceptionTest extends TestCase
 
         self::assertSame('git diff against "origin/main" failed: unknown error', $gitChangedFilesUnavailableException->getMessage());
     }
+
+    public function test_for_process_failure_names_the_operation_and_wraps_the_cause(): void
+    {
+        $runtimeException = new RuntimeException('timed out');
+
+        $gitChangedFilesUnavailableException = GitChangedFilesUnavailableException::forProcessFailure('verify git ref "main"', $runtimeException);
+
+        self::assertSame('Could not verify git ref "main": timed out', $gitChangedFilesUnavailableException->getMessage());
+        self::assertSame($runtimeException, $gitChangedFilesUnavailableException->getPrevious());
+        self::assertSame(0, $gitChangedFilesUnavailableException->getCode());
+    }
 }

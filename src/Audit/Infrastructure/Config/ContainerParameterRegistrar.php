@@ -132,13 +132,14 @@ final readonly class ContainerParameterRegistrar
     private function reviewerKeySalt(LLMConfiguration $llmConfiguration, AuditExecutionConfiguration $auditExecutionConfiguration): string
     {
         return \sprintf(
-            '%s|reviewer-v%d|prompt-v%d|collect-%s|tools-%s|batch-%d',
+            '%s|reviewer-v%d|prompt-v%d|collect-%s|tools-%s|batch-%d|max-output-%d',
             $llmConfiguration->reviewerModel(),
             FilesystemReviewerCache::CACHE_VERSION,
             ReviewerPromptBuilder::PROMPT_VERSION,
             $auditExecutionConfiguration->reviewerStructuredCollection ? 'tool' : 'json',
             $this->reviewerToolsSalt($auditExecutionConfiguration),
             $auditExecutionConfiguration->reviewerBatchSize,
+            $llmConfiguration->reviewerMaxOutputTokens(),
         );
     }
 
@@ -157,7 +158,7 @@ final readonly class ContainerParameterRegistrar
     private function attackerKeySalt(BundleConfiguration $bundleConfiguration, string $model): string
     {
         return \sprintf(
-            '%s|prompt-v%d|prescan-v%d|prescan-%s|tools-%s|patterns-%s|collect-%s|skills-%s|slice-%s',
+            '%s|prompt-v%d|prescan-v%d|prescan-%s|tools-%s|patterns-%s|collect-%s|skills-%s|slice-%s|max-output-%d',
             $model,
             AttackerPromptBuilder::PROMPT_VERSION,
             RegexStaticPreScanner::CACHE_VERSION,
@@ -174,6 +175,7 @@ final readonly class ContainerParameterRegistrar
             $bundleConfiguration->audit->structuredCollection ? 'tool' : 'json',
             $bundleConfiguration->audit->stableSystemPrompt ? 'full' : 'lean',
             $this->codeSlicingSalt($bundleConfiguration),
+            $bundleConfiguration->llm->attackerMaxOutputTokens(),
         );
     }
 

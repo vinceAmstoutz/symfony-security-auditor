@@ -244,16 +244,43 @@ final readonly class BatchReviewAnalyzer
 
             return $this->batchVerdictApplier->applyBatchReview($batch, $structuredReviewCollectionSession->drain(), $coverageRecorder, $cacheContexts);
         } catch (BudgetExceededException $budgetExceededException) {
-            $this->batchVerdictApplier->markBatchUnreached($batch, 'aborted', $coverageRecorder);
+            $this->recordDrainedBatchOrMarkUnreached($batch, $structuredReviewCollectionSession, $cacheContexts, 'aborted', $coverageRecorder);
 
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
-            $this->batchVerdictApplier->markBatchUnreached($batch, 'errored', $coverageRecorder);
+            $this->recordDrainedBatchOrMarkUnreached($batch, $structuredReviewCollectionSession, $cacheContexts, 'errored', $coverageRecorder);
 
             throw $llmProviderException;
         } catch (Throwable $exception) {
-            return $this->batchVerdictApplier->recordBatchError($batch, $exception, $coverageRecorder);
+            $rawData = $structuredReviewCollectionSession->drain();
+
+            return [] !== $rawData
+                ? $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, $cacheContexts)
+                : $this->batchVerdictApplier->recordBatchError($batch, $exception, $coverageRecorder);
         }
+    }
+
+    /**
+     * Recovers any verdicts the LLM already recorded via `record_review` tool
+     * calls in an earlier round of this batch's conversation before a later
+     * round aborted it — otherwise they vanish with the exception even
+     * though they were genuinely reached. Falls back to the existing
+     * not-reached handling only when nothing was recorded for the whole
+     * batch.
+     *
+     * @param list<Vulnerability>   $batch
+     * @param array<string, string> $cacheContexts
+     */
+    private function recordDrainedBatchOrMarkUnreached(array $batch, StructuredReviewCollectionSession $structuredReviewCollectionSession, array $cacheContexts, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        $rawData = $structuredReviewCollectionSession->drain();
+        if ([] === $rawData) {
+            $this->batchVerdictApplier->markBatchUnreached($batch, $status, $coverageRecorder);
+
+            return;
+        }
+
+        $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, $cacheContexts);
     }
 
     /**

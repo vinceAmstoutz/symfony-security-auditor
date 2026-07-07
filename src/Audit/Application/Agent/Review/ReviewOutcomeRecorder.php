@@ -90,6 +90,23 @@ final readonly class ReviewOutcomeRecorder
         ReviewerCoverageRecorder::record($vulnerability, $status, $coverageRecorder, $this->progressReporter);
     }
 
+    /**
+     * Recovers a verdict already recorded via a `record_review` tool call in
+     * an earlier round of a conversation that later aborted — otherwise it
+     * vanishes with the exception even though the verdict was genuinely
+     * reached. Returns `null` when nothing was recorded, so the caller falls
+     * back to its own not-reached handling via {@see recordUnreached()}.
+     */
+    public function recoverDrainedVerdict(Vulnerability $vulnerability, StructuredReviewCollectionSession $structuredReviewCollectionSession, CoverageRecorderInterface $coverageRecorder): ?Vulnerability
+    {
+        $verdicts = $structuredReviewCollectionSession->drain();
+        if ([] === $verdicts) {
+            return null;
+        }
+
+        return $this->recordVerdict($vulnerability, array_pop($verdicts), $coverageRecorder);
+    }
+
     public function applyResponse(Vulnerability $vulnerability, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder, ?string $codeContextForCache = null): Vulnerability
     {
         if ($llmResponse->isEmpty()) {

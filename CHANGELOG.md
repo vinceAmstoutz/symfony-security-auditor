@@ -2259,6 +2259,85 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `table.summary tr.severity-*` was never defined.
   `src/Audit/Infrastructure/Report/Template/report.html` now styles each summary
   row with the same severity color, applied as a left border on its `<th>`.
+- **A finding with an entirely omitted `title` key, or a `line_end` omitted on a
+  single-line finding, silently produced a malformed `Vulnerability` instead of
+  being dropped or normalized.** `VulnerabilityFactory::validateRawData()`
+  (`src/Audit/Application/Agent/VulnerabilityFactory.php`) only defaulted
+  `title` when the key was present but `null` (`??=` on an already-set `null`
+  does nothing against a missing array key under strict validation), so an
+  attacker response omitting `title` outright passed validation with a blank
+  title; the tool's own JSON Schema
+  (`src/Audit/Infrastructure/Tool/RecordVulnerabilityTool.php`) also didn't list
+  `title` as `required`, so the provider never rejected the omission either.
+  `buildVulnerability()` also defaulted a missing `line_end` to a fixed `1`
+  regardless of `line_start`, producing an inverted range (e.g.
+  `line_start: 18, line_end: 1`) for any finding on a line other than the first.
+  `title` is now added to the tool's `required` array and `validateRawData()`'s
+  `$data['title'] ??= ''` runs unconditionally before the `NotBlank` constraint
+  check, so an omitted title is dropped the same way a blank one already was;
+  `buildVulnerability()` now defaults `line_end` to the resolved `line_start`,
+  not a hardcoded `1`.
+- **`UnpricedModelBudgetGuard`'s interactive confirmation prompt was written to
+  stdout instead of stderr, polluting piped/redirected report output (e.g.
+  `audit:run --format=json > report.json`) with a prompt the user never answers
+  in a non-interactive run.** The `confirm()` call in
+  `src/Command/UnpricedModelBudgetGuard.php` used the primary `$symfonyStyle`
+  (bound to stdout) instead of the `$errorStyle` (bound to stderr) already
+  constructed for this purpose; it now prompts through `$errorStyle`.
+- **A tool-conversation retry that itself failed after tool calls had already
+  run left the conversation state inconsistent instead of cleanly aborting.**
+  `ToolConversationWavefront::retryOrAbortConversation()`
+  (`src/Audit/Infrastructure/LLM/ToolConversationWavefront.php`) caught a
+  failure from `processDeferredResult()` but not from the preceding
+  `retryingPlatformInvoker->invoke()` call — a `Throwable` from the retry
+  invocation itself propagated uncaught instead of degrading to the same
+  `abortConversation()` path used for every other conversation failure. The
+  invoke call is now wrapped in its own try/catch that also routes to
+  `abortConversation()`.
+- **A vulnerability or review verdict recorded via a `record_review`/
+  `record_vulnerability` tool call in an earlier round of a multi-round LLM
+  conversation was silently lost if a later round of the _same_ conversation
+  aborted (budget exceeded, provider error, or any other exception) before the
+  conversation's final return value materialized** — the tool call had genuinely
+  executed and the collector had genuinely stored it, but nothing ever drained
+  the collector before the abort discarded the whole call.
+  `StructuredVulnerabilityCollectionSession`/`StructuredReviewCollectionSession`
+  already expose `drain()` for exactly this recovery, but it was previously only
+  called on the happy path. All five call sites that run a structured
+  tool-collection conversation now drain and record whatever was collected
+  before rethrowing or falling back to the not-reached/errored path:
+  `SequentialChunkAnalyzer::analyzeChunkViaStructuredCollection()` and
+  `ConcurrentChunkAnalyzer::failRemainingWindows()`
+  (`src/Audit/Application/Agent/Chunk/`) for attacker findings; and
+  `StructuredReviewAnalyzer::reviewSingle()`,
+  `ConcurrentStructuredReviewAnalyzer::failRemainingWindows()`, and
+  `BatchReviewAnalyzer::reviewBatchViaStructuredCollection()`
+  (`src/Audit/Application/Agent/Review/`) for reviewer verdicts. The reviewer
+  side shares the recovery logic through a new
+  `ReviewOutcomeRecorder::recoverDrainedVerdict()`
+  (`src/Audit/Application/Agent/Review/ReviewOutcomeRecorder.php`), which drains
+  the session and applies the last recorded verdict, or returns `null` when
+  nothing was recorded so the caller falls back to its existing
+  not-reached/errored handling.
+- **`ContainerParameterRegistrar`'s attacker/reviewer cache-key salts didn't
+  change when `attacker_max_output_tokens`/`reviewer_max_output_tokens`
+  changed**, so lowering or raising either setting silently served stale cached
+  findings/verdicts produced under the old token budget instead of invalidating
+  the cache. `attackerKeySalt()`/`reviewerKeySalt()`
+  (`src/Audit/Infrastructure/Config/ContainerParameterRegistrar.php`) now append
+  a `|max-output-<n>` component sourced from the respective configuration,
+  alongside the salt's existing inputs.
+- **`ProcessGitChangedFilesResolver`'s `isInsideGitTree()`/`refExists()` let a
+  process-level failure (a hung `git` invocation, or a timeout under a
+  misbehaving filesystem) propagate as a raw `Symfony\Component\Process`
+  exception instead of the domain's own `GitChangedFilesUnavailableException`**,
+  breaking the `--since` flag's error contract for that failure mode. Both
+  methods (`src/Audit/Infrastructure/Diff/ProcessGitChangedFilesResolver.php`)
+  now run under a configurable timeout (`DEFAULT_TIMEOUT_SECONDS = 60`,
+  overridable via a new constructor parameter) and wrap `setTimeout()`/`run()`
+  in a try/catch that converts any `ExceptionInterface` into a new
+  `GitChangedFilesUnavailableException::forProcessFailure()`
+  (`src/Audit/Domain/Exception/GitChangedFilesUnavailableException.php`).
 
 ### Security
 
@@ -2284,6 +2363,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   release workflow (`.github/workflows/release.yaml`) also **smoke-tests** every
   binary (`--version`) before publishing, so a broken build never reaches the
   release.
+- **`ProjectFileScanner` followed symlinked files into the LLM prompt**, so a
+  symlink placed inside the audited project pointing at an arbitrary file
+  elsewhere on the filesystem (e.g. `/etc/passwd`, an SSH key, or a sibling
+  project's `.env`) had its target's contents read and sent to the LLM provider
+  like any other project file — `Finder`'s directory-symlink guard
+  (`followLinks()`) never applied to a symlink to a plain file, and
+  `SplFileInfo::isFile()` stats through the link to the target rather than
+  detecting it. `buildProjectFile()`
+  (`src/Audit/Infrastructure/FileSystem/ProjectFileScanner.php`) now checks
+  `SplFileInfo::isLink()` first and skips the file (with a logged warning)
+  before any content is read.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 
