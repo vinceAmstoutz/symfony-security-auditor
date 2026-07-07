@@ -210,6 +210,28 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         self::assertSame([], $accessControl);
     }
 
+    public function test_it_skips_an_entry_with_a_blank_path_instead_of_recording_a_universal_match_pattern(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: '', roles: ROLE_ADMIN }
+            YAML);
+
+        self::assertSame([], $accessControl);
+    }
+
+    public function test_it_skips_an_entry_with_a_whitespace_only_path(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: '   ', roles: ROLE_ADMIN }
+            YAML);
+
+        self::assertSame([], $accessControl);
+    }
+
     public function test_it_merges_access_control_across_root_and_when_env_sections(): void
     {
         $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'

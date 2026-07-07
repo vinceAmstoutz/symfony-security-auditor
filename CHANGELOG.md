@@ -628,6 +628,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A blank (or whitespace-only) `path` in a `security.yaml` `access_control`
+  entry silently falsely marked every route in the entire project as
+  firewall-covered, suppressing `broken_access_control` detection
+  project-wide.** `SymfonyYamlSecurityConfigParser::targetOf()`
+  (`src/Audit/Infrastructure/Scan/SymfonyYamlSecurityConfigParser.php`) accepted
+  any string `path` value — including `''` after `trim()` — and recorded it as a
+  route-access-map key. `SymfonyMappingContextRenderer::firewallRolesForPath()`
+  (`src/Audit/Infrastructure/Prompt/SymfonyMappingContextRenderer.php`) treats
+  every map key as a PCRE fragment via
+  `preg_match(sprintf('#%s#', $pattern), $routePath)`; an empty pattern (`##`)
+  matches any string at all, so a single malformed config line like
+  `{ path: '', roles: ROLE_ADMIN }` made every controller action in the codebase
+  — regardless of its real path — render as
+  `COVERED_BY access_control[ROLE_ADMIN]`, and the prompt text explicitly
+  instructs the attacker LLM not to report `broken_access_control` for
+  firewall-covered routes. `targetOf()` now drops a blank/whitespace-only `path`
+  instead of recording it, matching how a missing `path` key was already
+  dropped.
 - **A `#[AsLiveComponent]`/`#[ApiResource]` class that also extends
   `AbstractController` (the documented pattern for reusing
   `denyAccessUnlessGranted()`/`addFlash()`) had every `#[Route]`-mapped action

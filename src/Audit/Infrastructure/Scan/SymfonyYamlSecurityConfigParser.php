@@ -181,8 +181,11 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
      */
     private function targetOf(array $entry): ?string
     {
-        if (\is_string($entry['path'] ?? null)) {
-            return trim($entry['path']);
+        $rawPath = $entry['path'] ?? null;
+        // A blank path becomes an empty PCRE pattern, which matches any route at all — never record it.
+        $path = \is_string($rawPath) ? trim($rawPath) : '';
+        if ('' !== $path) {
+            return $path;
         }
 
         if (\is_string($entry['route'] ?? null)) {
