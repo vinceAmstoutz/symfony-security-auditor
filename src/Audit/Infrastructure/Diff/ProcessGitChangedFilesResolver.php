@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff;
 
+use Closure;
 use Override;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Exception\ExceptionInterface;
@@ -53,9 +54,13 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
 {
     public const int DEFAULT_TIMEOUT_SECONDS = 60;
 
+    /**
+     * @param ?Closure(list<string>, string): Process $gitDiffProcessFactory defaults to a plain `new Process(...)`; tests inject a stub to make a `git diff` call deterministically slow
+     */
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
         private int $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,
+        private ?Closure $gitDiffProcessFactory = null,
     ) {}
 
     /**
@@ -113,6 +118,25 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
     }
 
     /**
+     * @return Closure(list<string>, string): Process
+     */
+    private function defaultGitDiffProcessFactory(): Closure
+    {
+        return $this->buildDefaultGitDiffProcess(...);
+    }
+
+    /**
+     * @param list<string> $argv
+     */
+    private function buildDefaultGitDiffProcess(array $argv, string $projectPath): Process
+    {
+        // -z NUL-terminates each path instead of newline-terminating it, and disables
+        // git's C-style quoting of non-ASCII bytes AND of literal quotes/backslashes/
+        // control characters alike — core.quotepath=off alone only covers the former.
+        return new Process(['git', '-c', 'core.quotepath=off', ...$argv, '-z'], $projectPath);
+    }
+
+    /**
      * @param list<string> $argv
      *
      * @return list<string>
@@ -121,15 +145,16 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
      */
     private function runGit(string $projectPath, array $argv): array
     {
-        // -z NUL-terminates each path instead of newline-terminating it, and disables
-        // git's C-style quoting of non-ASCII bytes AND of literal quotes/backslashes/
-        // control characters alike — core.quotepath=off alone only covers the former.
-        $process = new Process(['git', '-c', 'core.quotepath=off', ...$argv, '-z'], $projectPath);
+        $factory = $this->gitDiffProcessFactory ?? $this->defaultGitDiffProcessFactory();
+        $process = $factory($argv, $projectPath);
 
         try {
+            $process->setTimeout((float) $this->timeoutSeconds);
             $process->mustRun();
         } catch (ProcessFailedException $processFailedException) {
             throw GitChangedFilesUnavailableException::fromProcessFailure($argv[\count($argv) - 1] ?? '', $process->getErrorOutput(), $processFailedException);
+        } catch (ExceptionInterface $exception) {
+            throw GitChangedFilesUnavailableException::forProcessFailure(\sprintf('diff against "%s"', $argv[\count($argv) - 1] ?? ''), $exception);
         }
 
         return array_values(array_filter(

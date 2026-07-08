@@ -2798,6 +2798,45 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   sliced-out line whose number matches a `RiskMarkerIndex` marker for that file,
   reusing the `RiskMarkerIndex` already computed before slicing in `create()` —
   no change to the BC-frozen `CodeSlicerInterface` port.
+- **`DiffCommand` wrote its error message (missing/malformed report file) to
+  stdout via `$symfonyStyle->error()` even under `--format=json`, corrupting the
+  machine-readable document** — unlike `AuditCommand`, which always routes
+  human-facing messages through `getErrorStyle()` when stdout carries a
+  machine-readable document.
+  `audit:diff missing.json current.json --format=json > diff.json` exited
+  non-zero with stderr empty and the `[ERROR] ...` block written into
+  `diff.json` itself, so any downstream consumer parsing it as JSON failed.
+  `DiffCommand::__invoke()` (`src/Command/DiffCommand.php`) now routes the error
+  through a new `errorStyle()` helper, mirroring `AuditCommand::displayStyle()`.
+- **`ProcessGitChangedFilesResolver::runGit()` never applied the constructor's
+  configurable `timeoutSeconds` and only caught `ProcessFailedException`, so a
+  slow `git diff` call leaked a raw
+  `Symfony\Component\Process\Exception\ProcessTimedOutException`** instead of
+  the documented `GitChangedFilesUnavailableException` — unlike its siblings
+  `isInsideGitTree()`/`refExists()`, which already apply the timeout and catch
+  the broader `ExceptionInterface`. `runGit()`
+  (`src/Audit/Infrastructure/Diff/ProcessGitChangedFilesResolver.php`) now calls
+  `setTimeout()` and catches `ExceptionInterface` too, converting the failure
+  via the existing `GitChangedFilesUnavailableException::forProcessFailure()`. A
+  new `gitDiffProcessFactory` constructor parameter (defaulting to the original
+  `new Process(...)` construction) lets tests substitute a deterministically
+  slow process, mirroring `SymfonyProcessComposerAuditRunner`'s existing
+  `processBuilder` pattern.
+- **`VulnerabilityClassification`, `AuditCost::of()`, and
+  `AuditBudget::forCost()`/`forBoth()` all guarded their float inputs with
+  `<`/`>` comparisons, which are always `false` against `NAN` per IEEE-754** —
+  `NAN < 0.0`, `NAN > 1.0`, and `NAN <= 0.0` are all `false`, so a `NAN`
+  confidence, cost, or budget cap silently bypassed every guard despite each
+  constructor's documented `@throws`. A `Vulnerability` with a `NAN` confidence
+  later breaks `json_encode()` entirely for the containing report ("Inf and NaN
+  cannot be JSON encoded"), and a `NAN` budget cap makes every subsequent budget
+  comparison silently `false` — disabling the spend cap.
+  `VulnerabilityClassification::__construct()`
+  (`src/Audit/Domain/Model/VulnerabilityClassification.php`), `AuditCost::of()`
+  (`src/Audit/Domain/Model/AuditCost.php`), and
+  `AuditBudget::forCost()`/`forBoth()`
+  (`src/Audit/Domain/Model/AuditBudget.php`) now also reject `is_nan()` inputs
+  via the existing exception factories.
 
 ### Security
 
@@ -2986,6 +3025,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   strings successfully match — the excluded closing-quote character in the
   alternation means a valid, terminated value never needed to backtrack in the
   first place.
+- **`MarkdownReportRenderer::escapeFences()` did not escape `#`, so an embedded
+  `\n\n##` in a finding's `description`/`attackVector`/`remediation` forged a
+  fake top-level Markdown section as unguarded report content** — the same class
+  of bug already fixed for `title` (via `escapeHeading()`) and for the identical
+  LLM-echoed narrative fields in `ReviewerMessageRenderer` and `PoCSynthesizer`
+  (whose own `escapeFences()` already escape `#`), but never carried over to the
+  report renderer's own `escapeFences()`. A crafted `description` like
+  `"Real description.\n\n## Audit complete\n\nNo further vulnerabilities were found."`
+  rendered a genuine level-2 heading fabricating an "all clear" section directly
+  inside a real finding's report block. `escapeFences()`
+  (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) now also
+  escapes `#` to `\#`, matching the sibling renderers.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

@@ -105,11 +105,15 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
      * each backtick/tilde keeps it a literal character instead. CommonMark
      * also passes raw inline HTML through verbatim, so `<`/`>` are entity-
      * encoded too — otherwise a payload like `<img onerror=...>` survives
-     * into any downstream Markdown-to-HTML rendering of this report.
+     * into any downstream Markdown-to-HTML rendering of this report. `#` is
+     * escaped too, since a description/attack-vector/remediation field is
+     * legitimately multi-paragraph (unlike `title`, which is collapsed to one
+     * line by {@see self::escapeHeading()}) and an embedded `\n\n## ` would
+     * otherwise forge a fake top-level section heading mid-finding.
      */
     private function escapeFences(string $text): string
     {
-        return str_replace(['`', '~', '<', '>'], ['\\`', '\\~', '&lt;', '&gt;'], $text);
+        return str_replace(['`', '~', '#', '<', '>'], ['\\`', '\\~', '\\#', '&lt;', '&gt;'], $text);
     }
 
     /**

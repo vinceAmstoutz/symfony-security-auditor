@@ -58,7 +58,7 @@ final readonly class AuditCost
             throw InvalidAuditCostException::forNegativeOutputTokens($outputTokens);
         }
 
-        if ($estimatedCostUsd < 0.0) {
+        if (is_nan($estimatedCostUsd) || $estimatedCostUsd < 0.0) {
             throw InvalidAuditCostException::forNegativeCost($estimatedCostUsd);
         }
 

@@ -163,6 +163,26 @@ final class AuditBudgetTest extends TestCase
         AuditBudget::forCost(-0.5);
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
+    public function test_for_cost_rejects_nan(): void
+    {
+        $this->expectException(InvalidAuditBudgetException::class);
+
+        AuditBudget::forCost(\NAN);
+    }
+
+    /**
+     * @throws InvalidAuditBudgetException
+     */
+    public function test_for_both_rejects_nan_cost(): void
+    {
+        $this->expectException(InvalidAuditBudgetException::class);
+
+        AuditBudget::forBoth(100, \NAN);
+    }
+
     public function test_for_cost_rejects_negative_and_formats_the_value_with_a_period_regardless_of_the_process_numeric_locale(): void
     {
         $previousLocale = setlocale(\LC_NUMERIC, '0');

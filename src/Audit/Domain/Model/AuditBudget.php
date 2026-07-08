@@ -59,7 +59,7 @@ final readonly class AuditBudget
             throw InvalidAuditBudgetException::forNonPositiveTokens($maxTokens);
         }
 
-        if ($maxCostUsd <= 0.0) {
+        if (is_nan($maxCostUsd) || $maxCostUsd <= 0.0) {
             throw InvalidAuditBudgetException::forNonPositiveCost($maxCostUsd);
         }
 
@@ -98,7 +98,7 @@ final readonly class AuditBudget
      */
     private static function assertPositiveCost(float $value): self
     {
-        if ($value <= 0.0) {
+        if (is_nan($value) || $value <= 0.0) {
             throw InvalidAuditBudgetException::forNonPositiveCost($value);
         }
 

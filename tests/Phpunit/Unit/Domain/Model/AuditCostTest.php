@@ -135,6 +135,15 @@ final class AuditCostTest extends TestCase
         AuditCost::of(0, 0, -0.01, 'm');
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     */
+    public function test_nan_cost_rejected(): void
+    {
+        $this->expectException(InvalidAuditCostException::class);
+        AuditCost::of(0, 0, \NAN, 'm');
+    }
+
     public function test_negative_cost_message_formats_the_value_with_a_period_regardless_of_the_process_numeric_locale(): void
     {
         $previousLocale = setlocale(\LC_NUMERIC, '0');

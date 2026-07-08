@@ -304,6 +304,25 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
     }
 
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_wraps_a_git_diff_timeout_instead_of_leaking_a_raw_process_exception(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php', 'init');
+
+        $processGitChangedFilesResolver = new ProcessGitChangedFilesResolver(
+            timeoutSeconds: 1,
+            gitDiffProcessFactory: static fn (array $argv, string $projectPath): Process => Process::fromShellCommandline('sleep 5'),
+        );
+
+        $this->expectException(GitChangedFilesUnavailableException::class);
+        $this->expectExceptionMessage('Could not diff against "main...HEAD"');
+
+        $processGitChangedFilesResolver->changedSince($this->tmpDir, 'main');
+    }
+
     #[Override]
     protected function setUp(): void
     {
