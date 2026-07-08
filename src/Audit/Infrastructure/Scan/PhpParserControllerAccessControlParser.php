@@ -53,6 +53,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
 {
     public function __construct(
         private RouteAttributeParser $routeAttributeParser = new RouteAttributeParser(),
+        private NodeFinder $nodeFinder = new NodeFinder(),
     ) {}
 
     #[Override]
@@ -67,12 +68,11 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
             return [];
         }
 
-        $nodeFinder = new NodeFinder();
-        $classes = $nodeFinder->findInstanceOf($ast, Class_::class);
+        $classes = $this->nodeFinder->findInstanceOf($ast, Class_::class);
 
         $entries = [];
         foreach ($classes as $class) {
-            foreach ($this->entriesForClass($projectFile->relativePath(), $class, $nodeFinder) as $entry) {
+            foreach ($this->entriesForClass($projectFile->relativePath(), $class) as $entry) {
                 $entries[] = $entry;
             }
         }
@@ -102,10 +102,11 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     /**
      * @return list<RouteAccessControl>
      */
-    private function entriesForClass(string $filePath, Class_ $class, NodeFinder $nodeFinder): array
+    private function entriesForClass(string $filePath, Class_ $class): array
     {
         $classHasIsGranted = $this->hasIsGrantedAttribute($class->attrGroups);
-        $classRouteData = $this->routeAttributeParser->extract($class->attrGroups)[0];
+        $classConstants = $this->classConstantStrings($class);
+        $classRouteData = $this->routeAttributeParser->extract($class->attrGroups, $classConstants)[0];
 
         $entries = [];
         foreach ($class->getMethods() as $classMethod) {
@@ -113,12 +114,37 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
                 continue;
             }
 
-            foreach ($this->buildEntries($filePath, $classMethod, $classHasIsGranted, $classRouteData, $nodeFinder) as $entry) {
+            foreach ($this->buildEntries($filePath, $classMethod, $classHasIsGranted, $classRouteData, $classConstants) as $entry) {
                 $entries[] = $entry;
             }
         }
 
         return $entries;
+    }
+
+    /**
+     * A `path: self::ADMIN_PATH`/`path: static::ADMIN_PATH` argument references
+     * a class constant instead of a literal — a common way to centralize a
+     * route prefix. Resolving it to its declared string value (when the
+     * constant lives on this same class and holds a literal string) lets the
+     * renderer match it against `security.yaml` the same way a literal path
+     * already would; a constant declared elsewhere, or not a string literal,
+     * is left unresolved rather than guessed at.
+     *
+     * @return array<string, string>
+     */
+    private function classConstantStrings(Class_ $class): array
+    {
+        $constants = [];
+        foreach ($class->getConstants() as $classConst) {
+            foreach ($classConst->consts as $const) {
+                if ($const->value instanceof String_) {
+                    $constants[$const->name->toString()] = $const->value->value;
+                }
+            }
+        }
+
+        return $constants;
     }
 
     /**
@@ -130,16 +156,17 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
      * method's own attribute in isolation.
      *
      * @param array{present: bool, path: ?string, methods: list<string>, name: ?string} $classRouteData
+     * @param array<string, string>                                                     $classConstants
      *
      * @return list<RouteAccessControl>
      */
-    private function buildEntries(string $filePath, ClassMethod $classMethod, bool $classHasIsGranted, array $classRouteData, NodeFinder $nodeFinder): array
+    private function buildEntries(string $filePath, ClassMethod $classMethod, bool $classHasIsGranted, array $classRouteData, array $classConstants): array
     {
         $methodLevelIsGranted = $this->extractIsGrantedValues($classMethod->attrGroups);
-        $methodHasDenyAccess = $this->methodInvokesDenyAccess($classMethod, $nodeFinder);
+        $methodHasDenyAccess = $this->methodInvokesDenyAccess($classMethod);
 
         $entries = [];
-        foreach ($this->routeAttributeParser->extract($classMethod->attrGroups) as $routeData) {
+        foreach ($this->routeAttributeParser->extract($classMethod->attrGroups, $classConstants) as $routeData) {
             $entries[] = new RouteAccessControl(
                 filePath: $filePath,
                 methodName: $classMethod->name->toString(),
@@ -270,11 +297,11 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         return [] !== $this->extractIsGrantedValues($attributeGroups);
     }
 
-    private function methodInvokesDenyAccess(ClassMethod $classMethod, NodeFinder $nodeFinder): bool
+    private function methodInvokesDenyAccess(ClassMethod $classMethod): bool
     {
         $methodCalls = [
-            ...$nodeFinder->findInstanceOf($classMethod->stmts ?? [], MethodCall::class),
-            ...$nodeFinder->findInstanceOf($classMethod->stmts ?? [], NullsafeMethodCall::class),
+            ...$this->nodeFinder->findInstanceOf($classMethod->stmts ?? [], MethodCall::class),
+            ...$this->nodeFinder->findInstanceOf($classMethod->stmts ?? [], NullsafeMethodCall::class),
         ];
         foreach ($methodCalls as $methodCall) {
             if ($methodCall->isFirstClassCallable()) {

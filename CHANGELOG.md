@@ -3009,6 +3009,46 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   patterns — lands on the line containing the actual security-relevant token.
   Single-line patterns are unaffected (start and end offset share the same
   line).
+- **A `#[Route(path: self::ADMIN_PATH)]` attribute — a common way to centralize
+  a route prefix as a class constant — resolved to a `null` route path, making
+  an already firewall-protected route look unprotected to the attacker LLM.**
+  `RouteAttributeParser::routePathFromArg()`
+  (`src/Audit/Infrastructure/Scan/RouteAttributeParser.php`) only handled a
+  literal string or a locale-keyed array for `path:`; a `ClassConstFetch` fell
+  through to `null`, so `SymfonyMappingContextRenderer::firewallRolesForPath()`
+  could never match it against a `security.yaml` `access_control` rule keyed by
+  path, and the route rendered as `LACKS_ACCESS_CHECK` — a likely false-positive
+  `broken_access_control` finding for a route that is genuinely covered.
+  `routePathFromArg()` now resolves `self::CONST`/`static::CONST` against the
+  constants declared on the same class (via a new
+  `PhpParserControllerAccessControlParser::classConstantStrings()`); a constant
+  declared on a different class, or a dynamic constant name, is left unresolved
+  rather than guessed at.
+- **A voter implementing `VoterInterface` directly — a documented Symfony
+  pattern for full control over `vote()`, used when a voter needs ABSTAIN
+  semantics the abstract `Voter` class doesn't expose — produced no
+  `VoterCapability` entry at all, even though `ProjectFileTypeClassifier`
+  correctly classifies it as a voter.** `PhpParserVoterCapabilityParser`
+  (`src/Audit/Infrastructure/Scan/PhpParserVoterCapabilityParser.php`) only
+  looked for a method literally named `supports` — the shape produced by
+  extending the abstract `Voter` class — so a `VoterInterface` implementation's
+  capability vocabulary (which lives inline in `vote()` instead) was silently
+  dropped from `AccessControlMap::voterCapabilities()`. Any `#[IsGranted]` call
+  site the voter actually covers would then appear completely uncovered to the
+  attacker LLM, risking a false `missing_voter` finding. `findVoterClass()` now
+  falls back to a `vote()` method when no `supports()` exists, applying the same
+  string-literal/instanceof/self-constant heuristics to its body.
+- **The standalone binary resolved its per-project
+  `.symfony-security-auditor.yaml` against the filesystem root instead of the
+  real working directory whenever `PWD` was exported but empty** (a real, if
+  narrow, condition — some minimal shell/container entrypoints export `PWD=`
+  without repopulating it after a `cd`), silently dropping the project's own
+  config from the merge. `StandaloneApplicationFactory::projectConfigFile()`
+  (`src/Standalone/StandaloneApplicationFactory.php`) used `??`, which only
+  falls through on an absent/`null` value, not an empty string — the same gap
+  `XdgConfigPathResolver::baseDirectory()` already guards against for
+  `XDG_CONFIG_HOME`/`HOME`. `projectConfigFile()` now falls back to `getcwd()`
+  whenever `PWD` is absent or empty, matching that existing convention.
 
 ### Security
 

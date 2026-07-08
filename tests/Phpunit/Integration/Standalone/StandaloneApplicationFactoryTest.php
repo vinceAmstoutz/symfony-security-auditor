@@ -128,6 +128,17 @@ final class StandaloneApplicationFactoryTest extends TestCase
         );
     }
 
+    public function test_it_falls_back_to_the_process_working_directory_when_pwd_is_exported_empty(): void
+    {
+        $workingDirectory = getcwd();
+        self::assertIsString($workingDirectory);
+
+        self::assertSame(
+            \sprintf('%s/.symfony-security-auditor.yaml', $workingDirectory),
+            StandaloneApplicationFactory::projectConfigFile(['PWD' => '']),
+        );
+    }
+
     #[RunInSeparateProcess]
     public function test_the_registered_audit_command_keeps_the_full_cli_option_surface(): void
     {

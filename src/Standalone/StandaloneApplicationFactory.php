@@ -79,7 +79,8 @@ final readonly class StandaloneApplicationFactory
      */
     public static function projectConfigFile(array $environment): ?string
     {
-        $workingDirectory = $environment['PWD'] ?? self::processWorkingDirectory();
+        $pwd = $environment['PWD'] ?? '';
+        $workingDirectory = '' !== $pwd ? $pwd : self::processWorkingDirectory();
 
         return null !== $workingDirectory ? \sprintf('%s/%s', $workingDirectory, self::PROJECT_CONFIG_FILENAME) : null;
     }

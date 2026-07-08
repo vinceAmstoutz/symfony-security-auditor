@@ -255,6 +255,36 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_extracts_capabilities_from_a_voter_implementing_voter_interface_directly(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            use App\Entity\ApiKey;
+            use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
+            final class ApiScopeVoter implements VoterInterface {
+                public function vote(mixed $token, mixed $subject, array $attributes): int {
+                    foreach ($attributes as $attribute) {
+                        if ('SCOPE_READ' === $attribute) {
+                            return $subject instanceof ApiKey ? self::ACCESS_GRANTED : self::ACCESS_DENIED;
+                        }
+                    }
+                    return self::ACCESS_ABSTAIN;
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/ApiScopeVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['SCOPE_READ'], $voterCapability->supportedAttributes());
+        self::assertSame(['App\\Entity\\ApiKey'], $voterCapability->supportedSubjects());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_collects_multiple_subject_types_from_supports_body(): void
     {
         $source = <<<'PHP'

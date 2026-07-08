@@ -95,7 +95,11 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
     /**
      * A voter file may declare helper classes alongside the voter itself
      * (e.g. a small attribute-constants holder); the voter is whichever class
-     * actually has a `supports()` method, not necessarily the first one.
+     * actually has a `supports()` method, not necessarily the first one. A
+     * voter implementing `VoterInterface` directly (rather than extending the
+     * abstract `Voter` class) has no `supports()` at all — its capability
+     * vocabulary lives inline in `vote()` instead, so that method is tried as
+     * a fallback source for the same string-literal/instanceof heuristics.
      *
      * @param array<Class_> $classes
      *
@@ -104,19 +108,19 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
     private function findVoterClass(array $classes): ?array
     {
         foreach ($classes as $class) {
-            $supportsMethod = $this->findSupportsMethod($class);
-            if ($supportsMethod instanceof ClassMethod) {
-                return [$class, $supportsMethod];
+            $capabilityMethod = $this->findMethodNamed($class, 'supports') ?? $this->findMethodNamed($class, 'vote');
+            if ($capabilityMethod instanceof ClassMethod) {
+                return [$class, $capabilityMethod];
             }
         }
 
         return null;
     }
 
-    private function findSupportsMethod(Class_ $class): ?ClassMethod
+    private function findMethodNamed(Class_ $class, string $methodName): ?ClassMethod
     {
         foreach ($class->getMethods() as $classMethod) {
-            if ('supports' === $classMethod->name->toString()) {
+            if ($methodName === $classMethod->name->toString()) {
                 return $classMethod;
             }
         }

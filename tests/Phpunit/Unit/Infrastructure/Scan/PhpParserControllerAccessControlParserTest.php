@@ -588,6 +588,73 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_resolves_a_route_path_expressed_as_a_self_class_constant(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                private const string ADMIN_PATH = '/admin/dashboard';
+
+                #[Route(path: self::ADMIN_PATH, name: 'admin_dashboard')]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/admin/dashboard', $entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_leaves_a_route_path_unresolved_when_it_references_another_classs_constant(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: AdminRoutes::PATH, name: 'admin_dashboard')]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertNull($entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_leaves_a_route_path_unresolved_when_the_class_constant_name_is_dynamic(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                private const string ADMIN_PATH = '/admin/dashboard';
+
+                #[Route(path: self::{$name}, name: 'admin_dashboard')]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertNull($entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_multiple_is_granted_attributes_on_same_method(): void
     {
         $source = <<<'PHP'

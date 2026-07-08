@@ -16,6 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 use PhpParser\Node\Arg;
 use PhpParser\Node\AttributeGroup;
 use PhpParser\Node\Expr\Array_;
+use PhpParser\Node\Expr\ClassConstFetch;
+use PhpParser\Node\Identifier;
+use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
 
 /**
@@ -31,10 +34,11 @@ final readonly class RouteAttributeParser
 {
     /**
      * @param array<AttributeGroup> $attributeGroups
+     * @param array<string, string> $classConstants  resolved `self`/`static` class-constant string values, keyed by constant name
      *
      * @return list<array{present: bool, path: ?string, methods: list<string>, name: ?string}>
      */
-    public function extract(array $attributeGroups): array
+    public function extract(array $attributeGroups, array $classConstants = []): array
     {
         $routeDataList = [];
         foreach ($attributeGroups as $attributeGroup) {
@@ -43,7 +47,7 @@ final readonly class RouteAttributeParser
                     continue;
                 }
 
-                $routeDataList[] = $this->routeDataFromArgs($attribute->args);
+                $routeDataList[] = $this->routeDataFromArgs($attribute->args, $classConstants);
             }
         }
 
@@ -53,11 +57,12 @@ final readonly class RouteAttributeParser
     }
 
     /**
-     * @param array<Arg> $args
+     * @param array<Arg>            $args
+     * @param array<string, string> $classConstants
      *
      * @return array{present: bool, path: ?string, methods: list<string>, name: ?string}
      */
-    private function routeDataFromArgs(array $args): array
+    private function routeDataFromArgs(array $args, array $classConstants): array
     {
         $path = null;
         $methods = [];
@@ -69,7 +74,7 @@ final readonly class RouteAttributeParser
                 ++$positionalIndex;
             }
 
-            $path = $this->routePathFromArg($argName, $arg, $path);
+            $path = $this->routePathFromArg($argName, $arg, $path, $classConstants);
             $methods = $this->routeMethodsFromArg($argName, $arg) ?? $methods;
             $name = $this->routeNameFromArg($argName, $arg, $name);
         }
@@ -77,7 +82,10 @@ final readonly class RouteAttributeParser
         return ['present' => true, 'path' => $path, 'methods' => $methods, 'name' => $name];
     }
 
-    private function routePathFromArg(?string $argName, Arg $arg, ?string $currentPath): ?string
+    /**
+     * @param array<string, string> $classConstants
+     */
+    private function routePathFromArg(?string $argName, Arg $arg, ?string $currentPath, array $classConstants): ?string
     {
         if ('path' !== $argName) {
             return $currentPath;
@@ -86,8 +94,25 @@ final readonly class RouteAttributeParser
         return match (true) {
             $arg->value instanceof String_ => $arg->value->value,
             $arg->value instanceof Array_ => $this->stringValuesFromArray($arg->value)[0] ?? $currentPath,
+            $arg->value instanceof ClassConstFetch => $this->resolveSelfConstant($arg->value, $classConstants) ?? $currentPath,
             default => $currentPath,
         };
+    }
+
+    /**
+     * @param array<string, string> $classConstants
+     */
+    private function resolveSelfConstant(ClassConstFetch $classConstFetch, array $classConstants): ?string
+    {
+        if (!$classConstFetch->class instanceof Name || !\in_array($classConstFetch->class->toString(), ['self', 'static'], true)) {
+            return null;
+        }
+
+        if (!$classConstFetch->name instanceof Identifier) {
+            return null;
+        }
+
+        return $classConstants[$classConstFetch->name->toString()] ?? null;
     }
 
     private function routeNameFromArg(?string $argName, Arg $arg, ?string $currentName): ?string
