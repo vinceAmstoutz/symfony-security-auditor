@@ -23,6 +23,9 @@ final class AuditContext implements CoverageRecorderInterface
     /** @var list<ProjectFile> */
     private array $projectFiles = [];
 
+    /** @var ?list<ProjectFile> */
+    private ?array $mappingFiles = null;
+
     private ?SymfonyMapping $symfonyMapping = null;
 
     /** @var array<string, Vulnerability> keyed by vulnerability id */
@@ -136,6 +139,21 @@ final class AuditContext implements CoverageRecorderInterface
         return $this->projectFiles;
     }
 
+    /**
+     * The files `MappingStage` builds `SymfonyMapping`/`AccessControlMap`
+     * from — the full scan scope, unlike {@see self::projectFiles()}, which
+     * a `--since` diff-mode run narrows to only the changed files. Falls
+     * back to {@see self::projectFiles()} when `IngestionStage` never calls
+     * {@see self::setMappingFiles()} (a full, non-diff run, or a test that
+     * only sets `projectFiles`), since the two are identical in that case.
+     *
+     * @return list<ProjectFile>
+     */
+    public function mappingFiles(): array
+    {
+        return $this->mappingFiles ?? $this->projectFiles;
+    }
+
     public function mapping(): ?SymfonyMapping
     {
         return $this->symfonyMapping;
@@ -151,6 +169,12 @@ final class AuditContext implements CoverageRecorderInterface
     public function setProjectFiles(array $files): void
     {
         $this->projectFiles = $files;
+    }
+
+    /** @param list<ProjectFile> $files */
+    public function setMappingFiles(array $files): void
+    {
+        $this->mappingFiles = $files;
     }
 
     public function setMapping(SymfonyMapping $symfonyMapping): void

@@ -3203,6 +3203,48 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   partially-drained batch into the findings the conversation actually produced a
   verdict for and the ones it never reached, routing only the former through
   `applyBatchReview()` and marking the latter not-reached instead.
+- **A `--since` diff-mode run built `SymfonyMapping`/`AccessControlMap` (routes,
+  voter capabilities, `security.yaml` access-control and firewall rules) from
+  only the git-changed subset of files instead of the full project**, since
+  PRs/commit ranges essentially never touch `config/security.yaml` or unrelated
+  voter classes, this silently blinded access-control cross-referencing on
+  almost every diff-mode run — the tool's flagship fast-PR-scan entry point.
+  `IngestionStage` (`src/Audit/Application/Pipeline/Stage/IngestionStage.php`)
+  wrote the diff-filtered file list to `AuditContext`'s only file-list field,
+  and `MappingStage` (`src/Audit/Application/Pipeline/Stage/MappingStage.php`)
+  read that same field to build the mapping — so a route relying on
+  firewall-level protection outside the diff, or a voter defined in a file the
+  diff never touched, disappeared from the mapping entirely. `AuditContext`
+  (`src/Audit/Domain/Model/AuditContext.php`) gains a `mappingFiles()`/
+  `setMappingFiles()` pair, distinct from `projectFiles()`; `IngestionStage` now
+  also records the full scan-path-restricted (but not diff-restricted) file list
+  there, and `MappingStage` reads from it instead — the attacker's own analysis
+  scope (`projectFiles()`) is unaffected and stays diff-filtered.
+- **A reviewer verdict's `accepted` field, when returned as the JSON string
+  `"false"` rather than the JSON boolean `false` (a known quirk of some
+  non-Anthropic providers reached through this bundle's provider-agnostic seam),
+  was interpreted as an ACCEPTED verdict** — the exact opposite of what the
+  reviewer decided — silently overturning an explicit rejection.
+  `VerdictApplier::apply()`
+  (`src/Audit/Application/Agent/Review/VerdictApplier.php`) cast the field with
+  a bare `(bool)`, and PHP's string-to-bool coercion treats any non-empty,
+  non-`"0"` string — including the literal text `"false"` — as `true`. A new
+  `parseAccepted()` special-cases that string before falling back to the
+  original cast.
+- **`ProjectFileInventory::fromFiles()` silently dropped every authenticator,
+  Messenger handler, event subscriber, normalizer, webhook consumer, scheduler,
+  Twig extension, API resource, and Live Component file from its file-count
+  buckets**, undercounting (in the worst case, to zero) the "Services" bucket
+  and `totalFiles()` — both embedded verbatim into the "Project Mapping Summary"
+  sent to the attacker LLM on every run. `fromFiles()`
+  (`src/Audit/Domain/Model/ProjectFileInventory.php`) used
+  `ProjectFile::isService()` for its residual bucket, but that method's own,
+  narrower contract additionally excludes every one of those file types (each
+  already correctly and separately tested as `false` for `isService()`,
+  elsewhere in the codebase, for its own purpose) — none of which has a bucket
+  of its own here. `fromFiles()` now uses a local predicate scoped to exactly
+  this aggregation's own six explicit buckets, so every `.php` file lands in
+  precisely one of the seven.
 
 ### Security
 

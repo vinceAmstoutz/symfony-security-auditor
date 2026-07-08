@@ -56,7 +56,7 @@ final readonly class MappingStage implements StageInterface
     #[Override]
     public function process(AuditContext $auditContext): void
     {
-        $files = $auditContext->projectFiles();
+        $files = $auditContext->mappingFiles();
 
         if ([] === $files) {
             $this->logger->warning('No files to map');

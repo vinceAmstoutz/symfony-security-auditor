@@ -61,6 +61,20 @@ final class VerdictApplierTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_it_treats_the_string_false_as_rejected_instead_of_a_truthy_string(): void
+    {
+        $verdictApplier = new VerdictApplier(new NullLogger());
+
+        $vulnerability = $verdictApplier->apply($this->vulnerability(), ['accepted' => 'false']);
+
+        self::assertFalse($vulnerability->isReviewerValidated());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     private function vulnerability(): Vulnerability
     {
         return Vulnerability::of(

@@ -175,6 +175,33 @@ final class StagesTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidAuditContextException
      */
+    public function test_ingestion_stage_populates_mapping_files_with_the_full_scan_scope_even_when_diff_filtering_project_files(): void
+    {
+        $scanner = self::createStub(ProjectFileScannerInterface::class);
+        $scanner->method('scan')->willReturn([
+            ProjectFile::create('src/ChangedA.php', '/app/src/ChangedA.php', '<?php'),
+            ProjectFile::create('src/Unchanged.php', '/app/src/Unchanged.php', '<?php'),
+        ]);
+
+        $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
+        $gitChangedFilesResolver->method('changedSince')->willReturn(['src/ChangedA.php']);
+
+        $ingestionStage = new IngestionStage($scanner, new NullLogger(), $gitChangedFilesResolver);
+        $auditContext = AuditContext::forProject($this->tmpDir, [], false, 'main');
+
+        $ingestionStage->process($auditContext);
+
+        $projectFilePaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles());
+        $mappingFilePaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->mappingFiles());
+
+        self::assertSame(['src/ChangedA.php'], $projectFilePaths);
+        self::assertSame(['src/ChangedA.php', 'src/Unchanged.php'], $mappingFilePaths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_ingestion_stage_does_not_filter_when_no_resolver_even_with_since_ref(): void
     {
         $scanner = self::createStub(ProjectFileScannerInterface::class);
@@ -410,6 +437,31 @@ final class StagesTest extends TestCase
         self::assertCount(1, $mapping->repositories());
         self::assertCount(1, $mapping->forms());
         self::assertCount(1, $mapping->templates());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_stage_builds_the_mapping_from_the_full_scan_scope_not_the_diff_filtered_project_files(): void
+    {
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', '<?php class UserController {}'),
+        ]);
+        $auditContext->setMappingFiles([
+            ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', '<?php class UserController {}'),
+            ProjectFile::create('src/Security/UserVoter.php', '/app/src/Security/UserVoter.php', '<?php class UserVoter {}'),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertCount(1, $mapping->controllers());
+        self::assertCount(1, $mapping->voters());
     }
 
     /**
