@@ -814,6 +814,35 @@ final class AuditOrchestratorTest extends TestCase
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
+    public function test_a_validated_finding_replaces_an_earlier_rejected_verdict_at_the_exact_same_location(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload(title: 'first')]),
+            $this->attackerResponse([$this->vulnPayload(title: 'second')]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->reviewerRejectResponse(),
+            $this->reviewerAcceptResponse(),
+        );
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping();
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertCount(1, $auditContext->validatedVulnerabilities());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     public function test_it_stores_exact_metadata_values_after_orchestration(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);

@@ -176,12 +176,16 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         $output = [];
         $openParenDepth = 0;
         $openStringDelimiter = null;
+        $insideBlockComment = false;
         foreach (explode("\n", $projectFile->content()) as $line) {
+            $blockCommentState = $this->stripBlockComments($line, $insideBlockComment);
+            $insideBlockComment = $blockCommentState['inside_block_comment'];
+
             $retain = $openParenDepth > 0 || $this->shouldRetain($line);
             $output[] = $retain ? $line : self::ELIDED_PLACEHOLDER;
 
             if ($retain) {
-                $parenState = $this->parenDelta($line, $openStringDelimiter);
+                $parenState = $this->parenDelta($blockCommentState['line'], $openStringDelimiter);
                 $openParenDepth = max(0, $openParenDepth + $parenState['delta']);
                 $openStringDelimiter = $parenState['open_string_delimiter'];
             }
@@ -295,8 +299,62 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
      */
     private function stripTrailingComment(string $text): string
     {
-        $commentOffset = strpos($text, '//');
+        $offsets = array_filter(
+            [$this->falseToNull(strpos($text, '//')), $this->hashCommentOffset($text)],
+            static fn (?int $offset): bool => null !== $offset,
+        );
 
-        return false === $commentOffset ? $text : substr($text, 0, $commentOffset);
+        return [] === $offsets ? $text : substr($text, 0, min($offsets));
+    }
+
+    /**
+     * A `#[` starts a PHP attribute, not a comment — the negative lookahead
+     * keeps an attribute's own argument list (which may span multiple lines
+     * and must be paren-tracked like any other retained line) from being
+     * truncated away at the `#`.
+     */
+    private function hashCommentOffset(string $text): ?int
+    {
+        return 1 === preg_match('/#(?!\[)/', $text, $matches, \PREG_OFFSET_CAPTURE) ? $matches[0][1] : null;
+    }
+
+    private function falseToNull(int|false $offset): ?int
+    {
+        return false === $offset ? null : $offset;
+    }
+
+    /**
+     * `/* *\/` block-comment boundaries must be tracked on every line — even
+     * an elided one — because they are a property of the raw source text, not
+     * of the elision decision. An elided `/**` opening line still needs its
+     * "inside a block comment" state carried forward so a later, independently
+     * retained continuation line (e.g. a PHPDoc note mentioning a
+     * security-token function by name) has its comment content stripped
+     * before {@see self::parenDelta()} counts parentheses in it — otherwise a
+     * stray unbalanced paren inside prose desyncs tracking for the rest of the
+     * file.
+     *
+     * @return array{line: string, inside_block_comment: bool}
+     */
+    private function stripBlockComments(string $line, bool $insideBlockComment): array
+    {
+        if ($insideBlockComment) {
+            $closeOffset = strpos($line, '*/');
+            if (false === $closeOffset) {
+                return ['line' => '', 'inside_block_comment' => true];
+            }
+
+            return $this->stripBlockComments(substr($line, $closeOffset + 2), false);
+        }
+
+        $openOffset = strpos($line, '/*');
+        if (false === $openOffset) {
+            return ['line' => $line, 'inside_block_comment' => false];
+        }
+
+        $before = substr($line, 0, $openOffset);
+        $after = $this->stripBlockComments(substr($line, $openOffset + 2), true);
+
+        return ['line' => $before.$after['line'], 'inside_block_comment' => $after['inside_block_comment']];
     }
 }

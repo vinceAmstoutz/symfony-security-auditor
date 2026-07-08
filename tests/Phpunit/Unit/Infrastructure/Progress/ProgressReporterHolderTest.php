@@ -80,6 +80,29 @@ final class ProgressReporterHolderTest extends TestCase
         self::assertSame('pipeline.failed', $loggedContext['event'] ?? null);
     }
 
+    public function test_it_falls_back_to_the_system_error_log_when_the_logger_itself_throws_while_recording_a_failed_delegate(): void
+    {
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug')->willThrowException(new RuntimeException('logger died'));
+
+        $progressReporterHolder = new ProgressReporterHolder($logger);
+        $throwing = self::createStub(ProgressReporterInterface::class);
+        $throwing->method('report')->willThrowException(new RuntimeException('boom'));
+        $progressReporterHolder->setDelegate($throwing);
+
+        $errorLogFile = (string) tempnam(sys_get_temp_dir(), 'ssa_errlog_');
+        $previousErrorLog = ini_set('error_log', $errorLogFile);
+
+        try {
+            $progressReporterHolder->report('pipeline.failed');
+        } finally {
+            ini_set('error_log', false === $previousErrorLog ? '' : $previousErrorLog);
+        }
+
+        self::assertStringContainsString('logger died', (string) file_get_contents($errorLogFile));
+        unlink($errorLogFile);
+    }
+
     public function test_it_forwards_context_to_delegate(): void
     {
         $progressReporterHolder = new ProgressReporterHolder(new NullLogger());

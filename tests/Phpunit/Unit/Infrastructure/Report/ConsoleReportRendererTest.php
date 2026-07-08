@@ -566,6 +566,30 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      */
+    public function test_render_strips_raw_ansi_escape_and_carriage_return_bytes_from_the_title_and_file_path(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, "Real SQLi\x1b[2K\rAll clear", 0.9),
+            new CodeLocation("src/Foo\x1b[31m.php", 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('Real SQLi', $output);
+        self::assertStringContainsString('All clear', $output);
+        self::assertStringContainsString('src/Foo', $output);
+        self::assertStringContainsString('.php:1-5', $output);
+        self::assertStringNotContainsString("\x1b", $output);
+        self::assertStringNotContainsString("\r", $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     */
     public function test_render_vulnerability_substitutes_severity_label(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);

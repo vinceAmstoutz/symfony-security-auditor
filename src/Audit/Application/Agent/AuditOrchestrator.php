@@ -350,10 +350,18 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         return $newFindings;
     }
 
+    /**
+     * A same-id repeat is a duplicate unless it corrects an earlier rejected
+     * verdict to validated — an already-validated entry is sticky (a later
+     * spurious rejection at the same id never displaces it), but a corrected
+     * accept must be allowed to replace a stale reject, or a reviewer-verified
+     * finding silently vanishes from the report.
+     */
     private function isDuplicate(Vulnerability $vulnerability, AuditContext $auditContext): bool
     {
-        if (\array_key_exists($vulnerability->id(), $auditContext->vulnerabilities())) {
-            return true;
+        $existingById = $auditContext->vulnerabilities()[$vulnerability->id()] ?? null;
+        if ($existingById instanceof Vulnerability) {
+            return $this->isSameIdDuplicate($existingById, $vulnerability);
         }
 
         foreach ($auditContext->validatedVulnerabilities() as $existing) {
@@ -371,6 +379,15 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         }
 
         return false;
+    }
+
+    private function isSameIdDuplicate(Vulnerability $existingById, Vulnerability $vulnerability): bool
+    {
+        if ($existingById->isReviewerValidated()) {
+            return true;
+        }
+
+        return !$vulnerability->isReviewerValidated();
     }
 
     private function linesOverlap(int $start1, int $end1, int $start2, int $end2): bool

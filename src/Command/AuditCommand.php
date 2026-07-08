@@ -107,34 +107,36 @@ final readonly class AuditCommand
         $displayStyle = $this->displayStyle($symfonyStyle, $auditCommandInput);
 
         try {
-            if ($auditCommandInput->showScanned) {
-                $this->showScannedFiles($displayStyle, $projectPath, $scanPaths);
+            try {
+                if ($auditCommandInput->showScanned) {
+                    $this->showScannedFiles($displayStyle, $projectPath, $scanPaths);
+                }
+
+                if ($auditCommandInput->dryRun) {
+                    return $this->runDryRun([$symfonyStyle, $displayStyle], $auditCommandInput, $projectPath, $scanPaths);
+                }
+
+                if ($auditCommandInput->showScanned) {
+                    return ExitCode::Success->value;
+                }
+
+                if (!$this->unpricedModelBudgetGuard->permitsRun($input, $symfonyStyle)) {
+                    return ExitCode::BudgetAborted->value;
+                }
+
+                $this->beginAuditRun($symfonyStyle, $auditCommandInput);
+
+                $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache, $auditCommandInput->since, $this->acceptedFingerprintsFor($auditCommandInput));
+                $report = $this->findingTypeFilter->apply($report);
+
+                if (null !== $auditCommandInput->generateBaseline) {
+                    return $this->generateBaseline($symfonyStyle, $auditCommandInput, $report, $auditCommandInput->generateBaseline);
+                }
+
+                return $this->finalizeAuditRun($symfonyStyle, $auditCommandInput, $report);
+            } catch (AuditAbortedExceptionInterface $auditAbortedException) {
+                return $this->handleAbort($symfonyStyle, $auditCommandInput, $auditAbortedException);
             }
-
-            if ($auditCommandInput->dryRun) {
-                return $this->runDryRun([$symfonyStyle, $displayStyle], $auditCommandInput, $projectPath, $scanPaths);
-            }
-
-            if ($auditCommandInput->showScanned) {
-                return ExitCode::Success->value;
-            }
-
-            if (!$this->unpricedModelBudgetGuard->permitsRun($input, $symfonyStyle)) {
-                return ExitCode::BudgetAborted->value;
-            }
-
-            $this->beginAuditRun($symfonyStyle, $auditCommandInput);
-
-            $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache, $auditCommandInput->since, $this->acceptedFingerprintsFor($auditCommandInput));
-            $report = $this->findingTypeFilter->apply($report);
-
-            if (null !== $auditCommandInput->generateBaseline) {
-                return $this->generateBaseline($symfonyStyle, $auditCommandInput, $report, $auditCommandInput->generateBaseline);
-            }
-
-            return $this->finalizeAuditRun($symfonyStyle, $auditCommandInput, $report);
-        } catch (AuditAbortedExceptionInterface $auditAbortedException) {
-            return $this->handleAbort($symfonyStyle, $auditCommandInput, $auditAbortedException);
         } catch (Throwable $throwable) {
             $this->auditPresenter->error($displayStyle, $throwable);
 

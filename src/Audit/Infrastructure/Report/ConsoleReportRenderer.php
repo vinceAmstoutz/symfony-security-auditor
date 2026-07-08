@@ -86,10 +86,10 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
         return strtr($this->templateLoader->load('vulnerability.txt'), [
             '{{id}}' => $vulnerability->id(),
             '{{severity}}' => $vulnerability->severity()->label(),
-            '{{title}}' => $vulnerability->title(),
+            '{{title}}' => $this->sanitizeControlCharacters($vulnerability->title()),
             '{{owasp}}' => $vulnerability->type()->owaspReference(),
             '{{cwe}}' => $vulnerability->type()->cwe()->label(),
-            '{{filePath}}' => $vulnerability->filePath(),
+            '{{filePath}}' => $this->sanitizeControlCharacters($vulnerability->filePath()),
             '{{lineStart}}' => $vulnerability->lineStart(),
             '{{lineEnd}}' => $vulnerability->lineEnd(),
             '{{description}}' => $this->indentChunks($vulnerability->description()),
@@ -104,7 +104,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
     {
         return implode("\n", array_map(
             static fn (string $chunk): string => \sprintf('    %s', $chunk),
-            explode("\n", u(mb_scrub($text, 'UTF-8'))->wordwrap(65, "\n", true)->toString()),
+            explode("\n", u($this->sanitizeControlCharacters(mb_scrub($text, 'UTF-8')))->wordwrap(65, "\n", true)->toString()),
         ));
     }
 
@@ -117,7 +117,22 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
     {
         return implode("\n", array_map(
             static fn (string $line): string => \sprintf('    %s', $line),
-            explode("\n", mb_scrub($text, 'UTF-8')),
+            explode("\n", $this->sanitizeControlCharacters(mb_scrub($text, 'UTF-8'))),
         ));
+    }
+
+    /**
+     * `ReportWriter` deliberately renders console output with `OUTPUT_RAW` so
+     * a finding's own `<tag>`-lookalike text isn't misread as Symfony Console
+     * markup — but that only bypasses Symfony's formatter, it does not strip
+     * raw control bytes already in the string. An LLM-sourced field quoting
+     * attacker-crafted project content verbatim could otherwise carry a real
+     * ESC byte (ANSI escape sequences) or carriage return, letting a crafted
+     * finding erase or overwrite adjacent terminal output — e.g. hiding a
+     * CRITICAL finding behind a forged "all clear" line.
+     */
+    private function sanitizeControlCharacters(string $text): string
+    {
+        return preg_replace('/[\x00-\x08\x0B-\x1F\x7F]/', '', $text) ?? $text;
     }
 }

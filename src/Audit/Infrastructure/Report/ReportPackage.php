@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
 use Composer\InstalledVersions;
+use OutOfBoundsException;
 
 /** @internal shared package identity used across report renderers */
 final readonly class ReportPackage
@@ -24,8 +25,16 @@ final readonly class ReportPackage
 
     public const string UNKNOWN_VERSION = 'unknown';
 
+    public function __construct(
+        private string $packageName = self::NAME,
+    ) {}
+
     public function version(): string
     {
-        return InstalledVersions::getPrettyVersion(self::NAME) ?? self::UNKNOWN_VERSION;
+        try {
+            return InstalledVersions::getPrettyVersion($this->packageName) ?? self::UNKNOWN_VERSION;
+        } catch (OutOfBoundsException) {
+            return self::UNKNOWN_VERSION;
+        }
     }
 }

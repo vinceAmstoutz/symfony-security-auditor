@@ -2663,6 +2663,87 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   default `FilesystemReviewerCache`/`FilesystemAttackerCache` implementations
   already provide for their own I/O — now guaranteed for any custom cache
   implementation too.
+- **`AuditOrchestrator` silently dropped a reviewer-corrected finding whenever
+  an earlier iteration had already recorded a rejected verdict at the exact same
+  location.** `isDuplicate()`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) treated any exact-`id`
+  match as a duplicate regardless of the two verdicts' validation state, so a
+  finding the attacker re-reported and the reviewer now accepted was discarded
+  in favor of the earlier, stale rejection — a reviewer-verified vulnerability
+  silently vanished from the report. `isDuplicate()` (via the extracted
+  `isSameIdDuplicate()`) now only treats a same-`id` match as a duplicate when
+  the existing entry is already validated (sticky — never displaced by a later
+  spurious rejection) or the new one is not validated; a corrected accept
+  replacing a stale reject is no longer swallowed.
+- **`RegexCodeSlicer` only stripped `//` line comments before scanning for
+  parenthesis-balance and elision decisions, leaving `#` line comments and
+  `/* */` block comments — including ones spanning multiple lines, like a PHPDoc
+  block — unstripped.** A quote or unbalanced paren inside an unstripped comment
+  could desync `openParenDepth`/`openStringDelimiter` tracking for the rest of
+  the file, and an elided opening line of a multi-line block comment (e.g. a
+  bare `/**`) failed to update the "inside comment" state needed to correctly
+  classify a later, independently retained continuation line (e.g. a PHPDoc note
+  mentioning a security-token function by name) as comment text rather than real
+  code. `stripTrailingComment()` now also recognizes a `#` not immediately
+  followed by `[` (so a `#[Attribute]` is never mistaken for a comment), and a
+  new `stripBlockComments()` tracks `/* */` boundaries unconditionally on every
+  line — independent of whether that line is retained or elided — so a later
+  retained line always sees accurate comment state
+  (`src/Audit/Infrastructure/Scan/RegexCodeSlicer.php`).
+- **`--path ./src` and a bare `--path .` silently matched zero files instead of
+  the intended subdirectory or whole project.**
+  `Symfony\Component\Filesystem\Path::makeRelative()` never produces a leading
+  `./` in its output, so a scan-path filter comparing a `./`-prefixed CLI
+  argument against real relative paths via prefix matching could never match
+  anything. `ScanPathFilter::normalizePrefixes()`
+  (`src/Audit/Application/Scan/ScanPathFilter.php`) and
+  `AuditCommandInput::scanPaths()` (`src/Command/AuditCommandInput.php`) now
+  both strip a leading `./` segment (repeated, for `././src`) and collapse a
+  bare `.` to "no filter", mirroring the existing slash-only-path fix.
+- **The rate limiter's pre-acquired token estimate for a multi-round tool-using
+  conversation was computed once from the initial system/user prompt and never
+  grew as the conversation accumulated tool-call and tool-result content,
+  defeating `TokenBucketRateLimiter`'s oversized-request guard and
+  under-reserving budget for later, much larger real requests.**
+  `SequentialToolLoop::run()`
+  (`src/Audit/Infrastructure/LLM/SequentialToolLoop.php`) and
+  `ToolConversationWavefront`
+  (`src/Audit/Infrastructure/LLM/ToolConversationWavefront.php`) now accumulate
+  the estimate with each round's tool results before the next invocation,
+  matching `PromptTokenEstimator`'s documented "used to pre-acquire rate-limit
+  budget before each invocation" contract.
+- **`ReportPackage::version()` propagated an uncaught `OutOfBoundsException`
+  from Composer's `InstalledVersions::getPrettyVersion()` whenever the package's
+  own name was not resolvable in the runtime installed-packages registry** (e.g.
+  a non-standard packaging or distribution context), crashing SARIF report
+  rendering entirely instead of falling back to the existing `UNKNOWN_VERSION`
+  sentinel the `??` operator already handles for a `null` result.
+  `ReportPackage` (`src/Audit/Infrastructure/Report/ReportPackage.php`) now also
+  catches `OutOfBoundsException`, matching the same defensive pattern
+  `ModelsDevPricingProvider::defaultCatalogPath()` already applies to the same
+  Composer API.
+- **`AuditCommand` crashed with an uncaught `MalformedBaselineFileException`
+  instead of reporting a graceful error when a run using `--format=sarif` or
+  `--generate-baseline` (both of which skip validating `--baseline` up front,
+  since baseline suppression there is applied only at render time) aborted
+  mid-run with a malformed baseline file on disk.** `handleAbort()`
+  unconditionally applies the baseline for suppression rendering, but it runs
+  from inside `runAuditFlow()`'s `catch (AuditAbortedExceptionInterface)` block
+  — an exception it throws is a sibling catch's blind spot, not caught by the
+  adjacent `catch (Throwable)`. `runAuditFlow()`
+  (`src/Command/AuditCommand.php`) now nests the abort handling inside the outer
+  `try`, so any exception `handleAbort()` itself throws is still reported
+  through the normal error path instead of escaping uncaught.
+- **`ProgressReporterHolder::report()`'s own failure-logging call was unguarded,
+  so a misbehaving PSR-3 logger could still abort the audit from inside the very
+  catch block meant to guarantee it couldn't** — contradicting the class's
+  documented contract ("Reporter exceptions are swallowed so a misbehaving
+  delegate cannot abort the audit") and leaving it inconsistent with
+  `LoggerProgressReporter`, which already falls back to `error_log()` for the
+  identical scenario. `ProgressReporterHolder::report()`
+  (`src/Audit/Infrastructure/Progress/ProgressReporterHolder.php`) now wraps the
+  failure-logging call in its own try/catch with the same `error_log()`
+  fallback.
 
 ### Security
 
@@ -2809,6 +2890,31 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   collapses embedded newlines to spaces before the existing fence-escaping runs
   — `description` and friends keep their newlines, since those fields are meant
   to be multi-paragraph.
+- **`ConsoleReportRenderer` rendered a finding's `title`/`filePath` with
+  `OUTPUT_RAW`, which only bypasses Symfony Console's own `<tag>` markup
+  formatter — it does not strip raw control bytes already present in the
+  string.** An LLM-sourced field quoting attacker-crafted project content
+  verbatim could carry a real ESC byte (an ANSI escape sequence) or carriage
+  return, letting a crafted finding erase or overwrite adjacent terminal output
+  — e.g. hiding a CRITICAL finding behind a forged "all clear" line.
+  `ConsoleReportRenderer`
+  (`src/Audit/Infrastructure/Report/ConsoleReportRenderer.php`) now strips C0
+  control bytes (except tab/LF) and DEL from `title`/`filePath` via a new
+  `sanitizeControlCharacters()`, composed into the existing `mb_scrub()`-based
+  `indentChunks()`/`indentLines()` helpers.
+- **A malicious PR could symlink an entire top-level included path (e.g. `src`,
+  `config`, `templates`) to a directory outside the project, reading arbitrary
+  filesystem content into the LLM prompt.** `ProjectFileScanner`'s existing
+  symlink guard only checked `SplFileInfo::isLink()` on files individually
+  discovered by Finder traversal, protecting the case of a symlinked file
+  selected explicitly — it did not cover a symlinked _directory_ passed
+  wholesale as a Finder traversal root, since `resolveIncludedPaths()`'s
+  `is_dir()` check follows symlinks transparently and every file discovered
+  inside such a directory is itself an ordinary, non-symlink file that trivially
+  passes the existing per-file check. `resolveIncludedPaths()`
+  (`src/Audit/Infrastructure/FileSystem/ProjectFileScanner.php`) now checks
+  `is_link()` on each included path first, skipping and logging a warning for a
+  symlinked directory before it ever reaches `is_dir()`.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

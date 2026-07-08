@@ -135,14 +135,18 @@ final readonly class SequentialToolLoop
 
             $messageBag->add(new AssistantMessage(...$toolCalls));
 
+            $toolResults = [];
             foreach ($toolCalls as $toolCall) {
                 $result = $toolRegistry->execute($toolCall->getName(), $toolCall->getArguments());
                 $messageBag->add(new ToolCallMessage($toolCall, $result));
+                $toolResults[] = $result;
                 $this->logger->debug('Tool invoked', [
                     'tool' => $toolCall->getName(),
                     'iteration' => $iteration + 1,
                 ]);
             }
+
+            $estimatedInputTokens += $this->promptTokenEstimator->estimate(...$toolResults);
 
             ++$iteration;
         }

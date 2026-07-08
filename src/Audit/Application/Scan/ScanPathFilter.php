@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan;
 
+use Symfony\Component\String\UnicodeString;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 use function Symfony\Component\String\u;
@@ -65,7 +66,7 @@ final readonly class ScanPathFilter
     {
         $normalized = [];
         foreach ($scanPaths as $scanPath) {
-            $trimmed = u($scanPath)->trim()->replace('\\', '/')->trimEnd('/');
+            $trimmed = self::stripLeadingCurrentDirSegment(u($scanPath)->trim()->replace('\\', '/')->trimEnd('/'));
             if ($trimmed->isEmpty()) {
                 continue;
             }
@@ -74,6 +75,22 @@ final readonly class ScanPathFilter
         }
 
         return $normalized;
+    }
+
+    /**
+     * `Path::makeRelative()` (used to compute every scanned file's relative
+     * path) never produces a leading `./` in its output, so a `--path ./src`
+     * or bare `--path .` CLI filter could otherwise never match any scanned
+     * real relative path — silently scanning zero files instead of the
+     * intended subdirectory (or, for a bare `.`, the whole project).
+     */
+    private static function stripLeadingCurrentDirSegment(UnicodeString $unicodeString): UnicodeString
+    {
+        while ($unicodeString->startsWith('./')) {
+            $unicodeString = $unicodeString->after('/');
+        }
+
+        return '.' === $unicodeString->toString() ? u('') : $unicodeString;
     }
 
     /**

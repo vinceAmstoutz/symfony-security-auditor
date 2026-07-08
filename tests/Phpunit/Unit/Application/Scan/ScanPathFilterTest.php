@@ -120,6 +120,28 @@ final class ScanPathFilterTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_a_leading_dot_slash_segment_in_a_scan_path_still_matches(): void
+    {
+        $files = [$this->file('src/A.php'), $this->file('tests/A.php')];
+
+        $filtered = ScanPathFilter::apply($files, ['./src']);
+
+        self::assertSame([$files[0]], $filtered);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_bare_dot_scan_path_is_dropped_and_treated_as_no_filter(): void
+    {
+        $files = [$this->file('src/A.php'), $this->file('tests/A.php')];
+
+        self::assertSame($files, ScanPathFilter::apply($files, ['.']));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_normalizes_windows_separators_in_project_files(): void
     {
         $projectFile = ProjectFile::create('apps\\api\\src\\A.php', '/app/apps/api/src/A.php', '<?php');

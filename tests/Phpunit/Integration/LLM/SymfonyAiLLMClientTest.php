@@ -883,6 +883,37 @@ final class SymfonyAiLLMClientTest extends TestCase
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_complete_batch_with_tools_grows_the_rate_limiter_estimate_as_tool_results_accumulate_in_the_conversation(): void
+    {
+        $tool = $this->makeTool('lookup', 'looks things up', static fn (array $args): string => 'tool-result');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        $platform = $this->scriptedPlatform([
+            new MultiPartResult([new ToolCallResult([new ToolCall('call-1', 'lookup', ['q' => 'test'])])]),
+            new MultiPartResult([new TextResult('final answer')]),
+        ]);
+
+        $fakeRateLimiter = new FakeRateLimiter();
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            new PlatformRequestConfig(tokenEstimator: new FixedTokenEstimator(10)),
+            new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
+        );
+
+        $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 'sys', 'user' => 'usr', 'tools' => $toolRegistry],
+        ], 1, 5);
+
+        self::assertSame([20, 30], $fakeRateLimiter->acquired);
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
@@ -1851,6 +1882,38 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         self::assertSame('final answer', $llmResponse->content());
         self::assertSame('end_turn', $llmResponse->stopReason());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_with_tools_grows_the_rate_limiter_estimate_as_tool_results_accumulate_in_the_conversation(): void
+    {
+        $tool = $this->makeTool('lookup', 'looks things up', static fn (array $args): string => 'tool-result');
+        $toolRegistry = new ToolRegistry([$tool], new NullLogger());
+
+        $platform = $this->scriptedPlatform([
+            new MultiPartResult([new ToolCallResult([new ToolCall('call-1', 'lookup', ['q' => 'test'])])]),
+            new MultiPartResult([new TextResult('final answer')]),
+        ]);
+
+        $fakeRateLimiter = new FakeRateLimiter();
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            new PlatformRequestConfig(tokenEstimator: new FixedTokenEstimator(10)),
+            new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
+        );
+
+        $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 5);
+
+        self::assertSame([20, 30], $fakeRateLimiter->acquired);
     }
 
     /**

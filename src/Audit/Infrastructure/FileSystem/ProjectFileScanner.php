@@ -197,6 +197,12 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
         $explicitFiles = [];
         foreach ($this->includedPaths as $includedPath) {
             $resolved = $projectPath.\DIRECTORY_SEPARATOR.$includedPath;
+            if (is_link($resolved)) {
+                $this->logger->warning('Skipped symlinked included path', ['path' => $resolved]);
+
+                continue;
+            }
+
             if (is_dir($resolved)) {
                 $directories[] = $resolved;
 

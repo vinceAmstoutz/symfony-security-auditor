@@ -43,6 +43,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
@@ -155,6 +156,28 @@ final class AuditCommandBudgetAbortReportFilteringTest extends TestCase
             [['kind' => 'external', 'justification' => 'Accepted via audit baseline']],
             $firstResult['suppressions'] ?? null,
         );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     */
+    public function test_a_malformed_baseline_file_during_a_budget_abort_is_reported_as_a_graceful_error_instead_of_crashing(): void
+    {
+        $vulnerability = $this->makeVuln();
+        $baselineFile = $this->fixtureDir.'/baseline.json';
+        file_put_contents($baselineFile, 'not valid json{{{');
+
+        $commandTester = $this->makeCommandTester($vulnerability, configuredBaseline: $baselineFile);
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--baseline' => $baselineFile,
+            '--format' => 'sarif',
+        ]);
+
+        self::assertSame(ExitCode::Failure->value, $exitCode);
+        self::assertStringContainsString('Unexpected error', $commandTester->getDisplay());
+        self::assertStringContainsString('Syntax error', $commandTester->getDisplay());
     }
 
     /**

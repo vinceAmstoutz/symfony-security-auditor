@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Component\String\UnicodeString;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
@@ -89,7 +90,7 @@ final class AuditCommandInput
     {
         $normalized = [];
         foreach ($this->paths as $path) {
-            $trimmed = u($path)->trim()->trimEnd('/');
+            $trimmed = $this->stripLeadingCurrentDirSegment(u($path)->trim()->trimEnd('/'));
             if ($trimmed->isEmpty()) {
                 continue;
             }
@@ -98,6 +99,22 @@ final class AuditCommandInput
         }
 
         return $normalized;
+    }
+
+    /**
+     * `Path::makeRelative()` (used to compute every scanned file's relative
+     * path) never produces a leading `./` in its output, so a `--path ./src`
+     * or bare `--path .` CLI filter could otherwise never match any scanned
+     * real relative path — silently scanning zero files instead of the
+     * intended subdirectory (or, for a bare `.`, the whole project).
+     */
+    private function stripLeadingCurrentDirSegment(UnicodeString $unicodeString): UnicodeString
+    {
+        while ($unicodeString->startsWith('./')) {
+            $unicodeString = $unicodeString->after('/');
+        }
+
+        return '.' === $unicodeString->toString() ? u('') : $unicodeString;
     }
 
     public function isMachineReadableToStdout(): bool

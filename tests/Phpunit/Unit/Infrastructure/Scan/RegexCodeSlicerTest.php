@@ -286,6 +286,78 @@ final class RegexCodeSlicerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_an_apostrophe_inside_a_hash_comment_on_a_continuation_line_does_not_defeat_elision_for_the_rest_of_the_file(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function bar(\n"
+            ."        int \$id, # don't remove this\n"
+            ."        string \$name\n"
+            ."    ) {\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_hash_prefixed_attribute_is_still_retained_and_not_mistaken_for_a_comment(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    #[SomeAttribute(\n"
+            ."        param: 'INERT_MARKER_KEEP'\n"
+            ."    )]\n"
+            ."    public function bar(): void {}\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('INERT_MARKER_KEEP', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_multi_line_phpdoc_block_mentioning_a_security_token_by_name_does_not_defeat_elision_for_the_rest_of_the_file(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    /**\n"
+            ."     * Wraps hash_hmac( for legacy callers\n"
+            ."     */\n"
+            ."    private function legacy(): void {}\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_same_line_block_comment_containing_an_unbalanced_paren_does_not_defeat_elision_for_the_rest_of_the_file(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$this->getUser(); /* legacy note: calls hash_hmac( internally */\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_inert_line_resembling_keyword_mid_line_is_elided(): void
     {
         // A comment mentioning "namespace"/"class" mid-line must NOT be treated as
