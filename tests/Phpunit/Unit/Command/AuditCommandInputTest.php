@@ -174,6 +174,17 @@ final class AuditCommandInputTest extends TestCase
     /**
      * @throws WorkingDirectoryUnavailableException
      */
+    public function test_resolved_project_path_does_not_need_the_working_directory_for_an_already_absolute_path(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->projectPath = '/an/explicit/absolute/path';
+
+        self::assertSame('/an/explicit/absolute/path', $auditCommandInput->resolvedProjectPath(static fn (): false => false));
+    }
+
+    /**
+     * @throws WorkingDirectoryUnavailableException
+     */
     public function test_resolved_project_path_uses_injected_resolver_when_property_is_null(): void
     {
         $auditCommandInput = new AuditCommandInput();

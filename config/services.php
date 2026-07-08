@@ -545,6 +545,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(TokenUsageRecorder::class),
             service(CostCalculator::class),
             param('symfony_security_auditor.attacker_model'),
+            service(BudgetTracker::class),
         ]);
 
     $defaultsConfigurator->set(UnpricedModelBudgetGuard::class)

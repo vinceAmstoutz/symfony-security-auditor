@@ -358,6 +358,12 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
     }
 
     /**
+     * A cross-line match's own security-relevant token (`return null;`, the
+     * actual `->request(` call) sits at the END of the match, not its start —
+     * a marker line pointing to the match's opening keyword (e.g. `public
+     * function supports(`) is often a structural line the code slicer already
+     * retains unconditionally, restoring nothing.
+     *
      * @return list<int>
      */
     private function matchAcrossLines(string $content, string $regex): array
@@ -365,8 +371,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         preg_match_all($regex, $content, $matches, \PREG_OFFSET_CAPTURE);
 
         $lines = [];
-        foreach ($matches[0] as $match) {
-            $lines[] = substr_count($content, "\n", 0, $match[1]) + 1;
+        foreach ($matches[0] as [$matchedText, $startOffset]) {
+            $lines[] = substr_count($content, "\n", 0, $startOffset + \strlen($matchedText)) + 1;
         }
 
         return array_values(array_unique($lines));

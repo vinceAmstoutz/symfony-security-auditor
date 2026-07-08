@@ -351,6 +351,47 @@ final class AttackerAgentTest extends TestCase
         self::assertStringContainsString('$qb->where("u.username = $username");', $captured);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_multi_line_risk_marker_restores_its_actually_dangerous_line_not_the_matchs_opening_line(): void
+    {
+        $inertLines = str_repeat("        \$x = 1;\n", 40);
+        $content = "<?php\nclass LoginAuthenticator {\n    public function supports(Request \$request): ?bool\n    {\n        return null;\n    }\n}\n".$inertLines;
+        $projectFile = ProjectFile::create('src/Security/LoginAuthenticator.php', '/app/src/Security/LoginAuthenticator.php', $content);
+
+        $captured = '';
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
+            $captured = $user;
+
+            return LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0));
+        });
+
+        $attackerAgent = new AttackerAgent(
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                codeSlicer: new RegexCodeSlicer(10),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: new NullAttackerCache(),
+                staticPreScanner: new RegexStaticPreScanner(),
+                progressReporter: new NullProgressReporter(),
+            ),
+            new AttackerAnalysisSettings(),
+            new NullLogger(),
+        );
+
+        $attackerAgent->analyze(new AttackerAnalysisRequest([$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())), new NullCoverageRecorder());
+
+        self::assertStringContainsString('return null;', $captured);
+    }
+
     public function test_it_returns_empty_array_when_no_files(): void
     {
         $llmClient = $this->createMock(LLMClientInterface::class);

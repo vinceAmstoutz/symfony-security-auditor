@@ -497,7 +497,7 @@ final class RegexStaticPreScannerTest extends TestCase
 
         self::assertCount(1, $markers);
         self::assertSame('supports_returns_null', $markers[0]->pattern());
-        self::assertSame(4, $markers[0]->line());
+        self::assertSame(6, $markers[0]->line());
     }
 
     /**
@@ -534,7 +534,7 @@ final class RegexStaticPreScannerTest extends TestCase
 
         self::assertCount(1, $markers);
         self::assertSame('http_client_request', $markers[0]->pattern());
-        self::assertSame(4, $markers[0]->line());
+        self::assertSame(6, $markers[0]->line());
     }
 
     /**
@@ -775,7 +775,7 @@ final class RegexStaticPreScannerTest extends TestCase
         $markers = $regexStaticPreScanner->scan([$projectFile]);
 
         self::assertCount(1, $markers);
-        self::assertSame(2, $markers[0]->line());
+        self::assertSame(4, $markers[0]->line());
     }
 
     /**
@@ -799,7 +799,7 @@ final class RegexStaticPreScannerTest extends TestCase
         $markers = $regexStaticPreScanner->scan([$projectFile]);
 
         self::assertCount(1, $markers);
-        self::assertSame(2, $markers[0]->line());
+        self::assertSame(4, $markers[0]->line());
     }
 
     /**

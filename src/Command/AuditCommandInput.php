@@ -74,12 +74,17 @@ final class AuditCommandInput
      */
     public function resolvedProjectPath(?callable $cwdResolver = null): string
     {
+        $trimmedPath = u($this->projectPath ?? '')->trim()->toString();
+        if (Path::isAbsolute($trimmedPath)) {
+            return Path::canonicalize($trimmedPath);
+        }
+
         $cwd = ($cwdResolver ?? \getcwd(...))();
         if (false === $cwd) {
             throw WorkingDirectoryUnavailableException::fromGetcwdFailure();
         }
 
-        return Path::makeAbsolute(u($this->projectPath ?? '')->trim()->toString(), $cwd);
+        return Path::makeAbsolute($trimmedPath, $cwd);
     }
 
     /**

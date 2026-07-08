@@ -2963,6 +2963,52 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   standalone application. `create()` now passes
   `(new ReportPackage())->version()` as the `Application` constructor's second
   argument.
+- **A real (non-`--dry-run`) audit's reported `estimated_cost_usd` priced every
+  token — attacker and reviewer alike — at the attacker model's rate, silently
+  producing the wrong total for any split-model setup
+  (`attacker_model`/`reviewer_model` configured differently).**
+  `TokenUsageRecorder`
+  (`src/Audit/Application/Telemetry/TokenUsageRecorder.php`) accumulates one
+  blended token total across every LLM call regardless of which model made it,
+  and `RunAuditUseCase::buildCost()`
+  (`src/Audit/Application/UseCase/RunAuditUseCase.php`) re-priced that entire
+  blended total using only the attacker model — `docs/configuration.md`
+  explicitly promises this figure "reflect[s] the real discounted spend," and
+  `EstimateAuditCostUseCase`'s `--dry-run` path already prices attacker and
+  reviewer tokens separately at their own models, so a real run's report could
+  diverge meaningfully from its own dry-run estimate whenever the two models'
+  prices differ. `BudgetTracker::recordCall()`
+  (`src/Audit/Application/Budget/BudgetTracker.php`) already accumulates an
+  accurate running cost priced per-call at each call's own model — it just
+  wasn't consulted for the final report figure. `RunAuditUseCase` now accepts an
+  optional `BudgetTracker` and prefers its `costUsdUsed()` for the reported cost
+  when available, falling back to the previous single-model calculation
+  otherwise; `config/services.php` wires the same shared `BudgetTracker`
+  instance already used for live budget enforcement.
+- **`AuditCommandInput::resolvedProjectPath()` failed with "Failed to determine
+  current working directory; pass an explicit project path" even when an
+  explicit, absolute project path was already given** — the one scenario where
+  the working directory is never actually needed. `resolvedProjectPath()`
+  (`src/Command/AuditCommandInput.php`) unconditionally resolved the current
+  working directory before checking whether the supplied path was already
+  absolute, so a process whose working directory had become unavailable (e.g.
+  removed mid-run) could not audit an explicit absolute path either — the only
+  remedy the exception's own message suggests. `resolvedProjectPath()` now
+  checks `Path::isAbsolute()` first and returns the canonicalized path directly,
+  only consulting the working-directory resolver for a relative or empty path.
+- **A cross-line static-pre-scan marker (`supports_returns_null`,
+  `http_client_request`, `no_hash_equals`) recorded the line where its match
+  _starts_ rather than where the actual dangerous token sits, so restoring that
+  single line after code-slicing often restored a harmless line the slicer
+  already kept unconditionally (e.g. a `public function supports(...)`
+  signature) while the real `return null;`/`->request(`/`===` line stayed elided
+  from what the attacker LLM sees.** `RegexStaticPreScanner::matchAcrossLines()`
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) computed the
+  marker's line from the match's start offset; it now computes it from the
+  match's end offset, which — for every one of this dictionary's cross-line
+  patterns — lands on the line containing the actual security-relevant token.
+  Single-line patterns are unaffected (start and end offset share the same
+  line).
 
 ### Security
 

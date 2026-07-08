@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase;
 
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
@@ -26,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderExcep
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 
 final readonly class RunAuditUseCase
@@ -36,6 +38,7 @@ final readonly class RunAuditUseCase
         private ?TokenUsageRecorder $tokenUsageRecorder = null,
         private ?CostCalculator $costCalculator = null,
         private string $primaryModel = '',
+        private ?BudgetTracker $budgetTracker = null,
     ) {}
 
     /**
@@ -115,10 +118,18 @@ final readonly class RunAuditUseCase
         }
 
         $snapshot = $this->tokenUsageRecorder->snapshot();
-        $estimatedCost = $this->costCalculator instanceof CostCalculator
-            ? $this->costCalculator->costForCall($snapshot->inputTokens(), $snapshot->outputTokens(), $this->primaryModel, $snapshot->cacheReadTokens(), $snapshot->cacheCreationTokens())
-            : 0.0;
 
-        return AuditCost::of($snapshot->inputTokens(), $snapshot->outputTokens(), $estimatedCost, $this->primaryModel);
+        return AuditCost::of($snapshot->inputTokens(), $snapshot->outputTokens(), $this->resolveEstimatedCost($snapshot), $this->primaryModel);
+    }
+
+    private function resolveEstimatedCost(TokenUsageSnapshot $tokenUsageSnapshot): float
+    {
+        if ($this->budgetTracker instanceof BudgetTracker) {
+            return $this->budgetTracker->costUsdUsed();
+        }
+
+        return $this->costCalculator instanceof CostCalculator
+            ? $this->costCalculator->costForCall($tokenUsageSnapshot->inputTokens(), $tokenUsageSnapshot->outputTokens(), $this->primaryModel, $tokenUsageSnapshot->cacheReadTokens(), $tokenUsageSnapshot->cacheCreationTokens())
+            : 0.0;
     }
 }
