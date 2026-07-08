@@ -42,6 +42,16 @@ final class XdgConfigPathResolverTest extends TestCase
     /**
      * @throws UnresolvableConfigPathException
      */
+    public function test_it_falls_back_to_home_dot_config_when_xdg_config_home_is_relative(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver('.config', null, '/home/dev');
+
+        self::assertSame('/home/dev/.config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
     public function test_it_resolves_the_cache_dir_under_xdg_cache_home_when_set(): void
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver(null, '/xdg/cache', '/home/dev');

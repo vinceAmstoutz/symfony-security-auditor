@@ -184,6 +184,22 @@ final class GrepToolTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_execute_truncates_a_single_excessively_long_matching_line(): void
+    {
+        $hugeLine = str_repeat('A', 20_000).'NEEDLE';
+        $projectFile = ProjectFile::create('src/Huge.php', '/app/Huge', "header\n{$hugeLine}\nfooter\n");
+
+        $grepTool = new GrepTool([$projectFile]);
+
+        $result = $grepTool->execute(['pattern' => 'NEEDLE']);
+
+        self::assertLessThan(1000, \strlen($result));
+        self::assertStringContainsString('[truncated]', $result);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_treats_empty_file_type_as_unset(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/x', 'foo bar');

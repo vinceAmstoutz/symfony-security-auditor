@@ -163,6 +163,8 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
             $this->assertSafeToWrite($path);
             $this->filesystem->mkdir(\dirname($path));
             $this->filesystem->dumpFile($path, $json);
+            // Stamped via $this->clock, not left to the OS, so isExpired()'s subtraction never mixes two different time sources.
+            $this->filesystem->touch($path, $this->clock->now()->getTimestamp());
             $this->logger->debug('Advisory cache stored', ['lockfile_hash' => $hash]);
         } catch (Throwable $throwable) {
             $this->logger->warning('Failed to write advisory cache entry', [

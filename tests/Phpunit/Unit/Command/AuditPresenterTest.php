@@ -157,6 +157,24 @@ final class AuditPresenterTest extends TestCase
     }
 
     /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_result_for_failure_exit_uses_singular_wording_for_exactly_one_vulnerability(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->result($symfonyStyle, $this->makeSingleVulnerabilityReport(), Command::FAILURE);
+
+        $flattened = preg_replace('/[\s!]+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('1 vulnerability found.', $flattened);
+        self::assertStringNotContainsString('1 vulnerabilities found', $flattened);
+    }
+
+    /**
      * @throws InvalidAuditContextException
      */
     public function test_result_for_success_exit_emits_success_message(): void
@@ -483,6 +501,27 @@ final class AuditPresenterTest extends TestCase
                 return \in_array($model, $this->supportedModels, true);
             }
         };
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function makeSingleVulnerabilityReport(): AuditReport
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability(
+            Vulnerability::of(
+                new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'Critical vuln', 0.9),
+                new CodeLocation('src/File.php', 1, 5),
+                new VulnerabilityNarrative('desc', 'inject', "' OR 1", 'fix'),
+                '$q',
+            )->withReviewerValidation(true),
+        );
+
+        return AuditReport::fromContext($auditContext);
     }
 
     /**

@@ -29,7 +29,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 15;
+    public const int PROMPT_VERSION = 16;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
@@ -72,6 +72,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             $symfonyMapping->controllersWithoutVoters(),
         ));
 
+        $firewallRules = SymfonyMappingContextRenderer::renderFirewallRules($symfonyMapping);
         $accessControlMap = SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping);
         $voterCoverage = SymfonyMappingContextRenderer::renderVoterCoverage($symfonyMapping);
         $formBindings = SymfonyMappingContextRenderer::renderFormBindings($symfonyMapping);
@@ -84,7 +85,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             ## Controllers WITHOUT Security Annotations (High Priority)
             {$noVoterList}
 
-            {$accessControlMap}{$voterCoverage}{$formBindings}## Source Code
+            {$firewallRules}{$accessControlMap}{$voterCoverage}{$formBindings}## Source Code
             Analyze these files for exploitable vulnerabilities. Each line is prefixed with its line number (`NNN | code`) — use those exact numbers when populating `line_start` and `line_end`; do NOT count manually or guess.
 
             {$context}

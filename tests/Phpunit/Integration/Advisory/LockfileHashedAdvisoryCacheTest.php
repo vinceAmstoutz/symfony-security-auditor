@@ -559,6 +559,26 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame(2, $recordingComposerAuditRunner->callCount, 'an entry past the TTL must not be served from cache');
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_expiry_is_computed_from_the_injected_clock_even_when_it_diverges_from_the_real_wall_clock(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+        $mockClock = new MockClock('2000-01-01T00:00:00Z');
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {"foo/bar": []}}');
+
+        $lockfileHashedAdvisoryCache = $this->makeCacheWithClock($recordingComposerAuditRunner, $mockClock);
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $mockClock->modify('+25 hours');
+        $recordingComposerAuditRunner->payload = '{"advisories": {"new/cve": []}}';
+        $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame('{"advisories": {"new/cve": []}}', $json);
+        self::assertSame(2, $recordingComposerAuditRunner->callCount, 'an entry past the TTL per the injected clock must expire regardless of the real OS wall-clock time recorded on the cache file');
+    }
+
     #[Override]
     protected function setUp(): void
     {

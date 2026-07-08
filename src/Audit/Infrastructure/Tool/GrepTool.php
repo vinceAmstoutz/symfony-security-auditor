@@ -31,6 +31,8 @@ final readonly class GrepTool implements ToolInterface
 {
     private const int MAX_MATCHES = 50;
 
+    private const int MAX_LINE_LENGTH = 500;
+
     /**
      * @param list<ProjectFile> $files
      */
@@ -136,7 +138,22 @@ final readonly class GrepTool implements ToolInterface
                 continue;
             }
 
-            yield \sprintf('%s:%d:%s', $projectFile->relativePath(), $lineIndex + 1, u($line)->trim()->toString());
+            yield \sprintf('%s:%d:%s', $projectFile->relativePath(), $lineIndex + 1, $this->truncateLine(u($line)->trim()->toString()));
         }
+    }
+
+    /**
+     * A single matched line's length is otherwise unbounded — audited-project
+     * content fully controls it (e.g. a long inline base64/SVG blob or config
+     * value), and unlike {@see MAX_MATCHES}, capping the match count alone
+     * does nothing to bound a single oversized line sent to the LLM.
+     */
+    private function truncateLine(string $line): string
+    {
+        if (\strlen($line) <= self::MAX_LINE_LENGTH) {
+            return $line;
+        }
+
+        return \sprintf('%s... [truncated]', mb_strcut($line, 0, self::MAX_LINE_LENGTH, 'UTF-8'));
     }
 }

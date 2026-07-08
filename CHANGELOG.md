@@ -3245,6 +3245,63 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   of its own here. `fromFiles()` now uses a local predicate scoped to exactly
   this aggregation's own six explicit buckets, so every `.php` file lands in
   precisely one of the seven.
+- **`GrepTool` returned an unbounded single line as one match, letting a single
+  excessively long line in the audited project blow up a tool-call result sent
+  to the LLM.** Unlike `ReadFileTool`, which already caps output via
+  `MAX_BYTES`, `matchesInFile()` (`src/Audit/Infrastructure/Tool/GrepTool.php`)
+  yielded the full matched line verbatim regardless of length. A new
+  `MAX_LINE_LENGTH` (500 characters) now truncates an overlong matching line via
+  `mb_strcut()`, appending a `[truncated]` marker — mirroring `ReadFileTool`'s
+  existing convention.
+- **`ListFilesTool` returned every matching file with no upper bound, letting a
+  project with an unusually large number of files blow up a single tool-call
+  result.** `execute()` (`src/Audit/Infrastructure/Tool/ListFilesTool.php`) now
+  caps output at a new `MAX_FILES` (2,000), appending a note naming how many
+  more files were omitted and suggesting the `file_type` argument to narrow the
+  query.
+- **Every controller's plain constructor (and any other non-routed public
+  method) was tagged `LACKS_ACCESS_CHECK` in the attacker prompt's Route
+  Access-Control Map, injecting a false-positive `broken_access_control`
+  candidate for virtually every controller** — which almost always has a
+  constructor. `PhpParserControllerAccessControlParser` emits a
+  `RouteAccessControl` entry for every public method on a controller-like class,
+  not just its routed actions, leaving `hasRouteAttribute() === false` on the
+  rest; `SymfonyMappingContextRenderer::renderRouteAccessControlMap()`
+  (`src/Audit/Infrastructure/Prompt/SymfonyMappingContextRenderer.php`) rendered
+  all of them regardless. A new `routedControls()` now filters to entries with
+  `hasRouteAttribute() === true` before rendering.
+- **The attacker prompt only ever showed a firewall count (`Firewall rules: N`),
+  never the actual firewall names or their `security: false`/`stateless` flags**
+  — contradicting `docs/architecture.md`'s claim that these flags land in the
+  map the attacker prompt renders. `SymfonyMapping::firewallRules()`'s only
+  consumer was `toSummary()`'s count, so a route sitting behind a firewall with
+  authentication fully disabled looked identical, from the LLM's perspective, to
+  one behind a normally-secured firewall. A new
+  `SymfonyMappingContextRenderer::renderFirewallRules()`
+  (`src/Audit/Infrastructure/Prompt/SymfonyMappingContextRenderer.php`) renders
+  each firewall rule as its own line, wired into
+  `AttackerPromptBuilder::buildUserMessage()`
+  (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`) ahead of the
+  Route Access-Control Map; `PROMPT_VERSION` bumps to 16, invalidating cached
+  attacker responses.
+- **A failed audit reported the grammatically incorrect "1 vulnerabilities
+  found."** for exactly one finding. `AuditPresenter::result()`
+  (`src/Command/AuditPresenter.php`) hardcoded the plural noun; the
+  fail-on-threshold message now picks the singular or plural form based on the
+  actual count, matching the `(s)` convention already used elsewhere in the same
+  file.
+- **`LockfileHashedAdvisoryCache::isExpired()` compared the injected
+  `ClockInterface`'s "now" against the cache file's real OS `filemtime()`,
+  mixing two independent time sources in a single duration calculation.**
+  Production wiring always binds a real-time clock (`NativeClock`), so this
+  never manifested in practice, but the two sources would silently diverge the
+  moment `ClockInterface` was ever rebound to anything else, making cache expiry
+  either never trigger or trigger immediately depending on the skew direction.
+  `writeCache()`
+  (`src/Audit/Infrastructure/Advisory/LockfileHashedAdvisoryCache.php`) now
+  stamps the cache file's mtime from `$this->clock->now()` instead of leaving it
+  to the OS, so the later expiry comparison always subtracts two readings of the
+  same clock.
 
 ### Security
 
@@ -3491,6 +3548,33 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   body now excludes only the specific closing quote captured in the pattern's
   own backreference (`(?!\2)[^\n]`), so an embedded instance of the _other_
   quote type no longer terminates the match early.
+- **A pre-planted symlink at the standalone binary's config file path (or its
+  parent directory) let `symfony-security-auditor init` write through to an
+  arbitrary file (CWE-59)** — the same class of vulnerability already fixed for
+  the filesystem attacker/reviewer caches and the advisory cache.
+  `Filesystem::dumpFile()` transparently writes through a pre-existing symlink
+  at its destination, and `Filesystem::mkdir()` treats a symlinked directory as
+  already existing. `YamlStandaloneConfigWriter::write()`
+  (`src/Audit/Infrastructure/Config/YamlStandaloneConfigWriter.php`) now refuses
+  to write when the target path or its parent directory is a symlink, via a new
+  `UnsafeStandaloneConfigWriteException::forSymlinkedPath()`
+  (`src/Audit/Infrastructure/Config/Exception/UnsafeStandaloneConfigWriteException.php`).
+- **A relative `XDG_CONFIG_HOME`/`XDG_CACHE_HOME`/`XDG_DATA_HOME` value was used
+  verbatim instead of being treated as unset, letting the standalone binary's
+  config/cache/data paths resolve relative to whatever directory it happened to
+  be invoked from** — typically the very project being audited, since that is
+  the binary's default working directory, a supply-chain-adjacent risk since the
+  audited project could then supply its own config. The XDG Base Directory
+  Specification requires these variables to hold absolute paths and says
+  implementations "may consider" a relative value invalid.
+  `XdgConfigPathResolver::baseDirectory()`
+  (`src/Audit/Infrastructure/Config/XdgConfigPathResolver.php`) now falls back
+  to the `$HOME`-based default whenever the configured value is not absolute,
+  via a new platform-independent `isAbsolutePath()` check — deliberately not
+  `Symfony\Component\Filesystem\Path::isAbsolute()`, whose Windows-drive-letter
+  detection is gated on the current process's own `DIRECTORY_SEPARATOR` rather
+  than the path's own shape, which would wrongly reject a genuine absolute
+  `%APPDATA%`-derived path when running on a non-Windows CI runner.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

@@ -128,4 +128,22 @@ final class ListFilesToolTest extends TestCase
 
         self::assertSame('No files match.', $result);
     }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_execute_caps_output_at_max_files_and_notes_how_many_were_omitted(): void
+    {
+        $files = [];
+        for ($i = 0; $i < 2500; ++$i) {
+            $files[] = ProjectFile::create(\sprintf('src/Generated/File%d.php', $i), '/app/x'.$i, '<?php');
+        }
+
+        $listFilesTool = new ListFilesTool($files);
+
+        $result = $listFilesTool->execute([]);
+
+        self::assertSame(2000, substr_count($result, '.php ['));
+        self::assertStringContainsString('500 more files', $result);
+    }
 }

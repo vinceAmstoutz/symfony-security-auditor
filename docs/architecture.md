@@ -362,9 +362,11 @@ by the extension). Logs stage name and elapsed time per stage.
 ### Stages
 
 **`IngestionStage`** — calls `ProjectFileScanner::scan(string $projectPath)`,
-calls `AuditContext::setProjectFiles()`.
+calls `AuditContext::setProjectFiles()` (diff-filtered when `--since` is set)
+and `AuditContext::setMappingFiles()` (the full scan scope, never diff-filtered)
+so `MappingStage` always sees the whole project.
 
-**`MappingStage`** — classifies `AuditContext::projectFiles()` into roles,
+**`MappingStage`** — classifies `AuditContext::mappingFiles()` into roles,
 constructs `SymfonyMapping`, calls `AuditContext::setMapping()`. May use the LLM
 client for semantic mapping or fall back to heuristic classification. The route
 access-control map and firewall rules come from `SecurityConfigParserInterface`

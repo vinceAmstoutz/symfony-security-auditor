@@ -28,6 +28,22 @@ final readonly class SymfonyMappingContextRenderer
 {
     private const string DELIMITER_CANDIDATES = '#~!%@';
 
+    public static function renderFirewallRules(SymfonyMapping $symfonyMapping): string
+    {
+        $firewallRules = $symfonyMapping->firewallRules();
+        if ([] === $firewallRules) {
+            return '';
+        }
+
+        $lines = ['## Firewall Rules'];
+        $lines[] = 'Each line names a `security.yaml` firewall and any notable flags. A `security: false` firewall enforces no authentication or access control at all on matching paths — treat every route behind it as unauthenticated regardless of voters or `#[IsGranted]`. A `stateless` firewall carries no session, so session-backed CSRF protection is ineffective there.';
+        foreach ($firewallRules as $firewallRule) {
+            $lines[] = \sprintf('- %s', self::sanitizeLine($firewallRule));
+        }
+
+        return \sprintf("%s\n\n", implode("\n", $lines));
+    }
+
     public static function renderVoterCoverage(SymfonyMapping $symfonyMapping): string
     {
         $voterCapabilities = $symfonyMapping->voterCapabilities();
@@ -64,7 +80,7 @@ final readonly class SymfonyMappingContextRenderer
 
     public static function renderRouteAccessControlMap(SymfonyMapping $symfonyMapping): string
     {
-        $routeAccessControls = $symfonyMapping->routeAccessControls();
+        $routeAccessControls = self::routedControls($symfonyMapping);
         if ([] === $routeAccessControls) {
             return '';
         }
@@ -95,6 +111,26 @@ final readonly class SymfonyMappingContextRenderer
         }
 
         return \sprintf("%s\n\n", implode("\n", $lines));
+    }
+
+    /**
+     * `PhpParserControllerAccessControlParser` emits a `RouteAccessControl`
+     * entry for every public method on a controller-like class, not just its
+     * routed actions — a plain constructor or helper method still gets one,
+     * with `hasRouteAttribute() === false`. Rendering those would tag every
+     * such method `LACKS_ACCESS_CHECK` even though it is not an HTTP action
+     * at all, injecting a false-positive `broken_access_control` candidate
+     * for virtually every controller (which almost always has a
+     * constructor).
+     *
+     * @return list<RouteAccessControl>
+     */
+    private static function routedControls(SymfonyMapping $symfonyMapping): array
+    {
+        return array_values(array_filter(
+            $symfonyMapping->routeAccessControls(),
+            static fn (RouteAccessControl $routeAccessControl): bool => $routeAccessControl->hasRouteAttribute(),
+        ));
     }
 
     /**
