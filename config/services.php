@@ -535,6 +535,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(ListScannedFilesUseCase::class)
         ->args([
             service(ProjectFileScannerInterface::class),
+            service(GitChangedFilesResolverInterface::class),
         ]);
 
     $defaultsConfigurator->set(RunAuditUseCase::class)

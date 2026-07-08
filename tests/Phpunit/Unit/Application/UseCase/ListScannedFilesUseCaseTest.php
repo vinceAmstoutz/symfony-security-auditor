@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 
 final class ListScannedFilesUseCaseTest extends TestCase
@@ -54,6 +55,54 @@ final class ListScannedFilesUseCaseTest extends TestCase
 
         self::assertSame(
             ['apps/api/src/A.php'],
+            array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_diff_since_ref_narrows_the_listing_to_changed_files(): void
+    {
+        $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
+        $gitChangedFilesResolver->method('changedSince')->willReturn(['src/Changed.php']);
+
+        $listScannedFilesUseCase = new ListScannedFilesUseCase(
+            $this->fixedScanner([
+                $this->makeProjectFile('src/Changed.php'),
+                $this->makeProjectFile('src/Unchanged.php'),
+            ]),
+            $gitChangedFilesResolver,
+        );
+
+        $files = $listScannedFilesUseCase->execute('/project', [], 'main');
+
+        self::assertSame(
+            ['src/Changed.php'],
+            array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_without_a_diff_since_ref_the_listing_covers_every_file(): void
+    {
+        $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
+        $gitChangedFilesResolver->method('changedSince')->willReturn(['src/Changed.php']);
+
+        $listScannedFilesUseCase = new ListScannedFilesUseCase(
+            $this->fixedScanner([
+                $this->makeProjectFile('src/Changed.php'),
+                $this->makeProjectFile('src/Unchanged.php'),
+            ]),
+            $gitChangedFilesResolver,
+        );
+
+        $files = $listScannedFilesUseCase->execute('/project');
+
+        self::assertSame(
+            ['src/Changed.php', 'src/Unchanged.php'],
             array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files),
         );
     }

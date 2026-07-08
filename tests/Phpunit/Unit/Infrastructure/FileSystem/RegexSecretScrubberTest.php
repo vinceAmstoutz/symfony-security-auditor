@@ -413,6 +413,15 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertStringContainsString('***REDACTED:custom_1***', $output);
     }
 
+    public function test_an_unterminated_quoted_value_full_of_backslashes_does_not_defeat_redaction_of_an_earlier_secret_in_the_same_file(): void
+    {
+        $payload = "password = \"SuperSecretPlaintext123!\"\nsecret = \"".str_repeat('\\', 40);
+
+        $output = $this->regexSecretScrubber->scrub($payload);
+
+        self::assertStringNotContainsString('SuperSecretPlaintext123!', $output);
+    }
+
     /**
      * @throws SecretScrubberConfigurationException
      */

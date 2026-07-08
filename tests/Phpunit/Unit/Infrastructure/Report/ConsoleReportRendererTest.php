@@ -590,6 +590,26 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      */
+    public function test_render_collapses_embedded_newlines_in_the_title_and_file_path_to_prevent_a_forged_finding_block(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::LOW, "Injected\n\n[FAKE-999] CRITICAL", 0.9),
+            new CodeLocation("src/Foo.php\n\n[FAKE-999] CRITICAL", 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringNotContainsString("\n[FAKE-999] CRITICAL", $output);
+        self::assertStringContainsString('Injected', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     */
     public function test_render_vulnerability_substitutes_severity_label(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);

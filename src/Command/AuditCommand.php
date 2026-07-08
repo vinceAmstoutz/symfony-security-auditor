@@ -109,7 +109,7 @@ final readonly class AuditCommand
         try {
             try {
                 if ($auditCommandInput->showScanned) {
-                    $this->showScannedFiles($displayStyle, $projectPath, $scanPaths);
+                    $this->showScannedFiles($displayStyle, $projectPath, $scanPaths, $auditCommandInput->since);
                 }
 
                 if ($auditCommandInput->dryRun) {
@@ -158,11 +158,11 @@ final readonly class AuditCommand
     /**
      * @param list<string> $scanPaths
      */
-    private function showScannedFiles(SymfonyStyle $symfonyStyle, string $projectPath, array $scanPaths): void
+    private function showScannedFiles(SymfonyStyle $symfonyStyle, string $projectPath, array $scanPaths, ?string $since): void
     {
         $this->auditPresenter->scannedFiles(
             $symfonyStyle,
-            $this->listScannedFilesUseCase->execute($projectPath, $scanPaths),
+            $this->listScannedFilesUseCase->execute($projectPath, $scanPaths, $since),
         );
     }
 

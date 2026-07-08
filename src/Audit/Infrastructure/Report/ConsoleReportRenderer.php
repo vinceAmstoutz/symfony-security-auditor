@@ -86,10 +86,10 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
         return strtr($this->templateLoader->load('vulnerability.txt'), [
             '{{id}}' => $vulnerability->id(),
             '{{severity}}' => $vulnerability->severity()->label(),
-            '{{title}}' => $this->sanitizeControlCharacters($vulnerability->title()),
+            '{{title}}' => $this->sanitizeSingleLineField($vulnerability->title()),
             '{{owasp}}' => $vulnerability->type()->owaspReference(),
             '{{cwe}}' => $vulnerability->type()->cwe()->label(),
-            '{{filePath}}' => $this->sanitizeControlCharacters($vulnerability->filePath()),
+            '{{filePath}}' => $this->sanitizeSingleLineField($vulnerability->filePath()),
             '{{lineStart}}' => $vulnerability->lineStart(),
             '{{lineEnd}}' => $vulnerability->lineEnd(),
             '{{description}}' => $this->indentChunks($vulnerability->description()),
@@ -134,5 +134,17 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
     private function sanitizeControlCharacters(string $text): string
     {
         return preg_replace('/[\x00-\x08\x0B-\x1F\x7F]/', '', $text) ?? $text;
+    }
+
+    /**
+     * `title`/`filePath` render on a single template line, unlike
+     * `description`/`attackVector`/`proof`/`remediation`, which are
+     * legitimately multi-line and rendered inside their own indented block —
+     * an embedded newline here would let a crafted finding forge a fake
+     * `[ID] SEVERITY` finding block as unguarded top-level output.
+     */
+    private function sanitizeSingleLineField(string $text): string
+    {
+        return $this->sanitizeControlCharacters(str_replace(["\r\n", "\n", "\r"], ' ', $text));
     }
 }

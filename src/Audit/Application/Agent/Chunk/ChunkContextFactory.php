@@ -49,7 +49,7 @@ final readonly class ChunkContextFactory
         $contextKey = $this->deriveContextKey($rejectedPreamble, $previousPreamble);
         $cacheable = $this->isCacheable($attackerAnalysisRequest, $contextKey, $cacheIsContextAware);
 
-        $slicedChunk = $this->sliceChunk($chunk);
+        $slicedChunk = $this->sliceChunk($chunk, $riskMarkerIndex);
         $systemPrompt = $this->attackerPromptBuilder->buildSystemPrompt($slicedChunk);
         $userMessage = $this->attackerPromptBuilder->buildUserMessage($slicedChunk, $attackerAnalysisRequest->symfonyMapping);
         $userMessage = $this->prependContext($userMessage, $chunkMarkers, $rejectedPreamble, $previousPreamble);
@@ -75,13 +75,22 @@ final readonly class ChunkContextFactory
         return $this->attackerContextPromptRenderer->renderPreviousFindings($attackerAnalysisRequest->previousFindings);
     }
 
+    /**
+     * Hashing each preamble individually before joining fixes both to 64 hex
+     * characters, which can never contain the raw-text join's own separator —
+     * so a rejected/previous preamble embedding a null byte (both are
+     * rendered from LLM-echoed `Vulnerability::filePath()` values, which are
+     * never null-byte-sanitized) can't shift content across the join
+     * boundary and collide with a genuinely different pair. Mirrors
+     * `FilesystemAttackerCache::keyForChunk()`'s per-file hash-then-join.
+     */
     private function deriveContextKey(string $rejectedPreamble, string $previousPreamble): string
     {
         if ('' === $rejectedPreamble && '' === $previousPreamble) {
             return '';
         }
 
-        return hash('sha256', \sprintf("%s\0%s", $rejectedPreamble, $previousPreamble));
+        return hash('sha256', hash('sha256', $rejectedPreamble).hash('sha256', $previousPreamble));
     }
 
     private function isCacheable(AttackerAnalysisRequest $attackerAnalysisRequest, string $contextKey, bool $cacheIsContextAware): bool
@@ -114,16 +123,19 @@ final readonly class ChunkContextFactory
      * down to security-relevant lines. The slicer preserves the original line
      * count by replacing elided lines with a `// elided` placeholder, so the
      * line-numbering protocol in the prompt stays accurate against the source.
+     * Any line the static pre-scanner already flagged as a risk marker is
+     * restored verbatim afterward, since the slicer's own keyword list is
+     * independently maintained and can miss patterns the pre-scanner catches.
      *
      * @param list<ProjectFile> $chunk
      *
      * @return list<ProjectFile>
      */
-    private function sliceChunk(array $chunk): array
+    private function sliceChunk(array $chunk, RiskMarkerIndex $riskMarkerIndex): array
     {
         $sliced = [];
         foreach ($chunk as $file) {
-            $newContent = $this->codeSlicer->slice($file);
+            $newContent = $this->restoreRiskMarkerLines($file, $this->codeSlicer->slice($file), $riskMarkerIndex->forChunk([$file]));
 
             if ($newContent === $file->content()) {
                 $sliced[] = $file;
@@ -135,5 +147,27 @@ final readonly class ChunkContextFactory
         }
 
         return $sliced;
+    }
+
+    /**
+     * @param list<RiskMarker> $markers
+     */
+    private function restoreRiskMarkerLines(ProjectFile $projectFile, string $slicedContent, array $markers): string
+    {
+        if ([] === $markers) {
+            return $slicedContent;
+        }
+
+        $originalLines = explode("\n", $projectFile->content());
+        $slicedLines = explode("\n", $slicedContent);
+
+        foreach ($markers as $marker) {
+            $index = $marker->line() - 1;
+            if (\array_key_exists($index, $slicedLines) && \array_key_exists($index, $originalLines)) {
+                $slicedLines[$index] = $originalLines[$index];
+            }
+        }
+
+        return implode("\n", $slicedLines);
     }
 }

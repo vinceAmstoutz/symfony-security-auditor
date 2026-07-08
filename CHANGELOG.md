@@ -2744,6 +2744,60 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/Progress/ProgressReporterHolder.php`) now wraps the
   failure-logging call in its own try/catch with the same `error_log()`
   fallback.
+- **`AuditReport::durationSeconds()` rounded every audit's reported duration
+  down to the nearest whole second instead of preserving sub-second precision.**
+  `durationSeconds()` (`src/Audit/Domain/Model/AuditReport.php`) cast both
+  `DateTimeImmutable` endpoints to `float` via `(float) $dateTime->format('U')`
+  before subtracting — `format('U')` truncates to whole seconds, discarding
+  microseconds, so a 400ms audit reported `0.0`. It now computes the
+  whole-second delta via `getTimestamp()` and the microsecond delta via
+  `format('u')` separately (both small numbers, avoiding float-precision loss
+  near a large Unix timestamp), then combines them.
+- **`ConsoleReportRenderer` still let an embedded literal newline in a finding's
+  `title`/`filePath` forge a fake `[ID] SEVERITY` finding block as unguarded
+  top-level console output**, surviving the ANSI/control-byte fix above —
+  `sanitizeControlCharacters()` deliberately preserves LF (it is a legitimate
+  line separator inside `description`/`attackVector`/`proof`), so it does
+  nothing to stop a `title`/`filePath` value (which must render on a single
+  line) from injecting one. A new `sanitizeSingleLineField()`
+  (`src/Audit/Infrastructure/Report/ConsoleReportRenderer.php`) collapses
+  `\r\n`/`\n`/`\r` to a space before control-character stripping, applied only
+  to `title`/`filePath` — `description` and friends keep their newlines.
+- **`ListScannedFilesUseCase` ignored `--since`, so
+  `audit:run --show-scanned --since <ref>` listed every scanned file instead of
+  the git-changed subset the corresponding real audit would actually analyze**,
+  contradicting `EstimateAuditCostUseCase`'s existing `--since`-aware cost
+  estimate for the same flag combination. `execute()`
+  (`src/Audit/Application/UseCase/ListScannedFilesUseCase.php`) took no diff-ref
+  parameter at all; it now accepts an optional `?string $diffSinceRef` and an
+  optional `GitChangedFilesResolverInterface` collaborator and narrows the
+  listing the same way `EstimateAuditCostUseCase` does.
+  `AuditCommand::showScannedFiles()` (`src/Command/AuditCommand.php`) now passes
+  `AuditCommandInput::$since` through, and `config/services.php` wires the
+  resolver into the use case.
+- **`ChunkContextFactory::deriveContextKey()` joined the rejected/previous
+  finding preambles with no separator, so a preamble embedding a null byte —
+  both are rendered from LLM-echoed `Vulnerability::filePath()` values, which
+  are never null-byte-sanitized — could shift content across the join boundary
+  and collide two genuinely different rejected/previous pairs onto the same
+  cache key**, letting one chunk's cached attacker response leak into an
+  unrelated iteration's context. `deriveContextKey()`
+  (`src/Audit/Application/Agent/Chunk/ChunkContextFactory.php`) now hashes each
+  preamble individually before joining, fixing both to 64 hex characters that
+  can never contain the raw-text join's own separator — mirroring
+  `FilesystemAttackerCache::keyForChunk()`'s existing per-file hash-then-join.
+- **`RegexCodeSlicer` could elide the exact line `RegexStaticPreScanner` had
+  just flagged as a risk marker**, since the two classes maintain independently
+  drifted keyword lists — e.g. a Doctrine `->where()` call with string
+  interpolation is flagged by the pre-scanner's `querybuilder_no_setparameter`
+  marker but is absent from the slicer's `SECURITY_TOKENS`, so on any file at or
+  above `minLinesBeforeSlicing` the flagged line was silently replaced with
+  `// elided` in what the LLM actually saw, even though the prompt told it a
+  risk marker existed at that line number. `ChunkContextFactory::sliceChunk()`
+  (`src/Audit/Application/Agent/Chunk/ChunkContextFactory.php`) now restores any
+  sliced-out line whose number matches a `RiskMarkerIndex` marker for that file,
+  reusing the `RiskMarkerIndex` already computed before slicing in `create()` —
+  no change to the BC-frozen `CodeSlicerInterface` port.
 
 ### Security
 
@@ -2915,6 +2969,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/FileSystem/ProjectFileScanner.php`) now checks
   `is_link()` on each included path first, skipping and logging a warning for a
   symlinked directory before it ever reaches `is_dir()`.
+- **`RegexSecretScrubber`'s `inline_assignment` and `multiline_assignment`
+  quoted-value patterns were vulnerable to catastrophic backtracking (ReDoS) on
+  an unterminated quoted value made mostly of backslashes, letting one malformed
+  line in a scanned file exhaust `pcre.backtrack_limit` and silently abort
+  redaction for the entire file — leaking every real secret on every other line
+  in plaintext into the LLM prompt.** Both patterns captured the quoted value
+  with an alternation between an escaped character and any non-quote/non-newline
+  character, both of which match a bare backslash — a greedy, backtracking
+  `{4,}` quantifier over that alternation had exponentially many equivalent ways
+  to split a long backslash run once the closing quote it expected was never
+  found. `DEFAULT_PATTERNS`
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) now makes that
+  quantifier possessive (and the `env_assignment` pattern's equivalent `*`
+  possessive too), which eliminates the backtracking without changing which
+  strings successfully match — the excluded closing-quote character in the
+  alternation means a valid, terminated value never needed to backtrack in the
+  first place.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

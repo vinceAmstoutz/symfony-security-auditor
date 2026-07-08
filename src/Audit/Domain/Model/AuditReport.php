@@ -174,7 +174,10 @@ final readonly class AuditReport
 
     public function durationSeconds(): float
     {
-        return (float) ($this->reportIdentity->completedAt->getTimestamp() - $this->reportIdentity->startedAt->getTimestamp());
+        $secondsDelta = $this->reportIdentity->completedAt->getTimestamp() - $this->reportIdentity->startedAt->getTimestamp();
+        $microsecondsDelta = (int) $this->reportIdentity->completedAt->format('u') - (int) $this->reportIdentity->startedAt->format('u');
+
+        return $secondsDelta + $microsecondsDelta / 1_000_000;
     }
 
     public function totalVulnerabilities(): int

@@ -76,6 +76,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\StubInvestigationTool;
@@ -303,6 +305,47 @@ final class AttackerAgentTest extends TestCase
         $attackerAgent->analyze(new AttackerAnalysisRequest([$this->makeFile('src/Controller/A.php')], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())), new NullCoverageRecorder());
 
         self::assertStringContainsString('SLICED-MARKER', $captured);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_line_flagged_by_the_static_pre_scanner_survives_code_slicing(): void
+    {
+        $inertLines = str_repeat("        \$x = 1;\n", 40);
+        $content = "<?php\n".$inertLines.'        $qb->where("u.username = $username");'."\n".$inertLines;
+        $projectFile = ProjectFile::create('src/Repository/UserRepository.php', '/app/src/Repository/UserRepository.php', $content);
+
+        $captured = '';
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
+            $captured = $user;
+
+            return LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0));
+        });
+
+        $attackerAgent = new AttackerAgent(
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                codeSlicer: new RegexCodeSlicer(10),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: new NullAttackerCache(),
+                staticPreScanner: new RegexStaticPreScanner(),
+                progressReporter: new NullProgressReporter(),
+            ),
+            new AttackerAnalysisSettings(),
+            new NullLogger(),
+        );
+
+        $attackerAgent->analyze(new AttackerAnalysisRequest([$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())), new NullCoverageRecorder());
+
+        self::assertStringContainsString('$qb->where("u.username = $username");', $captured);
     }
 
     public function test_it_returns_empty_array_when_no_files(): void
@@ -3509,7 +3552,7 @@ final class AttackerAgentTest extends TestCase
         $attackerContextPromptRenderer = new AttackerContextPromptRenderer();
         $expectedKey = hash(
             'sha256',
-            $attackerContextPromptRenderer->renderRejectedFindings([$rejectedFinding])."\0".$attackerContextPromptRenderer->renderPreviousFindings([$vulnerability]),
+            hash('sha256', $attackerContextPromptRenderer->renderRejectedFindings([$rejectedFinding])).hash('sha256', $attackerContextPromptRenderer->renderPreviousFindings([$vulnerability])),
         );
         self::assertSame([$expectedKey], $contextKeys);
     }

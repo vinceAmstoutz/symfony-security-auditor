@@ -245,6 +245,20 @@ final class AuditReportTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_duration_preserves_sub_second_precision_instead_of_rounding_to_whole_seconds(): void
+    {
+        $before = microtime(true);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        usleep(300_000);
+        $auditReport = AuditReport::fromContext($auditContext);
+        $measuredElapsed = microtime(true) - $before;
+
+        self::assertEqualsWithDelta($measuredElapsed, $auditReport->durationSeconds(), 0.15);
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
