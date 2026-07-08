@@ -141,12 +141,12 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
     public function test_it_reports_a_timeout_distinctly_instead_of_mislabeling_it_as_a_missing_binary(): void
     {
         $symfonyProcessComposerAuditRunner = new SymfonyProcessComposerAuditRunner(
-            timeoutSeconds: 1,
-            processBuilder: static fn (string $path): Process => Process::fromShellCommandline('sleep 5'),
+            timeoutSeconds: 0.1,
+            processBuilder: static fn (string $path): Process => Process::fromShellCommandline('sleep 2'),
         );
 
         $this->expectException(AdvisorySourceUnavailableException::class);
-        $this->expectExceptionMessage('composer audit timed out after 1 seconds');
+        $this->expectExceptionMessage('composer audit timed out after 0.1 seconds');
 
         $symfonyProcessComposerAuditRunner->run('/app');
     }

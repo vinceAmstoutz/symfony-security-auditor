@@ -38,7 +38,7 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
      * @param ?Closure(string): Process $processBuilder defaults to the standard composer-audit command; tests inject a stub
      */
     public function __construct(
-        private int $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,
+        private float $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,
         private ?Closure $processBuilder = null,
     ) {}
 
@@ -60,7 +60,7 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
         $process = $builder($projectPath);
 
         try {
-            $process->setTimeout((float) $this->timeoutSeconds);
+            $process->setTimeout($this->timeoutSeconds);
             $process->run();
         } catch (ProcessTimedOutException $processTimedOutException) {
             throw AdvisorySourceUnavailableException::forTimeout($this->timeoutSeconds, $processTimedOutException);

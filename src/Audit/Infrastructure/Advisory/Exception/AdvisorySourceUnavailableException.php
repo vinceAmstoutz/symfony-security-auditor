@@ -35,10 +35,10 @@ final class AdvisorySourceUnavailableException extends RuntimeException
         );
     }
 
-    public static function forTimeout(int $timeoutSeconds, Throwable $throwable): self
+    public static function forTimeout(float $timeoutSeconds, Throwable $throwable): self
     {
         return new self(
-            \sprintf('composer audit timed out after %d seconds', $timeoutSeconds),
+            \sprintf('composer audit timed out after %s seconds', $timeoutSeconds),
             previous: $throwable,
         );
     }
