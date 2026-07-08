@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -51,6 +52,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_includes_only_validated_vulnerabilities(): void
     {
@@ -74,6 +76,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_classifies_risk_levels_correctly(): void
     {
@@ -93,6 +96,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_filters_vulnerabilities_by_severity(): void
     {
@@ -120,6 +124,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_filters_vulnerabilities_by_type(): void
     {
@@ -144,6 +149,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_vulnerabilities_are_ordered_most_severe_first(): void
     {
@@ -183,6 +189,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_vulnerabilities_with_equal_severity_keep_discovery_order(): void
     {
@@ -262,6 +269,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_classifies_risk_level_at_exact_boundaries(): void
     {
@@ -279,6 +287,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     #[DataProvider('riskLevelEnumCases')]
     public function test_risk_level_enum_classifies_by_aggregate_score(int $score, RiskLevel $riskLevel): void
@@ -306,6 +315,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_risk_level_string_is_the_uppercased_enum_value(): void
     {
@@ -317,6 +327,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_toarray_vulnerabilities_is_array_of_arrays(): void
     {
@@ -414,6 +425,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function reportWithExactScore(int $score): AuditReport
     {
@@ -441,6 +453,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function reportWithScore(int $targetScore): AuditReport
     {
@@ -461,6 +474,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_fingerprints_lists_each_distinct_finding(): void
     {
@@ -479,6 +493,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_fingerprints_deduplicates_findings_that_share_a_fingerprint(): void
     {
@@ -495,6 +510,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_without_fingerprints_removes_only_matching_findings(): void
     {
@@ -514,6 +530,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_without_fingerprints_keeps_findings_absent_from_the_list(): void
     {
@@ -530,6 +547,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_without_fingerprints_preserves_report_metadata(): void
     {
@@ -549,6 +567,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_filtered_by_types_with_no_filters_keeps_all_findings(): void
     {
@@ -561,6 +580,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_filtered_by_types_drops_excluded_types(): void
     {
@@ -575,6 +595,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_filtered_by_types_with_an_allowlist_keeps_only_included_types(): void
     {
@@ -589,6 +610,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_filtered_by_types_lets_exclusions_win_over_the_allowlist(): void
     {
@@ -606,6 +628,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_filtered_by_types_preserves_report_metadata(): void
     {
@@ -622,6 +645,7 @@ final class AuditReportTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function reportWithTypes(VulnerabilityType ...$types): AuditReport
     {
@@ -649,6 +673,7 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function sameFingerprintVuln(int $lineStart): Vulnerability
     {
@@ -663,6 +688,7 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerability(
         string $discriminator,

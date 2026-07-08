@@ -17,6 +17,7 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -38,6 +39,7 @@ final class ReviewerMessageRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_single_includes_the_file_path_and_context(): void
     {
@@ -53,6 +55,7 @@ final class ReviewerMessageRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_single_formats_confidence_with_a_period_regardless_of_the_process_numeric_locale(): void
     {
@@ -73,6 +76,7 @@ final class ReviewerMessageRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_batch_formats_confidence_with_a_period_regardless_of_the_process_numeric_locale(): void
     {
@@ -93,6 +97,7 @@ final class ReviewerMessageRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_single_neutralizes_a_file_path_that_would_break_out_of_the_file_tag(): void
     {
@@ -109,6 +114,7 @@ final class ReviewerMessageRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_batch_neutralizes_a_file_path_that_would_break_out_of_the_file_tag(): void
     {
@@ -123,6 +129,7 @@ final class ReviewerMessageRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_single_escapes_a_code_fence_in_vulnerable_code_so_it_cannot_break_out_of_its_prompt_slot(): void
     {
@@ -136,6 +143,7 @@ final class ReviewerMessageRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_single_escapes_a_forged_section_header_in_an_unfenced_narrative_field(): void
     {
@@ -149,6 +157,7 @@ final class ReviewerMessageRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_batch_escapes_a_code_fence_in_vulnerable_code_so_it_cannot_break_out_of_its_prompt_slot(): void
     {
@@ -162,6 +171,7 @@ final class ReviewerMessageRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerability(string $filePath): Vulnerability
     {
@@ -176,6 +186,7 @@ final class ReviewerMessageRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerabilityWithNarrative(string $proof = 'proof', string $vulnerableCode = 'vulnerable code'): Vulnerability
     {

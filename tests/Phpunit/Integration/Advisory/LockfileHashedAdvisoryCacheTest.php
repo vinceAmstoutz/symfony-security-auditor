@@ -326,6 +326,88 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
     /**
      * @throws AdvisorySourceUnavailableException
      */
+    public function test_write_refuses_to_write_through_a_dangling_symlinked_cache_file(): void
+    {
+        $lockfileContent = '{"lock": "v1"}';
+        $this->writeLockfile($lockfileContent);
+        $expectedHash = hash('sha256', $lockfileContent);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedHash, 0, 2), $expectedHash);
+
+        $outsideTarget = sys_get_temp_dir().'/advisory_cache_symlink_target_'.uniqid('', true);
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($outsideTarget, $expectedPath);
+
+        try {
+            $lockfileHashedAdvisoryCache = $this->makeCache($this->recordingRunner('{"advisories": {"foo/bar": []}}'));
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+            self::assertFileDoesNotExist($outsideTarget);
+        } finally {
+            if (file_exists($outsideTarget)) {
+                unlink($outsideTarget);
+            }
+        }
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_read_refuses_to_return_content_through_a_symlinked_cache_file(): void
+    {
+        $lockfileContent = '{"lock": "v1"}';
+        $this->writeLockfile($lockfileContent);
+        $expectedHash = hash('sha256', $lockfileContent);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedHash, 0, 2), $expectedHash);
+
+        $outsideTarget = sys_get_temp_dir().'/advisory_cache_symlink_target_'.uniqid('', true);
+        file_put_contents($outsideTarget, 'ORIGINAL');
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($outsideTarget, $expectedPath);
+
+        try {
+            $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {"foo/bar": []}}');
+            $lockfileHashedAdvisoryCache = $this->makeCache($recordingComposerAuditRunner);
+
+            $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+            self::assertSame('{"advisories": {"foo/bar": []}}', $json);
+            self::assertSame(1, $recordingComposerAuditRunner->callCount, 'a symlinked cache entry must not be served as a hit');
+            self::assertSame('ORIGINAL', file_get_contents($outsideTarget));
+        } finally {
+            unlink($outsideTarget);
+        }
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_write_refuses_to_write_through_a_symlinked_shard_directory(): void
+    {
+        $lockfileContent = '{"lock": "v1"}';
+        $this->writeLockfile($lockfileContent);
+        $expectedHash = hash('sha256', $lockfileContent);
+        $shardDir = \sprintf('%s/%s', $this->cacheDir, substr($expectedHash, 0, 2));
+
+        $outsideDir = sys_get_temp_dir().'/advisory_cache_symlink_dir_'.uniqid('', true);
+        mkdir($outsideDir);
+        mkdir($this->cacheDir, recursive: true);
+        symlink($outsideDir, $shardDir);
+
+        try {
+            $lockfileHashedAdvisoryCache = $this->makeCache($this->recordingRunner('{"advisories": {"foo/bar": []}}'));
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+            $globResult = glob($outsideDir.'/*.json');
+            self::assertSame([], false !== $globResult ? $globResult : []);
+        } finally {
+            $filesystem = new Filesystem();
+            $filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_cache_dir_with_trailing_slash_is_normalized_before_assembling_path(): void
     {
         $this->writeLockfile('{"lock": "v1"}');

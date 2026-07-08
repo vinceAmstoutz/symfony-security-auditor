@@ -17,6 +17,7 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -87,6 +88,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_lists_a_validated_finding_with_its_location(): void
     {
@@ -103,6 +105,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_widens_the_location_code_span_delimiter_so_a_backtick_in_the_file_path_cannot_close_it_early(): void
     {
@@ -117,6 +120,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_pads_the_location_code_span_when_the_file_path_starts_with_a_backtick(): void
     {
@@ -131,6 +135,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_neutralizes_a_newline_in_the_title_so_it_cannot_forge_a_fake_section_heading(): void
     {
@@ -151,6 +156,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_neutralizes_an_unterminated_code_fence_in_a_description_so_it_does_not_swallow_later_findings(): void
     {
@@ -172,6 +178,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_neutralizes_an_unterminated_tilde_code_fence_in_a_description_so_it_does_not_swallow_later_findings(): void
     {
@@ -193,6 +200,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_neutralizes_a_heading_marker_in_a_description_so_it_cannot_forge_a_fake_section(): void
     {
@@ -213,6 +221,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_finding_type_line_shows_the_owasp_and_cwe_references(): void
     {
@@ -234,6 +243,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_finding_shows_confidence_percent_and_indented_proof(): void
     {
@@ -247,6 +257,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_renders_a_severity_summary_table(): void
     {
@@ -263,6 +274,7 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_orders_findings_most_severe_first(): void
     {

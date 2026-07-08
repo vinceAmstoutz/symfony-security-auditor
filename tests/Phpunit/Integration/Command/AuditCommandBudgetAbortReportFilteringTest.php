@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -76,6 +77,7 @@ final class AuditCommandBudgetAbortReportFilteringTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_partial_report_on_budget_abort_excludes_a_configured_finding_type(): void
     {
@@ -99,6 +101,7 @@ final class AuditCommandBudgetAbortReportFilteringTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws MalformedBaselineFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_partial_report_on_budget_abort_drops_a_baselined_finding(): void
     {
@@ -125,6 +128,7 @@ final class AuditCommandBudgetAbortReportFilteringTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws MalformedBaselineFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_partial_report_on_budget_abort_renders_a_baselined_finding_as_suppressed_in_sarif(): void
     {
@@ -161,6 +165,7 @@ final class AuditCommandBudgetAbortReportFilteringTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_a_malformed_baseline_file_during_a_budget_abort_is_reported_as_a_graceful_error_instead_of_crashing(): void
     {
@@ -183,6 +188,7 @@ final class AuditCommandBudgetAbortReportFilteringTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVuln(): Vulnerability
     {

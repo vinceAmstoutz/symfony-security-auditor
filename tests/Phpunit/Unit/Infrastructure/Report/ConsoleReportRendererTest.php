@@ -18,6 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCont
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -68,6 +69,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_substitutes_invalid_utf8_in_description_instead_of_throwing(): void
     {
@@ -87,6 +89,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_has_description_label_with_blank_line_above(): void
     {
@@ -99,6 +102,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_has_attack_vector_label_with_blank_line_above(): void
     {
@@ -111,6 +115,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_has_remediation_label_with_blank_line_above(): void
     {
@@ -181,6 +186,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_with_vulns_has_four_single_bar_separators(): void
     {
@@ -194,6 +200,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_dot_separator_is_exactly_70_chars(): void
     {
@@ -219,6 +226,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_lists_vulnerabilities_most_severe_first(): void
     {
@@ -238,6 +246,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_with_vulnerabilities_skips_no_findings_message(): void
     {
@@ -251,6 +260,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_severity_summary_shows_severity_with_count_one(): void
     {
@@ -264,6 +274,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_findings_output_ends_with_dot_separator_no_trailing_newline(): void
     {
@@ -276,6 +287,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_severity_summary_has_header_line(): void
     {
@@ -289,6 +301,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_severity_summary_omits_zero_count_severities(): void
     {
@@ -302,6 +315,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_description_chunks_at_exactly_65_chars(): void
     {
@@ -322,6 +336,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_wraps_multibyte_text_without_splitting_a_character(): void
     {
@@ -343,6 +358,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_attack_vector_chunks_at_exactly_65_chars(): void
     {
@@ -363,6 +379,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_remediation_chunks_at_exactly_65_chars(): void
     {
@@ -537,6 +554,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_substitutes_id(): void
     {
@@ -551,6 +569,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_substitutes_title(): void
     {
@@ -565,6 +584,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_strips_raw_ansi_escape_and_carriage_return_bytes_from_the_title_and_file_path(): void
     {
@@ -589,6 +609,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_collapses_embedded_newlines_in_the_title_and_file_path_to_prevent_a_forged_finding_block(): void
     {
@@ -609,6 +630,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_substitutes_severity_label(): void
     {
@@ -623,6 +645,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_substitutes_owasp_reference(): void
     {
@@ -637,6 +660,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_substitutes_cwe_reference(): void
     {
@@ -651,6 +675,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_substitutes_file_location_with_line_range(): void
     {
@@ -667,6 +692,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_substitutes_description(): void
     {
@@ -681,6 +707,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_substitutes_attack_vector(): void
     {
@@ -695,6 +722,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_substitutes_proof(): void
     {
@@ -709,6 +737,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_indents_every_line_of_a_multi_line_proof(): void
     {
@@ -728,6 +757,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_vulnerability_substitutes_remediation(): void
     {
@@ -742,6 +772,7 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_confidence_renders_as_exact_percent_value(): void
     {

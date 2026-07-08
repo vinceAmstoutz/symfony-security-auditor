@@ -19,6 +19,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\UnsafeAdvisoryCacheWriteException;
 
 use function Symfony\Component\String\u;
 
@@ -110,6 +111,14 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
     {
         $path = $this->pathForHash($hash);
 
+        if ($this->isUnsafePath($path)) {
+            $this->logger->warning('Refusing to read advisory cache entry through symlinked path, falling back to live audit', [
+                'path' => $path,
+            ]);
+
+            return null;
+        }
+
         if (!$this->filesystem->exists($path)) {
             return null;
         }
@@ -151,6 +160,7 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
         $path = $this->pathForHash($hash);
 
         try {
+            $this->assertSafeToWrite($path);
             $this->filesystem->mkdir(\dirname($path));
             $this->filesystem->dumpFile($path, $json);
             $this->logger->debug('Advisory cache stored', ['lockfile_hash' => $hash]);
@@ -160,5 +170,27 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
                 'error' => $throwable->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * `Filesystem::dumpFile()` transparently writes through a symlink at its
+     * destination, and `Filesystem::mkdir()` treats a symlinked directory as
+     * already existing — a cache path derived entirely from the project's own
+     * `composer.lock` content lets a malicious contributor pre-plant a symlink
+     * at the exact path this cache will write to, turning a routine audit run
+     * into an arbitrary-file overwrite.
+     *
+     * @throws UnsafeAdvisoryCacheWriteException
+     */
+    private function assertSafeToWrite(string $path): void
+    {
+        if ($this->isUnsafePath($path)) {
+            throw UnsafeAdvisoryCacheWriteException::forSymlinkedPath($path);
+        }
+    }
+
+    private function isUnsafePath(string $path): bool
+    {
+        return is_link($path) || is_link(\dirname($path));
     }
 }

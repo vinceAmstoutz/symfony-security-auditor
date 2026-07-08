@@ -21,6 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\Reviewer
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\VerdictApplier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -36,6 +37,7 @@ final class BatchVerdictApplierTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_matches_a_bare_single_review_object_for_a_size_one_batch(): void
     {
@@ -54,6 +56,7 @@ final class BatchVerdictApplierTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_matches_a_list_of_review_objects_by_id(): void
     {
@@ -76,6 +79,7 @@ final class BatchVerdictApplierTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_a_finding_with_no_matching_verdict_is_rejected(): void
     {
@@ -93,6 +97,7 @@ final class BatchVerdictApplierTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_an_empty_response_rejects_every_finding_without_matching_scalar_values(): void
     {
@@ -106,6 +111,7 @@ final class BatchVerdictApplierTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_reject_batch_marks_every_finding_as_not_validated(): void
     {
@@ -118,6 +124,7 @@ final class BatchVerdictApplierTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_mark_batch_errored_marks_every_finding_as_not_validated(): void
     {
@@ -129,6 +136,7 @@ final class BatchVerdictApplierTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_record_batch_error_logs_and_marks_every_finding_as_not_validated(): void
     {
@@ -150,6 +158,7 @@ final class BatchVerdictApplierTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function vulnerability(string $title = 'v', int $lineStart = 18): Vulnerability
     {

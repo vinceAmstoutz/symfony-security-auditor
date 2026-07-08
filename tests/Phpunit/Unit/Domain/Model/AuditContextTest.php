@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCont
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -143,6 +144,7 @@ final class AuditContextTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_stores_and_filters_vulnerabilities(): void
     {
@@ -164,6 +166,7 @@ final class AuditContextTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_critical_vulnerabilities_requires_both_critical_severity_and_reviewer_validation(): void
     {
@@ -198,6 +201,7 @@ final class AuditContextTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_replaces_vulnerability_by_id(): void
     {
@@ -218,6 +222,7 @@ final class AuditContextTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_calculates_risk_score_from_validated_vulnerabilities(): void
     {
@@ -372,6 +377,7 @@ final class AuditContextTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_drain_reviewed_findings_returns_every_recorded_finding_in_order(): void
     {
@@ -389,6 +395,7 @@ final class AuditContextTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_drain_reviewed_findings_clears_the_buffer(): void
     {
@@ -414,6 +421,7 @@ final class AuditContextTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_drain_found_vulnerabilities_returns_every_recorded_candidate_in_order(): void
     {
@@ -431,6 +439,7 @@ final class AuditContextTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_drain_found_vulnerabilities_clears_the_buffer(): void
     {
@@ -451,6 +460,7 @@ final class AuditContextTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerability(string $discriminator, VulnerabilitySeverity $vulnerabilitySeverity): Vulnerability
     {

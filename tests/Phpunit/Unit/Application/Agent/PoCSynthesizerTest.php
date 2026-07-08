@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\Budg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
@@ -56,6 +57,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
      * @throws InvalidTokenUsageException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_synthesizes_poc_for_validated_high_severity_finding(): void
     {
@@ -82,6 +84,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_escapes_a_code_fence_in_the_vulnerable_code_so_it_cannot_break_out_of_its_prompt_slot(): void
     {
@@ -105,6 +108,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_escapes_a_forged_section_header_in_an_unfenced_narrative_field(): void
     {
@@ -128,6 +132,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_skips_findings_below_severity_floor(): void
     {
@@ -148,6 +153,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_skips_findings_not_validated_by_reviewer(): void
     {
@@ -169,6 +175,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
      * @throws InvalidTokenUsageException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_keeps_original_when_llm_returns_empty(): void
     {
@@ -190,6 +197,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
      * @throws InvalidTokenUsageException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_keeps_original_when_llm_declines_with_the_no_poc_sentinel(): void
     {
@@ -215,6 +223,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_keeps_original_when_llm_throws_generic_exception(): void
     {
@@ -236,6 +245,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
      * @throws InvalidTokenUsageException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_severity_floor_medium_includes_medium_findings(): void
     {
@@ -262,6 +272,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
      * @throws InvalidTokenUsageException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_returned_list_preserves_input_order_and_length(): void
     {
@@ -291,6 +302,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
      * @throws InvalidTokenUsageException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_logs_completion_summary_with_inputs_synthesized_and_skipped_counts(): void
     {
@@ -328,6 +340,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_logs_vulnerability_id_and_error_when_synthesis_throws(): void
     {
@@ -355,6 +368,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
      * @throws InvalidTokenUsageException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_continues_to_the_next_finding_after_one_yields_no_poc(): void
     {
@@ -385,6 +399,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_rethrows_budget_exceeded_exception(): void
     {
@@ -402,6 +417,7 @@ final class PoCSynthesizerTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_rethrows_llm_provider_exception(): void
     {
@@ -417,6 +433,7 @@ final class PoCSynthesizerTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerability(
         VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,

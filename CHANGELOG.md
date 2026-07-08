@@ -2920,6 +2920,49 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `AuditConfigurationDefinition`'s `profile` node `info()` string
   (`src/Audit/Infrastructure/Config/AuditConfigurationDefinition.php`), and
   `docs/configuration.md` now all mention both concurrency settings.
+- **`VulnerabilityFactory` validated `file_path`/`description` for blankness
+  before the LLM data was coerced to a string, so a non-string scalar (e.g. the
+  integer `12345`) silently bypassed the check and hydrated into a finding with
+  a blank field instead of being dropped.** `Assert\NotBlank` and
+  `Assert\Length` both coerce a scalar to its string form internally
+  (`(string) 12345` is `"12345"`, neither blank nor overlong), so
+  `validateRawData()` (`src/Audit/Application/Agent/VulnerabilityFactory.php`)
+  raised no violation; `buildVulnerability()`'s `stringOrDefault()` then
+  discarded the non-string value and substituted `''`, and neither
+  `CodeLocation` nor `VulnerabilityNarrative` validated the field it was handed.
+  `CodeLocation`'s constructor (`src/Audit/Domain/Model/CodeLocation.php`) now
+  rejects a blank `filePath` via a new
+  `InvalidCodeLocationException::forBlankFilePath()`, and
+  `VulnerabilityNarrative`'s constructor
+  (`src/Audit/Domain/Model/VulnerabilityNarrative.php`) now rejects a blank
+  `description` via a new `InvalidVulnerabilityNarrativeException` — both
+  exceptions are caught by `VulnerabilityFactory::hydrate()`'s existing
+  catch-all, so the finding is dropped under `HYDRATION_FAILED` instead of
+  silently persisting with an empty file path or description.
+- **`TransientLLMFailureException::afterExhaustedAttempts()` overstated the
+  number of retries by one.** With `max_attempts: 3`, `RetryingPlatformInvoker`
+  (`src/Audit/Infrastructure/LLM/RetryingPlatformInvoker.php`) makes 3 total
+  invocation attempts but only 2 of them are retries following a backoff sleep —
+  confirmed by the existing test asserting exactly 2 sleeps for
+  `maxAttempts: 3`. The exception message read
+  `"LLM call failed after 3 transient retries"`, overstating the retry count by
+  one. `afterExhaustedAttempts()`
+  (`src/Audit/Infrastructure/LLM/Exception/TransientLLMFailureException.php`)
+  now reports `"LLM call failed after 3 attempts"`, accurately describing the
+  `$attempts` value it already receives.
+- **The standalone binary never reported its own version — `--version` and `-V`
+  always printed the Symfony Console default sentinel `UNKNOWN`.**
+  `StandaloneApplicationFactory::create()`
+  (`src/Standalone/StandaloneApplicationFactory.php`) constructed
+  `new Application(self::APPLICATION_NAME)`, passing only the application name
+  and leaving `Application`'s `$version` constructor parameter at its default.
+  `ReportPackage::version()`
+  (`src/Audit/Infrastructure/Report/ReportPackage.php`), which resolves the real
+  installed version via `Composer\InstalledVersions`, is already used by every
+  report renderer for exactly this purpose but was never wired into the
+  standalone application. `create()` now passes
+  `(new ReportPackage())->version()` as the `Application` constructor's second
+  argument.
 
 ### Security
 
@@ -3120,6 +3163,37 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   inside a real finding's report block. `escapeFences()`
   (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) now also
   escapes `#` to `\#`, matching the sibling renderers.
+- **A malicious PR could pre-plant a symlink at a filesystem cache's
+  deterministically-hashed path, turning a routine self-audit into an
+  arbitrary-file write or, for the advisory cache, an arbitrary-file read
+  (CWE-59).** `Symfony\Component\Filesystem\Filesystem::dumpFile()`
+  transparently follows a pre-existing symlink at its destination and writes
+  through to the symlink's resolved target instead of refusing or replacing the
+  symlink itself, and `Filesystem::mkdir()` treats a symlinked directory as
+  already existing. `FilesystemAttackerCache::storeForContext()`
+  (`src/Audit/Infrastructure/Cache/FilesystemAttackerCache.php`) and
+  `FilesystemReviewerCache::store()`
+  (`src/Audit/Infrastructure/Cache/FilesystemReviewerCache.php`) derive their
+  cache-file path from a SHA-256 hash of content fully controlled by the audited
+  project's author (a file's own path/content for the attacker cache; a
+  finding's own content for the reviewer cache), so a contributor could commit a
+  symlink at the exact predictable path and have a maintainer's or CI's cache
+  write silently overwrite an arbitrary file when the audit ran with caching
+  enabled. Both now refuse to write when the target path or its parent directory
+  is a symlink, via a new `UnsafeCacheWriteException::forSymlinkedPath()`
+  (`src/Audit/Infrastructure/Cache/Exception/UnsafeCacheWriteException.php`).
+  `LockfileHashedAdvisoryCache::writeCache()`
+  (`src/Audit/Infrastructure/Advisory/LockfileHashedAdvisoryCache.php`), keyed
+  by a hash of the project's own `composer.lock`, had the identical write
+  vulnerability (fixed the same way, via a new
+  `UnsafeAdvisoryCacheWriteException::forSymlinkedPath()`
+  (`src/Audit/Infrastructure/Advisory/Exception/UnsafeAdvisoryCacheWriteException.php`))
+  plus a second, distinct bug on the read side: `readCache()` returned a
+  symlinked cache entry's raw file content verbatim, with no JSON validation, as
+  if it were a trusted `composer audit` result — letting the same pre-planted
+  symlink make the audit read and propagate the content of any file the auditing
+  process can access. `readCache()` now also refuses to read through a symlinked
+  path, falling back to a live `composer audit` run instead.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

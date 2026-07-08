@@ -22,6 +22,7 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\UnsafeCacheWriteException;
 
 use function Symfony\Component\String\u;
 
@@ -94,6 +95,7 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
 
         try {
             $path = $this->pathFor($vulnerability, $codeContext);
+            $this->assertSafeToWrite($path);
             $encoded = json_encode($review, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
             $this->filesystem->mkdir(\dirname($path));
             $this->filesystem->dumpFile($path, $encoded);
@@ -103,6 +105,24 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
                 'path' => $path,
                 'error' => $throwable->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * `Filesystem::dumpFile()` transparently writes through a symlink at its
+     * destination, and `Filesystem::mkdir()` treats a symlinked directory as
+     * already existing — a cache path derived entirely from the finding's own
+     * content (attacker-influenced file paths and descriptions) lets a
+     * malicious contributor pre-plant a symlink at the exact path this cache
+     * will write to, turning a routine audit run into an arbitrary-file
+     * overwrite.
+     *
+     * @throws UnsafeCacheWriteException
+     */
+    private function assertSafeToWrite(string $path): void
+    {
+        if (is_link($path) || is_link(\dirname($path))) {
+            throw UnsafeCacheWriteException::forSymlinkedPath($path);
         }
     }
 

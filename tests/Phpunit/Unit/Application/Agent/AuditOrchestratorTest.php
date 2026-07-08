@@ -36,6 +36,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -249,6 +250,7 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_recovers_a_finding_recorded_by_the_attacker_but_omitted_from_its_return_value(): void
     {
@@ -1360,6 +1362,7 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_passes_previously_validated_findings_to_next_iteration(): void
     {
@@ -1397,6 +1400,7 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidTokenUsageException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_drains_the_reviewed_findings_buffer_on_every_successful_iteration_not_only_on_abort(): void
     {
@@ -1434,6 +1438,7 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_passes_only_reviewer_rejected_findings_to_next_iteration(): void
     {

@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -43,6 +44,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_an_accepted_verdict_reports_the_finding_as_reviewed(): void
     {
@@ -56,6 +58,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_a_rejected_verdict_reports_the_finding_as_reviewed(): void
     {
@@ -69,6 +72,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_a_finding_without_any_verdict_still_reports_as_reviewed(): void
     {
@@ -82,6 +86,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_an_errored_review_still_reports_the_finding_as_reviewed(): void
     {
@@ -96,6 +101,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidToolRegistryException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_recover_drained_verdict_returns_null_when_nothing_was_recorded(): void
     {
@@ -110,6 +116,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidToolRegistryException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_recover_drained_verdict_applies_the_last_recorded_verdict(): void
     {
@@ -128,6 +135,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidTokenUsageException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_apply_response_still_applies_the_verdict_when_the_cache_store_throws(): void
     {
@@ -175,6 +183,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function vulnerability(): Vulnerability
     {

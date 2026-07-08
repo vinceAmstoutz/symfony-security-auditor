@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\PoCSyn
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
@@ -63,6 +64,7 @@ final class PoCSynthesisStageTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_does_not_call_synthesizer_when_no_validated_findings(): void
     {
@@ -80,6 +82,7 @@ final class PoCSynthesisStageTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_replaces_validated_findings_with_enriched_copies(): void
     {
@@ -103,6 +106,7 @@ final class PoCSynthesisStageTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_records_count_metadata_in_context(): void
     {
@@ -125,6 +129,7 @@ final class PoCSynthesisStageTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_does_not_replace_findings_whose_poc_remained_null(): void
     {
@@ -147,6 +152,7 @@ final class PoCSynthesisStageTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_disabled_stage_does_not_synthesize_even_with_validated_findings(): void
     {
@@ -163,6 +169,7 @@ final class PoCSynthesisStageTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_stage_is_disabled_by_default_even_with_validated_findings(): void
     {
@@ -192,6 +199,7 @@ final class PoCSynthesisStageTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_logs_when_there_are_no_validated_findings(): void
     {
@@ -208,6 +216,7 @@ final class PoCSynthesisStageTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_logs_completion_with_enriched_and_total_counts(): void
     {
@@ -234,6 +243,7 @@ final class PoCSynthesisStageTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_persists_already_synthesized_pocs_before_a_budget_abort_discards_the_rest(): void
     {
@@ -276,6 +286,7 @@ final class PoCSynthesisStageTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_persists_already_synthesized_pocs_before_a_provider_exception_discards_the_rest(): void
     {
@@ -359,6 +370,7 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerability(): Vulnerability
     {
@@ -373,6 +385,7 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerabilityAt(string $filePath): Vulnerability
     {

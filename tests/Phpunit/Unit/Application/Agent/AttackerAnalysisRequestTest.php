@@ -18,6 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -55,6 +56,7 @@ final class AttackerAnalysisRequestTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_exposes_rejected_findings_from_the_constructor(): void
     {
@@ -68,6 +70,7 @@ final class AttackerAnalysisRequestTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_with_files_and_findings_preserves_rejected_findings(): void
     {
@@ -83,6 +86,7 @@ final class AttackerAnalysisRequestTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_exposes_the_constructor_arguments(): void
     {
@@ -102,6 +106,7 @@ final class AttackerAnalysisRequestTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_with_files_and_findings_replaces_both_and_preserves_mapping_and_bypass(): void
     {
@@ -126,6 +131,7 @@ final class AttackerAnalysisRequestTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerability(): Vulnerability
     {

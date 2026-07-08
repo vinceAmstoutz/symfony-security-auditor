@@ -2750,7 +2750,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $this->expectException(TransientLLMFailureException::class);
-        $this->expectExceptionMessage('LLM call failed after 3 transient retries');
+        $this->expectExceptionMessage('LLM call failed after 3 attempts');
 
         try {
             $symfonyAiLLMClient->complete('sys', 'usr');

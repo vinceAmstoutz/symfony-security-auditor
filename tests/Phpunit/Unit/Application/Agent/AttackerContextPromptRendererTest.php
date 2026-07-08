@@ -18,6 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContext
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -73,6 +74,7 @@ final class AttackerContextPromptRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_renders_previous_findings_grouped_by_type_with_locations(): void
     {
@@ -87,6 +89,7 @@ final class AttackerContextPromptRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_indents_previous_finding_lines_with_leading_whitespace(): void
     {
@@ -100,6 +103,7 @@ final class AttackerContextPromptRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_renders_rejected_findings_grouped_by_type_with_locations(): void
     {
@@ -114,6 +118,7 @@ final class AttackerContextPromptRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_instructs_the_model_not_to_re_report_rejected_findings(): void
     {
@@ -128,6 +133,7 @@ final class AttackerContextPromptRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_indents_rejected_finding_lines_with_leading_whitespace(): void
     {
@@ -155,6 +161,7 @@ final class AttackerContextPromptRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_neutralizes_a_newline_in_a_previous_finding_file_path_so_it_cannot_forge_a_new_section(): void
     {
@@ -170,6 +177,7 @@ final class AttackerContextPromptRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_neutralizes_a_newline_in_a_rejected_finding_file_path_so_it_cannot_forge_a_new_section(): void
     {
@@ -185,6 +193,7 @@ final class AttackerContextPromptRendererTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerability(VulnerabilityType $vulnerabilityType, string $filePath, int $start, int $end): Vulnerability
     {

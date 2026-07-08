@@ -42,6 +42,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarke
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -210,6 +211,7 @@ final class AttackerAgentTest extends TestCase
      * @throws LLMProviderException
      * @throws InvalidProjectFileException
      * @throws InvalidToolRegistryException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_previous_findings_are_prepended_before_the_user_message(): void
     {
@@ -241,6 +243,7 @@ final class AttackerAgentTest extends TestCase
      * @throws LLMProviderException
      * @throws InvalidProjectFileException
      * @throws InvalidToolRegistryException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_rejected_findings_are_prepended_before_the_user_message_with_a_blank_line(): void
     {
@@ -1667,6 +1670,7 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_injects_previous_findings_section_into_prompt_when_provided(): void
     {
@@ -1727,6 +1731,7 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidTokenUsageException
      * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_skips_cache_when_previous_findings_present(): void
     {
@@ -1755,6 +1760,7 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_injects_rejected_findings_section_into_prompt_when_provided(): void
     {
@@ -1807,6 +1813,7 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidTokenUsageException
      * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_skips_cache_when_rejected_findings_present(): void
     {
@@ -1846,6 +1853,7 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_previous_findings_section_groups_locations_by_vulnerability_type(): void
     {
@@ -2140,6 +2148,7 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerabilityFor(string $filePath): Vulnerability
     {
@@ -3426,6 +3435,7 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_context_aware_cache_serves_chunks_carrying_previous_findings(): void
     {
@@ -3454,6 +3464,7 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidTokenUsageException
      * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_context_aware_cache_stores_context_carrying_chunks_after_the_llm_call(): void
     {
@@ -3500,6 +3511,7 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidTokenUsageException
      * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_context_unaware_cache_is_skipped_for_chunks_carrying_previous_findings(): void
     {
@@ -3525,6 +3537,7 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidTokenUsageException
      * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_context_key_is_the_hash_of_the_rendered_context_preambles(): void
     {
@@ -3562,6 +3575,7 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidTokenUsageException
      * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_previous_and_rejected_findings_produce_distinct_context_keys(): void
     {

@@ -322,6 +322,56 @@ final class FilesystemAttackerCacheTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_store_refuses_to_write_through_a_symlinked_cache_file(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
+        $expectedKey = hash('sha256', $expectedSignature);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
+
+        $outsideTarget = sys_get_temp_dir().'/attacker_cache_symlink_target_'.uniqid('', true);
+        file_put_contents($outsideTarget, 'ORIGINAL');
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($outsideTarget, $expectedPath);
+
+        try {
+            $this->filesystemAttackerCache->store([$projectFile], [['type' => 'sql_injection']]);
+
+            self::assertSame('ORIGINAL', file_get_contents($outsideTarget));
+        } finally {
+            unlink($outsideTarget);
+        }
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_store_refuses_to_write_through_a_symlinked_shard_directory(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
+        $expectedKey = hash('sha256', $expectedSignature);
+        $shardDir = \sprintf('%s/%s', $this->cacheDir, substr($expectedKey, 0, 2));
+
+        $outsideDir = sys_get_temp_dir().'/attacker_cache_symlink_dir_'.uniqid('', true);
+        mkdir($outsideDir);
+        mkdir($this->cacheDir, recursive: true);
+        symlink($outsideDir, $shardDir);
+
+        try {
+            $this->filesystemAttackerCache->store([$projectFile], [['type' => 'sql_injection']]);
+
+            $globResult = glob($outsideDir.'/*.json');
+            self::assertSame([], false !== $globResult ? $globResult : []);
+        } finally {
+            $filesystem = new Filesystem();
+            $filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_store_creates_nested_shard_directory_from_key_prefix(): void
     {
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];

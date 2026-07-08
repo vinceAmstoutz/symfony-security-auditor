@@ -25,6 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -76,6 +77,7 @@ final class AuditCommandSarifBaselineSuppressionTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws MalformedBaselineFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_sarif_format_renders_a_baselined_finding_with_a_suppression_entry(): void
     {
@@ -116,6 +118,7 @@ final class AuditCommandSarifBaselineSuppressionTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws MalformedBaselineFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_json_format_still_drops_the_same_baselined_finding(): void
     {
@@ -143,6 +146,7 @@ final class AuditCommandSarifBaselineSuppressionTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVuln(): Vulnerability
     {
