@@ -251,11 +251,11 @@ final class AuditReportTest extends TestCase
     {
         $before = microtime(true);
         $auditContext = AuditContext::forProject($this->tmpDir);
-        usleep(300_000);
+        usleep(50_000);
         $auditReport = AuditReport::fromContext($auditContext);
         $measuredElapsed = microtime(true) - $before;
 
-        self::assertEqualsWithDelta($measuredElapsed, $auditReport->durationSeconds(), 0.15);
+        self::assertEqualsWithDelta($measuredElapsed, $auditReport->durationSeconds(), 0.03);
     }
 
     /**
