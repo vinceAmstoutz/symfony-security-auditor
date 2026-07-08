@@ -59,7 +59,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
      */
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
-        private int $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,
+        private float $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,
         private ?Closure $gitDiffProcessFactory = null,
     ) {}
 
@@ -91,7 +91,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
         $process = new Process(['git', 'rev-parse', '--is-inside-work-tree'], $projectPath);
 
         try {
-            $process->setTimeout((float) $this->timeoutSeconds);
+            $process->setTimeout($this->timeoutSeconds);
             $process->run();
         } catch (ExceptionInterface $exception) {
             throw GitChangedFilesUnavailableException::forProcessFailure(\sprintf('determine whether "%s" is a git working tree', $projectPath), $exception);
@@ -108,7 +108,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
         $process = new Process(['git', 'rev-parse', '--verify', '--quiet', $ref], $projectPath);
 
         try {
-            $process->setTimeout((float) $this->timeoutSeconds);
+            $process->setTimeout($this->timeoutSeconds);
             $process->run();
         } catch (ExceptionInterface $exception) {
             throw GitChangedFilesUnavailableException::forProcessFailure(\sprintf('verify git ref "%s"', $ref), $exception);
@@ -149,7 +149,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
         $process = $factory($argv, $projectPath);
 
         try {
-            $process->setTimeout((float) $this->timeoutSeconds);
+            $process->setTimeout($this->timeoutSeconds);
             $process->mustRun();
         } catch (ProcessFailedException $processFailedException) {
             throw GitChangedFilesUnavailableException::fromProcessFailure($argv[\count($argv) - 1] ?? '', $process->getErrorOutput(), $processFailedException);

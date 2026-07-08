@@ -399,6 +399,30 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_records_a_nullsafe_deny_access_unless_granted_call(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/users/{id}/delete')]
+                public function delete(int $id): void {
+                    $this->security?->denyAccessUnlessGranted('DELETE', $id);
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertTrue($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->hasAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_a_first_class_callable_reference_to_deny_access_unless_granted_does_not_count_as_an_access_check(): void
     {
         $source = <<<'PHP'
@@ -538,6 +562,27 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
         self::assertSame(['GET', 'POST', 'PATCH'], $entries[0]->routeMethods());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_extracts_a_path_from_a_locale_keyed_array_route_path(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class LocalizedController {
+                #[Route(path: ['en' => '/dashboard', 'fr' => '/tableau-de-bord'])]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/LocalizedController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/dashboard', $entries[0]->routePath());
     }
 
     /**

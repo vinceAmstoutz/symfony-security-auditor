@@ -33,6 +33,7 @@ final class AnthropicTokenEstimatorTest extends TestCase
         yield 'claude mythos' => ['claude-mythos-5'];
         yield 'bedrock claude' => ['anthropic.claude-opus-4-8'];
         yield 'bedrock cross-region claude' => ['us.anthropic.claude-opus-4-8'];
+        yield 'claude substring with no trailing hyphen, matching CostCalculator::isClaudeModel()' => ['deepclaude'];
     }
 
     public function test_it_does_not_support_a_non_claude_model(): void

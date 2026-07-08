@@ -313,8 +313,8 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->commit('src/Foo.php', '<?php', 'init');
 
         $processGitChangedFilesResolver = new ProcessGitChangedFilesResolver(
-            timeoutSeconds: 1,
-            gitDiffProcessFactory: static fn (array $argv, string $projectPath): Process => Process::fromShellCommandline('sleep 5'),
+            timeoutSeconds: 0.1,
+            gitDiffProcessFactory: static fn (array $argv, string $projectPath): Process => Process::fromShellCommandline('sleep 2'),
         );
 
         $this->expectException(GitChangedFilesUnavailableException::class);

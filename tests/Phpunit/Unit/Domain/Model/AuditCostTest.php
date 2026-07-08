@@ -59,13 +59,13 @@ final class AuditCostTest extends TestCase
     {
         $auditCost = AuditCost::of(120, 30, 0.04, 'claude-sonnet-4-5');
 
-        self::assertSame([
+        self::assertEquals([
             'input_tokens' => 120,
             'output_tokens' => 30,
             'total_tokens' => 150,
             'estimated_cost_usd' => 0.04,
             'primary_model' => 'claude-sonnet-4-5',
-            'by_role' => [],
+            'by_role' => (object) [],
         ], $auditCost->toArray());
     }
 

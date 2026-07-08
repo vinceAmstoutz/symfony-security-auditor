@@ -351,11 +351,14 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * A same-id repeat is a duplicate unless it corrects an earlier rejected
-     * verdict to validated — an already-validated entry is sticky (a later
-     * spurious rejection at the same id never displaces it), but a corrected
-     * accept must be allowed to replace a stale reject, or a reviewer-verified
-     * finding silently vanishes from the report.
+     * A same-id repeat is a duplicate unless it corrects an earlier verdict —
+     * an already-validated entry is sticky against a later spurious rejection
+     * (that never displaces it), but a corrected accept must be allowed to
+     * replace a stale reject, and a later iteration's validated verdict must
+     * be allowed to replace an earlier validated verdict when the severity or
+     * type differs (e.g. a reviewer's `adjusted_severity`/`corrected_type`
+     * applied on re-discovery) — otherwise a genuine correction silently
+     * vanishes from the report and the stale, less-accurate verdict persists.
      */
     private function isDuplicate(Vulnerability $vulnerability, AuditContext $auditContext): bool
     {
@@ -384,7 +387,12 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     private function isSameIdDuplicate(Vulnerability $existingById, Vulnerability $vulnerability): bool
     {
         if ($existingById->isReviewerValidated()) {
-            return true;
+            if (!$vulnerability->isReviewerValidated()) {
+                return true;
+            }
+
+            return $existingById->severity() === $vulnerability->severity()
+                && $existingById->type() === $vulnerability->type();
         }
 
         return !$vulnerability->isReviewerValidated();

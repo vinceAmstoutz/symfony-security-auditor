@@ -32,7 +32,7 @@ final readonly class AnthropicTokenEstimator implements ProviderTokenEstimatorIn
     #[Override]
     public function supports(string $model): bool
     {
-        return u($model)->containsAny('claude-');
+        return u($model)->containsAny('claude');
     }
 
     #[Override]

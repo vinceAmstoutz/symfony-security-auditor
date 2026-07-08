@@ -103,7 +103,16 @@ final readonly class AuditCost
         return $this->byRole;
     }
 
-    /** @return array<string, int|float|string|array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}>> */
+    /**
+     * `by_role` is cast to `object` so `json_encode()` always renders it as a
+     * JSON object (`{}`), never an array (`[]`) — PHP's array type can't
+     * distinguish "empty map" from "empty list", so an unqualified empty
+     * array here would silently flip the field's JSON type between the
+     * populated (dry-run) and unpopulated (real-run) cases, breaking any
+     * strongly-typed consumer of the JSON report.
+     *
+     * @return array<string, int|float|string|object>
+     */
     public function toArray(): array
     {
         return [
@@ -112,7 +121,7 @@ final readonly class AuditCost
             'total_tokens' => $this->totalTokens(),
             'estimated_cost_usd' => $this->estimatedCostUsd,
             'primary_model' => $this->primaryModel,
-            'by_role' => $this->byRole,
+            'by_role' => (object) $this->byRole,
         ];
     }
 }

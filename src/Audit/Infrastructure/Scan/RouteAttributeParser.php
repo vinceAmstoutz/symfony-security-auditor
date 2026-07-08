@@ -79,11 +79,15 @@ final readonly class RouteAttributeParser
 
     private function routePathFromArg(?string $argName, Arg $arg, ?string $currentPath): ?string
     {
-        if ('path' === $argName && $arg->value instanceof String_) {
-            return $arg->value->value;
+        if ('path' !== $argName) {
+            return $currentPath;
         }
 
-        return $currentPath;
+        return match (true) {
+            $arg->value instanceof String_ => $arg->value->value,
+            $arg->value instanceof Array_ => $this->stringValuesFromArray($arg->value)[0] ?? $currentPath,
+            default => $currentPath,
+        };
     }
 
     private function routeNameFromArg(?string $argName, Arg $arg, ?string $currentName): ?string

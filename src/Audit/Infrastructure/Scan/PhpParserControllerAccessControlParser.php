@@ -19,6 +19,7 @@ use PhpParser\Node\Arg;
 use PhpParser\Node\Attribute;
 use PhpParser\Node\AttributeGroup;
 use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\NullsafeMethodCall;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Class_;
@@ -271,7 +272,10 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
 
     private function methodInvokesDenyAccess(ClassMethod $classMethod, NodeFinder $nodeFinder): bool
     {
-        $methodCalls = $nodeFinder->findInstanceOf($classMethod->stmts ?? [], MethodCall::class);
+        $methodCalls = [
+            ...$nodeFinder->findInstanceOf($classMethod->stmts ?? [], MethodCall::class),
+            ...$nodeFinder->findInstanceOf($classMethod->stmts ?? [], NullsafeMethodCall::class),
+        ];
         foreach ($methodCalls as $methodCall) {
             if ($methodCall->isFirstClassCallable()) {
                 continue;

@@ -2837,6 +2837,89 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `AuditBudget::forCost()`/`forBoth()`
   (`src/Audit/Domain/Model/AuditBudget.php`) now also reject `is_nan()` inputs
   via the existing exception factories.
+- **`AuditCost::toArray()['by_role']` flipped between a JSON array and a JSON
+  object depending on which use case produced the report**, since PHP's
+  `json_encode()` can't distinguish an "empty map" from an "empty list" —
+  `RunAuditUseCase`'s real-run path never populates `$byRole` (`[]` → JSON
+  `[]`), while `EstimateAuditCostUseCase`'s `--dry-run` path always does
+  (`{...}` → JSON object). A strongly-typed consumer of `--format=json` output
+  (`jq '.cost.by_role.attacker'`, a Zod/Pydantic schema) that works against one
+  report shape breaks on the other. `AuditCost::toArray()`
+  (`src/Audit/Domain/Model/AuditCost.php`) now casts `by_role` to `object`
+  unconditionally, so it always encodes as a JSON object regardless of whether
+  any role entries are present.
+- **`AuditOrchestrator::isSameIdDuplicate()` discarded a later iteration's
+  validated verdict outright once any validated verdict already existed at the
+  same id**, even when the new verdict corrected the severity or type — e.g. a
+  reviewer's `adjusted_severity`/`corrected_type` applied on re-discovery in a
+  later iteration. Since
+  `Vulnerability::withElevatedSeverity()`/`withCorrectedType()` deliberately
+  preserve the original id, a genuine correction is by construction a same-id
+  collision with the sticky-validated entry, so it was silently thrown away —
+  the stale, less-accurate verdict persisted in the final report, undercounting
+  `riskScore()` and potentially skipping `PoCSynthesisStage` for what was
+  actually a higher-severity finding. `AuditOrchestrator::isSameIdDuplicate()`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) now also allows a
+  validated verdict to replace an earlier validated verdict at the same id when
+  the severity or type differs — a same-content re-validation is still
+  deduplicated, and a later spurious rejection still can't displace a sticky
+  validated entry.
+- **`RouteAttributeParser` dropped a `#[Route]` attribute's `path` entirely when
+  given as the locale-keyed array form Symfony's own `Route` attribute documents
+  (`path: ['en' => '/dashboard', 'fr' => '/tableau-de-bord']`)** — only the
+  plain-string form was handled, unlike the sibling `methods` argument, which
+  already handles both forms. A route using this form resolved to `path: null`,
+  so `SymfonyMappingContextRenderer::firewallRolesForPath()` bailed out
+  immediately and the route rendered as `LACKS_ACCESS_CHECK` in the attacker
+  prompt even when genuinely firewall-protected — a false positive on
+  `broken_access_control`. `RouteAttributeParser::routePathFromArg()`
+  (`src/Audit/Infrastructure/Scan/RouteAttributeParser.php`) now also accepts an
+  array `path`, using its first value.
+- **`PhpParserControllerAccessControlParser::methodInvokesDenyAccess()` missed a
+  nullsafe `denyAccessUnlessGranted()` call**
+  (`$this->security?->denyAccessUnlessGranted(...)`), since it only searched for
+  `PhpParser\Node\Expr\MethodCall` nodes — unlike the sibling
+  `PhpParserFormBindingParser`, which already searches both `MethodCall` and
+  `NullsafeMethodCall`. A controller action guarded only via a nullable,
+  constructor-promoted security collaborator's nullsafe call resolved as
+  `lacksAccessCheck() === true`, a false positive on `broken_access_control` for
+  a genuinely authorization-checked action. `methodInvokesDenyAccess()`
+  (`src/Audit/Infrastructure/Scan/PhpParserControllerAccessControlParser.php`)
+  now also searches `NullsafeMethodCall` nodes.
+- **`AnthropicTokenEstimator::supports()` used `containsAny('claude-')` (with a
+  trailing hyphen), diverging from `CostCalculator::isClaudeModel()`'s
+  `containsAny('claude')`**, even though a prior round's fix documented its own
+  intent as "match `CostCalculator`'s existing, already-correct heuristic" — the
+  replacement substring kept the hyphen the fix was meant to drop. A model name
+  containing `claude` without a following hyphen (e.g. a third-party catalog
+  entry like `deepclaude`) fell through every provider's `supports()` check and
+  landed on the generic fallback ratio instead of Anthropic's, and — for a
+  custom, non-cache-aware `PricingProviderInterface` implementation (a
+  documented extension point) — caused `CostCalculator`'s Anthropic
+  cache-read/cache-creation price multiplier to apply to a non-Anthropic model,
+  under-reporting real spend by up to 10x for the cache portion of a call.
+  `AnthropicTokenEstimator::supports()`
+  (`src/Audit/Infrastructure/LLM/TokenEstimator/AnthropicTokenEstimator.php`)
+  now matches the same substring as `CostCalculator`.
+- **`resources/schema.json` and `docs/configuration.md` still documented
+  `audit.budget.max_cost_usd` as accepting any value `> 0`, but a prior round
+  tightened the actual validation to `>= 0.01`** (matching `max_tokens`'s
+  existing minimum) without updating either — an editor honoring the schema
+  would autocomplete/validate a value like `0.005` that the bundle then rejects
+  at container-compile time. `resources/schema.json` now declares
+  `"minimum": 0.01` for `max_cost_usd`, and `docs/configuration.md`'s range
+  documentation is corrected to match.
+- **The `fast` profile's own docblock, config `info()` string, and
+  `docs/configuration.md` entry all described it as adding concurrency only to
+  the reviewer phase, omitting that `attacker_max_concurrent` is also set to
+  `4`** — `docs/cost-and-performance.md` already documented both, but the
+  primary config reference (`docs/configuration.md`, and
+  `config:dump-reference`'s output, sourced from the same `info()` string)
+  undersold what the profile actually configures. `AuditProfile`'s class
+  docblock (`src/Audit/Domain/Configuration/AuditProfile.php`),
+  `AuditConfigurationDefinition`'s `profile` node `info()` string
+  (`src/Audit/Infrastructure/Config/AuditConfigurationDefinition.php`), and
+  `docs/configuration.md` now all mention both concurrency settings.
 
 ### Security
 

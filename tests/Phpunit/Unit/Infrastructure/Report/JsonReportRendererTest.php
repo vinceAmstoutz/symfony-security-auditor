@@ -63,6 +63,16 @@ final class JsonReportRendererTest extends AbstractReportRendererTestCase
 
     /**
      * @throws InvalidAuditContextException
+     */
+    public function test_render_encodes_an_empty_cost_by_role_breakdown_as_a_json_object_not_an_array(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+
+        self::assertStringContainsString('"by_role": {}', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      */

@@ -44,7 +44,7 @@ final readonly class AuditConfigurationDefinition
                 ->enumNode('profile')
                     ->values(['fast', 'balanced', 'thorough'])
                     ->defaultValue('balanced')
-                    ->info('One-knob preset bundling the cost/speed/depth levers; any explicitly configured key always wins over the profile. `fast`: one attacker iteration, lean pre-scan (marker-bearing files only), code slicing on, up to 4 concurrent reviewer calls. `balanced` (default): identical to configuring nothing. `thorough`: balanced plus PoC synthesis for high-severity validated findings.')
+                    ->info('One-knob preset bundling the cost/speed/depth levers; any explicitly configured key always wins over the profile. `fast`: one attacker iteration, lean pre-scan (marker-bearing files only), code slicing on, up to 4 concurrent attacker and reviewer calls. `balanced` (default): identical to configuring nothing. `thorough`: balanced plus PoC synthesis for high-severity validated findings.')
                 ->end()
                 ->scalarNode('attacker_model')
                     ->defaultNull()

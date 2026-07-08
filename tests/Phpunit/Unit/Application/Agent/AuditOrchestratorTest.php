@@ -843,6 +843,68 @@ final class AuditOrchestratorTest extends TestCase
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
+    public function test_a_later_iterations_severity_correction_replaces_an_earlier_validated_verdict_at_the_same_location(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload()]),
+            $this->attackerResponse([$this->vulnPayload()]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->reviewerAcceptResponse(),
+            $this->reviewerAcceptWithSeverityResponse('critical'),
+        );
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping();
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        $validated = array_values($auditContext->validatedVulnerabilities());
+        self::assertCount(1, $validated);
+        self::assertSame(VulnerabilitySeverity::CRITICAL, $validated[0]->severity());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_an_already_validated_finding_stays_validated_despite_a_later_spurious_rejection_at_the_same_location(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([$this->vulnPayload()]),
+            $this->attackerResponse([$this->vulnPayload()]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->reviewerAcceptResponse(),
+            $this->reviewerRejectResponse(),
+        );
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping();
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        $validated = array_values($auditContext->validatedVulnerabilities());
+        self::assertCount(1, $validated);
+        self::assertSame(VulnerabilitySeverity::HIGH, $validated[0]->severity());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     public function test_it_stores_exact_metadata_values_after_orchestration(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -1732,6 +1794,14 @@ final class AuditOrchestratorTest extends TestCase
     private function reviewerRejectResponse(): LLMResponse
     {
         return LLMResponse::of((string) json_encode(['accepted' => false]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    private function reviewerAcceptWithSeverityResponse(string $adjustedSeverity): LLMResponse
+    {
+        return LLMResponse::of((string) json_encode(['accepted' => true, 'adjusted_severity' => $adjustedSeverity]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
     }
 
     private function defaultPayloadFingerprint(): string
