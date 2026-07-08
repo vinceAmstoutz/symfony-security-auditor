@@ -36,7 +36,8 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      * @var array<string, string> map of pattern label => PCRE pattern. Labels are stable
      *                            and appear in the redaction placeholder.
      */
-    // Possessive `*+`/`{4,}+` below: `\\.` and `[^"'\n]` both match a bare backslash, so a greedy (backtracking) quantifier here lets an unterminated backslash-heavy value elsewhere in the file exhaust pcre.backtrack_limit and silently skip redaction file-wide.
+    // Possessive `*+`/`{4,}+` below: `\\.` and `(?!\2)[^\n]` both match a bare backslash, so a greedy (backtracking) quantifier here lets an unterminated backslash-heavy value elsewhere in the file exhaust pcre.backtrack_limit and silently skip redaction file-wide.
+    // `(?!\2)[^\n]` (rather than excluding both quote characters) so a value quoted with one type can contain an unescaped instance of the *other* type — e.g. "don't" inside double quotes — without the closing-quote backreference matching that unrelated character and truncating the redaction mid-value.
     private const array DEFAULT_PATTERNS = [
         SecretPatternLabel::AwsAccessKey->value => '/\bAKIA[0-9A-Z]{16}\b/',
         SecretPatternLabel::GithubToken->value => '/\bgh[pousr]_[A-Za-z0-9]{36,255}\b/',
@@ -46,9 +47,9 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
         SecretPatternLabel::PemPrivateKey->value => '/-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/',
         SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]*://)[^:@/\s]*:[^/\s]+@~i',
-        SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|DSN)(?:_[A-Z0-9]+)*)\s*=[ \t]*(?!\s*\n)(?:(["\'])(?:\\\\.|[^"\'\n])*+\2|\S+)/m',
-        SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|[^"\'\n]){4,}+)\2|([^"\'\s]\S{3,}(?:[ \t]+[A-Za-z0-9]+)*))/i',
-        SecretPatternLabel::MultilineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|[^"\'\n]){4,}+)\2/mi',
+        SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|DSN)(?:_[A-Z0-9]+)*)\s*=[ \t]*(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\2)[^\n])*+\2|\S+)/m',
+        SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:[ \t]+[A-Za-z0-9]+)*))/i',
+        SecretPatternLabel::MultilineAssignment->value => '/(["\']?(?:password|secret|api[_-]?key|access[_-]?token|client[_-]?secret)["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi',
     ];
 
     /**

@@ -223,6 +223,10 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             return;
         }
 
+        $this->progressReporter->report(ProgressEvent::ReviewStarted->value, [
+            'findings' => \count($filtered),
+        ]);
+
         try {
             $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed());
         } catch (BudgetExceededException|LLMProviderException) {

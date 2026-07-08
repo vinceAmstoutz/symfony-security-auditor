@@ -3049,6 +3049,25 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `XdgConfigPathResolver::baseDirectory()` already guards against for
   `XDG_CONFIG_HOME`/`HOME`. `projectConfigFile()` now falls back to `getcwd()`
   whenever `PWD` is absent or empty, matching that existing convention.
+- **A finding recorded before a mid-attacker-abort recovery review could show a
+  nonsensical or stale "reviewing N/0" progress line on a live console, since
+  the reviewer's own `review.finding.reviewed` events fired without the
+  bracketing `review.started` event that resets `ConsoleProgressReporter`'s
+  counters.** `AuditOrchestrator::reviewRecoveredFindings()`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) — the path that reviews
+  findings recorded before a mid-run `BudgetExceededException`/
+  `LLMProviderException` abort — called `reviewerAgent->review()` directly
+  without ever reporting `review.started`, unlike the normal per-iteration
+  review path a few lines above it.
+  `ConsoleProgressReporter::onReviewFindingReviewed()`
+  (`src/Audit/Infrastructure/Progress/ConsoleProgressReporter.php`)
+  unconditionally increments a running counter and formats it against whatever
+  `$reviewTotal` was last set to — possibly `0` (construction default) or a
+  stale value left over from an earlier iteration's review — so the recovery
+  pass's progress line could read "reviewing 1/0" or show a "reviewed" count
+  exceeding a leftover total. `reviewRecoveredFindings()` now reports
+  `review.started` with the recovered findings' count before reviewing them,
+  matching the normal flow.
 
 ### Security
 
@@ -3280,6 +3299,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   symlink make the audit read and propagate the content of any file the auditing
   process can access. `readCache()` now also refuses to read through a symlinked
   path, falling back to a live `composer audit` run instead.
+- **A secret value quoted with one quote character but containing an unescaped
+  instance of the other quote character truncated redaction mid-value, leaking
+  the remainder in cleartext to the LLM.** The `EnvAssignment`,
+  `InlineAssignment`, and `MultilineAssignment` patterns in
+  `RegexSecretScrubber`
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) matched a
+  quoted value's body with a character class excluding **both** quote characters
+  (`[^"'\n]`), so a double-quoted value containing an apostrophe — e.g.
+  `MAIL_PASSWORD="don't tell anyone 2024!"` — had its closing-quote
+  backreference satisfied by the embedded `'`, redacting only up to that point
+  and leaving `tell anyone 2024!"` in the scrubbed output verbatim
+  (`MAIL_PASSWORD=***REDACTED:env_assignment*** tell anyone 2024!"`). The value
+  body now excludes only the specific closing quote captured in the pattern's
+  own backreference (`(?!\2)[^\n]`), so an embedded instance of the _other_
+  quote type no longer terminates the match early.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

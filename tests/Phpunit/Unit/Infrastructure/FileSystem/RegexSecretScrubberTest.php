@@ -262,6 +262,20 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame('password: "***REDACTED:inline_assignment***"', $output);
     }
 
+    public function test_env_assignment_fully_redacts_a_double_quoted_value_containing_an_unescaped_apostrophe(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('MAIL_PASSWORD="don\'t tell anyone 2024!"');
+
+        self::assertSame('MAIL_PASSWORD=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_inline_assignment_fully_redacts_a_single_quoted_value_containing_an_unescaped_double_quote(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('api_key: \'sk_it"s_a_fake_secret_key_1234\'');
+
+        self::assertSame("api_key: '***REDACTED:inline_assignment***'", $output);
+    }
+
     public function test_unquoted_inline_assignment_redacts_a_multi_word_value(): void
     {
         $output = $this->regexSecretScrubber->scrub('password: hunter2 secret pass phrase');
@@ -288,6 +302,13 @@ final class RegexSecretScrubberTest extends TestCase
     public function test_a_value_wrapped_to_the_next_line_containing_an_escaped_quote_is_fully_redacted(): void
     {
         $output = $this->regexSecretScrubber->scrub("password:\n  \"abcd\\\"efgh\"\n");
+
+        self::assertSame("password:\n\"***REDACTED:multiline_assignment***\"\n", $output);
+    }
+
+    public function test_a_value_wrapped_to_the_next_line_containing_an_unescaped_apostrophe_is_fully_redacted(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("password:\n  \"don't tell anyone\"\n");
 
         self::assertSame("password:\n\"***REDACTED:multiline_assignment***\"\n", $output);
     }

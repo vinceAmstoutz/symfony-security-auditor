@@ -206,6 +206,57 @@ final class AuditOrchestratorTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws LLMProviderException
      */
+    public function test_it_reports_review_start_before_reviewing_a_candidate_recovered_from_a_mid_attacker_budget_abort(): void
+    {
+        $files = [];
+        for ($i = 1; $i <= 11; ++$i) {
+            $files[] = ProjectFile::create(\sprintf('src/Service/Service%d.php', $i), \sprintf('/app/src/Service/Service%d.php', $i), '<?php');
+        }
+
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $callCount = 0;
+        $attackerLlm->method('complete')->willReturnCallback(function () use (&$callCount): LLMResponse {
+            ++$callCount;
+            if (2 === $callCount) {
+                throw BudgetExceededException::forTokens(500, 100);
+            }
+
+            return $this->attackerResponse([$this->vulnPayload(title: 'v1', filePath: 'src/Service/Service1.php')]);
+        });
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, ['recordingProgressReporter' => $recordingProgressReporter]);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles($files);
+        $auditContext->setMapping(SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
+
+        $budgetExceeded = false;
+        try {
+            $auditOrchestrator->orchestrate($auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow BudgetExceededException.');
+
+        $reviewRelatedEvents = array_values(array_filter(
+            $recordingProgressReporter->events,
+            static fn (array $event): bool => \in_array($event[0], ['review.started', 'review.finding.reviewed'], true),
+        ));
+
+        self::assertSame('review.started', $reviewRelatedEvents[0][0]);
+        self::assertSame(1, $reviewRelatedEvents[0][1]['findings']);
+        self::assertSame('review.finding.reviewed', $reviewRelatedEvents[1][0]);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws LLMProviderException
+     */
     public function test_it_swallows_a_second_abort_while_reviewing_a_recovered_candidate(): void
     {
         $files = [];
@@ -1714,6 +1765,7 @@ final class AuditOrchestratorTest extends TestCase
                     $reviewerLlm,
                     new ReviewerPromptBuilder(),
                     new NullLogger(),
+                    progressReporter: $overrides['recordingProgressReporter'] ?? new NullProgressReporter(),
                 ),
                 new ReviewerModeConfiguration(),
             ),
