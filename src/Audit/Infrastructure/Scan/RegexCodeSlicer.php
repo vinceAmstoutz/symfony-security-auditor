@@ -347,7 +347,7 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
             return $this->stripBlockComments(substr($line, $closeOffset + 2), false);
         }
 
-        $openOffset = strpos($line, '/*');
+        $openOffset = strpos($this->maskStringLiterals($line), '/*');
         if (false === $openOffset) {
             return ['line' => $line, 'inside_block_comment' => false];
         }
@@ -356,5 +356,23 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         $after = $this->stripBlockComments(substr($line, $openOffset + 2), true);
 
         return ['line' => $before.$after['line'], 'inside_block_comment' => $after['inside_block_comment']];
+    }
+
+    /**
+     * A string literal containing a bare `/*` (e.g. the `'image/*'` MIME
+     * wildcard) is indistinguishable from a genuine block-comment opener to a
+     * plain {@see strpos()} scan — masking same-line string literals to a
+     * same-length run of `x` before searching keeps offsets aligned with the
+     * original line (so the caller can still slice it correctly) while
+     * preventing a quoted `/*` from ever being mistaken for real comment
+     * syntax and permanently desyncing tracking for the rest of the file.
+     */
+    private function maskStringLiterals(string $line): string
+    {
+        return preg_replace_callback(
+            self::STRING_LITERAL_PATTERN,
+            static fn (array $matches): string => str_repeat('x', \strlen($matches[0])),
+            $line,
+        ) ?? $line;
     }
 }

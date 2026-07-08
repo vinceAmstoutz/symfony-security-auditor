@@ -73,7 +73,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'HttpClient request — verify host allowlist (SSRF)',
             ],
             'mailer_header_setter' => [
-                'regex' => '/->(?:from|subject|addBcc|addCc|to|replyTo)\s*\(/',
+                'regex' => '/->(?:from|subject|addBcc|bcc|addCc|cc|to|replyTo)\s*\(/',
                 'description' => 'Mailer header setter — verify no user-input concatenation (header injection)',
             ],
             'hash_equals_missing' => [
@@ -95,7 +95,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'Request input read — trace flow to dangerous sinks',
             ],
             'redirect_with_input' => [
-                'regex' => '/->redirect\s*\(\s*\$/',
+                'regex' => '/->redirect\s*\(.{0,200}\$/',
                 'description' => 'Redirect with variable target — verify protocol/host allowlist (open redirect)',
             ],
             'submit_request_all' => [
@@ -167,7 +167,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         ],
         ProjectFileType::ENTITY->value => [
             'sensitive_setter' => [
-                'regex' => '/public\s+function\s+set(?:Roles?|IsAdmin|PasswordHash|Password|Admin|Superuser)\b/i',
+                'regex' => '/public\s+function\s+set(?:Roles?|IsAdmin|IsSuperAdmin|PasswordHash|Password|Admin|SuperAdmin|Superuser)\b/i',
                 'description' => 'Public setter on sensitive field — verify it is not bound by a form',
             ],
             'serializer_groups_attribute' => [

@@ -255,18 +255,71 @@ final readonly class BatchReviewAnalyzer
             $rawData = $structuredReviewCollectionSession->drain();
 
             return [] !== $rawData
-                ? $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, $cacheContexts)
+                ? $this->applyPartialBatchReviewInOriginalOrder($batch, $rawData, $cacheContexts, $coverageRecorder)
                 : $this->batchVerdictApplier->recordBatchError($batch, $exception, $coverageRecorder);
         }
+    }
+
+    /**
+     * A batch member absent from `$rawData` because the conversation was cut
+     * off before it was ever considered must not be routed through
+     * {@see BatchVerdictApplier::applyBatchReview()}, which treats a missing
+     * verdict as an implicit rejection — it is marked errored instead, like a
+     * fully-empty drain. `mergeBatchIntoReviewed()` maps this method's return
+     * value back to the caller's findings purely by position, so the result
+     * is reassembled in `$batch`'s original order rather than concatenating
+     * the reviewed and errored groups.
+     *
+     * @param list<Vulnerability>      $batch
+     * @param array<int|string, mixed> $rawData
+     * @param array<string, string>    $cacheContexts
+     *
+     * @return list<Vulnerability>
+     */
+    private function applyPartialBatchReviewInOriginalOrder(array $batch, array $rawData, array $cacheContexts, CoverageRecorderInterface $coverageRecorder): array
+    {
+        [$reachedBatch, $unreachedBatch] = $this->partitionByReached($batch, $rawData);
+
+        $byId = [];
+        foreach ($this->batchVerdictApplier->applyBatchReview($reachedBatch, $rawData, $coverageRecorder, $cacheContexts) as $vulnerability) {
+            $byId[$vulnerability->id()] = $vulnerability;
+        }
+
+        foreach ($this->batchVerdictApplier->markBatchErrored($unreachedBatch, $coverageRecorder) as $vulnerability) {
+            $byId[$vulnerability->id()] = $vulnerability;
+        }
+
+        return array_map(static fn (Vulnerability $vulnerability): Vulnerability => $byId[$vulnerability->id()], $batch);
+    }
+
+    /**
+     * @param list<Vulnerability>      $batch
+     * @param array<int|string, mixed> $rawData
+     *
+     * @return array{0: list<Vulnerability>, 1: list<Vulnerability>}
+     */
+    private function partitionByReached(array $batch, array $rawData): array
+    {
+        $reachedIds = $this->batchVerdictApplier->reachedIds($rawData);
+
+        return [
+            array_values(array_filter($batch, static fn (Vulnerability $vulnerability): bool => \in_array($vulnerability->id(), $reachedIds, true))),
+            array_values(array_filter($batch, static fn (Vulnerability $vulnerability): bool => !\in_array($vulnerability->id(), $reachedIds, true))),
+        ];
     }
 
     /**
      * Recovers any verdicts the LLM already recorded via `record_review` tool
      * calls in an earlier round of this batch's conversation before a later
      * round aborted it — otherwise they vanish with the exception even
-     * though they were genuinely reached. Falls back to the existing
-     * not-reached handling only when nothing was recorded for the whole
-     * batch.
+     * though they were genuinely reached. A batch member with no matching
+     * verdict is marked not-reached rather than routed through
+     * {@see BatchVerdictApplier::applyBatchReview()}, which would otherwise
+     * treat its absence as an implicit rejection — correct when the model
+     * finished the batch and chose not to flag it, but wrong when the
+     * conversation was cut off before it was ever considered. Falls back to
+     * the existing not-reached handling for the whole batch only when
+     * nothing was recorded at all.
      *
      * @param list<Vulnerability>   $batch
      * @param array<string, string> $cacheContexts
@@ -280,7 +333,15 @@ final readonly class BatchReviewAnalyzer
             return;
         }
 
-        $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, $cacheContexts);
+        [$reachedBatch, $unreachedBatch] = $this->partitionByReached($batch, $rawData);
+
+        if ([] !== $reachedBatch) {
+            $this->batchVerdictApplier->applyBatchReview($reachedBatch, $rawData, $coverageRecorder, $cacheContexts);
+        }
+
+        if ([] !== $unreachedBatch) {
+            $this->batchVerdictApplier->markBatchUnreached($unreachedBatch, $status, $coverageRecorder);
+        }
     }
 
     /**

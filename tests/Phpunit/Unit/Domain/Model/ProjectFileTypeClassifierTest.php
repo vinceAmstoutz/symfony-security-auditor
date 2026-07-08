@@ -34,6 +34,7 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'live component by attribute' => ['src/Twig/Components/SearchBar.php', "<?php\n#[AsLiveComponent]\nclass SearchBar {}", ProjectFileType::LIVE_COMPONENT];
         yield 'live component extending abstract controller stays a live component' => ['src/Twig/Components/Cart.php', "<?php\n#[AsLiveComponent]\nclass Cart extends AbstractController {}", ProjectFileType::LIVE_COMPONENT];
         yield 'api resource with route attribute stays an api resource' => ['src/ApiResource/Offer.php', "<?php\n#[ApiResource]\n#[Route('/offers')]\nclass Offer {}", ProjectFileType::API_RESOURCE];
+        yield 'api resource by fully qualified standalone operation attribute' => ['src/ApiResource/AdminStats.php', "<?php\nuse ApiPlatform\\Metadata;\n#[ApiPlatform\\Metadata\\GetCollection]\nclass AdminStats {}", ProjectFileType::API_RESOURCE];
         yield 'controller directory wins over api resource attribute' => ['src/Controller/OfferController.php', "<?php\n#[ApiResource]\nclass OfferController {}", ProjectFileType::CONTROLLER];
         yield 'invokable as-controller service without base class or route attribute' => ['src/Action/CheckoutAction.php', "<?php\n#[AsController]\nclass CheckoutAction { public function __invoke() {} }", ProjectFileType::CONTROLLER];
         yield 'controller by route attribute without base class' => ['src/Action/ExportAction.php', "<?php\nclass ExportAction { #[Route('/export')]\npublic function __invoke() {} }", ProjectFileType::CONTROLLER];
@@ -45,6 +46,7 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'messenger handler by suffix' => ['src/Messenger/SendInvoiceMessageHandler.php', '<?php', ProjectFileType::MESSENGER_HANDLER];
         yield 'messenger handler by attribute' => ['src/Handler/ProcessPaymentAction.php', "<?php\n#[AsMessageHandler]\nclass ProcessPaymentAction {}", ProjectFileType::MESSENGER_HANDLER];
         yield 'webhook consumer by suffix' => ['src/Webhook/StripeWebhookConsumer.php', '<?php', ProjectFileType::WEBHOOK_CONSUMER];
+        yield 'webhook consumer by remote event consumer interface' => ['src/RemoteEvent/StripeEventConsumer.php', "<?php\n#[AsRemoteEventConsumer(name: 'stripe')]\nclass StripeEventConsumer implements RemoteEventConsumerInterface {}", ProjectFileType::WEBHOOK_CONSUMER];
         yield 'event subscriber by suffix' => ['src/EventSubscriber/AuditSubscriber.php', '<?php', ProjectFileType::EVENT_SUBSCRIBER];
         yield 'normalizer by suffix' => ['src/Serializer/UserNormalizer.php', '<?php', ProjectFileType::NORMALIZER];
         yield 'scheduler by suffix' => ['src/Schedule/CleanupSchedule.php', '<?php', ProjectFileType::SCHEDULER];

@@ -28,7 +28,7 @@ final readonly class ProjectFileTypeClassifier
             self::isFormPath($path), self::looksLikeForm($path, $content) => ProjectFileType::FORM,
             str_ends_with($path, 'Authenticator.php') => ProjectFileType::AUTHENTICATOR,
             self::isMessengerHandlerPath($path), self::looksLikeMessengerHandler($path, $content) => ProjectFileType::MESSENGER_HANDLER,
-            self::isWebhookConsumerPath($path) => ProjectFileType::WEBHOOK_CONSUMER,
+            self::isWebhookConsumerPath($path), self::looksLikeWebhookConsumer($path, $content) => ProjectFileType::WEBHOOK_CONSUMER,
             str_ends_with($path, 'Subscriber.php') || str_ends_with($path, 'EventListener.php') => ProjectFileType::EVENT_SUBSCRIBER,
             str_ends_with($path, 'Normalizer.php') || str_ends_with($path, 'Denormalizer.php') => ProjectFileType::NORMALIZER,
             str_ends_with($path, 'ScheduleProvider.php') || str_ends_with($path, 'Schedule.php') => ProjectFileType::SCHEDULER,
@@ -65,7 +65,7 @@ final readonly class ProjectFileTypeClassifier
         }
 
         return str_contains($content, 'ApiPlatform\\Metadata')
-            && 1 === preg_match('/#\[\s*(?:Get|GetCollection|Post|Put|Patch|Delete|Query|QueryCollection|Mutation)\b/', $content);
+            && 1 === preg_match('/#\[\s*(?:[\w\\\\]+\\\\)?(?:Get|GetCollection|Post|Put|Patch|Delete|Query|QueryCollection|Mutation)\b/', $content);
     }
 
     private static function looksLikeLiveComponent(string $path, string $content): bool
@@ -149,6 +149,14 @@ final readonly class ProjectFileTypeClassifier
         return str_ends_with($path, 'WebhookConsumer.php')
             || str_ends_with($path, 'WebhookParser.php')
             || (str_contains($path, '/Webhook/') && str_ends_with($path, '.php'));
+    }
+
+    private static function looksLikeWebhookConsumer(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && (str_contains($content, '#[AsRemoteEventConsumer')
+                || str_contains($content, 'implements RemoteEventConsumerInterface')
+                || str_contains($content, 'implements RequestParserInterface'));
     }
 
     private static function isDotenvPath(string $path): bool

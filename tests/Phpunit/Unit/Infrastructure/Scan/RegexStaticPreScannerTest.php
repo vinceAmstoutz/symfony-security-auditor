@@ -485,6 +485,76 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    #[DataProvider('bareMailerHeaderSetterCases')]
+    public function test_it_flags_bare_cc_and_bcc_mailer_header_setters(string $call): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Service/NotificationService.php',
+            '/app/src/Service/NotificationService.php',
+            "<?php\nclass NotificationService { public function send(\$email) { \$email{$call}(\$x); } }",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('mailer_header_setter', $patterns);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function bareMailerHeaderSetterCases(): iterable
+    {
+        yield 'bare cc' => ['->cc'];
+        yield 'bare bcc' => ['->bcc'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    #[DataProvider('redirectWithConcatenatedInputCases')]
+    public function test_it_flags_redirect_targets_built_from_a_variable_beyond_the_first_argument_character(string $argument): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/RedirectController.php',
+            '/app/src/Controller/RedirectController.php',
+            "<?php\nclass RedirectController { public function go(\$request) { return \$this->redirect({$argument}); } }",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('redirect_with_input', $patterns);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function redirectWithConcatenatedInputCases(): iterable
+    {
+        yield 'string concatenation' => ["'http://' . \$request->query->get('host')"];
+        yield 'cast before the variable' => ['(string) $request->query->get(\'url\')'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_a_super_admin_setter_as_a_sensitive_setter(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Entity/User.php',
+            '/app/src/Entity/User.php',
+            "<?php\nclass User { public function setSuperAdmin(\$value) { \$this->superAdmin = \$value; } }",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('sensitive_setter', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_supports_returning_null_across_multiple_lines(): void
     {
         $projectFile = ProjectFile::create(

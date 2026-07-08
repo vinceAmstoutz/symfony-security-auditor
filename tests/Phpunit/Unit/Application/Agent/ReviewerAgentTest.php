@@ -4004,9 +4004,13 @@ final class ReviewerAgentTest extends TestCase
         self::assertTrue($budgetExceeded, 'The reviewer must rethrow BudgetExceededException.');
         self::assertSame(
             [
-                ['file' => 'src/A.php', 'validated' => true],
-                ['file' => 'src/B.php', 'validated' => false],
+                ['stage' => 'reviewer', 'file' => 'src/A.php', 'status' => 'validated'],
+                ['stage' => 'reviewer', 'file' => 'src/B.php', 'status' => 'aborted'],
             ],
+            $auditContext->coverage(),
+        );
+        self::assertSame(
+            [['file' => 'src/A.php', 'validated' => true]],
             array_map($this->reviewedFindingShape(...), $auditContext->drainReviewedFindings()),
         );
     }

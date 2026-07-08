@@ -3123,6 +3123,86 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`is_nan($estimatedCostUsd) || $estimatedCostUsd < 0.0`) — `INF` is neither,
   so it passed through unchanged. The guard now uses
   `!is_finite($estimatedCostUsd)`, rejecting `INF` and `-INF` alongside `NaN`.
+- **A webhook consumer built on Symfony's official `symfony/webhook` +
+  `symfony/remote-event` components (`#[AsRemoteEventConsumer]`,
+  `RemoteEventConsumerInterface`, `RequestParserInterface`) was invisible to the
+  classifier unless its filename happened to end in
+  `WebhookConsumer.php`/`WebhookParser.php` or its path happened to contain
+  `/Webhook/`**, silently routing it to the generic PHP skill instead of
+  `WebhookConsumerAttackerSkill`'s HMAC/replay-attack guidance.
+  `ProjectFileTypeClassifier`
+  (`src/Audit/Domain/Model/ProjectFileTypeClassifier.php`) had a path heuristic
+  for `WEBHOOK_CONSUMER` but no content heuristic, unlike every other type in
+  its classification chain. A new `looksLikeWebhookConsumer()` detects the real
+  Symfony API regardless of file naming convention.
+- **An API Platform resource using a fully-qualified, non-`use`-imported
+  standalone operation attribute (e.g. `#[ApiPlatform\Metadata\GetCollection]`)
+  was not classified as `API_RESOURCE`.** `looksLikeApiResource()`'s regex
+  fallback (`src/Audit/Domain/Model/ProjectFileTypeClassifier.php`) required the
+  bare short name (`Get`, `GetCollection`, …) to appear directly after `#[`,
+  which only holds when the attribute is `use`-imported. The pattern now allows
+  an optional leading namespace segment before the operation name.
+- **`audit:run --dry-run --output=<path>` silently discarded the requested file
+  for the default (`console`) output format**, while a real (non-dry-run) audit
+  with the same flags correctly wrote it. `AuditCommand::runDryRun()`
+  (`src/Command/AuditCommand.php`) only called `ReportWriter::write()` when the
+  format was machine-readable, unlike `finalizeAuditRun()`'s unconditional call
+  — so `--output` had no effect at all for console-format dry runs, with no
+  error and a `0` exit code. The dry-run path now also writes when `--output` is
+  explicitly set, regardless of format. `AuditCommandInput`'s `--output` help
+  text and the CLI reference in `docs/configuration.md` were also updated — both
+  were already stale, omitting `junit` (and, for the help text, `console`) from
+  the list of formats `--output` supports.
+- **A file's `RegexCodeSlicer` output could silently drop a later, unrelated
+  method's parameter names, or retain almost the entire rest of the file,**
+  whenever an earlier line contained an ordinary string literal with a bare `/*`
+  inside it (e.g. the `'image/*'` MIME-type wildcard). `stripBlockComments()`
+  (`src/Audit/Infrastructure/Scan/RegexCodeSlicer.php`) searched for `/*`/`*/`
+  directly in the raw line text without first stripping string literals — unlike
+  `parenDelta()`, which already does this for the identical reason — so the
+  quoted `/*` was mistaken for a genuine block-comment opener, and with no
+  matching `*/` elsewhere in the file, every subsequent line was treated as
+  comment content and fed to `parenDelta()` as empty text.
+  `stripBlockComments()` now masks same-line string literals before searching
+  for a comment opener.
+- **A `createForm()` call moved behind a shared private or protected helper
+  method — a common CRUD-controller refactor — was invisible to the
+  controller/form-type cross-reference used to help the attacker correlate
+  mass-assignment risk with specific routes.** `PhpParserFormBindingParser`
+  (`src/Audit/Infrastructure/Scan/PhpParserFormBindingParser.php`) only scanned
+  each public action method's own body; a `createForm()` call reached only via
+  `$this->helper()` from that body was never found, even though it is fully
+  resolvable from the same already-parsed AST. The parser now follows
+  `$this->helper()` calls into methods declared on the same class (with cycle
+  protection for mutually-calling helpers) so the binding is still attributed to
+  the public action that reaches it.
+- **Three `RegexStaticPreScanner` patterns missed common syntax variants of the
+  exact idiom they exist to catch**
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`):
+  `mailer_header_setter` listed `addBcc`/`addCc` but not the equally common bare
+  `bcc()`/`cc()` setters; `redirect_with_input` only matched a bare variable as
+  the very first character of `->redirect(`'s argument, missing the classic
+  string-concatenation open-redirect idiom
+  (`->redirect('http://' . $request->query->get('host'))`) and a leading type
+  cast; `sensitive_setter` matched `setAdmin`/`setSuperuser` but not the equally
+  common `setSuperAdmin`/`setIsSuperAdmin`. All three patterns now cover the
+  missed variants.
+- **A finding reviewed in a batch of several findings sharing one LLM
+  tool-calling conversation could be persisted as an explicit reviewer rejection
+  when the conversation was actually cut off — by a budget/provider abort, or
+  any other exception — before the model ever considered it,** misreporting a
+  "not reached" finding as "reviewer rejected" in both the report and
+  reviewer-coverage telemetry. `BatchVerdictApplier::applyBatchReview()`
+  (`src/Audit/Application/Agent/Review/BatchVerdictApplier.php`) treats any
+  batch member absent from the verdict data as an implicit rejection — correct
+  when the model finished the batch and simply chose not to flag it, but wrong
+  when the conversation never reached it at all.
+  `BatchReviewAnalyzer::recordDrainedBatchOrMarkUnreached()` and its
+  generic-`Throwable` recovery branch
+  (`src/Audit/Application/Agent/Review/BatchReviewAnalyzer.php`) now split a
+  partially-drained batch into the findings the conversation actually produced a
+  verdict for and the ones it never reached, routing only the former through
+  `applyBatchReview()` and marking the latter not-reached instead.
 
 ### Security
 

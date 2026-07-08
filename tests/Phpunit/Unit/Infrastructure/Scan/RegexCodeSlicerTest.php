@@ -358,6 +358,28 @@ final class RegexCodeSlicerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_a_string_literal_containing_an_unbalanced_block_comment_opener_does_not_defeat_elision_for_the_rest_of_the_file(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$allowedType = 'image/*';\n"
+            .str_repeat("        \$x = 1;\n", 20)
+            ."    public function grantAccess(\n"
+            ."        \$subject,\n"
+            ."        \$attribute\n"
+            ."    ) {\n"
+            ."        \$this->denyAccessUnlessGranted(\$attribute, \$subject);\n"
+            ."    }\n";
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('$subject,', $sliced);
+        self::assertStringContainsString('$attribute', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_inert_line_resembling_keyword_mid_line_is_elided(): void
     {
         // A comment mentioning "namespace"/"class" mid-line must NOT be treated as

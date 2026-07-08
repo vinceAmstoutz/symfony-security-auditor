@@ -37,7 +37,7 @@ final class AuditCommandInput
     #[Option(description: 'Output format: console, json, sarif, html, markdown, junit or github', shortcut: 'f')]
     public OutputFormat $format = OutputFormat::Console;
 
-    #[Option(description: 'Output file path (for json, sarif, html or markdown format)', shortcut: 'o')]
+    #[Option(description: 'Output file path (any format)', shortcut: 'o')]
     public ?string $output = null;
 
     #[Option(description: 'Estimate token usage and cost without invoking the LLM; emits a report with zero vulnerabilities and an estimated cost block.')]

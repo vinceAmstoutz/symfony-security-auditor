@@ -198,6 +198,63 @@ final class PhpParserFormBindingParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_attributes_a_create_form_call_inside_a_private_helper_to_the_public_action_that_reaches_it(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Form\UserType;
+            final class UserController {
+                public function edit(): void {
+                    $this->processForm();
+                }
+                private function processForm(): void {
+                    $form = $this->createForm(UserType::class);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+
+        $bindings = $this->phpParserFormBindingParser->parse($projectFile);
+
+        self::assertCount(1, $bindings);
+        self::assertSame('edit', $bindings[0]->controllerMethod());
+        self::assertSame('App\\Form\\UserType', $bindings[0]->formTypeClass());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_does_not_infinitely_recurse_when_private_helpers_call_each_other_in_a_cycle(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Form\UserType;
+            final class UserController {
+                public function edit(): void {
+                    $this->helperA();
+                }
+                private function helperA(): void {
+                    $this->helperB();
+                }
+                private function helperB(): void {
+                    $this->helperA();
+                    $form = $this->createForm(UserType::class);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+
+        $bindings = $this->phpParserFormBindingParser->parse($projectFile);
+
+        self::assertCount(1, $bindings);
+        self::assertSame('edit', $bindings[0]->controllerMethod());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_collects_a_binding_from_a_nullsafe_create_form_call(): void
     {
         $source = <<<'PHP'

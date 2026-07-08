@@ -64,6 +64,22 @@ final readonly class BatchVerdictApplier
     }
 
     /**
+     * The set of finding ids a review conversation actually produced a
+     * verdict for. Lets a caller recovering from a mid-conversation abort
+     * distinguish a batch member the model genuinely reviewed from one it
+     * never reached, instead of {@see self::applyBatchReview()} treating
+     * every id absent from `$rawData` as an implicit rejection.
+     *
+     * @param array<int|string, mixed> $rawData
+     *
+     * @return list<string>
+     */
+    public function reachedIds(array $rawData): array
+    {
+        return array_keys($this->indexReviewsById($rawData));
+    }
+
+    /**
      * @param array<int|string, mixed> $rawData
      *
      * @return array<string, array<string, mixed>>

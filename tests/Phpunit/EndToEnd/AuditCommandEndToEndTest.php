@@ -1311,6 +1311,49 @@ final class AuditCommandEndToEndTest extends TestCase
         self::assertSame('stub', $cost['primary_model']);
     }
 
+    public function test_dry_run_with_console_format_still_writes_to_the_requested_output_file(): void
+    {
+        $this->createProjectDir();
+        mkdir($this->fixtureDir.'/src/Controller', 0o777, true);
+        file_put_contents($this->fixtureDir.'/src/Controller/UserController.php', '<?php class UserController { public function indexAction() {} }');
+
+        $throwingLLM = new class implements LLMClientInterface {
+            #[Override]
+            public function complete(string $systemPrompt, string $userMessage): LLMResponse
+            {
+                throw new RuntimeException('platform must not be invoked during --dry-run');
+            }
+
+            #[Override]
+            public function completeWithTools(
+                string $systemPrompt,
+                string $userMessage,
+                ToolRegistry $toolRegistry,
+                int $maxToolIterations,
+            ): LLMResponse {
+                throw new RuntimeException('platform must not be invoked during --dry-run');
+            }
+
+            #[Override]
+            public function model(): string
+            {
+                return 'stub';
+            }
+        };
+
+        $commandTester = $this->makeCommandTesterWithLLM($throwingLLM, $throwingLLM);
+
+        $reportPath = $this->fixtureDir.'/report.txt';
+        $exitCode = $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+            '--output' => $reportPath,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertFileExists($reportPath);
+    }
+
     public function test_show_scanned_lists_files_and_exits_success_without_invoking_llm(): void
     {
         $this->createProjectDir();

@@ -103,30 +103,42 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
      */
     private function bindingsForPublicMethods(string $filePath, Class_ $class, NodeFinder $nodeFinder): array
     {
+        $methodsByName = $this->methodsByName($class);
+
         $bindings = [];
         foreach ($class->getMethods() as $classMethod) {
             if (!$classMethod->isPublic()) {
                 continue;
             }
 
-            $bindings = [...$bindings, ...$this->bindingsForMethod($filePath, $classMethod, $nodeFinder)];
+            $bindings = [...$bindings, ...$this->bindingsForMethod($filePath, $classMethod, $methodsByName, $nodeFinder)];
         }
 
         return $bindings;
     }
 
     /**
-     * @return list<FormBinding>
+     * @return array<string, ClassMethod>
      */
-    private function bindingsForMethod(string $filePath, ClassMethod $classMethod, NodeFinder $nodeFinder): array
+    private function methodsByName(Class_ $class): array
     {
-        $body = $classMethod->stmts;
-        if (null === $body) {
-            return [];
+        $methodsByName = [];
+        foreach ($class->getMethods() as $classMethod) {
+            $methodsByName[$classMethod->name->toString()] = $classMethod;
         }
 
+        return $methodsByName;
+    }
+
+    /**
+     * @param array<string, ClassMethod> $methodsByName
+     *
+     * @return list<FormBinding>
+     */
+    private function bindingsForMethod(string $filePath, ClassMethod $classMethod, array $methodsByName, NodeFinder $nodeFinder): array
+    {
         $bindings = [];
-        foreach ($this->createFormCallSites($body, $nodeFinder) as $methodCall) {
+        foreach ($this->reachableCreateFormCallSites($classMethod, $methodsByName, $nodeFinder) as $methodCall) {
             if (!$this->isThisCreateFormCall($methodCall)) {
                 continue;
             }
@@ -140,6 +152,70 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
         }
 
         return $bindings;
+    }
+
+    /**
+     * A `createForm()` call moved behind a shared private/protected helper (a
+     * common CRUD-controller refactor) would otherwise be invisible, since a
+     * public action's own body only calls the helper, never `createForm()`
+     * directly. Follows `$this->helper()` calls into methods declared on the
+     * same class, statically resolvable from the already-parsed AST, so the
+     * binding is still attributed to the public action that reaches it.
+     *
+     * @param array<string, ClassMethod> $methodsByName
+     *
+     * @return list<MethodCall|NullsafeMethodCall>
+     */
+    private function reachableCreateFormCallSites(ClassMethod $classMethod, array $methodsByName, NodeFinder $nodeFinder): array
+    {
+        $bySpotId = [];
+        foreach ($this->reachableCreateFormCallSitesVisiting($classMethod, $methodsByName, $nodeFinder, []) as $methodCall) {
+            $bySpotId[spl_object_id($methodCall)] = $methodCall;
+        }
+
+        return array_values($bySpotId);
+    }
+
+    /**
+     * @param array<string, ClassMethod> $methodsByName
+     * @param array<string, true>        $visited
+     *
+     * @return list<MethodCall|NullsafeMethodCall>
+     */
+    private function reachableCreateFormCallSitesVisiting(ClassMethod $classMethod, array $methodsByName, NodeFinder $nodeFinder, array $visited): array
+    {
+        $name = $classMethod->name->toString();
+        if (\array_key_exists($name, $visited)) {
+            return [];
+        }
+
+        $visited[$name] = true;
+
+        $body = $classMethod->stmts;
+        if (null === $body) {
+            return [];
+        }
+
+        $ownCallSites = $this->createFormCallSites($body, $nodeFinder);
+
+        $helperCallSites = [];
+        foreach ($ownCallSites as $ownCallSite) {
+            $calledName = $this->thisCallName($ownCallSite);
+            if (null !== $calledName && \array_key_exists($calledName, $methodsByName)) {
+                $helperCallSites = [...$helperCallSites, ...$this->reachableCreateFormCallSitesVisiting($methodsByName[$calledName], $methodsByName, $nodeFinder, $visited)];
+            }
+        }
+
+        return [...$ownCallSites, ...$helperCallSites];
+    }
+
+    private function thisCallName(MethodCall|NullsafeMethodCall $methodCall): ?string
+    {
+        if (!$methodCall->var instanceof Variable || 'this' !== $methodCall->var->name) {
+            return null;
+        }
+
+        return $methodCall->name instanceof Identifier ? $methodCall->name->toString() : null;
     }
 
     /**

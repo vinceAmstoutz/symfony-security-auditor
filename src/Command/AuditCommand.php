@@ -186,7 +186,7 @@ final readonly class AuditCommand
 
         $this->auditPresenter->unsupportedModelWarnings($displayStyle, $auditReport);
 
-        if ($auditCommandInput->isMachineReadableFormat()) {
+        if ($auditCommandInput->isMachineReadableFormat() || null !== $auditCommandInput->output) {
             $this->reportWriter->write($auditReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
         }
 
