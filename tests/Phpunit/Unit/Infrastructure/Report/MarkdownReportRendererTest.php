@@ -223,6 +223,26 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_substitutes_invalid_utf8_across_every_llm_controlled_field_instead_of_corrupting_the_output(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, "Bad\xFFTitle", 0.9),
+            new CodeLocation("src/Fo\xFFo.php", 1, 5),
+            new VulnerabilityNarrative("Desc\xFEription", "vec\xFEtor", "proo\xFEf", "fi\xFEx"),
+            'code',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertTrue(mb_check_encoding($output, 'UTF-8'));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_render_finding_type_line_shows_the_owasp_and_cwe_references(): void
     {
         $output = $this->renderer->render($this->makeReport(

@@ -43,18 +43,31 @@ final readonly class ChunkContextFactory
     public function create(array $chunk, AttackerAnalysisRequest $attackerAnalysisRequest, RiskMarkerIndex $riskMarkerIndex, bool $cacheIsContextAware): ChunkContext
     {
         $chunkMarkers = $riskMarkerIndex->forChunk($chunk);
+        $markerPreamble = $this->renderMarkerPreamble($chunkMarkers);
 
         $rejectedPreamble = $this->renderRejectedPreamble($attackerAnalysisRequest);
         $previousPreamble = $this->renderPreviousPreamble($attackerAnalysisRequest);
-        $contextKey = $this->deriveContextKey($rejectedPreamble, $previousPreamble);
+        $contextKey = $this->deriveContextKey($markerPreamble, $rejectedPreamble, $previousPreamble);
         $cacheable = $this->isCacheable($attackerAnalysisRequest, $contextKey, $cacheIsContextAware);
 
         $slicedChunk = $this->sliceChunk($chunk, $riskMarkerIndex);
         $systemPrompt = $this->attackerPromptBuilder->buildSystemPrompt($slicedChunk);
         $userMessage = $this->attackerPromptBuilder->buildUserMessage($slicedChunk, $attackerAnalysisRequest->symfonyMapping);
-        $userMessage = $this->prependContext($userMessage, $chunkMarkers, $rejectedPreamble, $previousPreamble);
+        $userMessage = $this->prependContext($userMessage, $markerPreamble, $rejectedPreamble, $previousPreamble);
 
         return new ChunkContext($systemPrompt, $userMessage, $contextKey, $cacheable);
+    }
+
+    /**
+     * @param list<RiskMarker> $chunkMarkers
+     */
+    private function renderMarkerPreamble(array $chunkMarkers): string
+    {
+        if ([] === $chunkMarkers) {
+            return '';
+        }
+
+        return $this->attackerContextPromptRenderer->renderRiskMarkers($chunkMarkers);
     }
 
     private function renderRejectedPreamble(AttackerAnalysisRequest $attackerAnalysisRequest): string
@@ -76,21 +89,26 @@ final readonly class ChunkContextFactory
     }
 
     /**
-     * Hashing each preamble individually before joining fixes both to 64 hex
+     * Hashing each preamble individually before joining fixes each to 64 hex
      * characters, which can never contain the raw-text join's own separator —
      * so a rejected/previous preamble embedding a null byte (both are
      * rendered from LLM-echoed `Vulnerability::filePath()` values, which are
      * never null-byte-sanitized) can't shift content across the join
-     * boundary and collide with a genuinely different pair. Mirrors
+     * boundary and collide with a genuinely different triple. Mirrors
      * `FilesystemAttackerCache::keyForChunk()`'s per-file hash-then-join.
+     *
+     * The marker preamble is included so a chunk cache entry is invalidated
+     * whenever the risk markers it was built from change — e.g. a custom
+     * `StaticPreScannerInterface` implementation (a documented extension
+     * point) starts flagging a file differently on an unchanged content hash.
      */
-    private function deriveContextKey(string $rejectedPreamble, string $previousPreamble): string
+    private function deriveContextKey(string $markerPreamble, string $rejectedPreamble, string $previousPreamble): string
     {
-        if ('' === $rejectedPreamble && '' === $previousPreamble) {
+        if ('' === $markerPreamble && '' === $rejectedPreamble && '' === $previousPreamble) {
             return '';
         }
 
-        return hash('sha256', hash('sha256', $rejectedPreamble).hash('sha256', $previousPreamble));
+        return hash('sha256', hash('sha256', $markerPreamble).hash('sha256', $rejectedPreamble).hash('sha256', $previousPreamble));
     }
 
     private function isCacheable(AttackerAnalysisRequest $attackerAnalysisRequest, string $contextKey, bool $cacheIsContextAware): bool
@@ -98,13 +116,10 @@ final readonly class ChunkContextFactory
         return !$attackerAnalysisRequest->bypassCache && ('' === $contextKey || $cacheIsContextAware);
     }
 
-    /**
-     * @param list<RiskMarker> $chunkMarkers
-     */
-    private function prependContext(string $userMessage, array $chunkMarkers, string $rejectedPreamble, string $previousPreamble): string
+    private function prependContext(string $userMessage, string $markerPreamble, string $rejectedPreamble, string $previousPreamble): string
     {
-        if ([] !== $chunkMarkers) {
-            $userMessage = \sprintf("%s\n\n%s", $this->attackerContextPromptRenderer->renderRiskMarkers($chunkMarkers), $userMessage);
+        if ('' !== $markerPreamble) {
+            $userMessage = \sprintf("%s\n\n%s", $markerPreamble, $userMessage);
         }
 
         if ('' !== $rejectedPreamble) {

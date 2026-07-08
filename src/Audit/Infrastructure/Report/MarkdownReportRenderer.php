@@ -113,7 +113,7 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
      */
     private function escapeFences(string $text): string
     {
-        return str_replace(['`', '~', '#', '<', '>'], ['\\`', '\\~', '\\#', '&lt;', '&gt;'], $text);
+        return str_replace(['`', '~', '#', '<', '>'], ['\\`', '\\~', '\\#', '&lt;', '&gt;'], mb_scrub($text, 'UTF-8'));
     }
 
     /**
@@ -138,6 +138,7 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
      */
     private function inlineCode(string $text): string
     {
+        $text = mb_scrub($text, 'UTF-8');
         $delimiter = str_repeat('`', $this->longestBacktickRun($text) + 1);
         $padding = str_starts_with($text, '`') ? ' ' : '';
 
@@ -155,7 +156,7 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
     {
         return implode("\n", array_map(
             static fn (string $line): string => \sprintf('    %s', $line),
-            explode("\n", $text),
+            explode("\n", mb_scrub($text, 'UTF-8')),
         ));
     }
 }

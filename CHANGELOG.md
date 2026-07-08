@@ -3068,6 +3068,61 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   exceeding a leftover total. `reviewRecoveredFindings()` now reports
   `review.started` with the recovered findings' count before reviewing them,
   matching the normal flow.
+- **An attacker chunk cache entry could go stale — silently hiding a
+  vulnerability the next run would otherwise have caught — whenever the pre-scan
+  risk markers for an unchanged file changed, since the cache key never
+  accounted for them.** `ChunkContextFactory::create()`
+  (`src/Audit/Application/Agent/Chunk/ChunkContextFactory.php`) derived its
+  per-chunk `contextKey` only from the rejected/previous-findings preambles,
+  even though the rendered risk-marker block is injected into the same prompt
+  ahead of them. A custom `StaticPreScannerInterface` implementation (a
+  documented extension point) that starts flagging a file differently — or a
+  built-in ruleset change that a maintainer forgets to reflect in
+  `RegexStaticPreScanner::CACHE_VERSION` — left the chunk's cache key unchanged,
+  so a cached result computed without the new markers kept being served instead
+  of triggering a fresh LLM analysis. `deriveContextKey()` now folds the
+  rendered marker preamble into the key alongside the existing preambles, so any
+  change in a chunk's markers invalidates its cache entry.
+- **`Baseline::save()` could crash with a raw `JsonException` instead of the
+  documented `MalformedBaselineFileException` when a finding's title or other
+  free-text field contained invalid UTF-8** (plausible from an LLM echoing raw,
+  non-UTF-8 source content verbatim). `Baseline::save()`
+  (`src/Command/Baseline.php`) only caught `IOException` around its
+  `json_encode(..., JSON_THROW_ON_ERROR)` call, unlike its sibling `load()`,
+  which already catches both `JsonException` and `IOException` for the decode
+  direction. `save()` now also catches `JsonException` and wraps it via a new
+  `MalformedBaselineFileException::fromEncodingException()`
+  (`src/Command/Exception/MalformedBaselineFileException.php`).
+- **`audit:diff` could report the wrong entry index in a malformed-report error
+  message when a report's `vulnerabilities` value was a JSON object with
+  non-numeric keys instead of a JSON array.** `ReportDiffer::loadFindings()`
+  (`src/Command/ReportDiffer.php`) cast the iteration key directly to `int`
+  (`(int) $index`) to build the error's position — for a JSON object,
+  `(int) "alpha"` and `(int) "beta"` both cast to `0`, so every entry past the
+  first was misreported as "index 0" regardless of its real position.
+  `loadFindings()` now tracks a dedicated running counter instead of casting the
+  iteration key.
+- **`ConsoleReportRenderer` could emit non-UTF-8 output for a finding's title or
+  file path containing invalid UTF-8 bytes**, unlike its `description`,
+  `attackVector`, `proof`, and `remediation` fields, which were already
+  scrubbed. `sanitizeSingleLineField()`
+  (`src/Audit/Infrastructure/Report/ConsoleReportRenderer.php`), used only for
+  `title` and `filePath`, never called `mb_scrub()` — it now does, matching the
+  multi-line fields' existing handling.
+- **`MarkdownReportRenderer` performed no UTF-8 scrubbing at all**, unlike every
+  other report renderer, so a finding with an invalid UTF-8 byte in its title,
+  description, attack vector, remediation, proof, or file path produced a
+  non-UTF-8 Markdown report. `escapeFences()`, `inlineCode()`, and `codeBlock()`
+  (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) now each run
+  their input through `mb_scrub($text, 'UTF-8')` before further processing.
+- **`AuditCost::of()` accepted a positive-infinity `estimatedCostUsd`, which
+  later crashed JSON and SARIF report generation** (`json_encode()` cannot
+  represent `INF`/`NaN`) instead of failing validation up front with a clear
+  domain exception. `AuditCost::of()` (`src/Audit/Domain/Model/AuditCost.php`)
+  only rejected `NaN` and negative values
+  (`is_nan($estimatedCostUsd) || $estimatedCostUsd < 0.0`) — `INF` is neither,
+  so it passed through unchanged. The guard now uses
+  `!is_finite($estimatedCostUsd)`, rejecting `INF` and `-INF` alongside `NaN`.
 
 ### Security
 

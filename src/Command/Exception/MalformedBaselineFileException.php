@@ -29,6 +29,11 @@ final class MalformedBaselineFileException extends RuntimeException
         return new self(\sprintf('Baseline file "%s" is not valid JSON: %s', $path, $throwable->getMessage()), previous: $throwable);
     }
 
+    public static function fromEncodingException(string $path, Throwable $throwable): self
+    {
+        return new self(\sprintf('Baseline file "%s" could not be encoded as JSON: %s', $path, $throwable->getMessage()), previous: $throwable);
+    }
+
     public static function fromIOException(string $path, Throwable $throwable): self
     {
         return new self(\sprintf('Baseline file "%s" could not be read or written: %s', $path, $throwable->getMessage()), previous: $throwable);

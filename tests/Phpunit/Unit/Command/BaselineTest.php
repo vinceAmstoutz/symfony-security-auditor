@@ -224,6 +224,18 @@ final class BaselineTest extends TestCase
     }
 
     /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_save_wraps_an_encoding_failure_as_a_malformed_baseline_file_exception(): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+
+        $this->expectException(MalformedBaselineFileException::class);
+
+        (new Baseline($this->filesystem))->save($path, [[...$this->entry('SSA-AAA'), 'title' => "Bad\xFFTitle"]]);
+    }
+
+    /**
      * @return array<string, string>
      */
     private function entry(string $fingerprint): array

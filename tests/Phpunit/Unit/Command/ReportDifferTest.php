@@ -274,6 +274,25 @@ final class ReportDifferTest extends TestCase
     }
 
     /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_reports_the_actual_position_of_a_bad_entry_when_vulnerabilities_is_a_json_object_with_non_numeric_keys(): void
+    {
+        $previous = $this->tmpDir.'/object-entries.json';
+        $this->filesystem->dumpFile(
+            $previous,
+            '{"vulnerabilities": {"alpha": {"type": "sql_injection", "file": "src/Foo.php", "title": "SQL Injection", "severity": "high"}, "beta": 42}}',
+        );
+        $current = $this->writeReport('current.json', []);
+
+        $this->expectException(MalformedReportFileException::class);
+        $this->expectExceptionMessage('has a vulnerability entry at index 1 that is not a JSON object');
+
+        (new ReportDiffer($this->filesystem))->diff($previous, $current);
+    }
+
+    /**
      * @param array<string, string> $vulnerability
      *
      * @throws ReportFileNotReadableException

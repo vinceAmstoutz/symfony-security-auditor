@@ -58,12 +58,14 @@ final readonly class ReportDiffer implements ReportDifferInterface
     private function loadFindings(string $path): array
     {
         $findings = [];
-        foreach ($this->decodeVulnerabilities($path) as $index => $vulnerability) {
+        $index = 0;
+        foreach ($this->decodeVulnerabilities($path) as $vulnerability) {
             if (!\is_array($vulnerability)) {
-                throw MalformedReportFileException::vulnerabilityEntryNotAnObject($path, (int) $index);
+                throw MalformedReportFileException::vulnerabilityEntryNotAnObject($path, $index);
             }
 
-            $findings[] = $this->toDiffFinding($vulnerability, $path, (int) $index);
+            $findings[] = $this->toDiffFinding($vulnerability, $path, $index);
+            ++$index;
         }
 
         return $findings;

@@ -2128,9 +2128,9 @@ final class AttackerAgentTest extends TestCase
      */
     public function test_chunks_with_markers_still_consult_cache(): void
     {
-        $cache = self::createMock(AttackerCacheInterface::class);
-        $cache->expects(self::once())->method('get')->willReturn(null);
-        $cache->expects(self::once())->method('store');
+        $cache = self::createMock(ContextAwareAttackerCacheInterface::class);
+        $cache->expects(self::once())->method('getForContext')->willReturn(null);
+        $cache->expects(self::once())->method('storeForContext');
 
         $scanner = new class implements StaticPreScannerInterface {
             /**
@@ -3606,7 +3606,7 @@ final class AttackerAgentTest extends TestCase
         $attackerContextPromptRenderer = new AttackerContextPromptRenderer();
         $expectedKey = hash(
             'sha256',
-            hash('sha256', $attackerContextPromptRenderer->renderRejectedFindings([$rejectedFinding])).hash('sha256', $attackerContextPromptRenderer->renderPreviousFindings([$vulnerability])),
+            hash('sha256', '').hash('sha256', $attackerContextPromptRenderer->renderRejectedFindings([$rejectedFinding])).hash('sha256', $attackerContextPromptRenderer->renderPreviousFindings([$vulnerability])),
         );
         self::assertSame([$expectedKey], $contextKeys);
     }

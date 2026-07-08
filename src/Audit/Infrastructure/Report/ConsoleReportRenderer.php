@@ -145,6 +145,6 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
      */
     private function sanitizeSingleLineField(string $text): string
     {
-        return $this->sanitizeControlCharacters(str_replace(["\r\n", "\n", "\r"], ' ', $text));
+        return $this->sanitizeControlCharacters(str_replace(["\r\n", "\n", "\r"], ' ', mb_scrub($text, 'UTF-8')));
     }
 }
