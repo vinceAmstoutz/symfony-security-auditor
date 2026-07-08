@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
 final class BaselineTest extends TestCase
 {
@@ -49,6 +50,7 @@ final class BaselineTest extends TestCase
 
     /**
      * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
      */
     public function test_save_then_load_round_trips_the_fingerprints(): void
     {
@@ -65,6 +67,7 @@ final class BaselineTest extends TestCase
 
     /**
      * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
      */
     public function test_load_also_accepts_the_attacker_fingerprint_of_a_type_corrected_entry(): void
     {
@@ -81,6 +84,7 @@ final class BaselineTest extends TestCase
 
     /**
      * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
      */
     public function test_save_writes_pretty_printed_json(): void
     {
@@ -212,6 +216,7 @@ final class BaselineTest extends TestCase
 
     /**
      * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
      */
     public function test_save_wraps_an_io_failure_as_a_malformed_baseline_file_exception(): void
     {
@@ -225,6 +230,7 @@ final class BaselineTest extends TestCase
 
     /**
      * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
      */
     public function test_save_wraps_an_encoding_failure_as_a_malformed_baseline_file_exception(): void
     {
@@ -233,6 +239,48 @@ final class BaselineTest extends TestCase
         $this->expectException(MalformedBaselineFileException::class);
 
         (new Baseline($this->filesystem))->save($path, [[...$this->entry('SSA-AAA'), 'title' => "Bad\xFFTitle"]]);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
+     */
+    public function test_save_refuses_to_write_through_a_symlinked_baseline_file(): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+        $outsideTarget = sys_get_temp_dir().'/baseline_symlink_target_'.uniqid('', true);
+        $this->filesystem->dumpFile($outsideTarget, 'ORIGINAL');
+        symlink($outsideTarget, $path);
+
+        try {
+            $this->expectException(UnsafeBaselineWriteException::class);
+
+            (new Baseline($this->filesystem))->save($path, [$this->entry('SSA-AAA')]);
+        } finally {
+            self::assertSame('ORIGINAL', file_get_contents($outsideTarget));
+            $this->filesystem->remove($outsideTarget);
+        }
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
+     */
+    public function test_save_refuses_to_write_through_a_symlinked_parent_directory(): void
+    {
+        $outsideDir = sys_get_temp_dir().'/baseline_symlink_dir_'.uniqid('', true);
+        $this->filesystem->mkdir($outsideDir);
+        $nestedDir = $this->tmpDir.'/nested';
+        symlink($outsideDir, $nestedDir);
+
+        try {
+            $this->expectException(UnsafeBaselineWriteException::class);
+
+            (new Baseline($this->filesystem))->save($nestedDir.'/baseline.json', [$this->entry('SSA-AAA')]);
+        } finally {
+            self::assertSame([], glob($outsideDir.'/*'));
+            $this->filesystem->remove($outsideDir);
+        }
     }
 
     /**

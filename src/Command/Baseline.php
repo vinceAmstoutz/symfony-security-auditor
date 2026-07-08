@@ -18,6 +18,7 @@ use Override;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
 /**
  * Reads and writes the JSON baseline file of accepted-finding fingerprints.
@@ -77,10 +78,13 @@ final readonly class Baseline implements BaselineInterface
 
     /**
      * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
      */
     #[Override]
     public function save(string $path, array $entries): void
     {
+        $this->assertSafeToWrite($path);
+
         try {
             $this->filesystem->dumpFile(
                 $path,
@@ -90,6 +94,24 @@ final readonly class Baseline implements BaselineInterface
             throw MalformedBaselineFileException::fromEncodingException($path, $jsonException);
         } catch (IOException $ioException) {
             throw MalformedBaselineFileException::fromIOException($path, $ioException);
+        }
+    }
+
+    /**
+     * `Filesystem::dumpFile()` transparently writes through a pre-existing
+     * symlink at its destination — a predictable, documented baseline path
+     * (e.g. `.security-baseline.json`) committed as a symlink by a malicious
+     * PR would let the audit overwrite an arbitrary file the CI runner can
+     * reach. Mirrors the guard already applied to the filesystem
+     * attacker/reviewer/advisory caches, the standalone config writer, and
+     * the report writer.
+     *
+     * @throws UnsafeBaselineWriteException
+     */
+    private function assertSafeToWrite(string $path): void
+    {
+        if (is_link($path) || is_link(\dirname($path))) {
+            throw UnsafeBaselineWriteException::forSymlinkedPath($path);
         }
     }
 

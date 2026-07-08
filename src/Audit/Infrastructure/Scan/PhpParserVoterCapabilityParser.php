@@ -46,6 +46,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParser
  */
 final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityParserInterface
 {
+    public function __construct(
+        private ThisCallReachability $thisCallReachability = new ThisCallReachability(),
+    ) {}
+
     #[Override]
     public function parse(ProjectFile $projectFile): ?VoterCapability
     {
@@ -73,10 +77,11 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
 
         [$class, $supportsMethod] = $voter;
 
-        $body = $supportsMethod->stmts;
-        if (null === $body) {
+        if (null === $supportsMethod->stmts) {
             return null;
         }
+
+        $body = $this->thisCallReachability->reachableBody($supportsMethod, $this->methodsByName($class));
 
         $attributes = $this->mergeUnique(
             $this->collectStringLiterals($body, $nodeFinder),
@@ -126,6 +131,19 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
         }
 
         return null;
+    }
+
+    /**
+     * @return array<string, ClassMethod>
+     */
+    private function methodsByName(Class_ $class): array
+    {
+        $methodsByName = [];
+        foreach ($class->getMethods() as $classMethod) {
+            $methodsByName[$classMethod->name->toString()] = $classMethod;
+        }
+
+        return $methodsByName;
     }
 
     /**

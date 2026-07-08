@@ -44,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
@@ -102,6 +103,7 @@ final class AuditCommandBudgetAbortReportFilteringTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws MalformedBaselineFileException
      * @throws InvalidVulnerabilityNarrativeException
+     * @throws UnsafeBaselineWriteException
      */
     public function test_partial_report_on_budget_abort_drops_a_baselined_finding(): void
     {
@@ -129,6 +131,7 @@ final class AuditCommandBudgetAbortReportFilteringTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws MalformedBaselineFileException
      * @throws InvalidVulnerabilityNarrativeException
+     * @throws UnsafeBaselineWriteException
      */
     public function test_partial_report_on_budget_abort_renders_a_baselined_finding_as_suppressed_in_sarif(): void
     {

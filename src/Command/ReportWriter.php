@@ -20,6 +20,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BaselineSuppressingReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
@@ -45,6 +46,7 @@ final readonly class ReportWriter implements ReportWriterInterface
      * @param list<string> $baselinedFingerprints
      *
      * @throws UnsupportedOutputFormatException
+     * @throws UnsafeReportWriteException
      */
     #[Override]
     public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle, array $baselinedFingerprints = []): void
@@ -60,8 +62,26 @@ final readonly class ReportWriter implements ReportWriterInterface
             return;
         }
 
+        $this->assertSafeToWrite($outputFile);
         $this->filesystem->dumpFile($outputFile, $content);
         $symfonyStyle->success(\sprintf('Report saved to %s', $outputFile));
+    }
+
+    /**
+     * `Filesystem::dumpFile()` transparently writes through a pre-existing
+     * symlink at its destination — a predictable, documented `--output` path
+     * (e.g. `report.sarif`, `gl-sast-report.sarif`) committed as a symlink by
+     * a malicious PR would let the audit overwrite an arbitrary file the CI
+     * runner can reach. Mirrors the guard already applied to the filesystem
+     * attacker/reviewer/advisory caches and the standalone config writer.
+     *
+     * @throws UnsafeReportWriteException
+     */
+    private function assertSafeToWrite(string $path): void
+    {
+        if (is_link($path) || is_link(\dirname($path))) {
+            throw UnsafeReportWriteException::forSymlinkedPath($path);
+        }
     }
 
     /**

@@ -201,6 +201,61 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_extracts_attributes_checked_inside_a_private_helper_called_from_supports(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            use App\Entity\Post;
+            final class PostVoter {
+                public function supports(string $attribute, mixed $subject): bool {
+                    return $this->isSupportedAttribute($attribute) && $subject instanceof Post;
+                }
+                private function isSupportedAttribute(string $attribute): bool {
+                    return in_array($attribute, ['EDIT', 'DELETE'], true);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['EDIT', 'DELETE'], $voterCapability->supportedAttributes());
+        self::assertSame(['App\\Entity\\Post'], $voterCapability->supportedSubjects());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_does_not_infinitely_recurse_when_private_helpers_call_each_other_in_a_cycle(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class PostVoter {
+                public function supports(string $attribute, mixed $subject): bool {
+                    return $this->helperOne($attribute);
+                }
+                private function helperOne(string $attribute): bool {
+                    return $this->helperTwo($attribute);
+                }
+                private function helperTwo(string $attribute): bool {
+                    return $this->helperOne($attribute);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame([], $voterCapability->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_finds_the_voter_class_when_it_is_not_the_first_class_declared_in_the_file(): void
     {
         $source = <<<'PHP'

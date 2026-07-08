@@ -37,6 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
@@ -74,6 +75,7 @@ final class ReportWriterTest extends TestCase
     /**
      * @throws UnsupportedOutputFormatException
      * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
      */
     public function test_writing_to_file_announces_save_path_via_success_message(): void
     {
@@ -92,6 +94,7 @@ final class ReportWriterTest extends TestCase
     /**
      * @throws UnsupportedOutputFormatException
      * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
      */
     public function test_writing_to_file_persists_content_to_disk(): void
     {
@@ -109,6 +112,7 @@ final class ReportWriterTest extends TestCase
     /**
      * @throws UnsupportedOutputFormatException
      * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
      */
     public function test_writing_without_file_streams_content_to_console(): void
     {
@@ -128,6 +132,7 @@ final class ReportWriterTest extends TestCase
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
+     * @throws UnsafeReportWriteException
      */
     public function test_console_output_renders_finding_text_literally_instead_of_as_console_markup(): void
     {
@@ -150,6 +155,7 @@ final class ReportWriterTest extends TestCase
     /**
      * @throws UnsupportedOutputFormatException
      * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
      */
     public function test_writing_html_format_streams_an_html_document(): void
     {
@@ -166,6 +172,7 @@ final class ReportWriterTest extends TestCase
     /**
      * @throws UnsupportedOutputFormatException
      * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
      */
     public function test_writing_junit_format_streams_a_junit_xml_document(): void
     {
@@ -182,6 +189,7 @@ final class ReportWriterTest extends TestCase
     /**
      * @throws UnsupportedOutputFormatException
      * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
      */
     public function test_writing_to_file_creates_missing_parent_directories(): void
     {
@@ -196,6 +204,7 @@ final class ReportWriterTest extends TestCase
     /**
      * @throws UnsupportedOutputFormatException
      * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
      */
     public function test_writing_a_format_without_a_registered_renderer_throws(): void
     {
@@ -214,6 +223,7 @@ final class ReportWriterTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
+     * @throws UnsafeReportWriteException
      */
     public function test_writing_sarif_format_with_baselined_fingerprints_marks_the_matching_result_as_suppressed(): void
     {
@@ -238,6 +248,52 @@ final class ReportWriterTest extends TestCase
             [['kind' => 'external', 'justification' => 'Accepted via audit baseline']],
             $firstResult['suppressions'] ?? null,
         );
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     */
+    public function test_writing_refuses_to_write_through_a_symlinked_output_file(): void
+    {
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), new BufferedOutput());
+        $outputFile = $this->tmpDir.'/report.json';
+        $outsideTarget = sys_get_temp_dir().'/report_writer_symlink_target_'.uniqid('', true);
+        $this->filesystem->dumpFile($outsideTarget, 'ORIGINAL');
+        symlink($outsideTarget, $outputFile);
+
+        try {
+            $this->expectException(UnsafeReportWriteException::class);
+
+            $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $outputFile, $symfonyStyle);
+        } finally {
+            self::assertSame('ORIGINAL', file_get_contents($outsideTarget));
+            $this->filesystem->remove($outsideTarget);
+        }
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     */
+    public function test_writing_refuses_to_write_through_a_symlinked_parent_directory(): void
+    {
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), new BufferedOutput());
+        $outsideDir = sys_get_temp_dir().'/report_writer_symlink_dir_'.uniqid('', true);
+        $this->filesystem->mkdir($outsideDir);
+        $nestedDir = $this->tmpDir.'/nested';
+        symlink($outsideDir, $nestedDir);
+
+        try {
+            $this->expectException(UnsafeReportWriteException::class);
+
+            $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $nestedDir.'/report.json', $symfonyStyle);
+        } finally {
+            self::assertSame([], glob($outsideDir.'/*'));
+            $this->filesystem->remove($outsideDir);
+        }
     }
 
     /**

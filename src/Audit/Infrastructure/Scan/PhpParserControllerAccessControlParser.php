@@ -54,6 +54,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     public function __construct(
         private RouteAttributeParser $routeAttributeParser = new RouteAttributeParser(),
         private NodeFinder $nodeFinder = new NodeFinder(),
+        private ThisCallReachability $thisCallReachability = new ThisCallReachability(),
     ) {}
 
     #[Override]
@@ -107,6 +108,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         $classHasIsGranted = $this->hasIsGrantedAttribute($class->attrGroups);
         $classConstants = $this->classConstantStrings($class);
         $classRouteData = $this->routeAttributeParser->extract($class->attrGroups, $classConstants)[0];
+        $methodsByName = $this->methodsByName($class);
 
         $entries = [];
         foreach ($class->getMethods() as $classMethod) {
@@ -114,12 +116,30 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
                 continue;
             }
 
-            foreach ($this->buildEntries($filePath, $classMethod, $classHasIsGranted, $classRouteData, $classConstants) as $entry) {
+            $accessFlags = [
+                'classHasIsGranted' => $classHasIsGranted,
+                'methodHasDenyAccess' => $this->methodInvokesDenyAccess($classMethod, $methodsByName),
+            ];
+
+            foreach ($this->buildEntries($filePath, $classMethod, $accessFlags, $classRouteData, $classConstants) as $entry) {
                 $entries[] = $entry;
             }
         }
 
         return $entries;
+    }
+
+    /**
+     * @return array<string, ClassMethod>
+     */
+    private function methodsByName(Class_ $class): array
+    {
+        $methodsByName = [];
+        foreach ($class->getMethods() as $classMethod) {
+            $methodsByName[$classMethod->name->toString()] = $classMethod;
+        }
+
+        return $methodsByName;
     }
 
     /**
@@ -155,15 +175,15 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
      * route name must be matched against the same joined values, not the
      * method's own attribute in isolation.
      *
+     * @param array{classHasIsGranted: bool, methodHasDenyAccess: bool}                 $accessFlags
      * @param array{present: bool, path: ?string, methods: list<string>, name: ?string} $classRouteData
      * @param array<string, string>                                                     $classConstants
      *
      * @return list<RouteAccessControl>
      */
-    private function buildEntries(string $filePath, ClassMethod $classMethod, bool $classHasIsGranted, array $classRouteData, array $classConstants): array
+    private function buildEntries(string $filePath, ClassMethod $classMethod, array $accessFlags, array $classRouteData, array $classConstants): array
     {
         $methodLevelIsGranted = $this->extractIsGrantedValues($classMethod->attrGroups);
-        $methodHasDenyAccess = $this->methodInvokesDenyAccess($classMethod);
 
         $entries = [];
         foreach ($this->routeAttributeParser->extract($classMethod->attrGroups, $classConstants) as $routeData) {
@@ -174,8 +194,8 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
                 routeMethods: $routeData['methods'],
                 hasRouteAttribute: $routeData['present'],
                 methodLevelIsGranted: $methodLevelIsGranted,
-                methodHasDenyAccess: $methodHasDenyAccess,
-                classHasIsGranted: $classHasIsGranted,
+                methodHasDenyAccess: $accessFlags['methodHasDenyAccess'],
+                classHasIsGranted: $accessFlags['classHasIsGranted'],
                 routeName: $this->prefixedRouteName($classRouteData['name'], $routeData['name']),
             );
         }
@@ -297,23 +317,38 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         return [] !== $this->extractIsGrantedValues($attributeGroups);
     }
 
-    private function methodInvokesDenyAccess(ClassMethod $classMethod): bool
+    /**
+     * A `denyAccessUnlessGranted()` call moved behind a shared private/protected
+     * helper (a common refactor for a repeated check) would otherwise be
+     * invisible, since the action method's own body only calls the helper,
+     * never `denyAccessUnlessGranted()` directly.
+     *
+     * @param array<string, ClassMethod> $methodsByName
+     */
+    private function methodInvokesDenyAccess(ClassMethod $classMethod, array $methodsByName): bool
     {
+        $body = $this->thisCallReachability->reachableBody($classMethod, $methodsByName);
         $methodCalls = [
-            ...$this->nodeFinder->findInstanceOf($classMethod->stmts ?? [], MethodCall::class),
-            ...$this->nodeFinder->findInstanceOf($classMethod->stmts ?? [], NullsafeMethodCall::class),
+            ...$this->nodeFinder->findInstanceOf($body, MethodCall::class),
+            ...$this->nodeFinder->findInstanceOf($body, NullsafeMethodCall::class),
         ];
-        foreach ($methodCalls as $methodCall) {
-            if ($methodCall->isFirstClassCallable()) {
-                continue;
-            }
 
-            if ($methodCall->name instanceof Identifier && 'denyAccessUnlessGranted' === $methodCall->name->toString()) {
+        foreach ($methodCalls as $methodCall) {
+            if ($this->isDenyAccessCall($methodCall)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function isDenyAccessCall(MethodCall|NullsafeMethodCall $methodCall): bool
+    {
+        if ($methodCall->isFirstClassCallable()) {
+            return false;
+        }
+
+        return $methodCall->name instanceof Identifier && 'denyAccessUnlessGranted' === $methodCall->name->toString();
     }
 
     private function attributeShortNameMatches(string $fullyQualifiedName, string $expectedShortName): bool

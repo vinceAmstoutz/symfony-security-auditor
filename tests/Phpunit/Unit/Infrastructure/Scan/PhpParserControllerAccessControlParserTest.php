@@ -448,6 +448,62 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_attributes_a_deny_access_call_inside_a_private_helper_to_the_public_action_that_reaches_it(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/users/{id}/edit')]
+                public function edit(int $id): void {
+                    $this->authorize('EDIT', $id);
+                }
+                private function authorize(string $attribute, int $id): void {
+                    $this->denyAccessUnlessGranted($attribute, $id);
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertTrue($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->hasAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_does_not_infinitely_recurse_when_private_helpers_call_each_other_in_a_cycle(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/dashboard')]
+                public function dashboard(): void {
+                    $this->helperOne();
+                }
+                private function helperOne(): void {
+                    $this->helperTwo();
+                }
+                private function helperTwo(): void {
+                    $this->helperOne();
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertFalse($entries[0]->methodHasDenyAccess());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_emits_one_entry_per_public_method(): void
     {
         $source = <<<'PHP'

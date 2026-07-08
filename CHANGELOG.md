@@ -3302,6 +3302,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   stamps the cache file's mtime from `$this->clock->now()` instead of leaving it
   to the OS, so the later expiry comparison always subtracts two readings of the
   same clock.
+- **Every controller action guarded by `denyAccessUnlessGranted()` reached
+  through a shared private/protected helper — instead of calling it directly —
+  was misreported as `LACKS_ACCESS_CHECK` in the attacker prompt's Route
+  Access-Control Map**, a false-positive `broken_access_control` candidate for
+  an action that is actually protected.
+  `PhpParserControllerAccessControlParser ::methodInvokesDenyAccess()`
+  (`src/Audit/Infrastructure/Scan/PhpParserControllerAccessControlParser.php`)
+  only scanned the action method's own body — the exact same private-helper
+  blindness already fixed for `PhpParserFormBindingParser` in a previous round,
+  unfixed here. `methodInvokesDenyAccess()` now follows `$this->helper()` calls
+  into methods declared on the same class via a new, shared
+  `ThisCallReachability` collaborator
+  (`src/Audit/Infrastructure/Scan/ThisCallReachability.php`), with cycle
+  protection for mutually-calling helpers.
+- **A voter's attribute/subject check delegated to a shared private helper
+  method from `supports()`/`vote()` was invisible to the "Voter Coverage"
+  section of the attacker prompt**, making a fully-implemented voter look like
+  it covers no attributes at all — a false "no voter handles this attribute"
+  signal. `PhpParserVoterCapabilityParser::parse()`
+  (`src/Audit/Infrastructure/Scan/PhpParserVoterCapabilityParser.php`) only
+  scanned `supports()`/`vote()`'s own body for string literals, constant
+  fetches, and `instanceof` checks. It now also uses `ThisCallReachability` to
+  fold in every method transitively reachable through a `$this->helper()` call.
 
 ### Security
 
@@ -3575,6 +3598,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   detection is gated on the current process's own `DIRECTORY_SEPARATOR` rather
   than the path's own shape, which would wrongly reject a genuine absolute
   `%APPDATA%`-derived path when running on a non-Windows CI runner.
+- **A pre-planted symlink at a report's `--output` path, or at a baseline's
+  `--generate-baseline`/`audit.baseline` path, let a routine `audit:run`
+  overwrite an arbitrary file the CI runner can reach (CWE-59)** — the same
+  class of vulnerability already fixed for the filesystem attacker/reviewer
+  caches, the advisory cache, and the standalone config writer, but missed on
+  these two paths since neither is hash-derived and both are typically fixed,
+  documented CI filenames (e.g. `report.sarif`, `.security-baseline.json`) a
+  malicious PR can commit a symlink at directly. `ReportWriter::write()`
+  (`src/Command/ReportWriter.php`) and `Baseline::save()`
+  (`src/Command/Baseline.php`) now refuse to write when the target path or its
+  parent directory is a symlink, via new
+  `UnsafeReportWriteException::forSymlinkedPath()`
+  (`src/Command/Exception/UnsafeReportWriteException.php`) and
+  `UnsafeBaselineWriteException::forSymlinkedPath()`
+  (`src/Command/Exception/UnsafeBaselineWriteException.php`).
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 
