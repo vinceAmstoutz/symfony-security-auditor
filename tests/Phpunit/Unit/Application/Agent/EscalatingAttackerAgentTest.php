@@ -237,6 +237,38 @@ final class EscalatingAttackerAgentTest extends TestCase
     }
 
     /**
+     * `Vulnerability::filePath()` is free text echoed back by the LLM — the
+     * schema only constrains it to a non-blank string, so a cheap-model
+     * quirk like a leading `./` (a plausible path-normalization artifact) is
+     * never enforced to exactly match `ProjectFile::relativePath()`. Without
+     * normalizing both sides before comparing, the file with a real cheap
+     * finding is silently excluded from the expensive pass — the escalation
+     * feature quietly no-ops for it, indistinguishable from "nothing needed
+     * escalating".
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_escalates_a_file_whose_cheap_finding_path_has_a_leading_dot_slash(): void
+    {
+        $vulnerability = $this->makeVulnerability('./src/Controller/A.php');
+        $recordingAttackerAgent = $this->makeRecordingAttacker([$vulnerability]);
+        $expensive = $this->makeRecordingAttacker([]);
+
+        $this->callAnalyze(
+            new EscalatingAttackerAgent($recordingAttackerAgent, $expensive, new NullLogger()),
+            [$this->makeFile('src/Controller/A.php')],
+            SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
+            new NullCoverageRecorder(),
+        );
+
+        self::assertCount(1, $expensive->lastFiles);
+        self::assertSame('src/Controller/A.php', $expensive->lastFiles[0]->relativePath());
+    }
+
+    /**
      * @throws InvalidProjectFileException
      */
     public function test_it_logs_when_cheap_pass_finds_nothing(): void

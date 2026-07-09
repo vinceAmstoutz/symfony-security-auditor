@@ -370,6 +370,58 @@ final class FilesystemAttackerCacheTest extends TestCase
     }
 
     /**
+     * A cache path is derived entirely from a project file's own path/content
+     * (attacker-visible), so a malicious contributor can pre-plant a symlink
+     * at the exact path this cache will ever read from — with no `store()`
+     * ever called — turning a routine cached-run into an arbitrary-file read
+     * whose content is trusted as a real, previously-computed finding.
+     *
+     * @throws InvalidProjectFileException
+     */
+    public function test_get_refuses_to_read_through_a_symlinked_cache_file(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
+        $expectedKey = hash('sha256', $expectedSignature);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
+
+        $plantedTarget = sys_get_temp_dir().'/attacker_cache_symlink_read_target_'.uniqid('', true);
+        file_put_contents($plantedTarget, json_encode([['type' => 'PLANTED-BY-SYMLINK']]));
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($plantedTarget, $expectedPath);
+
+        try {
+            self::assertNull($this->filesystemAttackerCache->get([$projectFile]));
+        } finally {
+            unlink($plantedTarget);
+        }
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_get_refuses_to_read_through_a_symlinked_shard_directory(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
+        $expectedKey = hash('sha256', $expectedSignature);
+        $shardDir = \sprintf('%s/%s', $this->cacheDir, substr($expectedKey, 0, 2));
+
+        $outsideDir = sys_get_temp_dir().'/attacker_cache_symlink_read_dir_'.uniqid('', true);
+        mkdir($outsideDir);
+        file_put_contents(\sprintf('%s/%s.json', $outsideDir, $expectedKey), json_encode([['type' => 'PLANTED-BY-SYMLINK']]));
+        mkdir($this->cacheDir, recursive: true);
+        symlink($outsideDir, $shardDir);
+
+        try {
+            self::assertNull($this->filesystemAttackerCache->get([$projectFile]));
+        } finally {
+            $filesystem = new Filesystem();
+            $filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
      * @throws InvalidProjectFileException
      */
     public function test_store_creates_nested_shard_directory_from_key_prefix(): void

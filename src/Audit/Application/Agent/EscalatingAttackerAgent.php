@@ -85,6 +85,13 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
     }
 
     /**
+     * `Vulnerability::filePath()` is free text echoed back by the LLM — the
+     * `record_vulnerability` schema only constrains it to a non-blank
+     * string, with no cross-check against the chunk's real file list. A
+     * cheap-model quirk like a leading `./` must not make a real cheap
+     * finding's file silently excluded from the expensive pass, so both
+     * sides are normalized before comparing.
+     *
      * @param ProjectFile[]   $files
      * @param Vulnerability[] $cheapFindings
      *
@@ -93,14 +100,19 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
     private function filterToHotFiles(array $files, array $cheapFindings): array
     {
         $hotPaths = array_map(
-            static fn (Vulnerability $vulnerability): string => $vulnerability->filePath(),
+            static fn (Vulnerability $vulnerability): string => self::normalizePath($vulnerability->filePath()),
             $cheapFindings,
         );
 
         return array_values(array_filter(
             $files,
-            static fn (ProjectFile $projectFile): bool => \in_array($projectFile->relativePath(), $hotPaths, true),
+            static fn (ProjectFile $projectFile): bool => \in_array(self::normalizePath($projectFile->relativePath()), $hotPaths, true),
         ));
+    }
+
+    private static function normalizePath(string $path): string
+    {
+        return str_starts_with($path, './') ? substr($path, 2) : $path;
     }
 
     /**

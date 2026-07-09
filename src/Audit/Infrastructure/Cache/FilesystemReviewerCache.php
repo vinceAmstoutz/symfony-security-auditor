@@ -70,6 +70,12 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
                 return null;
             }
 
+            if ($this->isSymlinkedPath($path)) {
+                $this->logger->warning('Reviewer cache entry path was a symlink, ignoring', ['path' => $path]);
+
+                return null;
+            }
+
             $decoded = json_decode($this->filesystem->readFile($path), true, flags: \JSON_THROW_ON_ERROR);
             if (!\is_array($decoded)) {
                 return null;
@@ -121,9 +127,21 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
      */
     private function assertSafeToWrite(string $path): void
     {
-        if (is_link($path) || is_link(\dirname($path))) {
+        if ($this->isSymlinkedPath($path)) {
             throw UnsafeCacheWriteException::forSymlinkedPath($path);
         }
+    }
+
+    /**
+     * Mirrors {@see self::assertSafeToWrite()}'s check for the read side —
+     * `Filesystem::readFile()` also transparently follows a symlink, so the
+     * same pre-planted symlink that would otherwise corrupt a write turns an
+     * ordinary cache read into an arbitrary-file read whose content is
+     * trusted as a real, previously-computed verdict.
+     */
+    private function isSymlinkedPath(string $path): bool
+    {
+        return is_link($path) || is_link(\dirname($path));
     }
 
     /**

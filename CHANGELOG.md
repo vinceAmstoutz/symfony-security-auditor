@@ -3736,6 +3736,32 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   with a new `ConflictingCommandOptionsException`
   (`src/Command/Exception/ConflictingCommandOptionsException.php`) instead of
   silently doing nothing.
+- **`CharacterRatioCounter::estimate()` counted characters, not bytes, so emoji-
+  and CJK-heavy content had its token count wildly under-estimated** — BPE
+  tokenizers operate on UTF-8 bytes, and `charsPerToken` ratios only hold when a
+  character is roughly one byte, true for ASCII/Latin scripts but false for CJK
+  (2-3 bytes/char) and emoji (up to 4 bytes/char); a 550-character emoji-only
+  string estimated at 16 tokens by character count is closer to 58 by byte
+  count, and real BPE tokenizers put it in the hundreds. This doesn't only
+  affect `--dry-run`'s displayed estimate — the same estimator feeds
+  `TokenBucketRateLimiter::acquire()`'s pre-call budget reservation, so a badly
+  under-estimated chunk could let the limiter admit a call that busts the
+  provider's real per-minute token cap, producing spurious 429s despite rate
+  limiting being configured. `CharacterRatioCounter::estimate()`
+  (`src/Audit/Infrastructure/LLM/TokenEstimator/CharacterRatioCounter.php`) now
+  divides by `strlen()` (UTF-8 byte count) instead of `mb_strlen()` (character
+  count) — a no-op for ASCII/Latin text, where the two already agree.
+- **`EscalatingAttackerAgent::filterToHotFiles()` silently excluded a file from
+  the expensive escalation pass whenever the cheap model's echoed `file_path`
+  didn't exactly string-match `ProjectFile::relativePath()`** —
+  `Vulnerability::filePath()` is free text echoed back by the LLM, with no
+  cross-check against the chunk's real file list, so a cheap-model quirk like a
+  leading `./` left the file with a real cheap finding never escalated to the
+  more capable model, with no warning — only an `info` log that reads as if
+  nothing needed escalating. `filterToHotFiles()`
+  (`src/Audit/Application/Agent/EscalatingAttackerAgent.php`) now strips a
+  leading `./` from both the cheap finding's path and the real file's path
+  before comparing.
 
 ### Security
 
@@ -4165,6 +4191,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   content was never redacted before being sent to the LLM. The pattern
   (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) now also
   matches `github_pat_\w{22,255}`.
+- **`FilesystemAttackerCache::getForContext()` and
+  `FilesystemReviewerCache::get()` transparently followed a symlink on read
+  (CWE-59)** — the write side of both classes was already hardened against
+  exactly this (`assertSafeToWrite()`, fixed in an earlier round), but the read
+  side was missed. A cache path is derived entirely from attacker-visible
+  content (a project file's own path/ content for the attacker cache, a
+  finding's own content for the reviewer cache), so a malicious contributor can
+  pre-plant a symlink at the exact path either cache will ever read from — with
+  no `store()` ever called, since the default cache directory lives inside the
+  audited project's own directory tree — turning a routine cached run into an
+  arbitrary-file read whose content is trusted as a real, previously-computed
+  finding or verdict. `getForContext()`
+  (`src/Audit/Infrastructure/Cache/FilesystemAttackerCache.php`) and `get()`
+  (`src/Audit/Infrastructure/Cache/FilesystemReviewerCache.php`) now both check
+  the same `is_link($path) || is_link(dirname($path))` condition
+  `assertSafeToWrite()` already uses, treating a detected symlink as a safe
+  cache miss (logged, not thrown) rather than reading through it.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

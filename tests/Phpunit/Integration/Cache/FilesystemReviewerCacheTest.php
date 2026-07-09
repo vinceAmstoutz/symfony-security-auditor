@@ -412,6 +412,67 @@ final class FilesystemReviewerCacheTest extends TestCase
     }
 
     /**
+     * A cache path is derived entirely from the finding's own content
+     * (attacker-influenced file paths/descriptions), so a malicious
+     * contributor can pre-plant a symlink at the exact path this cache will
+     * ever read from — with no `store()` ever called — turning a routine
+     * cached-run into an arbitrary-file read whose content is trusted as a
+     * real, previously-computed verdict.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_get_refuses_to_read_through_a_symlinked_cache_file(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $codeContext = '<?php echo 1;';
+        $finding = $vulnerability->toArray();
+        unset($finding['id'], $finding['detected_at']);
+        $expectedKey = hash('sha256', json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
+
+        $plantedTarget = sys_get_temp_dir().'/reviewer_cache_symlink_read_target_'.uniqid('', true);
+        file_put_contents($plantedTarget, json_encode(['accepted' => false]));
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($plantedTarget, $expectedPath);
+
+        try {
+            self::assertNull($this->filesystemReviewerCache->get($vulnerability, $codeContext));
+        } finally {
+            unlink($plantedTarget);
+        }
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_get_refuses_to_read_through_a_symlinked_shard_directory(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $codeContext = '<?php echo 1;';
+        $finding = $vulnerability->toArray();
+        unset($finding['id'], $finding['detected_at']);
+        $expectedKey = hash('sha256', json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext);
+        $shardDir = \sprintf('%s/%s', $this->cacheDir, substr($expectedKey, 0, 2));
+
+        $outsideDir = sys_get_temp_dir().'/reviewer_cache_symlink_read_dir_'.uniqid('', true);
+        mkdir($outsideDir);
+        file_put_contents(\sprintf('%s/%s.json', $outsideDir, $expectedKey), json_encode(['accepted' => false]));
+        mkdir($this->cacheDir, recursive: true);
+        symlink($outsideDir, $shardDir);
+
+        try {
+            self::assertNull($this->filesystemReviewerCache->get($vulnerability, $codeContext));
+        } finally {
+            $filesystem = new Filesystem();
+            $filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
      * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException

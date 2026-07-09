@@ -64,6 +64,12 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
             return null;
         }
 
+        if ($this->isSymlinkedPath($path)) {
+            $this->logger->warning('Attacker cache entry path was a symlink, ignoring', ['path' => $path]);
+
+            return null;
+        }
+
         try {
             $raw = $this->filesystem->readFile($path);
 
@@ -124,9 +130,21 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
      */
     private function assertSafeToWrite(string $path): void
     {
-        if (is_link($path) || is_link(\dirname($path))) {
+        if ($this->isSymlinkedPath($path)) {
             throw UnsafeCacheWriteException::forSymlinkedPath($path);
         }
+    }
+
+    /**
+     * Mirrors {@see self::assertSafeToWrite()}'s check for the read side —
+     * `Filesystem::readFile()` also transparently follows a symlink, so the
+     * same pre-planted symlink that would otherwise corrupt a write turns an
+     * ordinary cache read into an arbitrary-file read whose content is
+     * trusted as a real, previously-computed finding.
+     */
+    private function isSymlinkedPath(string $path): bool
+    {
+        return is_link($path) || is_link(\dirname($path));
     }
 
     /**
