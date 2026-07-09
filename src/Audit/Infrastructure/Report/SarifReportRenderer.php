@@ -95,7 +95,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
         $result = [
             'ruleId' => $vulnerability->type()->owaspReference(),
             'level' => $this->sarifLevel($vulnerability->severity()),
-            'message' => ['text' => $vulnerability->title()],
+            'message' => ['text' => $this->escapeEmbeddedLinkSyntax($vulnerability->title())],
             'partialFingerprints' => ['symfonySecurityAuditor/v1' => $vulnerability->fingerprint()],
             'locations' => [
                 [
@@ -115,6 +115,22 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
         }
 
         return $result;
+    }
+
+    /**
+     * The SARIF 2.1.0 spec lets a plain-text `message.text` field embed a
+     * CommonMark-style `[display text](target)` hyperlink, and mandates
+     * that every viewer — even one with no Markdown support — render it as
+     * a clickable link. `Vulnerability::title()` is free LLM-influenced
+     * text with no character restrictions, so an unescaped title lets a
+     * crafted finding forge a live link into a report a reviewer trusts.
+     * Escaping the backslash first, then the two characters that open the
+     * link syntax, neutralizes it the same way CommonMark's own
+     * backslash-escape mechanism does.
+     */
+    private function escapeEmbeddedLinkSyntax(string $title): string
+    {
+        return str_replace(['\\', '[', ']'], ['\\\\', '\\[', '\\]'], $title);
     }
 
     /**

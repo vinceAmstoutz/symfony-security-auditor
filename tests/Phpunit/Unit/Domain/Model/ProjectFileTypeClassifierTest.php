@@ -42,6 +42,9 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'voter by suffix' => ['src/Security/UserVoter.php', '<?php', ProjectFileType::VOTER];
         yield 'repository by directory' => ['src/Repository/UserRepository.php', '<?php', ProjectFileType::REPOSITORY];
         yield 'form by directory and suffix' => ['src/Form/UserType.php', '<?php', ProjectFileType::FORM];
+        yield 'voter by suffix wins over a colocated entity-directory path' => ['src/Entity/Post/PostVoter.php', "<?php\nclass PostVoter extends Voter {}", ProjectFileType::VOTER];
+        yield 'repository by suffix wins over a colocated entity-directory path' => ['src/Entity/PostRepository.php', "<?php\nclass PostRepository extends EntityRepository {}", ProjectFileType::REPOSITORY];
+        yield 'form by suffix wins over a colocated entity-directory path' => ['src/Entity/Form/PostType.php', "<?php\nclass PostType extends AbstractType {}", ProjectFileType::FORM];
         yield 'authenticator by suffix' => ['src/Security/LoginFormAuthenticator.php', '<?php', ProjectFileType::AUTHENTICATOR];
         yield 'messenger handler by suffix' => ['src/Messenger/SendInvoiceMessageHandler.php', '<?php', ProjectFileType::MESSENGER_HANDLER];
         yield 'messenger handler by attribute' => ['src/Handler/ProcessPaymentAction.php', "<?php\n#[AsMessageHandler]\nclass ProcessPaymentAction {}", ProjectFileType::MESSENGER_HANDLER];

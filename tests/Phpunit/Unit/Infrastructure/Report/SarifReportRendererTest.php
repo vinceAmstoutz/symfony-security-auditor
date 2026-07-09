@@ -370,6 +370,37 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
+     * The SARIF 2.1.0 spec lets a plain-text `message.text` field embed a
+     * CommonMark-style `[display text](target)` hyperlink, and mandates that
+     * every viewer — even one with no Markdown support — render it as a
+     * clickable link. `Vulnerability::title()` is free LLM-influenced text
+     * with no character restrictions, so an unescaped title lets a crafted
+     * finding forge a live link into a security report a reviewer is
+     * trusting to triage real vulnerabilities.
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_escapes_embedded_link_syntax_in_the_message_text(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Click [here](https://evil.example.com) for the PoC', 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+
+        $decoded = $this->decodeSarif($this->makeReport($vulnerability));
+
+        self::assertSame(
+            'Click \\[here\\](https://evil.example.com) for the PoC',
+            $decoded['runs'][0]['results'][0]['message']['text'],
+        );
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException

@@ -3762,6 +3762,34 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Application/Agent/EscalatingAttackerAgent.php`) now strips a
   leading `./` from both the cheap finding's path and the real file's path
   before comparing.
+- **`ProjectFileTypeClassifier` let a bare `/Entity/`-directory path check
+  override an unambiguous Voter/Repository/Form signature**, so a file colocated
+  in an `Entity/` bounded-context folder (e.g. `src/Entity/Post/PostVoter.php`
+  extending `Voter`) was classified as `ENTITY` instead of
+  `VOTER`/`REPOSITORY`/`FORM`. The misclassified file never reached
+  `ProjectFileInventory`'s `voters()`/`repositories()`/`forms()` buckets, so its
+  own authorization logic never got the dedicated voter-bypass-hunting attacker
+  skill, and it was invisible to the "Voter Coverage" prompt section — steering
+  the attacker toward a false-positive `missing_voter` finding for a route the
+  voter actually does cover. `classify()`
+  (`src/Audit/Domain/Model/ProjectFileTypeClassifier.php`) now checks the
+  content-aware Voter/Repository/Form arms before the bare-path Entity check,
+  mirroring the existing Controller-vs-ApiResource/LiveComponent ordering.
+- **`ModelsDevPricingProvider` priced a provider-qualified model id (e.g.
+  `openai/o1-preview`) from whichever catalog provider happened to sort
+  alphabetically first among every provider re-listing that id, even when a
+  different provider's listing for the identical string carries the real,
+  materially different price** — the currently-vendored catalog has 14+ such
+  collisions where a free-tier aggregator entry (`$0`/`$0`) sorts ahead of a
+  genuinely paid one, e.g. `openai/o1-preview` priced at `$0.00` instead of the
+  real `$14.99`/`$59.99` per million tokens. Because `lookup()` still returns a
+  `ModelPrice` in this case, `hasModel()` reports `true`, silently bypassing
+  `UnpricedModelBudgetGuard`'s "no published pricing" safety net for the entire
+  run. `priceFromProviders()`
+  (`src/Audit/Infrastructure/Pricing/ModelsDevPricingProvider.php`) now prefers
+  the first non-zero-priced match over an earlier zero-priced one, falling back
+  to a zero price only when every matching provider genuinely prices the model
+  at zero.
 
 ### Security
 
@@ -4208,6 +4236,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   the same `is_link($path) || is_link(dirname($path))` condition
   `assertSafeToWrite()` already uses, treating a detected symlink as a safe
   cache miss (logged, not thrown) rather than reading through it.
+- **The SARIF 2.1.0 spec lets a plain-text `message.text` field embed a
+  CommonMark-style `[display text](target)` hyperlink, and mandates that every
+  viewer — even one with no Markdown support — render it as a clickable link;
+  `SarifReportRenderer` placed a finding's `title` there completely unescaped,
+  letting a crafted finding forge a live link into a security report a reviewer
+  is trusting to triage real vulnerabilities.** `resultFor()`
+  (`src/Audit/Infrastructure/Report/SarifReportRenderer.php`) now escapes `\`,
+  `[`, and `]` in the title via a new `escapeEmbeddedLinkSyntax()` helper before
+  placing it in `message.text`, the same backslash-escape mechanism CommonMark
+  itself uses to neutralize the link syntax.
+  `MarkdownReportRenderer::escapeFences()`
+  (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) had the
+  identical gap for the same injection class — it already escaped backtick/
+  tilde/`#`/`<`/`>` but never `[`/`]`, so the same crafted title rendered as a
+  real clickable link in the `.md` report too (the format `docs/extending.md`
+  recommends for a PR comment or `$GITHUB_STEP_SUMMARY`) — `escapeFences()` now
+  also escapes `[`/`]`.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

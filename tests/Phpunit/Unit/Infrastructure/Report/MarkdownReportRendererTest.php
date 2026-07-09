@@ -188,6 +188,33 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
+     * CommonMark's `[display text](target)` link syntax needs no code fence
+     * or heading marker to work — a title containing it forges a live,
+     * clickable link straight into the rendered report, which the tool's PR
+     * comment / `$GITHUB_STEP_SUMMARY` use case renders to real users
+     * reviewing security findings.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_neutralizes_embedded_link_syntax_in_the_title_so_it_cannot_forge_a_live_link(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Click [here](https://evil.example.com) for the PoC', 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringNotContainsString('[here](https://evil.example.com)', $output);
+        self::assertStringContainsString('Click \\[here\\](https://evil.example.com) for the PoC', $output);
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException

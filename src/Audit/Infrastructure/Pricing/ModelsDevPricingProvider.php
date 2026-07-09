@@ -131,17 +131,36 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
         return false === $withoutOptions ? $model : $withoutOptions;
     }
 
-    /** @param list<int|string> $providers */
+    /**
+     * A qualified id can legitimately appear under several providers at once
+     * (aggregators re-listing the same upstream model) with disagreeing
+     * prices — an aggregator's stray `$0` free-tier listing must never win
+     * over a genuinely paid one just because it sorts first, since that
+     * would both under-report the real cost and, via `hasModel()` returning
+     * `true`, silently bypass the "no published pricing" budget-guard safety
+     * net. The first non-zero match wins; a fully free model (every match
+     * genuinely `$0`) still prices at `$0`.
+     *
+     * @param list<int|string> $providers
+     */
     private function priceFromProviders(string $model, array $providers): ?ModelPrice
     {
+        $zeroPriceFallback = null;
         foreach ($providers as $provider) {
             $cost = $this->costEntry($provider, $model);
-            if (null !== $cost) {
-                return $this->toModelPrice($cost);
+            if (null === $cost) {
+                continue;
             }
+
+            $modelPrice = $this->toModelPrice($cost);
+            if (0.0 !== $modelPrice->input || 0.0 !== $modelPrice->output) {
+                return $modelPrice;
+            }
+
+            $zeroPriceFallback ??= $modelPrice;
         }
 
-        return null;
+        return $zeroPriceFallback;
     }
 
     /** @return array<array-key, mixed>|null */

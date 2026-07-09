@@ -147,13 +147,16 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
      * backslash already present right before a backtick/tilde must be escaped
      * *first* — otherwise it combines with the backslash inserted below into
      * an escaped-backslash-then-live-marker sequence CommonMark still parses
-     * as an open fence.
+     * as an open fence. `[`/`]` are escaped too: CommonMark's
+     * `[display text](target)` link syntax needs no fence or heading marker
+     * to work, so an unescaped title could forge a live, clickable link
+     * straight into the rendered report.
      */
     private function escapeFences(string $text): string
     {
         $backslashesEscaped = str_replace('\\', '\\\\', mb_scrub($text, 'UTF-8'));
 
-        return str_replace(['`', '~', '#', '<', '>'], ['\\`', '\\~', '\\#', '&lt;', '&gt;'], $backslashesEscaped);
+        return str_replace(['`', '~', '#', '<', '>', '[', ']'], ['\\`', '\\~', '\\#', '&lt;', '&gt;', '\\[', '\\]'], $backslashesEscaped);
     }
 
     /**
