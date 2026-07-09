@@ -210,11 +210,15 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         }
 
         $trimmedPrefix = rtrim($classPathPrefix, '/');
-        if ('' === $methodPath || '/' === $methodPath) {
-            return '' === $trimmedPrefix ? '/' : $trimmedPrefix;
+        if ('' !== $methodPath && '/' !== $methodPath) {
+            return \sprintf('%s/%s', $trimmedPrefix, ltrim($methodPath, '/'));
         }
 
-        return \sprintf('%s/%s', $trimmedPrefix, ltrim($methodPath, '/'));
+        if ('' === $trimmedPrefix) {
+            return '/';
+        }
+
+        return '/' === $methodPath ? \sprintf('%s/', $trimmedPrefix) : $trimmedPrefix;
     }
 
     private function prefixedRouteName(?string $classNamePrefix, ?string $methodName): ?string

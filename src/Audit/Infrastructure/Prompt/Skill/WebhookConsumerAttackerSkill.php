@@ -45,7 +45,6 @@ final readonly class WebhookConsumerAttackerSkill implements AttackerSkillInterf
             - Webhook routes mounted under a firewall that allows anonymous access AND lacks IP allowlist or mutual-TLS gating.
             Do NOT flag:
             - Webhook handlers calling `hash_equals($expected, $received)` against the framework's secret.
-            - `WebhookComponent::validate($request, $secret)` invocations — those use constant-time comparison internally.
             </skills>
             SKILL;
     }

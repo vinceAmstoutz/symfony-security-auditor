@@ -817,7 +817,54 @@ final class ReviewerAgentTest extends TestCase
             'id' => $vulnerability->id(),
             'accepted' => true,
             'notes' => 'looks good',
+            'additional_attack_paths' => '',
         ], $debugLogs[0][1]);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_logs_additional_attack_paths_reported_by_the_reviewer(): void
+    {
+        $vulnerability = $this->makeVulnerability();
+        $debugLogs = [];
+
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info');
+        $logger->method('debug')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$debugLogs): void {
+                $debugLogs[] = [$msg, $ctx];
+            },
+        );
+
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturn(LLMResponse::of((string) json_encode([
+                'accepted' => true,
+                'reviewer_notes' => 'looks good',
+                'additional_attack_paths' => 'Also reachable via the public API token endpoint.',
+            ]), 'claude', 'end_turn', TokenUsageSnapshot::of(10, 10)));
+
+        $reviewerAgent = new ReviewerAgent(
+            new ReviewerAgentCollaborators(
+                $llmClient,
+                new ReviewerPromptBuilder(),
+                $logger,
+            ),
+            new ReviewerModeConfiguration(),
+        );
+
+        $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
+
+        self::assertCount(1, $debugLogs);
+        self::assertSame('Also reachable via the public API token endpoint.', $debugLogs[0][1]['additional_attack_paths']);
     }
 
     /**
@@ -976,6 +1023,7 @@ final class ReviewerAgentTest extends TestCase
             'id' => $vulnerability->id(),
             'accepted' => false,
             'notes' => 'false positive',
+            'additional_attack_paths' => '',
         ], $reviewedLogs[0][1]);
     }
 
@@ -1033,6 +1081,7 @@ final class ReviewerAgentTest extends TestCase
             'id' => $vulnerability->id(),
             'accepted' => true,
             'notes' => 'severity upgraded',
+            'additional_attack_paths' => '',
         ], $reviewedLogs[0][1]);
     }
 

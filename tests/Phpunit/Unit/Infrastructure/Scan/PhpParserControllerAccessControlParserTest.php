@@ -332,6 +332,50 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_resolves_a_bare_slash_method_route_path_to_the_class_prefix_with_a_trailing_slash(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            #[Route('/blog')]
+            final class BlogController {
+                #[Route('/', name: 'blog_index')]
+                public function index(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/BlogController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/blog/', $entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_resolves_a_bare_slash_method_route_path_to_a_bare_slash_when_the_class_prefix_trims_to_nothing(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            #[Route('/')]
+            final class HomeController {
+                #[Route('/', name: 'home_index')]
+                public function index(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/HomeController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/', $entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_resolves_an_empty_method_route_path_to_just_the_class_prefix(): void
     {
         $source = <<<'PHP'

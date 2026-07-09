@@ -132,10 +132,12 @@ final readonly class VerdictApplier
     private function logReviewDecision(Vulnerability $vulnerability, bool $accepted, array $review): void
     {
         $rawNotes = $review['reviewer_notes'] ?? null;
+        $rawAdditionalAttackPaths = $review['additional_attack_paths'] ?? null;
         $this->logger->debug('Vulnerability reviewed', [
             'id' => $vulnerability->id(),
             'accepted' => $accepted,
             'notes' => \is_string($rawNotes) ? $rawNotes : '',
+            'additional_attack_paths' => \is_string($rawAdditionalAttackPaths) ? $rawAdditionalAttackPaths : '',
         ]);
     }
 }

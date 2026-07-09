@@ -47,9 +47,13 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'messenger handler by attribute' => ['src/Handler/ProcessPaymentAction.php', "<?php\n#[AsMessageHandler]\nclass ProcessPaymentAction {}", ProjectFileType::MESSENGER_HANDLER];
         yield 'webhook consumer by suffix' => ['src/Webhook/StripeWebhookConsumer.php', '<?php', ProjectFileType::WEBHOOK_CONSUMER];
         yield 'webhook consumer by remote event consumer interface' => ['src/RemoteEvent/StripeEventConsumer.php', "<?php\n#[AsRemoteEventConsumer(name: 'stripe')]\nclass StripeEventConsumer implements RemoteEventConsumerInterface {}", ProjectFileType::WEBHOOK_CONSUMER];
+        yield 'authenticator by interface without suffix' => ['src/Security/ApiKeyGuard.php', "<?php\nclass ApiKeyGuard implements AuthenticatorInterface {}", ProjectFileType::AUTHENTICATOR];
         yield 'event subscriber by suffix' => ['src/EventSubscriber/AuditSubscriber.php', '<?php', ProjectFileType::EVENT_SUBSCRIBER];
+        yield 'event subscriber by interface without suffix' => ['src/Listener/AuditListener.php', "<?php\nclass AuditListener implements EventSubscriberInterface {}", ProjectFileType::EVENT_SUBSCRIBER];
         yield 'normalizer by suffix' => ['src/Serializer/UserNormalizer.php', '<?php', ProjectFileType::NORMALIZER];
+        yield 'normalizer by interface without suffix' => ['src/Serializer/UserTransformer.php', "<?php\nclass UserTransformer implements NormalizerInterface {}", ProjectFileType::NORMALIZER];
         yield 'scheduler by suffix' => ['src/Schedule/CleanupSchedule.php', '<?php', ProjectFileType::SCHEDULER];
+        yield 'scheduler by interface without suffix' => ['src/Cron/JobProvider.php', "<?php\nclass JobProvider implements ScheduleProviderInterface {}", ProjectFileType::SCHEDULER];
         yield 'template by extension' => ['templates/user/index.html.twig', '{{ user.name }}', ProjectFileType::TEMPLATE];
         yield 'config by yaml extension' => ['config/security.yaml', 'security:', ProjectFileType::CONFIG];
         yield 'config by xml extension' => ['config/services.xml', '', ProjectFileType::CONFIG];

@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool;
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
@@ -56,12 +57,20 @@ final readonly class GrepTool implements ToolInterface
                     ],
                     'file_type' => [
                         'type' => 'string',
-                        'description' => 'Optional ProjectFile::type() to restrict the search to: controller, voter, entity, repository, form, template, config, php.',
+                        'description' => \sprintf('Optional ProjectFile::type() to restrict the search to: %s.', $this->fileTypeValues()),
                     ],
                 ],
                 'required' => ['pattern'],
             ],
         );
+    }
+
+    private function fileTypeValues(): string
+    {
+        return implode(', ', array_map(
+            static fn (ProjectFileType $projectFileType): string => $projectFileType->value,
+            ProjectFileType::cases(),
+        ));
     }
 
     #[Override]

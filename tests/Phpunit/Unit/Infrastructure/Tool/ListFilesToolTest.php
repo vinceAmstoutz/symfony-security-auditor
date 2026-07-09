@@ -37,7 +37,7 @@ final class ListFilesToolTest extends TestCase
                 'properties' => [
                     'file_type' => [
                         'type' => 'string',
-                        'description' => 'Optional ProjectFile::type() to filter by: controller, voter, entity, repository, form, template, config, php.',
+                        'description' => 'Optional ProjectFile::type() to filter by: controller, api_resource, live_component, entity, voter, repository, form, authenticator, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other.',
                     ],
                 ],
             ],

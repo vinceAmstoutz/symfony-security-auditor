@@ -90,6 +90,60 @@ final class ThisCallReachabilityTest extends TestCase
         self::assertSame(['deeply-nested'], $this->stringLiteralsIn($body));
     }
 
+    public function test_it_includes_a_helpers_body_reached_through_a_self_static_call(): void
+    {
+        $class = $this->parseClass(<<<'PHP'
+            <?php
+            final class Example {
+                public function action(): void {
+                    self::helper();
+                }
+                private static function helper(): void {
+                    echo 'from-static-helper';
+                }
+            }
+            PHP);
+
+        $body = $this->thisCallReachability->reachableBody($this->methodNamed($class, 'action'), $this->methodsByName($class));
+
+        self::assertSame(['from-static-helper'], $this->stringLiteralsIn($body));
+    }
+
+    public function test_it_includes_a_helpers_body_reached_through_a_static_keyword_call(): void
+    {
+        $class = $this->parseClass(<<<'PHP'
+            <?php
+            final class Example {
+                public function action(): void {
+                    static::helper();
+                }
+                private static function helper(): void {
+                    echo 'from-late-static-helper';
+                }
+            }
+            PHP);
+
+        $body = $this->thisCallReachability->reachableBody($this->methodNamed($class, 'action'), $this->methodsByName($class));
+
+        self::assertSame(['from-late-static-helper'], $this->stringLiteralsIn($body));
+    }
+
+    public function test_it_ignores_a_static_call_to_another_classs_method(): void
+    {
+        $class = $this->parseClass(<<<'PHP'
+            <?php
+            final class Example {
+                public function action(): void {
+                    OtherClass::helper();
+                }
+            }
+            PHP);
+
+        $body = $this->thisCallReachability->reachableBody($this->methodNamed($class, 'action'), $this->methodsByName($class));
+
+        self::assertSame([], $this->stringLiteralsIn($body));
+    }
+
     public function test_it_ignores_a_call_to_a_method_not_declared_on_the_same_class(): void
     {
         $class = $this->parseClass(<<<'PHP'

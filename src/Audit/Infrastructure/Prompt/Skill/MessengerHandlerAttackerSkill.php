@@ -39,7 +39,7 @@ final readonly class MessengerHandlerAttackerSkill implements AttackerSkillInter
             Hunt:
             - `#[AsMessageHandler]` / `MessageHandlerInterface::__invoke()` calling `unserialize()` / `igbinary_unserialize()` on payload fields.
             - Handlers invoking `Process` / `shell_exec` / SQL with values from `$message` without sanitization (queue-to-shell injection).
-            - Missing idempotency: handler with side effects (charge card, send email, mutate balance) not deduping by message id (`AmqpStamp::getApplicationHeaders()['x-message-id']`).
+            - Missing idempotency: handler with side effects (charge card, send email, mutate balance) not deduping by message id (`AmqpStamp::getAttributes()['headers']['x-message-id']`).
             - No replay protection: handler trusts `$message->createdAt` / `$message->userId` without verifying current state (stale message attack).
             - Transport configured with `serializer: php` (PHP-native serialize on untrusted bus) — gadget-chain RCE.
             - Handler swallowing exceptions silently → poisoned messages re-driven infinitely.

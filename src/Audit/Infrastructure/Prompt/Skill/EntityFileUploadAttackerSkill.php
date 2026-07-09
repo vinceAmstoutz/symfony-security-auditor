@@ -43,7 +43,7 @@ final readonly class EntityFileUploadAttackerSkill implements AttackerSkillInter
             - A Vich `uploadDestination` / `uriPrefix` under the public web root without disabling script execution for that path.
             - A file-replacement flow (re-uploading over an existing mapped field) that doesn't re-check ownership before the previous file is overwritten or deleted.
             Do NOT flag:
-            - `Vich\UploadableField` using its default namer, or an explicit `Uuid`/hash-based namer — unpredictable enough to resist enumeration.
+            - `Vich\UploadableField` using an explicit `Uuid`/hash-based namer — unpredictable enough to resist enumeration.
             - `#[Assert\File]` present with an explicit `mimeTypes` allow-list and `maxSize`.
             - Read groups exposing a path that is meant to be publicly reachable (e.g. a public avatar), where nothing sensitive is at stake.
             </skills>

@@ -367,6 +367,111 @@ final class AttackerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_route_is_not_marked_covered_when_the_matching_access_control_rule_is_restricted_to_a_different_method(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/AdminController.php',
+            '/app/src/Controller/AdminController.php',
+            '<?php class AdminController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'deleteUser',
+            routePath: '/admin/users/42',
+            routeMethods: ['DELETE'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(
+                routeAccessMap: ['^/admin' => ['ROLE_ADMIN', 'methods: GET']],
+                routeAccessControls: [$routeAccessControl],
+            ),
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('LACKS_ACCESS_CHECK', $message);
+        self::assertStringNotContainsString('COVERED_BY', $message);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_route_accepting_any_method_is_not_marked_covered_by_a_method_restricted_access_control_rule(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/AdminController.php',
+            '/app/src/Controller/AdminController.php',
+            '<?php class AdminController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'dashboard',
+            routePath: '/admin/dashboard',
+            routeMethods: [],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(
+                routeAccessMap: ['^/admin' => ['ROLE_ADMIN', 'methods: GET']],
+                routeAccessControls: [$routeAccessControl],
+            ),
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('LACKS_ACCESS_CHECK', $message);
+        self::assertStringNotContainsString('COVERED_BY', $message);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_route_is_marked_covered_when_the_matching_access_control_rules_methods_include_the_routes_own_method(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/AdminController.php',
+            '/app/src/Controller/AdminController.php',
+            '<?php class AdminController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'deleteUser',
+            routePath: '/admin/users/42',
+            routeMethods: ['DELETE'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(
+                routeAccessMap: ['^/admin' => ['ROLE_ADMIN', 'methods: GET|DELETE']],
+                routeAccessControls: [$routeAccessControl],
+            ),
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('COVERED_BY access_control[ROLE_ADMIN,methods: GET|DELETE]', $message);
+        self::assertStringNotContainsString('LACKS_ACCESS_CHECK', $message);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_a_hash_character_in_the_access_control_pattern_does_not_break_the_firewall_match(): void
     {
         $projectFile = ProjectFile::create(

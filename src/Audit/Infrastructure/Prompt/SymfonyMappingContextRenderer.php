@@ -143,8 +143,8 @@ final readonly class SymfonyMappingContextRenderer
             return implode(' + ', $checks);
         }
 
-        $firewallRoles = self::firewallRolesForPath($routeAccessControl->routePath(), $routeAccessMap)
-            ?? self::firewallRolesForRouteName($routeAccessControl->routeName(), $routeAccessMap);
+        $firewallRoles = self::firewallRolesForPath($routeAccessControl->routePath(), $routeAccessControl->routeMethods(), $routeAccessMap)
+            ?? self::firewallRolesForRouteName($routeAccessControl->routeName(), $routeAccessControl->routeMethods(), $routeAccessMap);
         if (null !== $firewallRoles) {
             return \sprintf('COVERED_BY access_control[%s]', implode(',', array_map(self::sanitizeLine(...), $firewallRoles)));
         }
@@ -159,20 +159,72 @@ final readonly class SymfonyMappingContextRenderer
      * one; a malformed pattern, or one containing every delimiter candidate,
      * simply fails to match rather than throwing.
      *
+     * @param list<string>                $routeMethods
      * @param array<string, list<string>> $routeAccessMap
      *
      * @return list<string>|null
      */
-    private static function firewallRolesForPath(?string $routePath, array $routeAccessMap): ?array
+    private static function firewallRolesForPath(?string $routePath, array $routeMethods, array $routeAccessMap): ?array
     {
         if (null === $routePath) {
             return null;
         }
 
         foreach ($routeAccessMap as $pattern => $roles) {
+            if (!self::methodsAreCovered($roles, $routeMethods)) {
+                continue;
+            }
+
             $delimiter = self::delimiterAvoiding($pattern);
             if (null !== $delimiter && 1 === preg_match($delimiter.$pattern.$delimiter, $routePath)) {
                 return $roles;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * A rule's `methods: GET|POST`-style requirement (recorded verbatim by
+     * {@see SymfonyYamlSecurityConfigParser}) only actually governs a route
+     * whose own declared methods are a subset of it — Symfony evaluates
+     * `access_control` rules in order and skips to the next one on a method
+     * mismatch, it does not treat a path-only match as sufficient. A route
+     * with no declared methods answers to every HTTP verb, so a
+     * method-restricted rule can never fully cover it.
+     *
+     * @param list<string> $roles
+     * @param list<string> $routeMethods
+     */
+    private static function methodsAreCovered(array $roles, array $routeMethods): bool
+    {
+        $ruleMethods = self::methodsRequirementOf($roles);
+        if (null === $ruleMethods) {
+            return true;
+        }
+
+        if ([] === $routeMethods) {
+            return false;
+        }
+
+        $upperRouteMethods = array_map(strtoupper(...), $routeMethods);
+
+        return [] === array_diff($upperRouteMethods, $ruleMethods);
+    }
+
+    /**
+     * @param list<string> $roles
+     *
+     * @return list<string>|null
+     */
+    private static function methodsRequirementOf(array $roles): ?array
+    {
+        foreach ($roles as $role) {
+            if (str_starts_with($role, 'methods: ')) {
+                return array_map(
+                    static fn (string $method): string => strtoupper(trim($method)),
+                    explode('|', substr($role, \strlen('methods: '))),
+                );
             }
         }
 
@@ -202,17 +254,20 @@ final readonly class SymfonyMappingContextRenderer
      * matching this route's name, or null when the route has no name or no
      * such rule exists.
      *
+     * @param list<string>                $routeMethods
      * @param array<string, list<string>> $routeAccessMap
      *
      * @return list<string>|null
      */
-    private static function firewallRolesForRouteName(?string $routeName, array $routeAccessMap): ?array
+    private static function firewallRolesForRouteName(?string $routeName, array $routeMethods, array $routeAccessMap): ?array
     {
         if (null === $routeName) {
             return null;
         }
 
-        return $routeAccessMap[\sprintf('route: %s', $routeName)] ?? null;
+        $roles = $routeAccessMap[\sprintf('route: %s', $routeName)] ?? null;
+
+        return null !== $roles && self::methodsAreCovered($roles, $routeMethods) ? $roles : null;
     }
 
     /**

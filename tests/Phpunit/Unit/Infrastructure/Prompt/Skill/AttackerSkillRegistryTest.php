@@ -210,4 +210,56 @@ final class AttackerSkillRegistryTest extends TestCase
 
         self::assertStringContainsString("</skills>\n\n<skills role=\"voter\">", $output);
     }
+
+    public function test_entity_file_upload_skill_does_not_wave_off_vich_s_unconfigured_default_namer(): void
+    {
+        $block = (new EntityFileUploadAttackerSkill())->block();
+
+        self::assertStringNotContainsString('using its default namer', $block);
+    }
+
+    public function test_file_upload_skill_does_not_wave_off_vich_s_unconfigured_default_namer(): void
+    {
+        $block = (new FileUploadAttackerSkill())->block();
+
+        self::assertStringNotContainsString("`VichUploaderBundle`'s default namer —", $block);
+    }
+
+    public function test_messenger_handler_skill_references_a_real_amqp_stamp_method(): void
+    {
+        $block = (new MessengerHandlerAttackerSkill())->block();
+
+        self::assertStringNotContainsString('getApplicationHeaders()', $block);
+        self::assertStringContainsString("AmqpStamp::getAttributes()['headers']['x-message-id']", $block);
+    }
+
+    public function test_normalizer_skill_references_a_real_ignored_attributes_mechanism(): void
+    {
+        $block = (new NormalizerAttackerSkill())->block();
+
+        self::assertStringNotContainsString('setIgnoredAttributes()', $block);
+        self::assertStringContainsString('AbstractNormalizer::IGNORED_ATTRIBUTES', $block);
+    }
+
+    public function test_twig_extension_skill_does_not_claim_is_safe_causes_double_escaping(): void
+    {
+        $block = (new TwigExtensionAttackerSkill())->block();
+
+        self::assertStringNotContainsString('double-escape', $block);
+    }
+
+    public function test_webhook_consumer_skill_does_not_reference_a_fictitious_webhook_component(): void
+    {
+        $block = (new WebhookConsumerAttackerSkill())->block();
+
+        self::assertStringNotContainsString('WebhookComponent', $block);
+    }
+
+    public function test_config_skill_references_the_real_html_sanitizer_option_name(): void
+    {
+        $block = (new ConfigAttackerSkill())->block();
+
+        self::assertStringNotContainsString('allowAllStaticAttributes()', $block);
+        self::assertStringContainsString('allow_static_elements: true', $block);
+    }
 }

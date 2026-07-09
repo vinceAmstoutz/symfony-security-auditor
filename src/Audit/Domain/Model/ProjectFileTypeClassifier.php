@@ -26,12 +26,12 @@ final readonly class ProjectFileTypeClassifier
             self::isVoterPath($path), self::looksLikeVoter($path, $content) => ProjectFileType::VOTER,
             self::isRepositoryPath($path), self::looksLikeRepository($path, $content) => ProjectFileType::REPOSITORY,
             self::isFormPath($path), self::looksLikeForm($path, $content) => ProjectFileType::FORM,
-            str_ends_with($path, 'Authenticator.php') => ProjectFileType::AUTHENTICATOR,
+            str_ends_with($path, 'Authenticator.php'), self::looksLikeAuthenticator($path, $content) => ProjectFileType::AUTHENTICATOR,
             self::isMessengerHandlerPath($path), self::looksLikeMessengerHandler($path, $content) => ProjectFileType::MESSENGER_HANDLER,
             self::isWebhookConsumerPath($path), self::looksLikeWebhookConsumer($path, $content) => ProjectFileType::WEBHOOK_CONSUMER,
-            str_ends_with($path, 'Subscriber.php') || str_ends_with($path, 'EventListener.php') => ProjectFileType::EVENT_SUBSCRIBER,
-            str_ends_with($path, 'Normalizer.php') || str_ends_with($path, 'Denormalizer.php') => ProjectFileType::NORMALIZER,
-            str_ends_with($path, 'ScheduleProvider.php') || str_ends_with($path, 'Schedule.php') => ProjectFileType::SCHEDULER,
+            str_ends_with($path, 'Subscriber.php') || str_ends_with($path, 'EventListener.php'), self::looksLikeEventSubscriber($path, $content) => ProjectFileType::EVENT_SUBSCRIBER,
+            str_ends_with($path, 'Normalizer.php') || str_ends_with($path, 'Denormalizer.php'), self::looksLikeNormalizer($path, $content) => ProjectFileType::NORMALIZER,
+            str_ends_with($path, 'ScheduleProvider.php') || str_ends_with($path, 'Schedule.php'), self::looksLikeScheduler($path, $content) => ProjectFileType::SCHEDULER,
             self::looksLikeTwigExtension($path, $content) => ProjectFileType::TWIG_EXTENSION,
             str_ends_with($path, '.twig') => ProjectFileType::TEMPLATE,
             str_ends_with($path, '.yaml') || str_ends_with($path, '.yml') || str_ends_with($path, '.xml'), self::isDotenvPath($path) => ProjectFileType::CONFIG,
@@ -157,6 +157,30 @@ final readonly class ProjectFileTypeClassifier
             && (str_contains($content, '#[AsRemoteEventConsumer')
                 || str_contains($content, 'implements RemoteEventConsumerInterface')
                 || str_contains($content, 'implements RequestParserInterface'));
+    }
+
+    private static function looksLikeAuthenticator(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && str_contains($content, 'implements AuthenticatorInterface');
+    }
+
+    private static function looksLikeEventSubscriber(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && str_contains($content, 'implements EventSubscriberInterface');
+    }
+
+    private static function looksLikeNormalizer(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && str_contains($content, 'implements NormalizerInterface');
+    }
+
+    private static function looksLikeScheduler(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && str_contains($content, 'implements ScheduleProviderInterface');
     }
 
     private static function isDotenvPath(string $path): bool

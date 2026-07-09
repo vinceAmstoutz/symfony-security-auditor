@@ -44,7 +44,7 @@ final readonly class NormalizerAttackerSkill implements AttackerSkillInterface
             - Custom denormalizer using `unserialize()` to decode a transport field.
             - `getSupportedTypes()` returning `'*'` widely — denormalizer steals control from safer normalizers downstream.
             Do NOT flag:
-            - `Symfony\Component\Serializer\Normalizer\PropertyNormalizer` without `setIgnoredAttributes()` when the model has only safe public properties.
+            - `Symfony\Component\Serializer\Normalizer\PropertyNormalizer` without an `AbstractNormalizer::IGNORED_ATTRIBUTES` context entry when the model has only safe public properties.
             - Normalizers operating purely on read-only DTOs with no setters.
             </skills>
             SKILL;

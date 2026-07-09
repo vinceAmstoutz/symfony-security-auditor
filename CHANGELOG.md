@@ -3356,6 +3356,75 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `bin/console config:dump-reference` and editor tooltips
   (`src/Audit/Infrastructure/Config/AuditConfigurationDefinition.php`) was
   wrong. Reworded to match.
+- **The reviewer LLM's `additional_attack_paths` field, requested by
+  `ReviewerPromptSections` and declared in `RecordReviewTool`'s schema, was read
+  nowhere** — `VerdictApplier::logReviewDecision()`
+  (`src/Audit/Application/Agent/Review/VerdictApplier.php`) logged its sibling
+  field `reviewer_notes` but silently discarded `additional_attack_paths`.
+  `logReviewDecision()` now includes it in the logged context alongside `notes`.
+- **`GrepTool`/`ListFilesTool`'s `file_type` parameter description listed only 8
+  of `ProjectFileType`'s 18 cases**
+  (`controller, voter, entity, repository, form, template, config, php`),
+  silently omitting `api_resource`, `live_component`, `authenticator`,
+  `messenger_handler`, `webhook_consumer`, `event_subscriber`, `normalizer`,
+  `scheduler`, `twig_extension`, and `other` — the attacker LLM had no way to
+  discover it could filter by those types. `GrepTool`/`ListFilesTool`
+  (`src/Audit/Infrastructure/Tool/GrepTool.php`,
+  `src/Audit/Infrastructure/Tool/ListFilesTool.php`) now generate the list from
+  `ProjectFileType::cases()`, so it can never drift out of sync again.
+- **`ThisCallReachability` (and therefore
+  `PhpParserControllerAccessControlParser` and `PhpParserVoterCapabilityParser`,
+  its only consumers) followed `$this->helper()` calls into private/protected
+  helpers but not `self::helper()`/`static::helper()` static calls** — the exact
+  same private-helper blindness fixed for instance-method delegation in a
+  previous round, unfixed for the static-call spelling of the same refactor. A
+  voter whose `supports()` delegates its attribute list to a `private static`
+  helper via `self::`, or a controller action that funnels its guard through a
+  `private static` helper the same way, was misreported as covering no
+  attributes / `LACKS_ACCESS_CHECK` respectively.
+  `ThisCallReachability::reachableBody()`
+  (`src/Audit/Infrastructure/Scan/ThisCallReachability.php`) now also resolves
+  `self::`/`static::` `StaticCall` nodes against the same-class method map.
+- **A route with an unconditional `access_control` match on its path, but a
+  `methods:` requirement narrower than the route's own declared methods, was
+  reported as `COVERED_BY` regardless** —
+  `SymfonyMappingContextRenderer ::firewallRolesForPath()`/`firewallRolesForRouteName()`
+  (`src/Audit/Infrastructure/Prompt/SymfonyMappingContextRenderer.php`) matched
+  purely on the path pattern, never cross-referencing the matched rule's own
+  `methods: GET`-style requirement (already captured verbatim by
+  `SymfonyYamlSecurityConfigParser`) against the route's `routeMethods()` —
+  exactly backwards from Symfony's real per-request evaluation, which skips a
+  rule entirely on a method mismatch and falls through to the next one. A
+  `DELETE`-only action with no `#[IsGranted]`/`denyAccessUnlessGranted()`,
+  behind a `security.yaml` rule scoped to `methods: [GET]`, was told it was
+  already firewall-protected — suppressing a genuine `broken_access_control`
+  candidate. Both methods now skip a path-matching rule whose `methods:`
+  requirement doesn't cover every method the route itself accepts (a route
+  declaring no methods at all — accepts every verb — can never be fully covered
+  by a method-restricted rule).
+- **`PhpParserControllerAccessControlParser::prefixedRoutePath()` conflated a
+  bare `#[Route('')]` and `#[Route('/')]` method path, dropping the trailing
+  slash Symfony's own `AttributeClassLoader` literally concatenates onto the
+  class prefix for the latter** — a very common "index action" pattern (a
+  class-level `#[Route('/blog')]` paired with a method-level `#[Route('/')]`)
+  resolved to `/blog` instead of Symfony's real `/blog/`, causing a false
+  `LACKS_ACCESS_CHECK` against a `security.yaml` rule scoped to `^/blog/`.
+  `prefixedRoutePath()`
+  (`src/Audit/Infrastructure/Scan/PhpParserControllerAccessControlParser.php`)
+  now preserves the trailing slash for a bare `/` method path (while still
+  deliberately not doubling a trailing-slash class prefix with a leading-slash
+  method path, an unrelated, already-tested normalization).
+- **`ProjectFileTypeClassifier` had no content-based fallback for
+  `AUTHENTICATOR`, `EVENT_SUBSCRIBER`, `NORMALIZER`, or `SCHEDULER`, unlike
+  every other case** — a class named e.g.
+  `ApiKeyGuard implements AuthenticatorInterface` with a path not ending in
+  `Authenticator.php` classified as generic `php`, silently losing its dedicated
+  attacker skill (and the same gap for `EventSubscriberInterface`,
+  `NormalizerInterface`, and `ScheduleProviderInterface`).
+  `ProjectFileTypeClassifier::classify()`
+  (`src/Audit/Domain/Model/ProjectFileTypeClassifier.php`) now also matches each
+  interface anywhere in the file's content, mirroring the `looksLikeX()` pattern
+  already used for every sibling case.
 
 ### Security
 
@@ -3675,6 +3744,57 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   alternative expanded `{name, options}` mapping syntax; it does not (`model` is
   a plain string config node) — the section now says so instead of documenting a
   form that throws a configuration error.
+- **`EntityFileUploadAttackerSkill` and `FileUploadAttackerSkill`'s Do-Not-Flag
+  lists whitelisted `VichUploaderBundle`'s unconfigured default namer as
+  unpredictable, directly contradicting each file's own Hunt bullet a few lines
+  above it.** Per `VichUploaderBundle`'s own documentation, a mapping with no
+  `namer` service configured keeps the original uploaded filename verbatim — the
+  opposite of unpredictable — and only an explicitly configured
+  `Uuid`/hash-based namer resists enumeration. The Do-Not-Flag wording would
+  have waved off the single most common real-world Vich misconfiguration: never
+  setting a `namer` at all.
+  `src/Audit/Infrastructure/Prompt/Skill/EntityFileUploadAttackerSkill.php` and
+  `src/Audit/Infrastructure/Prompt/Skill/FileUploadAttackerSkill.php` no longer
+  credit an unconfigured default namer as safe.
+- **Five other attacker skill blocks cited framework APIs that do not exist, or
+  explained real behavior backwards, undermining the guidance meant to help the
+  attacker LLM correctly recognize a vulnerable pattern.**
+  `MessengerHandlerAttackerSkill`
+  (`src/Audit/Infrastructure/Prompt/Skill/MessengerHandlerAttackerSkill.php`)
+  cited a nonexistent `AmqpStamp::getApplicationHeaders()` — the real API is
+  `AmqpStamp::getAttributes()['headers']`. `NormalizerAttackerSkill`
+  (`src/Audit/Infrastructure/Prompt/Skill/NormalizerAttackerSkill.php`) cited
+  `AbstractNormalizer::setIgnoredAttributes()`, removed in Symfony 7.0 (this
+  bundle's own minimum supported Symfony version) in favor of the
+  `IGNORED_ATTRIBUTES` context option. `TwigExtensionAttackerSkill`
+  (`src/Audit/Infrastructure/Prompt/Skill/TwigExtensionAttackerSkill.php`)
+  claimed declaring `is_safe: ['html']` causes Twig to "double-escape" output —
+  backwards: `is_safe` disables escaping entirely, which is exactly why
+  unsanitized content leaking through it becomes XSS.
+  `WebhookConsumerAttackerSkill`
+  (`src/Audit/Infrastructure/Prompt/Skill/WebhookConsumerAttackerSkill.php`)
+  cited a `WebhookComponent::validate()` that does not exist in
+  `symfony/webhook`. `ConfigAttackerSkill`
+  (`src/Audit/Infrastructure/Prompt/Skill/ConfigAttackerSkill.php`) cited a
+  fabricated `allowAllStaticAttributes()` `html_sanitizer` method; the real
+  unsafe configuration is `allow_static_elements: true` combined with a broad
+  `allow_elements`/`allow_attributes` list. All five now reference the real API
+  or the corrected explanation.
+- **The release workflow's PHAR-build job ran `composer install` (arbitrary
+  third-party dependency/plugin code) and `box compile` under a repo-write
+  `GITHUB_TOKEN`, needed by no step in that job — only the later binary-upload
+  job's `softprops/action-gh-release` step needs it.**
+  `.github/workflows/release.yaml` declared `permissions: contents: write` at
+  the workflow level, so `actions/checkout`'s default
+  `persist-credentials: true` left that write-scoped token on disk for the
+  entire `phar` job. A compromised or typosquatted dependency pulled in during
+  that install could have read the persisted credential and pushed commits/tags
+  or tampered with releases in this repo. `release.yaml` now scopes
+  `permissions: contents: read` at the workflow level, with `contents: write`
+  overridden only on the `binary` job. `.github/workflows/release-guard.yaml` (a
+  tag-push sanity check with no write action at all) declared no `permissions`
+  block whatsoever, inheriting whatever `GITHUB_TOKEN` default the
+  repository/organization has — now explicit `permissions: contents: read`.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

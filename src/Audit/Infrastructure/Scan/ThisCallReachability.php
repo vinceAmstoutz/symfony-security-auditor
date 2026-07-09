@@ -16,8 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 use PhpParser\Node;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\NullsafeMethodCall;
+use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
+use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
 
@@ -68,15 +70,21 @@ final readonly class ThisCallReachability
         $methodCalls = [
             ...$this->nodeFinder->findInstanceOf($ownBody, MethodCall::class),
             ...$this->nodeFinder->findInstanceOf($ownBody, NullsafeMethodCall::class),
+            ...$this->nodeFinder->findInstanceOf($ownBody, StaticCall::class),
         ];
         foreach ($methodCalls as $methodCall) {
-            $calledName = $this->thisCallName($methodCall);
+            $calledName = $this->calledMethodName($methodCall);
             if (null !== $calledName && \array_key_exists($calledName, $methodsByName)) {
                 $helperBody = [...$helperBody, ...$this->reachableBodyVisiting($methodsByName[$calledName], $methodsByName, $visited)];
             }
         }
 
         return [...$ownBody, ...$helperBody];
+    }
+
+    private function calledMethodName(MethodCall|NullsafeMethodCall|StaticCall $call): ?string
+    {
+        return $call instanceof StaticCall ? $this->selfStaticCallName($call) : $this->thisCallName($call);
     }
 
     private function thisCallName(MethodCall|NullsafeMethodCall $methodCall): ?string
@@ -86,5 +94,14 @@ final readonly class ThisCallReachability
         }
 
         return $methodCall->name instanceof Identifier ? $methodCall->name->toString() : null;
+    }
+
+    private function selfStaticCallName(StaticCall $staticCall): ?string
+    {
+        if (!$staticCall->class instanceof Name || !\in_array($staticCall->class->toString(), ['self', 'static'], true)) {
+            return null;
+        }
+
+        return $staticCall->name instanceof Identifier ? $staticCall->name->toString() : null;
     }
 }

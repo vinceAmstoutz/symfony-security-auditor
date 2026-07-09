@@ -47,7 +47,7 @@ final readonly class ConfigAttackerSkill implements AttackerSkillInterface
             - `framework.messenger.transports.*.serializer: 'php_serialize'` or any class implementing `SerializerInterface` that calls `unserialize` on dequeued payloads.
             - `framework.webhook` declared without an HMAC secret env var or with the secret committed in plaintext.
             - `framework.lock` not configured for routes that perform balance-affecting operations.
-            - `framework.html_sanitizer` set with `allowAllStaticAttributes()` or wide `allowElement()` lists — XSS via "sanitized" output.
+            - `framework.html_sanitizer` sanitizers with `allow_static_elements: true` plus a broad `allow_elements`/`allow_attributes` list — XSS via "sanitized" output.
             - `framework.http_client.scoped_clients.*.verify_peer: false` / `verify_host: false` — MITM exposure.
             - `messenger.routing` directing privileged commands to a transport with `failure_transport: null` — silent loss of audit trail.
             Do NOT flag:
