@@ -482,6 +482,28 @@ final class RegexStaticPreScannerTest extends TestCase
     }
 
     /**
+     * The idiomatic one-method-per-line Doctrine `QueryBuilder` fluent style
+     * (taught in virtually every Symfony tutorial) puts `orderBy($sort)` on
+     * its own line, split from the `->` on the previous line.
+     *
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_dynamic_order_by_split_across_lines(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Repository/UserRepository.php',
+            '/app/src/Repository/UserRepository.php',
+            "<?php\nclass UserRepository {\n    public function find(\$sort) {\n        return \$this->createQueryBuilder('u')\n            ->orderBy(\n                \$sort\n            )\n            ->getQuery()\n            ->getResult();\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('dynamic_order_by', $patterns);
+    }
+
+    /**
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
@@ -531,6 +553,42 @@ final class RegexStaticPreScannerTest extends TestCase
     {
         yield 'string concatenation' => ["'http://' . \$request->query->get('host')"];
         yield 'cast before the variable' => ['(string) $request->query->get(\'url\')'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_redirect_with_input_split_across_lines(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/RedirectController.php',
+            '/app/src/Controller/RedirectController.php',
+            "<?php\nclass RedirectController {\n    public function go(\$request) {\n        return \$this->redirect(\n            \$request->query->get('url')\n        );\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('redirect_with_input', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_form_submit_with_request_all_split_across_lines(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/UserController.php',
+            '/app/src/Controller/UserController.php',
+            "<?php\nclass UserController {\n    public function edit(\$request, \$form) {\n        \$form->submit(\n            \$request->request->all()\n        );\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('submit_request_all', $patterns);
     }
 
     /**

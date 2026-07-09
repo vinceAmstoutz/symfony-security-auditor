@@ -3936,6 +3936,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/LLM/TransientFailureClassifier.php`) now also
   excludes a match immediately preceded or followed by a word character or
   hyphen, alongside the existing decimal/thousands-separator exclusion.
+- **A large file was left unsliced from the first heredoc that closed on the
+  same line as its enclosing call's `)`/`;` onward** (e.g.
+  `->executeQuery(<<<SQL ... SQL);`), silently losing the token-cost reduction.
+  `RegexCodeSlicer` (`src/Audit/Infrastructure/Scan/RegexCodeSlicer.php`) never
+  fed the code trailing a heredoc's closing identifier into its open-paren
+  tracking, so the depth never returned to zero and every later line was
+  force-retained; that trailing code is now tracked.
+- **Three risk-marker pre-scan patterns (`redirect_with_input`,
+  `submit_request_all`, `dynamic_order_by`) missed calls split across lines**
+  (e.g. the one-method-per-line Doctrine `QueryBuilder` style).
+  `RegexStaticPreScanner`
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) only scans
+  whole-file rather than per-line when a pattern carries the `/s` modifier,
+  which these three lacked. All three now carry `/s`; `CACHE_VERSION` bumped.
 
 ### Security
 

@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 11;
+    public const int CACHE_VERSION = 12;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -95,11 +95,11 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'Request input read — trace flow to dangerous sinks',
             ],
             'redirect_with_input' => [
-                'regex' => '/->redirect\s*\(.{0,200}\$/',
+                'regex' => '/->redirect\s*\(.{0,200}\$/s',
                 'description' => 'Redirect with variable target — verify protocol/host allowlist (open redirect)',
             ],
             'submit_request_all' => [
-                'regex' => '/->submit\s*\(\s*\$request->\w+->all\s*\(\s*\)\s*\)/',
+                'regex' => '/->submit\s*\(\s*\$request->\w+->all\s*\(\s*\)\s*\)/s',
                 'description' => 'Form submit($request->...->all()) — mass-assignment risk',
             ],
             'map_request_payload' => [
@@ -123,7 +123,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'Native SQL with string concatenation — SQL injection risk',
             ],
             'dynamic_order_by' => [
-                'regex' => '/->orderBy\s*\(\s*\$/',
+                'regex' => '/->orderBy\s*\(\s*\$/s',
                 'description' => 'Dynamic orderBy — Doctrine does NOT parameterize ORDER BY',
             ],
             'querybuilder_no_setparameter' => [

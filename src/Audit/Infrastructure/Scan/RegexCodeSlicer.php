@@ -180,8 +180,8 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         $openHeredocIdentifier = null;
         foreach (explode("\n", $projectFile->content()) as $line) {
             if (null !== $openHeredocIdentifier) {
-                [$outputLine, $openHeredocIdentifier] = $this->consumeHeredocLine($line, $openHeredocIdentifier);
-                $output[] = $outputLine;
+                $output[] = $line;
+                [$openHeredocIdentifier, $openParenDepth, $openStringDelimiter] = $this->consumeHeredocLine($line, $openHeredocIdentifier, $openParenDepth, $openStringDelimiter);
 
                 continue;
             }
@@ -220,19 +220,18 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
     }
 
     /**
-     * A heredoc/nowdoc body is arbitrary text, not PHP code — treating it as
-     * such would misfire the security-token/structural checks on its content
-     * (a false negative when the body itself is the vulnerable line, e.g. raw
-     * SQL built with a heredoc) and feed unbalanced quotes/parens from prose
-     * into {@see self::parenDelta()}, desyncing continuation tracking for the
-     * rest of the file. The opener line and every line up to and including
-     * the closing identifier are retained verbatim instead.
-     *
-     * @return array{0: string, 1: ?string}
+     * @return array{0: ?string, 1: int, 2: ?string}
      */
-    private function consumeHeredocLine(string $line, string $identifier): array
+    private function consumeHeredocLine(string $line, string $openHeredocIdentifier, int $openParenDepth, ?string $openStringDelimiter): array
     {
-        return [$line, $this->closesHeredoc($line, $identifier) ? null : $identifier];
+        $trailer = $this->heredocCloseTrailer($line, $openHeredocIdentifier);
+        if (null === $trailer) {
+            return [$openHeredocIdentifier, $openParenDepth, $openStringDelimiter];
+        }
+
+        [$openParenDepth, $openStringDelimiter] = $this->advanceParenTracking(true, $trailer, $openParenDepth, $openStringDelimiter);
+
+        return [null, $openParenDepth, $openStringDelimiter];
     }
 
     private function heredocIdentifierOpenedBy(string $line): ?string
@@ -245,13 +244,28 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
     }
 
     /**
-     * PHP allows the closing identifier to be indented (flexible heredoc
-     * syntax, PHP 7.3+) and requires nothing but whitespace before it, so it
-     * is matched at the start of the line rather than requiring column 0.
+     * A heredoc/nowdoc body is arbitrary text, not PHP code — treating it as
+     * such would misfire the security-token/structural checks on its content
+     * (a false negative when the body itself is the vulnerable line, e.g. raw
+     * SQL built with a heredoc) and feed unbalanced quotes/parens from prose
+     * into {@see self::parenDelta()}, desyncing continuation tracking for the
+     * rest of the file. The opener line and every line up to and including
+     * the closing identifier are retained verbatim instead. PHP allows the
+     * closing identifier to be indented (flexible heredoc syntax, PHP 7.3+)
+     * and requires nothing but whitespace before it, so it is matched at the
+     * start of the line rather than requiring column 0. Any code trailing
+     * the identifier on the same line (e.g. the `);` that closes an
+     * enclosing multi-line call, a common Doctrine/DBAL idiom) is real PHP,
+     * not heredoc body — it is returned so the caller can still feed it into
+     * continuation tracking instead of silently dropping it.
      */
-    private function closesHeredoc(string $line, string $identifier): bool
+    private function heredocCloseTrailer(string $line, string $identifier): ?string
     {
-        return 1 === preg_match(\sprintf('/^\s*%s\b/', preg_quote($identifier, '/')), $line);
+        if (1 !== preg_match(\sprintf('/^\s*%s\b(.*)$/', preg_quote($identifier, '/')), $line, $matches)) {
+            return null;
+        }
+
+        return $matches[1];
     }
 
     private function shouldSlice(ProjectFile $projectFile): bool

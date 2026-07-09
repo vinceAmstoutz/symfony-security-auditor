@@ -226,6 +226,34 @@ final class RegexCodeSlicerTest extends TestCase
     }
 
     /**
+     * When a still-open multi-line call's closing `)`/`;` sits on the same
+     * line as the heredoc's closing identifier (a common Doctrine/DBAL idiom
+     * — `->executeQuery(<<<SQL ... SQL);`), that line is consumed entirely by
+     * the heredoc branch and its trailing code must still feed continuation
+     * tracking — otherwise `openParenDepth` never returns to zero and every
+     * remaining line in the file is force-retained.
+     *
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_heredoc_closing_line_that_also_closes_the_enclosing_call_does_not_desync_continuation_tracking(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 8)
+            ."    public function process(): void\n"
+            ."    {\n"
+            ."        \$this->getConnection()->executeQuery(\n"
+            ."            <<<SQL\n"
+            ."            SELECT 1\n"
+            ."            SQL);\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
      * @throws InvalidProjectFileException
      */
     public function test_a_closing_paren_inside_a_string_literal_default_value_does_not_break_continuation_tracking(): void
