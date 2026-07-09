@@ -690,6 +690,92 @@ final class AuditOrchestratorTest extends TestCase
     }
 
     /**
+     * A single accepted baseline fingerprint grants exactly one credit for the
+     * *whole run*, not one per attacker/reviewer iteration — recomputing the
+     * remaining budget fresh on every call would let the same accepted
+     * occurrence skip a different, never-reviewed finding that merely shares
+     * its fingerprint in a later iteration.
+     *
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_it_only_grants_one_baseline_credit_for_the_whole_run_not_per_iteration(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([
+                $this->vulnPayload(lineStart: 10, lineEnd: 15),
+                $this->vulnPayload(title: 'Control', lineStart: 50, lineEnd: 55),
+            ]),
+            $this->attackerResponse([
+                $this->vulnPayload(lineStart: 200, lineEnd: 210),
+            ]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping([$this->defaultPayloadFingerprint()]);
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        $lines = array_map(static fn (Vulnerability $vulnerability): int => $vulnerability->lineStart(), array_values($auditContext->vulnerabilities()));
+        sort($lines);
+        self::assertSame([50, 200], $lines);
+    }
+
+    /**
+     * `recordBaselineSkip()` only logs/reports the first skip event per
+     * fingerprint per run — a genuine second baseline credit for the
+     * identical fingerprint (two originally-accepted findings that happen to
+     * collide) still consumes its own budget slot, but must not emit a
+     * duplicate log line or progress event for what looks, from the outside,
+     * like the same finding being skipped twice.
+     *
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_it_only_reports_the_first_of_several_skips_sharing_the_same_fingerprint(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([
+                $this->vulnPayload(lineStart: 10, lineEnd: 15),
+                $this->vulnPayload(lineStart: 100, lineEnd: 105),
+                $this->vulnPayload(lineStart: 200, lineEnd: 210),
+            ]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm, [
+            'recordingProgressReporter' => $recordingProgressReporter,
+        ]);
+        $fingerprint = $this->defaultPayloadFingerprint();
+        $auditContext = $this->makeContextWithMapping([$fingerprint, $fingerprint]);
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertCount(1, $auditContext->vulnerabilities());
+        self::assertSame(200, array_values($auditContext->vulnerabilities())[0]->lineStart());
+
+        $skippedEvents = array_values(array_filter(
+            $recordingProgressReporter->events,
+            static fn (array $event): bool => 'baseline.finding.skipped' === $event[0],
+        ));
+        self::assertCount(1, $skippedEvents);
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException

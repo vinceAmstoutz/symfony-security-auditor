@@ -49,6 +49,34 @@ final class AuditReportTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_consumed_baseline_fingerprints_default_to_an_empty_list(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertSame([], $auditReport->consumedBaselineFingerprints());
+    }
+
+    /**
+     * `BaselineProcessor` needs this to avoid re-spending, at the final-report
+     * stage, a baseline credit `AuditOrchestrator` already spent skipping a
+     * finding before it ever reached the reviewer.
+     *
+     * @throws InvalidAuditContextException
+     */
+    public function test_it_carries_over_the_baseline_credits_consumed_during_the_run(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-AAA']);
+        $auditContext->consumeBaselineCredit('SSA-AAA');
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertSame(['SSA-AAA'], $auditReport->consumedBaselineFingerprints());
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException

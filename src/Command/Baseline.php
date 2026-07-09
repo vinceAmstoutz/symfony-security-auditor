@@ -55,14 +55,33 @@ final readonly class Baseline implements BaselineInterface
 
         $fingerprints = [];
         foreach ($decoded as $entry) {
-            $fingerprints[] = $this->fingerprintOf($entry, $path);
-            $attackerFingerprint = $this->attackerFingerprintOf($entry);
-            if (null !== $attackerFingerprint) {
-                $fingerprints[] = $attackerFingerprint;
+            foreach ($this->fingerprintsOf($entry, $path) as $fingerprint) {
+                $fingerprints[] = $fingerprint;
             }
         }
 
         return $fingerprints;
+    }
+
+    /**
+     * A redundant `attacker_fingerprint` equal to its own `fingerprint` (a
+     * hand-edited or merged baseline file could carry one, though the tool's
+     * own writer never produces this — `BaselineProcessor::entryFor()` only
+     * sets it when the two differ) must not grant a count-aware budget of 2
+     * credits for what is really just 1 accepted occurrence.
+     *
+     * @return list<string>
+     *
+     * @throws MalformedBaselineFileException
+     */
+    private function fingerprintsOf(mixed $entry, string $path): array
+    {
+        $fingerprint = $this->fingerprintOf($entry, $path);
+        $attackerFingerprint = $this->attackerFingerprintOf($entry);
+
+        return null !== $attackerFingerprint && $attackerFingerprint !== $fingerprint
+            ? [$fingerprint, $attackerFingerprint]
+            : [$fingerprint];
     }
 
     private function attackerFingerprintOf(mixed $entry): ?string

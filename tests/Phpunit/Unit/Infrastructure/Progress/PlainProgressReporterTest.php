@@ -119,6 +119,33 @@ final class PlainProgressReporterTest extends TestCase
         self::assertSame("  [VALIDATED] sql_injection — src/Foo.php</> <fg=grey>injected</>:18\n", $this->bufferedOutput->fetch());
     }
 
+    public function test_a_raw_ansi_escape_byte_in_a_reported_file_path_is_stripped(): void
+    {
+        $this->plainProgressReporter->report('attacker.finding.recorded', [
+            'severity' => 'high',
+            'type' => 'sql_injection',
+            'file' => "src/Foo.php\x1b[32mFAKE: 0 vulnerabilities found\x1b[0m",
+            'line' => 42,
+        ]);
+
+        $rendered = $this->bufferedOutput->fetch();
+        self::assertStringContainsString('src/Foo.php', $rendered);
+        self::assertStringContainsString('FAKE: 0 vulnerabilities found', $rendered);
+        self::assertStringNotContainsString("\x1b", $rendered);
+    }
+
+    public function test_an_embedded_newline_in_a_reported_file_path_does_not_forge_a_new_line(): void
+    {
+        $this->plainProgressReporter->report('attacker.finding.recorded', [
+            'severity' => 'high',
+            'type' => 'sql_injection',
+            'file' => "src/Foo.php\nFAKE: 0 vulnerabilities found",
+            'line' => 42,
+        ]);
+
+        self::assertStringNotContainsString("Foo.php\nFAKE", $this->bufferedOutput->fetch());
+    }
+
     public function test_it_defaults_missing_finding_strings_to_empty(): void
     {
         $this->plainProgressReporter->report('attacker.finding.recorded', ['line' => 7]);

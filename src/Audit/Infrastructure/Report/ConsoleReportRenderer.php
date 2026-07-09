@@ -113,7 +113,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
     {
         return implode("\n", array_map(
             static fn (string $chunk): string => \sprintf('    %s', $chunk),
-            explode("\n", u($this->sanitizeControlCharacters(mb_scrub($text, 'UTF-8')))->wordwrap(65, "\n", true)->toString()),
+            explode("\n", u(TerminalTextSanitizer::stripControlCharacters(mb_scrub($text, 'UTF-8')))->wordwrap(65, "\n", true)->toString()),
         ));
     }
 
@@ -126,26 +126,8 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
     {
         return implode("\n", array_map(
             static fn (string $line): string => \sprintf('    %s', $line),
-            explode("\n", $this->sanitizeControlCharacters(mb_scrub($text, 'UTF-8'))),
+            explode("\n", TerminalTextSanitizer::stripControlCharacters(mb_scrub($text, 'UTF-8'))),
         ));
-    }
-
-    /**
-     * `ReportWriter` deliberately renders console output with `OUTPUT_RAW` so
-     * a finding's own `<tag>`-lookalike text isn't misread as Symfony Console
-     * markup — but that only bypasses Symfony's formatter, it does not strip
-     * raw control bytes already in the string. An LLM-sourced field quoting
-     * attacker-crafted project content verbatim could otherwise carry a real
-     * ESC byte (ANSI escape sequences) or carriage return, letting a crafted
-     * finding erase or overwrite adjacent terminal output — e.g. hiding a
-     * CRITICAL finding behind a forged "all clear" line. The same field could
-     * also carry a Unicode bidi override (`U+202A`-`U+202E`, `U+2066`-`U+2069`)
-     * to visually reorder the displayed characters — a Trojan-Source-style
-     * spoof — so those are stripped alongside the ASCII/C1 control ranges.
-     */
-    private function sanitizeControlCharacters(string $text): string
-    {
-        return preg_replace('/[\x{0}-\x{8}\x{B}-\x{1F}\x{7F}-\x{9F}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $text) ?? $text;
     }
 
     /**
@@ -153,13 +135,10 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
      * `description`/`attackVector`/`proof`/`remediation`, which are
      * legitimately multi-line and rendered inside their own indented block —
      * an embedded newline here would let a crafted finding forge a fake
-     * `[ID] SEVERITY` finding block as unguarded top-level output. `\R` under
-     * the `/u` modifier collapses every Unicode newline sequence (CR, LF,
-     * CRLF, NEL, LS, PS), not just the ASCII ones a plain `str_replace` would
-     * catch.
+     * `[ID] SEVERITY` finding block as unguarded top-level output.
      */
     private function sanitizeSingleLineField(string $text): string
     {
-        return $this->sanitizeControlCharacters(preg_replace('/\R/u', ' ', mb_scrub($text, 'UTF-8')) ?? $text);
+        return TerminalTextSanitizer::collapseToSingleLine(mb_scrub($text, 'UTF-8'));
     }
 }

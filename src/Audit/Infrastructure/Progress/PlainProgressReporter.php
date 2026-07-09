@@ -17,6 +17,7 @@ use Override;
 use Symfony\Component\Console\Output\OutputInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /**
  * Append-only, line-oriented reporter for non-interactive output (CI logs,
@@ -87,7 +88,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
             '  [%s] %s — %s:%d',
             strtoupper(ProgressContext::string($context, 'severity')),
             ProgressContext::string($context, 'type'),
-            ProgressContext::string($context, 'file'),
+            TerminalTextSanitizer::collapseToSingleLine(ProgressContext::string($context, 'file')),
             ProgressContext::int($context, 'line'),
         );
     }
@@ -104,7 +105,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
         return \sprintf(
             '  [BASELINE-SKIPPED] %s — %s:%d',
             ProgressContext::string($context, 'type'),
-            ProgressContext::string($context, 'file'),
+            TerminalTextSanitizer::collapseToSingleLine(ProgressContext::string($context, 'file')),
             ProgressContext::int($context, 'line'),
         );
     }
@@ -116,7 +117,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
             '  [%s] %s — %s:%d',
             true === ($context['accepted'] ?? null) ? 'VALIDATED' : 'REJECTED',
             ProgressContext::string($context, 'type'),
-            ProgressContext::string($context, 'file'),
+            TerminalTextSanitizer::collapseToSingleLine(ProgressContext::string($context, 'file')),
             ProgressContext::int($context, 'line'),
         );
     }

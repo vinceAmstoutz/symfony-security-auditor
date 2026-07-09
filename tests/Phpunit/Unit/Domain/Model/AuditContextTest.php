@@ -71,6 +71,65 @@ final class AuditContextTest extends TestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_consumed_baseline_fingerprints_default_to_an_empty_list(): void
+    {
+        self::assertSame([], AuditContext::forProject($this->tmpDir)->consumedBaselineFingerprints());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_it_consumes_a_baseline_credit_and_records_it_as_consumed(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-AAA']);
+
+        self::assertTrue($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertSame(['SSA-AAA'], $auditContext->consumedBaselineFingerprints());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_it_refuses_to_consume_a_baseline_credit_that_was_never_accepted(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        self::assertFalse($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertSame([], $auditContext->consumedBaselineFingerprints());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_it_exhausts_a_baseline_credit_after_it_has_been_consumed_once(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-AAA']);
+
+        self::assertTrue($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertFalse($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertSame(['SSA-AAA'], $auditContext->consumedBaselineFingerprints());
+    }
+
+    /**
+     * A fingerprint accepted twice in the baseline (two distinct originally
+     * accepted findings sharing the same fingerprint) grants two credits —
+     * `array_count_values()`-style budgeting, not plain membership.
+     *
+     * @throws InvalidAuditContextException
+     */
+    public function test_it_grants_one_credit_per_repeated_occurrence_of_an_accepted_fingerprint(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-AAA', 'SSA-AAA']);
+
+        self::assertTrue($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertTrue($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertFalse($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertSame(['SSA-AAA', 'SSA-AAA'], $auditContext->consumedBaselineFingerprints());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_audit_id_matches_expected_format(): void
     {
         for ($i = 0; $i < 64; ++$i) {

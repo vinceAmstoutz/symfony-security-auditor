@@ -52,7 +52,8 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
         }
 
         $before = $auditReport->totalVulnerabilities();
-        $filtered = $auditReport->withoutFingerprints($fingerprints);
+        $remainingFingerprints = $this->withoutAlreadyConsumed($fingerprints, $auditReport->consumedBaselineFingerprints());
+        $filtered = $auditReport->withoutFingerprints($remainingFingerprints);
 
         return new BaselineResult($filtered, $before - $filtered->totalVulnerabilities(), $fingerprints);
     }
@@ -66,6 +67,32 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
         }
 
         return $this->baseline->load($baselinePath);
+    }
+
+    /**
+     * `AuditOrchestrator::withoutBaselineAccepted()` may already have spent
+     * some of these same credits skipping a different finding before the
+     * reviewer ever ran — reloading the baseline here grants a fresh,
+     * un-decremented budget, so each already-consumed occurrence is removed
+     * once before this stage builds its own count-aware suppression pass,
+     * rather than handing every finding still standing a second, unearned
+     * credit.
+     *
+     * @param list<string> $fingerprints
+     * @param list<string> $alreadyConsumed
+     *
+     * @return list<string>
+     */
+    private function withoutAlreadyConsumed(array $fingerprints, array $alreadyConsumed): array
+    {
+        foreach ($alreadyConsumed as $consumedFingerprint) {
+            $index = array_search($consumedFingerprint, $fingerprints, true);
+            if (false !== $index) {
+                unset($fingerprints[$index]);
+            }
+        }
+
+        return array_values($fingerprints);
     }
 
     /**

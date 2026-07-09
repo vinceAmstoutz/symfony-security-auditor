@@ -3880,6 +3880,62 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   now rejects a non-finite or out-of-`[0.0, 1.0]` `minConfidence` via a new
   `InvalidAuditExecutionConfigurationException`
   (`src/Audit/Domain/Exception/InvalidAuditExecutionConfigurationException.php`).
+- **A baseline-accepted finding's suppression credit could be spent twice,
+  silently dropping a genuinely new, reviewer-validated vulnerability from the
+  final report and exit code — both within a single `AuditOrchestrator` run
+  across iterations, and again between the pre-review and final-report stages.**
+  `AuditOrchestrator::withoutBaselineAccepted()`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) recomputed its
+  `array_count_values()`-based remaining budget fresh on every call, so a
+  1-credit baseline entry could grant a second, unearned skip to an unrelated
+  finding sharing the same fingerprint on a later attacker/reviewer iteration.
+  Separately, `BaselineProcessor::apply()` (`src/Command/BaselineProcessor.php`)
+  reloaded the baseline file from disk and rebuilt its own fresh budget for the
+  final report, with no knowledge of what the orchestrator already spent
+  pre-review — so a credit spent skipping one finding before review could be
+  spent _again_ against a different, already-validated finding sharing its
+  fingerprint, silently removing it from the report CI trusts for its exit code.
+  The budget itself now lives on `AuditContext` via a new
+  `consumeBaselineCredit()` (`src/Audit/Domain/Model/AuditContext.php`), shared
+  across every iteration of the same run; a new
+  `AuditContext::consumedBaselineFingerprints()` /
+  `AuditReport::consumedBaselineFingerprints()`
+  (`src/Audit/Domain/Model/AuditReport.php`) carries what was already spent out
+  to `BaselineProcessor::apply()`, which now subtracts those occurrences from
+  the freshly-loaded baseline before building its own suppression pass.
+- **`Baseline::load()` could grant two suppression credits for what is really
+  one accepted occurrence, if an entry's `attacker_fingerprint` happened to
+  equal its own `fingerprint`** — a redundant key the tool's own writer
+  (`BaselineProcessor::entryFor()`) never produces, but a hand-edited or merged
+  baseline file could. `load()` (`src/Command/Baseline.php`) now skips the
+  `attacker_fingerprint` value when it is identical to the entry's own
+  `fingerprint`.
+- **`ReviewOutcomeRecorder::recoverDrainedVerdict()` never wrote a verdict
+  recovered after a mid-conversation abort to the reviewer-verdict cache, unlike
+  the identical recovery already handled for the batch review path** — a verdict
+  the reviewer LLM genuinely reached and recorded via `record_review` before a
+  later `BudgetExceededException`/ `LLMProviderException`/generic `Throwable`
+  unwound the conversation was correctly recovered into this run's report, but
+  silently never cached, so a retried run of the same unchanged code (e.g. a CI
+  re-run after fixing whatever caused the abort) paid for the same reviewer LLM
+  call again. `recoverDrainedVerdict()`
+  (`src/Audit/Application/Agent/Review/ReviewOutcomeRecorder.php`) now accepts
+  an optional code context and stores the recovered verdict the same way a
+  normal, non-aborted verdict already is;
+  `StructuredReviewAnalyzer`/`ConcurrentStructuredReviewAnalyzer`
+  (`src/Audit/Application/Agent/Review/`) now pass it through, respecting
+  `bypassCache` the same way their own non-aborted cache-store already does.
+- **`TransientFailureClassifier::containsStatusCode()`'s `\b`-anchored regex
+  matched a status-code-shaped number embedded in an unrelated hyphenated
+  identifier** (a request id like `abc-500-xyz`, a model name like `gpt-4o-500`)
+  **as confidently as a genuine HTTP status code**, because `\b` treats a hyphen
+  as a word boundary the same as whitespace. A provider error message echoing
+  such an identifier verbatim could misclassify a transient failure as
+  non-transient (aborting a retryable call immediately) or vice versa (retrying
+  a permanent failure a few extra times). `containsStatusCode()`
+  (`src/Audit/Infrastructure/LLM/TransientFailureClassifier.php`) now also
+  excludes a match immediately preceded or followed by a word character or
+  hyphen, alongside the existing decimal/thousands-separator exclusion.
 
 ### Security
 
@@ -4365,6 +4421,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/Report/ConsoleReportRenderer.php`) now collapses
   every Unicode newline sequence via PCRE's `\R` under the `/u` modifier instead
   of a fixed `str_replace()` list.
+- **`ConsoleProgressReporter` and `PlainProgressReporter` left a finding's raw
+  ANSI escape bytes and embedded newlines untouched in the _live_ progress
+  narration, letting a crafted finding erase/overwrite adjacent terminal output
+  or forge a fake status line while the audit is still running** — the same
+  injection class already fixed above for the _final_ console/HTML reports
+  (`ConsoleReportRenderer`), but never carried over to the live per-finding
+  narration these two reporters print as the attacker records each finding.
+  `ConsoleProgressReporter` only escaped `<`/`>` via `OutputFormatter::escape()`
+  (preventing tag forgery, not raw ANSI/newlines); `PlainProgressReporter`
+  didn't sanitize the `file` field at all. A new shared `TerminalTextSanitizer`
+  (`src/Audit/Infrastructure/Report/TerminalTextSanitizer.php`, extracted from
+  `ConsoleReportRenderer`'s existing control-character/newline sanitization so
+  the live narration and the final report share one tested implementation) is
+  now applied to the `file` field in both reporters
+  (`src/Audit/Infrastructure/Progress/ConsoleProgressReporter.php`,
+  `src/Audit/Infrastructure/Progress/PlainProgressReporter.php`) before it
+  reaches the terminal.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

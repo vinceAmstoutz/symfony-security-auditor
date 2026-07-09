@@ -276,6 +276,36 @@ final class BaselineProcessorTest extends TestCase
     }
 
     /**
+     * `AuditOrchestrator::withoutBaselineAccepted()` already spent this
+     * baseline credit skipping a different, never-reviewed finding before the
+     * reviewer ever ran this run — re-applying the same credit here against a
+     * distinct, genuinely new, already-validated finding that merely shares
+     * its fingerprint must not silently drop it from the final report.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_apply_does_not_re_spend_a_baseline_credit_already_consumed_earlier_in_the_run(): void
+    {
+        $vulnerability = $this->makeVulnAtLine('src/Shared.php', 200);
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: [$vulnerability->fingerprint()]);
+        $auditContext->consumeBaselineCredit($vulnerability->fingerprint());
+        $auditContext->addVulnerability($vulnerability);
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        $baseline = self::createStub(BaselineInterface::class);
+        $baseline->method('load')->willReturn([$vulnerability->fingerprint()]);
+
+        $baselineResult = (new BaselineProcessor($baseline))->apply($auditReport, '/baseline.json');
+
+        self::assertSame(1, $baselineResult->report->totalVulnerabilities());
+        self::assertSame(0, $baselineResult->suppressedCount);
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
@@ -356,9 +386,23 @@ final class BaselineProcessorTest extends TestCase
      */
     private function makeVuln(string $filePath): Vulnerability
     {
+        return $this->makeVulnAtLine($filePath, 1);
+    }
+
+    /**
+     * Same type/file/title as {@see self::makeVuln()} at a different line —
+     * a distinct finding (distinct `id()`) sharing the identical, line-
+     * independent `fingerprint()`.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function makeVulnAtLine(string $filePath, int $lineStart): Vulnerability
+    {
         return Vulnerability::of(
             new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Finding '.$filePath, 0.9),
-            new CodeLocation($filePath, 1, 5),
+            new CodeLocation($filePath, $lineStart, $lineStart + 4),
             new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
             'code',
         )->withReviewerValidation(true);

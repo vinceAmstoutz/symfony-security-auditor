@@ -97,6 +97,7 @@ final readonly class StructuredReviewAnalyzer
     private function reviewSingle(Vulnerability $vulnerability, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): Vulnerability
     {
         $codeContext = CodeContextResolver::resolve($vulnerability->filePath(), $projectFiles);
+        $codeContextForCache = $bypassCache ? null : $codeContext;
 
         $cached = $this->reviewerVerdictCache->get($vulnerability, $codeContext, $bypassCache);
         if (null !== $cached) {
@@ -119,22 +120,22 @@ final readonly class StructuredReviewAnalyzer
 
             return $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $verdict, $coverageRecorder);
         } catch (BudgetExceededException $budgetExceededException) {
-            $this->recordAbortOrRecoveredVerdict($vulnerability, $structuredReviewCollectionSession, 'aborted', $coverageRecorder);
+            $this->recordAbortOrRecoveredVerdict($vulnerability, $structuredReviewCollectionSession, 'aborted', $coverageRecorder, $codeContextForCache);
 
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
-            $this->recordAbortOrRecoveredVerdict($vulnerability, $structuredReviewCollectionSession, 'errored', $coverageRecorder);
+            $this->recordAbortOrRecoveredVerdict($vulnerability, $structuredReviewCollectionSession, 'errored', $coverageRecorder, $codeContextForCache);
 
             throw $llmProviderException;
         } catch (Throwable $exception) {
-            return $this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $structuredReviewCollectionSession, $coverageRecorder)
+            return $this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $structuredReviewCollectionSession, $coverageRecorder, $codeContextForCache)
                 ?? $this->reviewOutcomeRecorder->recordReviewError($vulnerability, $exception, $coverageRecorder);
         }
     }
 
-    private function recordAbortOrRecoveredVerdict(Vulnerability $vulnerability, StructuredReviewCollectionSession $structuredReviewCollectionSession, string $status, CoverageRecorderInterface $coverageRecorder): void
+    private function recordAbortOrRecoveredVerdict(Vulnerability $vulnerability, StructuredReviewCollectionSession $structuredReviewCollectionSession, string $status, CoverageRecorderInterface $coverageRecorder, ?string $codeContextForCache): void
     {
-        if (!$this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $structuredReviewCollectionSession, $coverageRecorder) instanceof Vulnerability) {
+        if (!$this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $structuredReviewCollectionSession, $coverageRecorder, $codeContextForCache) instanceof Vulnerability) {
             $this->reviewOutcomeRecorder->recordUnreached($vulnerability, $status, $coverageRecorder);
         }
     }

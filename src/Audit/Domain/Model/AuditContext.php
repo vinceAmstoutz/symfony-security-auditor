@@ -43,6 +43,12 @@ final class AuditContext implements CoverageRecorderInterface
     /** @var list<Vulnerability> */
     private array $pendingFoundVulnerabilities = [];
 
+    /** @var ?array<string, int> */
+    private ?array $remainingBaselineBudget = null;
+
+    /** @var list<string> */
+    private array $consumedBaselineFingerprints = [];
+
     private DateTimeImmutable $startedAt;
 
     /**
@@ -100,6 +106,34 @@ final class AuditContext implements CoverageRecorderInterface
     public function acceptedFingerprints(): array
     {
         return $this->acceptedFingerprints;
+    }
+
+    /**
+     * Spends one baseline credit for `$fingerprint`, shared across every
+     * caller and every attacker/reviewer iteration of this run — the budget
+     * is seeded once from `$acceptedFingerprints` (`array_count_values()`
+     * semantics: an accepted fingerprint repeated N times grants N credits)
+     * and decrements monotonically, so the same accepted occurrence can never
+     * be spent twice regardless of how many times or where it is offered.
+     */
+    public function consumeBaselineCredit(string $fingerprint): bool
+    {
+        $this->remainingBaselineBudget ??= array_count_values($this->acceptedFingerprints);
+
+        if (($this->remainingBaselineBudget[$fingerprint] ?? 0) <= 0) {
+            return false;
+        }
+
+        --$this->remainingBaselineBudget[$fingerprint];
+        $this->consumedBaselineFingerprints[] = $fingerprint;
+
+        return true;
+    }
+
+    /** @return list<string> */
+    public function consumedBaselineFingerprints(): array
+    {
+        return $this->consumedBaselineFingerprints;
     }
 
     public function diffSinceRef(): ?string

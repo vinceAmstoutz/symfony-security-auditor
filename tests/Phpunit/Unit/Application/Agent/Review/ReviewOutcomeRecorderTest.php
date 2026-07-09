@@ -132,6 +132,39 @@ final class ReviewOutcomeRecorderTest extends TestCase
     }
 
     /**
+     * A verdict recovered after a mid-conversation abort was genuinely
+     * reached by the reviewer LLM — the same as a normal, non-aborted
+     * success — so it must be cached the same way, or a retried run pays for
+     * an LLM call that already produced a reliable answer.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_recover_drained_verdict_caches_the_recovered_verdict_when_a_code_context_is_given(): void
+    {
+        $vulnerability = $this->vulnerability();
+        $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin(new RecordReviewToolFactory(), new NullLogger());
+        $structuredReviewCollectionSession->toolRegistry->execute('record_review', ['id' => $vulnerability->id(), 'accepted' => true]);
+
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->expects(self::once())->method('store')->with($vulnerability, 'code-context');
+
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder(
+            new VerdictApplier(new NullLogger()),
+            new ReviewerVerdictCache($reviewerCache, new NullLogger()),
+            new NullLogger(),
+            self::createStub(ProgressReporterInterface::class),
+        );
+
+        $result = $reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $structuredReviewCollectionSession, new NullCoverageRecorder(), 'code-context');
+
+        self::assertNotNull($result);
+        self::assertTrue($result->isReviewerValidated());
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidTokenUsageException

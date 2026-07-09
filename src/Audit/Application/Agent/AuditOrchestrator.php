@@ -259,7 +259,11 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      * membership test would let one baseline-accepted occurrence of a shared
      * fingerprint (`Vulnerability::fingerprint()` is line-independent by
      * design) suppress every current finding sharing it, including ones that
-     * were never actually reviewed.
+     * were never actually reviewed. The budget itself lives on
+     * `$auditContext` (via `consumeBaselineCredit()`) rather than being
+     * recomputed here, so it is shared — and spent at most once — across
+     * every iteration of this method's own attacker/reviewer loop, not just
+     * within a single call.
      *
      * @param list<Vulnerability> $findings
      *
@@ -267,13 +271,9 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      */
     private function withoutBaselineAccepted(array $findings, AuditContext $auditContext): array
     {
-        $remainingByFingerprint = array_count_values($auditContext->acceptedFingerprints());
-
         $remaining = [];
         foreach ($findings as $finding) {
-            $fingerprint = $finding->fingerprint();
-            if (($remainingByFingerprint[$fingerprint] ?? 0) > 0) {
-                --$remainingByFingerprint[$fingerprint];
+            if ($auditContext->consumeBaselineCredit($finding->fingerprint())) {
                 $this->recordBaselineSkip($finding, $auditContext);
 
                 continue;

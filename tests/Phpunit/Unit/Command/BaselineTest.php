@@ -83,6 +83,29 @@ final class BaselineTest extends TestCase
     }
 
     /**
+     * A hand-edited or merged baseline file could carry a redundant
+     * `attacker_fingerprint` equal to its own `fingerprint` — the tool's own
+     * writer never produces this (`BaselineProcessor::entryFor()` only sets
+     * `attacker_fingerprint` when it differs), but `load()` must not grant a
+     * count-aware budget of 2 credits for what is really just 1 accepted
+     * occurrence.
+     *
+     * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
+     */
+    public function test_load_does_not_double_count_a_redundant_attacker_fingerprint_equal_to_its_own_fingerprint(): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+        $baseline = new Baseline($this->filesystem);
+
+        $baseline->save($path, [
+            [...$this->entry('SSA-SAME'), 'attacker_fingerprint' => 'SSA-SAME'],
+        ]);
+
+        self::assertSame(['SSA-SAME'], $baseline->load($path));
+    }
+
+    /**
      * @throws MalformedBaselineFileException
      * @throws UnsafeBaselineWriteException
      */

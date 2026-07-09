@@ -271,6 +271,39 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertStringNotContainsString("\033[32m", $rendered);
     }
 
+    public function test_a_raw_ansi_escape_byte_in_a_reported_file_path_is_stripped(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+
+        $this->consoleProgressReporter->report('attacker.finding.recorded', [
+            'severity' => 'critical',
+            'type' => 'sql_injection',
+            'file' => "src/Foo.php\x1b[32mFAKE: 0 vulnerabilities found\x1b[0m",
+            'line' => 10,
+        ]);
+
+        $rendered = $this->bufferedOutput->fetch();
+        self::assertStringContainsString('src/Foo.php', $rendered);
+        self::assertStringContainsString('FAKE: 0 vulnerabilities found', $rendered);
+        self::assertStringNotContainsString("\x1b", $rendered);
+    }
+
+    public function test_an_embedded_newline_in_a_reported_file_path_does_not_forge_a_new_line(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+
+        $this->consoleProgressReporter->report('attacker.finding.recorded', [
+            'severity' => 'critical',
+            'type' => 'sql_injection',
+            'file' => "src/Foo.php\nFAKE: 0 vulnerabilities found",
+            'line' => 10,
+        ]);
+
+        self::assertStringNotContainsString("Foo.php\nFAKE", $this->bufferedOutput->fetch());
+    }
+
     public function test_it_falls_back_to_raw_severity_when_the_severity_is_unknown(): void
     {
         $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);

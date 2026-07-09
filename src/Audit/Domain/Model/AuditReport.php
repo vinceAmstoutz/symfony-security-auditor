@@ -25,11 +25,13 @@ final readonly class AuditReport
 
     /**
      * @param list<array{stage: string, file: string, status: string}> $coverage
+     * @param list<string>                                             $consumedBaselineFingerprints
      */
     private function __construct(
         private ReportIdentity $reportIdentity,
         private array $coverage,
         ?AuditCost $auditCost,
+        private array $consumedBaselineFingerprints,
         Vulnerability ...$vulnerabilities,
     ) {
         $this->vulnerabilities = $this->orderedMostSevereFirst(array_values($vulnerabilities));
@@ -63,8 +65,22 @@ final readonly class AuditReport
             ),
             $auditContext->coverage(),
             $auditCost,
+            $auditContext->consumedBaselineFingerprints(),
             ...$auditContext->validatedVulnerabilities(),
         );
+    }
+
+    /**
+     * Baseline fingerprints already spent skipping a finding before the
+     * reviewer ever saw it this run — lets `BaselineProcessor` avoid granting
+     * the same accepted occurrence a second, unspent credit when it applies
+     * the baseline again against the final report.
+     *
+     * @return list<string>
+     */
+    public function consumedBaselineFingerprints(): array
+    {
+        return $this->consumedBaselineFingerprints;
     }
 
     public function auditId(): string
@@ -154,6 +170,7 @@ final readonly class AuditReport
             $this->reportIdentity,
             $this->coverage,
             $this->auditCost,
+            $this->consumedBaselineFingerprints,
             ...$kept,
         );
     }
@@ -179,6 +196,7 @@ final readonly class AuditReport
             $this->reportIdentity,
             $this->coverage,
             $this->auditCost,
+            $this->consumedBaselineFingerprints,
             ...$kept,
         );
     }

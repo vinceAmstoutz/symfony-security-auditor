@@ -87,8 +87,8 @@ final readonly class ConcurrentStructuredReviewAnalyzer
         }
 
         if ([] !== $requests) {
-            $concurrentReviewBatch = new ConcurrentReviewBatch($requests, $pendingIndexes, $sessions, $vulnerabilities, $codeContexts);
-            $reviewed = $this->dispatchInWindows($concurrentReviewBatch, $bypassCache, $coverageRecorder, $reviewed);
+            $concurrentReviewBatch = new ConcurrentReviewBatch($requests, $pendingIndexes, $sessions, $vulnerabilities, $codeContexts, $bypassCache);
+            $reviewed = $this->dispatchInWindows($concurrentReviewBatch, $coverageRecorder, $reviewed);
         }
 
         ksort($reviewed);
@@ -121,17 +121,17 @@ final readonly class ConcurrentStructuredReviewAnalyzer
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    private function dispatchInWindows(ConcurrentReviewBatch $concurrentReviewBatch, bool $bypassCache, CoverageRecorderInterface $coverageRecorder, array $reviewed): array
+    private function dispatchInWindows(ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, array $reviewed): array
     {
         $windowSize = max(1, $this->maxConcurrent);
         $requestWindows = array_chunk($concurrentReviewBatch->requests, $windowSize);
         $indexWindows = array_chunk($concurrentReviewBatch->pendingIndexes, $windowSize);
 
         foreach ($requestWindows as $windowNumber => $requestWindow) {
-            $windowBatch = new ConcurrentReviewBatch($requestWindow, $indexWindows[$windowNumber], $concurrentReviewBatch->sessions, $concurrentReviewBatch->vulnerabilities, $concurrentReviewBatch->codeContexts);
+            $windowBatch = new ConcurrentReviewBatch($requestWindow, $indexWindows[$windowNumber], $concurrentReviewBatch->sessions, $concurrentReviewBatch->vulnerabilities, $concurrentReviewBatch->codeContexts, $concurrentReviewBatch->bypassCache);
 
             try {
-                $reviewed = $this->dispatchPending($windowBatch, $coverageRecorder, $bypassCache, $reviewed);
+                $reviewed = $this->dispatchPending($windowBatch, $coverageRecorder, $reviewed);
             } catch (BudgetExceededException $budgetExceededException) {
                 $this->failRemainingWindows($indexWindows, $windowNumber, $concurrentReviewBatch, 'aborted', $coverageRecorder);
 
@@ -164,7 +164,7 @@ final readonly class ConcurrentStructuredReviewAnalyzer
 
             foreach ($indexes as $index) {
                 $vulnerability = $concurrentReviewBatch->vulnerabilities[$index];
-                $recovered = $this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $concurrentReviewBatch->sessions[$index], $coverageRecorder);
+                $recovered = $this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $concurrentReviewBatch->sessions[$index], $coverageRecorder, $concurrentReviewBatch->codeContextForCache($index));
                 if (!$recovered instanceof Vulnerability) {
                     $this->reviewOutcomeRecorder->recordUnreached($vulnerability, $status, $coverageRecorder);
                 }
@@ -180,7 +180,7 @@ final readonly class ConcurrentStructuredReviewAnalyzer
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    private function dispatchPending(ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, bool $bypassCache, array $reviewed): array
+    private function dispatchPending(ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, array $reviewed): array
     {
         try {
             $this->toolBatchCapableLLMClient->completeBatchWithTools($concurrentReviewBatch->requests, $this->maxConcurrent, $this->maxToolIterations);
@@ -193,26 +193,26 @@ final readonly class ConcurrentStructuredReviewAnalyzer
         }
 
         foreach ($concurrentReviewBatch->pendingIndexes as $index) {
-            $reviewed[$index] = $this->recordPendingVerdictOrError($index, $concurrentReviewBatch, $coverageRecorder, $bypassCache);
+            $reviewed[$index] = $this->recordPendingVerdictOrError($index, $concurrentReviewBatch, $coverageRecorder);
         }
 
         return $reviewed;
     }
 
-    private function recordPendingVerdictOrError(int $index, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): Vulnerability
+    private function recordPendingVerdictOrError(int $index, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
         try {
-            return $this->recordPendingVerdict($index, $concurrentReviewBatch, $coverageRecorder, $bypassCache);
+            return $this->recordPendingVerdict($index, $concurrentReviewBatch, $coverageRecorder);
         } catch (Throwable $throwable) {
             return $this->recoveredOrErroredVerdict($index, $concurrentReviewBatch, $throwable, $coverageRecorder);
         }
     }
 
-    private function recordPendingVerdict(int $index, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): Vulnerability
+    private function recordPendingVerdict(int $index, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
         $verdicts = $concurrentReviewBatch->sessions[$index]->drain();
         $verdict = array_pop($verdicts);
-        if (!$bypassCache) {
+        if (!$concurrentReviewBatch->bypassCache) {
             $this->reviewerVerdictCache->store($concurrentReviewBatch->vulnerabilities[$index], $concurrentReviewBatch->codeContexts[$index], $verdict);
         }
 
@@ -243,7 +243,7 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     private function recoveredOrErroredVerdict(int $index, ConcurrentReviewBatch $concurrentReviewBatch, Throwable $throwable, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
         $vulnerability = $concurrentReviewBatch->vulnerabilities[$index];
-        $recovered = $this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $concurrentReviewBatch->sessions[$index], $coverageRecorder);
+        $recovered = $this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $concurrentReviewBatch->sessions[$index], $coverageRecorder, $concurrentReviewBatch->codeContextForCache($index));
 
         return $recovered ?? $this->reviewOutcomeRecorder->recordReviewError($vulnerability, $throwable, $coverageRecorder);
     }

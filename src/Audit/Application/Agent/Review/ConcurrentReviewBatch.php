@@ -38,5 +38,16 @@ final readonly class ConcurrentReviewBatch
         public array $sessions,
         public array $vulnerabilities,
         public array $codeContexts,
+        public bool $bypassCache,
     ) {}
+
+    /**
+     * `null` when caching is bypassed for this run — the caller passes it
+     * straight through to `ReviewOutcomeRecorder::recoverDrainedVerdict()`,
+     * which caches a recovered verdict only when given a non-null context.
+     */
+    public function codeContextForCache(int $index): ?string
+    {
+        return $this->bypassCache ? null : $this->codeContexts[$index];
+    }
 }

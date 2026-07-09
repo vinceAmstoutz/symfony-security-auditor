@@ -60,6 +60,19 @@ final class TransientFailureClassifierTest extends TestCase
         self::assertFalse((new TransientFailureClassifier())->isTransient($throwable));
     }
 
+    #[DataProvider('hyphenatedIdentifierCases')]
+    public function test_it_does_not_mistake_a_status_like_number_embedded_in_a_hyphenated_identifier_for_a_real_status_code(Throwable $throwable): void
+    {
+        self::assertFalse((new TransientFailureClassifier())->isTransient($throwable));
+    }
+
+    /** @return iterable<string, array{Throwable}> */
+    public static function hyphenatedIdentifierCases(): iterable
+    {
+        yield 'status_code_embedded_in_request_id' => [new RuntimeException('request id abc-500-xyz failed')];
+        yield 'status_code_embedded_in_model_name' => [new RuntimeException('the model gpt-4o-500 is not available')];
+    }
+
     #[DataProvider('rateLimitCases')]
     public function test_it_recognizes_rate_limit_failures(Throwable $throwable): void
     {
