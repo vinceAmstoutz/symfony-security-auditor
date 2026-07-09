@@ -226,6 +226,45 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
     }
 
     /**
+     * The abstract Symfony `Voter` class's canonical style checks only the
+     * subject type in `supports()` and dispatches on the attribute inside
+     * `voteOnAttribute()` — this attribute vocabulary must not be invisible
+     * to the "Voter Coverage" prompt block just because it lives in a
+     * different method than `supports()`.
+     *
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_extracts_attributes_from_vote_on_attribute_when_supports_only_checks_the_subject_type(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            use App\Entity\Post;
+            use Symfony\Component\Security\Core\Authorization\Voter\Voter;
+            use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+            final class PostVoter extends Voter {
+                protected function supports(string $attribute, mixed $subject): bool {
+                    return $subject instanceof Post;
+                }
+                protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token): bool {
+                    return match ($attribute) {
+                        'EDIT' => true,
+                        'VIEW' => true,
+                        default => false,
+                    };
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['EDIT', 'VIEW'], $voterCapability->supportedAttributes());
+        self::assertSame(['App\\Entity\\Post'], $voterCapability->supportedSubjects());
+    }
+
+    /**
      * @throws InvalidProjectFileException
      */
     public function test_it_does_not_infinitely_recurse_when_private_helpers_call_each_other_in_a_cycle(): void

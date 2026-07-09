@@ -110,6 +110,8 @@ final readonly class AuditCommand
 
         try {
             try {
+                $auditCommandInput->assertNoConflictingOptions();
+
                 if ($auditCommandInput->showScanned) {
                     $this->showScannedFiles($displayStyle, $projectPath, $scanPaths, $auditCommandInput->since);
                 }

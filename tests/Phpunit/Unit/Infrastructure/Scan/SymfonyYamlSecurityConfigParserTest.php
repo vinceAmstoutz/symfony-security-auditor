@@ -166,6 +166,30 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         );
     }
 
+    /**
+     * Symfony's own route/request matching uppercases HTTP methods
+     * internally, so `methods: [post]` and `methods: [POST]` are equally
+     * valid, semantically-identical YAML. The `methods: ...` marker must be
+     * normalized to uppercase here, since
+     * `SymfonyMappingContextRenderer::alternativeCoversMethods()` re-parses
+     * it with an uppercase-only regex to decide route coverage.
+     */
+    public function test_it_normalizes_lowercase_methods_to_uppercase(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - path: ^/admin
+                      roles: ROLE_ADMIN
+                      methods: [post, delete]
+            YAML);
+
+        self::assertSame(
+            ['^/admin' => ['ROLE_ADMIN', 'methods: POST|DELETE']],
+            $accessControl,
+        );
+    }
+
     public function test_it_surfaces_a_host_constraint_alongside_roles(): void
     {
         $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'

@@ -254,23 +254,32 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
+     * Consumes at most as many findings per fingerprint as
+     * `$auditContext->acceptedFingerprints()` contains that value — a plain
+     * membership test would let one baseline-accepted occurrence of a shared
+     * fingerprint (`Vulnerability::fingerprint()` is line-independent by
+     * design) suppress every current finding sharing it, including ones that
+     * were never actually reviewed.
+     *
      * @param list<Vulnerability> $findings
      *
      * @return list<Vulnerability>
      */
     private function withoutBaselineAccepted(array $findings, AuditContext $auditContext): array
     {
-        $acceptedFingerprints = $auditContext->acceptedFingerprints();
+        $remainingByFingerprint = array_count_values($auditContext->acceptedFingerprints());
 
         $remaining = [];
         foreach ($findings as $finding) {
-            if (!\in_array($finding->fingerprint(), $acceptedFingerprints, true)) {
-                $remaining[] = $finding;
+            $fingerprint = $finding->fingerprint();
+            if (($remainingByFingerprint[$fingerprint] ?? 0) > 0) {
+                --$remainingByFingerprint[$fingerprint];
+                $this->recordBaselineSkip($finding, $auditContext);
 
                 continue;
             }
 
-            $this->recordBaselineSkip($finding, $auditContext);
+            $remaining[] = $finding;
         }
 
         return $remaining;

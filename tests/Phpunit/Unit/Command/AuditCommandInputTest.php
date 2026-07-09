@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 
@@ -275,5 +276,61 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput->failOn = RiskLevel::High;
 
         self::assertSame(RiskLevel::High, $auditCommandInput->failOn);
+    }
+
+    /**
+     * @throws ConflictingCommandOptionsException
+     */
+    public function test_assert_no_conflicting_options_allows_generate_baseline_alone(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->generateBaseline = 'baseline.json';
+
+        $auditCommandInput->assertNoConflictingOptions();
+
+        self::assertSame('baseline.json', $auditCommandInput->generateBaseline);
+    }
+
+    /**
+     * @throws ConflictingCommandOptionsException
+     */
+    public function test_assert_no_conflicting_options_allows_dry_run_alone(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->dryRun = true;
+
+        $auditCommandInput->assertNoConflictingOptions();
+
+        self::assertTrue($auditCommandInput->dryRun);
+    }
+
+    /**
+     * @throws ConflictingCommandOptionsException
+     */
+    public function test_assert_no_conflicting_options_rejects_generate_baseline_with_dry_run(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->generateBaseline = 'baseline.json';
+        $auditCommandInput->dryRun = true;
+
+        $this->expectException(ConflictingCommandOptionsException::class);
+        $this->expectExceptionMessage('--generate-baseline requires a real audit run and cannot be combined with --dry-run, which exits before the LLM is ever invoked.');
+
+        $auditCommandInput->assertNoConflictingOptions();
+    }
+
+    /**
+     * @throws ConflictingCommandOptionsException
+     */
+    public function test_assert_no_conflicting_options_rejects_generate_baseline_with_show_scanned(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->generateBaseline = 'baseline.json';
+        $auditCommandInput->showScanned = true;
+
+        $this->expectException(ConflictingCommandOptionsException::class);
+        $this->expectExceptionMessage('--generate-baseline requires a real audit run and cannot be combined with --show-scanned, which exits before the LLM is ever invoked.');
+
+        $auditCommandInput->assertNoConflictingOptions();
     }
 }

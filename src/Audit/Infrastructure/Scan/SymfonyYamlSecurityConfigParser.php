@@ -240,6 +240,10 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
         $requirements = [];
         foreach (['methods' => '|', 'ips' => ', '] as $key => $separator) {
             $values = $this->stringListOf($entry[$key] ?? null);
+            if ('methods' === $key) {
+                $values = array_map(strtoupper(...), $values);
+            }
+
             if ([] !== $values) {
                 $requirements[] = \sprintf('%s: %s', $key, implode($separator, $values));
             }

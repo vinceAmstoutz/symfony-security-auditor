@@ -3685,6 +3685,57 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   partitioned an aborted/unreachable batch away before `applyBatchReview()` is
   ever called, so an unmatched id at this point means the reviewer genuinely
   reached and rejected the finding, not that it was never reviewed.
+- **`AuditOrchestrator::withoutBaselineAccepted()` let one baseline-accepted
+  occurrence of a shared fingerprint silently suppress every current finding
+  sharing it, not just the one actually reviewed** — the same bug class already
+  fixed for `AuditReport::withoutFingerprints()`, missed at this earlier,
+  pre-review pipeline stage. `Vulnerability::fingerprint()` is line-independent
+  by design (`type + file + title`), so two distinct, never-reviewed findings on
+  different lines of the same file (e.g. two SQL injection points sharing a
+  generic attacker-generated title) collided with a single baselined fingerprint
+  and were both dropped before the reviewer ever saw them, with no trace in the
+  report. `withoutBaselineAccepted()`
+  (`src/Audit/Application/Agent/AuditOrchestrator.php`) now consumes at most as
+  many findings per fingerprint as `acceptedFingerprints()` contains that value,
+  mirroring `AuditReport::withoutFingerprints()`'s count-aware pattern.
+- **A `security.yaml` `access_control` rule using lowercase or mixed-case HTTP
+  methods (e.g. `methods: [post]`) made an unrelated, genuinely unprotected
+  route on a different method invisible to the attacker LLM.**
+  `SymfonyYamlSecurityConfigParser::listedRequirements()`
+  (`src/Audit/Infrastructure/Scan/SymfonyYamlSecurityConfigParser.php`) copied
+  the YAML `methods` value verbatim into the `methods: ...` marker string
+  without normalizing case, while
+  `SymfonyMappingContextRenderer::alternativeCoversMethods()` re-parses that
+  marker with an uppercase-only `/methods:\s*([A-Z|]+)/` regex — a lowercase
+  marker failed to match and fell into the "no methods restriction" branch,
+  which reports the rule as covering every HTTP method on the route. Symfony
+  itself uppercases HTTP methods internally, so `methods: [post]` and
+  `methods: [POST]` are equally valid, semantically identical YAML.
+  `listedRequirements()` now uppercases the `methods` values before formatting
+  the marker, matching the uppercasing
+  `SymfonyMappingContextRenderer::alternativeCoversMethods()` already applies to
+  the route's own declared methods.
+- **`PhpParserVoterCapabilityParser` never scanned `voteOnAttribute()`, only
+  `supports()`, so a voter following the common Symfony `Voter` style — check
+  only the subject type in `supports()`, dispatch on the attribute inside
+  `voteOnAttribute()` — reported an empty attribute list in the "Voter Coverage"
+  prompt block, which the attacker prompt explicitly treats as a `missing_voter`
+  signal for any real `#[IsGranted('EDIT', $subject)]` call site the voter does
+  cover.** `parse()`
+  (`src/Audit/Infrastructure/Scan/PhpParserVoterCapabilityParser.php`) now also
+  collects string literals/`instanceof` checks from `voteOnAttribute()` via a
+  new `voteOnAttributeBody()` helper, merging them with whatever
+  `supports()`/`vote()` already contributed.
+- **`--generate-baseline` silently had no effect when combined with `--dry-run`
+  or `--show-scanned`** — both exit before the LLM is ever invoked, so
+  `AuditCommand::runAuditFlow()` (`src/Command/AuditCommand.php`) returned from
+  one of those early-exit branches before ever reaching the
+  `--generate-baseline` check, with no file written and no diagnostic, exit `0`.
+  A new `AuditCommandInput::assertNoConflictingOptions()`
+  (`src/Command/AuditCommandInput.php`) now rejects the combination up front
+  with a new `ConflictingCommandOptionsException`
+  (`src/Command/Exception/ConflictingCommandOptionsException.php`) instead of
+  silently doing nothing.
 
 ### Security
 

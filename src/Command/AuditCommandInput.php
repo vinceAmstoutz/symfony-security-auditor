@@ -18,6 +18,7 @@ use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\String\UnicodeString;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
 use function Symfony\Component\String\u;
@@ -120,6 +121,29 @@ final class AuditCommandInput
         }
 
         return '.' === $unicodeString->toString() ? u('') : $unicodeString;
+    }
+
+    /**
+     * `--generate-baseline` requires a real audit run to have real findings
+     * to write to the baseline file, but `--dry-run` and `--show-scanned`
+     * both exit before the LLM is ever invoked — combined, one silently wins
+     * over the other with no file written and no diagnostic.
+     *
+     * @throws ConflictingCommandOptionsException
+     */
+    public function assertNoConflictingOptions(): void
+    {
+        if (null === $this->generateBaseline) {
+            return;
+        }
+
+        if ($this->dryRun) {
+            throw ConflictingCommandOptionsException::forGenerateBaselineWithPreviewFlag('--dry-run');
+        }
+
+        if ($this->showScanned) {
+            throw ConflictingCommandOptionsException::forGenerateBaselineWithPreviewFlag('--show-scanned');
+        }
     }
 
     public function isMachineReadableToStdout(): bool

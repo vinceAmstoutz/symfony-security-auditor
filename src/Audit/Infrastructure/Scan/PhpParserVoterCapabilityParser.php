@@ -81,7 +81,9 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
             return null;
         }
 
-        $body = $this->thisCallReachability->reachableBody($supportsMethod, $this->methodsByName($class));
+        $methodsByName = $this->methodsByName($class);
+        $body = $this->thisCallReachability->reachableBody($supportsMethod, $methodsByName);
+        $body = [...$body, ...$this->voteOnAttributeBody($class, $methodsByName)];
 
         $attributes = $this->mergeUnique(
             $this->collectStringLiterals($body, $nodeFinder),
@@ -131,6 +133,27 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
         }
 
         return null;
+    }
+
+    /**
+     * The abstract Symfony `Voter` class's canonical style checks only the
+     * subject type in `supports()` and dispatches on the attribute inside
+     * `voteOnAttribute()` instead — that attribute vocabulary would otherwise
+     * be invisible to the string-literal/instanceof heuristics, which only
+     * ever look at whichever method `findVoterClass()` returned.
+     *
+     * @param array<string, ClassMethod> $methodsByName
+     *
+     * @return array<Node>
+     */
+    private function voteOnAttributeBody(Class_ $class, array $methodsByName): array
+    {
+        $voteOnAttributeMethod = $this->findMethodNamed($class, 'voteOnAttribute');
+        if (!$voteOnAttributeMethod instanceof ClassMethod || null === $voteOnAttributeMethod->stmts) {
+            return [];
+        }
+
+        return $this->thisCallReachability->reachableBody($voteOnAttributeMethod, $methodsByName);
     }
 
     /**

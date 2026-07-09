@@ -666,6 +666,36 @@ final class AuditOrchestratorTest extends TestCase
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
+    public function test_it_only_skips_as_many_findings_per_baseline_fingerprint_as_were_accepted(): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
+            $this->attackerResponse([
+                $this->vulnPayload(lineStart: 10, lineEnd: 15),
+                $this->vulnPayload(lineStart: 200, lineEnd: 210),
+            ]),
+            $this->emptyResponse(),
+        );
+        $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
+
+        $auditOrchestrator = $this->makeOrchestrator($attackerLlm, $reviewerLlm);
+        $auditContext = $this->makeContextWithMapping([$this->defaultPayloadFingerprint()]);
+
+        $auditOrchestrator->orchestrate($auditContext);
+
+        self::assertCount(1, $auditContext->vulnerabilities());
+        self::assertSame(200, array_values($auditContext->vulnerabilities())[0]->lineStart());
+        self::assertSame(1, $auditContext->getMeta('audit.baseline_skipped'));
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     public function test_it_logs_the_skipped_finding_with_its_fingerprint_type_and_file(): void
     {
         $infoLogs = [];
