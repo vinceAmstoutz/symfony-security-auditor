@@ -128,7 +128,7 @@ final readonly class PlatformToolsMapper
     /**
      * @param array<array-key, mixed> $spec
      *
-     * @return array{items?: array<string, mixed>, properties?: array<string, mixed>, required?: list<string>}
+     * @return array{items?: array<string, mixed>, properties?: array<string, mixed>, required?: list<string>, additionalProperties?: false}
      */
     private static function normalizeNestedSchema(string $type, array $spec): array
     {
@@ -140,6 +140,7 @@ final readonly class PlatformToolsMapper
             return [
                 'properties' => self::normalizeProperties($spec['properties']),
                 'required' => self::normalizeRequired($spec['required'] ?? []),
+                'additionalProperties' => false,
             ];
         }
 

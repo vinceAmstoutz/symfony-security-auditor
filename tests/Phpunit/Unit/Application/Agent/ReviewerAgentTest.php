@@ -5398,7 +5398,7 @@ final class ReviewerAgentTest extends TestCase
      * @throws InvalidToolRegistryException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_batched_review_cache_miss_does_not_store_an_unmatched_finding(): void
+    public function test_batched_review_cache_miss_stores_both_a_matched_and_an_implicitly_rejected_finding(): void
     {
         $matched = $this->makeVulnerabilityAt('src/Matched.php');
         $unmatched = $this->makeVulnerabilityAt('src/Unmatched.php');
@@ -5408,12 +5408,12 @@ final class ReviewerAgentTest extends TestCase
             LLMResponse::of((string) json_encode([['id' => $matched->id(), 'accepted' => true]]), 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)),
         );
 
-        $storedFor = [];
+        $storedVerdictsByFile = [];
         $reviewerCache = self::createStub(ReviewerCacheInterface::class);
         $reviewerCache->method('get')->willReturn(null);
         $reviewerCache->method('store')->willReturnCallback(
-            static function (Vulnerability $vulnerability) use (&$storedFor): void {
-                $storedFor[] = $vulnerability->filePath();
+            static function (Vulnerability $vulnerability, string $codeContext, array $verdict) use (&$storedVerdictsByFile): void {
+                $storedVerdictsByFile[$vulnerability->filePath()] = $verdict;
             },
         );
 
@@ -5433,7 +5433,8 @@ final class ReviewerAgentTest extends TestCase
 
         self::assertTrue($result[0]->isReviewerValidated());
         self::assertFalse($result[1]->isReviewerValidated());
-        self::assertSame(['src/Matched.php'], $storedFor);
+        self::assertSame(['id' => $matched->id(), 'accepted' => true], $storedVerdictsByFile['src/Matched.php']);
+        self::assertSame(['accepted' => false], $storedVerdictsByFile['src/Unmatched.php']);
     }
 
     /**

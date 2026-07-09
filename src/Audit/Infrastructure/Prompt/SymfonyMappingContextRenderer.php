@@ -191,15 +191,69 @@ final readonly class SymfonyMappingContextRenderer
      * `access_control` rules in order and skips to the next one on a method
      * mismatch, it does not treat a path-only match as sufficient. A route
      * with no declared methods answers to every HTTP verb, so a
-     * method-restricted rule can never fully cover it.
+     * method-restricted rule can never fully cover it. A second (or third, …)
+     * `access_control` rule for the same path is recorded as one `or: ...`
+     * entry per rule ({@see SymfonyYamlSecurityConfigParser::recordAccessControlEntry()}),
+     * each its own independent alternative Symfony tries in turn — the path
+     * is covered for a route if ANY alternative covers it, not just the
+     * first.
      *
      * @param list<string> $roles
      * @param list<string> $routeMethods
      */
     private static function methodsAreCovered(array $roles, array $routeMethods): bool
     {
-        $ruleMethods = self::methodsRequirementOf($roles);
-        if (null === $ruleMethods) {
+        foreach (self::alternativesOf($roles) as $alternative) {
+            if (self::alternativeCoversMethods($alternative, $routeMethods)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Splits the flat, possibly-`or:`-joined roles list back into one string
+     * per alternative rule. The base rule's own list items are re-joined the
+     * same way an `or:` one already is, so both are checked identically by
+     * {@see self::alternativeCoversMethods()}.
+     *
+     * @param list<string> $roles
+     *
+     * @return list<string>
+     */
+    private static function alternativesOf(array $roles): array
+    {
+        $base = [];
+        $orAlternatives = [];
+        foreach ($roles as $role) {
+            if (str_starts_with($role, 'or: ')) {
+                $orAlternatives[] = substr($role, \strlen('or: '));
+
+                continue;
+            }
+
+            $base[] = $role;
+        }
+
+        return [implode(', ', $base), ...$orAlternatives];
+    }
+
+    /**
+     * Extracts the alternative's own `methods: GET|POST` requirement via a
+     * targeted regex rather than splitting the comma-joined alternative
+     * string apart — `listedRequirements()` already uses `, ` as the
+     * separator *within* an `ips: ...` requirement, so a generic split
+     * would misparse an alternative combining `ips:` and `methods:`. HTTP
+     * method names are always uppercase ASCII letters, which no other
+     * requirement value can contain, so the match is unambiguous regardless
+     * of what precedes or follows it.
+     *
+     * @param list<string> $routeMethods
+     */
+    private static function alternativeCoversMethods(string $alternative, array $routeMethods): bool
+    {
+        if (1 !== preg_match('/methods:\s*([A-Z|]+)/', $alternative, $matches)) {
             return true;
         }
 
@@ -207,28 +261,10 @@ final readonly class SymfonyMappingContextRenderer
             return false;
         }
 
+        $ruleMethods = explode('|', $matches[1]);
         $upperRouteMethods = array_map(strtoupper(...), $routeMethods);
 
         return [] === array_diff($upperRouteMethods, $ruleMethods);
-    }
-
-    /**
-     * @param list<string> $roles
-     *
-     * @return list<string>|null
-     */
-    private static function methodsRequirementOf(array $roles): ?array
-    {
-        foreach ($roles as $role) {
-            if (str_starts_with($role, 'methods: ')) {
-                return array_map(
-                    static fn (string $method): string => strtoupper(trim($method)),
-                    explode('|', substr($role, \strlen('methods: '))),
-                );
-            }
-        }
-
-        return null;
     }
 
     /**

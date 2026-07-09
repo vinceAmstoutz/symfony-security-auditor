@@ -326,6 +326,49 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $this->boot(['model' => 'gpt-4o', 'max_output_tokens' => 0]);
     }
 
+    #[RunInSeparateProcess]
+    #[MaximumDuration(500)]
+    public function test_bundle_rejects_an_empty_model(): void
+    {
+        $this->expectException(Throwable::class);
+
+        $this->boot(['model' => '']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(500)]
+    public function test_bundle_rejects_an_empty_attacker_model(): void
+    {
+        $this->expectException(Throwable::class);
+
+        $this->boot(['model' => 'gpt-4o', 'attacker_model' => '']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(500)]
+    public function test_bundle_rejects_an_empty_reviewer_model(): void
+    {
+        $this->expectException(Throwable::class);
+
+        $this->boot(['model' => 'gpt-4o', 'reviewer_model' => '']);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(500)]
+    public function test_bundle_rejects_an_empty_escalation_cheap_model(): void
+    {
+        $this->expectException(Throwable::class);
+
+        $this->boot(['model' => 'gpt-4o', 'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => '']]]);
+    }
+
+    public function test_bundle_accepts_a_null_attacker_model_falling_back_to_model(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'attacker_model' => null]);
+
+        self::assertSame('gpt-4o', $containerBuilder->getParameter('symfony_security_auditor.attacker_model'));
+    }
+
     public function test_bundle_defaults_structured_collection_to_true_so_provider_validates_findings(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);

@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 
 final class BatchVerdictApplierTest extends TestCase
@@ -145,11 +146,32 @@ final class BatchVerdictApplierTest extends TestCase
         self::assertFalse($errored[0]->isReviewerValidated());
     }
 
-    private function applier(): BatchVerdictApplier
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_finding_with_no_matching_verdict_caches_the_implicit_rejection(): void
+    {
+        $vulnerability = $this->vulnerability();
+        $reviewerCache = $this->createMock(ReviewerCacheInterface::class);
+        $reviewerCache->expects(self::once())
+            ->method('store')
+            ->with($vulnerability, 'context', ['accepted' => false]);
+
+        $this->applier($reviewerCache)->applyBatchReview(
+            [$vulnerability],
+            [['id' => 'VULN-does-not-match', 'accepted' => true]],
+            new NullCoverageRecorder(),
+            [$vulnerability->id() => 'context'],
+        );
+    }
+
+    private function applier(?ReviewerCacheInterface $reviewerCache = null): BatchVerdictApplier
     {
         return new BatchVerdictApplier(
             new VerdictApplier(new NullLogger()),
-            new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()),
+            new ReviewerVerdictCache($reviewerCache ?? new NullReviewerCache(), new NullLogger()),
             new NullLogger(),
             new NullProgressReporter(),
         );

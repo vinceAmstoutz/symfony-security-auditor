@@ -470,6 +470,48 @@ final class AttackerPromptBuilderTest extends TestCase
     }
 
     /**
+     * A second `access_control` rule for the same path is recorded as a
+     * single `or: ...`-prefixed entry appended to the first rule's own list
+     * (see `SymfonyYamlSecurityConfigParser::recordAccessControlEntry()`) —
+     * this route is only reachable via POST, which only the second
+     * (`ROLE_ADMIN`/`methods: POST`) rule covers, not the first
+     * (`ROLE_USER`/`methods: GET`) one.
+     *
+     * @throws InvalidProjectFileException
+     */
+    public function test_route_is_marked_covered_by_a_later_or_prefixed_access_control_rule_when_the_first_rules_methods_do_not_match(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/OrderController.php',
+            '/app/src/Controller/OrderController.php',
+            '<?php class OrderController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/OrderController.php',
+            methodName: 'create',
+            routePath: '/api/orders',
+            routeMethods: ['POST'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(
+                routeAccessMap: ['^/api/orders' => ['ROLE_USER', 'methods: GET', 'or: ROLE_ADMIN, methods: POST']],
+                routeAccessControls: [$routeAccessControl],
+            ),
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('COVERED_BY', $message);
+        self::assertStringNotContainsString('LACKS_ACCESS_CHECK', $message);
+    }
+
+    /**
      * @throws InvalidProjectFileException
      */
     public function test_a_hash_character_in_the_access_control_pattern_does_not_break_the_firewall_match(): void

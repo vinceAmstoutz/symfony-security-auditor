@@ -174,6 +174,7 @@ final class PlatformToolsMapperTest extends TestCase
 
         self::assertSame(['file' => ['type' => 'string', 'description' => 'the file']], $location['properties']);
         self::assertSame(['file'], $location['required']);
+        self::assertFalse($location['additionalProperties']);
     }
 
     /**

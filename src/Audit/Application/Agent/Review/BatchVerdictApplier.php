@@ -137,6 +137,10 @@ final readonly class BatchVerdictApplier
     private function reviewVulnerability(Vulnerability $vulnerability, ?array $review, CoverageRecorderInterface $coverageRecorder, array $codeContexts): Vulnerability
     {
         if (null === $review) {
+            if (\array_key_exists($vulnerability->id(), $codeContexts)) {
+                $this->reviewerVerdictCache->store($vulnerability, $codeContexts[$vulnerability->id()], ['accepted' => false]);
+            }
+
             ReviewerCoverageRecorder::record($vulnerability, 'rejected', $coverageRecorder, $this->progressReporter);
             $rejected = $vulnerability->withReviewerValidation(false);
             $coverageRecorder->recordReviewedFinding($rejected);

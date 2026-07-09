@@ -42,6 +42,24 @@ final class ComposerAuditAdvisoryDatabaseTest extends TestCase
         self::assertSame([], $composerAuditAdvisoryDatabase->lookup('vendor/unknown', '1.0.0'));
     }
 
+    public function test_lookup_matches_a_differently_cased_package_name(): void
+    {
+        $composerAuditRunner = $this->stubRunner($this->validJson());
+
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, new AuditedProjectPathHolder('/proj'), new NullLogger());
+
+        self::assertCount(1, $composerAuditAdvisoryDatabase->lookup('Vendor/Foo', '1.2.3'));
+    }
+
+    public function test_lookup_matches_a_package_name_with_leading_or_trailing_whitespace(): void
+    {
+        $composerAuditRunner = $this->stubRunner($this->validJson());
+
+        $composerAuditAdvisoryDatabase = new ComposerAuditAdvisoryDatabase($composerAuditRunner, new AuditedProjectPathHolder('/proj'), new NullLogger());
+
+        self::assertCount(1, $composerAuditAdvisoryDatabase->lookup(' vendor/foo ', '1.2.3'));
+    }
+
     public function test_lookup_returns_entries_for_each_distinct_package_in_payload(): void
     {
         $json = (string) json_encode([

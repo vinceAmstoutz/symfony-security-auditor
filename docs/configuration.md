@@ -30,8 +30,11 @@ bundle registration, bundle-level configuration, platform wiring via
 ## Bundle Registration
 
 Register both bundles in `config/bundles.php`. Symfony Flex does this
-automatically via the recipe. `AiBundle` must appear first — it provides the
-`PlatformInterface` service that this bundle references.
+automatically via the recipe. `AiBundle` must be installed and registered
+alongside this bundle — it provides the `PlatformInterface` service this bundle
+references — but array order does not matter: the reference is a lazy
+`nullOnInvalid()` service resolved by the container compiler after every
+bundle's `loadExtension()` has already run.
 
 ```php
 // config/bundles.php

@@ -3611,6 +3611,80 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) now renders the
   same audit ID/project/started/duration/tokens/model line Console and HTML
   already show.
+- **`VulnerabilityFactory::intOrDefault()` silently zeroed out a well-formed
+  line number reported as a whole-number float** — an LLM tool-call payload's
+  `line_start`/`line_end` arriving as JSON `42.0` (a legitimate encoding of the
+  integer 42) failed the `is_int()` check and fell through to the class's `1`
+  default, discarding the LLM's real location and misdirecting the reviewer/
+  report reader to the top of the file. `intOrDefault()`
+  (`src/Audit/Application/Agent/VulnerabilityFactory.php`) now also accepts a
+  `float` with no fractional part (`floor($value) === $value`), casting it to
+  `int`; a genuinely fractional float (`42.5`) still falls back to the default
+  as before.
+- **`PlatformToolsMapper::normalizeNestedSchema()`'s `object` branch omitted the
+  `additionalProperties: false` the mapper's top-level tool schema always
+  sets**, so a nested object property inside a tool's JSON schema (e.g.
+  `record_vulnerability`'s `location` property) permitted the LLM to attach
+  arbitrary extra keys that structured-output validation was supposed to reject
+  at every level, not just the top one. `normalizeNestedSchema()`
+  (`src/Audit/Infrastructure/LLM/PlatformToolsMapper.php`) now sets
+  `additionalProperties: false` on every normalized nested object, matching the
+  top-level schema's existing behavior.
+- **`model`, `attacker_model`, `reviewer_model`, and `escalation.cheap_model`
+  all silently accepted an empty string**, which `SymfonyAiLLMClient`/the
+  underlying `symfony/ai` platform would only reject deep inside a request with
+  a confusing provider-side error, far from the configuration mistake that
+  caused it. `AuditConfigurationDefinition::defineModelNodes()`
+  (`src/Audit/Infrastructure/Config/AuditConfigurationDefinition.php`) now
+  rejects an empty `model` via `->cannotBeEmpty()`; `attacker_model`/
+  `reviewer_model`/`cheap_model` are nullable-with-meaning (`null` means "fall
+  back to `model`"/"fall back to the reviewer model"), so plain
+  `cannotBeEmpty()` would also reject the documented `null` fallback — each
+  instead gets a `->validate()->ifTrue(fn ($v) => '' === $v)->thenInvalid(...)`
+  check that rejects only the empty string.
+- **`ComposerAuditAdvisoryDatabase` and `InMemoryAdvisoryDatabase` keyed
+  advisories by the exact package name string from `composer audit`'s JSON
+  output, so a `lookup_advisory` tool call using a differently-cased or
+  whitespace-padded package name (e.g. an LLM echoing a `use` statement's
+  capitalized namespace guess as `Symfony/Http-Foundation` instead of
+  `symfony/http-foundation`) silently missed a real, cached advisory.** Both
+  classes now normalize package names through a new shared
+  `PackageNameNormalizer::normalize()`
+  (`src/Audit/Infrastructure/Advisory/PackageNameNormalizer.php`,
+  `strtolower(trim(...))`), applied symmetrically when building the
+  `entriesByPackage` map and when looking a name up, so `lookup()`
+  (`ComposerAuditAdvisoryDatabase.php`, `InMemoryAdvisoryDatabase.php`) matches
+  regardless of case or surrounding whitespace.
+- **`SymfonyMappingContextRenderer::methodsAreCovered()` only checked the first
+  `access_control` rule's `methods:` requirement, so a route reachable only via
+  a later, `or:`-prefixed alternative rule
+  (`SymfonyYamlSecurityConfigParser::recordAccessControlEntry()` appends a
+  second rule for the same path as one `or: ...`-prefixed entry) was wrongly
+  reported as `LACKS_ACCESS_CHECK` to the attacker even when that second rule
+  fully covered the route's actual HTTP method.** `methodsAreCovered()`
+  (`src/Audit/Infrastructure/Prompt/SymfonyMappingContextRenderer.php`) now
+  splits the roles list back into every independent alternative rule (the base
+  rule plus each `or: ...` entry) and reports the route covered if _any_
+  alternative's `methods:` requirement covers it — matching how Symfony itself
+  evaluates `access_control` rules in order and falls through on a method
+  mismatch. The alternative's own methods requirement is now extracted via a
+  targeted `/methods:\s*([A-Z|]+)/` regex rather than a naive comma-split, since
+  `listedRequirements()` already reuses a comma-space separator _within_ an
+  `ips:` requirement's own value list.
+- **`BatchVerdictApplier` never cached a finding whose id had no matching
+  verdict in a batched reviewer response, so a distinct finding the reviewer
+  implicitly rejected (by omitting it from the `record_review`/JSON payload) was
+  re-sent to the LLM for review on every subsequent run, defeating
+  `FilesystemReviewerCache` for exactly the findings least likely to change.**
+  `reviewVulnerability()`'s `null === $review` branch
+  (`src/Audit/Application/Agent/Review/BatchVerdictApplier.php`) now stores an
+  explicit `['accepted' => false]` verdict via `ReviewerCacheInterface::store()`
+  for these findings too, mirroring the caching already done for an explicit
+  verdict match — safe to do because
+  `BatchReviewAnalyzer::recordDrainedBatchOrMarkUnreached()` has already
+  partitioned an aborted/unreachable batch away before `applyBatchReview()` is
+  ever called, so an unmatched id at this point means the reviewer genuinely
+  reached and rejected the finding, not that it was never reviewed.
 
 ### Security
 
