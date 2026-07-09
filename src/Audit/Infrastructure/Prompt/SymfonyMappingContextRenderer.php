@@ -93,24 +93,37 @@ final readonly class SymfonyMappingContextRenderer
         foreach ($routeAccessControls as $routeAccessControl) {
             $methods = [] === $routeAccessControl->routeMethods() ? 'ANY' : implode(',', array_map(self::sanitizeLine(...), $routeAccessControl->routeMethods()));
             $path = self::sanitizeLine($routeAccessControl->routePath() ?? '(unresolved)');
-            $checks = [];
-            if ($routeAccessControl->classHasIsGranted()) {
-                $checks[] = 'class:#[IsGranted]';
-            }
-
-            if ([] !== $routeAccessControl->methodLevelIsGranted()) {
-                $checks[] = \sprintf('method:#[IsGranted(%s)]', implode(',', array_map(self::sanitizeLine(...), $routeAccessControl->methodLevelIsGranted())));
-            }
-
-            if ($routeAccessControl->methodHasDenyAccess()) {
-                $checks[] = 'body:denyAccessUnlessGranted()';
-            }
-
+            $checks = self::accessCheckLabelsFor($routeAccessControl);
             $checkLabel = self::checkLabelFor($checks, $routeAccessControl, $routeAccessMap);
             $lines[] = \sprintf('- %s %s — %s::%s — %s', $methods, $path, self::sanitizeLine($routeAccessControl->filePath()), $routeAccessControl->methodName(), $checkLabel);
         }
 
         return \sprintf("%s\n\n", implode("\n", $lines));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function accessCheckLabelsFor(RouteAccessControl $routeAccessControl): array
+    {
+        $checks = [];
+        if ($routeAccessControl->classHasIsGranted()) {
+            $checks[] = 'class:#[IsGranted]';
+        }
+
+        if ([] !== $routeAccessControl->methodLevelIsGranted()) {
+            $checks[] = \sprintf('method:#[IsGranted(%s)]', implode(',', array_map(self::sanitizeLine(...), $routeAccessControl->methodLevelIsGranted())));
+        }
+
+        if ([] === $routeAccessControl->methodLevelIsGranted() && $routeAccessControl->methodHasIsGrantedAttribute()) {
+            $checks[] = 'method:#[IsGranted(unresolved)]';
+        }
+
+        if ($routeAccessControl->methodHasDenyAccess()) {
+            $checks[] = 'body:denyAccessUnlessGranted()';
+        }
+
+        return $checks;
     }
 
     /**

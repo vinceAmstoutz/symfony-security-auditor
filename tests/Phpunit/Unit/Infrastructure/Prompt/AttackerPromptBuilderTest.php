@@ -198,6 +198,38 @@ final class AttackerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_user_message_does_not_mark_an_unresolvable_is_granted_value_as_lacking_a_check(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/AdminController.php',
+            '/app/src/Controller/AdminController.php',
+            '<?php class AdminController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'edit',
+            routePath: '/admin/posts/{id}/edit',
+            routeMethods: ['POST'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+            methodHasIsGrantedAttribute: true,
+        );
+
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(routeAccessControls: [$routeAccessControl]),
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringNotContainsString('LACKS_ACCESS_CHECK', $message);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_user_message_omits_a_non_routed_method_from_the_access_control_map_instead_of_mislabeling_it(): void
     {
         $projectFile = ProjectFile::create(
@@ -1995,7 +2027,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
-        self::assertStringContainsString('MailerInterface::send()', $prompt);
+        self::assertStringContainsString('Headers::addTextHeader()', $prompt);
         self::assertStringContainsString('header injection', $prompt);
     }
 

@@ -262,4 +262,46 @@ final class AttackerSkillRegistryTest extends TestCase
         self::assertStringNotContainsString('allowAllStaticAttributes()', $block);
         self::assertStringContainsString('allow_static_elements: true', $block);
     }
+
+    /**
+     * Symfony Messenger's real default serializer (when `serializer` is
+     * omitted, the overwhelmingly common case) is native PHP
+     * `serialize()`/`unserialize()` via `messenger.transport.native_php_serializer`
+     * — `messenger.transport.symfony_serializer` is an explicit, safer
+     * opt-in, never the default. Confirmed against
+     * `vendor/symfony/framework-bundle/DependencyInjection/FrameworkExtension.php`'s
+     * `default_serializer` config node, whose default value is literally
+     * `messenger.transport.native_php_serializer`.
+     */
+    public function test_config_skill_does_not_claim_the_symfony_serializer_is_messengers_default(): void
+    {
+        $block = (new ConfigAttackerSkill())->block();
+
+        self::assertStringNotContainsString('the safe default', $block);
+        self::assertStringContainsString('native_php_serializer', $block);
+    }
+
+    public function test_messenger_handler_skill_does_not_claim_json_serializer_is_the_default(): void
+    {
+        $block = (new MessengerHandlerAttackerSkill())->block();
+
+        self::assertStringNotContainsString('the default `JsonSerializer`', $block);
+        self::assertStringContainsString('native_php_serializer', $block);
+    }
+
+    /**
+     * `Email::subject()` RFC-2047-encodes an embedded newline into the
+     * header body, and `Email::from()`/`addBcc()` either strip control
+     * characters or throw `InvalidArgumentException` for them — verified
+     * directly against a real `symfony/mime` `Email` instance. Unconditionally
+     * flagging these calls as header injection is a broad false positive for
+     * one of the most common real-world Mailer patterns (a dynamic subject
+     * or reply-to on a transactional email).
+     */
+    public function test_php_skill_does_not_unconditionally_flag_symfony_mailer_header_fields(): void
+    {
+        $block = (new PhpAttackerSkill())->block();
+
+        self::assertStringContainsString('RFC 2047', $block);
+    }
 }

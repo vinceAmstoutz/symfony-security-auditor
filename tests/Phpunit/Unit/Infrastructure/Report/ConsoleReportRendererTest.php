@@ -652,6 +652,50 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_collapses_unicode_line_separators_in_the_title_to_prevent_a_forged_finding_block(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::LOW, "Injected\u{2028}\u{2028}[FAKE-999] CRITICAL", 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringNotContainsString("\u{2028}[FAKE-999] CRITICAL", $output);
+        self::assertStringContainsString('Injected', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_strips_unicode_bidi_override_characters_from_the_title(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::LOW, "Real\u{202E}txt.exe\u{202C} SQLi", 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('Real', $output);
+        self::assertStringContainsString('txt.exe', $output);
+        self::assertStringNotContainsString("\u{202E}", $output);
+        self::assertStringNotContainsString("\u{202C}", $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_render_vulnerability_substitutes_severity_label(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);

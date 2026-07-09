@@ -41,11 +41,11 @@ final readonly class MessengerHandlerAttackerSkill implements AttackerSkillInter
             - Handlers invoking `Process` / `shell_exec` / SQL with values from `$message` without sanitization (queue-to-shell injection).
             - Missing idempotency: handler with side effects (charge card, send email, mutate balance) not deduping by message id (`AmqpStamp::getAttributes()['headers']['x-message-id']`).
             - No replay protection: handler trusts `$message->createdAt` / `$message->userId` without verifying current state (stale message attack).
-            - Transport configured with `serializer: php` (PHP-native serialize on untrusted bus) — gadget-chain RCE.
+            - Transport with no `serializer` configured, or explicitly set to `messenger.transport.native_php_serializer` — this is Messenger's real default (native PHP `unserialize()` on untrusted bus), not an opt-in — gadget-chain RCE.
             - Handler swallowing exceptions silently → poisoned messages re-driven infinitely.
             - Privileged action triggered solely by message presence with no authorization (`InvalidateUserCommand`, `PromoteToAdmin`, etc.).
             Do NOT flag:
-            - Handlers using the default `JsonSerializer` transport — well-typed via Symfony Serializer.
+            - Handlers using a transport explicitly configured with `messenger.transport.symfony_serializer` — well-typed via Symfony Serializer (this is an opt-in, not Messenger's default).
             - Handlers using `Symfony\Component\Messenger\Stamp\BusNameStamp` / `TransportNamesStamp` — those are routing, not security smells.
             </skills>
             SKILL;

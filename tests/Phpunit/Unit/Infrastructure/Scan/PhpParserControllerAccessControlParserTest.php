@@ -441,6 +441,37 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     }
 
     /**
+     * `isGranted()` + a manual `throw $this->createAccessDeniedException(...)`
+     * is an equally standard Symfony access-control idiom, used whenever the
+     * action wants a custom denial message — not just the shorthand
+     * `denyAccessUnlessGranted()`.
+     *
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_records_an_is_granted_call_as_a_deny_access_check(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/users/{id}/edit')]
+                public function edit(int $id): void {
+                    if (!$this->isGranted('EDIT', $id)) {
+                        throw $this->createAccessDeniedException('Not allowed to edit this user.');
+                    }
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertTrue($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->hasAccessCheck());
+    }
+
+    /**
      * @throws InvalidProjectFileException
      */
     public function test_it_records_a_nullsafe_deny_access_unless_granted_call(): void
@@ -478,6 +509,34 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
                 public function dashboard(): void {
                     $callback = $this->denyAccessUnlessGranted(...);
                     unset($callback);
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertFalse($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->lacksAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_first_class_callable_reference_to_a_helper_does_not_count_as_reaching_its_access_check(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/users/{id}/edit')]
+                public function edit(int $id): void {
+                    $callback = $this->authorize(...);
+                    unset($callback);
+                }
+                private function authorize(int $id): void {
+                    $this->denyAccessUnlessGranted('EDIT', $id);
                 }
             }
             PHP;
@@ -1114,6 +1173,34 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
         self::assertSame([], $entries[0]->methodLevelIsGranted());
+        self::assertFalse($entries[0]->lacksAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_recognizes_an_enum_backed_is_granted_attribute_value_as_an_access_check(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            enum Permission: string {
+                case Edit = 'EDIT';
+            }
+            final class AdminController {
+                #[Route(path: '/admin/post/{id}/edit')]
+                #[IsGranted(Permission::Edit->value)]
+                public function edit(int $id): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame([], $entries[0]->methodLevelIsGranted());
+        self::assertFalse($entries[0]->lacksAccessCheck());
     }
 
     /**

@@ -15,12 +15,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Configuration;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
 final class BundleConfigurationTest extends TestCase
 {
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_populates_every_typed_field(): void
@@ -78,6 +80,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_maps_explicit_fail_on_level(): void
@@ -91,6 +94,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_defaults_fail_on_to_critical_when_key_omitted_for_bc(): void
@@ -104,6 +108,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_maps_excluded_and_included_types(): void
@@ -119,6 +124,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_rate_limit_dimensions_flow_through_when_set(): void
@@ -139,6 +145,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_attacker_model_falls_back_to_top_level_model_when_override_omitted(): void
@@ -152,6 +159,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_reviewer_model_falls_back_to_top_level_model_when_override_omitted(): void
@@ -165,6 +173,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_max_output_tokens_defaults_flow_through_to_both_agents_when_overrides_omitted(): void
@@ -176,6 +185,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_max_output_tokens_overrides_flow_through_per_agent(): void
@@ -191,6 +201,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_attacker_max_output_tokens_falls_back_to_top_level_when_override_omitted(): void
@@ -207,6 +218,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_budget_is_not_unlimited_when_token_cap_set(): void
@@ -221,6 +233,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_provider_json_mode_defaults_false_in_tree_output(): void
@@ -231,6 +244,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_provider_json_mode_flows_through_when_enabled(): void
@@ -244,6 +258,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_tolerates_omitted_provider_json_mode_key_for_bc(): void
@@ -257,6 +272,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_defaults_max_output_tokens_to_4096_when_key_omitted_for_bc(): void
@@ -271,6 +287,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_defaults_structured_collection_to_true_when_audit_key_omits_it(): void
@@ -284,6 +301,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_propagates_structured_collection_opt_out(): void
@@ -297,6 +315,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_defaults_reviewer_structured_collection_to_true_when_audit_key_omits_it(): void
@@ -310,6 +329,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_propagates_reviewer_structured_collection_opt_out(): void
@@ -323,6 +343,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_defaults_stable_system_prompt_to_true_when_audit_key_omits_it(): void
@@ -336,6 +357,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_propagates_stable_system_prompt_opt_out(): void
@@ -349,6 +371,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_resolves_fast_profile_for_unset_keys(): void
@@ -366,6 +389,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_resolves_thorough_profile_for_unset_keys(): void
@@ -383,6 +407,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_defaults_to_the_balanced_profile_when_the_key_is_absent(): void
@@ -400,6 +425,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_lets_an_explicit_key_override_the_profile(): void
@@ -416,6 +442,7 @@ final class BundleConfigurationTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
     public function test_from_array_lets_explicit_boolean_keys_override_the_profile(): void

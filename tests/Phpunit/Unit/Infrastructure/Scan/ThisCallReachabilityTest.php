@@ -128,6 +128,26 @@ final class ThisCallReachabilityTest extends TestCase
         self::assertSame(['from-late-static-helper'], $this->stringLiteralsIn($body));
     }
 
+    public function test_it_ignores_a_first_class_callable_reference_to_a_helper(): void
+    {
+        $class = $this->parseClass(<<<'PHP'
+            <?php
+            final class Example {
+                public function action(): void {
+                    $callback = $this->helper(...);
+                    unset($callback);
+                }
+                private function helper(): void {
+                    echo 'from-helper';
+                }
+            }
+            PHP);
+
+        $body = $this->thisCallReachability->reachableBody($this->methodNamed($class, 'action'), $this->methodsByName($class));
+
+        self::assertSame([], $this->stringLiteralsIn($body));
+    }
+
     public function test_it_ignores_a_static_call_to_another_classs_method(): void
     {
         $class = $this->parseClass(<<<'PHP'

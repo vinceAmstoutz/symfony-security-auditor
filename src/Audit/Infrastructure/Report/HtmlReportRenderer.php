@@ -128,8 +128,17 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
         return null === $synthesizedPoC ? '' : \sprintf("<h4>Synthesized PoC</h4>\n  <pre>%s</pre>", $this->escape($synthesizedPoC));
     }
 
+    /**
+     * `htmlspecialchars()` neutralizes markup injection (`<`, `>`, `&`,
+     * quotes) but a browser still honours the Unicode Bidirectional
+     * Algorithm on the escaped text — a bidi override (`U+202A`-`U+202E`,
+     * `U+2066`-`U+2069`) in an LLM-sourced field can visually reorder the
+     * rendered characters, a Trojan-Source-style spoof of the finding text.
+     */
     private function escape(string $value): string
     {
-        return htmlspecialchars($value, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
+        $withoutBidiOverrides = preg_replace('/[\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $value) ?? $value;
+
+        return htmlspecialchars($withoutBidiOverrides, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
     }
 }

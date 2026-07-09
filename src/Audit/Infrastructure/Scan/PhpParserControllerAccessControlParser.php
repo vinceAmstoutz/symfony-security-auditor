@@ -15,9 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
 use Override;
 use PhpParser\Node;
-use PhpParser\Node\Arg;
-use PhpParser\Node\Attribute;
-use PhpParser\Node\AttributeGroup;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\NullsafeMethodCall;
 use PhpParser\Node\Identifier;
@@ -55,6 +52,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         private RouteAttributeParser $routeAttributeParser = new RouteAttributeParser(),
         private NodeFinder $nodeFinder = new NodeFinder(),
         private ThisCallReachability $thisCallReachability = new ThisCallReachability(),
+        private IsGrantedAttributeParser $isGrantedAttributeParser = new IsGrantedAttributeParser(),
     ) {}
 
     #[Override]
@@ -105,7 +103,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
      */
     private function entriesForClass(string $filePath, Class_ $class): array
     {
-        $classHasIsGranted = $this->hasIsGrantedAttribute($class->attrGroups);
+        $classHasIsGranted = $this->isGrantedAttributeParser->hasValueArg($class->attrGroups);
         $classConstants = $this->classConstantStrings($class);
         $classRouteData = $this->routeAttributeParser->extract($class->attrGroups, $classConstants)[0];
         $methodsByName = $this->methodsByName($class);
@@ -183,7 +181,8 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
      */
     private function buildEntries(string $filePath, ClassMethod $classMethod, array $accessFlags, array $classRouteData, array $classConstants): array
     {
-        $methodLevelIsGranted = $this->extractIsGrantedValues($classMethod->attrGroups);
+        $methodLevelIsGranted = $this->isGrantedAttributeParser->extractValues($classMethod->attrGroups);
+        $methodHasIsGrantedAttribute = $this->isGrantedAttributeParser->hasValueArg($classMethod->attrGroups);
 
         $entries = [];
         foreach ($this->routeAttributeParser->extract($classMethod->attrGroups, $classConstants) as $routeData) {
@@ -197,6 +196,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
                 methodHasDenyAccess: $accessFlags['methodHasDenyAccess'],
                 classHasIsGranted: $accessFlags['classHasIsGranted'],
                 routeName: $this->prefixedRouteName($classRouteData['name'], $routeData['name']),
+                methodHasIsGrantedAttribute: $methodHasIsGrantedAttribute,
             );
         }
 
@@ -231,97 +231,6 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
-     * @param array<AttributeGroup> $attributeGroups
-     *
-     * @return list<string>
-     */
-    private function extractIsGrantedValues(array $attributeGroups): array
-    {
-        $values = [];
-        foreach ($attributeGroups as $attributeGroup) {
-            foreach ($this->isGrantedValuesFromAttributes($attributeGroup->attrs) as $value) {
-                $values[] = $value;
-            }
-        }
-
-        return $values;
-    }
-
-    /**
-     * @param array<Attribute> $attributes
-     *
-     * @return list<string>
-     */
-    private function isGrantedValuesFromAttributes(array $attributes): array
-    {
-        $values = [];
-        foreach ($attributes as $attribute) {
-            $valueArgName = $this->valueArgNameFor($attribute->name->toString());
-            if (null === $valueArgName) {
-                continue;
-            }
-
-            $attributeArg = $this->isGrantedAttributeArgValue($attribute->args, $valueArgName);
-            if (null !== $attributeArg) {
-                $values[] = $attributeArg;
-            }
-        }
-
-        return $values;
-    }
-
-    /**
-     * `#[IsGranted]`'s first parameter is `$attribute`; `#[Security]`'s is
-     * `$expression` — resolve whichever applies the same way
-     * `resolveRouteArgName()` resolves `Route`'s `path`, so a reordered
-     * named-argument call (e.g. `#[IsGranted(subject: $post, attribute:
-     * 'EDIT')]`) still yields the attribute, not whichever string argument
-     * happens to come first.
-     */
-    private function valueArgNameFor(string $shortName): ?string
-    {
-        return match (true) {
-            $this->attributeShortNameMatches($shortName, 'IsGranted') => 'attribute',
-            $this->attributeShortNameMatches($shortName, 'Security') => 'expression',
-            default => null,
-        };
-    }
-
-    /**
-     * @param list<Arg> $args
-     */
-    private function isGrantedAttributeArgValue(array $args, string $valueArgName): ?string
-    {
-        foreach ($args as $index => $arg) {
-            if (!$arg->value instanceof String_) {
-                continue;
-            }
-
-            if ($this->isIsGrantedAttributeArg($arg, $index, $valueArgName)) {
-                return $arg->value->value;
-            }
-        }
-
-        return null;
-    }
-
-    private function isIsGrantedAttributeArg(Arg $arg, int $index, string $valueArgName): bool
-    {
-        return match (true) {
-            $arg->name instanceof Identifier => $valueArgName === $arg->name->toString(),
-            default => 0 === $index,
-        };
-    }
-
-    /**
-     * @param array<AttributeGroup> $attributeGroups
-     */
-    private function hasIsGrantedAttribute(array $attributeGroups): bool
-    {
-        return [] !== $this->extractIsGrantedValues($attributeGroups);
-    }
-
-    /**
      * A `denyAccessUnlessGranted()` call moved behind a shared private/protected
      * helper (a common refactor for a repeated check) would otherwise be
      * invisible, since the action method's own body only calls the helper,
@@ -346,19 +255,23 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         return false;
     }
 
+    /**
+     * `isGranted()` is recognized the same way `denyAccessUnlessGranted()`
+     * is — by presence alone, not by verifying it actually guards a
+     * `throw` — matching this parser's existing heuristic style (the class-
+     * level `#[IsGranted]` attribute check applies the identical "presence
+     * is sufficient" rule). `isGranted()` + a manual
+     * `throw $this->createAccessDeniedException(...)` is an equally standard
+     * Symfony idiom to the shorthand `denyAccessUnlessGranted()`, used
+     * whenever the action wants a custom denial message.
+     */
     private function isDenyAccessCall(MethodCall|NullsafeMethodCall $methodCall): bool
     {
         if ($methodCall->isFirstClassCallable()) {
             return false;
         }
 
-        return $methodCall->name instanceof Identifier && 'denyAccessUnlessGranted' === $methodCall->name->toString();
-    }
-
-    private function attributeShortNameMatches(string $fullyQualifiedName, string $expectedShortName): bool
-    {
-        $parts = explode('\\', $fullyQualifiedName);
-
-        return end($parts) === $expectedShortName;
+        return $methodCall->name instanceof Identifier
+            && \in_array($methodCall->name->toString(), ['denyAccessUnlessGranted', 'isGranted'], true);
     }
 }

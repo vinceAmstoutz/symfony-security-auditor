@@ -84,6 +84,10 @@ final readonly class ThisCallReachability
 
     private function calledMethodName(MethodCall|NullsafeMethodCall|StaticCall $call): ?string
     {
+        if ($call->isFirstClassCallable()) {
+            return null;
+        }
+
         return $call instanceof StaticCall ? $this->selfStaticCallName($call) : $this->thisCallName($call);
     }
 

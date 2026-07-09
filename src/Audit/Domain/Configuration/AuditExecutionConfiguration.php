@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
 final readonly class AuditExecutionConfiguration
@@ -20,6 +21,8 @@ final readonly class AuditExecutionConfiguration
     /**
      * @param list<string> $excludedTypes vulnerability-type values dropped from the report and exit code
      * @param list<string> $includedTypes when non-empty, the only vulnerability-type values kept
+     *
+     * @throws InvalidAuditExecutionConfigurationException
      */
     public function __construct(
         public int $maxIterations,
@@ -47,5 +50,9 @@ final readonly class AuditExecutionConfiguration
         public RiskLevel $failOn = RiskLevel::Critical,
         public array $excludedTypes = [],
         public array $includedTypes = [],
-    ) {}
+    ) {
+        if (!is_finite($minConfidence) || $minConfidence < 0.0 || $minConfidence > 1.0) {
+            throw InvalidAuditExecutionConfigurationException::forOutOfRangeMinConfidence($minConfidence);
+        }
+    }
 }

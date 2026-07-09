@@ -3790,6 +3790,96 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   the first non-zero-priced match over an earlier zero-priced one, falling back
   to a zero price only when every matching provider genuinely prices the model
   at zero.
+- **`ConfigAttackerSkill` and `MessengerHandlerAttackerSkill` told the attacker
+  LLM that Messenger's PHP-native serializer was an opt-in configuration
+  (`serializer: 'php_serialize'` / `serializer: php`), steering it toward
+  flagging only an explicitly-chosen unsafe setting** — but
+  `messenger.transport.native_php_serializer` (native PHP `unserialize()` on
+  dequeued payloads) is Symfony Messenger's actual **default**
+  `default_serializer`, confirmed against the vendored
+  `Symfony\Bundle\FrameworkBundle\DependencyInjection\FrameworkExtension`
+  TreeBuilder default. An unconfigured, entirely ordinary Messenger transport —
+  the realistic, common case — carries the same gadget-chain-deserialization
+  risk the skills' prompt text was actively steering the LLM away from. Both
+  skills' hunt/do-not-flag bullets
+  (`src/Audit/Infrastructure/Prompt/Skill/ConfigAttackerSkill.php`,
+  `src/Audit/Infrastructure/Prompt/Skill/MessengerHandlerAttackerSkill.php`) now
+  correctly describe the omitted-or-default case as the risk, and the explicit
+  `messenger.transport.symfony_serializer` opt-in as the safe one. Text-only
+  correction to existing skill content — no structural addition — so
+  `AttackerPromptBuilder::PROMPT_VERSION` is not bumped.
+- **`PhpAttackerSkill` told the attacker LLM to unconditionally flag
+  `Email::from($userInput)`/`subject($userInput)`/`addBcc($userInput)` as mailer
+  header injection**, a false positive verified against `symfony/mime`'s actual
+  behavior: `Address` rejects/strips embedded control characters and
+  `AbstractHeader` RFC 2047-encodes any header body token containing a `\r`/`\n`
+  before serialization, so classic newline-based header injection through these
+  call sites is not exploitable. The skill's hunt bullet
+  (`src/Audit/Infrastructure/Prompt/Skill/PhpAttackerSkill.php`) now points at
+  the genuine risk — raw header assembly via
+  `Headers::addTextHeader()`/`addMailboxListHeader()`, or a custom
+  `SerializerInterface`/transport bypassing `symfony/mime` — and a new
+  do-not-flag entry names the safe `Email`/`Address` call sites explicitly.
+- **`PhpParserControllerAccessControlParser::isDenyAccessCall()` only recognized
+  `denyAccessUnlessGranted()`, so the equally standard `isGranted()` +
+  `throw $this->createAccessDeniedException(...)` idiom (used whenever an action
+  wants a custom denial message) was invisible to the parser** — a route
+  protected this way was reported as `lacksAccessCheck() === true`, the same
+  "steers the attacker toward a false-positive `broken_access_control`" failure
+  mode as the voter-capability and classifier bugs above. `isDenyAccessCall()`
+  (`src/Audit/Infrastructure/Scan/PhpParserControllerAccessControlParser.php`)
+  now also recognizes `isGranted()`, matching the class-level `#[IsGranted]`
+  attribute check's existing "presence is sufficient" heuristic; a first-class
+  callable reference to either method (never actually invoked) still correctly
+  does not count.
+- **`ThisCallReachability` followed a `$this->helper(...)` first-class-callable
+  reference the same way it follows a genuine call, pulling the referenced
+  helper's body into the "reachable" set even though a first-class callable is
+  never actually invoked at that point** — a controller action that only
+  captured a callable reference to a helper containing a real
+  `denyAccessUnlessGranted()` call, without ever invoking it, was wrongly
+  reported as having an access check. This is the same false-negative direction
+  already guarded against for a _direct_ first-class-callable reference to
+  `denyAccessUnlessGranted()`/`isGranted()`
+  (`PhpParserControllerAccessControlParser::isDenyAccessCall()`), but the gap
+  lived one level deeper, in the reachability-expansion logic shared by that
+  parser, `PhpParserFormBindingParser`, and `PhpParserVoterCapabilityParser`.
+  `calledMethodName()`
+  (`src/Audit/Infrastructure/Scan/ThisCallReachability.php`) now excludes a
+  first-class-callable call node before resolving its name, so the referenced
+  helper's body is no longer treated as reachable.
+- **A method-level `#[IsGranted(...)]`/`#[Security(...)]` attribute whose value
+  argument could not be resolved to a literal string — an enum-backed value
+  (e.g. `#[IsGranted(Permission::Edit->value)]`) or a `new Expression(...)`
+  expression, both standard Symfony idioms — was treated as if the attribute
+  were entirely absent, reporting a genuinely protected route as
+  `lacksAccessCheck() === true`.** The parser's presence check derived
+  `classHasIsGranted`/the method-level check purely from the same literal-
+  string-only extraction used to build the human-readable attribute-value list,
+  conflating "has a value we can display" with "has a value at all". A new
+  `IsGrantedAttributeParser`
+  (`src/Audit/Infrastructure/Scan/IsGrantedAttributeParser.php`, extracted from
+  `PhpParserControllerAccessControlParser` to keep the class's cognitive
+  complexity under the project's limit) now detects value-argument _presence_
+  independently of whether it is string-extractable; a new
+  `RouteAccessControl::methodHasIsGrantedAttribute()`
+  (`src/Audit/Domain/Model/RouteAccessControl.php`) carries that signal into
+  `hasAccessCheck()`/`lacksAccessCheck()`, and
+  `SymfonyMappingContextRenderer::accessCheckLabelsFor()`
+  (`src/Audit/Infrastructure/Prompt/SymfonyMappingContextRenderer.php`) renders
+  it as `method:#[IsGranted(unresolved)]` in the attacker prompt's access-
+  control map instead of the misleading `LACKS_ACCESS_CHECK` marker.
+- **A computed `audit.min_confidence` that evaluates to `NAN` (e.g. a
+  `fdiv($x, 0)` "safe division" idiom in a PHP-format config file) bypassed the
+  TreeBuilder's `min(0.0)`/`max(1.0)` bounds — both comparisons are false
+  against `NAN` — and then made every subsequent
+  `AuditOrchestrator::passesConfidenceFloor()` check
+  (`$confidence >= $minConfidence`) false as well, silently dropping every
+  finding from every audit run with no error.** `AuditExecutionConfiguration`'s
+  constructor (`src/Audit/Domain/Configuration/AuditExecutionConfiguration.php`)
+  now rejects a non-finite or out-of-`[0.0, 1.0]` `minConfidence` via a new
+  `InvalidAuditExecutionConfigurationException`
+  (`src/Audit/Domain/Exception/InvalidAuditExecutionConfigurationException.php`).
 
 ### Security
 
@@ -4253,6 +4343,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   real clickable link in the `.md` report too (the format `docs/extending.md`
   recommends for a PR comment or `$GITHUB_STEP_SUMMARY`) — `escapeFences()` now
   also escapes `[`/`]`.
+- **`ConsoleReportRenderer`'s control-character stripping and
+  `HtmlReportRenderer`'s markup escaping left a Unicode bidirectional-override
+  character (`U+202A`-`U+202E`, `U+2066`-`U+2069`) untouched in a finding's
+  LLM-sourced fields, letting a crafted finding visually reorder its own
+  rendered text — a Trojan-Source-style spoof — in both the terminal report and
+  the generated HTML report** (a browser applies the Unicode Bidirectional
+  Algorithm to ordinary text by default, so the HTML renderer's
+  `htmlspecialchars()`-only escaping did not neutralize it).
+  `ConsoleReportRenderer::sanitizeControlCharacters()`
+  (`src/Audit/Infrastructure/Report/ConsoleReportRenderer.php`) and
+  `HtmlReportRenderer::escape()`
+  (`src/Audit/Infrastructure/Report/HtmlReportRenderer.php`) now also strip
+  those code points, alongside the C1 control range (`U+0080`-`U+009F`).
+- **`ConsoleReportRenderer::sanitizeSingleLineField()` only collapsed the ASCII
+  `\r`/`\n`/`\r\n` newline forms, so a `title`/`filePath` containing a Unicode
+  NEL (`U+0085`), Line Separator (`U+2028`), or Paragraph Separator (`U+2029`)
+  still broke onto a new line — the exact `[ID] SEVERITY` finding-block forgery
+  this method exists to prevent, just via a newline form the original fix didn't
+  cover.** `sanitizeSingleLineField()`
+  (`src/Audit/Infrastructure/Report/ConsoleReportRenderer.php`) now collapses
+  every Unicode newline sequence via PCRE's `\R` under the `/u` modifier instead
+  of a fixed `str_replace()` list.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

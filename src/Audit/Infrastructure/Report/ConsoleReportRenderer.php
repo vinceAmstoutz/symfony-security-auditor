@@ -138,11 +138,14 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
      * attacker-crafted project content verbatim could otherwise carry a real
      * ESC byte (ANSI escape sequences) or carriage return, letting a crafted
      * finding erase or overwrite adjacent terminal output — e.g. hiding a
-     * CRITICAL finding behind a forged "all clear" line.
+     * CRITICAL finding behind a forged "all clear" line. The same field could
+     * also carry a Unicode bidi override (`U+202A`-`U+202E`, `U+2066`-`U+2069`)
+     * to visually reorder the displayed characters — a Trojan-Source-style
+     * spoof — so those are stripped alongside the ASCII/C1 control ranges.
      */
     private function sanitizeControlCharacters(string $text): string
     {
-        return preg_replace('/[\x00-\x08\x0B-\x1F\x7F]/', '', $text) ?? $text;
+        return preg_replace('/[\x{0}-\x{8}\x{B}-\x{1F}\x{7F}-\x{9F}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $text) ?? $text;
     }
 
     /**
@@ -150,10 +153,13 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
      * `description`/`attackVector`/`proof`/`remediation`, which are
      * legitimately multi-line and rendered inside their own indented block —
      * an embedded newline here would let a crafted finding forge a fake
-     * `[ID] SEVERITY` finding block as unguarded top-level output.
+     * `[ID] SEVERITY` finding block as unguarded top-level output. `\R` under
+     * the `/u` modifier collapses every Unicode newline sequence (CR, LF,
+     * CRLF, NEL, LS, PS), not just the ASCII ones a plain `str_replace` would
+     * catch.
      */
     private function sanitizeSingleLineField(string $text): string
     {
-        return $this->sanitizeControlCharacters(str_replace(["\r\n", "\n", "\r"], ' ', mb_scrub($text, 'UTF-8')));
+        return $this->sanitizeControlCharacters(preg_replace('/\R/u', ' ', mb_scrub($text, 'UTF-8')) ?? $text);
     }
 }

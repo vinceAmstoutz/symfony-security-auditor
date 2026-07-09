@@ -180,6 +180,29 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_strips_unicode_bidi_override_characters_from_finding_content(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, "Real\u{202E}txt.exe\u{202C} SQLi", 0.9),
+            new CodeLocation('src/Foo.php', 1, 2),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('Real', $output);
+        self::assertStringContainsString('txt.exe', $output);
+        self::assertStringNotContainsString("\u{202E}", $output);
+        self::assertStringNotContainsString("\u{202C}", $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_render_includes_the_vulnerable_code(): void
     {
         $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));

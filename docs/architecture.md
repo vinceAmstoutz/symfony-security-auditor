@@ -311,11 +311,14 @@ security surface rather than file contents alone. Notable helpers:
 One entry per public controller action emitted by
 `ControllerAccessControlParserInterface` (default impl
 `PhpParserControllerAccessControlParser`, AST-based via `nikic/php-parser`).
-Captures `filePath`, `methodName`, `routePath`, `routeMethods`, plus three
-boolean / list signals — `methodLevelIsGranted`, `methodHasDenyAccess`,
-`classHasIsGranted` — combined by `hasAccessCheck()` and `lacksAccessCheck()`.
-The attacker prompt renders the full graph as a `Route Access-Control Map` block
-so the LLM can spot missing enforcement without re-deriving it from source.
+Captures `filePath`, `methodName`, `routePath`, `routeMethods`, plus four
+boolean / list signals — `methodLevelIsGranted`, `methodHasIsGrantedAttribute`
+(a method-level `#[IsGranted]`/`#[Security]` value present but not resolvable to
+a literal string, e.g. an enum case or `new Expression(...)`),
+`methodHasDenyAccess`, `classHasIsGranted` — combined by `hasAccessCheck()` and
+`lacksAccessCheck()`. The attacker prompt renders the full graph as a
+`Route Access-Control Map` block so the LLM can spot missing enforcement without
+re-deriving it from source.
 
 ### `VoterCapability` — immutable per-voter `supports()` summary
 

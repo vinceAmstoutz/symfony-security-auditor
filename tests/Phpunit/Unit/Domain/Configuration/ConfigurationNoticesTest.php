@@ -17,19 +17,29 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\AuditExecutionConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ConfigurationNotices;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
 
 final class ConfigurationNoticesTest extends TestCase
 {
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_no_notices_for_the_default_configuration(): void
     {
         self::assertSame([], ConfigurationNotices::of($this->audit(['reviewerBatchSize' => 1]), $this->llm()));
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_batched_reviews_emit_no_notice_now_that_the_cache_covers_them(): void
     {
         self::assertSame([], ConfigurationNotices::of($this->audit(['reviewerBatchSize' => 5]), $this->llm()));
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_escalation_with_a_cheap_model_equal_to_the_attacker_model_emits_a_notice(): void
     {
         $notices = ConfigurationNotices::of(
@@ -42,6 +52,9 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertStringContainsString('audit.escalation.cheap_model', $notices[0]);
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_escalation_with_a_genuinely_cheaper_model_emits_no_notice(): void
     {
         $notices = ConfigurationNotices::of(
@@ -52,6 +65,9 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertSame([], $notices);
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_escalation_falling_back_to_the_attacker_model_emits_a_notice(): void
     {
         $notices = ConfigurationNotices::of(
@@ -63,6 +79,9 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertStringContainsString('escalation', $notices[0]);
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_disabled_escalation_emits_no_notice_even_when_models_match(): void
     {
         $notices = ConfigurationNotices::of(
@@ -73,6 +92,9 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertSame([], $notices);
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_reviewer_concurrency_with_tools_enabled_emits_a_notice(): void
     {
         $notices = ConfigurationNotices::of(
@@ -85,6 +107,9 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertStringContainsString('audit.reviewer_tools_enabled', $notices[0]);
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_reviewer_concurrency_without_tools_emits_no_notice(): void
     {
         $notices = ConfigurationNotices::of(
@@ -95,6 +120,9 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertSame([], $notices);
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_attacker_concurrency_with_tools_enabled_emits_no_notice_now_that_tools_ride_along(): void
     {
         $notices = ConfigurationNotices::of(
@@ -105,6 +133,9 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertSame([], $notices);
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_attacker_concurrency_with_structured_collection_off_emits_a_notice(): void
     {
         $notices = ConfigurationNotices::of(
@@ -116,6 +147,9 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertStringContainsString('audit.structured_collection', $notices[0]);
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_attacker_concurrency_in_structured_toolless_mode_emits_no_notice(): void
     {
         $notices = ConfigurationNotices::of(
@@ -126,6 +160,9 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertSame([], $notices);
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_reviewer_concurrency_of_one_with_tools_emits_no_notice(): void
     {
         $notices = ConfigurationNotices::of(
@@ -136,6 +173,9 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertSame([], $notices);
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_attacker_concurrency_of_one_with_tools_emits_no_notice(): void
     {
         $notices = ConfigurationNotices::of(
@@ -146,6 +186,9 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertSame([], $notices);
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_attacker_concurrency_of_one_with_structured_collection_off_emits_no_notice(): void
     {
         $notices = ConfigurationNotices::of(
@@ -156,6 +199,9 @@ final class ConfigurationNoticesTest extends TestCase
         self::assertSame([], $notices);
     }
 
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_multiple_simultaneous_footguns_each_emit_their_own_notice(): void
     {
         $notices = ConfigurationNotices::of(
@@ -185,6 +231,8 @@ final class ConfigurationNoticesTest extends TestCase
      *     toolsEnabled?: bool,
      *     structuredCollection?: bool,
      * } $overrides
+     *
+     * @throws InvalidAuditExecutionConfigurationException
      */
     private function audit(array $overrides = []): AuditExecutionConfiguration
     {

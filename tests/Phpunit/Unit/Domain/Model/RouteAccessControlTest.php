@@ -86,6 +86,25 @@ final class RouteAccessControlTest extends TestCase
         self::assertFalse($routeAccessControl->lacksAccessCheck());
     }
 
+    public function test_method_with_an_unresolvable_is_granted_attribute_value_has_access_check(): void
+    {
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'edit',
+            routePath: '/admin/users/{id}/edit',
+            routeMethods: ['POST'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+            methodHasIsGrantedAttribute: true,
+        );
+
+        self::assertTrue($routeAccessControl->methodHasIsGrantedAttribute());
+        self::assertTrue($routeAccessControl->hasAccessCheck());
+        self::assertFalse($routeAccessControl->lacksAccessCheck());
+    }
+
     public function test_method_without_route_attribute_does_not_count_as_lacking_access_check(): void
     {
         $routeAccessControl = new RouteAccessControl(
