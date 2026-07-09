@@ -162,7 +162,7 @@ final readonly class AuditConfigurationDefinition
                         ->end()
                         ->booleanNode('reviewer_structured_collection')
                             ->defaultTrue()
-                            ->info('When true (the default), the reviewer records each verdict by calling a schema-enforced `record_review` tool instead of returning a JSON array, so a malformed verdict never costs a discarded (but fully billed) response. Verdicts are served from and stored to the reviewer-verdict cache exactly like the JSON path. The explicit opt-ins `reviewer_tools_enabled: true` and `reviewer_max_concurrent` > 1 take precedence and keep the JSON path. Set false to force JSON-array output (for models without tool-use support).')
+                            ->info('When true (the default), the reviewer records each verdict by calling a schema-enforced `record_review` tool instead of returning a JSON array, so a malformed verdict never costs a discarded (but fully billed) response. Verdicts are served from and stored to the reviewer-verdict cache exactly like the JSON path. The explicit opt-in `reviewer_tools_enabled: true` takes precedence and keeps the JSON path. `reviewer_max_concurrent` > 1 composes with the structured mode on platforms with an async transport (each finding still records through its own `record_review` tool); on platforms without one it falls back to the JSON path. Set false to force JSON-array output (for models without tool-use support).')
                         ->end()
                         ->booleanNode('stable_system_prompt')
                             ->defaultTrue()

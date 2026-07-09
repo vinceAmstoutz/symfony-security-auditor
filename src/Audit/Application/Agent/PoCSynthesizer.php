@@ -193,8 +193,8 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
             $data['id'],
             $data['type'],
             $data['severity'],
-            $this->escapeFences($data['title']),
-            $this->escapeFences($data['file']),
+            $this->stripEmbeddedNewline($this->escapeFences($data['title'])),
+            $this->stripEmbeddedNewline($data['file']),
             $data['line_start'],
             $data['line_end'],
             $this->escapeFences($data['vulnerable_code']),
@@ -214,5 +214,17 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
     private function escapeFences(string $text): string
     {
         return str_replace(['`', '#'], ['\\`', '\\#'], $text);
+    }
+
+    /**
+     * `title` lands in the bare, single-line `Title: ...` slot with no
+     * surrounding fence or heading to contain it — unlike the fenced/heading
+     * -guarded narrative fields `escapeFences()` protects. A raw newline here
+     * would forge a fake standalone instruction paragraph as unguarded
+     * top-level prompt text.
+     */
+    private function stripEmbeddedNewline(string $text): string
+    {
+        return str_replace("\n", ' ', $text);
     }
 }

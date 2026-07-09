@@ -3325,6 +3325,37 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   scanned `supports()`/`vote()`'s own body for string literals, constant
   fetches, and `instanceof` checks. It now also uses `ThisCallReachability` to
   fold in every method transitively reachable through a `$this->helper()` call.
+- **A `--path` entry with a doubled separator right after a leading dot (e.g.
+  `.//src`) silently matched zero scanned files instead of the intended
+  subdirectory** — the exact failure mode
+  `AuditCommandInput::stripLeadingCurrentDirSegment()`
+  (`src/Command/AuditCommandInput.php`) exists to prevent for the plain `./src`
+  case. `UnicodeString::after('/')` on `.//src` strips only the first `/`,
+  leaving a leading `/src` that `Path::makeRelative()`'s output (which never has
+  a leading slash) can never match. `stripLeadingCurrentDirSegment()` now also
+  trims any further leading `/` characters after each strip.
+- **The `--help` text and `docs/configuration.md`'s exit-code table only
+  documented the mid-run budget-exceeded cause of exit code `2`, omitting the
+  pre-flight cause** — `AuditCommand::runAuditFlow()`
+  (`src/Command/AuditCommand.php`) also returns exit code `2` when
+  `UnpricedModelBudgetGuard::permitsRun()` refuses to start the run at all (an
+  unpriceable model plus a configured cost budget, declined interactively or
+  running non-interactively), a case where **no report is emitted**, directly
+  contradicting the documented "(partial report still emitted)" qualifier.
+  `docs/versioning.md` already documented both causes correctly.
+  `AuditCommandHelp::HELP` (`src/Command/AuditCommandHelp.php`) and
+  `docs/configuration.md`'s exit-code table now describe both causes.
+- **`audit.reviewer_structured_collection`'s config-tree `info()` text claimed
+  `reviewer_max_concurrent` > 1 always forces the JSON-array reviewer path**,
+  contradicting `ReviewerAgent::shouldUseStructuredCollection()`
+  (`src/Audit/Application/Agent/ReviewerAgent.php`), which only falls back to
+  JSON when the configured platform lacks tool-batching support — otherwise
+  concurrency composes with structured collection via
+  `ConcurrentStructuredReviewAnalyzer`. `docs/configuration.md` already
+  documented the real precedence correctly; only the inline string shown by
+  `bin/console config:dump-reference` and editor tooltips
+  (`src/Audit/Infrastructure/Config/AuditConfigurationDefinition.php`) was
+  wrong. Reworded to match.
 
 ### Security
 
@@ -3613,6 +3644,37 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Command/Exception/UnsafeReportWriteException.php`) and
   `UnsafeBaselineWriteException::forSymlinkedPath()`
   (`src/Command/Exception/UnsafeBaselineWriteException.php`).
+- **`PoCSynthesizer` and `ReviewerMessageRenderer` left a finding's `title`
+  unescaped for embedded newlines in their bare, single-line `Title: ...` slot**
+  — `PoCSynthesizer::buildUserMessage()`
+  (`src/Audit/Application/Agent/PoCSynthesizer.php`) also left `file`
+  unprotected in its `File: ...` line. Both fields are attacker-influenceable
+  (the attacker LLM's free-form `title`/`file_path` tool arguments are only
+  validated for blankness and max length, never for embedded newlines), and a
+  raw newline there forges a fake standalone instruction paragraph as unguarded
+  top-level prompt text — the same class of injection
+  `ReviewerMessageRenderer::sanitizeFilePath()` already guarded `File: ...`
+  against, just not `Title: ...`, and never applied to `PoCSynthesizer` at all.
+  Both classes now strip embedded newlines from `title` (new
+  `stripEmbeddedNewline()`) in addition to the existing fence/heading escaping,
+  and `PoCSynthesizer` strips them from `file` too.
+- **A model name using the documented `model: 'name?temperature=0.2'`
+  query-string syntax for provider options was treated as entirely unpriced**,
+  reaching `ModelsDevPricingProvider::lookup()`
+  (`src/Audit/Infrastructure/Pricing/ModelsDevPricingProvider.php`) with the
+  `?...` suffix intact — nothing between the bundle config and this provider
+  ever strips it, since only `symfony/ai`'s own platform factory parses that
+  syntax. Beyond misleading "$0.00" cost reporting, combining this with a
+  configured `audit.budget.max_cost_usd` in non-interactive mode (the normal CI
+  usage this tool targets) makes `UnpricedModelBudgetGuard::permitsRun()` refuse
+  to start the run at all — a complete denial of service triggered by following
+  the bundle's own documented configuration example. `lookup()` now strips
+  everything from the first `?` before every catalog lookup via a new
+  `stripOptionsQueryString()`. `docs/configuration.md`'s "Model Options" section
+  also claimed this bundle's `model` key accepts `symfony/ai-bundle`'s
+  alternative expanded `{name, options}` mapping syntax; it does not (`model` is
+  a plain string config node) — the section now says so instead of documenting a
+  form that throws a configuration error.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

@@ -351,29 +351,19 @@ its default (`4096`) bypasses `symfony/ai`'s much smaller built-in default
 mid-finding.
 
 Other provider-specific parameters (e.g. `temperature`) can still be passed
-through the model name using either of the two syntaxes supported by
-`symfony/ai-bundle`:
-
-### Query-string syntax
+through the model name using the query-string syntax `symfony/ai-bundle`
+supports:
 
 ```yaml
 symfony_security_auditor:
     model: 'claude-opus-4-8?temperature=0.2'
 ```
 
-### Expanded syntax
-
-```yaml
-symfony_security_auditor:
-    model:
-        name: 'claude-opus-4-8'
-        options:
-            temperature: 0.2
-```
-
-Both forms are equivalent. Use expanded syntax when setting many options or
-preferring readability. `max_tokens` set via either form overrides the bundle's
-`max_output_tokens` for that role.
+`max_tokens` set this way overrides the bundle's `max_output_tokens` for that
+role. `symfony/ai-bundle`'s own `ai.yaml` platform config additionally accepts
+an expanded `{name, options}` mapping for a model — this bundle's `model` /
+`attacker_model` / `reviewer_model` keys do not: they are plain strings, so only
+the query-string form works here.
 
 ## Split-Model Setup
 
@@ -548,11 +538,11 @@ bin/console audit:run --baseline=.security-baseline.json
 
 ### Exit codes
 
-| Code | Meaning                                                                                                                            |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `0`  | Audit completed; aggregate risk level is below the `fail_on` threshold (default `critical` → SAFE, LOW, MEDIUM, or HIGH)           |
-| `1`  | Aggregate risk level is at or above the `fail_on` threshold (default `critical`), the audit itself failed, or the path was invalid |
-| `2`  | Audit aborted because the configured token or cost budget was exceeded (partial report still emitted)                              |
+| Code | Meaning                                                                                                                                                                                                                                                                                                                              |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0`  | Audit completed; aggregate risk level is below the `fail_on` threshold (default `critical` → SAFE, LOW, MEDIUM, or HIGH)                                                                                                                                                                                                             |
+| `1`  | Aggregate risk level is at or above the `fail_on` threshold (default `critical`), the audit itself failed, or the path was invalid                                                                                                                                                                                                   |
+| `2`  | The audit budget could not be honored: either it aborted mid-run because the configured token or cost budget was exceeded (partial report still emitted), or it never started because an unpriced model makes `audit.budget.max_cost_usd` unenforceable and the run was declined or non-interactive (no report emitted in that case) |
 
 ### `audit:diff` — comparing two reports
 

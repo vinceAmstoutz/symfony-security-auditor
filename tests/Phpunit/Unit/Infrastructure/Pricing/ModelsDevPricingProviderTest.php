@@ -33,6 +33,15 @@ final class ModelsDevPricingProviderTest extends TestCase
         self::assertSame(25.0, $modelsDevPricingProvider->pricePerMillionOutputTokens('claude-opus-4-8'));
     }
 
+    public function test_it_prices_a_model_name_carrying_the_documented_query_string_options_syntax(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('catalog.json');
+
+        self::assertTrue($modelsDevPricingProvider->hasModel('claude-opus-4-8?temperature=0.2'));
+        self::assertSame(5.0, $modelsDevPricingProvider->pricePerMillionInputTokens('claude-opus-4-8?temperature=0.2'));
+        self::assertSame(25.0, $modelsDevPricingProvider->pricePerMillionOutputTokens('claude-opus-4-8?temperature=0.2'));
+    }
+
     public function test_it_prefers_first_party_over_aggregator_for_a_bare_id(): void
     {
         $modelsDevPricingProvider = $this->providerForCatalog('catalog.json');

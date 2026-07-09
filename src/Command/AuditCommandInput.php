@@ -116,7 +116,7 @@ final class AuditCommandInput
     private function stripLeadingCurrentDirSegment(UnicodeString $unicodeString): UnicodeString
     {
         while ($unicodeString->startsWith('./')) {
-            $unicodeString = $unicodeString->after('/');
+            $unicodeString = $unicodeString->after('/')->trimStart('/');
         }
 
         return '.' === $unicodeString->toString() ? u('') : $unicodeString;

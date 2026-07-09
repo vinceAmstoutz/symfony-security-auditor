@@ -65,7 +65,7 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
             $data['id'],
             $data['type'],
             $data['severity'],
-            $this->escapeFences($data['title']),
+            $this->stripEmbeddedNewline($this->escapeFences($data['title'])),
             $filePath,
             $data['line_start'],
             $data['line_end'],
@@ -131,7 +131,7 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
                 $data['id'],
                 $data['type'],
                 $data['severity'],
-                $this->escapeFences($data['title']),
+                $this->stripEmbeddedNewline($this->escapeFences($data['title'])),
                 $filePath,
                 $data['line_start'],
                 $data['line_end'],
@@ -177,6 +177,19 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
     private function sanitizeFilePath(string $filePath): string
     {
         return str_replace(["\n", '"'], [' ', "'"], $filePath);
+    }
+
+    /**
+     * `title` lands in the bare, single-line `Title: ...` slot with no
+     * surrounding fence or heading to contain it — unlike the fenced/heading
+     * -guarded narrative fields `escapeFences()` protects. A raw newline here
+     * would forge a fake standalone instruction paragraph as unguarded
+     * top-level prompt text, the same class of injection
+     * `sanitizeFilePath()` already guards `File: ...` against.
+     */
+    private function stripEmbeddedNewline(string $text): string
+    {
+        return str_replace("\n", ' ', $text);
     }
 
     /**

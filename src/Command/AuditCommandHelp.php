@@ -45,7 +45,9 @@ final class AuditCommandHelp
         Exit codes (the failure threshold is configurable via <info>audit.fail_on</info> / <info>--fail-on</info>, default <info>critical</info>):
           <info>0</info>  audit completed; risk level is below the fail-on threshold
           <info>1</info>  audit completed with risk level at or above the fail-on threshold, or the audit itself failed
-          <info>2</info>  audit aborted because the configured token or cost budget was exceeded (partial report still emitted)
+          <info>2</info>  audit budget could not be honored: it aborted mid-run because the configured token or cost budget was
+                exceeded (partial report still emitted), or it never started because an unpriced model makes the cost
+                budget unenforceable and the run was declined or non-interactive (no report emitted in that case)
 
         Cost & duration: a typical Symfony project (~150 files) takes minutes, not seconds,
         and costs a few cents to a few dollars depending on the selected model. Configure

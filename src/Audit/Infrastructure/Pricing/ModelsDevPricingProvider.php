@@ -101,6 +101,8 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
 
     private function lookup(string $model): ?ModelPrice
     {
+        $model = $this->stripOptionsQueryString($model);
+
         $firstParty = $this->priceFromProviders($model, self::FIRST_PARTY_PROVIDERS);
         if ($firstParty instanceof ModelPrice) {
             return $firstParty;
@@ -111,6 +113,22 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
         }
 
         return $this->priceFromProviders($model, $this->sortedProviderKeys());
+    }
+
+    /**
+     * `docs/configuration.md`'s documented `model: 'name?temperature=0.2'`
+     * query-string syntax (per `symfony/ai-bundle`'s own convention) reaches
+     * this provider unparsed — `LLMConfiguration` and `ContainerParameterRegistrar`
+     * both publish the model name verbatim, only `symfony/ai`'s own platform
+     * factory ever splits it. Stripping everything from the first `?` before
+     * every catalog lookup keeps a model configured this way priced the same
+     * as its bare name.
+     */
+    private function stripOptionsQueryString(string $model): string
+    {
+        $withoutOptions = strstr($model, '?', true);
+
+        return false === $withoutOptions ? $model : $withoutOptions;
     }
 
     /** @param list<int|string> $providers */
