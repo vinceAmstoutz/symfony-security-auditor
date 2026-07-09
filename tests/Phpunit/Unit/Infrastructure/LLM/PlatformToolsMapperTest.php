@@ -130,6 +130,53 @@ final class PlatformToolsMapperTest extends TestCase
     }
 
     /**
+     * @throws InvalidToolDefinitionException
+     */
+    public function test_it_preserves_the_items_schema_of_an_array_property(): void
+    {
+        $toolDefinition = new ToolDefinition(
+            name: 'record_vulnerability',
+            description: 'records a finding',
+            parametersSchema: [
+                'type' => 'object',
+                'properties' => ['tags' => ['type' => 'array', 'description' => 'x', 'items' => ['type' => 'string', 'description' => 'a tag']]],
+                'required' => [],
+            ],
+        );
+
+        $tool = PlatformToolsMapper::map([$toolDefinition])[0];
+
+        self::assertSame(['type' => 'string', 'description' => 'a tag'], $this->parametersOf($tool)['properties']['tags']['items']);
+    }
+
+    /**
+     * @throws InvalidToolDefinitionException
+     */
+    public function test_it_preserves_the_nested_properties_of_an_object_property(): void
+    {
+        $toolDefinition = new ToolDefinition(
+            name: 'record_vulnerability',
+            description: 'records a finding',
+            parametersSchema: [
+                'type' => 'object',
+                'properties' => ['location' => [
+                    'type' => 'object',
+                    'description' => 'x',
+                    'properties' => ['file' => ['type' => 'string', 'description' => 'the file']],
+                    'required' => ['file'],
+                ]],
+                'required' => [],
+            ],
+        );
+
+        $tool = PlatformToolsMapper::map([$toolDefinition])[0];
+        $location = $this->parametersOf($tool)['properties']['location'];
+
+        self::assertSame(['file' => ['type' => 'string', 'description' => 'the file']], $location['properties']);
+        self::assertSame(['file'], $location['required']);
+    }
+
+    /**
      * @return array{type: 'object', properties: array<string, array<string, mixed>>, required: list<string>, additionalProperties: false}
      */
     private function parametersOf(Tool $tool): array

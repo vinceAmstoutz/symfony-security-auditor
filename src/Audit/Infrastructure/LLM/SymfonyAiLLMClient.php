@@ -125,6 +125,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformOptionsFactory,
             $this->promptTokenEstimator,
             $this,
+            $platformBinding->logger,
         );
 
         $this->toolConversationWavefront = new ToolConversationWavefront(

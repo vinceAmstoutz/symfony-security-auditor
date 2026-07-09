@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
+use Psr\Log\LoggerInterface;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\PlatformInterface;
@@ -47,6 +48,7 @@ final readonly class BatchWindowResolver
         private PlatformOptionsFactory $platformOptionsFactory,
         private PromptTokenEstimator $promptTokenEstimator,
         private LLMClientInterface $llmClient,
+        private LoggerInterface $logger,
     ) {}
 
     /**
@@ -123,6 +125,8 @@ final readonly class BatchWindowResolver
             if (!$reconciled) {
                 $this->rateLimiter->record(0, 0);
             }
+
+            $this->logger->warning('Batch-window response failed to resolve after dispatch; falling back to a fresh complete() call that may duplicate provider billing for the already-dispatched request');
 
             return $this->llmClient->complete($request['system'], $request['user']);
         }

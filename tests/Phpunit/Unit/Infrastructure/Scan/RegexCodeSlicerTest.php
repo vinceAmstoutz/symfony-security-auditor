@@ -189,6 +189,45 @@ final class RegexCodeSlicerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_a_heredoc_body_is_retained_in_full(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$name = \$request->get('name');\n"
+            ."        \$sql = <<<SQL\n"
+            ."            SELECT * FROM users WHERE name = ('\$name')\n"
+            ."            SQL;\n"
+            ."        return \$connection->executeQuery(\$sql);\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString("SELECT * FROM users WHERE name = ('\$name')", $sliced);
+        self::assertStringContainsString('$sql = <<<SQL', $sliced);
+        self::assertStringContainsString('SQL;', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_lines_after_a_closed_heredoc_are_still_elided_when_inert(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$sql = <<<SQL\n"
+            ."            SELECT 1\n"
+            ."            SQL;\n"
+            ."        \$inert = 1;\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('$inert = 1;', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_a_closing_paren_inside_a_string_literal_default_value_does_not_break_continuation_tracking(): void
     {
         $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)

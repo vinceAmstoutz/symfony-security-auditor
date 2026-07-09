@@ -1781,6 +1781,49 @@ final class SymfonyAiLLMClientTest extends TestCase
 
     /**
      * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
+    public function test_complete_batch_warns_when_falling_back_to_complete_after_a_resolve_failure(): void
+    {
+        $platform = new class implements PlatformInterface {
+            private int $calls = 0;
+
+            #[Override]
+            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
+            {
+                $converter = 0 === $this->calls++
+                    ? new ThrowingConverter(new RuntimeException('boom'))
+                    : new PlainConverter(new TextResult('recovered'));
+
+                return new DeferredResult($converter, new InMemoryRawResult(['text' => ''], [], (object) []), $options);
+            }
+
+            #[Override]
+            public function getModelCatalog(): ModelCatalogInterface
+            {
+                return new FallbackModelCatalog();
+            }
+        };
+
+        /** @var list<array{string, array<string, mixed>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', $logger));
+
+        $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+
+        self::assertCount(1, $warnings);
+        self::assertSame('Batch-window response failed to resolve after dispatch; falling back to a fresh complete() call that may duplicate provider billing for the already-dispatched request', $warnings[0][0]);
+    }
+
+    /**
+     * @throws MissingAiPlatformException
      * @throws InvalidAuditBudgetException
      */
     public function test_complete_batch_rethrows_budget_exceeded_without_falling_back_to_complete(): void

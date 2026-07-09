@@ -30,13 +30,7 @@ final readonly class LlamaTokenEstimator implements ProviderTokenEstimatorInterf
     #[Override]
     public function supports(string $model): bool
     {
-        foreach (self::PREFIXES as $prefix) {
-            if (u($model)->startsWith($prefix)) {
-                return true;
-            }
-        }
-
-        return false;
+        return u($model)->containsAny(self::PREFIXES);
     }
 
     #[Override]

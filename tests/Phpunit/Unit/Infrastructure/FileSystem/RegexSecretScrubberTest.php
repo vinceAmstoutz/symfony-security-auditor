@@ -28,6 +28,8 @@ final class RegexSecretScrubberTest extends TestCase
 
     private const string GHO = 'gho';
 
+    private const string GITHUB_PAT = 'github_pat';
+
     private const string STRIPE_LIVE = 'sk_live';
 
     private const string STRIPE_RK = 'rk_test';
@@ -60,6 +62,10 @@ final class RegexSecretScrubberTest extends TestCase
         ];
         yield 'github_oauth_token' => [
             self::GHO.'_1234567890abcdefghijklmnopqrstuvwxyz',
+            '***REDACTED:github_token***',
+        ];
+        yield 'github_fine_grained_pat' => [
+            self::GITHUB_PAT.'_11AABBCCDD0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
             '***REDACTED:github_token***',
         ];
         yield 'stripe_live_key' => [

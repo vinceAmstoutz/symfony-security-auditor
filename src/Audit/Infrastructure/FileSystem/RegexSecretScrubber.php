@@ -40,7 +40,7 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
     // `(?!\2)[^\n]` (rather than excluding both quote characters) so a value quoted with one type can contain an unescaped instance of the *other* type — e.g. "don't" inside double quotes — without the closing-quote backreference matching that unrelated character and truncating the redaction mid-value.
     private const array DEFAULT_PATTERNS = [
         SecretPatternLabel::AwsAccessKey->value => '/\bAKIA[0-9A-Z]{16}\b/',
-        SecretPatternLabel::GithubToken->value => '/\bgh[pousr]_[A-Za-z0-9]{36,255}\b/',
+        SecretPatternLabel::GithubToken->value => '/\b(?:gh[pousr]_[A-Za-z0-9]{36,255}|github_pat_\w{22,255})\b/',
         SecretPatternLabel::StripeKey->value => '/\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,99}\b/',
         SecretPatternLabel::SlackToken->value => '/\bxox[abprs]-[A-Za-z0-9-]{10,72}\b/',
         SecretPatternLabel::GoogleApiKey->value => '/\bAIza[0-9A-Za-z_\-]{35}(?![0-9A-Za-z_\-])/',

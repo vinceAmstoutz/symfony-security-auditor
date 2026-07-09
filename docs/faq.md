@@ -331,7 +331,9 @@ class of issue this tool exists to find.
 ### Can I tune model parameters (temperature, max_tokens)?
 
 Yes. For `max_tokens`, use the dedicated bundle key — it defaults to `4096` and
-avoids `symfony/ai`'s built-in ~1000-token cap:
+avoids `symfony/ai`'s built-in ~1000-token cap. This key currently only takes
+effect for Claude/Anthropic-dialect models — see
+[Configuration → Top-level](configuration.md#top-level):
 
 ```yaml
 symfony_security_auditor:

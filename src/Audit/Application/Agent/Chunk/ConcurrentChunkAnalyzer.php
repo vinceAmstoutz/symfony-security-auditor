@@ -316,9 +316,12 @@ final readonly class ConcurrentChunkAnalyzer
      */
     private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, CoverageRecorderInterface $coverageRecorder): void
     {
-        foreach ($this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain())->vulnerabilities() as $vulnerability) {
+        $vulnerabilities = $this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain())->vulnerabilities();
+        foreach ($vulnerabilities as $vulnerability) {
             $coverageRecorder->recordFoundVulnerability($vulnerability);
         }
+
+        ChunkFindingProgress::report($this->progressReporter, $vulnerabilities);
     }
 
     /**

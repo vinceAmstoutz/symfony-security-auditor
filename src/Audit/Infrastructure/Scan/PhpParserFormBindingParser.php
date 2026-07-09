@@ -19,6 +19,7 @@ use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\NullsafeMethodCall;
+use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
@@ -37,15 +38,22 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInte
  * @internal not part of the BC promise — see docs/versioning.md
  *
  * Walks each public controller-like method body looking for
- * `$this->createForm(SomeFormType::class)` call sites. Only literal
- * `FooType::class` arguments are recorded — dynamic class names (variables,
- * method calls returning class strings) are intentionally ignored because the
- * binding cannot be resolved statically. "Controller-like" also covers
- * `#[AsLiveComponent]`/`#[ApiResource]` classes that also extend
+ * `$this->createForm(SomeFormType::class)` (or `self::`/`static::createForm(...)`)
+ * call sites, following calls into same-class helper methods via {@see
+ * ThisCallReachability} so a call moved behind a shared private/protected
+ * helper is still attributed to the public action that reaches it. Only
+ * literal `FooType::class` arguments are recorded — dynamic class names
+ * (variables, method calls returning class strings) are intentionally ignored
+ * because the binding cannot be resolved statically. "Controller-like" also
+ * covers `#[AsLiveComponent]`/`#[ApiResource]` classes that also extend
  * `AbstractController`.
  */
 final readonly class PhpParserFormBindingParser implements FormBindingParserInterface
 {
+    public function __construct(
+        private ThisCallReachability $thisCallReachability = new ThisCallReachability(),
+    ) {}
+
     #[Override]
     public function parse(ProjectFile $projectFile): array
     {
@@ -137,13 +145,15 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
      */
     private function bindingsForMethod(string $filePath, ClassMethod $classMethod, array $methodsByName, NodeFinder $nodeFinder): array
     {
+        $body = $this->thisCallReachability->reachableBody($classMethod, $methodsByName);
+
         $bindings = [];
-        foreach ($this->reachableCreateFormCallSites($classMethod, $methodsByName, $nodeFinder) as $methodCall) {
-            if (!$this->isThisCreateFormCall($methodCall)) {
+        foreach ($this->createFormCallSites($body, $nodeFinder) as $call) {
+            if (!$this->isCreateFormCall($call)) {
                 continue;
             }
 
-            $formClass = $this->resolveFirstArgumentClassName($methodCall);
+            $formClass = $this->resolveFirstArgumentClassName($call);
             if (null === $formClass) {
                 continue;
             }
@@ -155,102 +165,47 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
     }
 
     /**
-     * A `createForm()` call moved behind a shared private/protected helper (a
-     * common CRUD-controller refactor) would otherwise be invisible, since a
-     * public action's own body only calls the helper, never `createForm()`
-     * directly. Follows `$this->helper()` calls into methods declared on the
-     * same class, statically resolvable from the already-parsed AST, so the
-     * binding is still attributed to the public action that reaches it.
+     * Deduplicates by node identity: a diamond-shaped helper call graph (two
+     * reachable methods both calling a shared third helper) can otherwise
+     * surface the same call site twice via {@see ThisCallReachability}.
      *
-     * @param array<string, ClassMethod> $methodsByName
-     *
-     * @return list<MethodCall|NullsafeMethodCall>
-     */
-    private function reachableCreateFormCallSites(ClassMethod $classMethod, array $methodsByName, NodeFinder $nodeFinder): array
-    {
-        $bySpotId = [];
-        foreach ($this->reachableCreateFormCallSitesVisiting($classMethod, $methodsByName, $nodeFinder, []) as $methodCall) {
-            $bySpotId[spl_object_id($methodCall)] = $methodCall;
-        }
-
-        return array_values($bySpotId);
-    }
-
-    /**
-     * @param array<string, ClassMethod> $methodsByName
-     * @param array<string, true>        $visited
-     *
-     * @return list<MethodCall|NullsafeMethodCall>
-     */
-    private function reachableCreateFormCallSitesVisiting(ClassMethod $classMethod, array $methodsByName, NodeFinder $nodeFinder, array $visited): array
-    {
-        $name = $classMethod->name->toString();
-        if (\array_key_exists($name, $visited)) {
-            return [];
-        }
-
-        $visited[$name] = true;
-
-        $body = $classMethod->stmts;
-        if (null === $body) {
-            return [];
-        }
-
-        $ownCallSites = $this->createFormCallSites($body, $nodeFinder);
-
-        $helperCallSites = [];
-        foreach ($ownCallSites as $ownCallSite) {
-            $calledName = $this->thisCallName($ownCallSite);
-            if (null !== $calledName && \array_key_exists($calledName, $methodsByName)) {
-                $helperCallSites = [...$helperCallSites, ...$this->reachableCreateFormCallSitesVisiting($methodsByName[$calledName], $methodsByName, $nodeFinder, $visited)];
-            }
-        }
-
-        return [...$ownCallSites, ...$helperCallSites];
-    }
-
-    private function thisCallName(MethodCall|NullsafeMethodCall $methodCall): ?string
-    {
-        if (!$methodCall->var instanceof Variable || 'this' !== $methodCall->var->name) {
-            return null;
-        }
-
-        return $methodCall->name instanceof Identifier ? $methodCall->name->toString() : null;
-    }
-
-    /**
      * @param array<Node> $body
      *
-     * @return list<MethodCall|NullsafeMethodCall>
+     * @return list<MethodCall|NullsafeMethodCall|StaticCall>
      */
     private function createFormCallSites(array $body, NodeFinder $nodeFinder): array
     {
-        $methodCalls = [
+        $callsBySpotId = [];
+        foreach ([
             ...$nodeFinder->findInstanceOf($body, MethodCall::class),
             ...$nodeFinder->findInstanceOf($body, NullsafeMethodCall::class),
-        ];
+            ...$nodeFinder->findInstanceOf($body, StaticCall::class),
+        ] as $call) {
+            $callsBySpotId[spl_object_id($call)] = $call;
+        }
 
-        usort($methodCalls, static fn (MethodCall|NullsafeMethodCall $a, MethodCall|NullsafeMethodCall $b): int => $a->getStartTokenPos() <=> $b->getStartTokenPos());
+        $calls = array_values($callsBySpotId);
+        usort($calls, static fn (MethodCall|NullsafeMethodCall|StaticCall $a, MethodCall|NullsafeMethodCall|StaticCall $b): int => $a->getStartTokenPos() <=> $b->getStartTokenPos());
 
-        return $methodCalls;
+        return $calls;
     }
 
-    private function isThisCreateFormCall(MethodCall|NullsafeMethodCall $methodCall): bool
+    private function isCreateFormCall(MethodCall|NullsafeMethodCall|StaticCall $call): bool
     {
-        if (!$methodCall->name instanceof Identifier) {
+        if (!$call->name instanceof Identifier || 'createForm' !== $call->name->toString()) {
             return false;
         }
 
-        if ('createForm' !== $methodCall->name->toString()) {
-            return false;
+        if ($call instanceof StaticCall) {
+            return $call->class instanceof Name && \in_array($call->class->toString(), ['self', 'static'], true);
         }
 
-        return $methodCall->var instanceof Variable && 'this' === $methodCall->var->name;
+        return $call->var instanceof Variable && 'this' === $call->var->name;
     }
 
-    private function resolveFirstArgumentClassName(MethodCall|NullsafeMethodCall $methodCall): ?string
+    private function resolveFirstArgumentClassName(MethodCall|NullsafeMethodCall|StaticCall $call): ?string
     {
-        $typeArgument = $this->typeArgument(array_values($methodCall->args));
+        $typeArgument = $this->typeArgument(array_values($call->args));
         if (!$typeArgument instanceof Arg) {
             return null;
         }

@@ -17,11 +17,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
  * Opt-in extension of {@see AttackerCacheInterface} for caches that can key an
- * entry by the chunk PLUS the cross-iteration prompt context (prior validated
- * findings, reviewer-rejected findings) injected ahead of it. Consumers check
- * `instanceof ContextAwareAttackerCacheInterface` and fall back to skipping
- * the cache for context-carrying chunks when it is not implemented, so adding
- * this capability never breaks an existing cache.
+ * entry by the chunk PLUS the extra prompt context injected ahead of it: the
+ * cross-iteration preambles (prior validated findings, reviewer-rejected
+ * findings) AND the static pre-scan risk-marker preamble — the latter is
+ * folded into `$contextKey` too, since it changes the prompt on an unchanged
+ * chunk content hash whenever a `StaticPreScannerInterface` implementation
+ * (also a documented extension point) starts flagging a file differently.
+ * Consumers check `instanceof ContextAwareAttackerCacheInterface` and fall
+ * back to skipping the cache for context-carrying chunks when it is not
+ * implemented, so adding this capability never breaks an existing cache.
  *
  * An empty `$contextKey` MUST address the same entry as the context-free
  * {@see AttackerCacheInterface::get()} / `store()` pair, so entries written

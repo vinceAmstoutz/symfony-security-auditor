@@ -177,21 +177,81 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         $openParenDepth = 0;
         $openStringDelimiter = null;
         $insideBlockComment = false;
+        $openHeredocIdentifier = null;
         foreach (explode("\n", $projectFile->content()) as $line) {
+            if (null !== $openHeredocIdentifier) {
+                [$outputLine, $openHeredocIdentifier] = $this->consumeHeredocLine($line, $openHeredocIdentifier);
+                $output[] = $outputLine;
+
+                continue;
+            }
+
             $blockCommentState = $this->stripBlockComments($line, $insideBlockComment);
             $insideBlockComment = $blockCommentState['inside_block_comment'];
 
-            $retain = $openParenDepth > 0 || $this->shouldRetain($line);
+            $heredocIdentifier = $this->heredocIdentifierOpenedBy($blockCommentState['line']);
+            $retain = null !== $heredocIdentifier || $openParenDepth > 0 || $this->shouldRetain($line);
             $output[] = $retain ? $line : self::ELIDED_PLACEHOLDER;
 
-            if ($retain) {
-                $parenState = $this->parenDelta($blockCommentState['line'], $openStringDelimiter);
-                $openParenDepth = max(0, $openParenDepth + $parenState['delta']);
-                $openStringDelimiter = $parenState['open_string_delimiter'];
+            if (null !== $heredocIdentifier) {
+                $openHeredocIdentifier = $heredocIdentifier;
+
+                continue;
             }
+
+            [$openParenDepth, $openStringDelimiter] = $this->advanceParenTracking($retain, $blockCommentState['line'], $openParenDepth, $openStringDelimiter);
         }
 
         return implode("\n", $output);
+    }
+
+    /**
+     * @return array{0: int, 1: ?string}
+     */
+    private function advanceParenTracking(bool $retain, string $line, int $openParenDepth, ?string $openStringDelimiter): array
+    {
+        if (!$retain) {
+            return [$openParenDepth, $openStringDelimiter];
+        }
+
+        $parenState = $this->parenDelta($line, $openStringDelimiter);
+
+        return [max(0, $openParenDepth + $parenState['delta']), $parenState['open_string_delimiter']];
+    }
+
+    /**
+     * A heredoc/nowdoc body is arbitrary text, not PHP code — treating it as
+     * such would misfire the security-token/structural checks on its content
+     * (a false negative when the body itself is the vulnerable line, e.g. raw
+     * SQL built with a heredoc) and feed unbalanced quotes/parens from prose
+     * into {@see self::parenDelta()}, desyncing continuation tracking for the
+     * rest of the file. The opener line and every line up to and including
+     * the closing identifier are retained verbatim instead.
+     *
+     * @return array{0: string, 1: ?string}
+     */
+    private function consumeHeredocLine(string $line, string $identifier): array
+    {
+        return [$line, $this->closesHeredoc($line, $identifier) ? null : $identifier];
+    }
+
+    private function heredocIdentifierOpenedBy(string $line): ?string
+    {
+        if (1 !== preg_match('/<<<\s*[\'"]?([A-Za-z_]\w*)[\'"]?\s*$/', $line, $matches)) {
+            return null;
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * PHP allows the closing identifier to be indented (flexible heredoc
+     * syntax, PHP 7.3+) and requires nothing but whitespace before it, so it
+     * is matched at the start of the line rather than requiring column 0.
+     */
+    private function closesHeredoc(string $line, string $identifier): bool
+    {
+        return 1 === preg_match(\sprintf('/^\s*%s\b/', preg_quote($identifier, '/')), $line);
     }
 
     private function shouldSlice(ProjectFile $projectFile): bool

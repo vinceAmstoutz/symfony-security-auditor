@@ -90,7 +90,7 @@ final readonly class PlatformToolsMapper
     /**
      * @param array<array-key, mixed> $spec
      *
-     * @return array{type: string, description: string, enum?: list<string>, minimum?: int|float, maximum?: int|float, maxLength?: int}
+     * @return array{type: string, description: string, enum?: list<string>, minimum?: int|float, maximum?: int|float, maxLength?: int, items?: array<string, mixed>, properties?: array<string, mixed>, required?: list<string>}
      */
     private static function normalizePropertySpec(array $spec): array
     {
@@ -122,7 +122,28 @@ final readonly class PlatformToolsMapper
             $normalized['enum'] = array_values(array_filter($enum, 'is_string'));
         }
 
-        return $normalized;
+        return [...$normalized, ...self::normalizeNestedSchema($normalized['type'], $spec)];
+    }
+
+    /**
+     * @param array<array-key, mixed> $spec
+     *
+     * @return array{items?: array<string, mixed>, properties?: array<string, mixed>, required?: list<string>}
+     */
+    private static function normalizeNestedSchema(string $type, array $spec): array
+    {
+        if ('array' === $type && \is_array($spec['items'] ?? null)) {
+            return ['items' => self::normalizePropertySpec($spec['items'])];
+        }
+
+        if ('object' === $type && \is_array($spec['properties'] ?? null)) {
+            return [
+                'properties' => self::normalizeProperties($spec['properties']),
+                'required' => self::normalizeRequired($spec['required'] ?? []),
+            ];
+        }
+
+        return [];
     }
 
     /**

@@ -3454,6 +3454,85 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   rendered `proof` (or any other narrative field beyond a short
   description/remediation) either, by deliberate design for their
   CI-tool-oriented consumers.
+- **`MistralTokenEstimator`/`LlamaTokenEstimator::supports()` matched model IDs
+  with a `foreach` + `startsWith()` loop against bare provider prefixes
+  (`'mistral-'`, `'llama-'`, …), missing every Bedrock-hosted ID** (e.g.
+  `mistral.pixtral-large-2502-v1:0`, `meta.llama3-1-70b-instruct-v1:0`,
+  `us.meta.llama4-scout-17b-instruct-v1:0`), which `symfony/models-dev`'s own
+  catalog lists — the same substring-vs-prefix gap `AnthropicTokenEstimator` was
+  fixed for in an earlier round, never generalized to its siblings. Both now use
+  `u($model)->containsAny(self::PREFIXES)`, matching `AnthropicTokenEstimator`'s
+  existing pattern.
+- **`RegexCodeSlicer` treated a heredoc/nowdoc body as ordinary code lines,
+  subject to the same structural/security-token retain-or-elide decision as
+  everything else**, so a heredoc body containing the actual vulnerable line
+  (e.g. raw SQL built via `<<<SQL ... SQL;`) was silently elided unless it
+  happened to contain a `SECURITY_TOKENS` substring — a false negative hiding
+  the exact line proving a vulnerability from the attacker. `slice()`
+  (`src/Audit/Infrastructure/Scan/RegexCodeSlicer.php`) now tracks open
+  heredoc/nowdoc state and force-retains the opener line and every line up to
+  and including the closing identifier, verbatim, bypassing the normal
+  retain/elide decision for that whole span.
+- **`PhpParserFormBindingParser` had its own duplicated, narrower reachability
+  walk that only recognized `$this->helper()` calls, never
+  `self::`/`static::helper()` delegation** — unlike its sibling parsers
+  (`PhpParserControllerAccessControlParser`, `PhpParserVoterCapabilityParser`),
+  which already share the `ThisCallReachability` collaborator extended for
+  static-call delegation in an earlier round. A `createForm()` call reached
+  through a `self::`/`static::` helper, or called directly as
+  `self::createForm(...)`/`static::createForm(...)`, was invisible to the
+  form-binding map, silently losing reviewer coverage for that form's mass-
+  assignment/CSRF surface. `PhpParserFormBindingParser`
+  (`src/Audit/Infrastructure/Scan/`) now takes a `ThisCallReachability`
+  collaborator instead of its own private walk, and its call-site
+  extraction/predicate also recognize a `StaticCall` on `self`/ `static` naming
+  `createForm`.
+- **`PlatformToolsMapper::normalizePropertySpec()` silently dropped the `items`
+  schema of an `array`-typed tool property and the `properties`/`required` of an
+  `object`-typed one**, sending an incomplete JSON Schema to the provider for
+  any extension of `RecordVulnerabilityToolFactoryInterface` (a documented
+  extension point, see `llm-seam.md`) that adds an array- or object-typed field
+  — the shipped tools never use either type, so this was unreachable via default
+  configuration. `normalizePropertySpec()`
+  (`src/Audit/Infrastructure/LLM/PlatformToolsMapper.php`) now recurses into
+  `items` for `array` and into `properties`/`required` for `object`.
+- **A finding recovered from a mid-conversation abort (via
+  `record_vulnerability` tool calls executed before a later round of the same
+  chunk's conversation threw) never emitted the `attacker.finding.recorded`
+  progress event**, even though it does end up in the final report —
+  `recordDrainedFindings()` in both `SequentialChunkAnalyzer` and
+  `ConcurrentChunkAnalyzer` (`src/Audit/Application/Agent/Chunk/`) fed the
+  recovered finding into `CoverageRecorderInterface::recordFoundVulnerability()`
+  but never called `ChunkFindingProgress::report()`, so a live TTY/CI run never
+  streamed it as discovered. Both now report it alongside recording it.
+- **`docs/configuration.md`/`docs/faq.md` claimed `provider_json_mode` is
+  "honored by OpenAI / Mistral / Ollama; silently ignored by Anthropic" and that
+  `max_output_tokens` is set "on every platform request"** — both are the
+  opposite of current behavior: `PlatformOptionsFactory::baseOptions()`
+  (`src/Audit/Infrastructure/LLM/PlatformOptionsFactory.php`) only forwards
+  `response_format`/`max_tokens` when the model name contains `claude`, a gate
+  added in an earlier round to stop `symfony/ai`'s Gemini and OpenAI Responses
+  bridges from crashing on those option keys, without updating either doc. Both
+  keys are documented as currently a no-op for non-Claude models.
+- **`ContextAwareAttackerCacheInterface`'s docblock described "context" as only
+  the cross-iteration preambles (prior validated findings, reviewer-rejected
+  findings), omitting that `ChunkContextFactory::deriveContextKey()` also folds
+  in the static pre-scan risk-marker preamble** — a documented extension point
+  implementing only the plain `AttackerCacheInterface` would, per that docblock,
+  reasonably expect caching to be skipped only for chunks carrying
+  prior/rejected findings, when in practice most ordinary marker-bearing chunks
+  are skipped too. The docblock
+  (`src/Audit/Domain/Port/ContextAwareAttackerCacheInterface.php`) now documents
+  the marker preamble as part of "context" too, matching `ChunkContextFactory`'s
+  existing, intentional behavior — no code change.
+- **`BatchWindowResolver::resolveOne()`'s resolve-failure fallback to a fresh
+  `complete()` call — deliberate, so the batch path is never less correct than
+  the per-call path — logged nothing**, so an operator had no visibility into a
+  duplicate dispatch that may have already been billed by the provider before
+  the fallback re-sent the same request.
+  (`src/Audit/Infrastructure/LLM/BatchWindowResolver.php`) now logs a warning
+  when this fallback fires, mirroring the existing log in
+  `ToolConversationWavefront::abortConversation()`'s equivalent tool-ran branch.
 
 ### Security
 
@@ -3876,6 +3955,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/Bridge/ComposerBridgeInstaller.php`) now refuses to
   write when the manifest path or the target directory is a symlink, via a new
   `BridgeInstallationFailedException::forSymlinkedTargetDirectory()`.
+- **`RegexSecretScrubber`'s `GithubToken` pattern only covered GitHub's legacy
+  classic-PAT/OAuth/app-token prefixes (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`),
+  missing the modern, GitHub-recommended-default fine-grained PAT format
+  (`github_pat_...`)** — a fine-grained token embedded in a scanned file's
+  content was never redacted before being sent to the LLM. The pattern
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) now also
+  matches `github_pat_\w{22,255}`.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

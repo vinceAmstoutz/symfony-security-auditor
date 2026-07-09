@@ -2310,6 +2310,41 @@ final class AttackerAgentTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_structured_collection_reports_progress_for_a_finding_recorded_before_a_later_round_of_the_same_chunk_aborts(): void
+    {
+        $files = [$this->makeFile('src/A.php')];
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
+                $toolRegistry->execute('record_vulnerability', self::recordedFinding('finding-a'));
+
+                throw BudgetExceededException::forTokens(10, 5);
+            });
+
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient, null, $recordingProgressReporter);
+
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), AuditContext::forProject($this->tmpDir));
+            self::fail('expected BudgetExceededException');
+        } catch (BudgetExceededException) {
+            self::assertSame(
+                [['attacker.finding.recorded', ['severity' => 'high', 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1]]],
+                array_values(array_filter(
+                    $recordingProgressReporter->events,
+                    static fn (array $event): bool => 'attacker.finding.recorded' === $event[0],
+                )),
+            );
+        }
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      * @throws InvalidProjectFileException
      */
@@ -2649,7 +2684,7 @@ final class AttackerAgentTest extends TestCase
         self::assertLessThan(60.0, $completed[0][1]['elapsed_seconds']);
     }
 
-    private function makeStructuredCollectionAttackerAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null): AttackerAgent
+    private function makeStructuredCollectionAttackerAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null, ?ProgressReporterInterface $progressReporter = null): AttackerAgent
     {
         return new AttackerAgent(
             new AttackerLlmCollaborators(
@@ -2662,7 +2697,7 @@ final class AttackerAgentTest extends TestCase
             new AttackerScanCollaborators(
                 attackerCache: $attackerCache ?? new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
-                progressReporter: new NullProgressReporter(),
+                progressReporter: $progressReporter ?? new NullProgressReporter(),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: true,
@@ -2831,6 +2866,42 @@ final class AttackerAgentTest extends TestCase
             $survived = $auditContext->drainFoundVulnerabilities();
             self::assertCount(1, $survived);
             self::assertSame('finding-a', $survived[0]->title());
+        }
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_concurrent_structured_analysis_reports_progress_for_a_finding_recorded_before_the_whole_batch_call_aborts_on_budget_exceeded(): void
+    {
+        $files = [$this->makeFile('src/A.php')];
+
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests): array {
+                self::registryOf($requests[0])->execute('record_vulnerability', self::recordedFinding('finding-a'));
+
+                throw BudgetExceededException::forTokens(10, 5);
+            });
+
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient, null, $recordingProgressReporter);
+
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+            self::fail('expected BudgetExceededException');
+        } catch (BudgetExceededException) {
+            self::assertSame(
+                [['attacker.finding.recorded', ['severity' => 'high', 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1]]],
+                array_values(array_filter(
+                    $recordingProgressReporter->events,
+                    static fn (array $event): bool => 'attacker.finding.recorded' === $event[0],
+                )),
+            );
         }
     }
 
