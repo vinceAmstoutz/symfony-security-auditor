@@ -759,6 +759,20 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_vulnerability_includes_the_vulnerable_code(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('$q', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_render_vulnerability_includes_the_synthesized_poc_when_present(): void
     {
         $vulnerability = $this->makeValidatedVuln()->withSynthesizedPoC("curl -X POST https://victim.example/admin\n  -d 'id=1 OR 1=1'");

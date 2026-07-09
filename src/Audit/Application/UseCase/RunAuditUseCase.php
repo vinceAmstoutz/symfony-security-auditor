@@ -65,6 +65,9 @@ final readonly class RunAuditUseCase
      */
     public function execute(string $projectPath, array $scanPaths = [], bool $bypassCache = false, ?string $diffSinceRef = null, array $acceptedFingerprints = []): AuditReport
     {
+        $this->tokenUsageRecorder?->reset();
+        $this->budgetTracker?->reset();
+
         $this->logger->info('Starting audit', [
             'project' => $projectPath,
             'scan_paths' => $scanPaths,

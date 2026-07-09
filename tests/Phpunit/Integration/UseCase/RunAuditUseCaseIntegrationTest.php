@@ -157,9 +157,8 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         file_put_contents($this->tmpDir.'/src/App.php', '<?php class App {}');
 
         $tokenUsageRecorder = new TokenUsageRecorder();
-        $tokenUsageRecorder->record(120, 30);
 
-        $auditReport = $this->makeUseCaseWithTelemetry('[]', '{}', $tokenUsageRecorder)->execute($this->tmpDir);
+        $auditReport = $this->makeUseCaseWithTelemetry('[]', '{}', $tokenUsageRecorder, TokenUsageSnapshot::of(120, 30))->execute($this->tmpDir);
 
         self::assertSame(120, $auditReport->cost()->inputTokens());
         self::assertSame(30, $auditReport->cost()->outputTokens());
@@ -181,9 +180,8 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         file_put_contents($this->tmpDir.'/src/App.php', '<?php class App {}');
 
         $tokenUsageRecorder = new TokenUsageRecorder();
-        $tokenUsageRecorder->record(0, 0, 0, 1_000_000);
 
-        $auditReport = $this->makeUseCaseWithTelemetry('[]', '{}', $tokenUsageRecorder)->execute($this->tmpDir);
+        $auditReport = $this->makeUseCaseWithTelemetry('[]', '{}', $tokenUsageRecorder, TokenUsageSnapshot::of(0, 0, 0, 1_000_000))->execute($this->tmpDir);
 
         self::assertSame(0, $auditReport->cost()->inputTokens());
         self::assertSame(0, $auditReport->cost()->outputTokens());
@@ -262,8 +260,15 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         mkdir($this->tmpDir.'/src', 0o777, true);
         file_put_contents($this->tmpDir.'/src/App.php', '<?php');
 
+        $tokenUsageRecorder = new TokenUsageRecorder();
         $attackerLLM = self::createStub(LLMClientInterface::class);
-        $attackerLLM->method('complete')->willReturn(LLMResponse::of('[]', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0)));
+        $attackerLLM->method('complete')->willReturnCallback(
+            static function () use ($tokenUsageRecorder): LLMResponse {
+                $tokenUsageRecorder->record(42, 7);
+
+                return LLMResponse::of('[]', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0));
+            },
+        );
         $reviewerLLM = self::createStub(LLMClientInterface::class);
         $reviewerLLM->method('complete')->willReturn(LLMResponse::of('{}', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
@@ -295,9 +300,6 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
             new NullLogger(),
             new NullProgressReporter(),
         );
-
-        $tokenUsageRecorder = new TokenUsageRecorder();
-        $tokenUsageRecorder->record(42, 7);
 
         $runAuditUseCase = new RunAuditUseCase(
             $auditPipeline,
@@ -552,10 +554,16 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         string $attackerResponse,
         string $reviewerResponse,
         TokenUsageRecorder $tokenUsageRecorder,
+        ?TokenUsageSnapshot $tokenUsageSnapshot = null,
     ): RunAuditUseCase {
+        $tokenUsageSnapshot ??= TokenUsageSnapshot::of(0, 0);
         $attackerLLM = self::createStub(LLMClientInterface::class);
-        $attackerLLM->method('complete')->willReturn(
-            LLMResponse::of($attackerResponse, 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0)),
+        $attackerLLM->method('complete')->willReturnCallback(
+            static function () use ($tokenUsageRecorder, $attackerResponse, $tokenUsageSnapshot): LLMResponse {
+                $tokenUsageRecorder->record($tokenUsageSnapshot->inputTokens(), $tokenUsageSnapshot->outputTokens(), $tokenUsageSnapshot->cacheReadTokens(), $tokenUsageSnapshot->cacheCreationTokens());
+
+                return LLMResponse::of($attackerResponse, 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0));
+            },
         );
 
         $reviewerLLM = self::createStub(LLMClientInterface::class);

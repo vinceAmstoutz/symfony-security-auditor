@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 
@@ -26,6 +27,7 @@ interface ReportWriterInterface
      *
      * @throws UnsupportedOutputFormatException
      * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle, array $baselinedFingerprints = []): void;
 }

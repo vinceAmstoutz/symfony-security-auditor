@@ -31,6 +31,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedPr
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\PlainProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
@@ -175,6 +176,7 @@ final readonly class AuditCommand
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
      * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     private function runDryRun(
         array $styles,
@@ -241,6 +243,7 @@ final readonly class AuditCommand
     /**
      * @throws UnsupportedOutputFormatException
      * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     private function generateBaseline(
         SymfonyStyle $symfonyStyle,
@@ -261,6 +264,7 @@ final readonly class AuditCommand
     /**
      * @throws UnsupportedOutputFormatException
      * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     private function finalizeAuditRun(
         SymfonyStyle $symfonyStyle,
@@ -288,6 +292,7 @@ final readonly class AuditCommand
      *
      * @throws UnsupportedOutputFormatException
      * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     private function handleAbort(
         SymfonyStyle $symfonyStyle,

@@ -112,6 +112,7 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
                 $vulnerability->lineEnd(),
             )),
             '{{description}}' => $this->escape($vulnerability->description()),
+            '{{vulnerableCode}}' => $this->escape($vulnerability->vulnerableCode()),
             '{{attackVector}}' => $this->escape($vulnerability->attackVector()),
             '{{proof}}' => $this->escape($vulnerability->proof()),
             '{{synthesizedPoc}}' => $this->synthesizedPocSection($vulnerability),

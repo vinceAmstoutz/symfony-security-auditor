@@ -30,8 +30,24 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
     #[Override]
     public function render(AuditReport $auditReport): string
     {
+        $cost = $auditReport->cost();
+
         return implode("\n", [
             '# Security Audit Report',
+            '',
+            \sprintf(
+                '**Audit ID:** %s · **Project:** %s · **Started:** %s · **Duration:** %ss',
+                $auditReport->auditId(),
+                $auditReport->projectPath(),
+                $auditReport->startedAt()->format('Y-m-d H:i:s'),
+                number_format($auditReport->durationSeconds(), 1, '.', ''),
+            ),
+            \sprintf(
+                '**Tokens:** %s in / %s out · **Model:** %s',
+                number_format($cost->inputTokens()),
+                number_format($cost->outputTokens()),
+                '' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel(),
+            ),
             '',
             \sprintf(
                 '**Risk level:** %s (score %d) · **Findings:** %d · **Files scanned:** %d',
@@ -85,6 +101,10 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
             \sprintf('- **Confidence:** %s%%', \sprintf('%.0f', $vulnerability->confidence() * 100)),
             '',
             $this->escapeFences($vulnerability->description()),
+            '',
+            '**Vulnerable code:**',
+            '',
+            $this->codeBlock($vulnerability->vulnerableCode()),
             '',
             \sprintf('**Attack vector:** %s', $this->escapeFences($vulnerability->attackVector())),
             '',

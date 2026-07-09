@@ -16,10 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Override;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BaselineSuppressingReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 
@@ -47,6 +49,7 @@ final readonly class ReportWriter implements ReportWriterInterface
      *
      * @throws UnsupportedOutputFormatException
      * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     #[Override]
     public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle, array $baselinedFingerprints = []): void
@@ -63,7 +66,13 @@ final readonly class ReportWriter implements ReportWriterInterface
         }
 
         $this->assertSafeToWrite($outputFile);
-        $this->filesystem->dumpFile($outputFile, $content);
+
+        try {
+            $this->filesystem->dumpFile($outputFile, $content);
+        } catch (IOException $ioException) {
+            throw ReportWriteFailedException::fromIOException($outputFile, $ioException);
+        }
+
         $symfonyStyle->success(\sprintf('Report saved to %s', $outputFile));
     }
 

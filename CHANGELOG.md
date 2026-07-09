@@ -3533,6 +3533,84 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/LLM/BatchWindowResolver.php`) now logs a warning
   when this fallback fires, mirroring the existing log in
   `ToolConversationWavefront::abortConversation()`'s equivalent tool-ran branch.
+- **`EventSubscriberAttackerSkill` cited a nonexistent
+  `SecurityEvents::AUTHENTICATION_SUCCESS`** — the real constant is
+  `AuthenticationEvents::AUTHENTICATION_SUCCESS`
+  (`Symfony\Component\Security\Core\AuthenticationEvents`); `SecurityEvents`
+  only declares `INTERACTIVE_LOGIN`/`SWITCH_USER`.
+  `src/Audit/Infrastructure/Prompt/Skill/EventSubscriberAttackerSkill.php` now
+  cites the correct class. `ControllerAttackerSkill` listed
+  `#[IsSignatureValid]` as a rate-limiter binding alongside
+  `RateLimiterFactory::create()`/`framework.rate_limiter` — verified against the
+  vendored `symfony/http-kernel` source, `#[IsSignatureValid]` calls
+  `UriSigner::verify()` and has nothing to do with request throttling. A
+  password-reset/2FA endpoint using it purely for signed-URL tamper protection
+  could be waved off by the attacker as already rate-limited when it isn't.
+  `src/Audit/Infrastructure/Prompt/Skill/ControllerAttackerSkill.php` no longer
+  cites it in that bullet.
+- **`RunAuditUseCase`'s `TokenUsageRecorder`/`BudgetTracker` collaborators never
+  reset between calls, so any caller reusing the same `RunAuditUseCase` service
+  across more than one `execute()` call (a documented integration path — a
+  custom Messenger consumer or scheduled batch job auditing several projects)
+  silently accumulated token/cost usage across runs.** Reproduced directly: two
+  sequential calls recording 1000/500 then 200/100 tokens reported 1200/600 on
+  the second report instead of 200/100, and two 800-token calls each comfortably
+  under a 900-token cap made the _second_ call abort with
+  `"token budget exceeded (1600 / 900 tokens)"` despite being independently
+  in-budget. `TokenUsageRecorder::reset()`
+  (`src/Audit/Application/Telemetry/TokenUsageRecorder.php`) already existed for
+  exactly this — its own docblock says it "clears state between independent
+  audit runs sharing a recorder instance" — but nothing called it.
+  `BudgetTracker` had no `reset()` at all. `RunAuditUseCase::execute()`
+  (`src/Audit/Application/UseCase/RunAuditUseCase.php`) now resets both at the
+  start of every call, and `BudgetTracker` gained a matching `reset()`
+  (`src/Audit/Application/Budget/BudgetTracker.php`).
+- **`BudgetTracker::assertWithinBudget()` compared the _used_ cost (rounded to 6
+  decimal places) against the raw, unrounded configured cap** — a cap configured
+  with finer precision than that rounding grid (nothing in
+  `AuditConfigurationDefinition` forbids `max_cost_usd: 0.1234567`) could abort
+  a run whose real spend never reached it: reproduced with cap `0.1234567` and
+  true spend `0.1234566` (strictly under the cap) — rounding the used amount to
+  `0.123457` pushed it above the unrounded cap, throwing
+  `"cost budget exceeded ($0.1235 / $0.1235 USD)"` even though the figures only
+  look equal at 4-decimal display precision. `assertWithinBudget()`
+  (`src/Audit/Application/Budget/BudgetTracker.php`) now rounds the cap to the
+  same precision before comparing.
+- **`ReportWriter::write()` let a raw
+  `Symfony\Component\Filesystem\Exception\IOException` escape on a write failure
+  (unwritable parent directory, disk full, an intermediate path segment that is
+  actually a file), discarding a fully-computed audit report with only a generic
+  "Unexpected error" message** — `ReportWriterInterface::write()` documented
+  only `UnsupportedOutputFormatException`/`UnsafeReportWriteException`, unlike
+  every other `dumpFile()` call site in the Command layer (`Baseline::save()`/
+  `load()`, the standalone config writer, `ComposerBridgeInstaller`), which all
+  wrap `IOException` into a project-defined exception. `ReportWriter::write()`
+  (`src/Command/ReportWriter.php`) now catches it and throws a new
+  `ReportWriteFailedException`
+  (`src/Command/Exception/ReportWriteFailedException.php`), mirroring
+  `Baseline::save()`'s existing pattern.
+- **`ConsoleReportRenderer`, `HtmlReportRenderer`, and `MarkdownReportRenderer`
+  never rendered a finding's `vulnerable_code`** — the actual offending code
+  snippet the attacker LLM quoted, documented as a core narrative field
+  alongside `attack_vector`/`proof`/`remediation` in `docs/architecture.md` and
+  `docs/extending.md`, and already present in the JSON report — but silently
+  absent from all three human-facing formats, the same regression class already
+  fixed once for `synthesized_poc` in an earlier round. All three
+  (`src/Audit/Infrastructure/Report/ConsoleReportRenderer.php`,
+  `HtmlReportRenderer.php`, `MarkdownReportRenderer.php`, plus their
+  `vulnerability.txt`/`vulnerability.html` templates) now render a "Vulnerable
+  code"/"Vulnerable Code" section next to "Proof of Concept", matching how
+  `proof` is already rendered (literal, no word-wrap).
+- **`MarkdownReportRenderer` omitted every run-metadata field
+  (`Console`/`HtmlReportRenderer` show audit ID, project path, started-at,
+  duration, tokens, and model; Markdown showed none of it)**, contradicting
+  `README.md`'s claim that "the full report renders the same way in console,
+  JSON, SARIF, HTML, and Markdown" — a reader of the Markdown format (the one
+  `docs/extending.md` recommends for PR comments/wikis) had no way to see what
+  an audit cost or which model ran it. `MarkdownReportRenderer::render()`
+  (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) now renders the
+  same audit ID/project/started/duration/tokens/model line Console and HTML
+  already show.
 
 ### Security
 

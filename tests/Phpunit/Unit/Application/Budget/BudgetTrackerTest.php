@@ -216,6 +216,21 @@ final class BudgetTrackerTest extends TestCase
     }
 
     /**
+     * @throws BudgetExceededException
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_cost_budget_is_not_falsely_exceeded_by_a_cap_with_finer_precision_than_the_rounding_grid(): void
+    {
+        $budgetTracker = $this->budgetTracker(AuditBudget::forCost(0.1234567), inputPrice: 0.1);
+
+        $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(1_234_566, 0)));
+        $budgetTracker->assertWithinBudget();
+
+        self::assertSame(0.123457, $budgetTracker->costUsdUsed());
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      */
     public function test_cost_used_is_rounded_to_six_decimal_places(): void
@@ -268,6 +283,24 @@ final class BudgetTrackerTest extends TestCase
         $budgetTracker->recordCall(LLMResponse::of('x', 'claude-opus-4-7', 'end_turn', TokenUsageSnapshot::of(0, 0, 0, 1_000_000)));
 
         self::assertSame(12.5, $budgetTracker->costUsdUsed());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_reset_clears_accumulated_tokens_and_cost(): void
+    {
+        $budgetTracker = $this->budgetTracker(AuditBudget::forTokens(100), inputPrice: 10.0);
+
+        $budgetTracker->recordCall(LLMResponse::of('a', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(80, 10)));
+
+        $budgetTracker->reset();
+
+        self::assertSame(0, $budgetTracker->tokensUsed());
+        self::assertSame(0.0, $budgetTracker->costUsdUsed());
+        $budgetTracker->assertWithinBudget();
     }
 
     private function budgetTracker(

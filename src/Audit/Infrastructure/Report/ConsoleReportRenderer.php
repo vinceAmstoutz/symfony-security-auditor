@@ -93,6 +93,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
             '{{lineStart}}' => $vulnerability->lineStart(),
             '{{lineEnd}}' => $vulnerability->lineEnd(),
             '{{description}}' => $this->indentChunks($vulnerability->description()),
+            '{{vulnerableCode}}' => $this->indentLines($vulnerability->vulnerableCode()),
             '{{attackVector}}' => $this->indentChunks($vulnerability->attackVector()),
             '{{proof}}' => $this->indentLines($vulnerability->proof()),
             '{{synthesizedPoc}}' => $this->synthesizedPocSection($vulnerability),
