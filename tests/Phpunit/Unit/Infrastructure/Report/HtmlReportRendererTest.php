@@ -180,6 +180,33 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_includes_the_synthesized_poc_when_present(): void
+    {
+        $vulnerability = $this->makeValidatedVuln()->withSynthesizedPoC('curl -X POST https://victim.example/admin');
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('curl -X POST https://victim.example/admin', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_omits_the_synthesized_poc_section_when_absent(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringNotContainsString('Synthesized PoC', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_render_renders_confidence_as_a_percentage(): void
     {
         $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));

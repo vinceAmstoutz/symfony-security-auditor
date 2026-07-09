@@ -175,6 +175,32 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
+     * A pre-existing backslash immediately before a backtick would otherwise
+     * combine with the backslash `escapeFences()` inserts to escape the
+     * backtick itself, forming an escaped-backslash-then-live-backtick
+     * sequence a CommonMark parser reads as an open code span, instead of the
+     * intended literal text.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_escapes_a_backslash_preceding_a_backtick_so_it_cannot_open_a_live_code_span(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::HEADER_INJECTION, VulnerabilitySeverity::CRITICAL, 'Header leak', 0.7),
+            new CodeLocation('src/Low.php', 5, 6),
+            new VulnerabilityNarrative('Path is C:\\Users\\Public\\`whoami`', 'n/a', 'n/a', 'n/a'),
+            'n/a',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('Path is C:\\\\Users\\\\Public\\\\\\`whoami\\`', $output);
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
@@ -271,6 +297,35 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
 
         self::assertStringContainsString('**Confidence:** 90%', $output);
         self::assertStringContainsString("\n    ' OR 1=1", $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_includes_the_synthesized_poc_when_present(): void
+    {
+        $vulnerability = $this->makeValidatedVuln()->withSynthesizedPoC('curl -X POST https://victim.example/admin');
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('**Synthesized PoC:**', $output);
+        self::assertStringContainsString("\n    curl -X POST https://victim.example/admin", $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_omits_the_synthesized_poc_section_when_absent(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringNotContainsString('Synthesized PoC', $output);
     }
 
     /**

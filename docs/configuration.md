@@ -450,9 +450,10 @@ effective precedence, highest first, is:
 3. The user-level `config.yaml`
 4. Built-in defaults
 
-> Scalars and mappings deep-merge; if you set the same **list** key (e.g.
-> `scan.included_paths`) in both files, keep it in one place to avoid surprising
-> index-wise merges.
+> Scalars and mappings deep-merge; a **list** key (e.g. `scan.included_paths`)
+> set in both files is replaced wholesale by whichever file sets it last — the
+> per-project file's list fully overrides the user config's list rather than
+> merging element-wise.
 
 ### Switching providers
 

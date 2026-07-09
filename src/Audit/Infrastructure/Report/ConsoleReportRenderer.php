@@ -95,9 +95,17 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
             '{{description}}' => $this->indentChunks($vulnerability->description()),
             '{{attackVector}}' => $this->indentChunks($vulnerability->attackVector()),
             '{{proof}}' => $this->indentLines($vulnerability->proof()),
+            '{{synthesizedPoc}}' => $this->synthesizedPocSection($vulnerability),
             '{{remediation}}' => $this->indentChunks($vulnerability->remediation()),
             '{{confidence}}' => \sprintf('%.0f', $vulnerability->confidence() * 100),
         ]);
+    }
+
+    private function synthesizedPocSection(Vulnerability $vulnerability): string
+    {
+        $synthesizedPoC = $vulnerability->synthesizedPoC();
+
+        return null === $synthesizedPoC ? '' : \sprintf("\n  Synthesized PoC:\n%s\n", $this->indentLines($synthesizedPoC));
     }
 
     private function indentChunks(string $text): string

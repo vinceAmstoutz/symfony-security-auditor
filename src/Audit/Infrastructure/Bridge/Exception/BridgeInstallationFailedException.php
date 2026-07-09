@@ -33,4 +33,9 @@ final class BridgeInstallationFailedException extends RuntimeException
     {
         return new self(\sprintf('Could not initialize a composer project in "%s": %s', $targetDirectory, $throwable->getMessage()), previous: $throwable);
     }
+
+    public static function forSymlinkedTargetDirectory(string $targetDirectory): self
+    {
+        return new self(\sprintf('Refusing to initialize a composer project in "%s": the target or its manifest path is a symlink.', $targetDirectory));
+    }
 }

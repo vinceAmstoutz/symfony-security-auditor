@@ -759,6 +759,34 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_vulnerability_includes_the_synthesized_poc_when_present(): void
+    {
+        $vulnerability = $this->makeValidatedVuln()->withSynthesizedPoC("curl -X POST https://victim.example/admin\n  -d 'id=1 OR 1=1'");
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString("    curl -X POST https://victim.example/admin\n      -d 'id=1 OR 1=1'", $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_vulnerability_omits_the_synthesized_poc_section_when_absent(): void
+    {
+        $vulnerability = $this->makeValidatedVuln();
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringNotContainsString('Synthesized PoC', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_render_vulnerability_indents_every_line_of_a_multi_line_proof(): void
     {
         $vulnerability = Vulnerability::of(

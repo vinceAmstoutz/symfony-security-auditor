@@ -92,8 +92,22 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
             '',
             $this->codeBlock($vulnerability->proof()),
             '',
+            ...$this->synthesizedPocLines($vulnerability),
             \sprintf('**Remediation:** %s', $this->escapeFences($vulnerability->remediation())),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function synthesizedPocLines(Vulnerability $vulnerability): array
+    {
+        $synthesizedPoC = $vulnerability->synthesizedPoC();
+        if (null === $synthesizedPoC) {
+            return [];
+        }
+
+        return ['**Synthesized PoC:**', '', $this->codeBlock($synthesizedPoC), ''];
     }
 
     /**
@@ -109,11 +123,17 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
      * escaped too, since a description/attack-vector/remediation field is
      * legitimately multi-paragraph (unlike `title`, which is collapsed to one
      * line by {@see self::escapeHeading()}) and an embedded `\n\n## ` would
-     * otherwise forge a fake top-level section heading mid-finding.
+     * otherwise forge a fake top-level section heading mid-finding. A raw
+     * backslash already present right before a backtick/tilde must be escaped
+     * *first* — otherwise it combines with the backslash inserted below into
+     * an escaped-backslash-then-live-marker sequence CommonMark still parses
+     * as an open fence.
      */
     private function escapeFences(string $text): string
     {
-        return str_replace(['`', '~', '#', '<', '>'], ['\\`', '\\~', '\\#', '&lt;', '&gt;'], mb_scrub($text, 'UTF-8'));
+        $backslashesEscaped = str_replace('\\', '\\\\', mb_scrub($text, 'UTF-8'));
+
+        return str_replace(['`', '~', '#', '<', '>'], ['\\`', '\\~', '\\#', '&lt;', '&gt;'], $backslashesEscaped);
     }
 
     /**

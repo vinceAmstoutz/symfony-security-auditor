@@ -85,6 +85,8 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     private function ensureComposerProject(string $targetDirectory): void
     {
         $manifest = \sprintf('%s/%s', $targetDirectory, self::MANIFEST_FILENAME);
+        $this->assertSafeToWrite($manifest, $targetDirectory);
+
         if ($this->filesystem->exists($manifest)) {
             return;
         }
@@ -93,6 +95,23 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
             $this->filesystem->dumpFile($manifest, self::EMPTY_MANIFEST);
         } catch (IOException $ioException) {
             throw BridgeInstallationFailedException::forManifestWriteFailure($targetDirectory, $ioException);
+        }
+    }
+
+    /**
+     * `Filesystem::exists()` follows a symlink, so a *dangling* one at the
+     * manifest path reads as absent — skipping the "already exists" early
+     * return — and `dumpFile()` then transparently writes through it to
+     * wherever it points. Mirrors the guard already applied to the
+     * filesystem attacker/reviewer/advisory caches, the standalone config
+     * writer, and the report/baseline writers.
+     *
+     * @throws BridgeInstallationFailedException
+     */
+    private function assertSafeToWrite(string $manifest, string $targetDirectory): void
+    {
+        if (is_link($manifest) || is_link($targetDirectory)) {
+            throw BridgeInstallationFailedException::forSymlinkedTargetDirectory($targetDirectory);
         }
     }
 }

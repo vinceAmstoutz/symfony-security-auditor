@@ -549,6 +549,25 @@ final class AuditReportTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_without_fingerprints_only_removes_as_many_shared_fingerprint_findings_as_were_accepted(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $vulnerability = $this->sameFingerprintVuln(1)->withReviewerValidation(true);
+        $unrelated = $this->sameFingerprintVuln(2)->withReviewerValidation(true);
+        $auditContext->addVulnerability($vulnerability);
+        $auditContext->addVulnerability($unrelated);
+
+        $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$vulnerability->fingerprint()]);
+
+        self::assertSame(1, $auditReport->totalVulnerabilities());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_without_fingerprints_preserves_report_metadata(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);

@@ -163,6 +163,42 @@ final class BaselineProcessorTest extends TestCase
         self::assertSame(2, $count);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_generate_keeps_separate_entries_for_two_distinct_uncorrected_findings_that_share_a_fingerprint(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Shared title', 0.9),
+            new CodeLocation('src/Shared.php', 10, 12),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+        $second = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Shared title', 0.9),
+            new CodeLocation('src/Shared.php', 40, 42),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+
+        self::assertSame($vulnerability->fingerprint(), $second->fingerprint());
+        self::assertNotSame($vulnerability->id(), $second->id());
+
+        $auditReport = $this->makeReport($vulnerability, $second);
+
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::once())
+            ->method('save')
+            ->with('/out/baseline.json', self::countOf(2));
+
+        $count = (new BaselineProcessor($baseline))->generate($auditReport, '/out/baseline.json');
+
+        self::assertSame(2, $count);
+    }
+
     public function test_accepted_fingerprints_returns_empty_when_no_path_is_configured(): void
     {
         $baseline = $this->createMock(BaselineInterface::class);

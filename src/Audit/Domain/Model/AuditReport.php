@@ -126,18 +126,29 @@ final readonly class AuditReport
     }
 
     /**
-     * Copy of the report with every finding whose fingerprint appears in
-     * `$fingerprints` removed — used to suppress baselined (accepted) findings
-     * before rendering and exit-code resolution.
+     * Copy of the report with findings removed by fingerprint, consuming at
+     * most as many findings per fingerprint as `$fingerprints` contains that
+     * value — a plain membership test would let one accepted occurrence of a
+     * shared fingerprint suppress every current finding sharing it, including
+     * ones that were never actually reviewed.
      *
      * @param list<string> $fingerprints
      */
     public function withoutFingerprints(array $fingerprints): self
     {
-        $kept = array_filter(
-            $this->vulnerabilities,
-            static fn (Vulnerability $vulnerability): bool => !\in_array($vulnerability->fingerprint(), $fingerprints, true),
-        );
+        $remainingByFingerprint = array_count_values($fingerprints);
+
+        $kept = [];
+        foreach ($this->vulnerabilities as $vulnerability) {
+            $fingerprint = $vulnerability->fingerprint();
+            if (($remainingByFingerprint[$fingerprint] ?? 0) > 0) {
+                --$remainingByFingerprint[$fingerprint];
+
+                continue;
+            }
+
+            $kept[] = $vulnerability;
+        }
 
         return new self(
             $this->reportIdentity,

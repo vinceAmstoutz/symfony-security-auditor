@@ -3425,6 +3425,35 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Domain/Model/ProjectFileTypeClassifier.php`) now also matches each
   interface anywhere in the file's content, mirroring the `looksLikeX()` pattern
   already used for every sibling case.
+- **`VulnerabilityType::ROLE_ESCALATION` mapped to CWE-266 ("Incorrect Privilege
+  Assignment" — a static assignment defect), not the standard CWE-269 ("Improper
+  Privilege Management") virtually every real-world privilege/role escalation
+  finding is tagged with.** `VulnerabilityType::cwe()`
+  (`src/Audit/Domain/Model/VulnerabilityType.php`) now maps it to CWE-269.
+- **`docs/configuration.md` described the standalone config loader's list-merge
+  semantics as still index-wise-merge-prone**, a warning left over from before
+  the wholesale-list-replacement fix in a much earlier round
+  (`StandaloneConfigLoader::merge()`,
+  `src/Audit/Infrastructure/Config/StandaloneConfigLoader.php`, never touched by
+  that fix). The doc now describes the actual, current behavior: a list key set
+  in both files is replaced wholesale by whichever file sets it last.
+- **`ConsoleReportRenderer`, `HtmlReportRenderer`, and `MarkdownReportRenderer`
+  silently dropped a finding's `synthesized_poc`**, the concrete reproduction
+  artifact `PoCSynthesisStage` attaches for qualifying high-severity findings
+  (an opt-in, documented `thorough`-profile feature) — every one of these three
+  formats already renders the weaker `proof` field in the exact narrative slot a
+  PoC belongs, but never referenced `Vulnerability::synthesizedPoC()` at all. A
+  team using `--format=html`/`--format=markdown`, or the default console output,
+  never saw the PoC-synthesis feature's actual output. All three
+  (`src/Audit/Infrastructure/Report/ConsoleReportRenderer.php`,
+  `HtmlReportRenderer.php`, `MarkdownReportRenderer.php`, plus their
+  `vulnerability.txt`/`vulnerability.html` templates) now render a "Synthesized
+  PoC" section next to "Proof of Concept" when present, and omit it cleanly when
+  absent. `SarifReportRenderer`, `JunitReportRenderer`, and
+  `GithubAnnotationsReportRenderer` are unaffected — none of the three ever
+  rendered `proof` (or any other narrative field beyond a short
+  description/remediation) either, by deliberate design for their
+  CI-tool-oriented consumers.
 
 ### Security
 
@@ -3795,6 +3824,58 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   tag-push sanity check with no write action at all) declared no `permissions`
   block whatsoever, inheriting whatever `GITHUB_TOKEN` default the
   repository/organization has — now explicit `permissions: contents: read`.
+- **A plain membership check let one baseline-accepted finding silently suppress
+  every current finding sharing its fingerprint, not just the one actually
+  reviewed.** `AuditReport::withoutFingerprints()`
+  (`src/Audit/Domain/Model/AuditReport.php`) dropped every vulnerability whose
+  fingerprint appeared anywhere in the baseline's fingerprint list via
+  `in_array()`, regardless of how many times that fingerprint was actually
+  accepted. A newly-introduced, never-reviewed vulnerability that happens to
+  share a fingerprint with an already-baselined one (e.g. the same
+  auto-generated title at a different line) was silently dropped from the report
+  — and from `AuditExitCodeResolver`'s input — letting a live, un-triaged
+  finding pass CI as if it had been suppressed on purpose. Compounding this,
+  `BaselineProcessor::entriesFor()` (`src/Command/BaselineProcessor.php`)
+  deduplicated baseline entries by `fingerprint()` + `attackerFingerprint()`
+  combined, which collapses two distinct, simultaneously-present,
+  un-reclassified findings that share a fingerprint into a single baseline entry
+  at generation time — so the baseline never captured both identities in the
+  first place. `withoutFingerprints()` now consumes at most as many findings per
+  fingerprint as the baseline lists for it (count-aware, mirroring the pairing
+  already used by `ReportDiffer::only()`/`intersect()`), and `entriesFor()` now
+  dedupes by `Vulnerability::id()` instead.
+- **`AuditBudget::forCost()`/`forBoth()` accepted `+INF` as a cost cap**,
+  silently disabling the spend cap while `isUnlimited()` still reported `false`
+  — the same failure mode an earlier round's `NaN` guard was written to prevent,
+  just for infinity instead. `assertPositiveCost()`
+  (`src/Audit/Domain/Model/AuditBudget.php`) only checked `is_nan()`, not
+  `is_finite()`, and `symfony/yaml` natively parses the YAML 1.1 literal `.inf`
+  — reachable through ordinary
+  `symfony_security_auditor.audit.budget.max_cost_usd: .inf` configuration,
+  which the config tree's own `->min(0.01)` validator does not reject either.
+  Both call sites now check `is_finite()` (which also subsumes the `NaN` case).
+- **A pre-existing backslash immediately before a backtick or tilde defeated
+  `MarkdownReportRenderer::escapeFences()`'s escaping**, letting
+  attacker/LLM-influenced narrative text forge a live inline code span (or
+  strikethrough) in the rendered Markdown report.
+  (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) inserted a new
+  backslash immediately before each backtick/tilde/`#` but never escaped a
+  backslash already present in the source text — a description like
+  `` C:\Users\Public\`whoami` `` (plausible when quoting an escaped shell
+  command or a Windows path) rendered as an escaped-backslash followed by a
+  live, unescaped backtick, which CommonMark parses as an open code span instead
+  of the intended literal text. `escapeFences()` now escapes backslashes first.
+- **`ComposerBridgeInstaller::ensureComposerProject()` wrote through a dangling
+  symlink at the `composer.json` manifest path (CWE-59)** — the same
+  vulnerability class already fixed for the filesystem attacker/reviewer/
+  advisory caches and the standalone config writer, missed on this class.
+  `Filesystem::exists()` follows a symlink, so a _dangling_ one at the manifest
+  path reads as absent, skipping the "already exists" early return, and
+  `Filesystem::dumpFile()` then transparently wrote through it to wherever it
+  pointed. `ComposerBridgeInstaller::assertSafeToWrite()`
+  (`src/Audit/Infrastructure/Bridge/ComposerBridgeInstaller.php`) now refuses to
+  write when the manifest path or the target directory is a symlink, via a new
+  `BridgeInstallationFailedException::forSymlinkedTargetDirectory()`.
 
 ## [1.12.0] — 2026-06-16 — Spotlight
 

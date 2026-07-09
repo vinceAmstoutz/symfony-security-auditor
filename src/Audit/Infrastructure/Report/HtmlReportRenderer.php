@@ -114,9 +114,17 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
             '{{description}}' => $this->escape($vulnerability->description()),
             '{{attackVector}}' => $this->escape($vulnerability->attackVector()),
             '{{proof}}' => $this->escape($vulnerability->proof()),
+            '{{synthesizedPoc}}' => $this->synthesizedPocSection($vulnerability),
             '{{remediation}}' => $this->escape($vulnerability->remediation()),
             '{{confidence}}' => $this->escape(\sprintf('%.0f', $vulnerability->confidence() * 100)),
         ]);
+    }
+
+    private function synthesizedPocSection(Vulnerability $vulnerability): string
+    {
+        $synthesizedPoC = $vulnerability->synthesizedPoC();
+
+        return null === $synthesizedPoC ? '' : \sprintf("<h4>Synthesized PoC</h4>\n  <pre>%s</pre>", $this->escape($synthesizedPoC));
     }
 
     private function escape(string $value): string
