@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 16;
+    public const int CACHE_VERSION = 17;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -73,8 +73,12 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'eval() on dynamic input — RCE risk',
             ],
             'http_client_request' => [
-                'regex' => '/\bHttpClient(?:Interface)?\b[^;]{0,400}->request\s*\(/s',
+                'regex' => '/->request\s*\(/',
                 'description' => 'HttpClient request — verify host allowlist (SSRF)',
+            ],
+            'open_redirect' => [
+                'regex' => '/new\s+RedirectResponse\s*\(/',
+                'description' => 'RedirectResponse with a variable target — verify the destination is not attacker-controlled (open redirect)',
             ],
             'mailer_header_setter' => [
                 'regex' => '/->(?:from|subject|addBcc|bcc|addCc|cc|to|replyTo)\s*\(/',

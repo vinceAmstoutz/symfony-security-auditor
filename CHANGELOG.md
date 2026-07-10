@@ -628,6 +628,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Under the `fast` profile, an SSRF-prone `HttpClient->request()` in the
+  common dependency-injection shape — and a plain-service
+  `new RedirectResponse($url)` open redirect — were dropped from the audit.**
+  The pre-scanner's `http_client_request` marker
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) used a proximity
+  regex (`HttpClient…->request(` within 400 chars and no intervening `;`) that
+  misses the dominant DI shapes (the client assigned in the constructor body, or
+  an options array built before the call), and `RedirectResponse` had no marker
+  at all — both are sinks `RegexCodeSlicer::SECURITY_TOKENS` retains, so a plain
+  `.php` service whose only sink was one of these produced zero markers and was
+  dropped by lean mode before the slicer ran. `http_client_request` now matches
+  any `->request(` call, and a new `open_redirect` marker flags
+  `new RedirectResponse(`; `CACHE_VERSION` bumps to 17.
 - **Under the `fast` profile, a service constructing a Symfony `Process` from
   user input was dropped from the audit.** `new Process(...)` is a
   command-execution sink `RegexCodeSlicer::SECURITY_TOKENS` retains and the

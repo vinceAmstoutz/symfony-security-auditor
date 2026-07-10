@@ -117,6 +117,7 @@ final class RegexStaticPreScannerTest extends TestCase
     public static function genericSinkCases(): iterable
     {
         yield 'new Process' => ["\$p = new Process([\$in, '--flag']);", 'process_construction'];
+        yield 'new RedirectResponse' => ['return new RedirectResponse($in);', 'open_redirect'];
         yield 'file_get_contents' => ["return file_get_contents('/var/'.\$in);", 'file_sink'];
         yield 'readfile' => ["readfile('/up/'.\$in);", 'file_sink'];
         yield 'fopen' => ["\$h = fopen(\$in, 'r');", 'file_sink'];
@@ -726,6 +727,26 @@ final class RegexStaticPreScannerTest extends TestCase
         self::assertCount(1, $markers);
         self::assertSame('http_client_request', $markers[0]->pattern());
         self::assertSame(6, $markers[0]->line());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    #[DataProvider('httpClientDiShapeCases')]
+    public function test_it_flags_an_http_client_request_regardless_of_the_dependency_injection_shape(string $source): void
+    {
+        $projectFile = ProjectFile::create('src/Service/UrlFetcher.php', '/app/src/Service/UrlFetcher.php', $source);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $this->regexStaticPreScanner->scan([$projectFile]));
+        self::assertContains('http_client_request', $patterns);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function httpClientDiShapeCases(): iterable
+    {
+        yield 'options array built before the call' => ["<?php\nuse Symfony\\Contracts\\HttpClient\\HttpClientInterface;\nfinal class UrlFetcher {\n    public function __construct(private HttpClientInterface \$httpClient) {}\n    public function fetch(string \$url): mixed {\n        \$options = ['timeout' => 5];\n\n        return \$this->httpClient->request('GET', \$url, \$options);\n    }\n}"];
+        yield 'client assigned in the constructor body' => ["<?php\nuse Symfony\\Contracts\\HttpClient\\HttpClientInterface;\nfinal class UrlFetcher {\n    private HttpClientInterface \$client;\n    public function __construct(HttpClientInterface \$client) { \$this->client = \$client; }\n    public function fetch(string \$url): mixed { return \$this->client->request('GET', \$url); }\n}"];
     }
 
     /**
