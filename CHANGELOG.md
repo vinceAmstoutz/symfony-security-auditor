@@ -628,6 +628,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Under the `fast` profile, a controller binding request data via
+  `#[MapRequestPayload]` (bare form) or
+  `#[MapQueryString]`/`#[MapQueryParameter]` was dropped from the audit.** The
+  pre-scanner's `map_request_payload` marker
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) required a literal
+  `(`, so the dominant arg-less form `#[MapRequestPayload] Dto $dto` never
+  matched, and `#[MapQueryString]`/`#[MapQueryParameter]` had no marker at all —
+  even though all three are sinks `RegexCodeSlicer::SECURITY_TOKENS` retains and
+  the attacker/reviewer prompts treat as a mass-assignment/IDOR surface. A
+  controller whose only marker-worthy content was such an attribute produced
+  zero markers and was dropped by lean mode before the slicer ran. The renamed
+  `request_mapping_attribute` marker now matches all three attributes in both
+  bare and configured forms; `CACHE_VERSION` bumps to 18.
 - **Two `Command`-layer console paths rendered untrusted text without stripping
   control characters.** `DiffPresenter::section()`
   (`src/Command/DiffPresenter.php`) printed each `DiffFinding`'s

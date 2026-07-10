@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 17;
+    public const int CACHE_VERSION = 18;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -134,9 +134,9 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'regex' => '/->submit\s*\(\s*\$request->\w+->all\s*\(\s*\)\s*\)/s',
                 'description' => 'Form submit($request->...->all()) — mass-assignment risk',
             ],
-            'map_request_payload' => [
-                'regex' => '/#\[MapRequestPayload(?:\s*\()/',
-                'description' => '#[MapRequestPayload] — verify the DTO has validation constraints and no privileged setters',
+            'request_mapping_attribute' => [
+                'regex' => '/#\[Map(?:RequestPayload|QueryString|QueryParameter)\b/',
+                'description' => '#[MapRequestPayload]/#[MapQueryString]/#[MapQueryParameter] — verify the bound DTO has validation constraints and no privileged setters (mass assignment / IDOR)',
             ],
         ],
         ProjectFileType::VOTER->value => [

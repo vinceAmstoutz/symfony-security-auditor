@@ -753,6 +753,29 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    #[DataProvider('requestMappingAttributeCases')]
+    public function test_it_flags_request_mapping_attributes_on_a_controller(string $parameterAttribute): void
+    {
+        $source = "<?php\nnamespace App\\Controller;\nuse Symfony\\Component\\Routing\\Attribute\\Route;\nfinal class OrderController {\n    #[Route('/orders', methods: ['POST'])]\n    public function create(".$parameterAttribute." OrderDto \$dto): void {}\n}";
+        $projectFile = ProjectFile::create('src/Controller/OrderController.php', '/app/src/Controller/OrderController.php', $source);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $this->regexStaticPreScanner->scan([$projectFile]));
+        self::assertContains('request_mapping_attribute', $patterns);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function requestMappingAttributeCases(): iterable
+    {
+        yield 'bare MapRequestPayload' => ['#[MapRequestPayload]'];
+        yield 'configured MapRequestPayload' => ["#[MapRequestPayload(acceptFormat: 'json')]"];
+        yield 'bare MapQueryString' => ['#[MapQueryString]'];
+        yield 'bare MapQueryParameter' => ['#[MapQueryParameter]'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_self_validating_passport_in_authenticator(): void
     {
         $projectFile = ProjectFile::create(
