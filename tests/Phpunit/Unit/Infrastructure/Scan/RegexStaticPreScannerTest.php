@@ -423,6 +423,54 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    #[DataProvider('controllerLikeRequestReadCases')]
+    public function test_it_flags_controller_request_reads_on_controller_like_types(string $relativePath, string $source): void
+    {
+        $projectFile = ProjectFile::create($relativePath, '/app/'.$relativePath, $source);
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('request_get', $patterns);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function controllerLikeRequestReadCases(): iterable
+    {
+        yield 'api resource with a routed action reading request input' => [
+            'src/ApiResource/ProductSearch.php',
+            "<?php\n#[ApiResource]\nclass ProductSearch extends AbstractController {\n    #[Route('/api/products/search')]\n    public function __invoke(Request \$request): JsonResponse { return \$this->json(\$request->query->get('q')); }\n}",
+        ];
+        yield 'live component with a routed action reading request input' => [
+            'src/Twig/Components/ProductList.php',
+            "<?php\n#[AsLiveComponent]\nclass ProductList extends AbstractController {\n    #[Route('/components/product-list/export')]\n    public function export(Request \$request): void { \$this->dump(\$request->query->get('sort')); }\n}",
+        ];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_controller_request_reads_on_a_non_controller_like_type(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Service/ReportService.php',
+            '/app/src/Service/ReportService.php',
+            "<?php\nclass ReportService {\n    public function build(Request \$request): void { \$this->render(\$request->query->get('q')); }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('request_get', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_writable_live_props(): void
     {
         $projectFile = ProjectFile::create(

@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 19;
+    public const int CACHE_VERSION = 20;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -327,6 +327,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             $bucket = $file->type();
             $patternsForBucket = [
                 ...$this->genericPhpPatternsFor($file),
+                ...$this->controllerPatternsFor($file),
                 ...(self::PATTERNS[$bucket] ?? []),
                 ...($this->customPatterns[$bucket] ?? []),
             ];
@@ -373,6 +374,29 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         }
 
         return self::PATTERNS[ProjectFileType::PHP->value];
+    }
+
+    /**
+     * The request-input markers (`request_get`, `redirect_with_input`,
+     * `submit_request_all`, `request_mapping_attribute`) live in the CONTROLLER
+     * bucket, but `#[ApiResource]` and `#[AsLiveComponent]` classes classify as
+     * their own type while still declaring `#[Route]`-mapped actions that read
+     * `$request` — the controller-like pattern the mapping parsers and the
+     * chunker already honour via {@see ProjectFileType::isControllerLike()}.
+     * Without this merge, such an action produces zero markers and is excluded
+     * by the `fast` profile's lean-mode filter, which drops files carrying no
+     * markers. Keyed by label, so a CONTROLLER-typed file (whose own bucket is
+     * this set) gets each pattern exactly once after the spread merge.
+     *
+     * @return array<string, array{regex: string, description: string}>
+     */
+    private function controllerPatternsFor(ProjectFile $projectFile): array
+    {
+        if (!$projectFile->fileType()->isControllerLike()) {
+            return [];
+        }
+
+        return self::PATTERNS[ProjectFileType::CONTROLLER->value];
     }
 
     /**

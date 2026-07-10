@@ -53,8 +53,10 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'authenticator by interface without suffix' => ['src/Security/ApiKeyGuard.php', "<?php\nclass ApiKeyGuard implements AuthenticatorInterface {}", ProjectFileType::AUTHENTICATOR];
         yield 'event subscriber by suffix' => ['src/EventSubscriber/AuditSubscriber.php', '<?php', ProjectFileType::EVENT_SUBSCRIBER];
         yield 'event subscriber by interface without suffix' => ['src/Listener/AuditListener.php', "<?php\nclass AuditListener implements EventSubscriberInterface {}", ProjectFileType::EVENT_SUBSCRIBER];
+        yield 'event subscriber by attribute without suffix or interface' => ['src/EventListener/TenantListener.php', "<?php\n#[AsEventListener(event: 'kernel.request')]\nclass TenantListener {}", ProjectFileType::EVENT_SUBSCRIBER];
         yield 'normalizer by suffix' => ['src/Serializer/UserNormalizer.php', '<?php', ProjectFileType::NORMALIZER];
         yield 'normalizer by interface without suffix' => ['src/Serializer/UserTransformer.php', "<?php\nclass UserTransformer implements NormalizerInterface {}", ProjectFileType::NORMALIZER];
+        yield 'normalizer by denormalizer interface without suffix' => ['src/Serializer/FlexibleInputHandler.php', "<?php\nclass FlexibleInputHandler implements DenormalizerInterface {}", ProjectFileType::NORMALIZER];
         yield 'scheduler by suffix' => ['src/Schedule/CleanupSchedule.php', '<?php', ProjectFileType::SCHEDULER];
         yield 'scheduler by interface without suffix' => ['src/Cron/JobProvider.php', "<?php\nclass JobProvider implements ScheduleProviderInterface {}", ProjectFileType::SCHEDULER];
         yield 'template by extension' => ['templates/user/index.html.twig', '{{ user.name }}', ProjectFileType::TEMPLATE];

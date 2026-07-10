@@ -168,13 +168,15 @@ final readonly class ProjectFileTypeClassifier
     private static function looksLikeEventSubscriber(string $path, string $content): bool
     {
         return str_ends_with($path, '.php')
-            && str_contains($content, 'implements EventSubscriberInterface');
+            && (str_contains($content, 'implements EventSubscriberInterface')
+                || str_contains($content, '#[AsEventListener'));
     }
 
     private static function looksLikeNormalizer(string $path, string $content): bool
     {
         return str_ends_with($path, '.php')
-            && str_contains($content, 'implements NormalizerInterface');
+            && (str_contains($content, 'implements NormalizerInterface')
+                || str_contains($content, 'implements DenormalizerInterface'));
     }
 
     private static function looksLikeScheduler(string $path, string $content): bool

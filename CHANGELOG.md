@@ -628,6 +628,38 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Under the `fast` profile, request-handling code in an `#[ApiResource]` or
+  `#[AsLiveComponent]` class was dropped from the audit.** The pre-scanner's
+  request-input markers (`request_get`, `redirect_with_input`,
+  `submit_request_all`, `request_mapping_attribute`) lived only in the
+  `CONTROLLER` bucket, but an `#[ApiResource]`/`#[AsLiveComponent]` class that
+  also extends `AbstractController` and declares `#[Route]`-mapped actions — the
+  controller-like pattern `ProjectFileType::isControllerLike()`
+  (`src/Audit/Domain/Model/ProjectFileType.php`) documents, and that the mapping
+  parsers, `MappingStage`, and `FileChunker` already honour — classifies as
+  `api_resource`/`live_component`, not `controller`. `RegexStaticPreScanner`
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) applied only that
+  type's own bucket, so a routed action reading `$request->query->get(...)` in
+  such a class produced zero markers and was dropped by lean mode before
+  chunking. `scan()` now merges the `CONTROLLER` markers into every
+  controller-like type (mirroring the existing generic-PHP merge, keyed by label
+  so a real controller is unaffected); `CACHE_VERSION` bumps to 20.
+- **Under the `fast` profile, an `#[AsEventListener]` attribute listener or a
+  standalone `DenormalizerInterface` class was dropped from the audit.**
+  `ProjectFileTypeClassifier`
+  (`src/Audit/Domain/Model/ProjectFileTypeClassifier.php`) detected event
+  listeners only by an `EventSubscriberInterface` implementation or a
+  `*Subscriber.php`/`*EventListener.php` filename, and (de)normalizers only by a
+  `NormalizerInterface` implementation or a
+  `*Normalizer.php`/`*Denormalizer.php` filename. A listener registered via the
+  modern `#[AsEventListener]` attribute (named e.g. `TenantListener.php`)
+  classified as plain `php` and lost its `request_attributes_mutation` marker; a
+  class implementing only `DenormalizerInterface` (named e.g.
+  `FlexibleInputHandler.php`) classified as plain `php` and lost its
+  `allow_extra_attributes` marker — so either, when its sole signal was that
+  marker, produced zero markers and was dropped by lean mode.
+  `looksLikeEventSubscriber()` now also matches `#[AsEventListener`, and
+  `looksLikeNormalizer()` now also matches `implements DenormalizerInterface`.
 - **Under the `fast` profile, an `#[ApiResource]` Doctrine entity exposing a
   sensitive setter (`setRoles`, `setPassword`, `setIsAdmin`, …) was dropped from
   the audit.** `ProjectFileTypeClassifier::classify()`
