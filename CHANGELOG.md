@@ -628,6 +628,30 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **The Messenger `native_php_serializer` transport — the real native-PHP
+  deserialization config — was invisible to the scanner.** The pre-scanner's
+  `php_serializer_transport` marker
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) matched only the
+  token `serializer: php_serialize`, but the actual dangerous Symfony value is
+  the service id `messenger.transport.native_php_serializer` (native
+  `unserialize()` on dequeue → gadget-chain RCE). A `messenger.yaml` whose only
+  marker-worthy line was that serializer produced zero markers and was dropped
+  by lean mode under the `fast` profile. The regex now matches the service-id
+  form (and still the bare token); `CACHE_VERSION` bumps to 26.
+- **Doctrine DBAL one-shot query methods (`fetchAllAssociative()`, `fetchOne()`,
+  `fetchAssociative()`, `iterateAssociative()`, …) were not flagged.** The
+  `doctrine_query` marker matched only
+  `createQuery`/`createQueryBuilder`/`executeQuery`/`executeStatement`, so a
+  service or repository running raw SQL through the DBAL `fetch*`/`iterate*` API
+  (`$conn->fetchAllAssociative('… '.$input)` — a SQL-injection sink) produced
+  zero markers and was dropped by lean mode. The marker now also matches the
+  `fetch*`/`iterate*` one-shot methods.
+- **`DOMDocument::loadXML()` and `simplexml_load_file()` XML parsing were not
+  flagged.** The `xml_external_entity` marker matched only
+  `simplexml_load_string()`, missing the most common XML entry point
+  (`DOMDocument::loadXML()`) and the file variant — the same XXE surface the
+  marker exists to flag — so a parser using them was dropped by lean mode. The
+  marker now matches all three.
 - **Under the `fast` profile, a nelmio CORS config declaring
   `allow_origin: ['*']` was dropped from the audit.** The pre-scanner's
   `cors_wildcard_with_credentials` marker

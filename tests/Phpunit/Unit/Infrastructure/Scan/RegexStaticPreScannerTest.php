@@ -129,6 +129,10 @@ final class RegexStaticPreScannerTest extends TestCase
         yield 'uploaded file move' => ["\$in->move('/up', \$in->getClientOriginalName());", 'upload_handling'];
         yield 'getClientOriginalName' => ['$name = $in->getClientOriginalName();', 'upload_handling'];
         yield 'simplexml_load_string' => ['return simplexml_load_string($in);', 'xml_external_entity'];
+        yield 'simplexml_load_file' => ['return simplexml_load_file($in);', 'xml_external_entity'];
+        yield 'DOMDocument loadXML' => ['$d = new \DOMDocument(); $d->loadXML($in);', 'xml_external_entity'];
+        yield 'DBAL fetchAllAssociative' => ["return \$this->conn->fetchAllAssociative('SELECT * FROM u WHERE n = '.\$in);", 'doctrine_query'];
+        yield 'DBAL fetchOne' => ["return \$this->conn->fetchOne('SELECT x FROM u WHERE n = '.\$in);", 'doctrine_query'];
         yield 'createQuery' => ["return \$this->em->createQuery(\"WHERE u.n='\".\$in.\"'\");", 'doctrine_query'];
         yield 'createQueryBuilder' => ['return $this->em->createQueryBuilder();', 'doctrine_query'];
         yield 'executeQuery' => ["return \$this->conn->executeQuery('SELECT '.\$in);", 'doctrine_query'];
@@ -946,6 +950,24 @@ final class RegexStaticPreScannerTest extends TestCase
             'config/packages/messenger.yaml',
             '/app/config/packages/messenger.yaml',
             "framework:\n    messenger:\n        transports:\n            main:\n                serializer: php_serialize",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('php_serializer_transport', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_the_native_php_serializer_transport_service_in_messenger_config(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/messenger.yaml',
+            '/app/config/packages/messenger.yaml',
+            "framework:\n    messenger:\n        transports:\n            main:\n                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'\n                serializer: 'messenger.transport.native_php_serializer'",
         );
 
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);

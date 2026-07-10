@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 25;
+    public const int CACHE_VERSION = 26;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -113,12 +113,12 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'Uploaded-file handling — verify extension/MIME/size validation and that the stored name/path is not attacker-controlled',
             ],
             'xml_external_entity' => [
-                'regex' => '/\bsimplexml_load_string\s*\(/',
-                'description' => 'simplexml_load_string on untrusted XML — verify external-entity loading is disabled (XXE)',
+                'regex' => '/\bsimplexml_load_string\s*\(|\bsimplexml_load_file\s*\(|->loadXML\s*\(/',
+                'description' => 'XML parsing of untrusted input (simplexml_load_string/_file, DOMDocument::loadXML) — verify external-entity loading is disabled (XXE)',
             ],
             'doctrine_query' => [
-                'regex' => '/->(?:createQuery|createQueryBuilder|executeQuery|executeStatement)\s*\(/',
-                'description' => 'Doctrine query construction — verify no user input is concatenated into DQL/SQL (use parameters)',
+                'regex' => '/->(?:createQuery|createQueryBuilder|executeQuery|executeStatement|fetchAllAssociative|fetchAllNumeric|fetchAllKeyValue|fetchAssociative|fetchNumeric|fetchOne|fetchFirstColumn|iterateAssociative|iterateKeyValue|iterateColumn)\s*\(/',
+                'description' => 'Doctrine query construction (incl. DBAL fetch*/iterate* one-shots) — verify no user input is concatenated into DQL/SQL (use parameters)',
             ],
             'querybuilder_predicate' => [
                 'regex' => '/->(?:where|andWhere|orWhere|having|andHaving|orHaving|orderBy|addOrderBy)\s*\(/',
@@ -261,8 +261,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'firewall security: false — verify the route is intentionally anonymous',
             ],
             'php_serializer_transport' => [
-                'regex' => '/serializer\s*:\s*[\'"]?php_serialize/',
-                'description' => 'Messenger transport with php_serialize — PHP-native unserialize on dequeue',
+                'regex' => '/serializer\s*:\s*[\'"]?[\w.]*php_serialize/',
+                'description' => 'Messenger transport using native PHP serialization (messenger.transport.native_php_serializer) — PHP-native unserialize on dequeue (gadget-chain RCE)',
             ],
             'env_credential_assignment' => [
                 'regex' => '/^\s*[A-Z0-9_]*(?:SECRET|PASSWORD|PASSWD|TOKEN|API_?KEY|ACCESS_KEY|PRIVATE_KEY)[A-Z0-9_]*\s*=\s*\S+/',
