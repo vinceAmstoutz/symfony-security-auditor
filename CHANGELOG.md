@@ -628,6 +628,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Under the `fast` profile, a nelmio CORS config declaring
+  `allow_origin: ['*']` was dropped from the audit.** The pre-scanner's
+  `cors_wildcard_with_credentials` marker
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) matched only the
+  scalar form `allow_origin: '*'`, not the list form `['*']`/`["*"]` that
+  nelmio/cors-bundle documents as the way to allow every origin. A CORS config
+  whose only marker-worthy line was the idiomatic wildcard list produced zero
+  markers and was dropped by lean mode — hiding a wildcard-origin +
+  `allow_credentials: true` cross-origin credential-leak misconfiguration the
+  marker exists to catch. The regex now also matches the optional `[` of the
+  list literal (`allow_origin: ['*']`, `["*"]`, `[ '*' ]`) while still rejecting
+  a specific origin list; `CACHE_VERSION` bumps to 25.
 - **Twig `->createTemplate()` server-side template injection was invisible to
   the scanner.** The pre-scanner recognises the sibling ExpressionLanguage SSTI
   sink `->evaluate()` (`expression_language_evaluate` marker) and the slicer

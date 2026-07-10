@@ -340,6 +340,51 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    #[DataProvider('wildcardCorsCases')]
+    public function test_it_flags_a_wildcard_cors_origin(string $allowOriginLine): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/nelmio_cors.yaml',
+            '/app/config/packages/nelmio_cors.yaml',
+            "nelmio_cors:\n    defaults:\n        allow_credentials: true\n        ".$allowOriginLine,
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('cors_wildcard_with_credentials', $patterns);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function wildcardCorsCases(): iterable
+    {
+        yield 'single-quoted list form' => ["allow_origin: ['*']"];
+        yield 'double-quoted list form' => ['allow_origin: ["*"]'];
+        yield 'scalar form' => ["allow_origin: '*'"];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_a_specific_cors_origin(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/nelmio_cors.yaml',
+            '/app/config/packages/nelmio_cors.yaml',
+            "nelmio_cors:\n    defaults:\n        allow_origin: ['https://app.example.com']",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('cors_wildcard_with_credentials', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_credential_assignment_in_dotenv_file(): void
     {
         $projectFile = ProjectFile::create(

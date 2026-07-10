@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 24;
+    public const int CACHE_VERSION = 25;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -253,7 +253,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'cookie_secure: false — session cookie sent over plain HTTP',
             ],
             'cors_wildcard_with_credentials' => [
-                'regex' => '/allow_origin[^:]*:\s*[\'"]?\*/',
+                'regex' => '/allow_origin[^:]*:\s*\[?\s*[\'"]?\*/',
                 'description' => 'CORS allow_origin: * — verify allow_credentials is not also true',
             ],
             'firewall_security_false' => [
