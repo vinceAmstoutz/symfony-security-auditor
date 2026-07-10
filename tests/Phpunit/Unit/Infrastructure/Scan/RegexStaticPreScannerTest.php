@@ -116,6 +116,7 @@ final class RegexStaticPreScannerTest extends TestCase
     /** @return iterable<string, array{string, string}> */
     public static function genericSinkCases(): iterable
     {
+        yield 'new Process' => ["\$p = new Process([\$in, '--flag']);", 'process_construction'];
         yield 'file_get_contents' => ["return file_get_contents('/var/'.\$in);", 'file_sink'];
         yield 'readfile' => ["readfile('/up/'.\$in);", 'file_sink'];
         yield 'fopen' => ["\$h = fopen(\$in, 'r');", 'file_sink'];

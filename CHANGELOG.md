@@ -628,6 +628,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Under the `fast` profile, a service constructing a Symfony `Process` from
+  user input was dropped from the audit.** `new Process(...)` is a
+  command-execution sink `RegexCodeSlicer::SECURITY_TOKENS` retains and the
+  `MESSENGER_HANDLER` pre-scanner bucket already flags, but the generic `php`
+  bucket (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) had no
+  pattern for it, so a plain `.php` service whose only sink was
+  `new Process([$userInput])` produced zero markers and was dropped by lean mode
+  before the slicer ran. The `php` bucket now flags `new Process(`
+  (`process_construction`); `CACHE_VERSION` bumps to 16.
 - **Under the `fast` profile, a service whose only Doctrine sink was a dynamic
   `->orderBy()`/`->addOrderBy()` was dropped from the audit.** The previous
   round added QueryBuilder predicate markers (`where`/`andWhere`/`having`) to

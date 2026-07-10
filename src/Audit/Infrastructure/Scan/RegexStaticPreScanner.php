@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 15;
+    public const int CACHE_VERSION = 16;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -55,6 +55,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'shell_invocation' => [
                 'regex' => '/\b(?:shell_exec|exec|passthru|proc_open|system|popen)\s*\(/',
                 'description' => 'Shell invocation — verify no user-input concatenation',
+            ],
+            'process_construction' => [
+                'regex' => '/new\s+Process\s*\(/',
+                'description' => 'Symfony Process construction — verify argv is not built from user input (command injection)',
             ],
             'md5_or_sha1_security' => [
                 'regex' => '/\b(?:md5|sha1)\s*\(/',
