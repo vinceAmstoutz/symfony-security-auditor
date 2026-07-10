@@ -130,6 +130,8 @@ final class RegexStaticPreScannerTest extends TestCase
         yield 'andWhere' => ["\$qb->andWhere(\"p.n LIKE '%\".\$in.\"%'\");", 'querybuilder_predicate'];
         yield 'having' => ["\$qb->having('COUNT(x) > '.\$in);", 'querybuilder_predicate'];
         yield 'where' => ["\$qb->where('u.name = '.\$in);", 'querybuilder_predicate'];
+        yield 'orderBy' => ["\$qb->orderBy('u.'.\$in, 'ASC');", 'querybuilder_predicate'];
+        yield 'addOrderBy' => ["\$qb->addOrderBy('u.'.\$in, 'DESC');", 'querybuilder_predicate'];
         yield 'GET superglobal' => ["return \$_GET['x'];", 'superglobal_input'];
         yield 'POST superglobal' => ["return \$_POST['x'];", 'superglobal_input'];
         yield 'COOKIE superglobal' => ["return \$_COOKIE['x'];", 'superglobal_input'];

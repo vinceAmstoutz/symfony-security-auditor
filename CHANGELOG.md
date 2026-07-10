@@ -628,6 +628,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Under the `fast` profile, a service whose only Doctrine sink was a dynamic
+  `->orderBy()`/`->addOrderBy()` was dropped from the audit.** The previous
+  round added QueryBuilder predicate markers (`where`/`andWhere`/`having`) to
+  the pre-scanner `php` bucket but not the ORDER BY clauses, which
+  `RegexCodeSlicer::SECURITY_TOKENS` retains and which Doctrine never
+  parameterises (a real SQL-injection sink). A `.php` file whose only
+  marker-worthy content was `->orderBy('u.'.$sort)` produced zero markers and
+  was dropped by lean mode before the slicer ran. `querybuilder_predicate`
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) now also matches
+  `orderBy`/`addOrderBy`; `CACHE_VERSION` bumps to 15.
 - **Under the `fast` profile, a plain service whose only danger was a file-I/O,
   upload, XXE, Doctrine-query or superglobal sink was still silently excluded
   from the audit.** An earlier fix applied the generic `php`-bucket risk-marker

@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 14;
+    public const int CACHE_VERSION = 15;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -105,8 +105,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'Doctrine query construction — verify no user input is concatenated into DQL/SQL (use parameters)',
             ],
             'querybuilder_predicate' => [
-                'regex' => '/->(?:where|andWhere|orWhere|having|andHaving|orHaving)\s*\(/',
-                'description' => 'QueryBuilder predicate — verify string interpolation is not used (SQL injection); bind via setParameter',
+                'regex' => '/->(?:where|andWhere|orWhere|having|andHaving|orHaving|orderBy|addOrderBy)\s*\(/',
+                'description' => 'QueryBuilder predicate or sort — verify no string interpolation (SQL injection); bind via setParameter, and note ORDER BY is never parameterised',
             ],
             'superglobal_input' => [
                 'regex' => '/\$_(?:GET|POST|REQUEST|COOKIE|FILES|SERVER)\b/',
