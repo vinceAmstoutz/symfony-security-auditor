@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 20;
+    public const int CACHE_VERSION = 21;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -99,6 +99,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'file_sink' => [
                 'regex' => '/\b(?:file_get_contents|file_put_contents|fopen|readfile|unlink|move_uploaded_file)\s*\(/',
                 'description' => 'File I/O sink — verify the path is not built from user input (path traversal, LFI, arbitrary read/write/delete)',
+            ],
+            'dynamic_file_inclusion' => [
+                'regex' => '/\b(?:require_once|require|include_once|include)\b[^;]*\$/',
+                'description' => 'include/require with a variable path — verify the included path is not user-controlled (LFI / RCE)',
             ],
             'upload_handling' => [
                 'regex' => '/->(?:move|getClientOriginalName)\s*\(|->files->/',

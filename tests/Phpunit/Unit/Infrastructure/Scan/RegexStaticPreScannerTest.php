@@ -137,6 +137,26 @@ final class RegexStaticPreScannerTest extends TestCase
         yield 'GET superglobal' => ["return \$_GET['x'];", 'superglobal_input'];
         yield 'POST superglobal' => ["return \$_POST['x'];", 'superglobal_input'];
         yield 'COOKIE superglobal' => ["return \$_COOKIE['x'];", 'superglobal_input'];
+        yield 'dynamic include' => ["include '/tpl/'.\$in.'.php';", 'dynamic_file_inclusion'];
+        yield 'dynamic require_once' => ['require_once $in;', 'dynamic_file_inclusion'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_a_static_require_without_a_dynamic_argument(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/bootstrap.php',
+            '/app/src/bootstrap.php',
+            "<?php\nrequire __DIR__.'/../vendor/autoload.php';\ninclude 'config/defaults.php';",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('dynamic_file_inclusion', $patterns);
     }
 
     /**

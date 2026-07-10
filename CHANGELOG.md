@@ -628,6 +628,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Under the `fast` profile, a PHP file whose only sink was a dynamic
+  `include`/`require` was dropped from the audit.** The pre-scanner's
+  generic-PHP `file_sink` marker
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) matched
+  `file_get_contents`/`fopen`/`readfile`/`unlink`/`move_uploaded_file` but not
+  `include`/`require`, even though `RegexCodeSlicer` deliberately retains those
+  lines (its `BARE_KEYWORD_PATTERN`). A file whose only marker-worthy line was
+  `include $userPath` (a local-file-inclusion / RCE sink) therefore produced
+  zero markers and was dropped by lean mode before the slicer ran. A new
+  generic-PHP `dynamic_file_inclusion` marker flags
+  `include`/`include_once`/`require`/`require_once` calls whose argument
+  contains a variable (static `require 'vendor/autoload.php'` is intentionally
+  not flagged); `CACHE_VERSION` bumps to 21.
 - **Under the `fast` profile, request-handling code in an `#[ApiResource]` or
   `#[AsLiveComponent]` class was dropped from the audit.** The pre-scanner's
   request-input markers (`request_get`, `redirect_with_input`,
