@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffFinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
@@ -161,6 +162,47 @@ final class ReportDifferTest extends TestCase
         self::assertSame([], $reportDiff->newFindings);
         self::assertCount(1, $reportDiff->fixedFindings);
         self::assertCount(1, $reportDiff->persistingFindings);
+    }
+
+    /**
+     * Several findings sharing one fingerprint on both sides but in different
+     * counts are paired off 1:1 in encounter order: the current report's first
+     * N (N = the previous count) persist, its remainder is new, and any
+     * previous excess is fixed. Pins the slice offset (from the front, not the
+     * back) and length so each bucket keeps exactly the entries it should, in
+     * order — not just the right count.
+     *
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_pairs_off_findings_sharing_one_fingerprint_by_count_and_encounter_order(): void
+    {
+        $previous = $this->writeReport('previous.json', [
+            $this->vulnerability('SQL Injection', 'low'),
+            $this->vulnerability('SQL Injection', 'medium'),
+        ]);
+        $current = $this->writeReport('current.json', [
+            $this->vulnerability('SQL Injection', 'low'),
+            $this->vulnerability('SQL Injection', 'medium'),
+            $this->vulnerability('SQL Injection', 'high'),
+            $this->vulnerability('SQL Injection', 'critical'),
+        ]);
+
+        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+
+        self::assertSame(['low', 'medium'], $this->severitiesOf($reportDiff->persistingFindings));
+        self::assertSame(['high', 'critical'], $this->severitiesOf($reportDiff->newFindings));
+        self::assertSame([], $reportDiff->fixedFindings);
+    }
+
+    /**
+     * @param list<DiffFinding> $findings
+     *
+     * @return list<string>
+     */
+    private function severitiesOf(array $findings): array
+    {
+        return array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->severity, $findings);
     }
 
     /**
