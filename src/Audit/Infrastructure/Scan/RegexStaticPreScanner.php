@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 18;
+    public const int CACHE_VERSION = 19;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -185,6 +185,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'serializer_groups_attribute' => [
                 'regex' => '/#\[\s*Groups\s*\(|@Groups\s*\(/',
                 'description' => 'Serializer #[Groups] attribute — verify write groups do not expose privileged fields (roles, isAdmin, passwordHash) to mass assignment',
+            ],
+            'sensitive_setter' => [
+                'regex' => '/public\s+function\s+set(?:Roles?|IsAdmin|IsSuperAdmin|PasswordHash|Password|Admin|SuperAdmin|Superuser)\b/i',
+                'description' => 'Public setter on sensitive field of an API resource — verify a serialization write group (or a DTO) prevents denormalization mass assignment',
             ],
         ],
         ProjectFileType::LIVE_COMPONENT->value => [

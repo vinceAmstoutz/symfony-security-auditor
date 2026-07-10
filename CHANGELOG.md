@@ -628,6 +628,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Under the `fast` profile, an `#[ApiResource]` Doctrine entity exposing a
+  sensitive setter (`setRoles`, `setPassword`, `setIsAdmin`, …) was dropped from
+  the audit.** `ProjectFileTypeClassifier::classify()`
+  (`src/Audit/Domain/Model/ProjectFileTypeClassifier.php`) evaluates
+  `looksLikeApiResource()` before `looksLikeEntity()`, so the standard API
+  Platform layout — an entity that is also `#[ApiResource]` — classifies as
+  `api_resource`, not `entity`. The `sensitive_setter` pre-scanner marker
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) lived only in the
+  `ENTITY` bucket, and the generic-PHP safety-net bucket has no setter pattern,
+  so such a resource whose only marker-worthy content was a sensitive setter
+  produced zero markers and was dropped by lean mode before chunking — exactly
+  when it is most dangerous, since an API resource without a write `#[Groups]`
+  denormalizes into every property (mass-assignment / privilege escalation). The
+  `API_RESOURCE` bucket now carries its own `sensitive_setter` marker;
+  `CACHE_VERSION` bumps to 19.
 - **Under the `fast` profile, a controller binding request data via
   `#[MapRequestPayload]` (bare form) or
   `#[MapQueryString]`/`#[MapQueryParameter]` was dropped from the audit.** The

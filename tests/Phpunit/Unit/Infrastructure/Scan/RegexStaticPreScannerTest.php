@@ -405,6 +405,24 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    public function test_it_flags_a_sensitive_setter_on_an_api_resource_entity(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Entity/User.php',
+            '/app/src/Entity/User.php',
+            "<?php\n#[ApiResource]\n#[ORM\\Entity]\nclass User {\n    public function setRoles(array \$roles): self { \$this->roles = \$roles; return \$this; }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('sensitive_setter', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_writable_live_props(): void
     {
         $projectFile = ProjectFile::create(
