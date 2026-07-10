@@ -84,7 +84,7 @@ final readonly class ContainerParameterRegistrar
             'audit.reviewer_max_concurrent' => $audit->reviewerMaxConcurrent,
             'audit.attacker_max_concurrent' => $audit->attackerMaxConcurrent,
             'audit.static_prescan.enabled' => $audit->staticPreScanEnabled,
-            'audit.static_prescan.lean_mode' => $audit->staticPreScanLeanMode,
+            'audit.static_prescan.lean_mode' => $audit->effectiveStaticPreScanLeanMode(),
             'audit.chunking.strategy' => $audit->chunkingStrategy,
             'audit.poc_synthesis.enabled' => $audit->poCSynthesisEnabled,
             'audit.poc_synthesis.severity_floor' => $audit->poCSynthesisSeverityFloor,

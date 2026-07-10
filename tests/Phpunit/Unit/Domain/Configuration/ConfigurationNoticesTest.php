@@ -221,6 +221,32 @@ final class ConfigurationNoticesTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_lean_mode_with_the_static_prescanner_disabled_emits_a_notice(): void
+    {
+        $notices = ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1, 'staticPreScanEnabled' => false, 'staticPreScanLeanMode' => true]),
+            $this->llm(),
+        );
+
+        self::assertCount(1, $notices);
+        self::assertStringContainsString('lean_mode', $notices[0]);
+        self::assertStringContainsString('static_prescan', $notices[0]);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_lean_mode_with_the_static_prescanner_enabled_emits_no_notice(): void
+    {
+        self::assertSame([], ConfigurationNotices::of(
+            $this->audit(['reviewerBatchSize' => 1, 'staticPreScanEnabled' => true, 'staticPreScanLeanMode' => true]),
+            $this->llm(),
+        ));
+    }
+
+    /**
      * @param array{
      *     reviewerBatchSize?: int,
      *     escalationEnabled?: bool,
@@ -230,6 +256,8 @@ final class ConfigurationNoticesTest extends TestCase
      *     attackerMaxConcurrent?: int,
      *     toolsEnabled?: bool,
      *     structuredCollection?: bool,
+     *     staticPreScanEnabled?: bool,
+     *     staticPreScanLeanMode?: bool,
      * } $overrides
      *
      * @throws InvalidAuditExecutionConfigurationException
@@ -242,6 +270,8 @@ final class ConfigurationNoticesTest extends TestCase
             reviewerBatchSize: $overrides['reviewerBatchSize'] ?? 1,
             toolsEnabled: $overrides['toolsEnabled'] ?? true,
             maxToolIterations: 8,
+            staticPreScanEnabled: $overrides['staticPreScanEnabled'] ?? true,
+            staticPreScanLeanMode: $overrides['staticPreScanLeanMode'] ?? false,
             reviewerToolsEnabled: $overrides['reviewerToolsEnabled'] ?? false,
             reviewerMaxConcurrent: $overrides['reviewerMaxConcurrent'] ?? 1,
             attackerMaxConcurrent: $overrides['attackerMaxConcurrent'] ?? 1,

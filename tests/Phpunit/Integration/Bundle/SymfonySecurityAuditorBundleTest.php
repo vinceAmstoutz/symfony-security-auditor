@@ -1193,6 +1193,23 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame([], $containerBuilder->getParameter('symfony_security_auditor.config_notices'));
     }
 
+    public function test_bundle_lean_mode_is_forced_off_when_the_static_prescanner_is_disabled(): void
+    {
+        $containerBuilder = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'profile' => 'fast',
+            'audit' => ['static_prescan' => ['enabled' => false]],
+        ]);
+
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.static_prescan.lean_mode'));
+        $notices = $containerBuilder->getParameter('symfony_security_auditor.config_notices');
+        self::assertIsArray($notices);
+        self::assertContains(
+            'audit.static_prescan.lean_mode has no effect while audit.static_prescan.enabled is false: with no risk markers, lean mode would drop every file, so all files are analysed instead. Enable static_prescan to use lean mode, or set lean_mode: false to silence this.',
+            $notices,
+        );
+    }
+
     public function test_bundle_baseline_parameter_defaults_to_null(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);

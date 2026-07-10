@@ -55,4 +55,17 @@ final readonly class AuditExecutionConfiguration
             throw InvalidAuditExecutionConfigurationException::forOutOfRangeMinConfidence($minConfidence);
         }
     }
+
+    /**
+     * Lean mode restricts the attacker to files the static pre-scanner tagged
+     * with a risk marker. With the pre-scanner disabled there are no markers,
+     * so an enabled lean filter would drop every file and turn the whole audit
+     * into a silent no-op. Lean mode is therefore only in effect when the
+     * pre-scanner is too; a caller that disabled the pre-scanner analyses every
+     * file regardless of the configured lean-mode flag.
+     */
+    public function effectiveStaticPreScanLeanMode(): bool
+    {
+        return $this->staticPreScanLeanMode && $this->staticPreScanEnabled;
+    }
 }

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Configuration;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\AuditExecutionConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
@@ -81,6 +82,34 @@ final class AuditExecutionConfigurationTest extends TestCase
             toolsEnabled: true,
             maxToolIterations: 5,
         );
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    #[DataProvider('effectiveLeanModeCases')]
+    public function test_effective_static_prescan_lean_mode_requires_the_prescanner_to_be_enabled(bool $leanMode, bool $preScanEnabled, bool $expected): void
+    {
+        $auditExecutionConfiguration = new AuditExecutionConfiguration(
+            maxIterations: 3,
+            minConfidence: 0.6,
+            reviewerBatchSize: 5,
+            toolsEnabled: true,
+            maxToolIterations: 5,
+            staticPreScanEnabled: $preScanEnabled,
+            staticPreScanLeanMode: $leanMode,
+        );
+
+        self::assertSame($expected, $auditExecutionConfiguration->effectiveStaticPreScanLeanMode());
+    }
+
+    /** @return iterable<string, array{bool, bool, bool}> */
+    public static function effectiveLeanModeCases(): iterable
+    {
+        yield 'lean on, prescan on' => [true, true, true];
+        yield 'lean on, prescan off' => [true, false, false];
+        yield 'lean off, prescan on' => [false, true, false];
+        yield 'lean off, prescan off' => [false, false, false];
     }
 
     /**

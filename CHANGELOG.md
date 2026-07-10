@@ -628,6 +628,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A `fast`-profile audit with the static pre-scanner explicitly disabled
+  analysed nothing and reported SAFE.** Lean mode (on by default under
+  `profile: fast`) restricts the attacker to files the pre-scanner tagged with a
+  risk marker; with `static_prescan.enabled: false` the pre-scanner is the
+  null-object that emits no markers, so the lean filter dropped every file and
+  the audit produced an empty, falsely-reassuring report.
+  `AuditExecutionConfiguration::effectiveStaticPreScanLeanMode()`
+  (`src/Audit/Domain/Configuration/AuditExecutionConfiguration.php`) now gates
+  lean mode on the pre-scanner being enabled — a disabled pre-scanner analyses
+  every file regardless of the `lean_mode` flag — and `ConfigurationNotices`
+  prints a pre-flight notice explaining the ignored `lean_mode`.
+- **Upgrading across attacker-skill guidance corrections did not invalidate
+  cached attacker responses.** Ten `*AttackerSkill` blocks changed their
+  hunt/do-not-flag guidance (e.g. `Email::from($userInput)` moved from a
+  header-injection finding to an explicit false-positive-suppression note;
+  Messenger's native-PHP-serializer default is now the flagged risk and the
+  Symfony serializer the safe opt-in) without bumping
+  `AttackerPromptBuilder::PROMPT_VERSION`
+  (`src/Audit/Infrastructure/Prompt/AttackerPromptBuilder.php`), which is folded
+  into the attacker cache key. With `cache.enabled` (the default), a re-audit
+  reusing the cache directory served pre-correction findings — keeping
+  suppressed false positives and missing newly-flagged risks. `PROMPT_VERSION`
+  bumps to 17, invalidating stale attacker cache entries.
 - **Under the `fast` profile, a controller (or any typed component) whose only
   danger was a generic PHP sink was silently excluded from the audit.**
   `RegexStaticPreScanner::scan()`
