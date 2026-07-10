@@ -119,6 +119,7 @@ final class RegexStaticPreScannerTest extends TestCase
     {
         yield 'new Process' => ["\$p = new Process([\$in, '--flag']);", 'process_construction'];
         yield 'Process::fromShellCommandline' => ["\$p = Process::fromShellCommandline('ls '.\$in);", 'process_construction'];
+        yield 'twig createTemplate' => ['return $this->twig->createTemplate($in)->render([]);', 'twig_string_template'];
         yield 'new RedirectResponse' => ['return new RedirectResponse($in);', 'open_redirect'];
         yield 'file_get_contents' => ["return file_get_contents('/var/'.\$in);", 'file_sink'];
         yield 'readfile' => ["readfile('/up/'.\$in);", 'file_sink'];

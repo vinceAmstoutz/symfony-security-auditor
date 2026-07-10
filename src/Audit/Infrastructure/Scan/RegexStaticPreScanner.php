@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 23;
+    public const int CACHE_VERSION = 24;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -95,6 +95,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'expression_language_evaluate' => [
                 'regex' => '/->evaluate\s*\(/',
                 'description' => 'ExpressionLanguage::evaluate() — verify expression not built from user input',
+            ],
+            'twig_string_template' => [
+                'regex' => '/->createTemplate\s*\(/',
+                'description' => 'Twig::createTemplate() compiling a dynamic string — verify the template source is not user-controlled (server-side template injection → RCE)',
             ],
             'file_sink' => [
                 'regex' => '/\b(?:file_get_contents|file_put_contents|fopen|readfile|unlink|move_uploaded_file)\s*\(/',

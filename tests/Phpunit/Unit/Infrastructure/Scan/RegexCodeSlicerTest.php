@@ -119,6 +119,21 @@ final class RegexCodeSlicerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_the_twig_string_template_line_is_retained(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$html = \$this->twig->createTemplate(\$source)->render(\$ctx);\n"
+            .str_repeat("        \$y = 2;\n", 20);
+        $projectFile = ProjectFile::create('src/Service/Renderer.php', '/app/src/Service/Renderer.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('$this->twig->createTemplate($source)', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_inert_body_lines_are_elided(): void
     {
         $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeController());

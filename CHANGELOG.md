@@ -628,6 +628,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Twig `->createTemplate()` server-side template injection was invisible to
+  the scanner.** The pre-scanner recognises the sibling ExpressionLanguage SSTI
+  sink `->evaluate()` (`expression_language_evaluate` marker) and the slicer
+  keeps it (`SECURITY_TOKENS`), but neither recognised
+  `Twig\Environment::createTemplate()`, which compiles a string into a template
+  — an SSTI → RCE sink when the source is user-controlled. Under the `fast`
+  profile a service whose only sink was
+  `$this->twig->createTemplate($userSource)->render(...)` produced zero markers
+  and was dropped by lean mode; even in a retained file the slicer elided the
+  line. A new generic-PHP `twig_string_template` marker
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) flags
+  `->createTemplate(`, and the slicer keeps those lines
+  (`src/Audit/Infrastructure/Scan/RegexCodeSlicer.php`); `CACHE_VERSION` bumps
+  to 24.
 - **`Process::fromShellCommandline()` — the shell-executing Symfony `Process`
   factory — was invisible to the scanner, hiding command-injection sinks.** The
   pre-scanner's `process_construction`/`process_in_handler` markers

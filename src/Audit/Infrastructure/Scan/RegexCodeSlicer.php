@@ -151,6 +151,7 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         'SelfValidatingPassport',
         'hash_hmac(',
         'evaluate(',
+        '->createTemplate(',
         'simplexml_load_string(',
         '->writeln(',
         'json_decode(',
