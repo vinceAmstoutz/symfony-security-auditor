@@ -33,10 +33,50 @@ final class AuditExecutionConfigurationTest extends TestCase
     public function test_it_rejects_a_nan_min_confidence(): void
     {
         $this->expectException(InvalidAuditExecutionConfigurationException::class);
+        $this->expectExceptionMessage('minConfidence must be finite and within 0.0-1.0, got NAN');
 
         new AuditExecutionConfiguration(
             maxIterations: 3,
             minConfidence: \NAN,
+            reviewerBatchSize: 5,
+            toolsEnabled: true,
+            maxToolIterations: 5,
+        );
+    }
+
+    /**
+     * A positive-infinite `min_confidence` (e.g. `fdiv(1, 0)` in a computed
+     * config value) is non-finite, so it is rejected the same way `NAN` is,
+     * and rendered as an explicit `INF` literal rather than coerced from the
+     * raw float (which PHP 8.5 warns about).
+     *
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_it_rejects_a_positive_infinite_min_confidence(): void
+    {
+        $this->expectException(InvalidAuditExecutionConfigurationException::class);
+        $this->expectExceptionMessage('minConfidence must be finite and within 0.0-1.0, got INF');
+
+        new AuditExecutionConfiguration(
+            maxIterations: 3,
+            minConfidence: \INF,
+            reviewerBatchSize: 5,
+            toolsEnabled: true,
+            maxToolIterations: 5,
+        );
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_it_rejects_a_negative_infinite_min_confidence(): void
+    {
+        $this->expectException(InvalidAuditExecutionConfigurationException::class);
+        $this->expectExceptionMessage('minConfidence must be finite and within 0.0-1.0, got -INF');
+
+        new AuditExecutionConfiguration(
+            maxIterations: 3,
+            minConfidence: -\INF,
             reviewerBatchSize: 5,
             toolsEnabled: true,
             maxToolIterations: 5,
@@ -49,6 +89,7 @@ final class AuditExecutionConfigurationTest extends TestCase
     public function test_it_rejects_a_min_confidence_above_one(): void
     {
         $this->expectException(InvalidAuditExecutionConfigurationException::class);
+        $this->expectExceptionMessage('minConfidence must be finite and within 0.0-1.0, got 1.5');
 
         new AuditExecutionConfiguration(
             maxIterations: 3,
@@ -65,6 +106,7 @@ final class AuditExecutionConfigurationTest extends TestCase
     public function test_it_rejects_a_negative_min_confidence(): void
     {
         $this->expectException(InvalidAuditExecutionConfigurationException::class);
+        $this->expectExceptionMessage('minConfidence must be finite and within 0.0-1.0, got -0.1');
 
         new AuditExecutionConfiguration(
             maxIterations: 3,

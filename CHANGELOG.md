@@ -628,6 +628,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Rejecting a non-finite `min_confidence` (`NAN`/`INF`) emitted a PHP 8.5
+  string-coercion warning while building the error message**, which the test
+  suite's `failOnWarning` turned into a hard failure on the PHP 8.5 CI matrix.
+  `InvalidAuditExecutionConfigurationException::forOutOfRangeMinConfidence()`
+  (`src/Audit/Domain/Exception/`) coerced the raw float through
+  `sprintf('%s', …)`; it now renders each non-finite case as an explicit literal
+  so the `(string)` cast only ever touches finite values. The message is
+  unchanged.
 - **A non-transient LLM provider failure (misconfigured platform, auth error,
   retired model) discarded the entire in-progress audit — including
   already-validated findings — instead of surfacing a partial report the way a
