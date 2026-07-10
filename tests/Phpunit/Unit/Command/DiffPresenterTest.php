@@ -84,6 +84,20 @@ final class DiffPresenterTest extends TestCase
         self::assertStringContainsString('Bad <fg=grey>debug</> title', $bufferedOutput->fetch());
     }
 
+    public function test_console_output_collapses_control_characters_in_a_finding_title_so_it_cannot_forge_a_line_or_spoof_the_terminal(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+        $diffFinding = new DiffFinding('fingerprint', 'sql_injection', 'src/Foo.php', "Benign\n  [CRITICAL] forged (x)\x1b[31m\u{202E}spoof", 'low');
+
+        $this->diffPresenter->present($symfonyStyle, new ReportDiff([$diffFinding], [], []), DiffOutputFormat::Console);
+        $output = $bufferedOutput->fetch();
+
+        self::assertDoesNotMatchRegularExpression('/^\s*\[CRITICAL] forged/m', $output);
+        self::assertStringNotContainsString("\x1b", $output);
+        self::assertStringNotContainsString("\u{202E}", $output);
+    }
+
     private function finding(string $severity = 'high'): DiffFinding
     {
         return new DiffFinding('fingerprint', 'sql_injection', 'src/Foo.php', 'SQL Injection', $severity);

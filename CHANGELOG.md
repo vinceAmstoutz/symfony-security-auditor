@@ -628,6 +628,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Two `Command`-layer console paths rendered untrusted text without stripping
+  control characters.** `DiffPresenter::section()`
+  (`src/Command/DiffPresenter.php`) printed each `DiffFinding`'s
+  severity/type/title/file with `OUTPUT_RAW` and no sanitization — a title
+  (LLM-produced, round-tripped through the untrusted JSON reports `audit:diff`
+  compares) with an embedded newline forged a fake `[SEVERITY]` finding line,
+  and ANSI/bidi characters reached the terminal (Trojan-Source spoof).
+  `AuditPresenter::scannedFiles()` (the `--show-scanned` listing,
+  `src/Command/AuditPresenter.php`) escaped only `<`/`>` markup
+  (`OutputFormatter::escape`), so a file in the audited project whose name
+  contained a newline/ANSI/bidi injected into the listing. Both now collapse
+  each value to a single line and strip control/ANSI/bidi characters via
+  `TerminalTextSanitizer` — the same defense `ConsoleReportRenderer` already
+  applies to the audit report.
 - **Under the `fast` profile, an SSRF-prone `HttpClient->request()` in the
   common dependency-injection shape — and a plain-service
   `new RedirectResponse($url)` open redirect — were dropped from the audit.**

@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditPresenter implements AuditPresenterInterface
@@ -155,7 +156,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
         foreach ($this->relativePathsByType($projectFiles) as $type => $relativePaths) {
             $symfonyStyle->writeln(\sprintf(' <info>%s</info> (%d)', $type, \count($relativePaths)));
-            $symfonyStyle->listing(array_map(OutputFormatter::escape(...), $relativePaths));
+            $symfonyStyle->listing(array_map($this->sanitizePathForListing(...), $relativePaths));
         }
 
         $symfonyStyle->success(\sprintf('%d file(s) in scope.', \count($projectFiles)));
@@ -168,6 +169,19 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             ' <fg=gray>Tip: run with --show-scanned to list the %d file(s) that would be audited.</>',
             $fileCount,
         ));
+    }
+
+    /**
+     * A scanned file's relative path comes from the audited (untrusted) project,
+     * where a filename may legally contain a newline, ANSI escape or bidi
+     * override. `OutputFormatter::escape()` neutralises `<`/`>` markup but not
+     * those characters, so the path is first collapsed to a single line and
+     * stripped of control/bidi characters — a crafted filename cannot forge a
+     * fake listing entry or spoof the terminal.
+     */
+    private function sanitizePathForListing(string $relativePath): string
+    {
+        return OutputFormatter::escape(TerminalTextSanitizer::collapseToSingleLine(mb_scrub($relativePath, 'UTF-8')));
     }
 
     /**

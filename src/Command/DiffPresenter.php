@@ -17,6 +17,7 @@ use JsonException;
 use Override;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /**
  * Renders a {@see ReportDiff} as human-readable console sections or as a raw
@@ -62,10 +63,10 @@ final readonly class DiffPresenter implements DiffPresenterInterface
             foreach ($findings as $finding) {
                 $symfonyStyle->writeln(\sprintf(
                     '  [%s] %s — %s (%s)',
-                    strtoupper($finding->severity),
-                    $finding->type,
-                    $finding->title,
-                    $finding->file,
+                    strtoupper($this->sanitize($finding->severity)),
+                    $this->sanitize($finding->type),
+                    $this->sanitize($finding->title),
+                    $this->sanitize($finding->file),
                 ), OutputInterface::OUTPUT_RAW);
             }
 
@@ -73,5 +74,19 @@ final readonly class DiffPresenter implements DiffPresenterInterface
         }
 
         $symfonyStyle->writeln('  (none)');
+    }
+
+    /**
+     * The diff reads its `DiffFinding` fields from two untrusted JSON report
+     * files whose titles/paths ultimately come from LLM-produced or
+     * project-derived text. `OUTPUT_RAW` bypasses Symfony's formatter but not
+     * the terminal itself, so — exactly as the console audit-report renderer
+     * does — each single-line field is collapsed and stripped of
+     * control/ANSI/bidi characters so a crafted value cannot forge a fake
+     * `[SEVERITY]` finding line or spoof the terminal.
+     */
+    private function sanitize(string $value): string
+    {
+        return TerminalTextSanitizer::collapseToSingleLine(mb_scrub($value, 'UTF-8'));
     }
 }

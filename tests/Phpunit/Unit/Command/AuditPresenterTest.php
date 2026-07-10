@@ -367,6 +367,24 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('src/PwnController<fg=grey>.php', $bufferedOutput->fetch());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_strips_control_characters_from_a_crafted_file_path(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create("src/Evil.php\n * [CRITICAL] forged\x1b[31m\u{202E}x", '/p/src/Evil.php', '<?php'),
+        ]);
+        $output = $bufferedOutput->fetch();
+
+        self::assertStringNotContainsString("\x1b", $output);
+        self::assertStringNotContainsString("\u{202E}", $output);
+        self::assertDoesNotMatchRegularExpression('/\n\s*\* \[CRITICAL] forged/', $output);
+    }
+
     public function test_scanned_files_warns_when_nothing_matched(): void
     {
         $bufferedOutput = new BufferedOutput();
