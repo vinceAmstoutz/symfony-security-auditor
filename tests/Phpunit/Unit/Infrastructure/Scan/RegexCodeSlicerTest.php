@@ -104,6 +104,21 @@ final class RegexCodeSlicerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_the_shell_process_factory_line_is_retained(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$p = Process::fromShellCommandline('ls '.\$dir);\n"
+            .str_repeat("        \$y = 2;\n", 20);
+        $projectFile = ProjectFile::create('src/Service/Runner.php', '/app/src/Service/Runner.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString("Process::fromShellCommandline('ls '.\$dir)", $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_inert_body_lines_are_elided(): void
     {
         $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeController());

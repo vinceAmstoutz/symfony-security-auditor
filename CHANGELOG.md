@@ -628,6 +628,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **`Process::fromShellCommandline()` — the shell-executing Symfony `Process`
+  factory — was invisible to the scanner, hiding command-injection sinks.** The
+  pre-scanner's `process_construction`/`process_in_handler` markers
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) and the slicer's
+  `SECURITY_TOKENS` (`src/Audit/Infrastructure/Scan/RegexCodeSlicer.php`)
+  matched only `new Process(` — the safe array form that never invokes a shell —
+  and not `Process::fromShellCommandline()`, which runs its string argument
+  through `/bin/sh -c`. Under the `fast` profile a file whose only sink was
+  `Process::fromShellCommandline('… '.$userInput)` produced zero markers and was
+  dropped by lean mode; even in a retained file the slicer elided the line (no
+  marker meant `restoreRiskMarkerLines` could not rescue it), so the RCE was
+  never shown to the LLM. Both pre-scanner markers now also match
+  `Process::fromShellCommandline(`, and the slicer keeps those lines;
+  `CACHE_VERSION` bumps to 23.
 - **Under the `fast` profile, a controller reading request input through a
   modern accessor (`$request->toArray()`, `$request->getPayload()`,
   `$request->cookies`/`files`/`headers`, `$request->request->all()`) was dropped

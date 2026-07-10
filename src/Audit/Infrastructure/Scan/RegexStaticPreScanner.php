@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 22;
+    public const int CACHE_VERSION = 23;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -57,8 +57,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'Shell invocation — verify no user-input concatenation',
             ],
             'process_construction' => [
-                'regex' => '/new\s+Process\s*\(/',
-                'description' => 'Symfony Process construction — verify argv is not built from user input (command injection)',
+                'regex' => '/new\s+Process\s*\(|Process::fromShellCommandline\s*\(/',
+                'description' => 'Symfony Process construction — verify argv is not built from user input (command injection); fromShellCommandline runs through a shell',
             ],
             'md5_or_sha1_security' => [
                 'regex' => '/\b(?:md5|sha1)\s*\(/',
@@ -285,8 +285,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'unserialize() in handler — gadget-chain risk on transported payload',
             ],
             'process_in_handler' => [
-                'regex' => '/new\s+Process\s*\(/',
-                'description' => 'Process construction in handler — verify argv is not built from message fields',
+                'regex' => '/new\s+Process\s*\(|Process::fromShellCommandline\s*\(/',
+                'description' => 'Process construction in handler — verify argv is not built from message fields; fromShellCommandline runs through a shell',
             ],
         ],
         ProjectFileType::WEBHOOK_CONSUMER->value => [

@@ -96,6 +96,7 @@ final class RegexStaticPreScannerTest extends TestCase
         yield 'unserialize in a controller' => ['src/Controller/ImportController.php', "<?php\nclass ImportController { public function import(\$data) { return unserialize(\$data); } }", 'unserialize_call'];
         yield 'eval in an entity' => ['src/Entity/Widget.php', "<?php\nclass Widget { public function run(\$c) { return eval(\$c); } }", 'eval_call'];
         yield 'http client request in a messenger handler' => ['src/MessageHandler/PingHandler.php', "<?php\nclass PingHandler { public function __construct(private HttpClientInterface \$client) {} public function __invoke(\$m) { return \$this->client->request('GET', \$m->url); } }", 'http_client_request'];
+        yield 'shell process factory in a messenger handler' => ['src/MessageHandler/RunHandler.php', "<?php\nclass RunHandler { public function __invoke(\$m) { return Process::fromShellCommandline(\$m->cmd); } }", 'process_in_handler'];
     }
 
     /**
@@ -117,6 +118,7 @@ final class RegexStaticPreScannerTest extends TestCase
     public static function genericSinkCases(): iterable
     {
         yield 'new Process' => ["\$p = new Process([\$in, '--flag']);", 'process_construction'];
+        yield 'Process::fromShellCommandline' => ["\$p = Process::fromShellCommandline('ls '.\$in);", 'process_construction'];
         yield 'new RedirectResponse' => ['return new RedirectResponse($in);', 'open_redirect'];
         yield 'file_get_contents' => ["return file_get_contents('/var/'.\$in);", 'file_sink'];
         yield 'readfile' => ["readfile('/up/'.\$in);", 'file_sink'];

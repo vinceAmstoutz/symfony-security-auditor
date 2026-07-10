@@ -118,6 +118,7 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         'popen(',
         'eval(',
         'new Process(',
+        'Process::fromShellCommandline(',
         'HttpClient',
         '->request(',
         '->redirect(',
