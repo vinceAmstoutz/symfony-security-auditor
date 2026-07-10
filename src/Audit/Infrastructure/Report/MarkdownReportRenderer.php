@@ -154,7 +154,8 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
      */
     private function escapeFences(string $text): string
     {
-        $backslashesEscaped = str_replace('\\', '\\\\', mb_scrub($text, 'UTF-8'));
+        $sanitized = TerminalTextSanitizer::stripControlCharacters(mb_scrub($text, 'UTF-8'));
+        $backslashesEscaped = str_replace('\\', '\\\\', $sanitized);
 
         return str_replace(['`', '~', '#', '<', '>', '[', ']'], ['\\`', '\\~', '\\#', '&lt;', '&gt;', '\\[', '\\]'], $backslashesEscaped);
     }
@@ -174,14 +175,19 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
      * Backslash escapes do not work inside a CommonMark code span — the
      * standard way to safely wrap arbitrary text in one is a delimiter longer
      * than any backtick run the text contains, padded with a leading space if
-     * the text starts with a backtick (the only edge this is ever called with
-     * — a location string always ends in a digit). `<`/`>` need no manual
-     * entity encoding here: CommonMark renders code-span content as literal
-     * text and HTML-escapes it automatically.
+     * the text starts with a backtick. `<`/`>` need no manual entity encoding
+     * here: CommonMark renders code-span content as literal text and
+     * HTML-escapes it automatically. A code span cannot contain a blank line
+     * (a blank line is a block-level separator resolved before inline parsing,
+     * so it ends the span no matter how wide the delimiter is), so an
+     * LLM-sourced `filePath` with an embedded `\n\n` would otherwise break out
+     * and render the remainder as live Markdown/HTML — the text is collapsed to
+     * a single line and stripped of control/bidi characters first, the same
+     * defense the sibling console and HTML renderers apply.
      */
     private function inlineCode(string $text): string
     {
-        $text = mb_scrub($text, 'UTF-8');
+        $text = TerminalTextSanitizer::collapseToSingleLine(mb_scrub($text, 'UTF-8'));
         $delimiter = str_repeat('`', $this->longestBacktickRun($text) + 1);
         $padding = str_starts_with($text, '`') ? ' ' : '';
 

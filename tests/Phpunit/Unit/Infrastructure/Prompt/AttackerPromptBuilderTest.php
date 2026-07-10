@@ -502,6 +502,85 @@ final class AttackerPromptBuilderTest extends TestCase
     }
 
     /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('publicAccessControlRoleCases')]
+    public function test_route_matching_only_a_public_access_control_rule_is_not_marked_covered(string $publicRole): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/AdminController.php',
+            '/app/src/Controller/AdminController.php',
+            '<?php class AdminController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'deleteUser',
+            routePath: '/admin/users/42',
+            routeMethods: ['DELETE'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(
+                routeAccessMap: ['^/admin' => [$publicRole]],
+                routeAccessControls: [$routeAccessControl],
+            ),
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('LACKS_ACCESS_CHECK', $message);
+        self::assertStringNotContainsString('COVERED_BY', $message);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function publicAccessControlRoleCases(): iterable
+    {
+        yield 'PUBLIC_ACCESS attribute' => ['PUBLIC_ACCESS'];
+        yield 'deprecated IS_AUTHENTICATED_ANONYMOUSLY attribute' => ['IS_AUTHENTICATED_ANONYMOUSLY'];
+        yield 'parser empty-requirement PUBLIC marker' => ['PUBLIC'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_route_reachable_only_through_a_public_or_prefixed_access_control_rule_is_not_marked_covered(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/AdminController.php',
+            '/app/src/Controller/AdminController.php',
+            '<?php class AdminController {}',
+        );
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/AdminController.php',
+            methodName: 'deleteUser',
+            routePath: '/admin/users/42',
+            routeMethods: ['DELETE'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]),
+            new AccessControlMap(
+                routeAccessMap: ['^/admin' => ['ROLE_ADMIN', 'methods: GET', 'or: PUBLIC_ACCESS, methods: DELETE']],
+                routeAccessControls: [$routeAccessControl],
+            ),
+        );
+
+        $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
+
+        self::assertStringContainsString('LACKS_ACCESS_CHECK', $message);
+        self::assertStringNotContainsString('COVERED_BY', $message);
+    }
+
+    /**
      * A second `access_control` rule for the same path is recorded as a
      * single `or: ...`-prefixed entry appended to the first rule's own list
      * (see `SymfonyYamlSecurityConfigParser::recordAccessControlEntry()`) —

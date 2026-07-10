@@ -522,6 +522,36 @@ final class RegexCodeSlicerTest extends TestCase
         yield 'tab-indented exec call' => ["\texec(\$cmd);"];
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('fileIoAndQueryBuilderSinkCases')]
+    public function test_file_io_and_query_builder_sink_lines_are_retained(string $sinkLine): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20).'        '.$sinkLine."\n".str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Controller/FileController.php', '/app/src/Controller/FileController.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString($sinkLine, $sliced);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function fileIoAndQueryBuilderSinkCases(): iterable
+    {
+        yield 'file_get_contents read' => ['$c = file_get_contents($userPath);'];
+        yield 'file_put_contents write' => ['file_put_contents($dest, $data);'];
+        yield 'fopen handle' => ['$h = fopen($userPath, \'r\');'];
+        yield 'readfile passthrough' => ['readfile($userPath);'];
+        yield 'unlink delete' => ['unlink($userPath);'];
+        yield 'move_uploaded_file' => ['move_uploaded_file($tmp, $userDest);'];
+        yield 'UploadedFile move' => ['$upload->move($dir, $name);'];
+        yield 'getClientOriginalName source' => ['$name = $upload->getClientOriginalName();'];
+        yield 'QueryBuilder where concat' => ['$qb->where(\'u.name = \'.$tainted);'];
+        yield 'QueryBuilder andWhere concat' => ['$qb->andWhere(\'u.role = \'.$role);'];
+        yield 'QueryBuilder having concat' => ['$qb->having(\'COUNT(x) > \'.$n);'];
+    }
+
     private function largeControllerWithBareIncludes(): string
     {
         $inert = str_repeat("        \$x = INERT_MARKER;\n", 25);

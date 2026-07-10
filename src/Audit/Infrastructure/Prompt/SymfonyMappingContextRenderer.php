@@ -28,6 +28,19 @@ final readonly class SymfonyMappingContextRenderer
 {
     private const string DELIMITER_CANDIDATES = '#~!%@';
 
+    /**
+     * `access_control` role tokens that grant access to everyone: the
+     * `PUBLIC_ACCESS` attribute, its deprecated predecessor
+     * `IS_AUTHENTICATED_ANONYMOUSLY`, and the `PUBLIC` marker
+     * {@see SymfonyYamlSecurityConfigParser} records for a requirement-less
+     * rule. A route reachable only through such a rule is not protected by the
+     * firewall at all, so it must not be presented as `COVERED_BY` — that would
+     * tell the attacker model to skip a genuinely unauthenticated route.
+     *
+     * @var list<string>
+     */
+    private const array PUBLIC_ACCESS_PSEUDO_ROLES = ['PUBLIC_ACCESS', 'IS_AUTHENTICATED_ANONYMOUSLY', 'PUBLIC'];
+
     public static function renderFirewallRules(SymfonyMapping $symfonyMapping): string
     {
         $firewallRules = $symfonyMapping->firewallRules();
@@ -158,11 +171,36 @@ final readonly class SymfonyMappingContextRenderer
 
         $firewallRoles = self::firewallRolesForPath($routeAccessControl->routePath(), $routeAccessControl->routeMethods(), $routeAccessMap)
             ?? self::firewallRolesForRouteName($routeAccessControl->routeName(), $routeAccessControl->routeMethods(), $routeAccessMap);
-        if (null !== $firewallRoles) {
-            return \sprintf('COVERED_BY access_control[%s]', implode(',', array_map(self::sanitizeLine(...), $firewallRoles)));
+
+        return self::firewallCoverageLabel($firewallRoles);
+    }
+
+    /**
+     * A matched `access_control` rule protects a route only if it actually
+     * restricts access. When no rule matches, or the matching one grants
+     * {@see self::PUBLIC_ACCESS_PSEUDO_ROLES public access}, the route is
+     * reachable by anyone, so it is tagged `LACKS_ACCESS_CHECK` rather than
+     * suppressed as `COVERED_BY`.
+     *
+     * @param list<string>|null $firewallRoles
+     */
+    private static function firewallCoverageLabel(?array $firewallRoles): string
+    {
+        if (null === $firewallRoles || self::grantsPublicAccess($firewallRoles)) {
+            return 'LACKS_ACCESS_CHECK';
         }
 
-        return 'LACKS_ACCESS_CHECK';
+        return \sprintf('COVERED_BY access_control[%s]', implode(',', array_map(self::sanitizeLine(...), $firewallRoles)));
+    }
+
+    /**
+     * @param list<string> $firewallRoles
+     */
+    private static function grantsPublicAccess(array $firewallRoles): bool
+    {
+        $tokens = explode(', ', str_replace('or: ', '', implode(', ', $firewallRoles)));
+
+        return [] !== array_intersect($tokens, self::PUBLIC_ACCESS_PSEUDO_ROLES);
     }
 
     /**

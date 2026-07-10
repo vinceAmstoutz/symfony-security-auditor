@@ -294,4 +294,28 @@ final class GithubAnnotationsReportRendererTest extends AbstractReportRendererTe
 
         self::assertStringContainsString('::line1%0Aline2%25', $output);
     }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_strips_ansi_escape_and_bidi_override_characters_from_llm_controlled_fields(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::TWIG_INJECTION, VulnerabilitySeverity::MEDIUM, "\x1b[31mTitle\u{202E}rev", 0.9),
+            new CodeLocation('src/Tpl.php', 3, 3),
+            new VulnerabilityNarrative("\x1b[2Kdesc\u{202D}", 'vector', 'proof', 'fix'),
+            '{{ raw }}',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringNotContainsString("\x1b", $output);
+        self::assertStringNotContainsString("\u{202E}", $output);
+        self::assertStringNotContainsString("\u{202D}", $output);
+        self::assertStringContainsString('title=[31mTitlerev', $output);
+        self::assertStringContainsString('::[2Kdesc%0A%0ARemediation: fix', $output);
+    }
 }

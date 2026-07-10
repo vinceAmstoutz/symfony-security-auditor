@@ -167,6 +167,56 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
+     * A CommonMark inline code span cannot contain a blank line — a blank line
+     * is resolved as a block separator before inline parsing, so it ends the
+     * span no matter how wide the backtick delimiter is. An LLM-sourced
+     * `filePath` with an embedded `\n\n` therefore breaks out of the Location
+     * code span and renders the remainder as live Markdown/HTML (a forged
+     * heading, a raw `<script>`), unless the path is collapsed to one line.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_collapses_a_blank_line_in_the_file_path_so_the_location_cannot_break_out_of_its_code_span(): void
+    {
+        $output = $this->renderer->render($this->makeReport(
+            $this->makeValidatedVuln(filePath: "src/A.php\n\n## PWNED\n\n<script>alert(1)</script>"),
+        ));
+
+        self::assertDoesNotMatchRegularExpression('/^## PWNED/m', $output);
+        self::assertStringContainsString('**Location:** `src/A.php  ## PWNED  <script>alert(1)</script>:1-5`', $output);
+    }
+
+    /**
+     * Unicode bidirectional-override characters let a crafted finding visually
+     * reorder its own rendered text (a Trojan-Source spoof) when the Markdown
+     * is viewed or rendered downstream — the sibling HTML renderer already
+     * strips them, so the Markdown renderer must too.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_strips_bidi_override_characters_from_llm_controlled_fields(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, "Title\u{202E}reversed", 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative("Desc\u{202E}reversed", 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringNotContainsString("\u{202E}", $output);
+        self::assertStringContainsString('Titlereversed', $output);
+        self::assertStringContainsString('Descreversed', $output);
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException

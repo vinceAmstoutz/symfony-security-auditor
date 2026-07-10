@@ -628,6 +628,61 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Two report renderers still let LLM-controlled text escape its intended
+  structure**, the same injection class fixed for the other renderers in earlier
+  rounds. `MarkdownReportRenderer::inlineCode()`
+  (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) wrapped a
+  finding's `Location` (`filePath:lineStart-lineEnd`) in a CommonMark code span,
+  but a code span cannot contain a blank line — an LLM-sourced `filePath` with
+  an embedded `\n\n` ended the span early and rendered the remainder as live
+  Markdown/HTML (a forged `##` heading, a raw `<script>`). The location is now
+  collapsed to a single line and stripped of control/bidi characters first (via
+  `TerminalTextSanitizer`, the same defense the console and HTML renderers
+  apply), and `escapeFences()` strips those characters too.
+  `GithubAnnotationsReportRenderer::escapeData()`
+  (`src/Audit/Infrastructure/Report/GithubAnnotationsReportRenderer.php`)
+  percent-encoded newlines but passed ANSI escape (`\x1b`) and Unicode
+  bidi-override characters through verbatim into the GitHub Actions annotation
+  stream; it now strips them _after_ percent-encoding, leaving legitimate
+  `%0D`/`%0A` intact.
+- **A route reachable only through a public `access_control` rule was told to
+  the attacker model as firewall-protected**, suppressing a genuinely
+  unauthenticated route. When a route had no attribute/body check but matched an
+  `access_control` rule whose roles were `PUBLIC_ACCESS`, the deprecated
+  `IS_AUTHENTICATED_ANONYMOUSLY`, or the parser's empty-requirement `PUBLIC`
+  marker, `SymfonyMappingContextRenderer`
+  (`src/Audit/Infrastructure/Prompt/SymfonyMappingContextRenderer.php`) rendered
+  it `COVERED_BY access_control[…]` — which the prompt explains as "the firewall
+  already protects them, so do NOT report `broken_access_control`". Those
+  pseudo-roles grant access to everyone, so such a route is now tagged
+  `LACKS_ACCESS_CHECK` (a `broken_access_control` candidate) instead; a rule
+  with at least one real gating role is still rendered `COVERED_BY` unchanged.
+- **`RegexCodeSlicer` elided the exact vulnerable line for two common Symfony
+  vulnerability classes when code slicing was enabled** (the `fast` profile).
+  Its file-type-agnostic `SECURITY_TOKENS` list
+  (`src/Audit/Infrastructure/Scan/RegexCodeSlicer.php`) retained `->orderBy(`
+  but not its SQL-injection siblings `->where(`/`->andWhere(`/`->having(`, and
+  carried no file-I/O sinks at all — so a string-concatenated QueryBuilder
+  predicate or a path-traversal `file_get_contents($userPath)` sitting on an
+  otherwise-inert line was replaced with `// elided` and never reached the
+  attacker model (the static pre-scanner only tags a file against its own type
+  bucket, so a controller-hosted query or file operation was caught by neither
+  defense). The slicer now also retains `->where(`, `->andWhere(`, `->having(`,
+  `file_get_contents(`, `file_put_contents(`, `fopen(`, `readfile(`, `unlink(`,
+  `move_uploaded_file(`, `->move(`, and `getClientOriginalName(`. Slicing output
+  feeds the attacker cache's content-hash key, so cached responses for affected
+  files re-key automatically.
+- **Findings from a provider that stringifies JSON numbers were silently
+  corrupted in the JSON-collection path.** `VulnerabilityFactory`
+  (`src/Audit/Application/Agent/VulnerabilityFactory.php`) already coerces
+  stringified booleans for reviewer verdicts (`VerdictApplier::parseAccepted()`)
+  but did not do the same for numbers reached through the provider-agnostic LLM
+  seam: a `confidence` of `"0.9"` fell back to the `0.5` default (dropping the
+  finding below the `0.6` confidence floor), and a `line_start` of `"42"` fell
+  back to `1` — which also changed the finding's `line_start`-derived id, so two
+  distinct findings could collide on one id. The factory now normalizes a
+  numeric string to its int/float value before applying the existing type
+  checks; a non-numeric string still yields the default.
 - **Rejecting a non-finite `min_confidence` (`NAN`/`INF`) emitted a PHP 8.5
   string-coercion warning while building the error message**, which the test
   suite's `failOnWarning` turned into a hard failure on the PHP 8.5 CI matrix.

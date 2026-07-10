@@ -30,8 +30,8 @@ use function Symfony\Component\String\u;
  *     class/interface/trait/enum signature (with optional modifiers), method
  *     signature, or property/visibility-prefixed declaration; or
  *   - dangerous — it contains at least one security-relevant token (Request::
- *     access, Doctrine query builder, unserialize, shell exec, mailer setters,
- *     HttpClient request, weak crypto, …).
+ *     access, Doctrine query builder, file I/O and upload handling, unserialize,
+ *     shell exec, mailer setters, HttpClient request, weak crypto, …).
  *
  * A retained line with an unclosed `(` (a multi-line method signature or
  * attribute argument list) keeps every continuation line until its
@@ -98,6 +98,17 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
         '->setParameter(',
         'getConnection()',
         '->orderBy(',
+        '->where(',
+        '->andWhere(',
+        '->having(',
+        'file_get_contents(',
+        'file_put_contents(',
+        'fopen(',
+        'readfile(',
+        'unlink(',
+        'move_uploaded_file(',
+        '->move(',
+        'getClientOriginalName(',
         'unserialize(',
         'igbinary_unserialize(',
         'shell_exec(',
