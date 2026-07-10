@@ -124,7 +124,42 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
             }
         }
 
-        return $entries;
+        return $this->withInvokableClassRoute($entries, $classRouteData);
+    }
+
+    /**
+     * Symfony's `AttributeClassLoader` routes an invokable controller's
+     * `__invoke()` from the class-level `#[Route]` when no method carries its
+     * own route. Without this the action is parsed as route-less and dropped
+     * from the access-control map, so an unguarded single-action controller is
+     * never flagged. Mirror that: when the class has a route and nothing routed
+     * a method, the `__invoke()` entry inherits the class route.
+     *
+     * @param list<RouteAccessControl>                                                  $entries
+     * @param array{present: bool, path: ?string, methods: list<string>, name: ?string} $classRouteData
+     *
+     * @return list<RouteAccessControl>
+     */
+    private function withInvokableClassRoute(array $entries, array $classRouteData): array
+    {
+        if (!$classRouteData['present'] || $this->anyEntryRouted($entries)) {
+            return $entries;
+        }
+
+        return array_map(
+            static fn (RouteAccessControl $routeAccessControl): RouteAccessControl => '__invoke' === $routeAccessControl->methodName()
+                ? $routeAccessControl->withRouteFromEnclosingClass($classRouteData['path'], $classRouteData['methods'], $classRouteData['name'])
+                : $routeAccessControl,
+            $entries,
+        );
+    }
+
+    /**
+     * @param list<RouteAccessControl> $entries
+     */
+    private function anyEntryRouted(array $entries): bool
+    {
+        return [] !== array_filter($entries, static fn (RouteAccessControl $routeAccessControl): bool => $routeAccessControl->hasRouteAttribute());
     }
 
     /**

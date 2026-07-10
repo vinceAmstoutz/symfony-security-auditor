@@ -17,6 +17,7 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 
 final class PhpParserControllerAccessControlParserTest extends TestCase
@@ -305,6 +306,67 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         self::assertSame('/admin/dashboard', $entries[0]->routePath());
         self::assertSame('admin_dashboard', $entries[0]->routeName());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_routes_an_invokable_single_action_controller_from_its_class_level_route(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            #[Route('/admin/dashboard', name: 'admin_dashboard', methods: ['GET'])]
+            final class DashboardController {
+                public function __invoke(): void {}
+            }
+            PHP;
+        $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/DashboardController.php', $source));
+
+        $routeAccessControl = $this->invokeEntry($entries);
+        self::assertTrue($routeAccessControl->hasRouteAttribute());
+        self::assertSame('/admin/dashboard', $routeAccessControl->routePath());
+        self::assertSame('admin_dashboard', $routeAccessControl->routeName());
+        self::assertSame(['GET'], $routeAccessControl->routeMethods());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_does_not_route_invoke_from_the_class_when_a_sibling_method_already_has_its_own_route(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            #[Route('/admin', name: 'admin_')]
+            final class MixedController {
+                #[Route('/list', name: 'list')]
+                public function list(): void {}
+                public function __invoke(): void {}
+            }
+            PHP;
+        $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/MixedController.php', $source));
+
+        self::assertFalse($this->invokeEntry($entries)->hasRouteAttribute());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_leaves_invoke_route_less_when_the_class_has_no_route(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            final class PlainController {
+                public function __invoke(): void {}
+            }
+            PHP;
+        $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/PlainController.php', $source));
+
+        self::assertFalse($this->invokeEntry($entries)->hasRouteAttribute());
     }
 
     /**
@@ -1241,5 +1303,19 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     private function makeFile(string $relativePath, string $content): ProjectFile
     {
         return ProjectFile::create($relativePath, '/app/'.$relativePath, $content);
+    }
+
+    /**
+     * @param list<RouteAccessControl> $entries
+     */
+    private function invokeEntry(array $entries): RouteAccessControl
+    {
+        foreach ($entries as $entry) {
+            if ('__invoke' === $entry->methodName()) {
+                return $entry;
+            }
+        }
+
+        self::fail('No __invoke entry was parsed.');
     }
 }

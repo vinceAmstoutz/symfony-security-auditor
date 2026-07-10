@@ -102,6 +102,43 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    #[DataProvider('genericSinkCases')]
+    public function test_it_flags_file_query_upload_xxe_and_input_sinks_in_a_plain_php_service(string $body, string $expectedPattern): void
+    {
+        $projectFile = ProjectFile::create('src/Service/Danger.php', '/app/src/Service/Danger.php', "<?php\nclass Danger { public function run(\$in) { ".$body.' } }');
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains($expectedPattern, $patterns);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function genericSinkCases(): iterable
+    {
+        yield 'file_get_contents' => ["return file_get_contents('/var/'.\$in);", 'file_sink'];
+        yield 'readfile' => ["readfile('/up/'.\$in);", 'file_sink'];
+        yield 'fopen' => ["\$h = fopen(\$in, 'r');", 'file_sink'];
+        yield 'unlink' => ["unlink('/tmp/'.\$in);", 'file_sink'];
+        yield 'move_uploaded_file' => ["move_uploaded_file(\$in, '/up/x');", 'file_sink'];
+        yield 'uploaded file move' => ["\$in->move('/up', \$in->getClientOriginalName());", 'upload_handling'];
+        yield 'getClientOriginalName' => ['$name = $in->getClientOriginalName();', 'upload_handling'];
+        yield 'simplexml_load_string' => ['return simplexml_load_string($in);', 'xml_external_entity'];
+        yield 'createQuery' => ["return \$this->em->createQuery(\"WHERE u.n='\".\$in.\"'\");", 'doctrine_query'];
+        yield 'createQueryBuilder' => ['return $this->em->createQueryBuilder();', 'doctrine_query'];
+        yield 'executeQuery' => ["return \$this->conn->executeQuery('SELECT '.\$in);", 'doctrine_query'];
+        yield 'andWhere' => ["\$qb->andWhere(\"p.n LIKE '%\".\$in.\"%'\");", 'querybuilder_predicate'];
+        yield 'having' => ["\$qb->having('COUNT(x) > '.\$in);", 'querybuilder_predicate'];
+        yield 'where' => ["\$qb->where('u.name = '.\$in);", 'querybuilder_predicate'];
+        yield 'GET superglobal' => ["return \$_GET['x'];", 'superglobal_input'];
+        yield 'POST superglobal' => ["return \$_POST['x'];", 'superglobal_input'];
+        yield 'COOKIE superglobal' => ["return \$_COOKIE['x'];", 'superglobal_input'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_non_constant_time_compare_regardless_of_operand_order(): void
     {
         $projectFile = ProjectFile::create(

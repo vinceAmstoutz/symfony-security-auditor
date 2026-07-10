@@ -628,6 +628,32 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Under the `fast` profile, a plain service whose only danger was a file-I/O,
+  upload, XXE, Doctrine-query or superglobal sink was still silently excluded
+  from the audit.** An earlier fix applied the generic `php`-bucket risk-marker
+  patterns to every PHP file, but the `php` bucket itself
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) carried no pattern
+  for those sink classes — even though `RegexCodeSlicer::SECURITY_TOKENS` treats
+  them as security-relevant — so a `.php` file whose only marker-worthy content
+  was, say, `file_get_contents($userPath)`, `->createQuery(...)`,
+  `->andWhere('...'.$x)`, `$request->files->get(...)`,
+  `simplexml_load_string($xml)` or `$_GET[...]` produced zero markers and was
+  dropped by lean mode before the slicer ran. The `php` bucket now flags file
+  I/O (`file_sink`), uploaded-file handling (`upload_handling`), XXE
+  (`xml_external_entity`), Doctrine query construction (`doctrine_query`),
+  QueryBuilder predicates (`querybuilder_predicate`), and superglobal reads
+  (`superglobal_input`). `CACHE_VERSION` bumps to 14.
+- **Invokable single-action controllers were missing from the attacker prompt's
+  route access-control map.** Symfony's `AttributeClassLoader` routes an
+  invokable controller's `__invoke()` from the class-level `#[Route]` when the
+  method has no route of its own, but `PhpParserControllerAccessControlParser`
+  (`src/Audit/Infrastructure/Scan/PhpParserControllerAccessControlParser.php`)
+  read the route only from the method's attributes, so `__invoke()` came back
+  route-less (`hasRouteAttribute: false`) and `SymfonyMappingContextRenderer`
+  dropped it — an unguarded single-action controller was never tagged
+  `LACKS_ACCESS_CHECK`. The parser now mirrors Symfony: when the class carries a
+  route and no method has its own, the `__invoke()` entry inherits the class
+  route (`RouteAccessControl::withRouteFromEnclosingClass()`).
 - **Two more LLM-controlled fields could break out of their Markdown
   structure.** `MarkdownReportRenderer::codeBlock()`
   (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) — which renders

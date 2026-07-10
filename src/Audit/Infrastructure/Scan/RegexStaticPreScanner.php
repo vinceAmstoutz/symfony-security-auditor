@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 13;
+    public const int CACHE_VERSION = 14;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -87,6 +87,30 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'expression_language_evaluate' => [
                 'regex' => '/->evaluate\s*\(/',
                 'description' => 'ExpressionLanguage::evaluate() — verify expression not built from user input',
+            ],
+            'file_sink' => [
+                'regex' => '/\b(?:file_get_contents|file_put_contents|fopen|readfile|unlink|move_uploaded_file)\s*\(/',
+                'description' => 'File I/O sink — verify the path is not built from user input (path traversal, LFI, arbitrary read/write/delete)',
+            ],
+            'upload_handling' => [
+                'regex' => '/->(?:move|getClientOriginalName)\s*\(|->files->/',
+                'description' => 'Uploaded-file handling — verify extension/MIME/size validation and that the stored name/path is not attacker-controlled',
+            ],
+            'xml_external_entity' => [
+                'regex' => '/\bsimplexml_load_string\s*\(/',
+                'description' => 'simplexml_load_string on untrusted XML — verify external-entity loading is disabled (XXE)',
+            ],
+            'doctrine_query' => [
+                'regex' => '/->(?:createQuery|createQueryBuilder|executeQuery|executeStatement)\s*\(/',
+                'description' => 'Doctrine query construction — verify no user input is concatenated into DQL/SQL (use parameters)',
+            ],
+            'querybuilder_predicate' => [
+                'regex' => '/->(?:where|andWhere|orWhere|having|andHaving|orHaving)\s*\(/',
+                'description' => 'QueryBuilder predicate — verify string interpolation is not used (SQL injection); bind via setParameter',
+            ],
+            'superglobal_input' => [
+                'regex' => '/\$_(?:GET|POST|REQUEST|COOKIE|FILES|SERVER)\b/',
+                'description' => 'Superglobal input read — trace the flow to dangerous sinks',
             ],
         ],
         ProjectFileType::CONTROLLER->value => [

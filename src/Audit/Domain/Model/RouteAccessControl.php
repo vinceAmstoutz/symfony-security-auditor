@@ -89,6 +89,30 @@ final readonly class RouteAccessControl
         return $this->methodHasIsGrantedAttribute;
     }
 
+    /**
+     * Returns a copy routed from the enclosing class's `#[Route]` — the way
+     * Symfony routes an invokable single-action controller's `__invoke()` when
+     * the method carries no route of its own. All access-control flags are
+     * preserved; only the route identity and `hasRouteAttribute` change.
+     *
+     * @param list<string> $routeMethods
+     */
+    public function withRouteFromEnclosingClass(?string $routePath, array $routeMethods, ?string $routeName): self
+    {
+        return new self(
+            filePath: $this->filePath,
+            methodName: $this->methodName,
+            routePath: $routePath,
+            routeMethods: $routeMethods,
+            hasRouteAttribute: true,
+            methodLevelIsGranted: $this->methodLevelIsGranted,
+            methodHasDenyAccess: $this->methodHasDenyAccess,
+            classHasIsGranted: $this->classHasIsGranted,
+            routeName: $routeName,
+            methodHasIsGrantedAttribute: $this->methodHasIsGrantedAttribute,
+        );
+    }
+
     public function hasAccessCheck(): bool
     {
         return $this->classHasIsGranted
