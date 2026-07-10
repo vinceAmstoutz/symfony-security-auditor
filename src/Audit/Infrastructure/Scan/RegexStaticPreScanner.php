@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 12;
+    public const int CACHE_VERSION = 13;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -290,6 +290,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         foreach ($files as $file) {
             $bucket = $file->type();
             $patternsForBucket = [
+                ...$this->genericPhpPatternsFor($file),
                 ...(self::PATTERNS[$bucket] ?? []),
                 ...($this->customPatterns[$bucket] ?? []),
             ];
@@ -309,6 +310,33 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         }
 
         return $markers;
+    }
+
+    /**
+     * The `php` bucket's generic sink patterns (unserialize, eval, shell exec,
+     * weak crypto, insecure RNG, SSRF-prone HttpClient calls, mailer header
+     * setters, non-constant-time compares, ExpressionLanguage evaluation) are
+     * dangerous in any PHP source file, not only plain services: a controller
+     * or messenger handler calling `unserialize()` on request input is at least
+     * as exploitable. `scan()` selects a single type bucket per file, so
+     * without this every non-`php` component (controller, voter, entity,
+     * repository, form, authenticator, …) would miss those markers — and under
+     * the `fast` profile's lean-mode filter, which drops files carrying zero
+     * markers, such a file would be excluded from the audit entirely. Keyed by
+     * label, so a `php`-typed file (whose own bucket already is the `php` set)
+     * gets each pattern exactly once after the spread merge. Non-PHP files
+     * (Twig templates, YAML config) are excluded — these patterns are
+     * PHP-source specific.
+     *
+     * @return array<string, array{regex: string, description: string}>
+     */
+    private function genericPhpPatternsFor(ProjectFile $projectFile): array
+    {
+        if ('php' !== pathinfo($projectFile->relativePath(), \PATHINFO_EXTENSION)) {
+            return [];
+        }
+
+        return self::PATTERNS[ProjectFileType::PHP->value];
     }
 
     /**

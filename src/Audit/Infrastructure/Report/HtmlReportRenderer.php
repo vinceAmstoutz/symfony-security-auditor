@@ -134,10 +134,15 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
      * Algorithm on the escaped text — a bidi override (`U+202A`-`U+202E`,
      * `U+2066`-`U+2069`) in an LLM-sourced field can visually reorder the
      * rendered characters, a Trojan-Source-style spoof of the finding text.
+     * Invalid UTF-8 is repaired with `mb_scrub()` first, the same defense the
+     * sibling console/Markdown/annotation renderers apply: a `/u` regex aborts
+     * (returns `null`) on an invalid subject byte, so without the scrub a
+     * single stray byte would defeat the bidi strip entirely.
      */
     private function escape(string $value): string
     {
-        $withoutBidiOverrides = preg_replace('/[\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $value) ?? $value;
+        $scrubbed = mb_scrub($value, 'UTF-8');
+        $withoutBidiOverrides = preg_replace('/[\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $scrubbed) ?? $scrubbed;
 
         return htmlspecialchars($withoutBidiOverrides, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
     }

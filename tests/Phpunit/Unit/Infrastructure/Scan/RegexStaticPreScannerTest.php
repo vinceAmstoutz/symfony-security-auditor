@@ -79,6 +79,29 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    #[DataProvider('typedComponentSinkCases')]
+    public function test_it_flags_generic_php_sinks_in_a_typed_component(string $relativePath, string $source, string $expectedPattern): void
+    {
+        $projectFile = ProjectFile::create($relativePath, '/app/'.$relativePath, $source);
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains($expectedPattern, $patterns);
+    }
+
+    /** @return iterable<string, array{string, string, string}> */
+    public static function typedComponentSinkCases(): iterable
+    {
+        yield 'unserialize in a controller' => ['src/Controller/ImportController.php', "<?php\nclass ImportController { public function import(\$data) { return unserialize(\$data); } }", 'unserialize_call'];
+        yield 'eval in an entity' => ['src/Entity/Widget.php', "<?php\nclass Widget { public function run(\$c) { return eval(\$c); } }", 'eval_call'];
+        yield 'http client request in a messenger handler' => ['src/MessageHandler/PingHandler.php', "<?php\nclass PingHandler { public function __construct(private HttpClientInterface \$client) {} public function __invoke(\$m) { return \$this->client->request('GET', \$m->url); } }", 'http_client_request'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_non_constant_time_compare_regardless_of_operand_order(): void
     {
         $projectFile = ProjectFile::create(

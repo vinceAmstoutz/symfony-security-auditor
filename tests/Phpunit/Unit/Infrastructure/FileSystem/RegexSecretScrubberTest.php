@@ -203,6 +203,32 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame('password: ***REDACTED:inline_assignment***', $output);
     }
 
+    #[DataProvider('additionalInlineCredentialKeyCases')]
+    public function test_inline_assignment_redacts_additional_credential_keys(string $key): void
+    {
+        $output = $this->regexSecretScrubber->scrub(\sprintf('%s: "aVeryLongSecretValue123"', $key));
+
+        self::assertSame(\sprintf('%s: "***REDACTED:inline_assignment***"', $key), $output);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function additionalInlineCredentialKeyCases(): iterable
+    {
+        yield 'passwd' => ['passwd'];
+        yield 'pwd' => ['pwd'];
+        yield 'private_key' => ['private_key'];
+        yield 'auth_token' => ['auth_token'];
+        yield 'credentials' => ['credentials'];
+    }
+
+    public function test_it_redacts_an_encrypted_pem_private_key(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIIBVQIBADANBg\n-----END ENCRYPTED PRIVATE KEY-----");
+
+        self::assertStringContainsString('***REDACTED:pem_private_key***', $output);
+        self::assertStringNotContainsString('MIIBVQIBADANBg', $output);
+    }
+
     public function test_unquoted_inline_assignment_leaves_symfony_placeholder_unmodified(): void
     {
         $input = 'api_key: %env(ANTHROPIC_API_KEY)%';

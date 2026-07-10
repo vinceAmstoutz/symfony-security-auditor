@@ -628,6 +628,36 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Under the `fast` profile, a controller (or any typed component) whose only
+  danger was a generic PHP sink was silently excluded from the audit.**
+  `RegexStaticPreScanner::scan()`
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) selects a single
+  risk-marker pattern bucket per file from its `type()`, and the generic sink
+  patterns (`unserialize`, `eval`, `shell_exec`, weak crypto, insecure RNG,
+  SSRF-prone `HttpClient` calls, mailer header setters, non-constant-time
+  compares, `ExpressionLanguage::evaluate()`) lived only in the `php` bucket —
+  applied to plain services but never to controllers, voters, entities,
+  repositories, forms, authenticators, or messenger handlers. Because the `fast`
+  profile's lean mode drops files carrying zero markers before the LLM sees them
+  (`AttackerAgent`/`RiskMarkerIndex::filesWithMarkers()`), a controller with,
+  say, `unserialize($_GET[...])` or a textbook SSRF `$client->request($url)`
+  produced no markers and was excluded from the audit entirely — a
+  false-negative SAFE. The scanner now applies the generic `php`-bucket patterns
+  to every PHP-source file in addition to its type-specific bucket (non-PHP
+  Twig/YAML files are unaffected). `CACHE_VERSION` bumps to 13, invalidating
+  stale pre-scan cache entries.
+- **`HtmlReportRenderer`'s bidi-override strip was silently defeated by a single
+  invalid UTF-8 byte.** `escape()`
+  (`src/Audit/Infrastructure/Report/HtmlReportRenderer.php`) removed
+  Trojan-Source bidi overrides (`U+202A`–`U+202E`, `U+2066`–`U+2069`) with a
+  `/u` regex, but a PCRE `/u` pattern aborts and returns `null` on an invalid
+  UTF-8 subject byte, so the `?? $value` fallback kept the _un-stripped_
+  original — any field prefixed with a stray byte carried its bidi overrides
+  straight into the HTML report (visual spoofing of a finding's text or file
+  path), even though `htmlspecialchars(…, ENT_SUBSTITUTE)` still neutralized
+  `<`/`>`/quotes. `escape()` now repairs the input with `mb_scrub()` before the
+  strip, the same defense the console, Markdown, and GitHub-annotation renderers
+  already apply, so the bidi removal runs on valid UTF-8 unconditionally.
 - **Two report renderers still let LLM-controlled text escape its intended
   structure**, the same injection class fixed for the other renderers in earlier
   rounds. `MarkdownReportRenderer::inlineCode()`
@@ -4016,6 +4046,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Security
 
+- **`RegexSecretScrubber` passed several common credential shapes to the LLM
+  verbatim.** The scrubber
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) — the
+  guardrail that redacts committed secrets before file content reaches the model
+  — did not recognize the inline/YAML keys `passwd`, `pwd`, `private_key`,
+  `auth_token`, or `credentials` (only `password`/`secret`/`api_key`/
+  `access_token`/`client_secret`), nor PEM blocks labeled
+  `ENCRYPTED PRIVATE KEY` (only `RSA`/`EC`/`DSA`/`OPENSSH`/`PGP`/plain). A
+  plaintext value under any of those keys, and encrypted PKCS#8 keys, reached
+  the attacker/reviewer prompt unredacted. The `inline_assignment`/
+  `multiline_assignment` key alternations and the `pem_private_key` prefix list
+  now cover these. The bare, high-false-positive key `token` is deliberately
+  still excluded, so a `?token=public` URL or a `TOKEN_STORE` env prefix is not
+  over-redacted.
 - **`RegexSecretScrubber`'s `env_assignment` and `inline_assignment` patterns
   could silently delete or plaintext-leak a real secret on the line _after_ an
   empty-valued credential key, defeating the class's entire purpose of keeping
