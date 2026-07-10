@@ -628,6 +628,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Two more LLM-controlled fields could break out of their Markdown
+  structure.** `MarkdownReportRenderer::codeBlock()`
+  (`src/Audit/Infrastructure/Report/MarkdownReportRenderer.php`) — which renders
+  `vulnerable_code`, `proof`, and the synthesized PoC — indented each line but
+  did not strip control characters, so a lone `\r` (a CommonMark line ending)
+  split a line and landed the remainder at column 0, outside the four-space
+  indent, as live Markdown/HTML (a forged heading, a raw `<img onerror=…>`). It
+  now strips control characters via `TerminalTextSanitizer` first, matching the
+  inline paths. Separately, `escapeFences()` escaped `#` (ATX headings) but not
+  `=`/`-` setext underlines, so a `description`/`attack_vector`/`remediation`
+  line followed by a run of `=`/`-` still forged an `<h1>`/`<h2>` (or a `<hr>`);
+  those underline runs are now backslash-escaped too.
 - **A `fast`-profile audit with the static pre-scanner explicitly disabled
   analysed nothing and reported SAFE.** Lean mode (on by default under
   `profile: fast`) restricts the attacker to files the pre-scanner tagged with a
@@ -4069,6 +4081,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Security
 
+- **`RegexSecretScrubber` did not redact the `api_token` key.** The inline/YAML
+  credential-key set covered `auth_token`, `access_token`, and `api_key` but not
+  `api_token` (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`),
+  so a plaintext `api_token`/`api-token` value reached the LLM prompt verbatim.
+  Both the `inline_assignment` and `multiline_assignment` alternations now
+  include `api[_-]?token`. The bare `token`, `authorization`, and `bearer` keys
+  stay excluded — their values are commonly non-secret
+  (`authorization: enabled`, a CSRF `token`), so redacting them would
+  over-scrub.
 - **`RegexSecretScrubber` passed several common credential shapes to the LLM
   verbatim.** The scrubber
   (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) — the

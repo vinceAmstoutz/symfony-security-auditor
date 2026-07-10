@@ -156,8 +156,25 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
     {
         $sanitized = TerminalTextSanitizer::stripControlCharacters(mb_scrub($text, 'UTF-8'));
         $backslashesEscaped = str_replace('\\', '\\\\', $sanitized);
+        $markerEscaped = str_replace(['`', '~', '#', '<', '>', '[', ']'], ['\\`', '\\~', '\\#', '&lt;', '&gt;', '\\[', '\\]'], $backslashesEscaped);
 
-        return str_replace(['`', '~', '#', '<', '>', '[', ']'], ['\\`', '\\~', '\\#', '&lt;', '&gt;', '\\[', '\\]'], $backslashesEscaped);
+        return $this->escapeSetextUnderlines($markerEscaped);
+    }
+
+    /**
+     * Escaping `#` (see {@see self::escapeFences()}) blocks a forged ATX
+     * heading, but CommonMark also promotes a paragraph line to a heading when
+     * the *next* line is a run of only `=` (H1) or `-` (H2) — a setext
+     * underline — with no `#` involved. A multi-paragraph
+     * description/attack-vector/remediation could therefore still forge a fake
+     * section (or, via a `-` run, a `<hr>` thematic break) mid-finding. Any line
+     * consisting solely of `=`/`-` (with up to three leading spaces, the
+     * CommonMark limit) has its run backslash-escaped so the line is no longer a
+     * valid underline yet still renders as the literal characters.
+     */
+    private function escapeSetextUnderlines(string $text): string
+    {
+        return preg_replace('/(^|\n)( {0,3})(=+|-+)([ \t]*)(?=\n|$)/', '$1$2\\\\$3$4', $text) ?? $text;
     }
 
     /**
@@ -201,11 +218,19 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
         return [] === $matches[0] ? 0 : max(array_map(\strlen(...), $matches[0]));
     }
 
+    /**
+     * A bare `\r` (0x0D not part of a `\r\n`) is a CommonMark line ending, so
+     * an LLM-sourced code snippet containing one would split inside a "line"
+     * and land the remainder at column 0 — outside the four-space indent — as
+     * live Markdown/HTML. Control characters are stripped first (the same
+     * {@see TerminalTextSanitizer} defense the inline paths apply), so every
+     * retained `\n`-delimited line stays inside the indented code block.
+     */
     private function codeBlock(string $text): string
     {
         return implode("\n", array_map(
             static fn (string $line): string => \sprintf('    %s', $line),
-            explode("\n", mb_scrub($text, 'UTF-8')),
+            explode("\n", TerminalTextSanitizer::stripControlCharacters(mb_scrub($text, 'UTF-8'))),
         ));
     }
 }

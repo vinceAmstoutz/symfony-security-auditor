@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
@@ -353,6 +354,54 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
 
         self::assertStringNotContainsString("\n\n## Audit complete", $output);
         self::assertStringContainsString('\\#\\# Audit complete', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_strips_a_lone_carriage_return_in_the_vulnerable_code_so_it_cannot_break_out_of_the_code_block(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Real SQLi', 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            "SAFE\r# FORGED\r<img src=x onerror=alert(1)>",
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringNotContainsString("\r", $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('setextUnderlineCases')]
+    public function test_render_neutralizes_a_setext_underline_in_a_description_so_it_cannot_forge_a_fake_heading(string $underline, string $expectedEscaped): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Real SQLi', 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative("Real description.\n\nFORGED HEADING\n".$underline."\n\nprose", 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString($expectedEscaped, $output);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function setextUnderlineCases(): iterable
+    {
+        yield 'H1 equals underline' => ['=====', '\\====='];
+        yield 'H2 dash underline' => ['-----', '\\-----'];
     }
 
     /**

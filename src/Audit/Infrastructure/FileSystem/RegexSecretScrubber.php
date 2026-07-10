@@ -48,8 +48,8 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         SecretPatternLabel::PemPrivateKey->value => '/-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----/',
         SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]*://)[^:@/\s]*:[^/\s]+@~i',
         SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|DSN)(?:_[A-Z0-9]+)*)\s*=[ \t]*(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\2)[^\n])*+\2|\S+)/m',
-        SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|passwd|pwd|secret|credentials|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key)["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:[ \t]+[A-Za-z0-9]+)*))/i',
-        SecretPatternLabel::MultilineAssignment->value => '/(["\']?(?:password|passwd|pwd|secret|credentials|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key)["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi',
+        SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|passwd|pwd|secret|credentials|api[_-]?key|api[_-]?token|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key)["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:[ \t]+[A-Za-z0-9]+)*))/i',
+        SecretPatternLabel::MultilineAssignment->value => '/(["\']?(?:password|passwd|pwd|secret|credentials|api[_-]?key|api[_-]?token|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key)["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi',
     ];
 
     /**

@@ -218,6 +218,8 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'pwd' => ['pwd'];
         yield 'private_key' => ['private_key'];
         yield 'auth_token' => ['auth_token'];
+        yield 'api_token' => ['api_token'];
+        yield 'api-token' => ['api-token'];
         yield 'credentials' => ['credentials'];
     }
 
