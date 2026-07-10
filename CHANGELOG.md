@@ -200,8 +200,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   threaded into the pipeline (`RunAuditUseCase::execute()` fifth parameter →
   `AuditContext::acceptedFingerprints()`), and `AuditOrchestrator` drops
   matching attacker findings _before_ the review phase — each unique skip
-  streams once as `⚖ ⤳ baseline-accepted <type> — file:line (review skipped)` on
-  a decorated terminal or `[BASELINE-SKIPPED] <type> — file:line` in plain
+  streams once as `⚖ ⤳ baseline-accepted <type> — file:line (review skipped)`
+  on a decorated terminal or `[BASELINE-SKIPPED] <type> — file:line` in plain
   output (new stable progress-event value `baseline.finding.skipped`), and the
   total lands in the `audit.baseline_skipped` context metadata.
   `--generate-baseline` now writes one JSON object per finding — `fingerprint`,
