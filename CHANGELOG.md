@@ -628,6 +628,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Under the `fast` profile, a controller reading request input through a
+  modern accessor (`$request->toArray()`, `$request->getPayload()`,
+  `$request->cookies`/`files`/`headers`, `$request->request->all()`) was dropped
+  from the audit.** The pre-scanner's `request_get` marker
+  (`src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`) matched only a
+  narrow method allow-list (`get`/`getContent`/`query->get`/`request->get`/
+  `attributes->get`), while `RegexCodeSlicer::SECURITY_TOKENS` retains the bare
+  `$request->` substring — so a JSON-API controller whose only marker-worthy
+  line was `$form->submit($request->toArray())` (mass assignment) or
+  `$request->getPayload()->get('id')` (IDOR) produced zero markers and was
+  dropped by lean mode before the slicer ran, even though the slicer would have
+  kept the line. `request_get` now matches any `$request->` access, mirroring
+  the slicer token; `CACHE_VERSION` bumps to 22.
 - **Under the `fast` profile, a PHP file whose only sink was a dynamic
   `include`/`require` was dropped from the audit.** The pre-scanner's
   generic-PHP `file_sink` marker

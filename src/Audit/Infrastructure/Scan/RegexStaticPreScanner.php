@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 21;
+    public const int CACHE_VERSION = 22;
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -127,8 +127,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         ],
         ProjectFileType::CONTROLLER->value => [
             'request_get' => [
-                'regex' => '/\$request->(?:get|getContent|query->get|request->get|attributes->get)\s*\(/',
-                'description' => 'Request input read — trace flow to dangerous sinks',
+                'regex' => '/\$request->/',
+                'description' => 'Request object access (query/body/payload/toArray/cookies/headers/files) — request input read; trace flow to dangerous sinks',
             ],
             'redirect_with_input' => [
                 'regex' => '/->redirect\s*\(.{0,200}\$/s',

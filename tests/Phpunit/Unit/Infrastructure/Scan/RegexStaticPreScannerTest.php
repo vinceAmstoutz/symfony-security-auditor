@@ -467,6 +467,18 @@ final class RegexStaticPreScannerTest extends TestCase
             'src/Twig/Components/ProductList.php',
             "<?php\n#[AsLiveComponent]\nclass ProductList extends AbstractController {\n    #[Route('/components/product-list/export')]\n    public function export(Request \$request): void { \$this->dump(\$request->query->get('sort')); }\n}",
         ];
+        yield 'controller decoding the json body with toArray()' => [
+            'src/Controller/RegistrationController.php',
+            "<?php\nclass RegistrationController extends AbstractController {\n    public function register(Request \$request): JsonResponse { \$form->submit(\$request->toArray()); return \$this->json([]); }\n}",
+        ];
+        yield 'controller reading the modern request payload bag' => [
+            'src/Controller/OrderController.php',
+            "<?php\nclass OrderController extends AbstractController {\n    public function show(Request \$request): JsonResponse { return \$this->json(\$this->repo->find(\$request->getPayload()->get('id'))); }\n}",
+        ];
+        yield 'controller reading a request cookie' => [
+            'src/Controller/DocController.php',
+            "<?php\nclass DocController extends AbstractController {\n    public function up(Request \$request): JsonResponse { return \$this->json(\$request->cookies->get('ref')); }\n}",
+        ];
     }
 
     /**
