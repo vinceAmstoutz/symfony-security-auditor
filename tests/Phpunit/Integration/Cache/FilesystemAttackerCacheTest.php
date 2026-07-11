@@ -400,6 +400,39 @@ final class FilesystemAttackerCacheTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_get_logs_a_warning_with_the_path_when_refusing_a_symlinked_cache_file(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
+        $expectedKey = hash('sha256', $expectedSignature);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
+
+        $plantedTarget = sys_get_temp_dir().'/attacker_cache_symlink_log_target_'.uniqid('', true);
+        file_put_contents($plantedTarget, json_encode([['type' => 'PLANTED-BY-SYMLINK']]));
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($plantedTarget, $expectedPath);
+
+        /** @var list<array{string, array<string, string>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        try {
+            (new FilesystemAttackerCache($this->cacheDir, new Filesystem(), $logger))->get([$projectFile]);
+        } finally {
+            unlink($plantedTarget);
+        }
+
+        self::assertSame([['Attacker cache entry path was a symlink, ignoring', ['path' => $expectedPath]]], $warnings);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_get_refuses_to_read_through_a_symlinked_shard_directory(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');

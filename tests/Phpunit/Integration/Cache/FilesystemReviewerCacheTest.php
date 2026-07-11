@@ -449,6 +449,43 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_get_logs_a_warning_with_the_path_when_refusing_a_symlinked_cache_file(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $codeContext = '<?php echo 1;';
+        $finding = $vulnerability->toArray();
+        unset($finding['id'], $finding['detected_at']);
+        $expectedKey = hash('sha256', json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
+
+        $plantedTarget = sys_get_temp_dir().'/reviewer_cache_symlink_log_target_'.uniqid('', true);
+        file_put_contents($plantedTarget, json_encode(['accepted' => false]));
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($plantedTarget, $expectedPath);
+
+        /** @var list<array{string, array<string, string>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        try {
+            (new FilesystemReviewerCache($this->cacheDir, new Filesystem(), $logger))->get($vulnerability, $codeContext);
+        } finally {
+            unlink($plantedTarget);
+        }
+
+        self::assertSame([['Reviewer cache entry path was a symlink, ignoring', ['path' => $expectedPath]]], $warnings);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_get_refuses_to_read_through_a_symlinked_shard_directory(): void
     {
         $vulnerability = $this->makeVulnerability('src/A.php');
