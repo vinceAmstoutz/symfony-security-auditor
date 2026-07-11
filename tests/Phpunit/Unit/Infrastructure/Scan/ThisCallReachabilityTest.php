@@ -204,6 +204,67 @@ final class ThisCallReachabilityTest extends TestCase
         self::assertSame(['one', 'two'], $this->stringLiteralsIn($body));
     }
 
+    public function test_it_includes_the_bodies_of_every_helper_a_method_calls_not_only_the_last(): void
+    {
+        $class = $this->parseClass(<<<'PHP'
+            <?php
+            final class Example {
+                public function action(): void {
+                    $this->helperOne();
+                    $this->helperTwo();
+                }
+                private function helperOne(): void {
+                    echo 'one';
+                }
+                private function helperTwo(): void {
+                    echo 'two';
+                }
+            }
+            PHP);
+
+        $body = $this->thisCallReachability->reachableBody($this->methodNamed($class, 'action'), $this->methodsByName($class));
+
+        self::assertSame(['one', 'two'], $this->stringLiteralsIn($body));
+    }
+
+    public function test_it_ignores_a_method_call_on_a_variable_other_than_this(): void
+    {
+        $class = $this->parseClass(<<<'PHP'
+            <?php
+            final class Example {
+                public function action(): void {
+                    $other->helper();
+                }
+                private function helper(): void {
+                    echo 'should-not-appear';
+                }
+            }
+            PHP);
+
+        $body = $this->thisCallReachability->reachableBody($this->methodNamed($class, 'action'), $this->methodsByName($class));
+
+        self::assertSame([], $this->stringLiteralsIn($body));
+    }
+
+    public function test_it_ignores_a_static_call_to_another_class_even_when_the_method_name_matches_a_local_one(): void
+    {
+        $class = $this->parseClass(<<<'PHP'
+            <?php
+            final class Example {
+                public function action(): void {
+                    OtherClass::helper();
+                }
+                private static function helper(): void {
+                    echo 'should-not-appear';
+                }
+            }
+            PHP);
+
+        $body = $this->thisCallReachability->reachableBody($this->methodNamed($class, 'action'), $this->methodsByName($class));
+
+        self::assertSame([], $this->stringLiteralsIn($body));
+    }
+
     private function parseClass(string $source): Class_
     {
         $parserFactory = new ParserFactory();

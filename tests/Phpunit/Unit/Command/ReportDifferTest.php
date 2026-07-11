@@ -65,6 +65,26 @@ final class ReportDifferTest extends TestCase
      * @throws ReportFileNotReadableException
      * @throws MalformedReportFileException
      */
+    public function test_diff_reports_every_distinct_new_fingerprint_not_only_the_last(): void
+    {
+        $previous = $this->writeReport('previous.json', []);
+        $current = $this->writeReport('current.json', [
+            $this->vulnerability('SQL Injection'),
+            $this->vulnerability('Mass Assignment'),
+        ]);
+
+        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+
+        self::assertCount(2, $reportDiff->newFindings);
+        $titles = array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $reportDiff->newFindings);
+        self::assertContains('SQL Injection', $titles);
+        self::assertContains('Mass Assignment', $titles);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
     public function test_diff_classifies_a_finding_only_in_the_previous_report_as_fixed(): void
     {
         $previous = $this->writeReport('previous.json', [$this->vulnerability('SQL Injection')]);
