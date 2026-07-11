@@ -157,7 +157,7 @@ final readonly class AuditReport
         $kept = [];
         foreach ($this->vulnerabilities as $vulnerability) {
             $fingerprint = $vulnerability->fingerprint();
-            if (($remainingByFingerprint[$fingerprint] ?? 0) > 0) {
+            if (\array_key_exists($fingerprint, $remainingByFingerprint) && $remainingByFingerprint[$fingerprint] > 0) {
                 --$remainingByFingerprint[$fingerprint];
 
                 continue;
@@ -203,10 +203,7 @@ final readonly class AuditReport
 
     public function durationSeconds(): float
     {
-        $secondsDelta = $this->reportIdentity->completedAt->getTimestamp() - $this->reportIdentity->startedAt->getTimestamp();
-        $microsecondsDelta = (int) $this->reportIdentity->completedAt->format('u') - (int) $this->reportIdentity->startedAt->format('u');
-
-        return $secondsDelta + $microsecondsDelta / 1_000_000;
+        return $this->reportIdentity->durationSeconds();
     }
 
     public function totalVulnerabilities(): int
