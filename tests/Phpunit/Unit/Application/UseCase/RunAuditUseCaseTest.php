@@ -377,6 +377,9 @@ final class RunAuditUseCaseTest extends TestCase
                 return 'throwing';
             }
 
+            /**
+             * @throws LLMProviderException
+             */
             #[Override]
             public function process(AuditContext $auditContext): void
             {

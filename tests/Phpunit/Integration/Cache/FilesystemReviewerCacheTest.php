@@ -445,6 +445,7 @@ final class FilesystemReviewerCacheTest extends TestCase
     }
 
     /**
+     * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException

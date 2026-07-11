@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkCont
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\SequentialChunkAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
@@ -39,6 +40,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\Re
 final class SequentialChunkAnalyzerTest extends TestCase
 {
     /**
+     * @throws BudgetExceededException
      * @throws InvalidProjectFileException
      */
     public function test_an_llm_provider_exception_marks_the_chunk_after_the_failing_one_as_errored(): void

@@ -398,6 +398,7 @@ final class FilesystemAttackerCacheTest extends TestCase
     }
 
     /**
+     * @throws InvalidCacheConfigurationException
      * @throws InvalidProjectFileException
      */
     public function test_get_logs_a_warning_with_the_path_when_refusing_a_symlinked_cache_file(): void
