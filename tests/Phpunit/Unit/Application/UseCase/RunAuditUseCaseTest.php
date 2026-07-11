@@ -357,6 +357,7 @@ final class RunAuditUseCaseTest extends TestCase
         );
 
         $runAuditUseCase->execute($this->tmpDir);
+
         $auditReport = $runAuditUseCase->execute($this->tmpDir);
 
         self::assertSame(10.0, $auditReport->cost()->estimatedCostUsd());

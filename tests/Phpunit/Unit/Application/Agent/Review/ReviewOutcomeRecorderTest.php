@@ -200,11 +200,11 @@ final class ReviewOutcomeRecorderTest extends TestCase
      */
     public function test_a_null_verdict_records_the_rejected_finding_with_the_coverage_recorder(): void
     {
-        $coverageRecorder = new RecordingCoverageRecorder();
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
 
-        $rejected = $this->recorder(self::createStub(ProgressReporterInterface::class))->recordVerdict($this->vulnerability(), null, $coverageRecorder);
+        $vulnerability = $this->recorder(self::createStub(ProgressReporterInterface::class))->recordVerdict($this->vulnerability(), null, $recordingCoverageRecorder);
 
-        self::assertSame([$rejected], $coverageRecorder->reviewed);
+        self::assertSame([$vulnerability], $recordingCoverageRecorder->reviewed);
     }
 
     /**
@@ -214,11 +214,11 @@ final class ReviewOutcomeRecorderTest extends TestCase
      */
     public function test_an_errored_review_records_the_finding_with_the_coverage_recorder(): void
     {
-        $coverageRecorder = new RecordingCoverageRecorder();
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
 
-        $errored = $this->recorder(self::createStub(ProgressReporterInterface::class))->recordReviewError($this->vulnerability(), new RuntimeException('llm down'), $coverageRecorder);
+        $vulnerability = $this->recorder(self::createStub(ProgressReporterInterface::class))->recordReviewError($this->vulnerability(), new RuntimeException('llm down'), $recordingCoverageRecorder);
 
-        self::assertSame([$errored], $coverageRecorder->reviewed);
+        self::assertSame([$vulnerability], $recordingCoverageRecorder->reviewed);
     }
 
     /**
@@ -229,15 +229,15 @@ final class ReviewOutcomeRecorderTest extends TestCase
      */
     public function test_a_parse_failure_records_the_errored_finding_with_the_coverage_recorder(): void
     {
-        $coverageRecorder = new RecordingCoverageRecorder();
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
 
-        $errored = $this->recorder(self::createStub(ProgressReporterInterface::class))->applyResponse(
+        $vulnerability = $this->recorder(self::createStub(ProgressReporterInterface::class))->applyResponse(
             $this->vulnerability(),
             LLMResponse::of('not json {{{', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)),
-            $coverageRecorder,
+            $recordingCoverageRecorder,
         );
 
-        self::assertSame([$errored], $coverageRecorder->reviewed);
+        self::assertSame([$vulnerability], $recordingCoverageRecorder->reviewed);
     }
 
     private function expectingReviewedEvent(bool $accepted): ProgressReporterInterface

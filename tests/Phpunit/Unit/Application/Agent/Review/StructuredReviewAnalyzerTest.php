@@ -69,7 +69,7 @@ final class StructuredReviewAnalyzerTest extends TestCase
         );
 
         $verdictApplier = new VerdictApplier(new NullLogger());
-        $analyzer = new StructuredReviewAnalyzer(
+        $structuredReviewAnalyzer = new StructuredReviewAnalyzer(
             $llmClient,
             new ReviewerPromptBuilder(useStructuredCollection: true),
             $reviewerVerdictCache,
@@ -79,7 +79,7 @@ final class StructuredReviewAnalyzerTest extends TestCase
             4,
         );
 
-        $reviewed = $analyzer->analyze([$vulnerability], [], new NullCoverageRecorder(), true);
+        $reviewed = $structuredReviewAnalyzer->analyze([$vulnerability], [], new NullCoverageRecorder(), true);
 
         self::assertTrue($reviewed[0]->isReviewerValidated());
     }

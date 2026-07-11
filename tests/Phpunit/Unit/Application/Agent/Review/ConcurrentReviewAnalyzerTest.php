@@ -62,7 +62,7 @@ final class ConcurrentReviewAnalyzerTest extends TestCase
             },
         );
 
-        $analyzer = new ConcurrentReviewAnalyzer(
+        $concurrentReviewAnalyzer = new ConcurrentReviewAnalyzer(
             $llmClient,
             new ReviewerPromptBuilder(),
             new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()),
@@ -70,7 +70,7 @@ final class ConcurrentReviewAnalyzerTest extends TestCase
             1,
         );
 
-        $analyzer->analyze([$this->vulnerabilityAt('src/A.php'), $this->vulnerabilityAt('src/B.php')], [], new NullCoverageRecorder(), false);
+        $concurrentReviewAnalyzer->analyze([$this->vulnerabilityAt('src/A.php'), $this->vulnerabilityAt('src/B.php')], [], new NullCoverageRecorder(), false);
 
         self::assertSame([1, 1], $batchSizes);
     }
@@ -99,7 +99,7 @@ final class ConcurrentReviewAnalyzerTest extends TestCase
             ),
         );
 
-        $analyzer = new ConcurrentReviewAnalyzer(
+        $concurrentReviewAnalyzer = new ConcurrentReviewAnalyzer(
             $llmClient,
             new ReviewerPromptBuilder(),
             new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()),
@@ -107,7 +107,7 @@ final class ConcurrentReviewAnalyzerTest extends TestCase
             2,
         );
 
-        $reviewed = $analyzer->analyze($vulnerabilities, [], new NullCoverageRecorder(), false);
+        $reviewed = $concurrentReviewAnalyzer->analyze($vulnerabilities, [], new NullCoverageRecorder(), false);
 
         self::assertSame(
             ['src/A.php', 'src/B.php', 'src/C.php', 'src/D.php'],

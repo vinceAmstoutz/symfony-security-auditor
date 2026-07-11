@@ -55,14 +55,14 @@ final class BatchReviewAnalyzerTest extends TestCase
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('completeWithTools')->willThrowException(new LLMProviderException('platform gone'));
 
-        $coverageRecorder = new RecordingCoverageRecorder();
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
 
         $providerFailed = false;
         try {
             $this->analyzer($llmClient)->analyze(
                 [$this->vulnerabilityAt('src/A.php'), $this->vulnerabilityAt('src/B.php')],
                 [],
-                new ReviewBatchSettings(5, true, false, $coverageRecorder, null),
+                new ReviewBatchSettings(5, true, false, $recordingCoverageRecorder, null),
             );
         } catch (LLMProviderException) {
             $providerFailed = true;
@@ -74,7 +74,7 @@ final class BatchReviewAnalyzerTest extends TestCase
                 ['stage' => 'reviewer', 'filePath' => 'src/A.php', 'status' => 'errored'],
                 ['stage' => 'reviewer', 'filePath' => 'src/B.php', 'status' => 'errored'],
             ],
-            $coverageRecorder->coverage,
+            $recordingCoverageRecorder->coverage,
         );
     }
 

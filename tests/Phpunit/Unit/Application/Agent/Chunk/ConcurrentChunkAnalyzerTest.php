@@ -66,7 +66,7 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
         $recordingCoverageRecorder = new RecordingCoverageRecorder();
         $concurrentChunkAnalyzer = $this->makeAnalyzer($llmClient, 4, $cache);
 
-        $concurrentChunkAnalyzer->analyze([[$this->makeFile('src/A.php')]], $this->request(), $recordingCoverageRecorder, new RiskMarkerIndex([]), null);
+        $concurrentChunkAnalyzer->analyze([[$this->makeFile('src/A.php')]], $this->request(), $recordingCoverageRecorder, new RiskMarkerIndex([]));
 
         self::assertSame(['cached-finding'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $recordingCoverageRecorder->found));
     }
@@ -99,7 +99,6 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
             $this->request(),
             new RecordingCoverageRecorder(),
             new RiskMarkerIndex([]),
-            null,
         );
 
         self::assertSame([1, 1], $requestCounts);
@@ -138,7 +137,6 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
             $this->request(),
             new RecordingCoverageRecorder(),
             new RiskMarkerIndex([]),
-            null,
         );
 
         self::assertCount(2, $vulnerabilities);
@@ -199,7 +197,7 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
 
         $concurrentChunkAnalyzer = $this->makeAnalyzer($llmClient, 4, null, $logger);
 
-        $concurrentChunkAnalyzer->analyze([[$this->makeFile('src/A.php')]], $this->request(), $throwingCoverageRecorder, new RiskMarkerIndex([]), null);
+        $concurrentChunkAnalyzer->analyze([[$this->makeFile('src/A.php')]], $this->request(), $throwingCoverageRecorder, new RiskMarkerIndex([]));
 
         self::assertContains(
             ['Finalizing an attacker chunk result failed; the chunk is recorded as errored and its siblings in the same window are preserved.', ['error' => 'coverage sink unavailable']],

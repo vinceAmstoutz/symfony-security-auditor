@@ -202,8 +202,8 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             $byId[$vulnerability->id()] = $vulnerability;
         }
 
-        foreach ($recoveredFindings as $vulnerability) {
-            $byId[$vulnerability->id()] = $vulnerability;
+        foreach ($recoveredFindings as $recoveredFinding) {
+            $byId[$recoveredFinding->id()] = $recoveredFinding;
         }
 
         return array_values($byId);

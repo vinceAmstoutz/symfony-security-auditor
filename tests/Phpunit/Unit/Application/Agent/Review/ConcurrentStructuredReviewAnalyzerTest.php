@@ -62,7 +62,7 @@ final class ConcurrentStructuredReviewAnalyzerTest extends TestCase
             },
         );
 
-        $analyzer = new ConcurrentStructuredReviewAnalyzer(
+        $concurrentStructuredReviewAnalyzer = new ConcurrentStructuredReviewAnalyzer(
             $llmClient,
             new ReviewerPromptBuilder(useStructuredCollection: true),
             new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()),
@@ -73,7 +73,7 @@ final class ConcurrentStructuredReviewAnalyzerTest extends TestCase
             4,
         );
 
-        $analyzer->analyze([$this->vulnerabilityAt('src/A.php'), $this->vulnerabilityAt('src/B.php')], [], new NullCoverageRecorder(), false);
+        $concurrentStructuredReviewAnalyzer->analyze([$this->vulnerabilityAt('src/A.php'), $this->vulnerabilityAt('src/B.php')], [], new NullCoverageRecorder(), false);
 
         self::assertSame([1, 1], $batchSizes);
     }

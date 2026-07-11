@@ -130,11 +130,11 @@ final class BatchVerdictApplierTest extends TestCase
      */
     public function test_reject_batch_records_every_rejected_finding_with_the_coverage_recorder(): void
     {
-        $coverageRecorder = $this->recordingCoverageRecorder();
+        $recordingCoverageRecorder = $this->recordingCoverageRecorder();
 
-        $this->applier()->rejectBatch([$this->vulnerability(), $this->vulnerability(title: 'second')], $coverageRecorder);
+        $this->applier()->rejectBatch([$this->vulnerability(), $this->vulnerability(title: 'second')], $recordingCoverageRecorder);
 
-        self::assertCount(2, $coverageRecorder->reviewed);
+        self::assertCount(2, $recordingCoverageRecorder->reviewed);
     }
 
     /**
@@ -144,11 +144,11 @@ final class BatchVerdictApplierTest extends TestCase
      */
     public function test_an_implicit_rejection_records_the_rejected_finding_with_the_coverage_recorder(): void
     {
-        $coverageRecorder = $this->recordingCoverageRecorder();
+        $recordingCoverageRecorder = $this->recordingCoverageRecorder();
 
-        $this->applier()->applyBatchReview([$this->vulnerability()], [], $coverageRecorder);
+        $this->applier()->applyBatchReview([$this->vulnerability()], [], $recordingCoverageRecorder);
 
-        self::assertCount(1, $coverageRecorder->reviewed);
+        self::assertCount(1, $recordingCoverageRecorder->reviewed);
     }
 
     /**
