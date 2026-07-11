@@ -37,6 +37,13 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
     public const int CACHE_VERSION = 26;
 
     /**
+     * Detects the `s` (DOTALL) flag among a PCRE pattern's trailing modifier
+     * letters — the run of letters after the closing delimiter, which is never
+     * itself a letter, so no in-pattern `s` is mistaken for the modifier.
+     */
+    private const string TRAILING_DOT_ALL_MODIFIER = '/s[a-zA-Z]*$/';
+
+    /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
      */
     public function __construct(
@@ -437,20 +444,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      */
     private function hasDotAllModifier(string $regex): bool
     {
-        \assert('' !== $regex, 'A configured regex pattern must not be empty');
-
-        $closingDelimiter = match ($regex[0]) {
-            '(' => ')',
-            '{' => '}',
-            '[' => ']',
-            '<' => '>',
-            default => $regex[0],
-        };
-
-        $closingPosition = strrpos($regex, $closingDelimiter, 1);
-        \assert(false !== $closingPosition, 'A well-formed PCRE pattern contains its closing delimiter');
-
-        return str_contains(substr($regex, $closingPosition + 1), 's');
+        return 1 === preg_match(self::TRAILING_DOT_ALL_MODIFIER, $regex);
     }
 
     /**
