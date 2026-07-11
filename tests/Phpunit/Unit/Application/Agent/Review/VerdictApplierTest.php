@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Review;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\VerdictApplier;
@@ -61,13 +62,25 @@ final class VerdictApplierTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    public function test_it_treats_the_string_false_as_rejected_instead_of_a_truthy_string(): void
+    #[DataProvider('stringifiedFalseCases')]
+    public function test_it_treats_a_stringified_false_as_rejected_regardless_of_case_or_surrounding_whitespace(string $accepted): void
     {
         $verdictApplier = new VerdictApplier(new NullLogger());
 
-        $vulnerability = $verdictApplier->apply($this->vulnerability(), ['accepted' => 'false']);
+        $vulnerability = $verdictApplier->apply($this->vulnerability(), ['accepted' => $accepted]);
 
         self::assertFalse($vulnerability->isReviewerValidated());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function stringifiedFalseCases(): iterable
+    {
+        yield 'lowercase' => ['false'];
+        yield 'uppercase' => ['FALSE'];
+        yield 'padded' => [' false '];
+        yield 'padded uppercase' => ['  FALSE  '];
     }
 
     /**

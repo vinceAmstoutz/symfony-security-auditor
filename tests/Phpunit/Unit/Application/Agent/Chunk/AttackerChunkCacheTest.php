@@ -48,4 +48,29 @@ final class AttackerChunkCacheTest extends TestCase
 
         self::assertSame('Failed to write attacker cache entry', $warnings[0][0]);
     }
+
+    public function test_store_records_the_underlying_error_message_in_the_warning_context(): void
+    {
+        $attackerCache = self::createStub(AttackerCacheInterface::class);
+        $attackerCache->method('store')->willThrowException(new RuntimeException('disk full'));
+
+        /** @var list<array{string, array<string, mixed>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $attackerChunkCache = new AttackerChunkCache(
+            $attackerCache,
+            new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+            $logger,
+        );
+
+        $attackerChunkCache->store([], 'context', []);
+
+        self::assertSame(['error' => 'disk full'], $warnings[0][1]);
+    }
 }
