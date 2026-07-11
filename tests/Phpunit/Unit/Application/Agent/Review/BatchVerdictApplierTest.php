@@ -32,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecor
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 
 final class BatchVerdictApplierTest extends TestCase
 {
@@ -127,6 +128,34 @@ final class BatchVerdictApplierTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_reject_batch_records_every_rejected_finding_with_the_coverage_recorder(): void
+    {
+        $coverageRecorder = $this->recordingCoverageRecorder();
+
+        $this->applier()->rejectBatch([$this->vulnerability(), $this->vulnerability(title: 'second')], $coverageRecorder);
+
+        self::assertCount(2, $coverageRecorder->reviewed);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_implicit_rejection_records_the_rejected_finding_with_the_coverage_recorder(): void
+    {
+        $coverageRecorder = $this->recordingCoverageRecorder();
+
+        $this->applier()->applyBatchReview([$this->vulnerability()], [], $coverageRecorder);
+
+        self::assertCount(1, $coverageRecorder->reviewed);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_mark_batch_errored_marks_every_finding_as_not_validated(): void
     {
         $errored = $this->applier()->markBatchErrored([$this->vulnerability()], new NullCoverageRecorder());
@@ -165,6 +194,11 @@ final class BatchVerdictApplierTest extends TestCase
             new NullCoverageRecorder(),
             [$vulnerability->id() => 'context'],
         );
+    }
+
+    private function recordingCoverageRecorder(): RecordingCoverageRecorder
+    {
+        return new RecordingCoverageRecorder();
     }
 
     private function applier(?ReviewerCacheInterface $reviewerCache = null): BatchVerdictApplier
