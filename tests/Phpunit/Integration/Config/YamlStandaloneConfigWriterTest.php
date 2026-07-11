@@ -67,6 +67,24 @@ final class YamlStandaloneConfigWriterTest extends TestCase
      * @throws StandaloneConfigWriteException
      * @throws UnsafeStandaloneConfigWriteException
      */
+    public function test_it_tightens_permissions_on_a_pre_existing_loosely_permissioned_config_file(): void
+    {
+        $filesystem = new Filesystem();
+        $filesystem->mkdir(\dirname($this->configFile));
+        $filesystem->dumpFile($this->configFile, "old: value\n");
+        $filesystem->chmod($this->configFile, 0o644);
+
+        (new YamlStandaloneConfigWriter($filesystem))->write($this->configFile, ['model' => 'claude-opus-4-8']);
+
+        $permissions = fileperms($this->configFile);
+        self::assertNotFalse($permissions);
+        self::assertSame('0600', substr(\sprintf('%o', $permissions), -4));
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
     public function test_the_config_file_already_has_owner_only_permissions_before_its_content_is_written(): void
     {
         $filesystem = new class extends Filesystem {
