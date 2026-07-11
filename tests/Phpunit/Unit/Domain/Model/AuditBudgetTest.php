@@ -80,7 +80,7 @@ final class AuditBudgetTest extends TestCase
     public function test_for_cost_rejects_zero(): void
     {
         $this->expectException(InvalidAuditBudgetException::class);
-        $this->expectExceptionMessage('maxCostUsd must be > 0.0');
+        $this->expectExceptionMessageMatches('/^maxCostUsd must be > 0\.0, got 0\.000000$/');
 
         AuditBudget::forCost(0.0);
     }

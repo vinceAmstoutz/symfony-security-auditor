@@ -120,7 +120,7 @@ final class AuditContext implements CoverageRecorderInterface
     {
         $this->remainingBaselineBudget ??= array_count_values($this->acceptedFingerprints);
 
-        if (($this->remainingBaselineBudget[$fingerprint] ?? 0) <= 0) {
+        if (!\array_key_exists($fingerprint, $this->remainingBaselineBudget) || $this->remainingBaselineBudget[$fingerprint] <= 0) {
             return false;
         }
 

@@ -120,6 +120,17 @@ final class AuditCostTest extends TestCase
     /**
      * @throws InvalidAuditCostException
      */
+    public function test_negative_cost_message_reports_the_value_to_six_decimals(): void
+    {
+        $this->expectException(InvalidAuditCostException::class);
+        $this->expectExceptionMessageMatches('/^estimatedCostUsd must be >= 0\.0, got -1\.000000$/');
+
+        AuditCost::of(0, 0, -1.0, 'm');
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     */
     public function test_negative_output_tokens_rejected(): void
     {
         $this->expectException(InvalidAuditCostException::class);
