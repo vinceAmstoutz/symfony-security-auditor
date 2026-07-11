@@ -68,9 +68,7 @@ final readonly class RetryAfterHeaderParser
     private function secondsFromMessage(string $message): ?int
     {
         if (1 === preg_match('/retry-after\s*:\s*(\d+)/i', $message, $matches)) {
-            $seconds = (int) $matches[1];
-
-            return $seconds > 0 ? $seconds : null;
+            return $this->positiveSecondsOrNull((int) $matches[1]);
         }
 
         if (1 === preg_match('/retry-after\s*:\s*([A-Za-z]{3},\s*\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\s+\d{2}:\d{2}:\d{2}\s+GMT)/i', $message, $matches)) {
@@ -79,11 +77,14 @@ final readonly class RetryAfterHeaderParser
                 return null;
             }
 
-            $seconds = $timestamp - time();
-
-            return $seconds > 0 ? $seconds : null;
+            return $this->positiveSecondsOrNull($timestamp - time());
         }
 
         return null;
+    }
+
+    private function positiveSecondsOrNull(int $seconds): ?int
+    {
+        return $seconds > 0 ? $seconds : null;
     }
 }

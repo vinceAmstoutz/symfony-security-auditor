@@ -156,8 +156,9 @@ final readonly class ConcurrentChunkAnalyzer
         $totalChunks = \count($chunks);
         $allVulnerabilities = [];
         $totalDropsByReason = [];
+        $chunkResults = $cachedResults + $dispatchedResults;
         foreach (array_keys($chunks) as $index) {
-            $chunkResult = $cachedResults[$index] ?? $dispatchedResults[$index];
+            $chunkResult = $chunkResults[$index];
             ChunkFindingProgress::report($this->progressReporter, $chunkResult->vulnerabilities());
             $this->reportChunkCompleted($index, $totalChunks);
             $allVulnerabilities = [...$allVulnerabilities, ...$chunkResult->vulnerabilities()];

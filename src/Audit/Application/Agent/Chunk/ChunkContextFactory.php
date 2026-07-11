@@ -169,10 +169,6 @@ final readonly class ChunkContextFactory
      */
     private function restoreRiskMarkerLines(ProjectFile $projectFile, string $slicedContent, array $markers): string
     {
-        if ([] === $markers) {
-            return $slicedContent;
-        }
-
         $originalLines = explode("\n", $projectFile->content());
         $slicedLines = explode("\n", $slicedContent);
 
