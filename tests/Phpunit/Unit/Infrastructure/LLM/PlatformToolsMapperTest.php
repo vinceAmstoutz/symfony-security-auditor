@@ -50,6 +50,28 @@ final class PlatformToolsMapperTest extends TestCase
     /**
      * @throws InvalidToolDefinitionException
      */
+    public function test_it_maps_a_nested_object_property_without_properties_as_a_bare_object(): void
+    {
+        $toolDefinition = new ToolDefinition(
+            name: 'record_vulnerability',
+            description: 'records a finding',
+            parametersSchema: [
+                'type' => 'object',
+                'properties' => ['meta' => ['type' => 'object', 'description' => 'freeform']],
+                'required' => [],
+            ],
+        );
+
+        $tool = PlatformToolsMapper::map([$toolDefinition])[0];
+
+        $meta = $this->parametersOf($tool)['properties']['meta'];
+        self::assertSame('object', $meta['type']);
+        self::assertArrayNotHasKey('properties', $meta);
+    }
+
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_it_preserves_the_enum_constraint(): void
     {
         $toolDefinition = new ToolDefinition(
