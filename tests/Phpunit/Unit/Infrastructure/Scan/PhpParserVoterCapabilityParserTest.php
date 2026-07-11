@@ -91,6 +91,31 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_reads_capabilities_from_supports_in_preference_to_vote(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Security;
+            final class DualVoter {
+                public function supports(string $attribute, mixed $subject): bool {
+                    return in_array($attribute, ['EDIT'], true);
+                }
+                public function vote(mixed $token, mixed $subject, array $attributes): int {
+                    return in_array('DELETE', $attributes, true) ? 1 : 0;
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Security/DualVoter.php', '/app/x', $source);
+
+        $voterCapability = $this->phpParserVoterCapabilityParser->parse($projectFile);
+
+        self::assertNotNull($voterCapability);
+        self::assertSame(['EDIT'], $voterCapability->supportedAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_null_when_supports_is_abstract_without_a_body(): void
     {
         $source = <<<'PHP'
