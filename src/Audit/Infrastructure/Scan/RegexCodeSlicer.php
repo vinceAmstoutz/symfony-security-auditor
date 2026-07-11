@@ -274,11 +274,11 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
      */
     private function heredocCloseTrailer(string $line, string $identifier): ?string
     {
-        if (1 !== preg_match(\sprintf('/^\s*%s\b(.*)$/', preg_quote($identifier, '/')), $line, $matches)) {
+        if (1 !== preg_match(\sprintf('/^\s*%s\b(?<trailer>.*)$/', $identifier), $line, $matches)) {
             return null;
         }
 
-        return $matches[1];
+        return $matches['trailer'];
     }
 
     private function shouldSlice(ProjectFile $projectFile): bool
