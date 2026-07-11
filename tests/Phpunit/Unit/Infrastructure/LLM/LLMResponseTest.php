@@ -181,6 +181,19 @@ final class LLMResponseTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_it_recovers_json_after_an_unpaired_leading_quote(): void
+    {
+        $content = '"5 then [1,2]';
+        $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
+
+        $data = $llmResponse->parseJson();
+
+        self::assertSame([1, 2], $data);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_treats_empty_json_string_as_closed_during_extraction(): void
     {
         $content = 'see [{"a":"","b":9}] end';

@@ -195,7 +195,7 @@ final readonly class LLMResponse
     private function advanceIfTrackingStringLiterals(bool $trackStringLiterals, string $char, array $state): array
     {
         if (!$trackStringLiterals) {
-            return ['inString' => false, 'escape' => false, 'consumed' => false];
+            return [...$state, 'consumed' => false];
         }
 
         return $this->advanceStringLiteralState($char, $state['inString'], $state['escape']);
@@ -217,10 +217,6 @@ final readonly class LLMResponse
     private function hasBalancedQuotes(string $content): bool
     {
         $length = \strlen($content);
-        if (0 === $length) {
-            return true;
-        }
-
         $inString = false;
         $escape = false;
 
