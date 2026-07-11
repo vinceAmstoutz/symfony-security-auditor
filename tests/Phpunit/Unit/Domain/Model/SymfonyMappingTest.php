@@ -236,6 +236,22 @@ final class SymfonyMappingTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_treats_a_regex_metacharacter_in_the_entity_name_literally(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/RegexVoter.php',
+            '/app/src/Security/RegexVoter.php',
+            '<?php class RegexVoter extends Voter { protected function supports(string $attribute, mixed $subject): bool { return $subject instanceof UserX; } }',
+        );
+
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['voters' => [$projectFile]]), new AccessControlMap());
+
+        self::assertFalse($symfonyMapping->hasVoterForEntity('User.'));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_finds_controllers_without_security_annotations(): void
     {
         $projectFile = ProjectFile::create(
