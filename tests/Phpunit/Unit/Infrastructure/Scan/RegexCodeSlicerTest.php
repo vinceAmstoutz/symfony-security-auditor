@@ -477,6 +477,25 @@ final class RegexCodeSlicerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_a_leading_open_paren_before_an_unclosed_string_keeps_its_continuation_retained(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function process(\n"
+            ."('unclosed\n"
+            ."text');\n"
+            ."        \$inert = 'RETAINED_MARKER';\n"
+            ."    );\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('RETAINED_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_inert_line_resembling_keyword_mid_line_is_elided(): void
     {
         // A comment mentioning "namespace"/"class" mid-line must NOT be treated as

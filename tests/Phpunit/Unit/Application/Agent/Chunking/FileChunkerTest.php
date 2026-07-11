@@ -479,6 +479,24 @@ final class FileChunkerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_feature_does_not_group_a_file_whose_remainder_after_the_feature_starts_with_a_digit(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/User2Repository.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        self::assertNotNull($userChunk);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
+        self::assertNotContains('src/User2Repository.php', $paths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_non_positive_chunk_size_is_clamped_to_one(): void
     {
         $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];
