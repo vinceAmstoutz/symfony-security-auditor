@@ -452,13 +452,17 @@ final class AuditOrchestratorTest extends TestCase
 
         $auditOrchestrator->orchestrate($auditContext);
 
-        $messages = [];
+        $dropContext = null;
         foreach ($bufferingLogger->cleanLogs() as $log) {
             self::assertIsArray($log);
-            $messages[] = $log[1];
+            if ('Dropping finding below the confidence floor' === $log[1]) {
+                $dropContext = $log[2];
+            }
         }
 
-        self::assertContains('Dropping finding below the confidence floor', $messages);
+        self::assertIsArray($dropContext);
+        self::assertSame(0.3, $dropContext['confidence']);
+        self::assertSame(0.6, $dropContext['min_confidence']);
     }
 
     /**
