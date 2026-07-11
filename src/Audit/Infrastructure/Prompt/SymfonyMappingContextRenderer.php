@@ -264,10 +264,12 @@ final readonly class SymfonyMappingContextRenderer
     }
 
     /**
-     * Splits the flat, possibly-`or:`-joined roles list back into one string
-     * per alternative rule. The base rule's own list items are re-joined the
-     * same way an `or:` one already is, so both are checked identically by
-     * {@see self::alternativeCoversMethods()}.
+     * Splits the flat, possibly-`or:`-joined roles list into one string per
+     * alternative rule: the base rule's own list items joined into a single
+     * string, then each `or:` entry on its own. The leading `or: ` marker is
+     * left on those entries — {@see self::alternativeCoversMethods()} locates
+     * the `methods:` requirement anywhere in the string, so the marker never
+     * affects the check.
      *
      * @param list<string> $roles
      *
@@ -279,7 +281,7 @@ final readonly class SymfonyMappingContextRenderer
         $orAlternatives = [];
         foreach ($roles as $role) {
             if (str_starts_with($role, 'or: ')) {
-                $orAlternatives[] = substr($role, \strlen('or: '));
+                $orAlternatives[] = $role;
 
                 continue;
             }

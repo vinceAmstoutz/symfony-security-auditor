@@ -184,7 +184,7 @@ final readonly class PhpParserFormBindingParser implements FormBindingParserInte
             $callsBySpotId[spl_object_id($call)] = $call;
         }
 
-        $calls = array_values($callsBySpotId);
+        $calls = $callsBySpotId;
         usort($calls, static fn (MethodCall|NullsafeMethodCall|StaticCall $a, MethodCall|NullsafeMethodCall|StaticCall $b): int => $a->getStartTokenPos() <=> $b->getStartTokenPos());
 
         return $calls;
