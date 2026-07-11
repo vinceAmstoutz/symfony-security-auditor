@@ -630,4 +630,31 @@ final class PhpParserFormBindingParserTest extends TestCase
 
         self::assertSame([], $this->phpParserFormBindingParser->parse($projectFile));
     }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_orders_form_bindings_by_source_position_across_call_kinds(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use App\Form\FirstType;
+            use App\Form\SecondType;
+            final class UserController {
+                public function edit(): void {
+                    $first = self::createForm(FirstType::class);
+                    $second = $this->createForm(SecondType::class);
+                }
+            }
+            PHP;
+        $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/x', $source);
+
+        $bindings = $this->phpParserFormBindingParser->parse($projectFile);
+
+        self::assertSame(
+            ['App\\Form\\FirstType', 'App\\Form\\SecondType'],
+            [$bindings[0]->formTypeClass(), $bindings[1]->formTypeClass()],
+        );
+    }
 }
