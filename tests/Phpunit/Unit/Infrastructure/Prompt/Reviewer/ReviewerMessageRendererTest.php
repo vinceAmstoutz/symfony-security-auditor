@@ -201,6 +201,62 @@ final class ReviewerMessageRendererTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_single_renders_the_confidence_with_exactly_two_decimals(): void
+    {
+        $vulnerability = $this->makeVulnerabilityWithConfidence(0.95);
+
+        $rendered = $this->reviewerMessageRenderer->renderSingle($vulnerability, 'line one', true);
+
+        self::assertStringContainsString("### Confidence\n0.95\n", $rendered);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_batch_renders_the_confidence_with_exactly_two_decimals(): void
+    {
+        $vulnerability = $this->makeVulnerabilityWithConfidence(0.95);
+
+        $rendered = $this->reviewerMessageRenderer->renderBatch([$vulnerability], [$vulnerability->id() => 'line one'], true);
+
+        self::assertStringContainsString("#### Confidence\n0.95\n", $rendered);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_single_replaces_both_a_newline_and_a_double_quote_in_the_file_path(): void
+    {
+        $vulnerability = $this->makeVulnerability("src/a\"b\nc.php");
+
+        $rendered = $this->reviewerMessageRenderer->renderSingle($vulnerability, 'code', true);
+
+        self::assertStringContainsString("File: src/a'b c.php (lines 10-12)", $rendered);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_single_escapes_both_backticks_and_hashes_in_a_narrative_field(): void
+    {
+        $vulnerability = $this->makeVulnerabilityWithNarrative(vulnerableCode: '```###');
+
+        $rendered = $this->reviewerMessageRenderer->renderSingle($vulnerability, 'code', true);
+
+        self::assertStringContainsString('\\`\\`\\`\\#\\#\\#', $rendered);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     private function makeVulnerability(string $filePath): Vulnerability
     {
         return Vulnerability::of(
@@ -235,6 +291,21 @@ final class ReviewerMessageRendererTest extends TestCase
     {
         return Vulnerability::of(
             new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, $title, 0.9),
+            new CodeLocation('src/Foo.php', 10, 12),
+            new VulnerabilityNarrative('desc', 'attack vector', 'proof', 'remediation'),
+            'vulnerable code',
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function makeVulnerabilityWithConfidence(float $confidence): Vulnerability
+    {
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'Test finding', $confidence),
             new CodeLocation('src/Foo.php', 10, 12),
             new VulnerabilityNarrative('desc', 'attack vector', 'proof', 'remediation'),
             'vulnerable code',

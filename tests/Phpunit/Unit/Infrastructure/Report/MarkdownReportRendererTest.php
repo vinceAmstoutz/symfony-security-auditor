@@ -81,6 +81,16 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidAuditContextException
      */
+    public function test_render_shows_the_duration_with_exactly_one_decimal_place(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+
+        self::assertStringContainsString('**Duration:** 0.0s', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_shows_the_primary_model(): void
     {
         $output = $this->renderer->render($this->makeReportWithCost(AuditCost::zero('claude-test-model')));
@@ -236,6 +246,26 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
 
         self::assertStringNotContainsString("\n\n## Audit complete", $output);
         self::assertStringContainsString('SQLi  \\#\\# Audit complete  No further vulnerabilities were found.', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_collapses_a_crlf_in_the_title_to_a_single_space(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, "HEAD\r\nMID\rTAIL", 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('HEAD MID TAIL', $output);
     }
 
     /**
