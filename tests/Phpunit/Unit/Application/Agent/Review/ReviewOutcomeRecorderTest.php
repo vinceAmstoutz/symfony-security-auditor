@@ -38,6 +38,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 
 final class ReviewOutcomeRecorderTest extends TestCase
 {
@@ -190,6 +191,53 @@ final class ReviewOutcomeRecorderTest extends TestCase
         );
 
         self::assertTrue($vulnerability->isReviewerValidated());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_null_verdict_records_the_rejected_finding_with_the_coverage_recorder(): void
+    {
+        $coverageRecorder = new RecordingCoverageRecorder();
+
+        $rejected = $this->recorder(self::createStub(ProgressReporterInterface::class))->recordVerdict($this->vulnerability(), null, $coverageRecorder);
+
+        self::assertSame([$rejected], $coverageRecorder->reviewed);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_errored_review_records_the_finding_with_the_coverage_recorder(): void
+    {
+        $coverageRecorder = new RecordingCoverageRecorder();
+
+        $errored = $this->recorder(self::createStub(ProgressReporterInterface::class))->recordReviewError($this->vulnerability(), new RuntimeException('llm down'), $coverageRecorder);
+
+        self::assertSame([$errored], $coverageRecorder->reviewed);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_parse_failure_records_the_errored_finding_with_the_coverage_recorder(): void
+    {
+        $coverageRecorder = new RecordingCoverageRecorder();
+
+        $errored = $this->recorder(self::createStub(ProgressReporterInterface::class))->applyResponse(
+            $this->vulnerability(),
+            LLMResponse::of('not json {{{', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)),
+            $coverageRecorder,
+        );
+
+        self::assertSame([$errored], $coverageRecorder->reviewed);
     }
 
     private function expectingReviewedEvent(bool $accepted): ProgressReporterInterface
