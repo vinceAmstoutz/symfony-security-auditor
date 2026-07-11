@@ -26,7 +26,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 
 final class ChunkContextFactoryTest extends TestCase
 {
@@ -53,5 +55,54 @@ final class ChunkContextFactoryTest extends TestCase
         $withMarkers = $chunkContextFactory->create($chunk, $attackerAnalysisRequest, new RiskMarkerIndex([$riskMarker]), true);
 
         self::assertNotSame($chunkContext->contextKey, $withMarkers->contextKey);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_a_risk_marker_line_absent_from_the_sliced_output_is_not_restored(): void
+    {
+        $codeSlicer = self::createStub(CodeSlicerInterface::class);
+        $codeSlicer->method('slice')->willReturn('<?php');
+
+        $chunkContextFactory = new ChunkContextFactory(
+            new AttackerPromptBuilder(),
+            $codeSlicer,
+            new AttackerContextPromptRenderer(),
+        );
+
+        $projectFile = ProjectFile::create('src/Repository/UserRepository.php', '/app/src/Repository/UserRepository.php', "<?php\n\$a = 1;\n\$b = 2;\nDANGER_LINE_HERE\n\$d = 4;");
+        $chunk = [$projectFile];
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap());
+        $attackerAnalysisRequest = new AttackerAnalysisRequest($chunk, $symfonyMapping);
+
+        $riskMarker = RiskMarker::create($projectFile->relativePath(), 4, 'sql_injection', 'raw query concatenation');
+        $chunkContext = $chunkContextFactory->create($chunk, $attackerAnalysisRequest, new RiskMarkerIndex([$riskMarker]), true);
+
+        self::assertStringNotContainsString('DANGER_LINE_HERE', $chunkContext->userMessage);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_file_without_risk_markers_keeps_the_slicer_output_verbatim(): void
+    {
+        $codeSlicer = self::createStub(CodeSlicerInterface::class);
+        $codeSlicer->method('slice')->willReturn("<?php\n// SLICED_ONLY_TOKEN");
+
+        $chunkContextFactory = new ChunkContextFactory(
+            new AttackerPromptBuilder(),
+            $codeSlicer,
+            new AttackerContextPromptRenderer(),
+        );
+
+        $projectFile = ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', "<?php\nORIGINAL_ONLY_TOKEN\n// more");
+        $chunk = [$projectFile];
+        $attackerAnalysisRequest = new AttackerAnalysisRequest($chunk, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()));
+
+        $chunkContext = $chunkContextFactory->create($chunk, $attackerAnalysisRequest, new RiskMarkerIndex([]), true);
+
+        self::assertStringContainsString('SLICED_ONLY_TOKEN', $chunkContext->userMessage);
     }
 }

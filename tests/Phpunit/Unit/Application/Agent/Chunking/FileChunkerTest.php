@@ -460,6 +460,25 @@ final class FileChunkerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_feature_keeps_a_file_matching_two_equal_length_features_with_the_first_matched_feature(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/Controller/PostController.php'),
+            $this->makeFile('src/User/Post/Shared.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        self::assertNotNull($userChunk);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
+        self::assertContains('src/User/Post/Shared.php', $paths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_non_positive_chunk_size_is_clamped_to_one(): void
     {
         $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];
