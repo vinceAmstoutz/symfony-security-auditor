@@ -198,7 +198,11 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     private function mergeRecoveredFindings(array $rawFindings, array $recoveredFindings): array
     {
         $byId = [];
-        foreach ([...$rawFindings, ...$recoveredFindings] as $vulnerability) {
+        foreach ($rawFindings as $vulnerability) {
+            $byId[$vulnerability->id()] = $vulnerability;
+        }
+
+        foreach ($recoveredFindings as $vulnerability) {
             $byId[$vulnerability->id()] = $vulnerability;
         }
 
