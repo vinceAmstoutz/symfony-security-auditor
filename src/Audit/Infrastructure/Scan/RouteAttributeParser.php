@@ -93,8 +93,8 @@ final readonly class RouteAttributeParser
 
         return match (true) {
             $arg->value instanceof String_ => $arg->value->value,
-            $arg->value instanceof Array_ => $this->stringValuesFromArray($arg->value)[0] ?? $currentPath,
-            $arg->value instanceof ClassConstFetch => $this->resolveSelfConstant($arg->value, $classConstants) ?? $currentPath,
+            $arg->value instanceof Array_ => $this->firstRoutePath($arg->value),
+            $arg->value instanceof ClassConstFetch => $this->resolveSelfConstant($arg->value, $classConstants),
             default => $currentPath,
         };
     }
@@ -155,6 +155,13 @@ final readonly class RouteAttributeParser
         $parts = explode('\\', $fullyQualifiedName);
 
         return end($parts) === $expectedShortName;
+    }
+
+    private function firstRoutePath(Array_ $array): ?string
+    {
+        $paths = $this->stringValuesFromArray($array);
+
+        return [] === $paths ? null : $paths[0];
     }
 
     /**
