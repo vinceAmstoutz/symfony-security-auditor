@@ -134,6 +134,20 @@ final class ModelsDevPricingProviderTest extends TestCase
         self::assertSame(20.0, $modelsDevPricingProvider->pricePerMillionOutputTokens('qualified/free-tier-collision'));
     }
 
+    public function test_a_partial_first_party_price_with_a_nonzero_input_wins_over_a_later_provider(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('partial-and-free-collisions.json');
+
+        self::assertSame(3.0, $modelsDevPricingProvider->pricePerMillionInputTokens('partial-price-probe'));
+    }
+
+    public function test_a_fully_free_model_keeps_the_first_providers_cache_rate_across_zero_priced_collisions(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('partial-and-free-collisions.json');
+
+        self::assertSame(0.25, $modelsDevPricingProvider->cacheReadPricePerMillionTokens('fully-free-probe'));
+    }
+
     public function test_it_ignores_unrecognised_cost_fields(): void
     {
         $modelsDevPricingProvider = $this->providerForCatalog('catalog.json');

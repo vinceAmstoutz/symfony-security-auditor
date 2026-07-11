@@ -1,0 +1,36 @@
+{
+  "anthropic": {
+    "models": {
+      "partial-price-probe": {
+        "cost": {
+          "input": 3,
+          "output": 0
+        }
+      },
+      "fully-free-probe": {
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0.25
+        }
+      }
+    }
+  },
+  "openai": {
+    "models": {
+      "partial-price-probe": {
+        "cost": {
+          "input": 9,
+          "output": 9
+        }
+      },
+      "fully-free-probe": {
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cache_read": 0.75
+        }
+      }
+    }
+  }
+}

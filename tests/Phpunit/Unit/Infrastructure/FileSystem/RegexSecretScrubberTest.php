@@ -324,6 +324,13 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame("\$config = [\n    'password' =>\n'***REDACTED:multiline_assignment***',\n];", $output);
     }
 
+    public function test_a_multiline_secret_spanning_two_newlines_reproduces_every_newline_it_spanned(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("password\n: \n'SuperSecretValue1234'");
+
+        self::assertSame("password\n:\n\n'***REDACTED:multiline_assignment***'", $output);
+    }
+
     public function test_a_symfony_placeholder_wrapped_to_the_next_line_is_left_unmodified(): void
     {
         $input = "\$config = [\n    'password' =>\n        '%env(APP_SECRET)%',\n];";

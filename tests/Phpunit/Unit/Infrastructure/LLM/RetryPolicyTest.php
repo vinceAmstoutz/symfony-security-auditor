@@ -242,6 +242,32 @@ final class RetryPolicyTest extends TestCase
         self::assertStringContainsString('got 0.500000', $message);
     }
 
+    public function test_low_backoff_multiplier_message_formats_the_value_with_exactly_six_decimals(): void
+    {
+        $message = '';
+
+        try {
+            new BackoffSchedule(backoffMultiplier: 0.5);
+        } catch (InvalidArgumentException $invalidArgumentException) {
+            $message = $invalidArgumentException->getMessage();
+        }
+
+        self::assertSame('backoffMultiplier must be >= 1.0, got 0.500000', $message);
+    }
+
+    public function test_out_of_range_jitter_ratio_message_formats_the_value_with_exactly_six_decimals(): void
+    {
+        $message = '';
+
+        try {
+            new BackoffSchedule(jitterRatio: 1.5);
+        } catch (InvalidArgumentException $invalidArgumentException) {
+            $message = $invalidArgumentException->getMessage();
+        }
+
+        self::assertSame('jitterRatio must be in [0.0, 1.0], got 1.500000', $message);
+    }
+
     /**
      * @throws InvalidRetryConfigurationException
      */
@@ -485,6 +511,34 @@ final class RetryPolicyTest extends TestCase
         );
 
         self::assertSame(120_000, $retryPolicy->rateLimitDelayMs(3));
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_rate_limit_delay_rounds_a_high_fraction_up_distinguishing_floor(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            new BackoffSchedule(backoffMultiplier: 1.0, jitterRatio: 0.25),
+            new RateLimitBackoff(initialDelayMs: 2, maxDelayMs: 300_000),
+            jitterSource: static fn (): float => 1.0,
+        );
+
+        self::assertSame(3, $retryPolicy->rateLimitDelayMs(1));
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_rate_limit_delay_rounds_a_low_fraction_down_distinguishing_ceil(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            new BackoffSchedule(backoffMultiplier: 1.0, jitterRatio: 0.125),
+            new RateLimitBackoff(initialDelayMs: 2, maxDelayMs: 300_000),
+            jitterSource: static fn (): float => 1.0,
+        );
+
+        self::assertSame(2, $retryPolicy->rateLimitDelayMs(1));
     }
 
     /**

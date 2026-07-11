@@ -561,6 +561,48 @@ final class ProjectFileTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_is_api_resource_returns_true_for_an_api_resource(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/ApiResource/Book.php',
+            '/app/src/ApiResource/Book.php',
+            "<?php\n#[ApiResource]\nclass Book {}",
+        );
+
+        self::assertTrue($projectFile->isApiResource());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_is_live_component_returns_true_for_a_live_component(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/Components/Counter.php',
+            '/app/src/Twig/Components/Counter.php',
+            "<?php\n#[AsLiveComponent]\nclass Counter {}",
+        );
+
+        self::assertTrue($projectFile->isLiveComponent());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_is_twig_extension_returns_true_for_a_twig_extension(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Twig/AppExtension.php',
+            '/app/src/Twig/AppExtension.php',
+            "<?php\nclass AppExtension extends AbstractExtension {}",
+        );
+
+        self::assertTrue($projectFile->isTwigExtension());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_counts_lines_correctly(): void
     {
         $content = "<?php\n\nclass Foo\n{\n    public function bar(): void {}\n}\n";

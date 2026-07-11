@@ -149,6 +149,38 @@ final class AuditExecutionConfigurationTest extends TestCase
     /**
      * @throws InvalidAuditExecutionConfigurationException
      */
+    public function test_it_accepts_a_min_confidence_of_exactly_one(): void
+    {
+        $auditExecutionConfiguration = new AuditExecutionConfiguration(
+            maxIterations: 3,
+            minConfidence: 1.0,
+            reviewerBatchSize: 5,
+            toolsEnabled: true,
+            maxToolIterations: 5,
+        );
+
+        self::assertSame(1.0, $auditExecutionConfiguration->minConfidence);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
+    public function test_it_accepts_a_min_confidence_of_exactly_zero(): void
+    {
+        $auditExecutionConfiguration = new AuditExecutionConfiguration(
+            maxIterations: 3,
+            minConfidence: 0.0,
+            reviewerBatchSize: 5,
+            toolsEnabled: true,
+            maxToolIterations: 5,
+        );
+
+        self::assertSame(0.0, $auditExecutionConfiguration->minConfidence);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     */
     public function test_optional_arguments_fall_back_to_their_documented_defaults(): void
     {
         $auditExecutionConfiguration = new AuditExecutionConfiguration(

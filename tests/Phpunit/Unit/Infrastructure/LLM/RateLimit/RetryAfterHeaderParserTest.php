@@ -107,6 +107,20 @@ final class RetryAfterHeaderParserTest extends TestCase
         self::assertLessThanOrEqual(30, $seconds);
     }
 
+    public function test_http_date_extraction_is_case_insensitive_for_the_header_name(): void
+    {
+        $future = gmdate('D, d M Y H:i:s', time() + 30).' GMT';
+        $runtimeException = new RuntimeException(\sprintf('HTTP 429: Retry-After: %s', $future));
+
+        $retryAfterHeaderParser = new RetryAfterHeaderParser();
+
+        $seconds = $retryAfterHeaderParser->parse($runtimeException);
+
+        self::assertNotNull($seconds);
+        self::assertGreaterThanOrEqual(28, $seconds);
+        self::assertLessThanOrEqual(30, $seconds);
+    }
+
     public function test_http_date_retry_after_in_the_past_is_ignored(): void
     {
         $past = gmdate('D, d M Y H:i:s', time() - 30).' GMT';
