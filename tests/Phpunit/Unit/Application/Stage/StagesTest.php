@@ -57,6 +57,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigPar
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
@@ -765,6 +766,47 @@ final class StagesTest extends TestCase
         $rule = $mapping->routeAccessMap()['^/admin'];
         self::assertContains('ROLE_ADMIN', $rule);
         self::assertContains('or: ips: 10.0.0.0/8', $rule);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_stage_keeps_merging_new_targets_after_an_already_seen_target_within_a_later_config_file(): void
+    {
+        $firstConfigContent = 'FIRST_CONFIG';
+        $secondConfigContent = 'SECOND_CONFIG';
+
+        $securityConfigParser = new readonly class($firstConfigContent) implements SecurityConfigParserInterface {
+            public function __construct(private string $firstConfigContent) {}
+
+            #[Override]
+            public function parseAccessControl(string $configContent): array
+            {
+                return $configContent === $this->firstConfigContent
+                    ? ['^/shared' => ['ROLE_A']]
+                    : ['^/shared' => ['ROLE_B'], '^/new' => ['ROLE_NEW']];
+            }
+
+            #[Override]
+            public function parseFirewallRules(string $configContent): array
+            {
+                return [];
+            }
+        };
+
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), $securityConfigParser);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('config/security.yaml', '/app/config/security.yaml', $firstConfigContent),
+            ProjectFile::create('config/security_admin.yaml', '/app/config/security_admin.yaml', $secondConfigContent),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertArrayHasKey('^/new', $mapping->routeAccessMap());
     }
 
     /**

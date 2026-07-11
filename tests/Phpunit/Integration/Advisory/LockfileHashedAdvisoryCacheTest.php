@@ -579,6 +579,111 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         self::assertSame(2, $recordingComposerAuditRunner->callCount, 'an entry past the TTL per the injected clock must expire regardless of the real OS wall-clock time recorded on the cache file');
     }
 
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_read_through_symlinked_cache_entry_logs_a_warning_with_the_full_path_context(): void
+    {
+        $lockfileContent = '{"lock": "v1"}';
+        $this->writeLockfile($lockfileContent);
+        $expectedHash = hash('sha256', $lockfileContent);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedHash, 0, 2), $expectedHash);
+
+        $outsideTarget = sys_get_temp_dir().'/advisory_cache_symlink_target_'.uniqid('', true);
+        file_put_contents($outsideTarget, 'ORIGINAL');
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($outsideTarget, $expectedPath);
+
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$warnings): void {
+                $warnings[] = [$message, $context];
+            },
+        );
+        $logger->method('debug');
+
+        try {
+            $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache(
+                $this->recordingRunner('{"advisories": {"foo/bar": []}}'),
+                $this->cacheDir,
+                new Filesystem(),
+                $logger,
+                new NativeClock(),
+            );
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+            $symlinkWarnings = array_values(array_filter(
+                $warnings,
+                static fn (array $entry): bool => 'Refusing to read advisory cache entry through symlinked path, falling back to live audit' === $entry[0],
+            ));
+            self::assertCount(1, $symlinkWarnings);
+            self::assertSame(['path' => $expectedPath], $symlinkWarnings[0][1]);
+        } finally {
+            unlink($outsideTarget);
+        }
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_expired_cache_entry_logs_a_debug_with_the_full_path_context(): void
+    {
+        $lockfileContent = '{"lock": "v1"}';
+        $this->writeLockfile($lockfileContent);
+        $expectedHash = hash('sha256', $lockfileContent);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedHash, 0, 2), $expectedHash);
+
+        $mockClock = new MockClock('2000-01-01T00:00:00Z');
+        $this->makeCacheWithClock($this->recordingRunner('{"advisories": {"foo/bar": []}}'), $mockClock)->run($this->projectDir);
+
+        $debugMessages = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$debugMessages): void {
+                $debugMessages[] = [$message, $context];
+            },
+        );
+
+        $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache(
+            $this->recordingRunner('{"advisories": {"new/cve": []}}'),
+            $this->cacheDir,
+            new Filesystem(),
+            $logger,
+            $mockClock,
+        );
+
+        $mockClock->modify('+25 hours');
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $expiredLogs = array_values(array_filter(
+            $debugMessages,
+            static fn (array $entry): bool => 'Advisory cache entry expired, falling back to live audit' === $entry[0],
+        ));
+        self::assertCount(1, $expiredLogs);
+        self::assertSame(['path' => $expectedPath], $expiredLogs[0][1]);
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_cache_entry_aged_exactly_the_ttl_is_treated_as_expired(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+        $mockClock = new MockClock('2000-01-01T00:00:00Z');
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {"foo/bar": []}}');
+
+        $lockfileHashedAdvisoryCache = $this->makeCacheWithClock($recordingComposerAuditRunner, $mockClock);
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $mockClock->modify('+24 hours');
+        $recordingComposerAuditRunner->payload = '{"advisories": {"new/cve": []}}';
+        $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame('{"advisories": {"new/cve": []}}', $json);
+        self::assertSame(2, $recordingComposerAuditRunner->callCount, 'an entry aged exactly the TTL must be treated as expired, not served from cache');
+    }
+
     #[Override]
     protected function setUp(): void
     {

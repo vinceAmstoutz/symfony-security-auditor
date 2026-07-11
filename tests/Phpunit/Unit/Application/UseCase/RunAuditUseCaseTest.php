@@ -28,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
@@ -287,6 +288,131 @@ final class RunAuditUseCaseTest extends TestCase
 
         self::assertSame(1000, $auditReport->cost()->inputTokens());
         self::assertSame(500, $auditReport->cost()->outputTokens());
+    }
+
+    /**
+     * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     */
+    public function test_it_resets_the_budget_tracker_between_separate_execute_calls_on_the_same_instance(): void
+    {
+        $pricingProvider = new class implements PricingProviderInterface {
+            #[Override]
+            public function pricePerMillionInputTokens(string $model): float
+            {
+                return 10.0;
+            }
+
+            #[Override]
+            public function pricePerMillionOutputTokens(string $model): float
+            {
+                return 0.0;
+            }
+
+            #[Override]
+            public function hasModel(string $model): bool
+            {
+                return true;
+            }
+        };
+        $costCalculator = new CostCalculator($pricingProvider);
+        $budgetTracker = new BudgetTracker(AuditBudget::unlimited(), $costCalculator);
+        $tokenUsageRecorder = new TokenUsageRecorder();
+
+        $recordingCostStage = new class($budgetTracker, $tokenUsageRecorder) implements StageInterface {
+            public function __construct(
+                private readonly BudgetTracker $budgetTracker,
+                private readonly TokenUsageRecorder $tokenUsageRecorder,
+            ) {}
+
+            #[Override]
+            public function name(): string
+            {
+                return 'recording-cost';
+            }
+
+            /**
+             * @throws InvalidTokenUsageException
+             * @throws NegativeTokenCountException
+             */
+            #[Override]
+            public function process(AuditContext $auditContext): void
+            {
+                $this->budgetTracker->recordCall(LLMResponse::of('', 'attacker-model', 'end_turn', TokenUsageSnapshot::of(1_000_000, 0)));
+                $this->tokenUsageRecorder->record(1_000_000, 0);
+            }
+        };
+
+        $runAuditUseCase = new RunAuditUseCase(
+            $this->makePipeline($recordingCostStage),
+            new NullLogger(),
+            $tokenUsageRecorder,
+            $costCalculator,
+            'attacker-model',
+            $budgetTracker,
+        );
+
+        $runAuditUseCase->execute($this->tmpDir);
+        $auditReport = $runAuditUseCase->execute($this->tmpDir);
+
+        self::assertSame(10.0, $auditReport->cost()->estimatedCostUsd());
+    }
+
+    /**
+     * @throws AuditAbortedByBudgetException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_logs_provider_failure_abort_with_exact_context(): void
+    {
+        $throwingStage = new class implements StageInterface {
+            #[Override]
+            public function name(): string
+            {
+                return 'throwing';
+            }
+
+            #[Override]
+            public function process(AuditContext $auditContext): void
+            {
+                throw new LLMProviderException('provider exploded');
+            }
+        };
+
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $runAuditUseCase = new RunAuditUseCase($this->makePipeline($throwingStage), $logger);
+
+        $thrown = null;
+
+        try {
+            $runAuditUseCase->execute($this->tmpDir);
+        } catch (AuditAbortedByProviderException $auditAbortedByProviderException) {
+            $thrown = $auditAbortedByProviderException;
+        }
+
+        self::assertInstanceOf(AuditAbortedByProviderException::class, $thrown);
+
+        $providerFailureWarnings = array_values(array_filter(
+            $warnings,
+            static fn (array $entry): bool => 'Audit aborted by LLM provider failure' === $entry[0],
+        ));
+        self::assertCount(1, $providerFailureWarnings);
+        self::assertSame(
+            ['audit_id' => $thrown->partialReport()->auditId(), 'error' => 'provider exploded'],
+            $providerFailureWarnings[0][1],
+        );
     }
 
     private function makePipeline(?StageInterface $stage = null): AuditPipeline

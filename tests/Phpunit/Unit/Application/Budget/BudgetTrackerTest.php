@@ -231,6 +231,22 @@ final class BudgetTrackerTest extends TestCase
     }
 
     /**
+     * @throws BudgetExceededException
+     * @throws InvalidAuditBudgetException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_cost_budget_threshold_is_rounded_to_six_decimals_not_five(): void
+    {
+        $budgetTracker = $this->budgetTracker(AuditBudget::forCost(0.1234567), inputPrice: 0.123459);
+
+        $budgetTracker->recordCall(LLMResponse::of('x', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(1_000_000, 0)));
+        self::assertSame(0.123459, $budgetTracker->costUsdUsed());
+
+        $this->expectException(BudgetExceededException::class);
+        $budgetTracker->assertWithinBudget();
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      */
     public function test_cost_used_is_rounded_to_six_decimal_places(): void
