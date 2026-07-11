@@ -209,4 +209,48 @@ final class GrepToolTest extends TestCase
 
         self::assertStringContainsString('src/A.php', $result);
     }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_execute_returns_a_line_at_exactly_the_length_limit_untruncated(): void
+    {
+        $line = 'NEEDLE'.str_repeat('a', 494); // exactly 500 chars
+        $projectFile = ProjectFile::create('src/Bound.php', '/app/Bound', $line."\n");
+        $grepTool = new GrepTool([$projectFile]);
+
+        $result = $grepTool->execute(['pattern' => 'NEEDLE']);
+
+        self::assertSame('src/Bound.php:1:'.$line, $result);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_execute_truncates_from_the_start_of_an_overlong_line(): void
+    {
+        $line = 'Z'.str_repeat('y', 600); // 601 chars, distinct first char
+        $projectFile = ProjectFile::create('src/Off.php', '/app/Off', $line."\n");
+        $grepTool = new GrepTool([$projectFile]);
+
+        $result = $grepTool->execute(['pattern' => 'Z']);
+
+        self::assertSame('src/Off.php:1:Z'.str_repeat('y', 499).'... [truncated]', $result);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_execute_truncates_on_a_character_boundary_not_a_byte_boundary(): void
+    {
+        // Byte 500 falls inside the 3-byte '€'; a byte-wise cut would emit a
+        // broken half-character, a character-safe cut stops before it.
+        $line = str_repeat('a', 499).'€NEEDLE'; // 508 bytes, match past the cut
+        $projectFile = ProjectFile::create('src/Mb.php', '/app/Mb', $line."\n");
+        $grepTool = new GrepTool([$projectFile]);
+
+        $result = $grepTool->execute(['pattern' => 'NEEDLE']);
+
+        self::assertSame('src/Mb.php:1:'.str_repeat('a', 499).'... [truncated]', $result);
+    }
 }
