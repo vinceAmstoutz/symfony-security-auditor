@@ -226,7 +226,7 @@
               "additionalProperties": false,
               "properties": {
                 "max_tokens": { "type": ["integer", "null"], "minimum": 1, "description": "Abort the audit past this many total tokens. null = unlimited." },
-                "max_cost_usd": { "type": ["number", "null"], "description": "Abort the audit past this estimated USD cost. null = unlimited." }
+                "max_cost_usd": { "type": ["number", "null"], "minimum": 0.01, "description": "Abort the audit past this estimated USD cost. null = unlimited." }
               }
             },
             "retry": {

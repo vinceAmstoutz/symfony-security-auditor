@@ -29,7 +29,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      * previously-cached LLM responses. Bump whenever the prompt structure or
      * skill blocks change in a way the LLM is expected to react to.
      */
-    public const int PROMPT_VERSION = 14;
+    public const int PROMPT_VERSION = 17;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
@@ -68,10 +68,11 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
         $summary = $symfonyMapping->toSummary();
 
         $noVoterList = implode("\n", array_map(
-            static fn (ProjectFile $projectFile): string => \sprintf('  - %s', $projectFile->relativePath()),
+            static fn (ProjectFile $projectFile): string => \sprintf('  - %s', self::sanitizePathLine($projectFile->relativePath())),
             $symfonyMapping->controllersWithoutVoters(),
         ));
 
+        $firewallRules = SymfonyMappingContextRenderer::renderFirewallRules($symfonyMapping);
         $accessControlMap = SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping);
         $voterCoverage = SymfonyMappingContextRenderer::renderVoterCoverage($symfonyMapping);
         $formBindings = SymfonyMappingContextRenderer::renderFormBindings($symfonyMapping);
@@ -84,7 +85,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             ## Controllers WITHOUT Security Annotations (High Priority)
             {$noVoterList}
 
-            {$accessControlMap}{$voterCoverage}{$formBindings}## Source Code
+            {$firewallRules}{$accessControlMap}{$voterCoverage}{$formBindings}## Source Code
             Analyze these files for exploitable vulnerabilities. Each line is prefixed with its line number (`NNN | code`) — use those exact numbers when populating `line_start` and `line_end`; do NOT count manually or guess.
 
             {$context}
@@ -100,6 +101,18 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
         }
 
         return 'Return a JSON array of all vulnerabilities found.';
+    }
+
+    /**
+     * A scanned file's path comes from the audited project's filesystem, not
+     * from us — a POSIX filename may contain a raw newline, which would
+     * otherwise let a crafted filename forge a fake `##`-prefixed section
+     * (e.g. the literal `## Source Code` heading further down this prompt)
+     * as unguarded top-level prompt text.
+     */
+    private static function sanitizePathLine(string $path): string
+    {
+        return str_replace("\n", ' ', $path);
     }
 
     private function basePrompt(): string

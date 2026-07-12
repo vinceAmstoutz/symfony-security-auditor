@@ -15,8 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 use Override;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
@@ -44,6 +47,10 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         private ProgressReporterInterface $progressReporter,
     ) {}
 
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
     #[Override]
     public function orchestrate(AuditContext $auditContext): void
     {
@@ -79,16 +86,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
             $previousFindings = array_values($auditContext->validatedVulnerabilities());
             $rejectedFindings = $this->rejectedFindings($auditContext);
-            $rawFindings = $this->attackerAgent->analyze(
-                new AttackerAnalysisRequest(
-                    files: $files,
-                    symfonyMapping: $mapping,
-                    bypassCache: $auditContext->isCacheBypassed(),
-                    previousFindings: $previousFindings,
-                    rejectedFindings: $rejectedFindings,
-                ),
-                $auditContext,
-            );
+            $rawFindings = $this->analyzeWithRecovery($mapping, $files, $previousFindings, $rejectedFindings, $auditContext);
             $filtered = $this->filterByConfidence($rawFindings);
 
             if ([] === $filtered) {
@@ -108,8 +106,16 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             $this->progressReporter->report(ProgressEvent::ReviewStarted->value, [
                 'findings' => \count($filtered),
             ]);
-            $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed());
-            $newFindings = $this->persistReviewedFindings($reviewed, $auditContext);
+
+            try {
+                $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed());
+            } catch (BudgetExceededException|LLMProviderException $exception) {
+                $this->persistReviewedFindings($auditContext->drainReviewedFindings(), $auditContext);
+
+                throw $exception;
+            }
+
+            $newFindings = $this->persistReviewedFindings($this->mergeRecoveredFindings($reviewed, $auditContext->drainReviewedFindings()), $auditContext);
 
             $acceptedCount = \count(array_filter(
                 $reviewed,
@@ -142,6 +148,101 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
+     * @param list<Vulnerability> $previousFindings
+     * @param list<Vulnerability> $rejectedFindings
+     * @param list<ProjectFile>   $files
+     *
+     * @return list<Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    private function analyzeWithRecovery(SymfonyMapping $symfonyMapping, array $files, array $previousFindings, array $rejectedFindings, AuditContext $auditContext): array
+    {
+        try {
+            $rawFindings = $this->attackerAgent->analyze(
+                new AttackerAnalysisRequest(
+                    files: $files,
+                    symfonyMapping: $symfonyMapping,
+                    bypassCache: $auditContext->isCacheBypassed(),
+                    previousFindings: $previousFindings,
+                    rejectedFindings: $rejectedFindings,
+                ),
+                $auditContext,
+            );
+        } catch (BudgetExceededException|LLMProviderException $attackerException) {
+            $this->reviewRecoveredFindings($auditContext->drainFoundVulnerabilities(), $files, $auditContext);
+
+            throw $attackerException;
+        }
+
+        return $this->mergeRecoveredFindings($rawFindings, $auditContext->drainFoundVulnerabilities());
+    }
+
+    /**
+     * Shared by both the attacker and reviewer recovery paths. A chunk/finding
+     * whose own conversation swallowed a generic (non-abort) `Throwable` after
+     * a partial `record_vulnerability`/`record_review` success records that
+     * finding via the coverage recorder, but the agent's own return value can
+     * still come back missing it — draining and merging by id here recovers
+     * it. Draining unconditionally (not only on an abort) also keeps the
+     * coverage recorder's buffer from accumulating findings across iterations
+     * that a later abort would otherwise re-review as if they were never
+     * persisted.
+     *
+     * @param list<Vulnerability> $rawFindings
+     * @param list<Vulnerability> $recoveredFindings
+     *
+     * @return list<Vulnerability>
+     */
+    private function mergeRecoveredFindings(array $rawFindings, array $recoveredFindings): array
+    {
+        $byId = [];
+        foreach ($rawFindings as $rawFinding) {
+            $byId[$rawFinding->id()] = $rawFinding;
+        }
+
+        foreach ($recoveredFindings as $recoveredFinding) {
+            $byId[$recoveredFinding->id()] = $recoveredFinding;
+        }
+
+        return array_values($byId);
+    }
+
+    /**
+     * Gives raw attacker candidates found before a mid-run abort a chance to
+     * reach the report: filters and reviews them exactly like a completed
+     * iteration would. A further abort from this review attempt is swallowed
+     * after persisting whatever verdicts it managed to reach, so the
+     * caller-visible exception is always the original attacker abort.
+     *
+     * @param list<Vulnerability> $rawFindings
+     * @param list<ProjectFile>   $files
+     */
+    private function reviewRecoveredFindings(array $rawFindings, array $files, AuditContext $auditContext): void
+    {
+        $filtered = $this->withoutBaselineAccepted($this->filterByConfidence($rawFindings), $auditContext);
+
+        if ([] === $filtered) {
+            return;
+        }
+
+        $this->progressReporter->report(ProgressEvent::ReviewStarted->value, [
+            'findings' => \count($filtered),
+        ]);
+
+        try {
+            $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed());
+        } catch (BudgetExceededException|LLMProviderException) {
+            $this->persistReviewedFindings($auditContext->drainReviewedFindings(), $auditContext);
+
+            return;
+        }
+
+        $this->persistReviewedFindings($reviewed, $auditContext);
+    }
+
+    /**
      * Findings the reviewer has already rejected in earlier iterations. Fed back
      * to the attacker so it stops re-reporting them — that would otherwise burn
      * tool-call and reviewer budget on findings the deduplication step discards.
@@ -157,23 +258,32 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
+     * Consumes at most as many findings per fingerprint as
+     * `$auditContext->acceptedFingerprints()` contains that value — a plain
+     * membership test would let one baseline-accepted occurrence of a shared
+     * fingerprint (`Vulnerability::fingerprint()` is line-independent by
+     * design) suppress every current finding sharing it, including ones that
+     * were never actually reviewed. The budget itself lives on
+     * `$auditContext` (via `consumeBaselineCredit()`) rather than being
+     * recomputed here, so it is shared — and spent at most once — across
+     * every iteration of this method's own attacker/reviewer loop, not just
+     * within a single call.
+     *
      * @param list<Vulnerability> $findings
      *
      * @return list<Vulnerability>
      */
     private function withoutBaselineAccepted(array $findings, AuditContext $auditContext): array
     {
-        $acceptedFingerprints = $auditContext->acceptedFingerprints();
-
         $remaining = [];
         foreach ($findings as $finding) {
-            if (!\in_array($finding->fingerprint(), $acceptedFingerprints, true)) {
-                $remaining[] = $finding;
+            if ($auditContext->consumeBaselineCredit($finding->fingerprint())) {
+                $this->recordBaselineSkip($finding, $auditContext);
 
                 continue;
             }
 
-            $this->recordBaselineSkip($finding, $auditContext);
+            $remaining[] = $finding;
         }
 
         return $remaining;
@@ -219,10 +329,23 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      */
     private function filterByConfidence(array $vulnerabilities): array
     {
-        return array_values(array_filter(
-            $vulnerabilities,
-            fn (Vulnerability $vulnerability): bool => $vulnerability->confidence() >= $this->auditLoopSettings->minConfidence,
-        ));
+        return array_values(array_filter($vulnerabilities, $this->passesConfidenceFloor(...)));
+    }
+
+    private function passesConfidenceFloor(Vulnerability $vulnerability): bool
+    {
+        if ($vulnerability->confidence() >= $this->auditLoopSettings->minConfidence) {
+            return true;
+        }
+
+        $this->logger->warning('Dropping finding below the confidence floor', [
+            'type' => $vulnerability->type()->value,
+            'file' => $vulnerability->filePath(),
+            'confidence' => $vulnerability->confidence(),
+            'min_confidence' => $this->auditLoopSettings->minConfidence,
+        ]);
+
+        return false;
     }
 
     /**
@@ -244,9 +367,24 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         return $newFindings;
     }
 
+    /**
+     * A same-id repeat is a duplicate unless it corrects an earlier verdict —
+     * an already-validated entry is sticky against a later spurious rejection
+     * (that never displaces it), but a corrected accept must be allowed to
+     * replace a stale reject, and a later iteration's validated verdict must
+     * be allowed to replace an earlier validated verdict when the severity or
+     * type differs (e.g. a reviewer's `adjusted_severity`/`corrected_type`
+     * applied on re-discovery) — otherwise a genuine correction silently
+     * vanishes from the report and the stale, less-accurate verdict persists.
+     */
     private function isDuplicate(Vulnerability $vulnerability, AuditContext $auditContext): bool
     {
-        foreach ($auditContext->vulnerabilities() as $existing) {
+        $existingById = $auditContext->vulnerabilities()[$vulnerability->id()] ?? null;
+        if ($existingById instanceof Vulnerability) {
+            return $this->isSameIdDuplicate($existingById, $vulnerability);
+        }
+
+        foreach ($auditContext->validatedVulnerabilities() as $existing) {
             if ($existing->filePath() === $vulnerability->filePath()
                 && $existing->type() === $vulnerability->type()
                 && $this->linesOverlap(
@@ -261,6 +399,20 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         }
 
         return false;
+    }
+
+    private function isSameIdDuplicate(Vulnerability $existingById, Vulnerability $vulnerability): bool
+    {
+        if ($existingById->isReviewerValidated()) {
+            if (!$vulnerability->isReviewerValidated()) {
+                return true;
+            }
+
+            return $existingById->severity() === $vulnerability->severity()
+                && $existingById->type() === $vulnerability->type();
+        }
+
+        return !$vulnerability->isReviewerValidated();
     }
 
     private function linesOverlap(int $start1, int $end1, int $start2, int $end2): bool

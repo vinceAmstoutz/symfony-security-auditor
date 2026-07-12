@@ -22,6 +22,7 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ContextAwareAttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\UnsafeCacheWriteException;
 
 use function Symfony\Component\String\u;
 
@@ -38,7 +39,7 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
         private string $keySalt = '',
     ) {
         if (u($cacheDir)->trim()->isEmpty()) {
-            throw InvalidCacheConfigurationException::forEmptyCacheDir();
+            throw InvalidCacheConfigurationException::forEmptyCacheDir('Attacker');
         }
     }
 
@@ -60,6 +61,12 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
         $path = $this->pathForChunk($chunk, $contextKey);
 
         if (!$this->filesystem->exists($path)) {
+            return null;
+        }
+
+        if ($this->isSymlinkedPath($path)) {
+            $this->logger->warning('Attacker cache entry path was a symlink, ignoring', ['path' => $path]);
+
             return null;
         }
 
@@ -97,6 +104,7 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
         $path = $this->pathForChunk($chunk, $contextKey);
 
         try {
+            $this->assertSafeToWrite($path);
             $encoded = json_encode($rawVulnerabilities, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
             $this->filesystem->mkdir(\dirname($path));
             $this->filesystem->dumpFile($path, $encoded);
@@ -107,6 +115,36 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
                 'error' => $throwable->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * `Filesystem::dumpFile()` transparently writes through a symlink at its
+     * destination, and `Filesystem::mkdir()` treats a symlinked directory as
+     * already existing — a cache path derived entirely from attacker-visible
+     * content (a project file's own path/content, folded through a key salt
+     * built from the target's own bundle config) lets a malicious contributor
+     * pre-plant a symlink at the exact path this cache will write to, turning
+     * a routine audit run into an arbitrary-file overwrite.
+     *
+     * @throws UnsafeCacheWriteException
+     */
+    private function assertSafeToWrite(string $path): void
+    {
+        if ($this->isSymlinkedPath($path)) {
+            throw UnsafeCacheWriteException::forSymlinkedPath($path);
+        }
+    }
+
+    /**
+     * Mirrors {@see self::assertSafeToWrite()}'s check for the read side —
+     * `Filesystem::readFile()` also transparently follows a symlink, so the
+     * same pre-planted symlink that would otherwise corrupt a write turns an
+     * ordinary cache read into an arbitrary-file read whose content is
+     * trusted as a real, previously-computed finding.
+     */
+    private function isSymlinkedPath(string $path): bool
+    {
+        return is_link($path) || is_link(\dirname($path));
     }
 
     /**
@@ -144,13 +182,22 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
     }
 
     /**
+     * A scanned file's path comes from the audited project's filesystem, not
+     * from us — a crafted relative path embedding another file's own
+     * `path=hash` signature plus a newline can make a single-file chunk's
+     * raw signature string byte-identical to a real multi-file chunk's
+     * joined signatures. Hashing each file's signature individually first
+     * fixes every field to 64 hex characters, which can never contain the
+     * `=`/newline separators, so no crafted path can bleed into another
+     * file's field or forge an extra one.
+     *
      * @param list<ProjectFile> $chunk
      */
     private function keyForChunk(array $chunk, string $contextKey): string
     {
         $signatures = [];
         foreach ($chunk as $file) {
-            $signatures[] = \sprintf('%s=%s', $file->relativePath(), $file->contentHash());
+            $signatures[] = hash('sha256', \sprintf('%s=%s', $file->relativePath(), $file->contentHash()));
         }
 
         sort($signatures);

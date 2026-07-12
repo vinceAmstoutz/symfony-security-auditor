@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
-use InvalidArgumentException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 
 final readonly class ProjectFile
 {
@@ -25,13 +25,16 @@ final readonly class ProjectFile
         private int $linesCount,
     ) {}
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public static function create(
         string $relativePath,
         string $absolutePath,
         string $content,
     ): self {
         if ('' === trim($relativePath)) {
-            throw new InvalidArgumentException('Relative path cannot be empty');
+            throw InvalidProjectFileException::forBlankRelativePath();
         }
 
         return new self(
@@ -56,6 +59,23 @@ final readonly class ProjectFile
     public function content(): string
     {
         return $this->content;
+    }
+
+    /**
+     * Preserves the original `fileType()` instead of reclassifying — a
+     * `CodeSlicer`-elided version of a content-detected component (e.g. a
+     * voter matched via `implements VoterInterface`) must not lose its type
+     * just because the slicer dropped the telltale line.
+     */
+    public function withContent(string $content): self
+    {
+        return new self(
+            relativePath: $this->relativePath,
+            absolutePath: $this->absolutePath,
+            content: $content,
+            projectFileType: $this->projectFileType,
+            linesCount: substr_count($content, "\n") + 1,
+        );
     }
 
     public function type(): string
@@ -133,6 +153,21 @@ final readonly class ProjectFile
         return ProjectFileType::SCHEDULER === $this->projectFileType;
     }
 
+    public function isApiResource(): bool
+    {
+        return ProjectFileType::API_RESOURCE === $this->projectFileType;
+    }
+
+    public function isLiveComponent(): bool
+    {
+        return ProjectFileType::LIVE_COMPONENT === $this->projectFileType;
+    }
+
+    public function isTwigExtension(): bool
+    {
+        return ProjectFileType::TWIG_EXTENSION === $this->projectFileType;
+    }
+
     public function isService(): bool
     {
         return !$this->matchesKnownComponentType()
@@ -145,12 +180,24 @@ final readonly class ProjectFile
             return true;
         }
 
-        return $this->matchesMessagingComponentType();
+        if ($this->matchesMessagingComponentType()) {
+            return true;
+        }
+
+        return $this->isTwigExtension();
     }
 
     private function matchesDomainComponentType(): bool
     {
         if ($this->isController()) {
+            return true;
+        }
+
+        if ($this->isApiResource()) {
+            return true;
+        }
+
+        if ($this->isLiveComponent()) {
             return true;
         }
 

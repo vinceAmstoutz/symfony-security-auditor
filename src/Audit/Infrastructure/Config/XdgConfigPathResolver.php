@@ -75,11 +75,18 @@ final readonly class XdgConfigPathResolver
     }
 
     /**
+     * The XDG Base Directory Specification requires every one of these
+     * variables to hold an absolute path and says implementations "may
+     * consider" a relative value invalid — this treats it as unset (falling
+     * back to `$home`) rather than resolving paths relative to whatever the
+     * process's current working directory happens to be, e.g. an audited
+     * project directory the standalone binary is invoked from.
+     *
      * @throws UnresolvableConfigPathException
      */
     private function baseDirectory(?string $xdgBase, string $homeRelativeFallback): string
     {
-        if (null !== $xdgBase && '' !== $xdgBase) {
+        if (null !== $xdgBase && '' !== $xdgBase && $this->isAbsolutePath($xdgBase)) {
             return $xdgBase;
         }
 
@@ -88,5 +95,22 @@ final readonly class XdgConfigPathResolver
         }
 
         throw UnresolvableConfigPathException::missingHome();
+    }
+
+    /**
+     * `Symfony\Component\Filesystem\Path::isAbsolute()` only recognizes a
+     * Windows drive-letter path (`C:\...`/`C:/...`) as absolute when the
+     * *current* runtime's `DIRECTORY_SEPARATOR` is itself `\` — but
+     * {@see self::fromEnvironment()} deliberately builds a Windows-shaped
+     * instance from a `Windows` `$osFamily` argument regardless of the OS
+     * actually running the process (see the Windows-environment test suite),
+     * so an OS-runtime-dependent check would wrongly reject a genuine
+     * absolute `%APPDATA%`-derived path on a non-Windows CI runner.
+     */
+    private function isAbsolutePath(string $path): bool
+    {
+        return str_starts_with($path, '/')
+            || str_starts_with($path, '\\')
+            || 1 === preg_match('#^[A-Za-z]:[/\\\\]#', $path);
     }
 }

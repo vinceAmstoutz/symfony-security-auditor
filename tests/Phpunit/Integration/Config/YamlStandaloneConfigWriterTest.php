@@ -17,6 +17,8 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\StandaloneConfigWriteException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsafeStandaloneConfigWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
 
 final class YamlStandaloneConfigWriterTest extends TestCase
@@ -35,6 +37,10 @@ final class YamlStandaloneConfigWriterTest extends TestCase
         (new Filesystem())->remove(\dirname($this->configFile));
     }
 
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
     public function test_it_writes_the_configuration_as_parseable_yaml(): void
     {
         $config = ['provider' => 'anthropic', 'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']], 'model' => 'claude-opus-4-8'];
@@ -44,6 +50,10 @@ final class YamlStandaloneConfigWriterTest extends TestCase
         self::assertSame($config, Yaml::parseFile($this->configFile));
     }
 
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
     public function test_it_restricts_the_config_file_to_owner_only_permissions(): void
     {
         (new YamlStandaloneConfigWriter())->write($this->configFile, ['model' => 'claude-opus-4-8']);
@@ -51,5 +61,109 @@ final class YamlStandaloneConfigWriterTest extends TestCase
         $permissions = fileperms($this->configFile);
         self::assertNotFalse($permissions);
         self::assertSame('0600', substr(\sprintf('%o', $permissions), -4));
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
+    public function test_it_tightens_permissions_on_a_pre_existing_loosely_permissioned_config_file(): void
+    {
+        $filesystem = new Filesystem();
+        $filesystem->mkdir(\dirname($this->configFile));
+        $filesystem->dumpFile($this->configFile, "old: value\n");
+        $filesystem->chmod($this->configFile, 0o644);
+
+        (new YamlStandaloneConfigWriter($filesystem))->write($this->configFile, ['model' => 'claude-opus-4-8']);
+
+        $permissions = fileperms($this->configFile);
+        self::assertNotFalse($permissions);
+        self::assertSame('0600', substr(\sprintf('%o', $permissions), -4));
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
+    public function test_the_config_file_already_has_owner_only_permissions_before_its_content_is_written(): void
+    {
+        $filesystem = new class extends Filesystem {
+            public ?int $permissionsAtDumpFileStart = null;
+
+            /**
+             * @param resource|string $content
+             */
+            #[Override]
+            public function dumpFile(string $filename, $content): void
+            {
+                $this->permissionsAtDumpFileStart = file_exists($filename) ? fileperms($filename) & 0o777 : null;
+                parent::dumpFile($filename, $content);
+            }
+        };
+
+        (new YamlStandaloneConfigWriter($filesystem))->write($this->configFile, ['model' => 'claude-opus-4-8']);
+
+        self::assertSame(0o600, $filesystem->permissionsAtDumpFileStart);
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
+    public function test_it_wraps_an_io_failure_as_a_standalone_config_write_exception(): void
+    {
+        $filesystem = new Filesystem();
+        $blockingFile = \dirname($this->configFile).'/not-a-directory';
+        $filesystem->mkdir(\dirname($blockingFile));
+        $filesystem->dumpFile($blockingFile, 'x');
+
+        $this->expectException(StandaloneConfigWriteException::class);
+
+        (new YamlStandaloneConfigWriter())->write($blockingFile.'/config.yaml', ['model' => 'claude-opus-4-8']);
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
+    public function test_it_refuses_to_write_through_a_symlinked_config_file(): void
+    {
+        $filesystem = new Filesystem();
+        $outsideTarget = sys_get_temp_dir().'/ssa-write-target-'.bin2hex(random_bytes(6));
+        $filesystem->dumpFile($outsideTarget, 'ORIGINAL');
+        $filesystem->mkdir(\dirname($this->configFile));
+        symlink($outsideTarget, $this->configFile);
+
+        try {
+            $this->expectException(UnsafeStandaloneConfigWriteException::class);
+
+            (new YamlStandaloneConfigWriter($filesystem))->write($this->configFile, ['model' => 'claude-opus-4-8']);
+        } finally {
+            self::assertSame('ORIGINAL', file_get_contents($outsideTarget));
+            $filesystem->remove($outsideTarget);
+        }
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
+    public function test_it_refuses_to_write_through_a_symlinked_parent_directory(): void
+    {
+        $filesystem = new Filesystem();
+        $outsideDir = sys_get_temp_dir().'/ssa-write-dir-'.bin2hex(random_bytes(6));
+        $filesystem->mkdir($outsideDir);
+        $filesystem->mkdir(\dirname($this->configFile, 2));
+        symlink($outsideDir, \dirname($this->configFile));
+
+        try {
+            $this->expectException(UnsafeStandaloneConfigWriteException::class);
+
+            (new YamlStandaloneConfigWriter($filesystem))->write($this->configFile, ['model' => 'claude-opus-4-8']);
+        } finally {
+            self::assertSame([], glob($outsideDir.'/*'));
+            $filesystem->remove($outsideDir);
+            $filesystem->remove(\dirname($this->configFile));
+        }
     }
 }

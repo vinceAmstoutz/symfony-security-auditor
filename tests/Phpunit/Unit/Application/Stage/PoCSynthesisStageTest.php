@@ -18,9 +18,13 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\ErrorHandler\BufferingLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\PoCSynthesisStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -44,6 +48,9 @@ final class PoCSynthesisStageTest extends TestCase
         self::assertSame(BuiltInStageName::PoCSynthesis->value, $poCSynthesisStage->name());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_skips_when_disabled(): void
     {
         $synthesizer = self::createMock(PoCSynthesizerInterface::class);
@@ -56,6 +63,8 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_does_not_call_synthesizer_when_no_validated_findings(): void
     {
@@ -72,6 +81,8 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_replaces_validated_findings_with_enriched_copies(): void
     {
@@ -94,6 +105,8 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_records_count_metadata_in_context(): void
     {
@@ -115,6 +128,8 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_does_not_replace_findings_whose_poc_remained_null(): void
     {
@@ -136,6 +151,8 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_disabled_stage_does_not_synthesize_even_with_validated_findings(): void
     {
@@ -151,6 +168,8 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_stage_is_disabled_by_default_even_with_validated_findings(): void
     {
@@ -163,6 +182,9 @@ final class PoCSynthesisStageTest extends TestCase
         (new PoCSynthesisStage($synthesizer, new NullLogger()))->process($auditContext);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_logs_debug_when_disabled(): void
     {
         $bufferingLogger = new BufferingLogger();
@@ -176,6 +198,8 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_logs_when_there_are_no_validated_findings(): void
     {
@@ -191,6 +215,8 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_logs_completion_with_enriched_and_total_counts(): void
     {
@@ -209,6 +235,92 @@ final class PoCSynthesisStageTest extends TestCase
             ['enriched' => 1, 'total_validated' => 1],
             $this->contextOf($bufferingLogger->cleanLogs(), 'PoC synthesis stage complete'),
         );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_persists_already_synthesized_pocs_before_a_budget_abort_discards_the_rest(): void
+    {
+        $first = $this->makeVulnerabilityAt('src/A.php');
+        $second = $this->makeVulnerabilityAt('src/B.php');
+
+        $synthesizer = self::createStub(PoCSynthesizerInterface::class);
+        $synthesizer->method('synthesize')->willReturnCallback(
+            static function (array $vulnerabilities) use ($first): array {
+                $vulnerability = $vulnerabilities[0];
+                self::assertInstanceOf(Vulnerability::class, $vulnerability);
+
+                if ($vulnerability->filePath() === $first->filePath()) {
+                    return [$vulnerability->withSynthesizedPoC('curl /x')];
+                }
+
+                throw BudgetExceededException::forTokens(500, 100);
+            },
+        );
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability($first);
+        $auditContext->addVulnerability($second);
+
+        $budgetExceeded = false;
+        try {
+            (new PoCSynthesisStage($synthesizer, new NullLogger(), true))->process($auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The stage must rethrow BudgetExceededException.');
+        $stored = $auditContext->vulnerabilities()[$first->id()];
+        self::assertSame('curl /x', $stored->synthesizedPoC());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_persists_already_synthesized_pocs_before_a_provider_exception_discards_the_rest(): void
+    {
+        $first = $this->makeVulnerabilityAt('src/A.php');
+        $second = $this->makeVulnerabilityAt('src/B.php');
+
+        $synthesizer = self::createStub(PoCSynthesizerInterface::class);
+        $synthesizer->method('synthesize')->willReturnCallback(
+            static function (array $vulnerabilities) use ($first): array {
+                $vulnerability = $vulnerabilities[0];
+                self::assertInstanceOf(Vulnerability::class, $vulnerability);
+
+                if ($vulnerability->filePath() === $first->filePath()) {
+                    return [$vulnerability->withSynthesizedPoC('curl /x')];
+                }
+
+                throw new LLMProviderException('platform unreachable');
+            },
+        );
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability($first);
+        $auditContext->addVulnerability($second);
+
+        $providerFailed = false;
+        try {
+            (new PoCSynthesisStage($synthesizer, new NullLogger(), true))->process($auditContext);
+        } catch (LLMProviderException) {
+            $providerFailed = true;
+        }
+
+        self::assertTrue($providerFailed, 'The stage must rethrow LLMProviderException.');
+        $stored = $auditContext->vulnerabilities()[$first->id()];
+        self::assertSame('curl /x', $stored->synthesizedPoC());
     }
 
     #[Override]
@@ -258,6 +370,7 @@ final class PoCSynthesisStageTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerability(): Vulnerability
     {
@@ -267,5 +380,20 @@ final class PoCSynthesisStageTest extends TestCase
             new VulnerabilityNarrative('d', 'av', 'proof', 'r'),
             'code',
         );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function makeVulnerabilityAt(string $filePath): Vulnerability
+    {
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Test', 0.9),
+            new CodeLocation($filePath, 10, 15),
+            new VulnerabilityNarrative('d', 'av', 'proof', 'r'),
+            'code',
+        )->withReviewerValidation(true);
     }
 }

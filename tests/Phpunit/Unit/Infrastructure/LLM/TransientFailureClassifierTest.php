@@ -35,6 +35,8 @@ final class TransientFailureClassifierTest extends TestCase
         yield 'http_502' => [new RuntimeException('Bad Gateway 502')];
         yield 'http_503' => [new RuntimeException('Service Unavailable (HTTP 503)')];
         yield 'http_504' => [new RuntimeException('Gateway Timeout (504)')];
+        yield 'http_529_overloaded' => [new RuntimeException('HTTP 529: Overloaded')];
+        yield 'overloaded_phrasing' => [new RuntimeException('The Anthropic API is currently overloaded, please retry')];
         yield 'rate_limit_phrasing' => [new RuntimeException('Rate limit exceeded')];
         yield 'timeout_phrasing' => [new RuntimeException('Request timed out after 30s')];
         yield 'temporarily_unavailable' => [new RuntimeException('Provider temporarily unavailable')];
@@ -56,6 +58,19 @@ final class TransientFailureClassifierTest extends TestCase
     public function test_it_recognizes_non_transient_failures(Throwable $throwable): void
     {
         self::assertFalse((new TransientFailureClassifier())->isTransient($throwable));
+    }
+
+    #[DataProvider('hyphenatedIdentifierCases')]
+    public function test_it_does_not_mistake_a_status_like_number_embedded_in_a_hyphenated_identifier_for_a_real_status_code(Throwable $throwable): void
+    {
+        self::assertFalse((new TransientFailureClassifier())->isTransient($throwable));
+    }
+
+    /** @return iterable<string, array{Throwable}> */
+    public static function hyphenatedIdentifierCases(): iterable
+    {
+        yield 'status_code_embedded_in_request_id' => [new RuntimeException('request id abc-500-xyz failed')];
+        yield 'status_code_embedded_in_model_name' => [new RuntimeException('the model gpt-4o-500 is not available')];
     }
 
     #[DataProvider('rateLimitCases')]
@@ -89,6 +104,7 @@ final class TransientFailureClassifierTest extends TestCase
     public static function nonRateLimitCases(): iterable
     {
         yield 'http_503_transient_but_not_rate_limit' => [new RuntimeException('HTTP 503 Service Unavailable')];
+        yield 'http_529_transient_but_not_rate_limit' => [new RuntimeException('HTTP 529 Overloaded')];
         yield 'connection_reset' => [new RuntimeException('Connection reset by peer')];
         yield 'http_401_non_transient' => [new RuntimeException('HTTP 401 Unauthorized')];
         yield 'unknown_error' => [new RuntimeException('Something went wrong')];

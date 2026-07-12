@@ -56,7 +56,7 @@ final readonly class MappingStage implements StageInterface
     #[Override]
     public function process(AuditContext $auditContext): void
     {
-        $files = $auditContext->projectFiles();
+        $files = $auditContext->mappingFiles();
 
         if ([] === $files) {
             $this->logger->warning('No files to map');
@@ -66,11 +66,12 @@ final readonly class MappingStage implements StageInterface
         }
 
         $projectFileInventory = ProjectFileInventory::fromFiles($files);
+        $controllerLikeFiles = $this->controllerLikeFiles($files);
 
         [$routeAccessMap, $firewallRules] = $this->extractSecurityConfig($files);
-        $routeAccessControls = $this->parseControllerAccessControls($projectFileInventory->controllers());
+        $routeAccessControls = $this->parseControllerAccessControls($controllerLikeFiles);
         $voterCapabilities = $this->parseVoterCapabilities($projectFileInventory->voters());
-        $formBindings = $this->parseFormBindings($projectFileInventory->controllers());
+        $formBindings = $this->parseFormBindings($controllerLikeFiles);
 
         $symfonyMapping = SymfonyMapping::of(
             $projectFileInventory,
@@ -100,6 +101,25 @@ final readonly class MappingStage implements StageInterface
             'voter_capabilities' => \count($voterCapabilities),
             'form_bindings' => \count($formBindings),
         ]);
+    }
+
+    /**
+     * A `#[AsLiveComponent]`/`#[ApiResource]` file classifies as its own
+     * dedicated {@see ProjectFileType} (to keep its specialized attacker-skill
+     * treatment) even when it also extends `AbstractController` — so
+     * `ProjectFileInventory::controllers()` alone would miss its routed,
+     * access-controlled actions.
+     *
+     * @param list<ProjectFile> $files
+     *
+     * @return list<ProjectFile>
+     */
+    private function controllerLikeFiles(array $files): array
+    {
+        return array_values(array_filter(
+            $files,
+            static fn (ProjectFile $projectFile): bool => $projectFile->fileType()->isControllerLike(),
+        ));
     }
 
     /**
@@ -169,10 +189,36 @@ final readonly class MappingStage implements StageInterface
             }
 
             $content = $file->content();
-            $routeAccessMap = array_merge($routeAccessMap, $this->securityConfigParser->parseAccessControl($content));
+            $routeAccessMap = $this->mergeRouteAccessMaps($routeAccessMap, $this->securityConfigParser->parseAccessControl($content));
             $firewallRules = [...$firewallRules, ...$this->securityConfigParser->parseFirewallRules($content)];
         }
 
         return [$routeAccessMap, $firewallRules];
+    }
+
+    /**
+     * Mirrors {@see SymfonyYamlSecurityConfigParser::recordAccessControlEntry()}'s
+     * first-match-wins semantics across config files: a rule for a path already
+     * covered by an earlier file is appended as an `or: …` requirement instead of
+     * replacing it, so no file's rule is silently dropped.
+     *
+     * @param array<string, list<string>> $routeAccessMap
+     * @param array<string, list<string>> $incoming
+     *
+     * @return array<string, list<string>>
+     */
+    private function mergeRouteAccessMaps(array $routeAccessMap, array $incoming): array
+    {
+        foreach ($incoming as $target => $requirements) {
+            if (\array_key_exists($target, $routeAccessMap)) {
+                $routeAccessMap[$target][] = \sprintf('or: %s', implode(', ', $requirements));
+
+                continue;
+            }
+
+            $routeAccessMap[$target] = $requirements;
+        }
+
+        return $routeAccessMap;
     }
 }

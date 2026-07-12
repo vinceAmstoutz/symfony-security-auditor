@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Closure;
-use InvalidArgumentException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class RetryPolicy
@@ -41,6 +41,16 @@ final readonly class RetryPolicy
      */
     public const int DEFAULT_RATE_LIMIT_MAX_DELAY_MS = 300_000;
 
+    /**
+     * Upper bound applied to a transient-failure retry delay, mirroring
+     * {@see DEFAULT_RATE_LIMIT_MAX_DELAY_MS} — without it, a high
+     * `max_attempts` combined with the default `backoff_multiplier` grows the
+     * delay exponentially without limit (e.g. attempt 19 computes to roughly
+     * a day), wedging the audit exactly as the rate-limit ceiling above was
+     * introduced to prevent.
+     */
+    public const int DEFAULT_MAX_DELAY_MS = 300_000;
+
     /** @var Closure(): float */
     private Closure $jitterSource;
 
@@ -58,13 +68,16 @@ final readonly class RetryPolicy
         return $this->backoffSchedule->maxAttempts;
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     public function delayMs(int $attempt): int
     {
         if ($attempt < 1) {
-            throw new InvalidArgumentException(\sprintf('attempt must be >= 1, got %d', $attempt));
+            throw InvalidRetryConfigurationException::forNonPositiveAttempt($attempt);
         }
 
-        return $this->computeDelay($this->backoffSchedule->initialDelayMs, $attempt);
+        return (int) round(min($this->computeDelay($this->backoffSchedule->initialDelayMs, $attempt), (float) self::DEFAULT_MAX_DELAY_MS));
     }
 
     /**
@@ -74,28 +87,42 @@ final readonly class RetryPolicy
      * `Retry-After` response header via `RetryAfterHeaderParser`), the hint
      * wins over the local exponential schedule. Otherwise the delay is
      * `rateLimitInitialDelayMs` grown by `backoffMultiplier ** (attempt − 1)`
-     * with the same jitter as `delayMs()`. The result is always clamped to
+     * jittered upward-only (unlike `delayMs()`'s symmetric jitter) so it never
+     * undercuts a provider's requested wait. The result is always clamped to
      * `rateLimitMaxDelayMs` so a hostile provider cannot push the wait past
      * a sane ceiling.
+     *
+     * @throws InvalidRetryConfigurationException
      */
     public function rateLimitDelayMs(int $attempt, ?int $serverHintSeconds = null): int
     {
         if ($attempt < 1) {
-            throw new InvalidArgumentException(\sprintf('attempt must be >= 1, got %d', $attempt));
+            throw InvalidRetryConfigurationException::forNonPositiveAttempt($attempt);
         }
 
         if (null !== $serverHintSeconds && $serverHintSeconds > 0) {
             return min($serverHintSeconds * 1_000, $this->rateLimitBackoff->maxDelayMs);
         }
 
-        return min($this->computeDelay($this->rateLimitBackoff->initialDelayMs, $attempt), $this->rateLimitBackoff->maxDelayMs);
+        return (int) round(min($this->computeDelay($this->rateLimitBackoff->initialDelayMs, $attempt, upwardOnlyJitter: true), (float) $this->rateLimitBackoff->maxDelayMs));
     }
 
-    private function computeDelay(int $baseInitialDelayMs, int $attempt): int
+    /**
+     * Returns the unclamped, unrounded delay so callers can clamp against
+     * their own ceiling in float space before rounding — clamping after an
+     * `(int)` cast is too late: the exponential term can exceed `PHP_INT_MAX`
+     * long before any realistic ceiling, and casting an out-of-range float to
+     * int is undefined (observed as a nonsensical negative value), which
+     * `min()` would then wrongly treat as "smaller than the ceiling".
+     */
+    private function computeDelay(int $baseInitialDelayMs, int $attempt, bool $upwardOnlyJitter = false): float
     {
         $baseDelay = $baseInitialDelayMs * ($this->backoffSchedule->backoffMultiplier ** ($attempt - 1));
-        $jitterFactor = 1.0 + $this->backoffSchedule->jitterRatio * (2.0 * ($this->jitterSource)() - 1.0);
+        $jitterSample = ($this->jitterSource)();
+        $jitterFactor = $upwardOnlyJitter
+            ? 1.0 + $this->backoffSchedule->jitterRatio * $jitterSample
+            : 1.0 + $this->backoffSchedule->jitterRatio * (2.0 * $jitterSample - 1.0);
 
-        return (int) round($baseDelay * $jitterFactor);
+        return $baseDelay * $jitterFactor;
     }
 }

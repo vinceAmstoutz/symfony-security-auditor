@@ -25,15 +25,17 @@ so we can document it.
 
 ### `Class "Symfony\AI\AiBundle\AiBundle" not found`
 
-You forgot to install a platform bridge **or** to register `AiBundle` before
-`SymfonySecurityAuditorBundle`.
+`symfony/ai-bundle` isn't installed, or Composer's autoloader hasn't picked it
+up yet. This is a Composer/autoload issue, not a `config/bundles.php` ordering
+problem — `AiBundle` and `SymfonySecurityAuditorBundle` can be registered in
+either order.
 
 ```bash
 composer require symfony/ai-anthropic-platform  # or any other bridge
 ```
 
 ```php
-// config/bundles.php — AiBundle MUST come first
+// config/bundles.php — either order works
 Symfony\AI\AiBundle\AiBundle::class => ['all' => true],
 VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['dev' => true, 'test' => true],
 ```

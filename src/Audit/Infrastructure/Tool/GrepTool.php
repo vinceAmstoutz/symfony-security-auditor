@@ -14,7 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
@@ -30,11 +32,16 @@ final readonly class GrepTool implements ToolInterface
 {
     private const int MAX_MATCHES = 50;
 
+    private const int MAX_LINE_LENGTH = 500;
+
     /**
      * @param list<ProjectFile> $files
      */
     public function __construct(private array $files) {}
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     #[Override]
     public function definition(): ToolDefinition
     {
@@ -50,12 +57,20 @@ final readonly class GrepTool implements ToolInterface
                     ],
                     'file_type' => [
                         'type' => 'string',
-                        'description' => 'Optional ProjectFile::type() to restrict the search to: controller, voter, entity, repository, form, template, config, php.',
+                        'description' => \sprintf('Optional ProjectFile::type() to restrict the search to: %s.', $this->fileTypeValues()),
                     ],
                 ],
                 'required' => ['pattern'],
             ],
         );
+    }
+
+    private function fileTypeValues(): string
+    {
+        return implode(', ', array_map(
+            static fn (ProjectFileType $projectFileType): string => $projectFileType->value,
+            ProjectFileType::cases(),
+        ));
     }
 
     #[Override]
@@ -132,7 +147,22 @@ final readonly class GrepTool implements ToolInterface
                 continue;
             }
 
-            yield \sprintf('%s:%d:%s', $projectFile->relativePath(), $lineIndex + 1, u($line)->trim()->toString());
+            yield \sprintf('%s:%d:%s', $projectFile->relativePath(), $lineIndex + 1, $this->truncateLine(u($line)->trim()->toString()));
         }
+    }
+
+    /**
+     * A single matched line's length is otherwise unbounded — audited-project
+     * content fully controls it (e.g. a long inline base64/SVG blob or config
+     * value), and unlike {@see MAX_MATCHES}, capping the match count alone
+     * does nothing to bound a single oversized line sent to the LLM.
+     */
+    private function truncateLine(string $line): string
+    {
+        if (\strlen($line) <= self::MAX_LINE_LENGTH) {
+            return $line;
+        }
+
+        return \sprintf('%s... [truncated]', mb_strcut($line, 0, self::MAX_LINE_LENGTH, 'UTF-8'));
     }
 }

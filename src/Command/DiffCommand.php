@@ -42,7 +42,7 @@ final readonly class DiffCommand
         try {
             $reportDiff = $this->reportDiffer->diff($previousReport, $currentReport);
         } catch (ReportFileNotReadableException|MalformedReportFileException $exception) {
-            $symfonyStyle->error($exception->getMessage());
+            $this->errorStyle($symfonyStyle, $diffOutputFormat)->error($exception->getMessage());
 
             return ExitCode::Failure->value;
         }
@@ -50,5 +50,15 @@ final readonly class DiffCommand
         $this->diffPresenter->present($symfonyStyle, $reportDiff, $diffOutputFormat);
 
         return ExitCode::Success->value;
+    }
+
+    /**
+     * Human-facing error messages move to stderr when stdout carries a
+     * machine-readable document, so `--format=json > diff.json` receives the
+     * document alone — mirrors `AuditCommand::displayStyle()`.
+     */
+    private function errorStyle(SymfonyStyle $symfonyStyle, DiffOutputFormat $diffOutputFormat): SymfonyStyle
+    {
+        return DiffOutputFormat::Json === $diffOutputFormat ? $symfonyStyle->getErrorStyle() : $symfonyStyle;
     }
 }

@@ -58,12 +58,14 @@ final readonly class ReportDiffer implements ReportDifferInterface
     private function loadFindings(string $path): array
     {
         $findings = [];
-        foreach ($this->decodeVulnerabilities($path) as $index => $vulnerability) {
+        $index = 0;
+        foreach ($this->decodeVulnerabilities($path) as $vulnerability) {
             if (!\is_array($vulnerability)) {
-                throw MalformedReportFileException::invalidVulnerabilityEntry($path, (int) $index);
+                throw MalformedReportFileException::vulnerabilityEntryNotAnObject($path, $index);
             }
 
-            $findings[] = $this->toDiffFinding($vulnerability, $path, (int) $index);
+            $findings[] = $this->toDiffFinding($vulnerability, $path, $index);
+            ++$index;
         }
 
         return $findings;
@@ -133,43 +135,54 @@ final readonly class ReportDiffer implements ReportDifferInterface
     }
 
     /**
-     * @param array<string, DiffFinding> $findings
-     * @param array<string, DiffFinding> $excluded
+     * Two distinct findings can share a fingerprint (same type/file/title,
+     * different line) — grouping by fingerprint instead of overwriting keeps
+     * both instead of silently dropping one. Buckets are paired off by count:
+     * a fingerprint with more entries in `$findings` than in `$excluded`
+     * contributes only its excess as "not excluded", matching each shared
+     * entry 1:1 before counting anything as new/fixed.
+     *
+     * @param array<string, list<DiffFinding>> $findings
+     * @param array<string, list<DiffFinding>> $excluded
      *
      * @return list<DiffFinding>
      */
     private function only(array $findings, array $excluded): array
     {
-        return array_values(array_filter(
-            $findings,
-            static fn (DiffFinding $diffFinding): bool => !\array_key_exists($diffFinding->fingerprint, $excluded),
-        ));
+        $result = [];
+        foreach ($findings as $fingerprint => $group) {
+            $result = [...$result, ...\array_slice($group, \count($excluded[$fingerprint] ?? []))];
+        }
+
+        return $result;
     }
 
     /**
-     * @param array<string, DiffFinding> $findings
-     * @param array<string, DiffFinding> $other
+     * @param array<string, list<DiffFinding>> $findings
+     * @param array<string, list<DiffFinding>> $other
      *
      * @return list<DiffFinding>
      */
     private function intersect(array $findings, array $other): array
     {
-        return array_values(array_filter(
-            $findings,
-            static fn (DiffFinding $diffFinding): bool => \array_key_exists($diffFinding->fingerprint, $other),
-        ));
+        $result = [];
+        foreach ($findings as $fingerprint => $group) {
+            $result = [...$result, ...\array_slice($group, 0, \count($other[$fingerprint] ?? []))];
+        }
+
+        return $result;
     }
 
     /**
      * @param list<DiffFinding> $findings
      *
-     * @return array<string, DiffFinding>
+     * @return array<string, list<DiffFinding>>
      */
     private function indexByFingerprint(array $findings): array
     {
         $indexed = [];
         foreach ($findings as $finding) {
-            $indexed[$finding->fingerprint] = $finding;
+            $indexed[$finding->fingerprint][] = $finding;
         }
 
         return $indexed;

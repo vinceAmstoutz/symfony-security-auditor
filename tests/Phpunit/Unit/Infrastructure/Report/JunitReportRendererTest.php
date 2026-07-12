@@ -15,8 +15,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
 use DOMDocument;
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -43,6 +45,8 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_reports_each_validated_finding_as_a_failed_testcase(): void
     {
@@ -70,6 +74,9 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
         self::assertStringContainsString('CWE: '.VulnerabilityType::SQL_INJECTION->cwe()->label(), $failure->textContent);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_reports_an_empty_suite_when_no_findings(): void
     {
         $testsuite = $this->decodeJunit($this->makeReport())->getElementsByTagName('testsuite')->item(0);
@@ -82,6 +89,8 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_escapes_xml_metacharacters(): void
     {
@@ -102,6 +111,8 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_strips_xml_illegal_control_characters(): void
     {
@@ -128,6 +139,8 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_strips_illegal_control_characters_from_the_file_path(): void
     {
@@ -152,6 +165,8 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_strips_non_characters_that_are_valid_utf8_but_illegal_xml(): void
     {
@@ -172,6 +187,8 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_drops_a_value_that_is_not_valid_utf8_instead_of_corrupting_the_document(): void
     {
@@ -192,6 +209,8 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_pretty_prints_the_document(): void
     {

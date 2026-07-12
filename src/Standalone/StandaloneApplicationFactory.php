@@ -19,6 +19,7 @@ use Symfony\Component\Console\Command\LazyCommand;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
@@ -27,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
@@ -77,7 +79,8 @@ final readonly class StandaloneApplicationFactory
      */
     public static function projectConfigFile(array $environment): ?string
     {
-        $workingDirectory = $environment['PWD'] ?? self::processWorkingDirectory();
+        $pwd = $environment['PWD'] ?? '';
+        $workingDirectory = '' !== $pwd ? $pwd : self::processWorkingDirectory();
 
         return null !== $workingDirectory ? \sprintf('%s/%s', $workingDirectory, self::PROJECT_CONFIG_FILENAME) : null;
     }
@@ -94,7 +97,7 @@ final readonly class StandaloneApplicationFactory
 
     public function create(): Application
     {
-        $application = new Application(self::APPLICATION_NAME);
+        $application = new Application(self::APPLICATION_NAME, (new ReportPackage())->version());
         $application->addCommand($this->initCommand());
         $application->addCommand($this->lazyAuditCommand());
 
@@ -145,6 +148,7 @@ final readonly class StandaloneApplicationFactory
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
      * @throws UnresolvableAuditCommandException
+     * @throws MalformedProjectConfigException
      */
     private function loadAuditCommand(): Command
     {
@@ -158,6 +162,7 @@ final readonly class StandaloneApplicationFactory
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
+     * @throws MalformedProjectConfigException
      */
     private function buildContainer(): ContainerBuilder
     {

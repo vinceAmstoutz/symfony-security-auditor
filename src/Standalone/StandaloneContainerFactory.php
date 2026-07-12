@@ -13,9 +13,11 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 
+use Psr\Clock\ClockInterface;
 use Psr\Log\NullLogger;
 use Symfony\AI\AiBundle\AiBundle;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\EventDispatcher\EventDispatcher;
@@ -59,6 +61,7 @@ final readonly class StandaloneContainerFactory
 
         $containerBuilder->register('event_dispatcher', EventDispatcher::class)->setPublic(true);
         $containerBuilder->register('logger', NullLogger::class);
+        $containerBuilder->register(ClockInterface::class, NativeClock::class);
 
         $this->bundleExtensionLoader->load(new AiBundle(), $standaloneConfig->platform->toAiConfig(), $containerBuilder);
         $this->bundleExtensionLoader->load(new SymfonySecurityAuditorBundle(), $standaloneConfig->auditConfig, $containerBuilder);

@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
 use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -128,6 +129,9 @@ final class SymfonyMappingTest extends TestCase
         self::assertSame([$unprotected], $symfonyMapping->controllersWithoutAccessCheck());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_counts_total_files_correctly(): void
     {
         $symfonyMapping = SymfonyMapping::of(
@@ -142,6 +146,9 @@ final class SymfonyMappingTest extends TestCase
         self::assertSame(4, $symfonyMapping->totalFiles());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_total_files_includes_forms_and_services(): void
     {
         $symfonyMapping = SymfonyMapping::of(
@@ -155,6 +162,9 @@ final class SymfonyMappingTest extends TestCase
         self::assertSame(3, $symfonyMapping->totalFiles());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_total_files_includes_repositories_and_templates(): void
     {
         $symfonyMapping = SymfonyMapping::of(
@@ -168,6 +178,9 @@ final class SymfonyMappingTest extends TestCase
         self::assertSame(3, $symfonyMapping->totalFiles());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_total_files_sums_all_seven_categories(): void
     {
         $symfonyMapping = SymfonyMapping::of(
@@ -186,6 +199,9 @@ final class SymfonyMappingTest extends TestCase
         self::assertSame(8, $symfonyMapping->totalFiles());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_voter_for_entity(): void
     {
         $projectFile = ProjectFile::create(
@@ -200,6 +216,42 @@ final class SymfonyMappingTest extends TestCase
         self::assertFalse($symfonyMapping->hasVoterForEntity('Post'));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_does_not_match_an_entity_name_that_is_only_a_substring_of_an_unrelated_identifier(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/AdminUserVoter.php',
+            '/app/src/Security/AdminUserVoter.php',
+            '<?php class AdminUserVoter extends Voter { protected function supports(string $attribute, mixed $subject): bool { return $subject instanceof AdminUser; } }',
+        );
+
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['voters' => [$projectFile]]), new AccessControlMap());
+
+        self::assertFalse($symfonyMapping->hasVoterForEntity('User'));
+        self::assertTrue($symfonyMapping->hasVoterForEntity('AdminUser'));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_treats_a_regex_metacharacter_in_the_entity_name_literally(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/RegexVoter.php',
+            '/app/src/Security/RegexVoter.php',
+            '<?php class RegexVoter extends Voter { protected function supports(string $attribute, mixed $subject): bool { return $subject instanceof UserX; } }',
+        );
+
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['voters' => [$projectFile]]), new AccessControlMap());
+
+        self::assertFalse($symfonyMapping->hasVoterForEntity('User.'));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_finds_controllers_without_security_annotations(): void
     {
         $projectFile = ProjectFile::create(
@@ -221,6 +273,9 @@ final class SymfonyMappingTest extends TestCase
         self::assertSame('src/Controller/PublicController.php', $unprotected[0]->relativePath());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_generates_summary_string(): void
     {
         $symfonyMapping = SymfonyMapping::of(
@@ -244,6 +299,8 @@ final class SymfonyMappingTest extends TestCase
 
     /**
      * @deprecated covers the deprecated {@see SymfonyMapping::create()} delegator until it is removed in 2.0.
+     *
+     * @throws InvalidProjectFileException
      */
     #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
     public function test_deprecated_create_maps_every_group_to_of(): void
@@ -297,6 +354,9 @@ final class SymfonyMappingTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     private function makeFile(string $path): ProjectFile
     {
         return ProjectFile::create($path, '/app/'.$path, '<?php');

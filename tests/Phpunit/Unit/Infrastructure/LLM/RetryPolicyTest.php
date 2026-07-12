@@ -116,21 +116,53 @@ final class RetryPolicyTest extends TestCase
         self::assertSame(0, $retryPolicy->delayMs(3));
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_delay_is_clamped_to_max_instead_of_growing_unbounded(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            new BackoffSchedule(maxAttempts: 20, initialDelayMs: 500, backoffMultiplier: 2.0, jitterRatio: 0.0),
+            jitterSource: static fn (): float => 0.0,
+        );
+
+        self::assertSame(300_000, $retryPolicy->delayMs(19));
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_delay_stays_clamped_to_max_even_when_the_exponential_term_would_overflow_an_int(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            new BackoffSchedule(maxAttempts: 100, initialDelayMs: 500, backoffMultiplier: 2.0, jitterRatio: 0.0),
+            jitterSource: static fn (): float => 0.0,
+        );
+
+        self::assertSame(300_000, $retryPolicy->delayMs(56));
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     public function test_invalid_attempt_is_rejected(): void
     {
         $retryPolicy = new RetryPolicy();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidRetryConfigurationException::class);
         $this->expectExceptionMessage('attempt must be >= 1, got 0');
 
         $retryPolicy->delayMs(0);
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     public function test_invalid_attempt_is_rejected_for_rate_limit_delay(): void
     {
         $retryPolicy = new RetryPolicy();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidRetryConfigurationException::class);
         $this->expectExceptionMessage('attempt must be >= 1, got 0');
 
         $retryPolicy->rateLimitDelayMs(0);
@@ -191,6 +223,51 @@ final class RetryPolicyTest extends TestCase
         new BackoffSchedule(jitterRatio: -0.01);
     }
 
+    public function test_invalid_configuration_messages_format_the_value_with_a_period_regardless_of_the_process_numeric_locale(): void
+    {
+        $previousLocale = setlocale(\LC_NUMERIC, '0');
+        setlocale(\LC_NUMERIC, 'de_DE.UTF-8');
+
+        try {
+            $message = '';
+            try {
+                new BackoffSchedule(backoffMultiplier: 0.5);
+            } catch (InvalidArgumentException $invalidArgumentException) {
+                $message = $invalidArgumentException->getMessage();
+            }
+        } finally {
+            setlocale(\LC_NUMERIC, false !== $previousLocale ? $previousLocale : 'C');
+        }
+
+        self::assertStringContainsString('got 0.500000', $message);
+    }
+
+    public function test_low_backoff_multiplier_message_formats_the_value_with_exactly_six_decimals(): void
+    {
+        $message = '';
+
+        try {
+            new BackoffSchedule(backoffMultiplier: 0.5);
+        } catch (InvalidArgumentException $invalidArgumentException) {
+            $message = $invalidArgumentException->getMessage();
+        }
+
+        self::assertSame('backoffMultiplier must be >= 1.0, got 0.500000', $message);
+    }
+
+    public function test_out_of_range_jitter_ratio_message_formats_the_value_with_exactly_six_decimals(): void
+    {
+        $message = '';
+
+        try {
+            new BackoffSchedule(jitterRatio: 1.5);
+        } catch (InvalidArgumentException $invalidArgumentException) {
+            $message = $invalidArgumentException->getMessage();
+        }
+
+        self::assertSame('jitterRatio must be in [0.0, 1.0], got 1.500000', $message);
+    }
+
     /**
      * @throws InvalidRetryConfigurationException
      */
@@ -245,6 +322,9 @@ final class RetryPolicyTest extends TestCase
         self::assertSame(100, $retryPolicy->delayMs(5));
     }
 
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
     public function test_constructor_defaults_match_documented_values(): void
     {
         $retryPolicy = new RetryPolicy(jitterSource: static fn (): float => 0.5);
@@ -287,11 +367,47 @@ final class RetryPolicyTest extends TestCase
         self::assertSame(60_000, $retryPolicy->rateLimitDelayMs(1));
     }
 
-    public function test_rate_limit_delay_default_is_sixty_seconds(): void
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_rate_limit_delay_default_is_at_least_sixty_seconds(): void
     {
-        $retryPolicy = new RetryPolicy(jitterSource: static fn (): float => 0.5);
+        $retryPolicy = new RetryPolicy(jitterSource: static fn (): float => 0.0);
 
         self::assertSame(60_000, $retryPolicy->rateLimitDelayMs(1));
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_rate_limit_delay_jitter_never_fires_before_the_window_has_elapsed(): void
+    {
+        $retryPolicyAtFloor = new RetryPolicy(
+            new BackoffSchedule(jitterRatio: 0.2),
+            new RateLimitBackoff(initialDelayMs: 60_000),
+            jitterSource: static fn (): float => 0.0,
+        );
+        $retryPolicyAtCeiling = new RetryPolicy(
+            new BackoffSchedule(jitterRatio: 0.2),
+            new RateLimitBackoff(initialDelayMs: 60_000),
+            jitterSource: static fn (): float => 1.0,
+        );
+
+        self::assertSame(60_000, $retryPolicyAtFloor->rateLimitDelayMs(1));
+        self::assertSame(72_000, $retryPolicyAtCeiling->rateLimitDelayMs(1));
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_regular_delay_jitter_remains_symmetric_around_the_base(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            new BackoffSchedule(initialDelayMs: 60_000, jitterRatio: 0.2),
+            jitterSource: static fn (): float => 0.0,
+        );
+
+        self::assertSame(48_000, $retryPolicy->delayMs(1));
     }
 
     /**
@@ -395,6 +511,34 @@ final class RetryPolicyTest extends TestCase
         );
 
         self::assertSame(120_000, $retryPolicy->rateLimitDelayMs(3));
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_rate_limit_delay_rounds_a_high_fraction_up_distinguishing_floor(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            new BackoffSchedule(backoffMultiplier: 1.0, jitterRatio: 0.25),
+            new RateLimitBackoff(initialDelayMs: 2, maxDelayMs: 300_000),
+            jitterSource: static fn (): float => 1.0,
+        );
+
+        self::assertSame(3, $retryPolicy->rateLimitDelayMs(1));
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_rate_limit_delay_rounds_a_low_fraction_down_distinguishing_ceil(): void
+    {
+        $retryPolicy = new RetryPolicy(
+            new BackoffSchedule(backoffMultiplier: 1.0, jitterRatio: 0.125),
+            new RateLimitBackoff(initialDelayMs: 2, maxDelayMs: 300_000),
+            jitterSource: static fn (): float => 1.0,
+        );
+
+        self::assertSame(2, $retryPolicy->rateLimitDelayMs(1));
     }
 
     /**

@@ -17,6 +17,7 @@ use Closure;
 use Override;
 use Symfony\Component\Process\Exception\ExceptionInterface;
 use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
 
@@ -37,7 +38,7 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
      * @param ?Closure(string): Process $processBuilder defaults to the standard composer-audit command; tests inject a stub
      */
     public function __construct(
-        private int $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,
+        private float $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,
         private ?Closure $processBuilder = null,
     ) {}
 
@@ -59,14 +60,20 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
         $process = $builder($projectPath);
 
         try {
-            $process->setTimeout((float) $this->timeoutSeconds);
+            $process->setTimeout($this->timeoutSeconds);
             $process->run();
+        } catch (ProcessTimedOutException $processTimedOutException) {
+            throw AdvisorySourceUnavailableException::forTimeout($this->timeoutSeconds, $processTimedOutException);
         } catch (ExceptionInterface $exception) {
-            throw AdvisorySourceUnavailableException::forBinaryNotFound($exception);
+            throw AdvisorySourceUnavailableException::forProcessSetupFailure($exception);
         }
 
         $stdout = $process->getOutput();
         if (u($stdout)->trim()->isEmpty()) {
+            if (127 === $process->getExitCode()) {
+                throw AdvisorySourceUnavailableException::forBinaryNotFound(new ProcessFailedException($process));
+            }
+
             $errorOutput = $process->getErrorOutput();
 
             throw AdvisorySourceUnavailableException::forFailedProcess($projectPath, '' !== $errorOutput ? $errorOutput : 'empty stdout', $process->isSuccessful() ? null : new ProcessFailedException($process));

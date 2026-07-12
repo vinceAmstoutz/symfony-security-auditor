@@ -16,11 +16,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 
@@ -58,28 +61,39 @@ final readonly class EstimateAuditCostUseCase
         private float $outputRatio = self::DEFAULT_OUTPUT_RATIO,
         private string $reviewerModel = '',
         private float $reviewerInputRatio = self::DEFAULT_REVIEWER_INPUT_RATIO,
+        private ?GitChangedFilesResolverInterface $gitChangedFilesResolver = null,
     ) {}
 
     /**
-     * @param list<string> $scanPaths optional project-relative subdirectories
-     *                                to restrict the estimate to; empty list
-     *                                (the default) estimates over the whole
-     *                                project
+     * @param list<string> $scanPaths    optional project-relative subdirectories
+     *                                   to restrict the estimate to; empty list
+     *                                   (the default) estimates over the whole
+     *                                   project
+     * @param ?string      $diffSinceRef when set, mirrors `IngestionStage` by
+     *                                   narrowing the estimate to files changed
+     *                                   against this git ref, matching what an
+     *                                   `audit:run --since` would actually scan
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
      */
-    public function execute(string $projectPath, array $scanPaths = []): AuditReport
+    public function execute(string $projectPath, array $scanPaths = [], ?string $diffSinceRef = null): AuditReport
     {
         $this->logger->info('Estimating audit cost (dry-run)', ['project' => $projectPath, 'scan_paths' => $scanPaths]);
 
-        $auditContext = AuditContext::forProject($projectPath, $scanPaths);
+        $auditContext = AuditContext::forProject($projectPath, $scanPaths, diffSinceRef: $diffSinceRef);
         $files = $this->filterByScanPaths($this->projectFileScanner->scan($projectPath), $scanPaths);
-        $auditContext->setProjectFiles($files);
-
-        $totalInputChars = 0;
-        foreach ($files as $file) {
-            $totalInputChars += mb_strlen($file->content());
+        if (null !== $diffSinceRef && $this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
+            $files = $this->filterByGitDiff($projectPath, $diffSinceRef, $files);
         }
 
-        $attackerPerRoundInput = $this->tokenEstimator->estimateTokens(str_repeat('x', $totalInputChars), $this->primaryModel);
+        $auditContext->setProjectFiles($files);
+
+        $attackerPerRoundInput = 0;
+        foreach ($files as $file) {
+            $attackerPerRoundInput += $this->tokenEstimator->estimateTokens($file->content(), $this->primaryModel);
+        }
+
         $attackerInputTokens = $attackerPerRoundInput * $this->maxIterations;
         $attackerOutputTokens = (int) ceil($attackerInputTokens * $this->outputRatio);
         $attackerCostUsd = $this->costCalculator->costForCall($attackerInputTokens, $attackerOutputTokens, $this->primaryModel);
@@ -131,5 +145,21 @@ final readonly class EstimateAuditCostUseCase
     private function filterByScanPaths(array $files, array $scanPaths): array
     {
         return ScanPathFilter::apply($files, $scanPaths);
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     *
+     * @return list<ProjectFile>
+     */
+    private function filterByGitDiff(string $projectPath, string $ref, array $files): array
+    {
+        $changed = $this->gitChangedFilesResolver?->changedSince($projectPath, $ref) ?? [];
+        $changedSet = array_flip($changed);
+
+        return array_values(array_filter(
+            $files,
+            static fn (ProjectFile $projectFile): bool => \array_key_exists($projectFile->relativePath(), $changedSet),
+        ));
     }
 }

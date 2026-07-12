@@ -43,18 +43,31 @@ final readonly class ChunkContextFactory
     public function create(array $chunk, AttackerAnalysisRequest $attackerAnalysisRequest, RiskMarkerIndex $riskMarkerIndex, bool $cacheIsContextAware): ChunkContext
     {
         $chunkMarkers = $riskMarkerIndex->forChunk($chunk);
+        $markerPreamble = $this->renderMarkerPreamble($chunkMarkers);
 
         $rejectedPreamble = $this->renderRejectedPreamble($attackerAnalysisRequest);
         $previousPreamble = $this->renderPreviousPreamble($attackerAnalysisRequest);
-        $contextKey = $this->deriveContextKey($rejectedPreamble, $previousPreamble);
+        $contextKey = $this->deriveContextKey($markerPreamble, $rejectedPreamble, $previousPreamble);
         $cacheable = $this->isCacheable($attackerAnalysisRequest, $contextKey, $cacheIsContextAware);
 
-        $slicedChunk = $this->sliceChunk($chunk);
+        $slicedChunk = $this->sliceChunk($chunk, $riskMarkerIndex);
         $systemPrompt = $this->attackerPromptBuilder->buildSystemPrompt($slicedChunk);
         $userMessage = $this->attackerPromptBuilder->buildUserMessage($slicedChunk, $attackerAnalysisRequest->symfonyMapping);
-        $userMessage = $this->prependContext($userMessage, $chunkMarkers, $rejectedPreamble, $previousPreamble);
+        $userMessage = $this->prependContext($userMessage, $markerPreamble, $rejectedPreamble, $previousPreamble);
 
         return new ChunkContext($systemPrompt, $userMessage, $contextKey, $cacheable);
+    }
+
+    /**
+     * @param list<RiskMarker> $chunkMarkers
+     */
+    private function renderMarkerPreamble(array $chunkMarkers): string
+    {
+        if ([] === $chunkMarkers) {
+            return '';
+        }
+
+        return $this->attackerContextPromptRenderer->renderRiskMarkers($chunkMarkers);
     }
 
     private function renderRejectedPreamble(AttackerAnalysisRequest $attackerAnalysisRequest): string
@@ -75,13 +88,27 @@ final readonly class ChunkContextFactory
         return $this->attackerContextPromptRenderer->renderPreviousFindings($attackerAnalysisRequest->previousFindings);
     }
 
-    private function deriveContextKey(string $rejectedPreamble, string $previousPreamble): string
+    /**
+     * Hashing each preamble individually before joining fixes each to 64 hex
+     * characters, which can never contain the raw-text join's own separator —
+     * so a rejected/previous preamble embedding a null byte (both are
+     * rendered from LLM-echoed `Vulnerability::filePath()` values, which are
+     * never null-byte-sanitized) can't shift content across the join
+     * boundary and collide with a genuinely different triple. Mirrors
+     * `FilesystemAttackerCache::keyForChunk()`'s per-file hash-then-join.
+     *
+     * The marker preamble is included so a chunk cache entry is invalidated
+     * whenever the risk markers it was built from change — e.g. a custom
+     * `StaticPreScannerInterface` implementation (a documented extension
+     * point) starts flagging a file differently on an unchanged content hash.
+     */
+    private function deriveContextKey(string $markerPreamble, string $rejectedPreamble, string $previousPreamble): string
     {
-        if ('' === $rejectedPreamble && '' === $previousPreamble) {
+        if ('' === $markerPreamble && '' === $rejectedPreamble && '' === $previousPreamble) {
             return '';
         }
 
-        return hash('sha256', \sprintf("%s\0%s", $rejectedPreamble, $previousPreamble));
+        return hash('sha256', hash('sha256', $markerPreamble).hash('sha256', $rejectedPreamble).hash('sha256', $previousPreamble));
     }
 
     private function isCacheable(AttackerAnalysisRequest $attackerAnalysisRequest, string $contextKey, bool $cacheIsContextAware): bool
@@ -89,13 +116,10 @@ final readonly class ChunkContextFactory
         return !$attackerAnalysisRequest->bypassCache && ('' === $contextKey || $cacheIsContextAware);
     }
 
-    /**
-     * @param list<RiskMarker> $chunkMarkers
-     */
-    private function prependContext(string $userMessage, array $chunkMarkers, string $rejectedPreamble, string $previousPreamble): string
+    private function prependContext(string $userMessage, string $markerPreamble, string $rejectedPreamble, string $previousPreamble): string
     {
-        if ([] !== $chunkMarkers) {
-            $userMessage = \sprintf("%s\n\n%s", $this->attackerContextPromptRenderer->renderRiskMarkers($chunkMarkers), $userMessage);
+        if ('' !== $markerPreamble) {
+            $userMessage = \sprintf("%s\n\n%s", $markerPreamble, $userMessage);
         }
 
         if ('' !== $rejectedPreamble) {
@@ -114,16 +138,19 @@ final readonly class ChunkContextFactory
      * down to security-relevant lines. The slicer preserves the original line
      * count by replacing elided lines with a `// elided` placeholder, so the
      * line-numbering protocol in the prompt stays accurate against the source.
+     * Any line the static pre-scanner already flagged as a risk marker is
+     * restored verbatim afterward, since the slicer's own keyword list is
+     * independently maintained and can miss patterns the pre-scanner catches.
      *
      * @param list<ProjectFile> $chunk
      *
      * @return list<ProjectFile>
      */
-    private function sliceChunk(array $chunk): array
+    private function sliceChunk(array $chunk, RiskMarkerIndex $riskMarkerIndex): array
     {
         $sliced = [];
         foreach ($chunk as $file) {
-            $newContent = $this->codeSlicer->slice($file);
+            $newContent = $this->restoreRiskMarkerLines($file, $this->codeSlicer->slice($file), $riskMarkerIndex->forChunk([$file]));
 
             if ($newContent === $file->content()) {
                 $sliced[] = $file;
@@ -131,13 +158,27 @@ final readonly class ChunkContextFactory
                 continue;
             }
 
-            $sliced[] = ProjectFile::create(
-                relativePath: $file->relativePath(),
-                absolutePath: $file->absolutePath(),
-                content: $newContent,
-            );
+            $sliced[] = $file->withContent($newContent);
         }
 
         return $sliced;
+    }
+
+    /**
+     * @param list<RiskMarker> $markers
+     */
+    private function restoreRiskMarkerLines(ProjectFile $projectFile, string $slicedContent, array $markers): string
+    {
+        $originalLines = explode("\n", $projectFile->content());
+        $slicedLines = explode("\n", $slicedContent);
+
+        foreach ($markers as $marker) {
+            $index = $marker->line() - 1;
+            if (\array_key_exists($index, $slicedLines) && \array_key_exists($index, $originalLines)) {
+                $slicedLines[$index] = $originalLines[$index];
+            }
+        }
+
+        return implode("\n", $slicedLines);
     }
 }

@@ -15,7 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
 use Override;
 use PhpParser\Node;
+use PhpParser\Node\Expr;
+use PhpParser\Node\Expr\Array_;
+use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\Instanceof_;
+use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Class_;
@@ -42,6 +46,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParser
  */
 final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityParserInterface
 {
+    public function __construct(
+        private ThisCallReachability $thisCallReachability = new ThisCallReachability(),
+    ) {}
+
     #[Override]
     public function parse(ProjectFile $projectFile): ?VoterCapability
     {
@@ -62,22 +70,25 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
         }
 
         $nodeFinder = new NodeFinder();
-        $class = $nodeFinder->findFirstInstanceOf($ast, Class_::class);
-        if (!$class instanceof Class_) {
+        $voter = $this->findVoterClass($nodeFinder->findInstanceOf($ast, Class_::class));
+        if (null === $voter) {
             return null;
         }
 
-        $supportsMethod = $this->findSupportsMethod($class);
-        if (!$supportsMethod instanceof ClassMethod) {
+        [$class, $supportsMethod] = $voter;
+
+        if (null === $supportsMethod->stmts) {
             return null;
         }
 
-        $body = $supportsMethod->stmts;
-        if (null === $body) {
-            return null;
-        }
+        $methodsByName = $this->methodsByName($class);
+        $body = $this->thisCallReachability->reachableBody($supportsMethod, $methodsByName);
+        $body = [...$body, ...$this->voteOnAttributeBody($class, $methodsByName)];
 
-        $attributes = $this->collectStringLiterals($body, $nodeFinder);
+        $attributes = $this->mergeUnique(
+            $this->collectStringLiterals($body, $nodeFinder),
+            $this->collectSelfConstantFetches($body, $nodeFinder, $this->resolveOwnConstants($class)),
+        );
         $subjects = $this->collectInstanceofClassNames($body, $nodeFinder);
 
         return new VoterCapability(
@@ -88,15 +99,74 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
         );
     }
 
-    private function findSupportsMethod(Class_ $class): ?ClassMethod
+    /**
+     * A voter file may declare helper classes alongside the voter itself
+     * (e.g. a small attribute-constants holder); the voter is whichever class
+     * actually has a `supports()` method, not necessarily the first one. A
+     * voter implementing `VoterInterface` directly (rather than extending the
+     * abstract `Voter` class) has no `supports()` at all — its capability
+     * vocabulary lives inline in `vote()` instead, so that method is tried as
+     * a fallback source for the same string-literal/instanceof heuristics.
+     *
+     * @param array<Class_> $classes
+     *
+     * @return array{Class_, ClassMethod}|null
+     */
+    private function findVoterClass(array $classes): ?array
+    {
+        foreach ($classes as $class) {
+            $capabilityMethod = $this->findMethodNamed($class, 'supports') ?? $this->findMethodNamed($class, 'vote');
+            if ($capabilityMethod instanceof ClassMethod) {
+                return [$class, $capabilityMethod];
+            }
+        }
+
+        return null;
+    }
+
+    private function findMethodNamed(Class_ $class, string $methodName): ?ClassMethod
     {
         foreach ($class->getMethods() as $classMethod) {
-            if ('supports' === $classMethod->name->toString()) {
+            if ($methodName === $classMethod->name->toString()) {
                 return $classMethod;
             }
         }
 
         return null;
+    }
+
+    /**
+     * The abstract Symfony `Voter` class's canonical style checks only the
+     * subject type in `supports()` and dispatches on the attribute inside
+     * `voteOnAttribute()` instead — that attribute vocabulary would otherwise
+     * be invisible to the string-literal/instanceof heuristics, which only
+     * ever look at whichever method `findVoterClass()` returned.
+     *
+     * @param array<string, ClassMethod> $methodsByName
+     *
+     * @return array<Node>
+     */
+    private function voteOnAttributeBody(Class_ $class, array $methodsByName): array
+    {
+        $voteOnAttributeMethod = $this->findMethodNamed($class, 'voteOnAttribute');
+        if (!$voteOnAttributeMethod instanceof ClassMethod || null === $voteOnAttributeMethod->stmts) {
+            return [];
+        }
+
+        return $this->thisCallReachability->reachableBody($voteOnAttributeMethod, $methodsByName);
+    }
+
+    /**
+     * @return array<string, ClassMethod>
+     */
+    private function methodsByName(Class_ $class): array
+    {
+        $methodsByName = [];
+        foreach ($class->getMethods() as $classMethod) {
+            $methodsByName[$classMethod->name->toString()] = $classMethod;
+        }
+
+        return $methodsByName;
     }
 
     /**
@@ -122,6 +192,107 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
         }
 
         return $values;
+    }
+
+    /**
+     * Resolves `self::EDIT`/`static::EDIT` fetches in `$body` against the
+     * voter's own class constants — the canonical Symfony voter pattern
+     * (`const EDIT = 'edit'; ... in_array($attribute, [self::EDIT, ...])`)
+     * has no bare string literal for `collectStringLiterals()` to find. A
+     * constant naming an array of strings (`const SUPPORTED = ['edit', ...];
+     * ... in_array($attribute, self::SUPPORTED, true)`) resolves to every
+     * string element it holds.
+     *
+     * @param array<Node>                 $body
+     * @param array<string, list<string>> $constantValues
+     *
+     * @return list<string>
+     */
+    private function collectSelfConstantFetches(array $body, NodeFinder $nodeFinder, array $constantValues): array
+    {
+        $values = [];
+        $constFetchNodes = $nodeFinder->findInstanceOf($body, ClassConstFetch::class);
+        foreach ($constFetchNodes as $constFetchNode) {
+            $values = $this->mergeUnique($values, $this->resolvedConstantValues($constFetchNode, $constantValues));
+        }
+
+        return $values;
+    }
+
+    /**
+     * @param array<string, list<string>> $constantValues
+     *
+     * @return list<string>
+     */
+    private function resolvedConstantValues(ClassConstFetch $classConstFetch, array $constantValues): array
+    {
+        if (!$classConstFetch->class instanceof Name || !\in_array($classConstFetch->class->toString(), ['self', 'static'], true)) {
+            return [];
+        }
+
+        if (!$classConstFetch->name instanceof Identifier) {
+            return [];
+        }
+
+        return $constantValues[$classConstFetch->name->toString()] ?? [];
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function resolveOwnConstants(Class_ $class): array
+    {
+        $constantValues = [];
+        foreach ($class->getConstants() as $classConst) {
+            foreach ($classConst->consts as $const) {
+                $values = $this->stringValuesFromConstExpr($const->value);
+                if ([] !== $values) {
+                    $constantValues[$const->name->toString()] = $values;
+                }
+            }
+        }
+
+        return $constantValues;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stringValuesFromConstExpr(Expr $expr): array
+    {
+        if ($expr instanceof String_) {
+            return [$expr->value];
+        }
+
+        if (!$expr instanceof Array_) {
+            return [];
+        }
+
+        $values = [];
+        foreach ($expr->items as $item) {
+            if ($item->value instanceof String_) {
+                $values[] = $item->value->value;
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * @param list<string> $first
+     * @param list<string> $second
+     *
+     * @return list<string>
+     */
+    private function mergeUnique(array $first, array $second): array
+    {
+        foreach ($second as $value) {
+            if (!\in_array($value, $first, true)) {
+                $first[] = $value;
+            }
+        }
+
+        return $first;
     }
 
     /**

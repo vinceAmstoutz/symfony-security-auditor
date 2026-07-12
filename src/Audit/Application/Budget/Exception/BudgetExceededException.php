@@ -25,6 +25,6 @@ final class BudgetExceededException extends RuntimeException
 
     public static function forCost(float $used, float $cap): self
     {
-        return new self(\sprintf('Audit aborted: cost budget exceeded ($%.4f / $%.4f USD)', $used, $cap));
+        return new self(\sprintf('Audit aborted: cost budget exceeded ($%s / $%s USD)', number_format($used, 4, '.', ''), number_format($cap, 4, '.', '')));
     }
 }

@@ -17,6 +17,7 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -50,15 +51,40 @@ final readonly class StructuredReviewAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function analyze(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): array
     {
         $reviewed = [];
-        foreach ($vulnerabilities as $vulnerability) {
-            $reviewed[] = $this->reviewSingle($vulnerability, $projectFiles, $coverageRecorder, $bypassCache);
+        foreach ($vulnerabilities as $index => $vulnerability) {
+            try {
+                $reviewed[] = $this->reviewSingle($vulnerability, $projectFiles, $coverageRecorder, $bypassCache);
+            } catch (BudgetExceededException $budgetExceededException) {
+                $this->failRemaining($vulnerabilities, $index + 1, 'aborted', $coverageRecorder);
+
+                throw $budgetExceededException;
+            } catch (LLMProviderException $llmProviderException) {
+                $this->failRemaining($vulnerabilities, $index + 1, 'errored', $coverageRecorder);
+
+                throw $llmProviderException;
+            }
         }
 
         return $reviewed;
+    }
+
+    /**
+     * @param list<Vulnerability> $vulnerabilities
+     */
+    private function failRemaining(array $vulnerabilities, int $fromIndex, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        foreach ($vulnerabilities as $index => $vulnerability) {
+            if ($index < $fromIndex) {
+                continue;
+            }
+
+            $this->reviewOutcomeRecorder->recordUnreached($vulnerability, $status, $coverageRecorder);
+        }
     }
 
     /**
@@ -66,10 +92,12 @@ final readonly class StructuredReviewAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     private function reviewSingle(Vulnerability $vulnerability, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache): Vulnerability
     {
         $codeContext = CodeContextResolver::resolve($vulnerability->filePath(), $projectFiles);
+        $codeContextForCache = $bypassCache ? null : $codeContext;
 
         $cached = $this->reviewerVerdictCache->get($vulnerability, $codeContext, $bypassCache);
         if (null !== $cached) {
@@ -84,18 +112,31 @@ final readonly class StructuredReviewAnalyzer
         try {
             $this->llmClient->completeWithTools($systemPrompt, $userMessage, $structuredReviewCollectionSession->toolRegistry, $this->maxToolIterations);
 
-            $verdict = $structuredReviewCollectionSession->drain()[0] ?? null;
+            $verdicts = $structuredReviewCollectionSession->drain();
+            $verdict = array_pop($verdicts);
             if (!$bypassCache) {
                 $this->reviewerVerdictCache->store($vulnerability, $codeContext, $verdict);
             }
 
             return $this->reviewOutcomeRecorder->recordVerdict($vulnerability, $verdict, $coverageRecorder);
         } catch (BudgetExceededException $budgetExceededException) {
+            $this->recordAbortOrRecoveredVerdict($vulnerability, $structuredReviewCollectionSession, 'aborted', $coverageRecorder, $codeContextForCache);
+
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
+            $this->recordAbortOrRecoveredVerdict($vulnerability, $structuredReviewCollectionSession, 'errored', $coverageRecorder, $codeContextForCache);
+
             throw $llmProviderException;
         } catch (Throwable $exception) {
-            return $this->reviewOutcomeRecorder->recordReviewError($vulnerability, $exception, $coverageRecorder);
+            return $this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $structuredReviewCollectionSession, $coverageRecorder, $codeContextForCache)
+                ?? $this->reviewOutcomeRecorder->recordReviewError($vulnerability, $exception, $coverageRecorder);
+        }
+    }
+
+    private function recordAbortOrRecoveredVerdict(Vulnerability $vulnerability, StructuredReviewCollectionSession $structuredReviewCollectionSession, string $status, CoverageRecorderInterface $coverageRecorder, ?string $codeContextForCache): void
+    {
+        if (!$this->reviewOutcomeRecorder->recoverDrainedVerdict($vulnerability, $structuredReviewCollectionSession, $coverageRecorder, $codeContextForCache) instanceof Vulnerability) {
+            $this->reviewOutcomeRecorder->recordUnreached($vulnerability, $status, $coverageRecorder);
         }
     }
 }

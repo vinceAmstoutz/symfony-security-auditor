@@ -6,6 +6,12 @@
           "input": 50,
           "output": 100
         }
+      },
+      "qualified/free-tier-collision": {
+        "cost": {
+          "input": 10,
+          "output": 20
+        }
       }
     }
   },
@@ -27,6 +33,12 @@
         "cost": {
           "input": 88,
           "output": 176
+        }
+      },
+      "qualified/free-tier-collision": {
+        "cost": {
+          "input": 0,
+          "output": 0
         }
       }
     }

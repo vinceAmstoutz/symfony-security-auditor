@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
-use InvalidArgumentException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 
 /**
  * Immutable snapshot of input/output token counts at a point in time.
@@ -30,22 +30,25 @@ final readonly class TokenUsageSnapshot
         private int $cacheCreationTokens,
     ) {}
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public static function of(int $inputTokens, int $outputTokens, int $cacheReadTokens = 0, int $cacheCreationTokens = 0): self
     {
         if ($inputTokens < 0) {
-            throw new InvalidArgumentException(\sprintf('Input tokens must be >= 0, got %d', $inputTokens));
+            throw InvalidTokenUsageException::forNegativeInputTokens($inputTokens);
         }
 
         if ($outputTokens < 0) {
-            throw new InvalidArgumentException(\sprintf('Output tokens must be >= 0, got %d', $outputTokens));
+            throw InvalidTokenUsageException::forNegativeOutputTokens($outputTokens);
         }
 
         if ($cacheReadTokens < 0) {
-            throw new InvalidArgumentException(\sprintf('Cache read tokens must be >= 0, got %d', $cacheReadTokens));
+            throw InvalidTokenUsageException::forNegativeCacheReadTokens($cacheReadTokens);
         }
 
         if ($cacheCreationTokens < 0) {
-            throw new InvalidArgumentException(\sprintf('Cache creation tokens must be >= 0, got %d', $cacheCreationTokens));
+            throw InvalidTokenUsageException::forNegativeCacheCreationTokens($cacheCreationTokens);
         }
 
         return new self($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);

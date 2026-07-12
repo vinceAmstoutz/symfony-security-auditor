@@ -45,14 +45,15 @@ final readonly class IngestionStage implements StageInterface
             'path' => $auditContext->projectPath(),
         ]);
 
-        $files = ScanPathFilter::apply(
+        $scannedFiles = ScanPathFilter::apply(
             $this->projectFileScanner->scan($auditContext->projectPath()),
             $auditContext->scanPaths(),
         );
 
+        $files = $scannedFiles;
         $diffSinceRef = $auditContext->diffSinceRef();
         if (null !== $diffSinceRef && $this->gitChangedFilesResolver instanceof GitChangedFilesResolverInterface) {
-            $files = $this->filterByGitDiff($auditContext->projectPath(), $diffSinceRef, $files);
+            $files = $this->filterByGitDiff($auditContext->projectPath(), $diffSinceRef, $scannedFiles);
         }
 
         if ([] === $files) {
@@ -62,6 +63,7 @@ final readonly class IngestionStage implements StageInterface
         }
 
         $auditContext->setProjectFiles($files);
+        $auditContext->setMappingFiles($scannedFiles);
         $auditContext->setMeta('ingestion.file_count', \count($files));
         $auditContext->setMeta('ingestion.total_lines', array_sum(
             array_map(static fn (ProjectFile $projectFile): int => $projectFile->linesCount(), $files),

@@ -66,6 +66,59 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         );
     }
 
+    public function test_an_explicitly_empty_roles_rule_is_recorded_as_public_instead_of_dropped(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: ^/status, roles: [] }
+            YAML);
+
+        self::assertSame(['^/status' => ['PUBLIC']], $accessControl);
+    }
+
+    public function test_a_later_rule_for_a_publicly_matched_path_does_not_override_first_match(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: ^/status, roles: [] }
+                    - { path: ^/status, roles: ROLE_ADMIN }
+            YAML);
+
+        self::assertSame(['^/status' => ['PUBLIC', 'or: ROLE_ADMIN']], $accessControl);
+    }
+
+    public function test_a_public_rule_after_a_restricted_rule_for_the_same_path_is_appended_as_or(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: ^/status, methods: [POST], roles: ROLE_ADMIN }
+                    - { path: ^/status, methods: [GET], roles: [] }
+            YAML);
+
+        self::assertSame(
+            ['^/status' => ['ROLE_ADMIN', 'methods: POST', 'or: methods: GET']],
+            $accessControl,
+        );
+    }
+
+    public function test_a_fully_public_rule_after_a_restricted_rule_for_the_same_path_is_appended_as_or_public(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: ^/reports, methods: [POST], roles: ROLE_ADMIN }
+                    - { path: ^/reports, roles: [] }
+            YAML);
+
+        self::assertSame(
+            ['^/reports' => ['ROLE_ADMIN', 'methods: POST', 'or: PUBLIC']],
+            $accessControl,
+        );
+    }
+
     public function test_a_path_after_a_merged_duplicate_is_still_processed(): void
     {
         $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
@@ -113,6 +166,77 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         );
     }
 
+    /**
+     * Symfony's own route/request matching uppercases HTTP methods
+     * internally, so `methods: [post]` and `methods: [POST]` are equally
+     * valid, semantically-identical YAML. The `methods: ...` marker must be
+     * normalized to uppercase here, since
+     * `SymfonyMappingContextRenderer::alternativeCoversMethods()` re-parses
+     * it with an uppercase-only regex to decide route coverage.
+     */
+    public function test_it_normalizes_lowercase_methods_to_uppercase(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - path: ^/admin
+                      roles: ROLE_ADMIN
+                      methods: [post, delete]
+            YAML);
+
+        self::assertSame(
+            ['^/admin' => ['ROLE_ADMIN', 'methods: POST|DELETE']],
+            $accessControl,
+        );
+    }
+
+    public function test_it_surfaces_a_host_constraint_alongside_roles(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - path: ^/admin
+                      roles: ROLE_USER_HOST
+                      host: symfony\.com$
+            YAML);
+
+        self::assertSame(
+            ['^/admin' => ['ROLE_USER_HOST', 'host: symfony\.com$']],
+            $accessControl,
+        );
+    }
+
+    public function test_it_records_a_host_only_access_control_entry_instead_of_dropping_it(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - path: ^/internal-admin
+                      host: admin\.internal\.example\.com
+            YAML);
+
+        self::assertSame(
+            ['^/internal-admin' => ['host: admin\.internal\.example\.com']],
+            $accessControl,
+        );
+    }
+
+    public function test_it_surfaces_a_port_constraint(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - path: ^/admin
+                      roles: ROLE_ADMIN
+                      port: 8000
+            YAML);
+
+        self::assertSame(
+            ['^/admin' => ['ROLE_ADMIN', 'port: 8000']],
+            $accessControl,
+        );
+    }
+
     public function test_it_reads_access_control_inside_when_env_blocks(): void
     {
         $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
@@ -152,6 +276,28 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
                 access_control:
                     - { roles: ROLE_ADMIN }
                     - { path: ^/nothing }
+            YAML);
+
+        self::assertSame([], $accessControl);
+    }
+
+    public function test_it_skips_an_entry_with_a_blank_path_instead_of_recording_a_universal_match_pattern(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: '', roles: ROLE_ADMIN }
+            YAML);
+
+        self::assertSame([], $accessControl);
+    }
+
+    public function test_it_skips_an_entry_with_a_whitespace_only_path(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: '   ', roles: ROLE_ADMIN }
             YAML);
 
         self::assertSame([], $accessControl);

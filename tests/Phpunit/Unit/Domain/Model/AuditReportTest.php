@@ -16,8 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -32,6 +34,9 @@ final class AuditReportTest extends TestCase
 {
     private string $tmpDir;
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_builds_from_context_with_no_vulnerabilities(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -44,8 +49,38 @@ final class AuditReportTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_consumed_baseline_fingerprints_default_to_an_empty_list(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertSame([], $auditReport->consumedBaselineFingerprints());
+    }
+
+    /**
+     * `BaselineProcessor` needs this to avoid re-spending, at the final-report
+     * stage, a baseline credit `AuditOrchestrator` already spent skipping a
+     * finding before it ever reached the reviewer.
+     *
+     * @throws InvalidAuditContextException
+     */
+    public function test_it_carries_over_the_baseline_credits_consumed_during_the_run(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-AAA']);
+        $auditContext->consumeBaselineCredit('SSA-AAA');
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertSame(['SSA-AAA'], $auditReport->consumedBaselineFingerprints());
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_includes_only_validated_vulnerabilities(): void
     {
@@ -68,6 +103,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_classifies_risk_levels_correctly(): void
     {
@@ -86,6 +123,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_filters_vulnerabilities_by_severity(): void
     {
@@ -112,6 +151,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_filters_vulnerabilities_by_type(): void
     {
@@ -135,6 +176,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_vulnerabilities_are_ordered_most_severe_first(): void
     {
@@ -173,6 +216,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_vulnerabilities_with_equal_severity_keep_discovery_order(): void
     {
@@ -190,6 +235,9 @@ final class AuditReportTest extends TestCase
         self::assertSame(['src/firstHigh.php', 'src/secondHigh.php', 'src/low.php'], $filePaths);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_serializes_to_array(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -209,6 +257,9 @@ final class AuditReportTest extends TestCase
         self::assertArrayHasKey('vulnerabilities', $array);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_calculates_duration(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -217,6 +268,9 @@ final class AuditReportTest extends TestCase
         self::assertGreaterThanOrEqual(0.0, $auditReport->durationSeconds());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_duration_uses_subtraction_not_addition(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -226,8 +280,24 @@ final class AuditReportTest extends TestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_duration_preserves_sub_second_precision_instead_of_rounding_to_whole_seconds(): void
+    {
+        $before = microtime(true);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        usleep(50_000);
+        $auditReport = AuditReport::fromContext($auditContext);
+        $measuredElapsed = microtime(true) - $before;
+
+        self::assertEqualsWithDelta($measuredElapsed, $auditReport->durationSeconds(), 0.03);
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_classifies_risk_level_at_exact_boundaries(): void
     {
@@ -244,6 +314,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     #[DataProvider('riskLevelEnumCases')]
     public function test_risk_level_enum_classifies_by_aggregate_score(int $score, RiskLevel $riskLevel): void
@@ -270,6 +342,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_risk_level_string_is_the_uppercased_enum_value(): void
     {
@@ -280,6 +354,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_toarray_vulnerabilities_is_array_of_arrays(): void
     {
@@ -297,6 +373,9 @@ final class AuditReportTest extends TestCase
         self::assertArrayHasKey('title', $array['vulnerabilities'][0]);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_report_carries_coverage_from_context(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -314,6 +393,9 @@ final class AuditReportTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_report_array_includes_coverage_key(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -328,6 +410,9 @@ final class AuditReportTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_report_coverage_is_empty_when_context_recorded_nothing(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -337,6 +422,9 @@ final class AuditReportTest extends TestCase
         self::assertSame([], $auditReport->coverage());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_completed_at_is_at_or_after_started_at(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -364,6 +452,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function reportWithExactScore(int $score): AuditReport
     {
@@ -390,6 +480,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function reportWithScore(int $targetScore): AuditReport
     {
@@ -409,6 +501,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_fingerprints_lists_each_distinct_finding(): void
     {
@@ -426,6 +520,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_fingerprints_deduplicates_findings_that_share_a_fingerprint(): void
     {
@@ -441,6 +537,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_without_fingerprints_removes_only_matching_findings(): void
     {
@@ -459,6 +557,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_without_fingerprints_keeps_findings_absent_from_the_list(): void
     {
@@ -474,6 +574,27 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_without_fingerprints_only_removes_as_many_shared_fingerprint_findings_as_were_accepted(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $vulnerability = $this->sameFingerprintVuln(1)->withReviewerValidation(true);
+        $unrelated = $this->sameFingerprintVuln(2)->withReviewerValidation(true);
+        $auditContext->addVulnerability($vulnerability);
+        $auditContext->addVulnerability($unrelated);
+
+        $auditReport = AuditReport::fromContext($auditContext)->withoutFingerprints([$vulnerability->fingerprint()]);
+
+        self::assertSame(1, $auditReport->totalVulnerabilities());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_without_fingerprints_preserves_report_metadata(): void
     {
@@ -492,6 +613,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_filtered_by_types_with_no_filters_keeps_all_findings(): void
     {
@@ -503,6 +626,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_filtered_by_types_drops_excluded_types(): void
     {
@@ -516,6 +641,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_filtered_by_types_with_an_allowlist_keeps_only_included_types(): void
     {
@@ -529,6 +656,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_filtered_by_types_lets_exclusions_win_over_the_allowlist(): void
     {
@@ -545,6 +674,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_filtered_by_types_preserves_report_metadata(): void
     {
@@ -560,6 +691,8 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function reportWithTypes(VulnerabilityType ...$types): AuditReport
     {
@@ -587,6 +720,7 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function sameFingerprintVuln(int $lineStart): Vulnerability
     {
@@ -601,6 +735,7 @@ final class AuditReportTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerability(
         string $discriminator,

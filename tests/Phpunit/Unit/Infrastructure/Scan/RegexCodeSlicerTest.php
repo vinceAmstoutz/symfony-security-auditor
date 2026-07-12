@@ -15,11 +15,15 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 
 final class RegexCodeSlicerTest extends TestCase
 {
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_files_shorter_than_threshold_are_returned_unchanged(): void
     {
         $content = "<?php\nclass Tiny { public function foo() { return 1; } }";
@@ -28,6 +32,9 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertSame($content, (new RegexCodeSlicer(80))->slice($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_non_php_files_are_returned_unchanged(): void
     {
         $content = str_repeat("{{ value }}\n", 100);
@@ -36,6 +43,9 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertSame($content, (new RegexCodeSlicer(10))->slice($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_file_at_exactly_the_threshold_is_sliced(): void
     {
         // Pins GreaterThanOrEqualTo (>=) against GreaterThan (>): a file whose line
@@ -50,6 +60,9 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertStringContainsString('// elided', $sliced);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_file_one_line_below_threshold_is_not_sliced(): void
     {
         $lines = array_fill(0, 8, '        $inert = 1;');
@@ -60,6 +73,9 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertSame($content, (new RegexCodeSlicer(10))->slice($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_slicing_preserves_total_line_count(): void
     {
         $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeController());
@@ -72,6 +88,9 @@ final class RegexCodeSlicerTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_lines_with_security_tokens_are_retained(): void
     {
         $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeController());
@@ -82,6 +101,39 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertStringContainsString('unserialize($payload)', $sliced);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_the_shell_process_factory_line_is_retained(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$p = Process::fromShellCommandline('ls '.\$dir);\n"
+            .str_repeat("        \$y = 2;\n", 20);
+        $projectFile = ProjectFile::create('src/Service/Runner.php', '/app/src/Service/Runner.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString("Process::fromShellCommandline('ls '.\$dir)", $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_the_twig_string_template_line_is_retained(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$html = \$this->twig->createTemplate(\$source)->render(\$ctx);\n"
+            .str_repeat("        \$y = 2;\n", 20);
+        $projectFile = ProjectFile::create('src/Service/Renderer.php', '/app/src/Service/Renderer.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('$this->twig->createTemplate($source)', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_inert_body_lines_are_elided(): void
     {
         $projectFile = ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', $this->largeController());
@@ -92,6 +144,9 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertStringContainsString('// elided', $sliced);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     #[DataProvider('structuralLineCases')]
     public function test_structural_lines_are_retained(string $structuralLine): void
     {
@@ -119,8 +174,15 @@ final class RegexCodeSlicerTest extends TestCase
         yield 'public method signature' => ['public function show(): void'];
         yield 'protected member' => ['protected string $name;'];
         yield 'private member' => ['private int $count = 0;'];
+        yield 'method signature with no visibility modifier' => ['function delete(Request $request, string $id): Response'];
+        yield 'static method signature with no visibility modifier' => ['static function fromRequest(Request $request): self'];
+        yield 'static property with no visibility modifier' => ['static $instance;'];
+        yield 'enum case' => ["case ROLE_ADMIN = 'ROLE_ADMIN';"];
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_indented_structural_line_is_retained(): void
     {
         // Pins the ltrim() call: the method signature is indented, so detection
@@ -133,6 +195,307 @@ final class RegexCodeSlicerTest extends TestCase
         self::assertStringContainsString('public function deeplyIndented(): void', $sliced);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_multiline_method_signature_parameters_are_retained(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function import(\n"
+            ."        Request \$request,\n"
+            ."        AdminOnlyDataMapper \$dataMapper\n"
+            ."    ): Response\n"
+            ."    {\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('Request $request,', $sliced);
+        self::assertStringContainsString('AdminOnlyDataMapper $dataMapper', $sliced);
+        self::assertStringContainsString('): Response', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_heredoc_body_is_retained_in_full(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$name = \$request->get('name');\n"
+            ."        \$sql = <<<SQL\n"
+            ."            SELECT * FROM users WHERE name = ('\$name')\n"
+            ."            SQL;\n"
+            ."        return \$connection->executeQuery(\$sql);\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString("SELECT * FROM users WHERE name = ('\$name')", $sliced);
+        self::assertStringContainsString('$sql = <<<SQL', $sliced);
+        self::assertStringContainsString('SQL;', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_lines_after_a_closed_heredoc_are_still_elided_when_inert(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$sql = <<<SQL\n"
+            ."            SELECT 1\n"
+            ."            SQL;\n"
+            ."        \$inert = 1;\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('$inert = 1;', $sliced);
+    }
+
+    /**
+     * When a still-open multi-line call's closing `)`/`;` sits on the same
+     * line as the heredoc's closing identifier (a common Doctrine/DBAL idiom
+     * — `->executeQuery(<<<SQL ... SQL);`), that line is consumed entirely by
+     * the heredoc branch and its trailing code must still feed continuation
+     * tracking — otherwise `openParenDepth` never returns to zero and every
+     * remaining line in the file is force-retained.
+     *
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_heredoc_closing_line_that_also_closes_the_enclosing_call_does_not_desync_continuation_tracking(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 8)
+            ."    public function process(): void\n"
+            ."    {\n"
+            ."        \$this->getConnection()->executeQuery(\n"
+            ."            <<<SQL\n"
+            ."            SELECT 1\n"
+            ."            SQL);\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_closing_paren_inside_a_string_literal_default_value_does_not_break_continuation_tracking(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function process(\n"
+            ."        string \$label = 'Confirm)',\n"
+            ."        AdminOnlyDataMapper \$dataMapper,\n"
+            ."        int \$retries = 3,\n"
+            ."    ): void {\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('AdminOnlyDataMapper $dataMapper,', $sliced);
+        self::assertStringContainsString('int $retries = 3,', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_line_after_a_closed_multiline_signature_is_still_elided(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function import(\n"
+            ."        Request \$request\n"
+            ."    ): Response\n"
+            ."    {\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_multi_line_string_literal_with_an_unbalanced_paren_does_not_defeat_elision_for_the_rest_of_the_file(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function process(\n"
+            ."        string \$default = \"opening paren example (\n"
+            ."        unbalanced\"\n"
+            ."    ) {\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_string_literal_spanning_three_lines_does_not_defeat_elision_for_the_rest_of_the_file(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function process(\n"
+            ."        string \$default = \"opening line (\n"
+            ."        middle line with parens ( and ) but no quote\n"
+            ."        closing line\"\n"
+            ."    ) {\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_an_apostrophe_inside_a_line_comment_on_a_continuation_line_does_not_defeat_elision_for_the_rest_of_the_file(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function bar(\n"
+            ."        int \$id, // don't remove this\n"
+            ."        string \$name\n"
+            ."    ) {\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_an_apostrophe_inside_a_hash_comment_on_a_continuation_line_does_not_defeat_elision_for_the_rest_of_the_file(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function bar(\n"
+            ."        int \$id, # don't remove this\n"
+            ."        string \$name\n"
+            ."    ) {\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_hash_prefixed_attribute_is_still_retained_and_not_mistaken_for_a_comment(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    #[SomeAttribute(\n"
+            ."        param: 'INERT_MARKER_KEEP'\n"
+            ."    )]\n"
+            ."    public function bar(): void {}\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('INERT_MARKER_KEEP', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_multi_line_phpdoc_block_mentioning_a_security_token_by_name_does_not_defeat_elision_for_the_rest_of_the_file(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    /**\n"
+            ."     * Wraps hash_hmac( for legacy callers\n"
+            ."     */\n"
+            ."    private function legacy(): void {}\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_same_line_block_comment_containing_an_unbalanced_paren_does_not_defeat_elision_for_the_rest_of_the_file(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$this->getUser(); /* legacy note: calls hash_hmac( internally */\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_string_literal_containing_an_unbalanced_block_comment_opener_does_not_defeat_elision_for_the_rest_of_the_file(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$allowedType = 'image/*';\n"
+            .str_repeat("        \$x = 1;\n", 20)
+            ."    public function grantAccess(\n"
+            ."        \$subject,\n"
+            ."        \$attribute\n"
+            ."    ) {\n"
+            ."        \$this->denyAccessUnlessGranted(\$attribute, \$subject);\n"
+            ."    }\n";
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('$subject,', $sliced);
+        self::assertStringContainsString('$attribute', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_leading_open_paren_before_an_unclosed_string_keeps_its_continuation_retained(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function process(\n"
+            ."('unclosed\n"
+            ."text');\n"
+            ."        \$inert = 'RETAINED_MARKER';\n"
+            ."    );\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('RETAINED_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_inert_line_resembling_keyword_mid_line_is_elided(): void
     {
         // A comment mentioning "namespace"/"class" mid-line must NOT be treated as
@@ -143,6 +506,408 @@ final class RegexCodeSlicerTest extends TestCase
         $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
 
         self::assertStringNotContainsString('the class and namespace are fine', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_bare_include_and_require_statements_are_retained(): void
+    {
+        $projectFile = ProjectFile::create('src/Controller/PageController.php', '/app/src/Controller/PageController.php', $this->largeControllerWithBareIncludes());
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('include $partial;', $sliced);
+        self::assertStringContainsString('require_once $bootstrap;', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('parenthesizedInclusionCases')]
+    public function test_parenthesized_inclusion_calls_are_retained(string $inclusionLine): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20).\sprintf('        %s%s', $inclusionLine, \PHP_EOL).str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString($inclusionLine, $sliced);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function parenthesizedInclusionCases(): iterable
+    {
+        yield 'include' => ['include($partial);'];
+        yield 'include_once' => ['include_once($partial);'];
+        yield 'require' => ['require($bootstrap);'];
+        yield 'require_once' => ['require_once($bootstrap);'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('unanchoredSecurityKeywordCases')]
+    public function test_column_zero_and_tab_indented_security_keywords_are_retained(string $keywordLine): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20).$keywordLine."\n".str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString($keywordLine, $sliced);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function unanchoredSecurityKeywordCases(): iterable
+    {
+        yield 'column-zero exec call' => ['exec($userInput);'];
+        yield 'column-zero rand call' => ['rand();'];
+        yield 'column-zero include statement' => ['include $partial;'];
+        yield 'column-zero include_once call' => ['include_once($partial);'];
+        yield 'column-zero require statement' => ['require $bootstrap;'];
+        yield 'column-zero require_once call' => ['require_once($bootstrap);'];
+        yield 'tab-indented require statement' => ["\trequire \$bootstrap;"];
+        yield 'tab-indented exec call' => ["\texec(\$cmd);"];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('fileIoAndQueryBuilderSinkCases')]
+    public function test_file_io_and_query_builder_sink_lines_are_retained(string $sinkLine): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20).'        '.$sinkLine."\n".str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Controller/FileController.php', '/app/src/Controller/FileController.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString($sinkLine, $sliced);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function fileIoAndQueryBuilderSinkCases(): iterable
+    {
+        yield 'file_get_contents read' => ['$c = file_get_contents($userPath);'];
+        yield 'file_put_contents write' => ['file_put_contents($dest, $data);'];
+        yield 'fopen handle' => ['$h = fopen($userPath, \'r\');'];
+        yield 'readfile passthrough' => ['readfile($userPath);'];
+        yield 'unlink delete' => ['unlink($userPath);'];
+        yield 'move_uploaded_file' => ['move_uploaded_file($tmp, $userDest);'];
+        yield 'UploadedFile move' => ['$upload->move($dir, $name);'];
+        yield 'getClientOriginalName source' => ['$name = $upload->getClientOriginalName();'];
+        yield 'QueryBuilder where concat' => ['$qb->where(\'u.name = \'.$tainted);'];
+        yield 'QueryBuilder andWhere concat' => ['$qb->andWhere(\'u.role = \'.$role);'];
+        yield 'QueryBuilder having concat' => ['$qb->having(\'COUNT(x) > \'.$n);'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_paren_opened_on_the_very_first_line_retains_its_continuation(): void
+    {
+        $content = "public function process(\n"
+            ."        \$onlyKeptViaDepth\n"
+            ."    ) {\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('$onlyKeptViaDepth', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_an_elided_line_with_an_unbalanced_paren_does_not_advance_depth(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$data = compute(\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_over_closing_parens_on_a_retained_line_do_not_drive_depth_negative(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$this->getUser());\n"
+            ."        \$this->getUser(\n"
+            ."        \$keep = 'KEEP_MARKER';\n"
+            ."        );\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('KEEP_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_heredoc_opener_with_trailing_content_is_not_treated_as_a_heredoc(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$note = '<<<HEREDOC not really';\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_middle_line_of_a_multiline_string_keeps_the_open_paren_depth(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function process(\n"
+            ."        string \$default = \"open (\n"
+            ."        middle no quote here\n"
+            ."        KEEP_MARKER end\"\n"
+            ."    ) {\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('KEEP_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_paren_directly_after_a_multiline_string_close_is_counted(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$x = \$_GET . \"abc\n"
+            ."        \$_GET def\"(\n"
+            ."        \$keep = 'KEEP_MARKER';\n"
+            ."        );\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('KEEP_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_trailing_line_comment_on_a_closing_paren_line_lets_depth_reach_zero(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."    public function f(\n"
+            .") // (((\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            ."        );\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_real_code_after_a_multiline_block_comment_close_is_paren_tracked(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        /* open\n"
+            ."        end*/((\$this->getUser(\n"
+            ."        \$keep = 'KEEP_MARKER';\n"
+            ."        )));\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('KEEP_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_single_paren_after_a_same_line_block_comment_close_is_counted(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$_GET/* c */(\n"
+            ."        \$keep = 'KEEP_MARKER';\n"
+            ."        );\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('KEEP_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_block_comment_close_offset_is_not_shifted_before_the_delimiter(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$_GET/* c */*(\n"
+            ."        \$keep = 'KEEP_MARKER';\n"
+            ."        );\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('KEEP_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_recursively_stripped_block_comment_keeps_the_paren_boundary_aligned(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$_GET( /*/(*/ y\n"
+            ."        )\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            ."        ;\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_code_before_a_same_line_block_comment_is_paren_tracked(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."(\$_GET/* c */x\n"
+            ."        \$keep = 'KEEP_MARKER';\n"
+            ."        );\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('KEEP_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_line_comment_after_a_same_line_block_comment_is_truncated(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$_GET( /* c */ // tail\n"
+            ."        \$keep = 'KEEP_MARKER';\n"
+            ."        );\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('KEEP_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_an_empty_block_comment_does_not_leak_its_open_state(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$_GET( /**/\n"
+            ."        )\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            ."        ;\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_code_after_a_same_line_block_comment_is_paren_tracked(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$_GET = 'longstring' /* note */ ((\n"
+            ."        \$keep = 'KEEP_MARKER';\n"
+            ."        ));\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('KEEP_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_masked_string_literal_keeps_the_block_comment_offset_aligned(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$_GET = 'longstring' /* note */ ((\n"
+            ."        )\n"
+            ."        )\n"
+            ."        \$inert = 'INERT_MARKER';\n"
+            ."        ;\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    private function largeControllerWithBareIncludes(): string
+    {
+        $inert = str_repeat("        \$x = INERT_MARKER;\n", 25);
+
+        return <<<PHP
+            <?php
+
+            namespace App\\Controller;
+
+            use Symfony\\Component\\HttpFoundation\\Response;
+
+            class PageController
+            {
+                public function render(string \$partial): Response
+                {
+                    include \$partial;
+
+                    return new Response('ok');
+                }
+
+                public function bootstrap(string \$bootstrap): Response
+                {
+                    require_once \$bootstrap;
+            {$inert}
+                    return new Response('ok');
+                }
+            }
+            PHP;
     }
 
     private function largeController(): string

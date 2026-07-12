@@ -19,7 +19,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
  *
  * - `fast` — cheapest and quickest: a single attacker iteration over
  *   marker-bearing files only (lean pre-scan), large files sliced to their
- *   security-relevant lines, and up to four concurrent reviewer calls.
+ *   security-relevant lines, and up to four concurrent attacker and reviewer
+ *   calls.
  * - `balanced` — the default; identical to configuring nothing.
  * - `thorough` — adds PoC synthesis for high-severity validated findings on
  *   top of the balanced depth.

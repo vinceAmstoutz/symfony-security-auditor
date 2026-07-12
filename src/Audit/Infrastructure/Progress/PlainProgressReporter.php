@@ -17,6 +17,7 @@ use Override;
 use Symfony\Component\Console\Output\OutputInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /**
  * Append-only, line-oriented reporter for non-interactive output (CI logs,
@@ -39,17 +40,22 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     public function report(string $event, array $context = []): void
     {
         match (ProgressEvent::tryFrom($event)) {
-            ProgressEvent::AuditStarted => $this->output->writeln(AuditOverviewLine::from($context)),
-            ProgressEvent::AuditIterationStarted => $this->output->writeln($this->iterationLine($context)),
-            ProgressEvent::AttackerChunkStarted => $this->output->writeln($this->chunkLine($context)),
-            ProgressEvent::AttackerChunkCompleted => $this->output->writeln($this->chunkDoneLine($context)),
-            ProgressEvent::AttackerFindingRecorded => $this->output->writeln($this->findingLine($context)),
-            ProgressEvent::ReviewStarted => $this->output->writeln($this->reviewStartLine($context)),
-            ProgressEvent::ReviewFindingReviewed => $this->output->writeln($this->reviewedLine($context)),
-            ProgressEvent::BaselineFindingSkipped => $this->output->writeln($this->baselineSkippedLine($context)),
-            ProgressEvent::ReviewCompleted => $this->output->writeln($this->reviewSummaryLine($context)),
+            ProgressEvent::AuditStarted => $this->writeln(AuditOverviewLine::from($context)),
+            ProgressEvent::AuditIterationStarted => $this->writeln($this->iterationLine($context)),
+            ProgressEvent::AttackerChunkStarted => $this->writeln($this->chunkLine($context)),
+            ProgressEvent::AttackerChunkCompleted => $this->writeln($this->chunkDoneLine($context)),
+            ProgressEvent::AttackerFindingRecorded => $this->writeln($this->findingLine($context)),
+            ProgressEvent::ReviewStarted => $this->writeln($this->reviewStartLine($context)),
+            ProgressEvent::ReviewFindingReviewed => $this->writeln($this->reviewedLine($context)),
+            ProgressEvent::BaselineFindingSkipped => $this->writeln($this->baselineSkippedLine($context)),
+            ProgressEvent::ReviewCompleted => $this->writeln($this->reviewSummaryLine($context)),
             default => null,
         };
+    }
+
+    private function writeln(string $line): void
+    {
+        $this->output->writeln($line, OutputInterface::OUTPUT_RAW);
     }
 
     /** @param array<string, mixed> $context */
@@ -82,7 +88,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
             '  [%s] %s — %s:%d',
             strtoupper(ProgressContext::string($context, 'severity')),
             ProgressContext::string($context, 'type'),
-            ProgressContext::string($context, 'file'),
+            TerminalTextSanitizer::collapseToSingleLine(ProgressContext::string($context, 'file')),
             ProgressContext::int($context, 'line'),
         );
     }
@@ -99,7 +105,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
         return \sprintf(
             '  [BASELINE-SKIPPED] %s — %s:%d',
             ProgressContext::string($context, 'type'),
-            ProgressContext::string($context, 'file'),
+            TerminalTextSanitizer::collapseToSingleLine(ProgressContext::string($context, 'file')),
             ProgressContext::int($context, 'line'),
         );
     }
@@ -111,7 +117,7 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
             '  [%s] %s — %s:%d',
             true === ($context['accepted'] ?? null) ? 'VALIDATED' : 'REJECTED',
             ProgressContext::string($context, 'type'),
-            ProgressContext::string($context, 'file'),
+            TerminalTextSanitizer::collapseToSingleLine(ProgressContext::string($context, 'file')),
             ProgressContext::int($context, 'line'),
         );
     }

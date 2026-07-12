@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Phpunit\Unit\Infrastructure
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewCollector;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewTool;
 
@@ -23,6 +24,8 @@ final class RecordReviewToolTest extends TestCase
 {
     /**
      * @param array{type: string, maxLength?: int} $expectedConstraints
+     *
+     * @throws InvalidToolDefinitionException
      */
     #[DataProvider('propertyConstraintCases')]
     public function test_definition_schema_pins_property_constraints(string $propertyName, array $expectedConstraints): void
@@ -50,6 +53,9 @@ final class RecordReviewToolTest extends TestCase
         yield 'additional_attack_paths is string with 5000 char cap' => ['additional_attack_paths', ['type' => 'string', 'maxLength' => 5000]];
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_definition_exposes_record_review_name(): void
     {
         $recordReviewTool = new RecordReviewTool(new ReviewCollector());
@@ -57,6 +63,9 @@ final class RecordReviewToolTest extends TestCase
         self::assertSame('record_review', $recordReviewTool->definition()->name);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_definition_describes_one_call_per_finding(): void
     {
         $recordReviewTool = new RecordReviewTool(new ReviewCollector());
@@ -64,6 +73,9 @@ final class RecordReviewToolTest extends TestCase
         self::assertStringContainsString('one call per finding', $recordReviewTool->definition()->description);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_definition_schema_requires_id_and_accepted(): void
     {
         $recordReviewTool = new RecordReviewTool(new ReviewCollector());
@@ -71,6 +83,9 @@ final class RecordReviewToolTest extends TestCase
         self::assertSame(['id', 'accepted'], $recordReviewTool->definition()->parametersSchema['required'] ?? null);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_definition_schema_forbids_additional_properties(): void
     {
         $recordReviewTool = new RecordReviewTool(new ReviewCollector());
@@ -78,6 +93,9 @@ final class RecordReviewToolTest extends TestCase
         self::assertFalse($recordReviewTool->definition()->parametersSchema['additionalProperties'] ?? null);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_definition_schema_declares_accepted_as_boolean(): void
     {
         $recordReviewTool = new RecordReviewTool(new ReviewCollector());
@@ -89,6 +107,9 @@ final class RecordReviewToolTest extends TestCase
         self::assertSame('boolean', $acceptedProperty['type'] ?? null);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_definition_schema_constrains_adjusted_severity_to_enum(): void
     {
         $recordReviewTool = new RecordReviewTool(new ReviewCollector());
@@ -100,6 +121,9 @@ final class RecordReviewToolTest extends TestCase
         self::assertSame(['critical', 'high', 'medium', 'low', 'info'], $severityProperty['enum'] ?? null);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_definition_schema_constrains_corrected_type_to_every_vulnerability_type(): void
     {
         $recordReviewTool = new RecordReviewTool(new ReviewCollector());
@@ -116,6 +140,9 @@ final class RecordReviewToolTest extends TestCase
         self::assertSame($expected, $typeProperty['enum'] ?? null);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_definition_schema_declares_id_as_string(): void
     {
         $recordReviewTool = new RecordReviewTool(new ReviewCollector());

@@ -39,7 +39,7 @@ final readonly class VerdictApplier
     {
         $review = $this->normalize($reviewData);
 
-        $accepted = (bool) ($review['accepted'] ?? false);
+        $accepted = $this->parseAccepted($review['accepted'] ?? false);
         $rawSeverity = $review['adjusted_severity'] ?? null;
         $adjustedSeverity = \is_string($rawSeverity) ? $rawSeverity : null;
         $rawCorrectedType = $review['corrected_type'] ?? null;
@@ -55,6 +55,23 @@ final readonly class VerdictApplier
         $this->logReviewDecision($vulnerability, $accepted, $review);
 
         return $reviewed;
+    }
+
+    /**
+     * PHP's `(bool)` cast treats any non-empty, non-`"0"` string as `true` —
+     * including the literal string `"false"`, which a provider that
+     * stringifies JSON booleans (a known quirk of some non-Anthropic models
+     * reached through this bundle's provider-agnostic seam) can plausibly
+     * send instead of the JSON boolean `false`, silently overturning an
+     * explicit reviewer rejection.
+     */
+    private function parseAccepted(mixed $accepted): bool
+    {
+        if (\is_string($accepted) && 'false' === strtolower(trim($accepted))) {
+            return false;
+        }
+
+        return (bool) $accepted;
     }
 
     private function applyAdjustedSeverity(Vulnerability $vulnerability, ?string $adjustedSeverity): Vulnerability
@@ -115,10 +132,12 @@ final readonly class VerdictApplier
     private function logReviewDecision(Vulnerability $vulnerability, bool $accepted, array $review): void
     {
         $rawNotes = $review['reviewer_notes'] ?? null;
+        $rawAdditionalAttackPaths = $review['additional_attack_paths'] ?? null;
         $this->logger->debug('Vulnerability reviewed', [
             'id' => $vulnerability->id(),
             'accepted' => $accepted,
             'notes' => \is_string($rawNotes) ? $rawNotes : '',
+            'additional_attack_paths' => \is_string($rawAdditionalAttackPaths) ? $rawAdditionalAttackPaths : '',
         ]);
     }
 }

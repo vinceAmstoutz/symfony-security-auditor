@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 
-use InvalidArgumentException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 
 /**
  * Typed shape of the `audit.rate_limit.*` configuration tree.
@@ -25,21 +25,24 @@ use InvalidArgumentException;
  */
 final readonly class RateLimitConfiguration
 {
+    /**
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function __construct(
         public ?int $requestsPerMinute,
         public ?int $inputTokensPerMinute,
         public ?int $outputTokensPerMinute,
     ) {
         if (null !== $requestsPerMinute && $requestsPerMinute < 1) {
-            throw new InvalidArgumentException(\sprintf('requestsPerMinute must be >= 1 or null, got %d', $requestsPerMinute));
+            throw InvalidRateLimitConfigurationException::forNonPositiveRequestsPerMinute($requestsPerMinute);
         }
 
         if (null !== $inputTokensPerMinute && $inputTokensPerMinute < 1) {
-            throw new InvalidArgumentException(\sprintf('inputTokensPerMinute must be >= 1 or null, got %d', $inputTokensPerMinute));
+            throw InvalidRateLimitConfigurationException::forNonPositiveInputTokensPerMinute($inputTokensPerMinute);
         }
 
         if (null !== $outputTokensPerMinute && $outputTokensPerMinute < 1) {
-            throw new InvalidArgumentException(\sprintf('outputTokensPerMinute must be >= 1 or null, got %d', $outputTokensPerMinute));
+            throw InvalidRateLimitConfigurationException::forNonPositiveOutputTokensPerMinute($outputTokensPerMinute);
         }
     }
 

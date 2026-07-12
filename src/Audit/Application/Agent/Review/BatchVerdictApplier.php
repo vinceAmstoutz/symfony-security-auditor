@@ -64,6 +64,22 @@ final readonly class BatchVerdictApplier
     }
 
     /**
+     * The set of finding ids a review conversation actually produced a
+     * verdict for. Lets a caller recovering from a mid-conversation abort
+     * distinguish a batch member the model genuinely reviewed from one it
+     * never reached, instead of {@see self::applyBatchReview()} treating
+     * every id absent from `$rawData` as an implicit rejection.
+     *
+     * @param array<int|string, mixed> $rawData
+     *
+     * @return list<string>
+     */
+    public function reachedIds(array $rawData): array
+    {
+        return array_keys($this->indexReviewsById($rawData));
+    }
+
+    /**
      * @param array<int|string, mixed> $rawData
      *
      * @return array<string, array<string, mixed>>
@@ -71,7 +87,7 @@ final readonly class BatchVerdictApplier
     private function indexReviewsById(array $rawData): array
     {
         $reviewsById = [];
-        foreach ($rawData as $entry) {
+        foreach ($this->asReviewList($rawData) as $entry) {
             if (!\is_array($entry)) {
                 continue;
             }
@@ -83,6 +99,20 @@ final readonly class BatchVerdictApplier
         }
 
         return $reviewsById;
+    }
+
+    /**
+     * A batch of one may come back as a bare review object instead of a
+     * one-element array — treat it as a single-entry list rather than
+     * iterating its scalar values.
+     *
+     * @param array<int|string, mixed> $rawData
+     *
+     * @return list<mixed>
+     */
+    private function asReviewList(array $rawData): array
+    {
+        return [] !== $rawData && !array_is_list($rawData) ? [$rawData] : $rawData;
     }
 
     /**
@@ -107,9 +137,15 @@ final readonly class BatchVerdictApplier
     private function reviewVulnerability(Vulnerability $vulnerability, ?array $review, CoverageRecorderInterface $coverageRecorder, array $codeContexts): Vulnerability
     {
         if (null === $review) {
-            ReviewerCoverageRecorder::record($vulnerability, 'rejected', $coverageRecorder, $this->progressReporter);
+            if (\array_key_exists($vulnerability->id(), $codeContexts)) {
+                $this->reviewerVerdictCache->store($vulnerability, $codeContexts[$vulnerability->id()], ['accepted' => false]);
+            }
 
-            return $vulnerability->withReviewerValidation(false);
+            ReviewerCoverageRecorder::record($vulnerability, 'rejected', $coverageRecorder, $this->progressReporter);
+            $rejected = $vulnerability->withReviewerValidation(false);
+            $coverageRecorder->recordReviewedFinding($rejected);
+
+            return $rejected;
         }
 
         if (\array_key_exists($vulnerability->id(), $codeContexts)) {
@@ -123,6 +159,7 @@ final readonly class BatchVerdictApplier
             $coverageRecorder,
             $this->progressReporter,
         );
+        $coverageRecorder->recordReviewedFinding($applied);
 
         return $applied;
     }
@@ -136,8 +173,10 @@ final readonly class BatchVerdictApplier
     {
         $rejected = [];
         foreach ($batch as $vulnerability) {
-            $rejected[] = $vulnerability->withReviewerValidation(false);
+            $withVerdict = $vulnerability->withReviewerValidation(false);
+            $rejected[] = $withVerdict;
             ReviewerCoverageRecorder::record($vulnerability, 'rejected', $coverageRecorder, $this->progressReporter);
+            $coverageRecorder->recordReviewedFinding($withVerdict);
         }
 
         return $rejected;
@@ -152,11 +191,28 @@ final readonly class BatchVerdictApplier
     {
         $errored = [];
         foreach ($batch as $vulnerability) {
-            $errored[] = $vulnerability->withReviewerValidation(false);
+            $withVerdict = $vulnerability->withReviewerValidation(false);
+            $errored[] = $withVerdict;
             ReviewerCoverageRecorder::record($vulnerability, 'errored', $coverageRecorder, $this->progressReporter);
+            $coverageRecorder->recordReviewedFinding($withVerdict);
         }
 
         return $errored;
+    }
+
+    /**
+     * Marks every finding in a batch the reviewer never reached because a
+     * budget/provider abort unwound the batch loop before a verdict for it
+     * was produced — no logging, no persisted verdict, unlike
+     * `markBatchErrored()`, whose findings did get a (failed) verdict.
+     *
+     * @param list<Vulnerability> $batch
+     */
+    public function markBatchUnreached(array $batch, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        foreach ($batch as $vulnerability) {
+            ReviewerCoverageRecorder::record($vulnerability, $status, $coverageRecorder, $this->progressReporter);
+        }
     }
 
     /**

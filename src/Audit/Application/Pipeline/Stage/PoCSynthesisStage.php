@@ -52,12 +52,11 @@ final readonly class PoCSynthesisStage implements StageInterface
             return;
         }
 
-        $enriched = $this->poCSynthesizer->synthesize($validated);
-
         $count = 0;
-        foreach ($enriched as $vulnerability) {
-            if (null !== $vulnerability->synthesizedPoC()) {
-                $auditContext->replaceVulnerability($vulnerability);
+        foreach ($validated as $vulnerability) {
+            [$enriched] = $this->poCSynthesizer->synthesize([$vulnerability]);
+            if (null !== $enriched->synthesizedPoC()) {
+                $auditContext->replaceVulnerability($enriched);
                 ++$count;
             }
         }

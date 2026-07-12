@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 
 use Psr\Log\LoggerInterface;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityHydrationResult;
@@ -25,7 +26,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ContextAwareAttackerC
  * Adapts {@see AttackerCacheInterface} for chunk analysis: transparently uses
  * the context-aware key when the wired cache supports it (so iterations 2+ are
  * cacheable), falling back to the context-free key otherwise, and turns a cache
- * hit into a hydrated result with coverage + logging.
+ * hit into a hydrated result with coverage + logging. A store failure is
+ * caught and logged rather than left to propagate — the caller already has
+ * the chunk's findings in hand by the time it stores them, so losing the
+ * cache write must never cost the caller the findings themselves.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -60,13 +64,19 @@ final readonly class AttackerChunkCache
      */
     public function store(array $chunk, string $contextKey, array $rawVulnerabilities): void
     {
-        if ($this->attackerCache instanceof ContextAwareAttackerCacheInterface) {
-            $this->attackerCache->storeForContext($chunk, $contextKey, $rawVulnerabilities);
+        try {
+            if ($this->attackerCache instanceof ContextAwareAttackerCacheInterface) {
+                $this->attackerCache->storeForContext($chunk, $contextKey, $rawVulnerabilities);
 
-            return;
+                return;
+            }
+
+            $this->attackerCache->store($chunk, $rawVulnerabilities);
+        } catch (Throwable $throwable) {
+            $this->logger->warning('Failed to write attacker cache entry', [
+                'error' => $throwable->getMessage(),
+            ]);
         }
-
-        $this->attackerCache->store($chunk, $rawVulnerabilities);
     }
 
     /**

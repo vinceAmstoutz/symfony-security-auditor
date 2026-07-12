@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
 /**
@@ -24,8 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
  * contract — the VOs do. Downstream code that needs to introspect the
  * configuration (e.g. compiler passes) depends on these immutable types
  * instead of magic array keys.
- */
-/**
+ *
  * @phpstan-type BundleConfigArray array{
  *     profile?: string,
  *     model: string,
@@ -54,6 +55,9 @@ final readonly class BundleConfiguration
 
     /**
      * @param BundleConfigArray $config
+     *
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
      */
     public static function fromArray(array $config): self
     {

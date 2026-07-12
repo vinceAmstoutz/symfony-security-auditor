@@ -24,7 +24,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\Re
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInterface
 {
-    public const int PROMPT_VERSION = 1;
+    /**
+     * Wire-format version of the prompt this builder emits. Folded into the
+     * reviewer cache key so that a wording change automatically invalidates
+     * previously-cached verdicts. Bump whenever the decision-rules text
+     * changes in a way expected to alter accept/reject outcomes.
+     */
+    public const int PROMPT_VERSION = 2;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = false;
 

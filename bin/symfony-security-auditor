@@ -12,6 +12,7 @@
 
 declare(strict_types=1);
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 
 (static function (): void {
@@ -30,9 +31,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory
 
 $environment = getenv();
 
-$bridgeAutoloadFile = StandaloneApplicationFactory::bridgeAutoloadFile($environment);
-if (is_file($bridgeAutoloadFile)) {
-    require_once $bridgeAutoloadFile;
-}
+(static function (array $environment): void {
+    try {
+        $bridgeAutoloadFile = StandaloneApplicationFactory::bridgeAutoloadFile($environment);
+    } catch (UnresolvableConfigPathException) {
+        return;
+    }
+
+    if (is_file($bridgeAutoloadFile)) {
+        require_once $bridgeAutoloadFile;
+    }
+})($environment);
 
 exit(StandaloneApplicationFactory::fromEnvironment($environment)->create()->run());

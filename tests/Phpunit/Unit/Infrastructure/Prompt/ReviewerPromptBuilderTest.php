@@ -18,6 +18,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -47,6 +48,7 @@ final class ReviewerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_batch_user_message_starts_with_reports_header(): void
     {
@@ -63,6 +65,7 @@ final class ReviewerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_batch_user_message_numbers_findings_starting_from_one(): void
     {
@@ -82,6 +85,7 @@ final class ReviewerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_batch_user_message_finding_numbers_match_input_position(): void
     {
@@ -110,6 +114,7 @@ final class ReviewerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_batch_user_message_ends_with_id_based_array_instruction(): void
     {
@@ -126,6 +131,7 @@ final class ReviewerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_batch_user_message_includes_code_context_for_finding_id(): void
     {
@@ -143,6 +149,7 @@ final class ReviewerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_batch_user_message_uses_empty_string_when_code_context_missing_for_id(): void
     {
@@ -378,6 +385,7 @@ final class ReviewerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_batch_user_message_line_numbers_full_file_context(): void
     {
@@ -396,6 +404,7 @@ final class ReviewerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_single_user_message_line_numbers_full_file_context(): void
     {
@@ -410,6 +419,7 @@ final class ReviewerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_empty_code_context_yields_empty_full_file_block(): void
     {
@@ -433,6 +443,27 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('Each entry of the JSON array MUST be shaped', $prompt);
     }
 
+    public function test_structured_system_prompt_uses_the_same_lenient_decision_rules_as_the_default_mode(): void
+    {
+        $reviewerPromptBuilder = new ReviewerPromptBuilder(useStructuredCollection: true);
+
+        $prompt = $reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString(
+            'Reject a finding ONLY when you can name a specific mitigating control',
+            $prompt,
+        );
+        self::assertStringContainsString(
+            '"Not clearly exploitable" is not, by itself, grounds to reject',
+            $prompt,
+        );
+        self::assertStringContainsString(
+            'do NOT reject: accept it and downgrade the severity',
+            $prompt,
+        );
+        self::assertStringNotContainsString('Be strict: reject any finding', $prompt);
+    }
+
     public function test_structured_system_prompt_keeps_rubric_and_playbook(): void
     {
         $reviewerPromptBuilder = new ReviewerPromptBuilder(useStructuredCollection: true);
@@ -442,6 +473,19 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringContainsString('You are a senior AppSec engineer', $prompt);
         self::assertStringContainsString('Severity rubric', $prompt);
         self::assertStringContainsString('false-positive playbook', $prompt);
+    }
+
+    public function test_structured_batch_system_prompt_uses_the_same_lenient_decision_rules_as_the_default_mode(): void
+    {
+        $reviewerPromptBuilder = new ReviewerPromptBuilder(useStructuredCollection: true);
+
+        $prompt = $reviewerPromptBuilder->buildBatchSystemPrompt();
+
+        self::assertStringContainsString(
+            'Reject a finding ONLY when you can name a specific mitigating control',
+            $prompt,
+        );
+        self::assertStringNotContainsString('Be strict: reject any finding', $prompt);
     }
 
     public function test_structured_batch_system_prompt_directs_one_record_review_call_per_input(): void
@@ -459,6 +503,7 @@ final class ReviewerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_structured_single_user_message_asks_for_a_record_review_call(): void
     {
@@ -473,6 +518,7 @@ final class ReviewerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_structured_batch_user_message_asks_for_record_review_calls(): void
     {
@@ -499,6 +545,7 @@ final class ReviewerPromptBuilderTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerability(string $filePath): Vulnerability
     {

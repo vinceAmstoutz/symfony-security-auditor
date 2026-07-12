@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
-use InvalidArgumentException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 
 /**
  * Token + USD cost attribution for an audit run.
@@ -45,19 +45,21 @@ final readonly class AuditCost
      *                                                                                                                      entry's totals must
      *                                                                                                                      not exceed the
      *                                                                                                                      aggregate
+     *
+     * @throws InvalidAuditCostException
      */
     public static function of(int $inputTokens, int $outputTokens, float $estimatedCostUsd, string $primaryModel, array $byRole = []): self
     {
         if ($inputTokens < 0) {
-            throw new InvalidArgumentException(\sprintf('inputTokens must be >= 0, got %d', $inputTokens));
+            throw InvalidAuditCostException::forNegativeInputTokens($inputTokens);
         }
 
         if ($outputTokens < 0) {
-            throw new InvalidArgumentException(\sprintf('outputTokens must be >= 0, got %d', $outputTokens));
+            throw InvalidAuditCostException::forNegativeOutputTokens($outputTokens);
         }
 
-        if ($estimatedCostUsd < 0.0) {
-            throw new InvalidArgumentException(\sprintf('estimatedCostUsd must be >= 0.0, got %f', $estimatedCostUsd));
+        if (!is_finite($estimatedCostUsd) || $estimatedCostUsd < 0.0) {
+            throw InvalidAuditCostException::forNegativeCost($estimatedCostUsd);
         }
 
         return new self($inputTokens, $outputTokens, round($estimatedCostUsd, 6), $primaryModel, $byRole);
@@ -101,7 +103,16 @@ final readonly class AuditCost
         return $this->byRole;
     }
 
-    /** @return array<string, int|float|string|array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}>> */
+    /**
+     * `by_role` is cast to `object` so `json_encode()` always renders it as a
+     * JSON object (`{}`), never an array (`[]`) — PHP's array type can't
+     * distinguish "empty map" from "empty list", so an unqualified empty
+     * array here would silently flip the field's JSON type between the
+     * populated (dry-run) and unpopulated (real-run) cases, breaking any
+     * strongly-typed consumer of the JSON report.
+     *
+     * @return array<string, int|float|string|object>
+     */
     public function toArray(): array
     {
         return [
@@ -110,7 +121,7 @@ final readonly class AuditCost
             'total_tokens' => $this->totalTokens(),
             'estimated_cost_usd' => $this->estimatedCostUsd,
             'primary_model' => $this->primaryModel,
-            'by_role' => $this->byRole,
+            'by_role' => (object) $this->byRole,
         ];
     }
 }

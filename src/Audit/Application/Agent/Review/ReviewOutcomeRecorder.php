@@ -49,8 +49,10 @@ final readonly class ReviewOutcomeRecorder
     {
         if (null === $review) {
             ReviewerCoverageRecorder::record($vulnerability, 'rejected', $coverageRecorder, $this->progressReporter);
+            $rejected = $vulnerability->withReviewerValidation(false);
+            $coverageRecorder->recordReviewedFinding($rejected);
 
-            return $vulnerability->withReviewerValidation(false);
+            return $rejected;
         }
 
         $reviewed = $this->verdictApplier->apply($vulnerability, $review);
@@ -60,6 +62,7 @@ final readonly class ReviewOutcomeRecorder
             $coverageRecorder,
             $this->progressReporter,
         );
+        $coverageRecorder->recordReviewedFinding($reviewed);
 
         return $reviewed;
     }
@@ -71,8 +74,46 @@ final readonly class ReviewOutcomeRecorder
             'error' => $throwable->getMessage(),
         ]);
         ReviewerCoverageRecorder::record($vulnerability, 'errored', $coverageRecorder, $this->progressReporter);
+        $errored = $vulnerability->withReviewerValidation(false);
+        $coverageRecorder->recordReviewedFinding($errored);
 
-        return $vulnerability->withReviewerValidation(false);
+        return $errored;
+    }
+
+    /**
+     * Marks a finding the reviewer never reached because a budget/provider
+     * abort unwound the review loop first — no logging, mirroring how
+     * `ChunkCoverageRecorder` marks a chunk the attacker never reached.
+     */
+    public function recordUnreached(Vulnerability $vulnerability, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        ReviewerCoverageRecorder::record($vulnerability, $status, $coverageRecorder, $this->progressReporter);
+    }
+
+    /**
+     * Recovers a verdict already recorded via a `record_review` tool call in
+     * an earlier round of a conversation that later aborted — otherwise it
+     * vanishes with the exception even though the verdict was genuinely
+     * reached. Returns `null` when nothing was recorded, so the caller falls
+     * back to its own not-reached handling via {@see recordUnreached()}. A
+     * recovered verdict is cached the same way a normal, non-aborted verdict
+     * already is — it was genuinely reached, so a retried run should not pay
+     * for an LLM call that already produced a reliable answer — bypassed
+     * when the caller passes no code context (mirrors `bypassCache`).
+     */
+    public function recoverDrainedVerdict(Vulnerability $vulnerability, StructuredReviewCollectionSession $structuredReviewCollectionSession, CoverageRecorderInterface $coverageRecorder, ?string $codeContextForCache = null): ?Vulnerability
+    {
+        $verdicts = $structuredReviewCollectionSession->drain();
+        if ([] === $verdicts) {
+            return null;
+        }
+
+        $verdict = array_pop($verdicts);
+        if (null !== $codeContextForCache) {
+            $this->reviewerVerdictCache->store($vulnerability, $codeContextForCache, $verdict);
+        }
+
+        return $this->recordVerdict($vulnerability, $verdict, $coverageRecorder);
     }
 
     public function applyResponse(Vulnerability $vulnerability, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder, ?string $codeContextForCache = null): Vulnerability
@@ -91,8 +132,10 @@ final readonly class ReviewOutcomeRecorder
                 'content_preview' => substr($llmResponse->content(), 0, self::PARSE_FAILURE_PREVIEW_BYTES),
             ]);
             ReviewerCoverageRecorder::record($vulnerability, 'errored', $coverageRecorder, $this->progressReporter);
+            $errored = $vulnerability->withReviewerValidation(false);
+            $coverageRecorder->recordReviewedFinding($errored);
 
-            return $vulnerability->withReviewerValidation(false);
+            return $errored;
         }
 
         if (null !== $codeContextForCache) {

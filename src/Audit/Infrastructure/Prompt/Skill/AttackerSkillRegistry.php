@@ -64,6 +64,7 @@ final readonly class AttackerSkillRegistry
     {
         return [
             new ControllerAttackerSkill(),
+            new ControllerFileUploadAttackerSkill(),
             new ApiResourceAttackerSkill(),
             new LiveComponentAttackerSkill(),
             new AuthenticatorAttackerSkill(),
@@ -77,6 +78,7 @@ final readonly class AttackerSkillRegistry
             new FileUploadAttackerSkill(),
             new RepositoryAttackerSkill(),
             new EntityAttackerSkill(),
+            new EntityFileUploadAttackerSkill(),
             new TemplateAttackerSkill(),
             new TwigExtensionAttackerSkill(),
             new ConfigAttackerSkill(),

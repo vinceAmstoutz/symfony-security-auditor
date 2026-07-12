@@ -82,7 +82,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
             ],
         ];
 
-        return json_encode($sarif, \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
+        return json_encode($sarif, \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_PRESERVE_ZERO_FRACTION);
     }
 
     /**
@@ -95,12 +95,12 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
         $result = [
             'ruleId' => $vulnerability->type()->owaspReference(),
             'level' => $this->sarifLevel($vulnerability->severity()),
-            'message' => ['text' => $vulnerability->title()],
+            'message' => ['text' => $this->escapeEmbeddedLinkSyntax($vulnerability->title())],
             'partialFingerprints' => ['symfonySecurityAuditor/v1' => $vulnerability->fingerprint()],
             'locations' => [
                 [
                     'physicalLocation' => [
-                        'artifactLocation' => ['uri' => $vulnerability->filePath()],
+                        'artifactLocation' => ['uri' => $this->encodeArtifactUri($vulnerability->filePath())],
                         'region' => [
                             'startLine' => $vulnerability->lineStart(),
                             'endLine' => $vulnerability->lineEnd(),
@@ -117,18 +117,54 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
         return $result;
     }
 
+    /**
+     * The SARIF 2.1.0 spec lets a plain-text `message.text` field embed a
+     * CommonMark-style `[display text](target)` hyperlink, and mandates
+     * that every viewer — even one with no Markdown support — render it as
+     * a clickable link. `Vulnerability::title()` is free LLM-influenced
+     * text with no character restrictions, so an unescaped title lets a
+     * crafted finding forge a live link into a report a reviewer trusts.
+     * Escaping the backslash first, then the two characters that open the
+     * link syntax, neutralizes it the same way CommonMark's own
+     * backslash-escape mechanism does.
+     */
+    private function escapeEmbeddedLinkSyntax(string $title): string
+    {
+        return str_replace(['\\', '[', ']'], ['\\\\', '\\[', '\\]'], $title);
+    }
+
+    /**
+     * The SARIF spec requires `artifactLocation.uri` to be a valid RFC 3986
+     * URI reference; a raw file path can contain `#`/`?`, which a
+     * spec-compliant consumer would parse as a fragment/query delimiter
+     * rather than literal path content. Percent-encoding each segment (while
+     * preserving `/` as the path separator) keeps the path intact.
+     */
+    private function encodeArtifactUri(string $filePath): string
+    {
+        return implode('/', array_map(rawurlencode(...), explode('/', $filePath)));
+    }
+
     private function sarifLevel(VulnerabilitySeverity $vulnerabilitySeverity): string
     {
         return SeverityLevelMapper::level($vulnerabilitySeverity, 'note');
     }
 
     /**
+     * When multiple `VulnerabilityType`s share an OWASP category (they can
+     * have different `category()` values — e.g. `broken_access_control` vs
+     * `path_traversal` both under A01), the representative used for `name`
+     * and `shortDescription` is picked by sorting on the type's own value so
+     * it stays stable across runs instead of following whichever finding
+     * happens to be most severe.
+     *
      * @param non-empty-array<string, VulnerabilityType> $contributingTypes
      *
      * @return array<string, mixed>
      */
     private function ruleFor(array $contributingTypes): array
     {
+        ksort($contributingTypes);
         $vulnerabilityType = reset($contributingTypes);
 
         return [

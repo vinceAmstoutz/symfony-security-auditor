@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
@@ -47,6 +48,9 @@ final readonly class ReadFileTool implements ToolInterface
         $this->filesByPath = $byPath;
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     #[Override]
     public function definition(): ToolDefinition
     {
@@ -82,7 +86,7 @@ final readonly class ReadFileTool implements ToolInterface
         $content = $this->filesByPath[$rawPath]->content();
 
         if (\strlen($content) > self::MAX_BYTES) {
-            return \sprintf("%s\n\n... [truncated to %d bytes]", substr($content, 0, self::MAX_BYTES), self::MAX_BYTES);
+            return \sprintf("%s\n\n... [truncated to %d bytes]", mb_strcut($content, 0, self::MAX_BYTES, 'UTF-8'), self::MAX_BYTES);
         }
 
         return $content;

@@ -14,13 +14,13 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit;
 
 use DateTimeImmutable;
-use InvalidArgumentException;
 use Override;
 use Psr\Clock\ClockInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\RateLimitRequestTooLargeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Exception\InvalidRateLimiterConfigurationException;
 
 /**
  * Fixed-minute token bucket with three independent dimensions (RPM, ITPM, OTPM).
@@ -63,19 +63,23 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
 
     private ?DateTimeImmutable $pausedUntil = null;
 
+    /**
+     * @throws InvalidRateLimiterConfigurationException
+     */
     public function __construct(
         private readonly RateLimitConfiguration $rateLimitConfiguration,
         private readonly ClockInterface $clock,
         private readonly SleeperInterface $sleeper,
     ) {
         if (!$rateLimitConfiguration->isEnabled()) {
-            throw new InvalidArgumentException('TokenBucketRateLimiter requires at least one rate-limit dimension; wire NullRateLimiter for fully-disabled config.');
+            throw InvalidRateLimiterConfigurationException::forNoEnabledDimension();
         }
 
         $this->windowStart = $this->floorToMinute($this->clock->now());
     }
 
     /**
+     * @throws InvalidRateLimiterConfigurationException
      * @throws RateLimitRequestTooLargeException
      */
     #[Override]
@@ -101,12 +105,13 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
     }
 
     /**
+     * @throws InvalidRateLimiterConfigurationException
      * @throws RateLimitRequestTooLargeException
      */
     private function assertAcceptableEstimate(int $estimatedInputTokens): void
     {
         if ($estimatedInputTokens < 0) {
-            throw new InvalidArgumentException(\sprintf('estimatedInputTokens must be >= 0, got %d', $estimatedInputTokens));
+            throw InvalidRateLimiterConfigurationException::forNegativeEstimatedInputTokens($estimatedInputTokens);
         }
 
         $itpm = $this->rateLimitConfiguration->inputTokensPerMinute;
@@ -151,7 +156,9 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
     #[Override]
     public function pauseUntil(DateTimeImmutable $until): void
     {
-        $this->pausedUntil = $until;
+        $this->pausedUntil = $this->pausedUntil instanceof DateTimeImmutable
+            ? max($this->pausedUntil, $until)
+            : $until;
     }
 
     private function currentInstant(): DateTimeImmutable

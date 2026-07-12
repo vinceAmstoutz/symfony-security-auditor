@@ -34,6 +34,8 @@ use function Symfony\Component\String\u;
  */
 final readonly class PoCSynthesizer implements PoCSynthesizerInterface
 {
+    private const string NO_POC_SENTINEL = 'NO_POC:';
+
     public function __construct(
         private LLMClientInterface $llmClient,
         private LoggerInterface $logger,
@@ -104,7 +106,7 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
             $response = $this->llmClient->complete($systemPrompt, $userMessage);
             $content = u($response->content())->trim()->toString();
 
-            return '' === $content ? null : $content;
+            return $this->isUsablePoC($content) ? $content : null;
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
@@ -117,6 +119,11 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
 
             return null;
         }
+    }
+
+    private function isUsablePoC(string $content): bool
+    {
+        return '' !== $content && !u($content)->startsWith(self::NO_POC_SENTINEL);
     }
 
     private function buildSystemPrompt(): string
@@ -186,14 +193,38 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
             $data['id'],
             $data['type'],
             $data['severity'],
-            $data['title'],
-            $data['file'],
+            $this->stripEmbeddedNewline($this->escapeFences($data['title'])),
+            $this->stripEmbeddedNewline($data['file']),
             $data['line_start'],
             $data['line_end'],
-            $data['vulnerable_code'],
-            $data['attack_vector'],
-            $data['proof'],
-            $data['remediation'],
+            $this->escapeFences($data['vulnerable_code']),
+            $this->escapeFences($data['attack_vector']),
+            $this->escapeFences($data['proof']),
+            $this->escapeFences($data['remediation']),
         );
+    }
+
+    /**
+     * LLM-echoed finding text is interpolated into this prompt's own
+     * ```-delimited code-fence and `###`-prefixed section headers; an
+     * unescaped run of backticks would let the finding forge a fake fence,
+     * and an unescaped `#` would let it forge a fake section header (e.g. a
+     * bogus `### SYSTEM OVERRIDE`) as unguarded top-level prompt text.
+     */
+    private function escapeFences(string $text): string
+    {
+        return str_replace(['`', '#'], ['\\`', '\\#'], $text);
+    }
+
+    /**
+     * `title` lands in the bare, single-line `Title: ...` slot with no
+     * surrounding fence or heading to contain it — unlike the fenced/heading
+     * -guarded narrative fields `escapeFences()` protects. A raw newline here
+     * would forge a fake standalone instruction paragraph as unguarded
+     * top-level prompt text.
+     */
+    private function stripEmbeddedNewline(string $text): string
+    {
+        return str_replace("\n", ' ', $text);
     }
 }

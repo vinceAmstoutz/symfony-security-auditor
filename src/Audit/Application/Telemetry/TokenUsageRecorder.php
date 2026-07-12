@@ -13,7 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry;
 
-use InvalidArgumentException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 
 /**
@@ -40,22 +41,25 @@ final class TokenUsageRecorder
 
     private int $cacheCreationTokens = 0;
 
+    /**
+     * @throws NegativeTokenCountException
+     */
     public function record(int $inputTokens, int $outputTokens, int $cacheReadTokens = 0, int $cacheCreationTokens = 0): void
     {
         if ($inputTokens < 0) {
-            throw new InvalidArgumentException(\sprintf('Input tokens must be >= 0, got %d', $inputTokens));
+            throw NegativeTokenCountException::forInputTokens($inputTokens);
         }
 
         if ($outputTokens < 0) {
-            throw new InvalidArgumentException(\sprintf('Output tokens must be >= 0, got %d', $outputTokens));
+            throw NegativeTokenCountException::forOutputTokens($outputTokens);
         }
 
         if ($cacheReadTokens < 0) {
-            throw new InvalidArgumentException(\sprintf('Cache read tokens must be >= 0, got %d', $cacheReadTokens));
+            throw NegativeTokenCountException::forCacheReadTokens($cacheReadTokens);
         }
 
         if ($cacheCreationTokens < 0) {
-            throw new InvalidArgumentException(\sprintf('Cache creation tokens must be >= 0, got %d', $cacheCreationTokens));
+            throw NegativeTokenCountException::forCacheCreationTokens($cacheCreationTokens);
         }
 
         $this->inputTokens += $inputTokens;
@@ -64,6 +68,9 @@ final class TokenUsageRecorder
         $this->cacheCreationTokens += $cacheCreationTokens;
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function snapshot(): TokenUsageSnapshot
     {
         return TokenUsageSnapshot::of($this->inputTokens, $this->outputTokens, $this->cacheReadTokens, $this->cacheCreationTokens);

@@ -14,11 +14,15 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Tool;
 
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\LookupAdvisoryTool;
 
 final class LookupAdvisoryToolTest extends TestCase
 {
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_definition_matches_expected_full_schema(): void
     {
         $lookupAdvisoryTool = new LookupAdvisoryTool(new InMemoryAdvisoryDatabase());

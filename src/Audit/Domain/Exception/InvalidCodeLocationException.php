@@ -26,4 +26,9 @@ final class InvalidCodeLocationException extends InvalidArgumentException
     {
         return new self('Line end must be >= line start');
     }
+
+    public static function forBlankFilePath(): self
+    {
+        return new self('File path must not be blank');
+    }
 }

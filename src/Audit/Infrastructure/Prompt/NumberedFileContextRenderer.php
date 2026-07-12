@@ -31,7 +31,7 @@ final readonly class NumberedFileContextRenderer
         foreach ($files as $file) {
             $parts[] = \sprintf(
                 "<file path=\"%s\" type=\"%s\">\n%s\n</file>",
-                $file->relativePath(),
+                self::sanitizePathAttribute($file->relativePath()),
                 $file->type(),
                 self::numberLines($file->content()),
             );
@@ -40,8 +40,24 @@ final readonly class NumberedFileContextRenderer
         return implode("\n\n", $parts);
     }
 
+    /**
+     * A scanned file's path comes from the audited project's filesystem, not
+     * from us — a POSIX filename may contain `"` or a newline, either of
+     * which would otherwise let a crafted filename close this attribute
+     * early and forge additional `<file>` blocks in the attacker/reviewer
+     * prompt.
+     */
+    private static function sanitizePathAttribute(string $path): string
+    {
+        return str_replace(["\n", '"'], [' ', "'"], $path);
+    }
+
     private static function numberLines(string $content): string
     {
+        if ('' === $content) {
+            return '';
+        }
+
         $lines = explode("\n", $content);
         $numbered = [];
         foreach ($lines as $index => $line) {

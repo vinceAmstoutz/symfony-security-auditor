@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
@@ -33,7 +34,14 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 9;
+    public const int CACHE_VERSION = 26;
+
+    /**
+     * Detects the `s` (DOTALL) flag among a PCRE pattern's trailing modifier
+     * letters — the run of letters after the closing delimiter, which is never
+     * itself a letter, so no in-pattern `s` is mistaken for the modifier.
+     */
+    private const string TRAILING_DOT_ALL_MODIFIER = '/s[a-zA-Z]*$/';
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
@@ -55,6 +63,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'regex' => '/\b(?:shell_exec|exec|passthru|proc_open|system|popen)\s*\(/',
                 'description' => 'Shell invocation — verify no user-input concatenation',
             ],
+            'process_construction' => [
+                'regex' => '/new\s+Process\s*\(|Process::fromShellCommandline\s*\(/',
+                'description' => 'Symfony Process construction — verify argv is not built from user input (command injection); fromShellCommandline runs through a shell',
+            ],
             'md5_or_sha1_security' => [
                 'regex' => '/\b(?:md5|sha1)\s*\(/',
                 'description' => 'md5/sha1 — confirm not used for passwords or signatures',
@@ -68,11 +80,15 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'eval() on dynamic input — RCE risk',
             ],
             'http_client_request' => [
-                'regex' => '/\bHttpClient(?:Interface)?\b[^;]{0,400}->request\s*\(/s',
+                'regex' => '/->request\s*\(/',
                 'description' => 'HttpClient request — verify host allowlist (SSRF)',
             ],
+            'open_redirect' => [
+                'regex' => '/new\s+RedirectResponse\s*\(/',
+                'description' => 'RedirectResponse with a variable target — verify the destination is not attacker-controlled (open redirect)',
+            ],
             'mailer_header_setter' => [
-                'regex' => '/->(?:from|subject|addBcc|addCc|to|replyTo)\s*\(/',
+                'regex' => '/->(?:from|subject|addBcc|bcc|addCc|cc|to|replyTo)\s*\(/',
                 'description' => 'Mailer header setter — verify no user-input concatenation (header injection)',
             ],
             'hash_equals_missing' => [
@@ -87,23 +103,55 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'regex' => '/->evaluate\s*\(/',
                 'description' => 'ExpressionLanguage::evaluate() — verify expression not built from user input',
             ],
+            'twig_string_template' => [
+                'regex' => '/->createTemplate\s*\(/',
+                'description' => 'Twig::createTemplate() compiling a dynamic string — verify the template source is not user-controlled (server-side template injection → RCE)',
+            ],
+            'file_sink' => [
+                'regex' => '/\b(?:file_get_contents|file_put_contents|fopen|readfile|unlink|move_uploaded_file)\s*\(/',
+                'description' => 'File I/O sink — verify the path is not built from user input (path traversal, LFI, arbitrary read/write/delete)',
+            ],
+            'dynamic_file_inclusion' => [
+                'regex' => '/\b(?:require_once|require|include_once|include)\b[^;]*\$/',
+                'description' => 'include/require with a variable path — verify the included path is not user-controlled (LFI / RCE)',
+            ],
+            'upload_handling' => [
+                'regex' => '/->(?:move|getClientOriginalName)\s*\(|->files->/',
+                'description' => 'Uploaded-file handling — verify extension/MIME/size validation and that the stored name/path is not attacker-controlled',
+            ],
+            'xml_external_entity' => [
+                'regex' => '/\bsimplexml_load_string\s*\(|\bsimplexml_load_file\s*\(|->loadXML\s*\(/',
+                'description' => 'XML parsing of untrusted input (simplexml_load_string/_file, DOMDocument::loadXML) — verify external-entity loading is disabled (XXE)',
+            ],
+            'doctrine_query' => [
+                'regex' => '/->(?:createQuery|createQueryBuilder|executeQuery|executeStatement|fetchAllAssociative|fetchAllNumeric|fetchAllKeyValue|fetchAssociative|fetchNumeric|fetchOne|fetchFirstColumn|iterateAssociative|iterateKeyValue|iterateColumn)\s*\(/',
+                'description' => 'Doctrine query construction (incl. DBAL fetch*/iterate* one-shots) — verify no user input is concatenated into DQL/SQL (use parameters)',
+            ],
+            'querybuilder_predicate' => [
+                'regex' => '/->(?:where|andWhere|orWhere|having|andHaving|orHaving|orderBy|addOrderBy)\s*\(/',
+                'description' => 'QueryBuilder predicate or sort — verify no string interpolation (SQL injection); bind via setParameter, and note ORDER BY is never parameterised',
+            ],
+            'superglobal_input' => [
+                'regex' => '/\$_(?:GET|POST|REQUEST|COOKIE|FILES|SERVER)\b/',
+                'description' => 'Superglobal input read — trace the flow to dangerous sinks',
+            ],
         ],
         ProjectFileType::CONTROLLER->value => [
             'request_get' => [
-                'regex' => '/\$request->(?:get|getContent|query->get|request->get|attributes->get)\s*\(/',
-                'description' => 'Request input read — trace flow to dangerous sinks',
+                'regex' => '/\$request->/',
+                'description' => 'Request object access (query/body/payload/toArray/cookies/headers/files) — request input read; trace flow to dangerous sinks',
             ],
             'redirect_with_input' => [
-                'regex' => '/->redirect\s*\(\s*\$/',
+                'regex' => '/->redirect\s*\(.{0,200}\$/s',
                 'description' => 'Redirect with variable target — verify protocol/host allowlist (open redirect)',
             ],
             'submit_request_all' => [
-                'regex' => '/->submit\s*\(\s*\$request->\w+->all\s*\(\s*\)\s*\)/',
+                'regex' => '/->submit\s*\(\s*\$request->\w+->all\s*\(\s*\)\s*\)/s',
                 'description' => 'Form submit($request->...->all()) — mass-assignment risk',
             ],
-            'map_request_payload' => [
-                'regex' => '/#\[MapRequestPayload(?:\s*\()/',
-                'description' => '#[MapRequestPayload] — verify the DTO has validation constraints and no privileged setters',
+            'request_mapping_attribute' => [
+                'regex' => '/#\[Map(?:RequestPayload|QueryString|QueryParameter)\b/',
+                'description' => '#[MapRequestPayload]/#[MapQueryString]/#[MapQueryParameter] — verify the bound DTO has validation constraints and no privileged setters (mass assignment / IDOR)',
             ],
         ],
         ProjectFileType::VOTER->value => [
@@ -122,7 +170,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'Native SQL with string concatenation — SQL injection risk',
             ],
             'dynamic_order_by' => [
-                'regex' => '/->orderBy\s*\(\s*\$/',
+                'regex' => '/->orderBy\s*\(\s*\$/s',
                 'description' => 'Dynamic orderBy — Doctrine does NOT parameterize ORDER BY',
             ],
             'querybuilder_no_setparameter' => [
@@ -153,6 +201,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'regex' => '/#\[\s*Groups\s*\(|@Groups\s*\(/',
                 'description' => 'Serializer #[Groups] attribute — verify write groups do not expose privileged fields (roles, isAdmin, passwordHash) to mass assignment',
             ],
+            'sensitive_setter' => [
+                'regex' => '/public\s+function\s+set(?:Roles?|IsAdmin|IsSuperAdmin|PasswordHash|Password|Admin|SuperAdmin|Superuser)\b/i',
+                'description' => 'Public setter on sensitive field of an API resource — verify a serialization write group (or a DTO) prevents denormalization mass assignment',
+            ],
         ],
         ProjectFileType::LIVE_COMPONENT->value => [
             'live_prop_writable' => [
@@ -166,7 +218,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         ],
         ProjectFileType::ENTITY->value => [
             'sensitive_setter' => [
-                'regex' => '/public\s+function\s+set(?:Roles?|IsAdmin|PasswordHash|Password|Admin|Superuser)\b/i',
+                'regex' => '/public\s+function\s+set(?:Roles?|IsAdmin|IsSuperAdmin|PasswordHash|Password|Admin|SuperAdmin|Superuser)\b/i',
                 'description' => 'Public setter on sensitive field — verify it is not bound by a form',
             ],
             'serializer_groups_attribute' => [
@@ -176,7 +228,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         ],
         ProjectFileType::TWIG_EXTENSION->value => [
             'extension_shell_or_file_sink' => [
-                'regex' => '/\b(?:shell_exec|exec|passthru|proc_open|system|popen|file_get_contents|file_put_contents|include|include_once|require|require_once)\s*\(/',
+                'regex' => '/\b(?:shell_exec|exec|passthru|proc_open|system|popen|file_get_contents|file_put_contents)\s*\(|\b(?:include|include_once|require|require_once)\b/',
                 'description' => 'Shell/file sink inside a Twig extension — reachable from any template calling this function/filter; verify no template-supplied argument reaches it (RCE/LFI)',
             ],
             'extension_is_safe_html' => [
@@ -208,7 +260,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'cookie_secure: false — session cookie sent over plain HTTP',
             ],
             'cors_wildcard_with_credentials' => [
-                'regex' => '/allow_origin[^:]*:\s*[\'"]?\*/',
+                'regex' => '/allow_origin[^:]*:\s*\[?\s*[\'"]?\*/',
                 'description' => 'CORS allow_origin: * — verify allow_credentials is not also true',
             ],
             'firewall_security_false' => [
@@ -216,8 +268,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'firewall security: false — verify the route is intentionally anonymous',
             ],
             'php_serializer_transport' => [
-                'regex' => '/serializer\s*:\s*[\'"]?php_serialize/',
-                'description' => 'Messenger transport with php_serialize — PHP-native unserialize on dequeue',
+                'regex' => '/serializer\s*:\s*[\'"]?[\w.]*php_serialize/',
+                'description' => 'Messenger transport using native PHP serialization (messenger.transport.native_php_serializer) — PHP-native unserialize on dequeue (gadget-chain RCE)',
             ],
             'env_credential_assignment' => [
                 'regex' => '/^\s*[A-Z0-9_]*(?:SECRET|PASSWORD|PASSWD|TOKEN|API_?KEY|ACCESS_KEY|PRIVATE_KEY)[A-Z0-9_]*\s*=\s*\S+/',
@@ -234,7 +286,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'SelfValidatingPassport — skips credential check; verify the flow is OAuth/token, not password',
             ],
             'supports_returns_null' => [
-                'regex' => '/public\s+function\s+supports\s*\([^)]*\)\s*:\s*\??bool\s*\{[^}]*return\s+null\s*;/s',
+                'regex' => '/public\s+function\s+supports\s*\([^)]*\)\s*:\s*\??bool\s*\{[\s\S]{0,500}?return\s+null\s*;/s',
                 'description' => 'supports() returning null — Symfony treats null as "supports", silently letting non-matching paths through',
             ],
         ],
@@ -244,13 +296,13 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'unserialize() in handler — gadget-chain risk on transported payload',
             ],
             'process_in_handler' => [
-                'regex' => '/new\s+Process\s*\(/',
-                'description' => 'Process construction in handler — verify argv is not built from message fields',
+                'regex' => '/new\s+Process\s*\(|Process::fromShellCommandline\s*\(/',
+                'description' => 'Process construction in handler — verify argv is not built from message fields; fromShellCommandline runs through a shell',
             ],
         ],
         ProjectFileType::WEBHOOK_CONSUMER->value => [
             'no_hash_equals' => [
-                'regex' => '/(?:signature|hmac|hash)[^;]{0,80}[!=]==/i',
+                'regex' => '/(?:signature|hmac|hash)[^;]{0,80}[!=]==/is',
                 'description' => 'Signature/HMAC compared with === — use hash_equals() for constant-time',
             ],
         ],
@@ -278,6 +330,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * @param list<ProjectFile> $files
      *
      * @return list<RiskMarker>
+     *
+     * @throws InvalidRiskMarkerException
      */
     #[Override]
     public function scan(array $files): array
@@ -287,6 +341,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         foreach ($files as $file) {
             $bucket = $file->type();
             $patternsForBucket = [
+                ...$this->genericPhpPatternsFor($file),
+                ...$this->controllerPatternsFor($file),
                 ...(self::PATTERNS[$bucket] ?? []),
                 ...($this->customPatterns[$bucket] ?? []),
             ];
@@ -306,6 +362,56 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         }
 
         return $markers;
+    }
+
+    /**
+     * The `php` bucket's generic sink patterns (unserialize, eval, shell exec,
+     * weak crypto, insecure RNG, SSRF-prone HttpClient calls, mailer header
+     * setters, non-constant-time compares, ExpressionLanguage evaluation) are
+     * dangerous in any PHP source file, not only plain services: a controller
+     * or messenger handler calling `unserialize()` on request input is at least
+     * as exploitable. `scan()` selects a single type bucket per file, so
+     * without this every non-`php` component (controller, voter, entity,
+     * repository, form, authenticator, …) would miss those markers — and under
+     * the `fast` profile's lean-mode filter, which drops files carrying zero
+     * markers, such a file would be excluded from the audit entirely. Keyed by
+     * label, so a `php`-typed file (whose own bucket already is the `php` set)
+     * gets each pattern exactly once after the spread merge. Non-PHP files
+     * (Twig templates, YAML config) are excluded — these patterns are
+     * PHP-source specific.
+     *
+     * @return array<string, array{regex: string, description: string}>
+     */
+    private function genericPhpPatternsFor(ProjectFile $projectFile): array
+    {
+        if ('php' !== pathinfo($projectFile->relativePath(), \PATHINFO_EXTENSION)) {
+            return [];
+        }
+
+        return self::PATTERNS[ProjectFileType::PHP->value];
+    }
+
+    /**
+     * The request-input markers (`request_get`, `redirect_with_input`,
+     * `submit_request_all`, `request_mapping_attribute`) live in the CONTROLLER
+     * bucket, but `#[ApiResource]` and `#[AsLiveComponent]` classes classify as
+     * their own type while still declaring `#[Route]`-mapped actions that read
+     * `$request` — the controller-like pattern the mapping parsers and the
+     * chunker already honour via {@see ProjectFileType::isControllerLike()}.
+     * Without this merge, such an action produces zero markers and is excluded
+     * by the `fast` profile's lean-mode filter, which drops files carrying no
+     * markers. Keyed by label, so a CONTROLLER-typed file (whose own bucket is
+     * this set) gets each pattern exactly once after the spread merge.
+     *
+     * @return array<string, array{regex: string, description: string}>
+     */
+    private function controllerPatternsFor(ProjectFile $projectFile): array
+    {
+        if (!$projectFile->fileType()->isControllerLike()) {
+            return [];
+        }
+
+        return self::PATTERNS[ProjectFileType::CONTROLLER->value];
     }
 
     /**
@@ -329,14 +435,25 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         return $matches;
     }
 
+    /**
+     * A well-formed PCRE pattern always has a non-empty delimiter and its
+     * closing counterpart somewhere in the string — both are asserted rather
+     * than branched on, since a pattern violating either is already
+     * malformed and will fail its own `preg_match()` call regardless of what
+     * this method returns.
+     */
     private function hasDotAllModifier(string $regex): bool
     {
-        $segments = explode('/', $regex);
-
-        return str_contains(end($segments), 's');
+        return 1 === preg_match(self::TRAILING_DOT_ALL_MODIFIER, $regex);
     }
 
     /**
+     * A cross-line match's own security-relevant token (`return null;`, the
+     * actual `->request(` call) sits at the END of the match, not its start —
+     * a marker line pointing to the match's opening keyword (e.g. `public
+     * function supports(`) is often a structural line the code slicer already
+     * retains unconditionally, restoring nothing.
+     *
      * @return list<int>
      */
     private function matchAcrossLines(string $content, string $regex): array
@@ -344,8 +461,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         preg_match_all($regex, $content, $matches, \PREG_OFFSET_CAPTURE);
 
         $lines = [];
-        foreach ($matches[0] as $match) {
-            $lines[] = substr_count($content, "\n", 0, $match[1]) + 1;
+        foreach ($matches[0] as [$matchedText, $startOffset]) {
+            $lines[] = substr_count($content, "\n", 0, $startOffset + \strlen($matchedText)) + 1;
         }
 
         return array_values(array_unique($lines));

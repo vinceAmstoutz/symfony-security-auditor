@@ -29,7 +29,7 @@ final class TransientLLMFailureException extends LLMProviderException
     public static function afterExhaustedAttempts(int $attempts, Throwable $throwable): self
     {
         return new self(
-            \sprintf('LLM call failed after %d transient retries: %s', $attempts, $throwable->getMessage()),
+            \sprintf('LLM call failed after %d attempts: %s', $attempts, $throwable->getMessage()),
             previous: $throwable,
         );
     }

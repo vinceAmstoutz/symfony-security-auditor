@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 
@@ -174,6 +175,17 @@ final class AuditCommandInputTest extends TestCase
     /**
      * @throws WorkingDirectoryUnavailableException
      */
+    public function test_resolved_project_path_does_not_need_the_working_directory_for_an_already_absolute_path(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->projectPath = '/an/explicit/absolute/path';
+
+        self::assertSame('/an/explicit/absolute/path', $auditCommandInput->resolvedProjectPath(static fn (): false => false));
+    }
+
+    /**
+     * @throws WorkingDirectoryUnavailableException
+     */
     public function test_resolved_project_path_uses_injected_resolver_when_property_is_null(): void
     {
         $auditCommandInput = new AuditCommandInput();
@@ -212,6 +224,38 @@ final class AuditCommandInputTest extends TestCase
         self::assertSame(['apps/api/src', 'libs/shared'], $auditCommandInput->scanPaths());
     }
 
+    public function test_scan_paths_drops_a_slash_only_entry(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->paths = ['/', 'apps/api/src'];
+
+        self::assertSame(['apps/api/src'], $auditCommandInput->scanPaths());
+    }
+
+    public function test_scan_paths_strips_a_leading_dot_slash_segment(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->paths = ['./src', 'apps/api/src'];
+
+        self::assertSame(['src', 'apps/api/src'], $auditCommandInput->scanPaths());
+    }
+
+    public function test_scan_paths_drops_a_bare_dot_entry(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->paths = ['.', 'apps/api/src'];
+
+        self::assertSame(['apps/api/src'], $auditCommandInput->scanPaths());
+    }
+
+    public function test_scan_paths_strips_a_leading_dot_slash_segment_with_a_doubled_separator(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->paths = ['.//src', 'apps/api/src'];
+
+        self::assertSame(['src', 'apps/api/src'], $auditCommandInput->scanPaths());
+    }
+
     public function test_default_no_cache_is_false(): void
     {
         $auditCommandInput = new AuditCommandInput();
@@ -232,5 +276,61 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput->failOn = RiskLevel::High;
 
         self::assertSame(RiskLevel::High, $auditCommandInput->failOn);
+    }
+
+    /**
+     * @throws ConflictingCommandOptionsException
+     */
+    public function test_assert_no_conflicting_options_allows_generate_baseline_alone(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->generateBaseline = 'baseline.json';
+
+        $auditCommandInput->assertNoConflictingOptions();
+
+        self::assertSame('baseline.json', $auditCommandInput->generateBaseline);
+    }
+
+    /**
+     * @throws ConflictingCommandOptionsException
+     */
+    public function test_assert_no_conflicting_options_allows_dry_run_alone(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->dryRun = true;
+
+        $auditCommandInput->assertNoConflictingOptions();
+
+        self::assertTrue($auditCommandInput->dryRun);
+    }
+
+    /**
+     * @throws ConflictingCommandOptionsException
+     */
+    public function test_assert_no_conflicting_options_rejects_generate_baseline_with_dry_run(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->generateBaseline = 'baseline.json';
+        $auditCommandInput->dryRun = true;
+
+        $this->expectException(ConflictingCommandOptionsException::class);
+        $this->expectExceptionMessage('--generate-baseline requires a real audit run and cannot be combined with --dry-run, which exits before the LLM is ever invoked.');
+
+        $auditCommandInput->assertNoConflictingOptions();
+    }
+
+    /**
+     * @throws ConflictingCommandOptionsException
+     */
+    public function test_assert_no_conflicting_options_rejects_generate_baseline_with_show_scanned(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->generateBaseline = 'baseline.json';
+        $auditCommandInput->showScanned = true;
+
+        $this->expectException(ConflictingCommandOptionsException::class);
+        $this->expectExceptionMessage('--generate-baseline requires a real audit run and cannot be combined with --show-scanned, which exits before the LLM is ever invoked.');
+
+        $auditCommandInput->assertNoConflictingOptions();
     }
 }

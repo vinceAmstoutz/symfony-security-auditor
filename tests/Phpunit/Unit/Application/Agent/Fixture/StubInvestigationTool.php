@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
@@ -21,6 +22,9 @@ final readonly class StubInvestigationTool implements ToolInterface
 {
     public function __construct(private string $name = 'read_file') {}
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     #[Override]
     public function definition(): ToolDefinition
     {

@@ -31,13 +31,26 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInter
 final readonly class InMemoryAdvisoryDatabase implements AdvisoryDatabaseInterface
 {
     /**
+     * @var array<string, list<array{cve: ?string, title: string, summary: string, affected_versions: string, link: ?string}>>
+     */
+    private array $entriesByPackage;
+
+    /**
      * @param array<string, list<array{cve: ?string, title: string, summary: string, affected_versions: string, link: ?string}>> $entriesByPackage
      */
-    public function __construct(private array $entriesByPackage = []) {}
+    public function __construct(array $entriesByPackage = [])
+    {
+        $normalized = [];
+        foreach ($entriesByPackage as $packageName => $entries) {
+            $normalized[PackageNameNormalizer::normalize($packageName)] = $entries;
+        }
+
+        $this->entriesByPackage = $normalized;
+    }
 
     #[Override]
     public function lookup(string $packageName, string $installedVersion): array
     {
-        return $this->entriesByPackage[$packageName] ?? [];
+        return $this->entriesByPackage[PackageNameNormalizer::normalize($packageName)] ?? [];
     }
 }

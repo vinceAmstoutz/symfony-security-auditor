@@ -29,4 +29,15 @@ final readonly class ReportIdentity
         public DateTimeImmutable $completedAt,
         public int $filesScanned,
     ) {}
+
+    public function durationSeconds(): float
+    {
+        $elapsed = $this->startedAt->diff($this->completedAt);
+
+        return $elapsed->days * 86_400
+            + $elapsed->h * 3_600
+            + $elapsed->i * 60
+            + $elapsed->s
+            + $elapsed->f;
+    }
 }

@@ -13,12 +13,15 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 
 final class RiskMarkerTest extends TestCase
 {
+    /**
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_creates_with_valid_data(): void
     {
         $riskMarker = RiskMarker::create('src/Foo.php', 42, 'unserialize_call', 'unserialize() on payload');
@@ -29,27 +32,39 @@ final class RiskMarkerTest extends TestCase
         self::assertSame('unserialize() on payload', $riskMarker->description());
     }
 
+    /**
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_throws_on_empty_file_path(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidRiskMarkerException::class);
         RiskMarker::create('  ', 1, 'pattern', 'desc');
     }
 
+    /**
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_throws_on_zero_line(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidRiskMarkerException::class);
         RiskMarker::create('src/Foo.php', 0, 'pattern', 'desc');
     }
 
+    /**
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_throws_on_negative_line(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidRiskMarkerException::class);
         RiskMarker::create('src/Foo.php', -3, 'pattern', 'desc');
     }
 
+    /**
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_throws_on_empty_pattern_label(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidRiskMarkerException::class);
         RiskMarker::create('src/Foo.php', 1, '  ', 'desc');
     }
 }

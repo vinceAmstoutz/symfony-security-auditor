@@ -13,10 +13,16 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
+use LogicException;
+use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
+use Symfony\Component\Console\Output\ConsoleSectionOutput;
+use Symfony\Component\Console\Output\Output;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
@@ -67,6 +73,55 @@ final class UnpricedModelBudgetGuardTest extends TestCase
 
         self::assertTrue($unpricedModelBudgetGuard->permitsRun($input, new SymfonyStyle($input, $bufferedOutput)));
         self::assertStringContainsString('audit.budget.max_cost_usd', $bufferedOutput->fetch());
+    }
+
+    public function test_it_sends_the_interactive_confirmation_prompt_to_stderr_not_stdout(): void
+    {
+        $unpricedModelBudgetGuard = new UnpricedModelBudgetGuard($this->pricingKnowing(), ['mystery-model'], 10.0);
+        $bufferedOutput = new BufferedOutput();
+        $consoleOutput = new class($bufferedOutput) extends Output implements ConsoleOutputInterface {
+            private string $buffer = '';
+
+            public function __construct(private OutputInterface $errorOutput)
+            {
+                parent::__construct();
+            }
+
+            #[Override]
+            protected function doWrite(string $message, bool $newline): void
+            {
+                $this->buffer .= $message.($newline ? "\n" : '');
+            }
+
+            public function fetch(): string
+            {
+                return $this->buffer;
+            }
+
+            #[Override]
+            public function getErrorOutput(): OutputInterface
+            {
+                return $this->errorOutput;
+            }
+
+            #[Override]
+            public function setErrorOutput(OutputInterface $error): void
+            {
+                $this->errorOutput = $error;
+            }
+
+            #[Override]
+            public function section(): ConsoleSectionOutput
+            {
+                throw new LogicException('Sections are not supported by this test double.');
+            }
+        };
+        $input = $this->interactiveInput("yes\n");
+
+        $unpricedModelBudgetGuard->permitsRun($input, new SymfonyStyle($input, $consoleOutput));
+
+        self::assertStringNotContainsString('Continue anyway', $consoleOutput->fetch());
+        self::assertStringContainsString('Continue anyway', $bufferedOutput->fetch());
     }
 
     public function test_it_aborts_the_run_when_the_user_declines_interactively(): void

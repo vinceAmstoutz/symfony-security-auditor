@@ -17,6 +17,7 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use RuntimeException;
 use Symfony\Component\Validator\Validation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisSettings;
@@ -31,12 +32,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -49,6 +55,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
@@ -59,6 +66,10 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_report_contains_correct_project_path(): void
     {
@@ -72,6 +83,10 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_report_files_scanned_matches_real_file_count(): void
     {
@@ -88,6 +103,10 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_returns_safe_report_when_no_vulnerabilities_found(): void
     {
@@ -102,6 +121,10 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_report_contains_vulnerability_found_by_stub_llm(): void
     {
@@ -122,6 +145,11 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_attaches_token_and_cost_telemetry_to_report(): void
     {
@@ -129,9 +157,8 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         file_put_contents($this->tmpDir.'/src/App.php', '<?php class App {}');
 
         $tokenUsageRecorder = new TokenUsageRecorder();
-        $tokenUsageRecorder->record(120, 30);
 
-        $auditReport = $this->makeUseCaseWithTelemetry('[]', '{}', $tokenUsageRecorder)->execute($this->tmpDir);
+        $auditReport = $this->makeUseCaseWithTelemetry('[]', '{}', $tokenUsageRecorder, TokenUsageSnapshot::of(120, 30))->execute($this->tmpDir);
 
         self::assertSame(120, $auditReport->cost()->inputTokens());
         self::assertSame(30, $auditReport->cost()->outputTokens());
@@ -141,6 +168,11 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_includes_cache_tokens_in_the_reported_cost(): void
     {
@@ -148,15 +180,20 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         file_put_contents($this->tmpDir.'/src/App.php', '<?php class App {}');
 
         $tokenUsageRecorder = new TokenUsageRecorder();
-        $tokenUsageRecorder->record(0, 0, 0, 1_000_000);
 
-        $auditReport = $this->makeUseCaseWithTelemetry('[]', '{}', $tokenUsageRecorder)->execute($this->tmpDir);
+        $auditReport = $this->makeUseCaseWithTelemetry('[]', '{}', $tokenUsageRecorder, TokenUsageSnapshot::of(0, 0, 0, 1_000_000))->execute($this->tmpDir);
 
         self::assertSame(0, $auditReport->cost()->inputTokens());
         self::assertSame(0, $auditReport->cost()->outputTokens());
         self::assertGreaterThan(0.0, $auditReport->cost()->estimatedCostUsd());
     }
 
+    /**
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_execute_wraps_budget_exception_with_partial_report(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
@@ -182,14 +219,56 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_execute_wraps_llm_provider_exception_with_partial_report(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/App.php', '<?php class App {}');
+
+        $abortingAttacker = self::createStub(LLMClientInterface::class);
+        $abortingAttacker->method('complete')->willThrowException(NonTransientLLMFailureException::from(new RuntimeException('model retired')));
+        $abortingAttacker->method('completeWithTools')->willThrowException(NonTransientLLMFailureException::from(new RuntimeException('model retired')));
+        $reviewerLLM = self::createStub(LLMClientInterface::class);
+        $reviewerLLM->method('complete')->willReturn(LLMResponse::of('{}', 'stub', 'end_turn', TokenUsageSnapshot::of(0, 0)));
+
+        $runAuditUseCase = $this->makeUseCaseWithLLM($abortingAttacker, $reviewerLLM);
+
+        try {
+            $runAuditUseCase->execute($this->tmpDir);
+            self::fail('Expected AuditAbortedByProviderException');
+        } catch (AuditAbortedByProviderException $auditAbortedByProviderException) {
+            self::assertSame('LLM call failed with non-transient error: model retired', $auditAbortedByProviderException->getMessage());
+            self::assertSame(1, $auditAbortedByProviderException->partialReport()->filesScanned());
+            self::assertSame(0, $auditAbortedByProviderException->partialReport()->totalVulnerabilities());
+        }
+    }
+
+    /**
+     * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_attaches_zero_cost_when_recorder_set_but_calculator_omitted(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
         file_put_contents($this->tmpDir.'/src/App.php', '<?php');
 
+        $tokenUsageRecorder = new TokenUsageRecorder();
         $attackerLLM = self::createStub(LLMClientInterface::class);
-        $attackerLLM->method('complete')->willReturn(LLMResponse::of('[]', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0)));
+        $attackerLLM->method('complete')->willReturnCallback(
+            static function () use ($tokenUsageRecorder): LLMResponse {
+                $tokenUsageRecorder->record(42, 7);
+
+                return LLMResponse::of('[]', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0));
+            },
+        );
         $reviewerLLM = self::createStub(LLMClientInterface::class);
         $reviewerLLM->method('complete')->willReturn(LLMResponse::of('{}', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
@@ -222,9 +301,6 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
             new NullProgressReporter(),
         );
 
-        $tokenUsageRecorder = new TokenUsageRecorder();
-        $tokenUsageRecorder->record(42, 7);
-
         $runAuditUseCase = new RunAuditUseCase(
             $auditPipeline,
             new NullLogger(),
@@ -242,6 +318,10 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_propagates_reviewer_budget_exception_as_audit_aborted(): void
     {
@@ -269,6 +349,10 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_propagates_reviewer_batch_budget_exception(): void
     {
@@ -324,6 +408,12 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         $runAuditUseCase->execute($this->tmpDir);
     }
 
+    /**
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_execute_warns_logger_when_budget_aborts_the_audit(): void
     {
         mkdir($this->tmpDir.'/src', 0o777, true);
@@ -367,6 +457,10 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
 
     /**
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditCostException
      */
     public function test_execute_report_audit_id_is_non_empty(): void
     {
@@ -392,6 +486,9 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         $this->rmdirRecursive($this->tmpDir);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     private function makeUseCase(string $attackerResponse, string $reviewerResponse): RunAuditUseCase
     {
         $attackerLLM = self::createStub(LLMClientInterface::class);
@@ -450,14 +547,23 @@ final class RunAuditUseCaseIntegrationTest extends TestCase
         return new RunAuditUseCase($auditPipeline, $logger);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     private function makeUseCaseWithTelemetry(
         string $attackerResponse,
         string $reviewerResponse,
         TokenUsageRecorder $tokenUsageRecorder,
+        ?TokenUsageSnapshot $tokenUsageSnapshot = null,
     ): RunAuditUseCase {
+        $tokenUsageSnapshot ??= TokenUsageSnapshot::of(0, 0);
         $attackerLLM = self::createStub(LLMClientInterface::class);
-        $attackerLLM->method('complete')->willReturn(
-            LLMResponse::of($attackerResponse, 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0)),
+        $attackerLLM->method('complete')->willReturnCallback(
+            static function () use ($tokenUsageRecorder, $attackerResponse, $tokenUsageSnapshot): LLMResponse {
+                $tokenUsageRecorder->record($tokenUsageSnapshot->inputTokens(), $tokenUsageSnapshot->outputTokens(), $tokenUsageSnapshot->cacheReadTokens(), $tokenUsageSnapshot->cacheCreationTokens());
+
+                return LLMResponse::of($attackerResponse, 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(0, 0));
+            },
         );
 
         $reviewerLLM = self::createStub(LLMClientInterface::class);

@@ -38,6 +38,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\Mappin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
@@ -106,6 +107,9 @@ final class DiffCommandEndToEndTest extends TestCase
         $this->filesystem->remove([$this->fixtureDir, $this->reportsDir]);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_it_diffs_the_real_json_reports_produced_by_two_audit_runs(): void
     {
         $persistingFinding = $this->finding('SQL Injection', 'src/Repo1.php');
@@ -126,6 +130,9 @@ final class DiffCommandEndToEndTest extends TestCase
         self::assertStringContainsString('Summary: 1 new, 1 fixed, 1 persisting.', $display);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_json_diff_output_preserves_console_markup_lookalikes_in_titles(): void
     {
         $markupTitle = 'XSS via <info>user-supplied</info> HTML';
@@ -157,6 +164,8 @@ final class DiffCommandEndToEndTest extends TestCase
 
     /**
      * @param list<array{type: string, title: string, file_path: string}> $findings
+     *
+     * @throws InvalidTokenUsageException
      */
     private function runAuditAndCapture(string $reportFilename, array $findings): string
     {
@@ -190,6 +199,9 @@ final class DiffCommandEndToEndTest extends TestCase
         return $reportPath;
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     private function makeAuditCommandTester(string $attackerResponse, string $reviewerResponse): CommandTester
     {
         $attackerLLM = self::createStub(LLMClientInterface::class);

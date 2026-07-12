@@ -125,7 +125,8 @@ final readonly class ReviewerPromptSections implements ReviewerPromptSectionsInt
 
     private const string STRUCTURED_DECISION_RULES = <<<'RULES'
         Rules:
-        - Be strict: reject any finding where exploitation is not clearly demonstrated
+        - Reject a finding ONLY when you can name a specific mitigating control (a guard clause, a parameterized query, an `access_control` rule, a framework default) or the vulnerable pattern is simply not present in the code. "Not clearly exploitable" is not, by itself, grounds to reject — that erases real-but-hard-to-prove issues (race conditions, business-logic flaws, context-dependent access control) that SAST tools already miss.
+        - When the vulnerable pattern is genuinely present but exploitability is uncertain, do NOT reject: accept it and downgrade the severity (down to `info` for pure defense-in-depth), and state what evidence is missing in `reviewer_notes`. A downstream human triage step ranks accepted findings, so preserving an uncertain finding is cheaper than discarding a real one.
         - Accept a finding if it represents a REAL risk, even if exploitation is complex
         - You MAY upgrade severity if context reveals a worse impact
         - You MAY downgrade if the scanner overstated impact

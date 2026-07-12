@@ -19,8 +19,10 @@ use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -35,6 +37,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
@@ -71,6 +75,9 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     public function test_writing_to_file_announces_save_path_via_success_message(): void
     {
@@ -88,6 +95,9 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     public function test_writing_to_file_persists_content_to_disk(): void
     {
@@ -104,6 +114,9 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     public function test_writing_without_file_streams_content_to_console(): void
     {
@@ -119,6 +132,36 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_console_output_renders_finding_text_literally_instead_of_as_console_markup(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'Finding </> <fg=green>[report clean]</>', 0.9),
+            new CodeLocation('src/A.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'quoted from source: <fg=grey>debug</>', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+        $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->reportWriter->write($this->makeReport($vulnerability), OutputFormat::Console, null, $symfonyStyle);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('Finding </> <fg=green>[report clean]</>', $display);
+        self::assertStringContainsString('quoted from source: <fg=grey>debug</>', $display);
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     public function test_writing_html_format_streams_an_html_document(): void
     {
@@ -134,6 +177,9 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     public function test_writing_junit_format_streams_a_junit_xml_document(): void
     {
@@ -149,6 +195,9 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     public function test_writing_to_file_creates_missing_parent_directories(): void
     {
@@ -162,6 +211,9 @@ final class ReportWriterTest extends TestCase
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     public function test_writing_a_format_without_a_registered_renderer_throws(): void
     {
@@ -178,6 +230,10 @@ final class ReportWriterTest extends TestCase
      * @throws UnsupportedOutputFormatException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     public function test_writing_sarif_format_with_baselined_fingerprints_marks_the_matching_result_as_suppressed(): void
     {
@@ -204,6 +260,75 @@ final class ReportWriterTest extends TestCase
         );
     }
 
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_writing_refuses_to_write_through_a_symlinked_output_file(): void
+    {
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), new BufferedOutput());
+        $outputFile = $this->tmpDir.'/report.json';
+        $outsideTarget = sys_get_temp_dir().'/report_writer_symlink_target_'.uniqid('', true);
+        $this->filesystem->dumpFile($outsideTarget, 'ORIGINAL');
+        symlink($outsideTarget, $outputFile);
+
+        try {
+            $this->expectException(UnsafeReportWriteException::class);
+
+            $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $outputFile, $symfonyStyle);
+        } finally {
+            self::assertSame('ORIGINAL', file_get_contents($outsideTarget));
+            $this->filesystem->remove($outsideTarget);
+        }
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_writing_refuses_to_write_through_a_symlinked_parent_directory(): void
+    {
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), new BufferedOutput());
+        $outsideDir = sys_get_temp_dir().'/report_writer_symlink_dir_'.uniqid('', true);
+        $this->filesystem->mkdir($outsideDir);
+        $nestedDir = $this->tmpDir.'/nested';
+        symlink($outsideDir, $nestedDir);
+
+        try {
+            $this->expectException(UnsafeReportWriteException::class);
+
+            $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $nestedDir.'/report.json', $symfonyStyle);
+        } finally {
+            self::assertSame([], glob($outsideDir.'/*'));
+            $this->filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_writing_wraps_a_filesystem_write_failure_in_a_project_defined_exception(): void
+    {
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), new BufferedOutput());
+        $blockerPath = $this->tmpDir.'/blocker';
+        file_put_contents($blockerPath, 'not a directory');
+        $outputFile = $blockerPath.'/report.json';
+
+        $this->expectException(ReportWriteFailedException::class);
+
+        $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $outputFile, $symfonyStyle);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     private function makeReport(Vulnerability ...$vulnerabilities): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -217,6 +342,7 @@ final class ReportWriterTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVuln(): Vulnerability
     {

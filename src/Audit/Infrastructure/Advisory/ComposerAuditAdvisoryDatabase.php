@@ -52,7 +52,7 @@ final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseIn
     #[Override]
     public function lookup(string $packageName, string $installedVersion): array
     {
-        return $this->entriesByPackage[$packageName] ?? [];
+        return $this->entriesByPackage[PackageNameNormalizer::normalize($packageName)] ?? [];
     }
 
     /**
@@ -99,10 +99,13 @@ final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseIn
     private function parse(string $json): array
     {
         try {
-            /** @var array<string, mixed> $decoded */
             $decoded = json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
         } catch (JsonException $jsonException) {
             throw MalformedAdvisoryPayloadException::forInvalidJson($jsonException);
+        }
+
+        if (!\is_array($decoded)) {
+            throw MalformedAdvisoryPayloadException::forNonArrayPayload($decoded);
         }
 
         if (!\array_key_exists('advisories', $decoded) || !\is_array($decoded['advisories'])) {
@@ -118,7 +121,7 @@ final readonly class ComposerAuditAdvisoryDatabase implements AdvisoryDatabaseIn
                 continue;
             }
 
-            $entries[$packageName] = $this->mapAdvisories($advisories);
+            $entries[PackageNameNormalizer::normalize($packageName)] = $this->mapAdvisories($advisories);
         }
 
         return $entries;

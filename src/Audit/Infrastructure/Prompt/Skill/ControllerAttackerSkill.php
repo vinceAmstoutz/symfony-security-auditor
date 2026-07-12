@@ -43,7 +43,7 @@ final readonly class ControllerAttackerSkill implements AttackerSkillInterface
             - `#[MapRequestPayload]` / `#[MapQueryString]` DTO mapping over an entity-shaped class with public mutable properties (mass-assignment via Serializer).
             - Redirect targets and `RedirectResponse` arguments against open-redirect via user-controlled URLs.
             - File-upload handlers: missing MIME validation, predictable upload paths, no content-type enforcement.
-            - Authentication endpoints (login, password reset, 2FA, registration) without rate-limiter binding (`#[IsSignatureValid]` / `RateLimiterFactory::create()` / `framework.rate_limiter`).
+            - Authentication endpoints (login, password reset, 2FA, registration) without rate-limiter binding (`RateLimiterFactory::create()` / `framework.rate_limiter`).
             - `Request::get()` / `getContent()` flowing into Doctrine raw queries, `exec`, `passthru`, `eval`, `unserialize`, `simplexml_load_string`.
             - Live Components: `#[LiveAction]` / `#[LiveProp(writable: true)]` exposing privileged setters or unbounded properties to the browser.
             Do NOT flag:

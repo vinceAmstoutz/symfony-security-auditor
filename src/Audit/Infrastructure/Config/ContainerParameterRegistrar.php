@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use JsonException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use UnitEnum;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\AuditExecutionConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ConfigurationNotices;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
@@ -83,7 +84,7 @@ final readonly class ContainerParameterRegistrar
             'audit.reviewer_max_concurrent' => $audit->reviewerMaxConcurrent,
             'audit.attacker_max_concurrent' => $audit->attackerMaxConcurrent,
             'audit.static_prescan.enabled' => $audit->staticPreScanEnabled,
-            'audit.static_prescan.lean_mode' => $audit->staticPreScanLeanMode,
+            'audit.static_prescan.lean_mode' => $audit->effectiveStaticPreScanLeanMode(),
             'audit.chunking.strategy' => $audit->chunkingStrategy,
             'audit.poc_synthesis.enabled' => $audit->poCSynthesisEnabled,
             'audit.poc_synthesis.severity_floor' => $audit->poCSynthesisSeverityFloor,
@@ -101,7 +102,7 @@ final readonly class ContainerParameterRegistrar
             'cache.dir' => $cache->dir,
             'cache.advisory_dir' => \sprintf('%s/advisory', $cache->dir),
             'cache.reviewer_dir' => \sprintf('%s/reviewer', $cache->dir),
-            'cache.reviewer_key_salt' => $this->reviewerKeySalt($llm),
+            'cache.reviewer_key_salt' => $this->reviewerKeySalt($llm, $audit),
             'cache.prompt_caching' => $cache->promptCaching,
             'cache.key_salt' => $this->attackerKeySalt($bundleConfiguration, $llm->attackerModel()),
             'cache.cheap_attacker_key_salt' => $this->attackerKeySalt(
@@ -128,14 +129,27 @@ final readonly class ContainerParameterRegistrar
         return array_values(array_unique($models));
     }
 
-    private function reviewerKeySalt(LLMConfiguration $llmConfiguration): string
+    private function reviewerKeySalt(LLMConfiguration $llmConfiguration, AuditExecutionConfiguration $auditExecutionConfiguration): string
     {
         return \sprintf(
-            '%s|reviewer-v%d|prompt-v%d',
+            '%s|reviewer-v%d|prompt-v%d|collect-%s|tools-%s|batch-%d|max-output-%d',
             $llmConfiguration->reviewerModel(),
             FilesystemReviewerCache::CACHE_VERSION,
             ReviewerPromptBuilder::PROMPT_VERSION,
+            $auditExecutionConfiguration->reviewerStructuredCollection ? 'tool' : 'json',
+            $this->reviewerToolsSalt($auditExecutionConfiguration),
+            $auditExecutionConfiguration->reviewerBatchSize,
+            $llmConfiguration->reviewerMaxOutputTokens(),
         );
+    }
+
+    private function reviewerToolsSalt(AuditExecutionConfiguration $auditExecutionConfiguration): string
+    {
+        if (!$auditExecutionConfiguration->reviewerToolsEnabled) {
+            return 'off';
+        }
+
+        return \sprintf('on-%d', $auditExecutionConfiguration->reviewerMaxToolIterations);
     }
 
     /**
@@ -144,7 +158,7 @@ final readonly class ContainerParameterRegistrar
     private function attackerKeySalt(BundleConfiguration $bundleConfiguration, string $model): string
     {
         return \sprintf(
-            '%s|prompt-v%d|prescan-v%d|prescan-%s|tools-%s|patterns-%s|collect-%s|skills-%s|slice-%s',
+            '%s|prompt-v%d|prescan-v%d|prescan-%s|tools-%s|patterns-%s|collect-%s|skills-%s|slice-%s|max-output-%d',
             $model,
             AttackerPromptBuilder::PROMPT_VERSION,
             RegexStaticPreScanner::CACHE_VERSION,
@@ -161,6 +175,7 @@ final readonly class ContainerParameterRegistrar
             $bundleConfiguration->audit->structuredCollection ? 'tool' : 'json',
             $bundleConfiguration->audit->stableSystemPrompt ? 'full' : 'lean',
             $this->codeSlicingSalt($bundleConfiguration),
+            $bundleConfiguration->llm->attackerMaxOutputTokens(),
         );
     }
 

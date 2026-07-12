@@ -25,6 +25,10 @@ final readonly class CodeLocation
         private int $lineStart,
         private int $lineEnd,
     ) {
+        if ('' === trim($filePath)) {
+            throw InvalidCodeLocationException::forBlankFilePath();
+        }
+
         if ($lineStart < 1) {
             throw InvalidCodeLocationException::forNonPositiveLineStart();
         }

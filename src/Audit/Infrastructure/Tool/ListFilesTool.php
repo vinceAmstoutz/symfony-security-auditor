@@ -14,7 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
@@ -27,11 +29,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
  */
 final readonly class ListFilesTool implements ToolInterface
 {
+    private const int MAX_FILES = 2000;
+
     /**
      * @param list<ProjectFile> $files
      */
     public function __construct(private array $files) {}
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     #[Override]
     public function definition(): ToolDefinition
     {
@@ -43,11 +50,19 @@ final readonly class ListFilesTool implements ToolInterface
                 'properties' => [
                     'file_type' => [
                         'type' => 'string',
-                        'description' => 'Optional ProjectFile::type() to filter by: controller, voter, entity, repository, form, template, config, php.',
+                        'description' => \sprintf('Optional ProjectFile::type() to filter by: %s.', $this->fileTypeValues()),
                     ],
                 ],
             ],
         );
+    }
+
+    private function fileTypeValues(): string
+    {
+        return implode(', ', array_map(
+            static fn (ProjectFileType $projectFileType): string => $projectFileType->value,
+            ProjectFileType::cases(),
+        ));
     }
 
     #[Override]
@@ -56,17 +71,42 @@ final readonly class ListFilesTool implements ToolInterface
         $rawFileType = $arguments['file_type'] ?? null;
         $fileType = \is_string($rawFileType) && '' !== $rawFileType ? $rawFileType : null;
 
-        $lines = [];
+        $matched = [];
         foreach ($this->files as $file) {
             if (null !== $fileType && $file->type() !== $fileType) {
                 continue;
             }
 
-            $lines[] = \sprintf('%s [%s]', $file->relativePath(), $file->type());
+            $matched[] = $file;
         }
 
-        if ([] === $lines) {
+        if ([] === $matched) {
             return 'No files match.';
+        }
+
+        return $this->render($matched);
+    }
+
+    /**
+     * `ProjectFileScanner` bounds an individual file's size but never the
+     * total number of scanned files, so an unfiltered listing on a large
+     * project (or one deliberately padded with many small stub files) could
+     * otherwise blow the token budget with no mitigation, unlike this tool's
+     * siblings ({@see ReadFileTool}, {@see GrepTool}).
+     *
+     * @param list<ProjectFile> $matched
+     */
+    private function render(array $matched): string
+    {
+        $shown = \array_slice($matched, 0, self::MAX_FILES);
+        $lines = array_map(
+            static fn (ProjectFile $projectFile): string => \sprintf('%s [%s]', $projectFile->relativePath(), $projectFile->type()),
+            $shown,
+        );
+
+        $omitted = \count($matched) - \count($shown);
+        if ($omitted > 0) {
+            $lines[] = \sprintf('... [truncated: %d more files not shown, narrow with "file_type"]', $omitted);
         }
 
         return implode("\n", $lines);

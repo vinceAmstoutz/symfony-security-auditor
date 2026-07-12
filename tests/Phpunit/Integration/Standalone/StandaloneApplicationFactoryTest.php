@@ -18,6 +18,7 @@ use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 
 final class StandaloneApplicationFactoryTest extends TestCase
@@ -67,6 +68,16 @@ final class StandaloneApplicationFactoryTest extends TestCase
         self::assertTrue($application->has('audit:run'));
     }
 
+    public function test_it_reports_the_installed_package_version_instead_of_unknown(): void
+    {
+        $application = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+
+        self::assertSame((new ReportPackage())->version(), $application->getVersion());
+    }
+
     public function test_it_registers_the_init_command(): void
     {
         $application = StandaloneApplicationFactory::fromEnvironment([
@@ -114,6 +125,17 @@ final class StandaloneApplicationFactoryTest extends TestCase
         self::assertSame(
             \sprintf('%s/.symfony-security-auditor.yaml', $workingDirectory),
             StandaloneApplicationFactory::projectConfigFile([]),
+        );
+    }
+
+    public function test_it_falls_back_to_the_process_working_directory_when_pwd_is_exported_empty(): void
+    {
+        $workingDirectory = getcwd();
+        self::assertIsString($workingDirectory);
+
+        self::assertSame(
+            \sprintf('%s/.symfony-security-auditor.yaml', $workingDirectory),
+            StandaloneApplicationFactory::projectConfigFile(['PWD' => '']),
         );
     }
 

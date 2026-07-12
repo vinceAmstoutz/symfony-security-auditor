@@ -13,11 +13,13 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Model;
 
-use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -34,6 +36,9 @@ final class AuditContextTest extends TestCase
 {
     private string $tmpDir;
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_creates_for_valid_project_path(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -45,11 +50,17 @@ final class AuditContextTest extends TestCase
         self::assertNull($auditContext->mapping());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_accepted_fingerprints_default_to_an_empty_list(): void
     {
         self::assertSame([], AuditContext::forProject($this->tmpDir)->acceptedFingerprints());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_returns_the_accepted_fingerprints_it_was_created_with(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-AAA', 'SSA-BBB']);
@@ -57,6 +68,68 @@ final class AuditContextTest extends TestCase
         self::assertSame(['SSA-AAA', 'SSA-BBB'], $auditContext->acceptedFingerprints());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_consumed_baseline_fingerprints_default_to_an_empty_list(): void
+    {
+        self::assertSame([], AuditContext::forProject($this->tmpDir)->consumedBaselineFingerprints());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_it_consumes_a_baseline_credit_and_records_it_as_consumed(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-AAA']);
+
+        self::assertTrue($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertSame(['SSA-AAA'], $auditContext->consumedBaselineFingerprints());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_it_refuses_to_consume_a_baseline_credit_that_was_never_accepted(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        self::assertFalse($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertSame([], $auditContext->consumedBaselineFingerprints());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_it_exhausts_a_baseline_credit_after_it_has_been_consumed_once(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-AAA']);
+
+        self::assertTrue($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertFalse($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertSame(['SSA-AAA'], $auditContext->consumedBaselineFingerprints());
+    }
+
+    /**
+     * A fingerprint accepted twice in the baseline (two distinct originally
+     * accepted findings sharing the same fingerprint) grants two credits —
+     * `array_count_values()`-style budgeting, not plain membership.
+     *
+     * @throws InvalidAuditContextException
+     */
+    public function test_it_grants_one_credit_per_repeated_occurrence_of_an_accepted_fingerprint(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: ['SSA-AAA', 'SSA-AAA']);
+
+        self::assertTrue($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertTrue($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertFalse($auditContext->consumeBaselineCredit('SSA-AAA'));
+        self::assertSame(['SSA-AAA', 'SSA-AAA'], $auditContext->consumedBaselineFingerprints());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_audit_id_matches_expected_format(): void
     {
         for ($i = 0; $i < 64; ++$i) {
@@ -67,12 +140,18 @@ final class AuditContextTest extends TestCase
         }
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_throws_on_invalid_project_path(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidAuditContextException::class);
         AuditContext::forProject('/nonexistent/path/xyz');
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_strips_trailing_slash_from_project_path(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir.'/');
@@ -80,6 +159,20 @@ final class AuditContextTest extends TestCase
         self::assertSame($this->tmpDir, $auditContext->projectPath());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_the_filesystem_root_does_not_collapse_to_an_empty_project_path(): void
+    {
+        $auditContext = AuditContext::forProject('/');
+
+        self::assertSame('/', $auditContext->projectPath());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_accepts_and_returns_project_files(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -93,6 +186,43 @@ final class AuditContextTest extends TestCase
         self::assertCount(2, $auditContext->projectFiles());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_files_falls_back_to_project_files_when_never_explicitly_set(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $files = [ProjectFile::create('src/A.php', '/app/src/A.php', '<?php')];
+
+        $auditContext->setProjectFiles($files);
+
+        self::assertSame($files, $auditContext->mappingFiles());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_files_can_be_set_independently_of_the_diff_filtered_project_files(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $projectFiles = [ProjectFile::create('src/Changed.php', '/app/src/Changed.php', '<?php')];
+        $mappingFiles = [
+            ProjectFile::create('src/Changed.php', '/app/src/Changed.php', '<?php'),
+            ProjectFile::create('src/Unchanged.php', '/app/src/Unchanged.php', '<?php'),
+        ];
+
+        $auditContext->setProjectFiles($projectFiles);
+        $auditContext->setMappingFiles($mappingFiles);
+
+        self::assertSame($projectFiles, $auditContext->projectFiles());
+        self::assertSame($mappingFiles, $auditContext->mappingFiles());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_accepts_mapping(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -106,6 +236,8 @@ final class AuditContextTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_stores_and_filters_vulnerabilities(): void
     {
@@ -126,6 +258,8 @@ final class AuditContextTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_critical_vulnerabilities_requires_both_critical_severity_and_reviewer_validation(): void
     {
@@ -159,6 +293,8 @@ final class AuditContextTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_replaces_vulnerability_by_id(): void
     {
@@ -178,6 +314,8 @@ final class AuditContextTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_calculates_risk_score_from_validated_vulnerabilities(): void
     {
@@ -196,6 +334,9 @@ final class AuditContextTest extends TestCase
         self::assertSame(17, $auditContext->riskScore());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_it_stores_and_retrieves_metadata(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -216,6 +357,9 @@ final class AuditContextTest extends TestCase
         mkdir($this->tmpDir, 0o777, true);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_coverage_starts_empty(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -223,6 +367,9 @@ final class AuditContextTest extends TestCase
         self::assertSame([], $auditContext->coverage());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_record_coverage_appends_entry_with_stage_file_and_status(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -235,6 +382,9 @@ final class AuditContextTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_record_coverage_preserves_insertion_order_for_multiple_entries(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -253,6 +403,9 @@ final class AuditContextTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_record_coverage_allows_duplicate_entries_for_same_file_stage_status(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -263,6 +416,9 @@ final class AuditContextTest extends TestCase
         self::assertCount(2, $auditContext->coverage());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_scan_paths_default_is_empty_list(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -270,6 +426,9 @@ final class AuditContextTest extends TestCase
         self::assertSame([], $auditContext->scanPaths());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_for_project_stores_scan_paths(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir, ['apps/api/src', 'libs/shared']);
@@ -277,6 +436,9 @@ final class AuditContextTest extends TestCase
         self::assertSame(['apps/api/src', 'libs/shared'], $auditContext->scanPaths());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_cache_bypassed_default_is_false(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -284,11 +446,102 @@ final class AuditContextTest extends TestCase
         self::assertFalse($auditContext->isCacheBypassed());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_for_project_stores_cache_bypassed_flag(): void
     {
         $auditContext = AuditContext::forProject($this->tmpDir, [], true);
 
         self::assertTrue($auditContext->isCacheBypassed());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_drain_reviewed_findings_starts_empty(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        self::assertSame([], $auditContext->drainReviewedFindings());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_drain_reviewed_findings_returns_every_recorded_finding_in_order(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $vulnerability = $this->makeVulnerability('v1', VulnerabilitySeverity::HIGH);
+        $second = $this->makeVulnerability('v2', VulnerabilitySeverity::HIGH);
+
+        $auditContext->recordReviewedFinding($vulnerability);
+        $auditContext->recordReviewedFinding($second);
+
+        self::assertSame([$vulnerability, $second], $auditContext->drainReviewedFindings());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_drain_reviewed_findings_clears_the_buffer(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordReviewedFinding($this->makeVulnerability('v1', VulnerabilitySeverity::HIGH));
+
+        $auditContext->drainReviewedFindings();
+
+        self::assertSame([], $auditContext->drainReviewedFindings());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_drain_found_vulnerabilities_starts_empty(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        self::assertSame([], $auditContext->drainFoundVulnerabilities());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_drain_found_vulnerabilities_returns_every_recorded_candidate_in_order(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $vulnerability = $this->makeVulnerability('v1', VulnerabilitySeverity::HIGH);
+        $second = $this->makeVulnerability('v2', VulnerabilitySeverity::HIGH);
+
+        $auditContext->recordFoundVulnerability($vulnerability);
+        $auditContext->recordFoundVulnerability($second);
+
+        self::assertSame([$vulnerability, $second], $auditContext->drainFoundVulnerabilities());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_drain_found_vulnerabilities_clears_the_buffer(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->recordFoundVulnerability($this->makeVulnerability('v1', VulnerabilitySeverity::HIGH));
+
+        $auditContext->drainFoundVulnerabilities();
+
+        self::assertSame([], $auditContext->drainFoundVulnerabilities());
     }
 
     #[Override]
@@ -300,6 +553,7 @@ final class AuditContextTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerability(string $discriminator, VulnerabilitySeverity $vulnerabilitySeverity): Vulnerability
     {

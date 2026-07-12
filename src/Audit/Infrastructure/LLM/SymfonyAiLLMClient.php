@@ -15,16 +15,21 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Override;
 use Psr\Log\LoggerInterface;
+use Symfony\AI\Platform\Exception\UnexpectedResultTypeException;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
@@ -120,6 +125,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             $platformOptionsFactory,
             $this->promptTokenEstimator,
             $this,
+            $platformBinding->logger,
         );
 
         $this->toolConversationWavefront = new ToolConversationWavefront(
@@ -141,6 +147,10 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
      * @throws MissingAiPlatformException
      * @throws TransientLLMFailureException
      * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws UnexpectedResultTypeException
      */
     #[Override]
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
@@ -165,8 +175,14 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
             return $this->emptyResponseAndLog($emptyllmResponseException);
         }
 
-        $content = $deferredResult->asText();
-        [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->platformResultExtractor->extractTokens($deferredResult);
+        try {
+            $content = $deferredResult->asText();
+            [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens] = $this->platformResultExtractor->extractTokens($deferredResult);
+        } catch (Throwable $throwable) {
+            $this->rateLimiter->record(0, 0);
+
+            throw $throwable;
+        }
 
         $this->rateLimiter->record($inputTokens, $outputTokens);
 
@@ -212,6 +228,8 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
     /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
      */
     #[Override]
     public function completeBatchWithTools(array $requests, int $maxConcurrent, int $maxToolIterations): array
@@ -235,6 +253,9 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
      * @throws MissingAiPlatformException
      * @throws TransientLLMFailureException
      * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
      */
     #[Override]
     public function completeWithTools(
@@ -252,6 +273,9 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         return $this->model;
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     private function emptyResponseAndLog(EmptyLLMResponseException $emptyllmResponseException): LLMResponse
     {
         $this->logger->warning('LLM returned a response with no content blocks', [

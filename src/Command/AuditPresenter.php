@@ -16,12 +16,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use InvalidArgumentException;
 use Override;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditPresenter implements AuditPresenterInterface
@@ -33,7 +35,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     {
         $symfonyStyle->title('Symfony LLM Security Auditor');
         $symfonyStyle->text([
-            \sprintf('Project: <info>%s</info>', $projectPath),
+            \sprintf('Project: <info>%s</info>', OutputFormatter::escape($projectPath)),
             'Pipeline: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer)',
             '',
         ]);
@@ -121,14 +123,14 @@ final readonly class AuditPresenter implements AuditPresenterInterface
                 number_format($cost->outputTokens()),
                 number_format($cost->totalTokens()),
             );
-            $lines[] = \sprintf('Cost  : $%.4f (estimate)', $cost->estimatedCostUsd());
+            $lines[] = \sprintf('Cost  : $%s (estimate)', number_format($cost->estimatedCostUsd(), 4, '.', ''));
 
             foreach ($cost->byRole() as $role => $entry) {
                 $lines[] = \sprintf(
-                    '  %-8s (%s): $%.4f — %s in / %s out',
+                    '  %-8s (%s): $%s — %s in / %s out',
                     $role,
                     $entry['model'],
-                    $entry['estimated_cost_usd'],
+                    number_format($entry['estimated_cost_usd'], 4, '.', ''),
                     number_format($entry['input_tokens']),
                     number_format($entry['output_tokens']),
                 );
@@ -154,7 +156,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
         foreach ($this->relativePathsByType($projectFiles) as $type => $relativePaths) {
             $symfonyStyle->writeln(\sprintf(' <info>%s</info> (%d)', $type, \count($relativePaths)));
-            $symfonyStyle->listing($relativePaths);
+            $symfonyStyle->listing(array_map($this->sanitizePathForListing(...), $relativePaths));
         }
 
         $symfonyStyle->success(\sprintf('%d file(s) in scope.', \count($projectFiles)));
@@ -167,6 +169,19 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             ' <fg=gray>Tip: run with --show-scanned to list the %d file(s) that would be audited.</>',
             $fileCount,
         ));
+    }
+
+    /**
+     * A scanned file's relative path comes from the audited (untrusted) project,
+     * where a filename may legally contain a newline, ANSI escape or bidi
+     * override. `OutputFormatter::escape()` neutralises `<`/`>` markup but not
+     * those characters, so the path is first collapsed to a single line and
+     * stripped of control/bidi characters — a crafted filename cannot forge a
+     * fake listing entry or spoof the terminal.
+     */
+    private function sanitizePathForListing(string $relativePath): string
+    {
+        return OutputFormatter::escape(TerminalTextSanitizer::collapseToSingleLine(mb_scrub($relativePath, 'UTF-8')));
     }
 
     /**
@@ -198,9 +213,12 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode): void
     {
         if (Command::FAILURE === $exitCode) {
+            $totalVulnerabilities = $auditReport->totalVulnerabilities();
             $symfonyStyle->caution(\sprintf(
-                'Audit completed with CRITICAL risk level. %d vulnerabilities found.',
-                $auditReport->totalVulnerabilities(),
+                'Audit completed at or above the fail-on threshold. Risk: %s. %d %s found.',
+                $auditReport->riskLevel(),
+                $totalVulnerabilities,
+                1 === $totalVulnerabilities ? 'vulnerability' : 'vulnerabilities',
             ));
 
             return;

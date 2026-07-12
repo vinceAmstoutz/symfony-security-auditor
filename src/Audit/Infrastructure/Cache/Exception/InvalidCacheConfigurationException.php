@@ -18,8 +18,8 @@ use InvalidArgumentException;
 /** @internal not part of the BC promise — see docs/versioning.md */
 final class InvalidCacheConfigurationException extends InvalidArgumentException
 {
-    public static function forEmptyCacheDir(): self
+    public static function forEmptyCacheDir(string $cacheLabel): self
     {
-        return new self('Attacker cache dir cannot be empty');
+        return new self(\sprintf('%s cache dir cannot be empty', $cacheLabel));
     }
 }

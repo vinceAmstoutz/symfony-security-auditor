@@ -21,7 +21,7 @@ use function Symfony\Component\String\u;
 final readonly class TransientFailureClassifier
 {
     /** @var list<string> */
-    private const array TRANSIENT_STATUS_CODES = ['429', '500', '502', '503', '504'];
+    private const array TRANSIENT_STATUS_CODES = ['429', '500', '502', '503', '504', '529'];
 
     /** @var list<string> */
     private const array TRANSIENT_HINTS = [
@@ -35,6 +35,7 @@ final readonly class TransientFailureClassifier
         'internal server error',
         'bad gateway',
         'gateway timeout',
+        'overloaded',
         'connection reset',
         'connection refused',
         'connection aborted',
@@ -128,10 +129,16 @@ final readonly class TransientFailureClassifier
     }
 
     /**
+     * `\b` treats a hyphen as a boundary the same as whitespace, so a status
+     * code embedded in a hyphenated identifier (a request id like
+     * `abc-500-xyz`, a model name like `gpt-4o-500`) matched as confidently as
+     * a genuine status code. The `[\w-]` lookaround excludes that case
+     * alongside the existing decimal/thousands-separator exclusion.
+     *
      * @param list<string> $codes
      */
     private function containsStatusCode(string $joined, array $codes): bool
     {
-        return 1 === preg_match(\sprintf('/\b(?<!\d[,.])(?:%s)\b(?![,.]\d)/', implode('|', $codes)), $joined);
+        return 1 === preg_match(\sprintf('/(?<![\w-])(?<!\d[,.])(?:%s)(?![\w-])(?![,.]\d)/', implode('|', $codes)), $joined);
     }
 }

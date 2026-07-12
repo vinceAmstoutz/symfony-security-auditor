@@ -19,15 +19,20 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedExceptionInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAuditCostUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\ListScannedFilesUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\PlainProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
@@ -85,37 +90,59 @@ final readonly class AuditCommand
 
         $scanPaths = $auditCommandInput->scanPaths();
 
+        return $this->runAuditFlow($input, $symfonyStyle, $auditCommandInput, $projectPath, $scanPaths);
+    }
+
+    /**
+     * @param list<string> $scanPaths
+     *
+     * @throws UnsupportedOutputFormatException
+     * @throws WorkingDirectoryUnavailableException
+     */
+    private function runAuditFlow(
+        InputInterface $input,
+        SymfonyStyle $symfonyStyle,
+        AuditCommandInput $auditCommandInput,
+        string $projectPath,
+        array $scanPaths,
+    ): int {
+        $displayStyle = $this->displayStyle($symfonyStyle, $auditCommandInput);
+
         try {
-            if ($auditCommandInput->showScanned) {
-                $this->showScannedFiles($displayStyle, $projectPath, $scanPaths);
+            try {
+                $auditCommandInput->assertNoConflictingOptions();
+
+                if ($auditCommandInput->showScanned) {
+                    $this->showScannedFiles($displayStyle, $projectPath, $scanPaths, $auditCommandInput->since);
+                }
+
+                if ($auditCommandInput->dryRun) {
+                    return $this->runDryRun([$symfonyStyle, $displayStyle], $auditCommandInput, $projectPath, $scanPaths);
+                }
+
+                if ($auditCommandInput->showScanned) {
+                    return ExitCode::Success->value;
+                }
+
+                if (!$this->unpricedModelBudgetGuard->permitsRun($input, $symfonyStyle)) {
+                    return ExitCode::BudgetAborted->value;
+                }
+
+                $this->beginAuditRun($symfonyStyle, $auditCommandInput);
+
+                $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache, $auditCommandInput->since, $this->acceptedFingerprintsFor($auditCommandInput));
+                $report = $this->findingTypeFilter->apply($report);
+
+                if (null !== $auditCommandInput->generateBaseline) {
+                    return $this->generateBaseline($symfonyStyle, $auditCommandInput, $report, $auditCommandInput->generateBaseline);
+                }
+
+                return $this->finalizeAuditRun($symfonyStyle, $auditCommandInput, $report);
+            } catch (AuditAbortedExceptionInterface $auditAbortedException) {
+                return $this->handleAbort($symfonyStyle, $auditCommandInput, $auditAbortedException);
             }
-
-            if ($auditCommandInput->dryRun) {
-                return $this->runDryRun([$symfonyStyle, $displayStyle], $auditCommandInput, $projectPath, $scanPaths);
-            }
-
-            if ($auditCommandInput->showScanned) {
-                return ExitCode::Success->value;
-            }
-
-            if (!$this->unpricedModelBudgetGuard->permitsRun($input, $symfonyStyle)) {
-                return ExitCode::BudgetAborted->value;
-            }
-
-            $this->beginAuditRun($symfonyStyle, $auditCommandInput);
-
-            $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache, $auditCommandInput->since, $this->acceptedFingerprintsFor($auditCommandInput));
-            $report = $this->findingTypeFilter->apply($report);
-
-            if (null !== $auditCommandInput->generateBaseline) {
-                return $this->generateBaseline($symfonyStyle, $auditCommandInput, $report, $auditCommandInput->generateBaseline);
-            }
-
-            return $this->finalizeAuditRun($symfonyStyle, $auditCommandInput, $report);
-        } catch (AuditAbortedByBudgetException $auditAbortedByBudgetException) {
-            return $this->handleBudgetAbort($symfonyStyle, $auditCommandInput, $auditAbortedByBudgetException);
         } catch (Throwable $throwable) {
-            $this->auditPresenter->error($symfonyStyle, $throwable);
+            $this->auditPresenter->error($displayStyle, $throwable);
 
             return ExitCode::Failure->value;
         }
@@ -135,11 +162,11 @@ final readonly class AuditCommand
     /**
      * @param list<string> $scanPaths
      */
-    private function showScannedFiles(SymfonyStyle $symfonyStyle, string $projectPath, array $scanPaths): void
+    private function showScannedFiles(SymfonyStyle $symfonyStyle, string $projectPath, array $scanPaths, ?string $since): void
     {
         $this->auditPresenter->scannedFiles(
             $symfonyStyle,
-            $this->listScannedFilesUseCase->execute($projectPath, $scanPaths),
+            $this->listScannedFilesUseCase->execute($projectPath, $scanPaths, $since),
         );
     }
 
@@ -148,6 +175,10 @@ final readonly class AuditCommand
      * @param list<string>                      $scanPaths
      *
      * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     private function runDryRun(
         array $styles,
@@ -157,11 +188,11 @@ final readonly class AuditCommand
     ): int {
         [$symfonyStyle, $displayStyle] = $styles;
         $this->auditPresenter->estimatingSection($displayStyle);
-        $auditReport = $this->estimateAuditCostUseCase->execute($projectPath, $scanPaths);
+        $auditReport = $this->estimateAuditCostUseCase->execute($projectPath, $scanPaths, $auditCommandInput->since);
 
         $this->auditPresenter->unsupportedModelWarnings($displayStyle, $auditReport);
 
-        if ($auditCommandInput->isMachineReadableFormat()) {
+        if ($auditCommandInput->isMachineReadableFormat() || null !== $auditCommandInput->output) {
             $this->reportWriter->write($auditReport, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle);
         }
 
@@ -178,7 +209,7 @@ final readonly class AuditCommand
 
     private function beginAuditRun(SymfonyStyle $symfonyStyle, AuditCommandInput $auditCommandInput): void
     {
-        $this->auditPresenter->runningSection($symfonyStyle);
+        $this->auditPresenter->runningSection($this->displayStyle($symfonyStyle, $auditCommandInput));
 
         if ($auditCommandInput->isMachineReadableToStdout()) {
             return;
@@ -213,6 +244,8 @@ final readonly class AuditCommand
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     private function generateBaseline(
         SymfonyStyle $symfonyStyle,
@@ -232,6 +265,8 @@ final readonly class AuditCommand
 
     /**
      * @throws UnsupportedOutputFormatException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     private function finalizeAuditRun(
         SymfonyStyle $symfonyStyle,
@@ -253,21 +288,32 @@ final readonly class AuditCommand
     }
 
     /**
+     * A budget abort gets its own dedicated exit code (partial report still
+     * emitted, but the run stopped on purpose); every other abort cause
+     * shares the generic failure code.
+     *
      * @throws UnsupportedOutputFormatException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
-    private function handleBudgetAbort(
+    private function handleAbort(
         SymfonyStyle $symfonyStyle,
         AuditCommandInput $auditCommandInput,
-        AuditAbortedByBudgetException $auditAbortedByBudgetException,
+        AuditAbortedExceptionInterface $auditAbortedException,
     ): int {
+        $auditReport = $this->findingTypeFilter->apply($auditAbortedException->partialReport());
+        $baselineResult = $this->baselineProcessor->apply($auditReport, $auditCommandInput->baseline);
+        $reportToWrite = OutputFormat::Sarif === $auditCommandInput->format ? $auditReport : $baselineResult->report;
+
         $this->reportWriter->write(
-            $auditAbortedByBudgetException->partialReport(),
+            $reportToWrite,
             $auditCommandInput->format,
             $auditCommandInput->output,
             $symfonyStyle,
+            $baselineResult->acceptedFingerprints,
         );
-        $this->auditPresenter->error($symfonyStyle, $auditAbortedByBudgetException);
+        $this->auditPresenter->error($this->displayStyle($symfonyStyle, $auditCommandInput), $auditAbortedException);
 
-        return ExitCode::BudgetAborted->value;
+        return $auditAbortedException instanceof AuditAbortedByBudgetException ? ExitCode::BudgetAborted->value : ExitCode::Failure->value;
     }
 }

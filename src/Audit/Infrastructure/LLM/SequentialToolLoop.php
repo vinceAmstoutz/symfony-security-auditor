@@ -18,13 +18,17 @@ use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\EmptyLLMResponseException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
@@ -56,6 +60,9 @@ final readonly class SequentialToolLoop
      * @throws MissingAiPlatformException
      * @throws TransientLLMFailureException
      * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
      */
     public function run(string $systemPrompt, string $userMessage, ToolRegistry $toolRegistry, int $maxToolIterations): LLMResponse
     {
@@ -84,7 +91,14 @@ final readonly class SequentialToolLoop
             }
 
             $platformResult = $deferredResult->getResult();
-            [$callInput, $callOutput, $callCacheRead, $callCacheCreation] = $this->platformResultExtractor->extractTokens($deferredResult);
+            try {
+                [$callInput, $callOutput, $callCacheRead, $callCacheCreation] = $this->platformResultExtractor->extractTokens($deferredResult);
+            } catch (Throwable $throwable) {
+                $this->rateLimiter->record(0, 0);
+
+                throw $throwable;
+            }
+
             $totalInputTokens += $callInput;
             $totalOutputTokens += $callOutput;
             $totalCacheReadTokens += $callCacheRead;
@@ -121,14 +135,18 @@ final readonly class SequentialToolLoop
 
             $messageBag->add(new AssistantMessage(...$toolCalls));
 
+            $toolResults = [];
             foreach ($toolCalls as $toolCall) {
                 $result = $toolRegistry->execute($toolCall->getName(), $toolCall->getArguments());
                 $messageBag->add(new ToolCallMessage($toolCall, $result));
+                $toolResults[] = $result;
                 $this->logger->debug('Tool invoked', [
                     'tool' => $toolCall->getName(),
                     'iteration' => $iteration + 1,
                 ]);
             }
+
+            $estimatedInputTokens += $this->promptTokenEstimator->estimate(...$toolResults);
 
             ++$iteration;
         }

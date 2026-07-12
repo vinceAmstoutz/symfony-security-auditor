@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffFinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
@@ -58,6 +59,26 @@ final class ReportDifferTest extends TestCase
         self::assertSame('SQL Injection', $reportDiff->newFindings[0]->title);
         self::assertSame([], $reportDiff->fixedFindings);
         self::assertSame([], $reportDiff->persistingFindings);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_reports_every_distinct_new_fingerprint_not_only_the_last(): void
+    {
+        $previous = $this->writeReport('previous.json', []);
+        $current = $this->writeReport('current.json', [
+            $this->vulnerability('SQL Injection'),
+            $this->vulnerability('Mass Assignment'),
+        ]);
+
+        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+
+        self::assertCount(2, $reportDiff->newFindings);
+        $titles = array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $reportDiff->newFindings);
+        self::assertContains('SQL Injection', $titles);
+        self::assertContains('Mass Assignment', $titles);
     }
 
     /**
@@ -125,6 +146,83 @@ final class ReportDifferTest extends TestCase
         self::assertSame([], $reportDiff->newFindings);
         self::assertSame([], $reportDiff->fixedFindings);
         self::assertSame([], $reportDiff->persistingFindings);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_treats_an_extra_current_finding_sharing_a_fingerprint_as_new_not_hidden(): void
+    {
+        $collidingLow = $this->vulnerability('SQL Injection', 'low');
+        $collidingHigh = $this->vulnerability('SQL Injection', 'high');
+        $previous = $this->writeReport('previous.json', [$collidingLow]);
+        $current = $this->writeReport('current.json', [$collidingLow, $collidingHigh]);
+
+        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+
+        self::assertCount(1, $reportDiff->newFindings);
+        self::assertCount(1, $reportDiff->persistingFindings);
+        self::assertSame([], $reportDiff->fixedFindings);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_treats_an_extra_previous_finding_sharing_a_fingerprint_as_fixed_not_hidden(): void
+    {
+        $collidingLow = $this->vulnerability('SQL Injection', 'low');
+        $collidingHigh = $this->vulnerability('SQL Injection', 'high');
+        $previous = $this->writeReport('previous.json', [$collidingLow, $collidingHigh]);
+        $current = $this->writeReport('current.json', [$collidingLow]);
+
+        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+
+        self::assertSame([], $reportDiff->newFindings);
+        self::assertCount(1, $reportDiff->fixedFindings);
+        self::assertCount(1, $reportDiff->persistingFindings);
+    }
+
+    /**
+     * Several findings sharing one fingerprint on both sides but in different
+     * counts are paired off 1:1 in encounter order: the current report's first
+     * N (N = the previous count) persist, its remainder is new, and any
+     * previous excess is fixed. Pins the slice offset (from the front, not the
+     * back) and length so each bucket keeps exactly the entries it should, in
+     * order — not just the right count.
+     *
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_pairs_off_findings_sharing_one_fingerprint_by_count_and_encounter_order(): void
+    {
+        $previous = $this->writeReport('previous.json', [
+            $this->vulnerability('SQL Injection', 'low'),
+            $this->vulnerability('SQL Injection', 'medium'),
+        ]);
+        $current = $this->writeReport('current.json', [
+            $this->vulnerability('SQL Injection', 'low'),
+            $this->vulnerability('SQL Injection', 'medium'),
+            $this->vulnerability('SQL Injection', 'high'),
+            $this->vulnerability('SQL Injection', 'critical'),
+        ]);
+
+        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+
+        self::assertSame(['low', 'medium'], $this->severitiesOf($reportDiff->persistingFindings));
+        self::assertSame(['high', 'critical'], $this->severitiesOf($reportDiff->newFindings));
+        self::assertSame([], $reportDiff->fixedFindings);
+    }
+
+    /**
+     * @param list<DiffFinding> $findings
+     *
+     * @return list<string>
+     */
+    private function severitiesOf(array $findings): array
+    {
+        return array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->severity, $findings);
     }
 
     /**
@@ -232,6 +330,26 @@ final class ReportDifferTest extends TestCase
         $current = $this->writeReport('current.json', []);
 
         $this->expectException(MalformedReportFileException::class);
+        $this->expectExceptionMessage('has a vulnerability entry at index 0 that is not a JSON object');
+
+        (new ReportDiffer($this->filesystem))->diff($previous, $current);
+    }
+
+    /**
+     * @throws ReportFileNotReadableException
+     * @throws MalformedReportFileException
+     */
+    public function test_diff_reports_the_actual_position_of_a_bad_entry_when_vulnerabilities_is_a_json_object_with_non_numeric_keys(): void
+    {
+        $previous = $this->tmpDir.'/object-entries.json';
+        $this->filesystem->dumpFile(
+            $previous,
+            '{"vulnerabilities": {"alpha": {"type": "sql_injection", "file": "src/Foo.php", "title": "SQL Injection", "severity": "high"}, "beta": 42}}',
+        );
+        $current = $this->writeReport('current.json', []);
+
+        $this->expectException(MalformedReportFileException::class);
+        $this->expectExceptionMessage('has a vulnerability entry at index 1 that is not a JSON object');
 
         (new ReportDiffer($this->filesystem))->diff($previous, $current);
     }
@@ -282,13 +400,13 @@ final class ReportDifferTest extends TestCase
     /**
      * @return array{type: string, file: string, title: string, severity: string, fingerprint: string}
      */
-    private function vulnerability(string $title): array
+    private function vulnerability(string $title, string $severity = 'high'): array
     {
         return [
             'type' => 'sql_injection',
             'file' => 'src/Foo.php',
             'title' => $title,
-            'severity' => 'high',
+            'severity' => $severity,
             'fingerprint' => Vulnerability::fingerprintOf('sql_injection', 'src/Foo.php', $title),
         ];
     }

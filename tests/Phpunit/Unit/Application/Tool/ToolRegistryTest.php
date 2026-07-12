@@ -13,18 +13,22 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Tool;
 
-use InvalidArgumentException;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 final class ToolRegistryTest extends TestCase
 {
+    /**
+     * @throws InvalidToolRegistryException
+     */
     public function test_definitions_returns_one_entry_per_registered_tool(): void
     {
         $toolRegistry = new ToolRegistry(
@@ -37,6 +41,9 @@ final class ToolRegistryTest extends TestCase
         self::assertSame(['a', 'b'], $names);
     }
 
+    /**
+     * @throws InvalidToolRegistryException
+     */
     public function test_has_returns_true_for_registered_tool(): void
     {
         $toolRegistry = new ToolRegistry(
@@ -48,6 +55,9 @@ final class ToolRegistryTest extends TestCase
         self::assertFalse($toolRegistry->has('b'));
     }
 
+    /**
+     * @throws InvalidToolRegistryException
+     */
     public function test_execute_dispatches_to_registered_tool(): void
     {
         $toolRegistry = new ToolRegistry(
@@ -64,6 +74,9 @@ final class ToolRegistryTest extends TestCase
         self::assertSame('got hello', $result);
     }
 
+    /**
+     * @throws InvalidToolRegistryException
+     */
     public function test_execute_returns_error_text_for_unknown_tool(): void
     {
         $toolRegistry = new ToolRegistry(
@@ -77,6 +90,9 @@ final class ToolRegistryTest extends TestCase
         self::assertStringContainsString('unknown', $result);
     }
 
+    /**
+     * @throws InvalidToolRegistryException
+     */
     public function test_execute_catches_tool_exception_and_returns_error_text(): void
     {
         $toolRegistry = new ToolRegistry(
@@ -93,9 +109,12 @@ final class ToolRegistryTest extends TestCase
         self::assertStringContainsString('kaboom', $result);
     }
 
+    /**
+     * @throws InvalidToolRegistryException
+     */
     public function test_constructor_rejects_duplicate_tool_names(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidToolRegistryException::class);
 
         new ToolRegistry(
             tools: [$this->makeTool('a'), $this->makeTool('a')],
@@ -103,6 +122,9 @@ final class ToolRegistryTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidToolRegistryException
+     */
     public function test_execute_logs_warning_with_tool_name_when_tool_unknown(): void
     {
         $warnings = [];
@@ -120,6 +142,9 @@ final class ToolRegistryTest extends TestCase
         self::assertSame([['Tool not found, returning error to LLM', ['tool' => 'ghost']]], $warnings);
     }
 
+    /**
+     * @throws InvalidToolRegistryException
+     */
     public function test_execute_logs_warning_with_tool_name_and_error_when_tool_throws(): void
     {
         $warnings = [];
@@ -159,6 +184,9 @@ final class ToolRegistryTest extends TestCase
                 private readonly mixed $execute,
             ) {}
 
+            /**
+             * @throws InvalidToolDefinitionException
+             */
             #[Override]
             public function definition(): ToolDefinition
             {

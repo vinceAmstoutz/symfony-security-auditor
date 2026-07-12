@@ -232,8 +232,7 @@ All properties are `readonly`. State changes return new instances:
 - `withElevatedSeverity(VulnerabilitySeverity): self` — called when reviewer
   adjusts severity
 
-The `id` is deterministic:
-`VULN-{sha1(type+filePath+lineStart+microtime)[0..7]}`.
+The `id` is deterministic: `VULN-{sha1(type+filePath+lineStart)[0..7]}`.
 
 Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`,
 `filePath`, `lineStart`, `lineEnd`, `vulnerableCode`, `attackVector`, `proof`,
@@ -266,10 +265,10 @@ Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`,
 | Cryptographic         | `WEAK_CRYPTOGRAPHY`, `HARDCODED_SECRET`, `INSECURE_RANDOM`                 |
 
 `category()` and `owaspReference()` return human-readable strings used in report
-output and LLM prompts. `cweReference()` and `cweReferenceUrl()` return the
-matching MITRE CWE identifier (e.g. `CWE-89`) and its
-`https://cwe.mitre.org/data/definitions/<n>.html` definition page, surfaced
-alongside the OWASP mapping in every report renderer.
+output and LLM prompts. `cwe(): CweReference` returns the matching MITRE CWE
+value object, whose `label()` (e.g. `CWE-89`) and `url()`
+(`https://cwe.mitre.org/data/definitions/<n>.html`) are surfaced alongside the
+OWASP mapping in every report renderer.
 
 ### `ProjectFile` — immutable scanned file
 
@@ -312,11 +311,14 @@ security surface rather than file contents alone. Notable helpers:
 One entry per public controller action emitted by
 `ControllerAccessControlParserInterface` (default impl
 `PhpParserControllerAccessControlParser`, AST-based via `nikic/php-parser`).
-Captures `filePath`, `methodName`, `routePath`, `routeMethods`, plus three
-boolean / list signals — `methodLevelIsGranted`, `methodHasDenyAccess`,
-`classHasIsGranted` — combined by `hasAccessCheck()` and `lacksAccessCheck()`.
-The attacker prompt renders the full graph as a `Route Access-Control Map` block
-so the LLM can spot missing enforcement without re-deriving it from source.
+Captures `filePath`, `methodName`, `routePath`, `routeMethods`, plus four
+boolean / list signals — `methodLevelIsGranted`, `methodHasIsGrantedAttribute`
+(a method-level `#[IsGranted]`/`#[Security]` value present but not resolvable to
+a literal string, e.g. an enum case or `new Expression(...)`),
+`methodHasDenyAccess`, `classHasIsGranted` — combined by `hasAccessCheck()` and
+`lacksAccessCheck()`. The attacker prompt renders the full graph as a
+`Route Access-Control Map` block so the LLM can spot missing enforcement without
+re-deriving it from source.
 
 ### `VoterCapability` — immutable per-voter `supports()` summary
 
@@ -363,9 +365,11 @@ by the extension). Logs stage name and elapsed time per stage.
 ### Stages
 
 **`IngestionStage`** — calls `ProjectFileScanner::scan(string $projectPath)`,
-calls `AuditContext::setProjectFiles()`.
+calls `AuditContext::setProjectFiles()` (diff-filtered when `--since` is set)
+and `AuditContext::setMappingFiles()` (the full scan scope, never diff-filtered)
+so `MappingStage` always sees the whole project.
 
-**`MappingStage`** — classifies `AuditContext::projectFiles()` into roles,
+**`MappingStage`** — classifies `AuditContext::mappingFiles()` into roles,
 constructs `SymfonyMapping`, calls `AuditContext::setMapping()`. May use the LLM
 client for semantic mapping or fall back to heuristic classification. The route
 access-control map and firewall rules come from `SecurityConfigParserInterface`
@@ -810,9 +814,8 @@ provider-agnostic.
 `symfony/ai`.
 
 **Add new vulnerability types** — add a case to `VulnerabilityType`, add a
-branch in `category()`, `owaspReference()`, `owaspReferenceUrl()`,
-`cweReference()`, and `cweReferenceUrl()`. The factory, agents, and report
-serialization require no changes.
+branch in `category()`, `owaspReference()`, `owaspReferenceUrl()`, and `cwe()`.
+The factory, agents, and report serialization require no changes.
 
 **Add new severity levels** — add a case to `VulnerabilitySeverity` with
 `score()`, `label()`, `isExploitable()` implementations, and update the

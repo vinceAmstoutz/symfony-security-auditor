@@ -13,12 +13,16 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Telemetry;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 
 final class TokenUsageRecorderTest extends TestCase
 {
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_fresh_recorder_snapshots_to_zero_zero(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -30,6 +34,10 @@ final class TokenUsageRecorderTest extends TestCase
         self::assertSame(0, $snapshot->totalTokens());
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     */
     public function test_single_record_call_is_reflected_in_snapshot(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -43,6 +51,10 @@ final class TokenUsageRecorderTest extends TestCase
         self::assertSame(150, $snapshot->totalTokens());
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     */
     public function test_multiple_record_calls_accumulate(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -57,6 +69,10 @@ final class TokenUsageRecorderTest extends TestCase
         self::assertSame(35, $snapshot->outputTokens());
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     */
     public function test_reset_clears_accumulated_state(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -70,6 +86,10 @@ final class TokenUsageRecorderTest extends TestCase
         self::assertSame(0, $snapshot->outputTokens());
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     */
     public function test_recording_after_reset_starts_from_zero(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -84,6 +104,10 @@ final class TokenUsageRecorderTest extends TestCase
         self::assertSame(3, $snapshot->outputTokens());
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     */
     public function test_cache_tokens_accumulate_across_record_calls(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -97,6 +121,10 @@ final class TokenUsageRecorderTest extends TestCase
         self::assertSame(15, $snapshot->cacheCreationTokens());
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     */
     public function test_cache_tokens_default_to_zero_when_omitted(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -109,6 +137,10 @@ final class TokenUsageRecorderTest extends TestCase
         self::assertSame(0, $snapshot->cacheCreationTokens());
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     */
     public function test_reset_clears_accumulated_cache_tokens(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -122,46 +154,62 @@ final class TokenUsageRecorderTest extends TestCase
         self::assertSame(0, $snapshot->cacheCreationTokens());
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     */
     public function test_recording_negative_cache_read_tokens_throws(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(NegativeTokenCountException::class);
         $this->expectExceptionMessage('Cache read tokens must be >= 0, got -2');
 
         $tokenUsageRecorder->record(0, 0, -2, 0);
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     */
     public function test_recording_negative_cache_creation_tokens_throws(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(NegativeTokenCountException::class);
         $this->expectExceptionMessage('Cache creation tokens must be >= 0, got -7');
 
         $tokenUsageRecorder->record(0, 0, 0, -7);
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     */
     public function test_recording_negative_input_tokens_throws(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(NegativeTokenCountException::class);
         $this->expectExceptionMessage('Input tokens must be >= 0, got -1');
 
         $tokenUsageRecorder->record(-1, 0);
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     */
     public function test_recording_negative_output_tokens_throws(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(NegativeTokenCountException::class);
         $this->expectExceptionMessage('Output tokens must be >= 0, got -5');
 
         $tokenUsageRecorder->record(0, -5);
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     */
     public function test_snapshot_does_not_observe_subsequent_recording(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -174,6 +222,10 @@ final class TokenUsageRecorderTest extends TestCase
         self::assertSame(5, $tokenUsageSnapshot->outputTokens());
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     */
     public function test_later_snapshot_observes_cumulative_state(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();
@@ -186,6 +238,10 @@ final class TokenUsageRecorderTest extends TestCase
         self::assertSame(15, $tokenUsageSnapshot->outputTokens());
     }
 
+    /**
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     */
     public function test_recording_zero_tokens_does_not_change_state(): void
     {
         $tokenUsageRecorder = new TokenUsageRecorder();

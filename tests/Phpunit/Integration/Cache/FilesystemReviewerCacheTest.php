@@ -21,6 +21,7 @@ use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -39,6 +40,7 @@ final class FilesystemReviewerCacheTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_get_returns_null_when_no_entry_exists(): void
     {
@@ -49,6 +51,7 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_get_skips_read_when_no_entry_exists(): void
     {
@@ -64,6 +67,7 @@ final class FilesystemReviewerCacheTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_round_trip_store_and_get_returns_same_review(): void
     {
@@ -78,6 +82,7 @@ final class FilesystemReviewerCacheTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_get_returns_null_when_finding_content_differs(): void
     {
@@ -92,6 +97,7 @@ final class FilesystemReviewerCacheTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_get_returns_null_when_code_context_differs(): void
     {
@@ -105,6 +111,7 @@ final class FilesystemReviewerCacheTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_get_hits_for_a_distinct_finding_object_with_identical_content(): void
     {
@@ -123,6 +130,26 @@ final class FilesystemReviewerCacheTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_get_hits_across_runs_despite_a_different_detected_at_timestamp(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php', title: 'same');
+        $review = ['accepted' => true];
+        $this->filesystemReviewerCache->store($vulnerability, 'code', $review);
+
+        usleep(1_100_000);
+
+        $secondRun = $this->makeVulnerability('src/A.php', title: 'same');
+
+        self::assertNotEquals($vulnerability->toArray()['detected_at'], $secondRun->toArray()['detected_at']);
+        self::assertSame($review, $this->filesystemReviewerCache->get($secondRun, 'code'));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_get_returns_null_when_cache_file_is_invalid_json(): void
     {
@@ -140,6 +167,7 @@ final class FilesystemReviewerCacheTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_get_returns_null_when_cache_file_contains_non_array_json(): void
     {
@@ -154,11 +182,77 @@ final class FilesystemReviewerCacheTest extends TestCase
     }
 
     /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_get_returns_null_instead_of_throwing_when_finding_content_is_not_valid_utf8(): void
+    {
+        $vulnerability = $this->makeVulnerabilityWithCode('src/A.php', "\xB1\xB2 legacy latin1 snippet");
+
+        self::assertNull($this->filesystemReviewerCache->get($vulnerability, 'code'));
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_get_logs_warning_when_finding_content_is_not_valid_utf8(): void
+    {
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('debug');
+
+        $filesystemReviewerCache = new FilesystemReviewerCache($this->cacheDir, new Filesystem(), $logger);
+        $vulnerability = $this->makeVulnerabilityWithCode('src/A.php', "\xB1\xB2 legacy latin1 snippet");
+
+        self::assertNull($filesystemReviewerCache->get($vulnerability, 'code'));
+        self::assertCount(1, $warnings);
+        self::assertSame('Reviewer cache entry was unreadable, ignoring', $warnings[0][0]);
+        self::assertNull($warnings[0][1]['path']);
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_store_logs_warning_instead_of_throwing_when_finding_content_is_not_valid_utf8(): void
+    {
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('debug');
+
+        $filesystemReviewerCache = new FilesystemReviewerCache($this->cacheDir, new Filesystem(), $logger);
+        $vulnerability = $this->makeVulnerabilityWithCode('src/A.php', "\xB1\xB2 legacy latin1 snippet");
+
+        $filesystemReviewerCache->store($vulnerability, 'code', ['accepted' => true]);
+
+        self::assertCount(1, $warnings);
+        self::assertSame('Failed to write reviewer cache entry', $warnings[0][0]);
+        self::assertNull($warnings[0][1]['path']);
+    }
+
+    /**
      * @throws InvalidCacheConfigurationException
      */
     public function test_constructor_rejects_empty_cache_dir(): void
     {
         $this->expectException(InvalidCacheConfigurationException::class);
+        $this->expectExceptionMessage('Reviewer cache dir cannot be empty');
         new FilesystemReviewerCache('   ', new Filesystem(), new NullLogger());
     }
 
@@ -166,6 +260,7 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_get_returns_null_when_filesystem_read_throws_io_exception(): void
     {
@@ -182,6 +277,7 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_get_logs_warning_with_path_and_error_when_read_throws_io_exception(): void
     {
@@ -211,6 +307,7 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_get_logs_warning_when_cache_entry_is_unreadable_json(): void
     {
@@ -243,6 +340,7 @@ final class FilesystemReviewerCacheTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_store_creates_nested_shard_directory_from_key_prefix(): void
     {
@@ -256,9 +354,167 @@ final class FilesystemReviewerCacheTest extends TestCase
     }
 
     /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_store_refuses_to_write_through_a_symlinked_cache_file(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $codeContext = '<?php echo 1;';
+        $finding = $vulnerability->toArray();
+        unset($finding['id'], $finding['detected_at']);
+        $expectedKey = hash('sha256', json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
+
+        $outsideTarget = sys_get_temp_dir().'/reviewer_cache_symlink_target_'.uniqid('', true);
+        file_put_contents($outsideTarget, 'ORIGINAL');
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($outsideTarget, $expectedPath);
+
+        try {
+            $this->filesystemReviewerCache->store($vulnerability, $codeContext, ['accepted' => true]);
+
+            self::assertSame('ORIGINAL', file_get_contents($outsideTarget));
+        } finally {
+            unlink($outsideTarget);
+        }
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_store_refuses_to_write_through_a_symlinked_shard_directory(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $codeContext = '<?php echo 1;';
+        $finding = $vulnerability->toArray();
+        unset($finding['id'], $finding['detected_at']);
+        $expectedKey = hash('sha256', json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext);
+        $shardDir = \sprintf('%s/%s', $this->cacheDir, substr($expectedKey, 0, 2));
+
+        $outsideDir = sys_get_temp_dir().'/reviewer_cache_symlink_dir_'.uniqid('', true);
+        mkdir($outsideDir);
+        mkdir($this->cacheDir, recursive: true);
+        symlink($outsideDir, $shardDir);
+
+        try {
+            $this->filesystemReviewerCache->store($vulnerability, $codeContext, ['accepted' => true]);
+
+            $globResult = glob($outsideDir.'/*.json');
+            self::assertSame([], false !== $globResult ? $globResult : []);
+        } finally {
+            $filesystem = new Filesystem();
+            $filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
+     * A cache path is derived entirely from the finding's own content
+     * (attacker-influenced file paths/descriptions), so a malicious
+     * contributor can pre-plant a symlink at the exact path this cache will
+     * ever read from — with no `store()` ever called — turning a routine
+     * cached-run into an arbitrary-file read whose content is trusted as a
+     * real, previously-computed verdict.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_get_refuses_to_read_through_a_symlinked_cache_file(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $codeContext = '<?php echo 1;';
+        $finding = $vulnerability->toArray();
+        unset($finding['id'], $finding['detected_at']);
+        $expectedKey = hash('sha256', json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
+
+        $plantedTarget = sys_get_temp_dir().'/reviewer_cache_symlink_read_target_'.uniqid('', true);
+        file_put_contents($plantedTarget, json_encode(['accepted' => false]));
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($plantedTarget, $expectedPath);
+
+        try {
+            self::assertNull($this->filesystemReviewerCache->get($vulnerability, $codeContext));
+        } finally {
+            unlink($plantedTarget);
+        }
+    }
+
+    /**
      * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_get_logs_a_warning_with_the_path_when_refusing_a_symlinked_cache_file(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $codeContext = '<?php echo 1;';
+        $finding = $vulnerability->toArray();
+        unset($finding['id'], $finding['detected_at']);
+        $expectedKey = hash('sha256', json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
+
+        $plantedTarget = sys_get_temp_dir().'/reviewer_cache_symlink_log_target_'.uniqid('', true);
+        file_put_contents($plantedTarget, json_encode(['accepted' => false]));
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($plantedTarget, $expectedPath);
+
+        /** @var list<array{string, array<string, string>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        try {
+            (new FilesystemReviewerCache($this->cacheDir, new Filesystem(), $logger))->get($vulnerability, $codeContext);
+        } finally {
+            unlink($plantedTarget);
+        }
+
+        self::assertSame([['Reviewer cache entry path was a symlink, ignoring', ['path' => $expectedPath]]], $warnings);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_get_refuses_to_read_through_a_symlinked_shard_directory(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+        $codeContext = '<?php echo 1;';
+        $finding = $vulnerability->toArray();
+        unset($finding['id'], $finding['detected_at']);
+        $expectedKey = hash('sha256', json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext);
+        $shardDir = \sprintf('%s/%s', $this->cacheDir, substr($expectedKey, 0, 2));
+
+        $outsideDir = sys_get_temp_dir().'/reviewer_cache_symlink_read_dir_'.uniqid('', true);
+        mkdir($outsideDir);
+        file_put_contents(\sprintf('%s/%s.json', $outsideDir, $expectedKey), json_encode(['accepted' => false]));
+        mkdir($this->cacheDir, recursive: true);
+        symlink($outsideDir, $shardDir);
+
+        try {
+            self::assertNull($this->filesystemReviewerCache->get($vulnerability, $codeContext));
+        } finally {
+            $filesystem = new Filesystem();
+            $filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_store_calls_mkdir_to_create_shard_directory(): void
     {
@@ -274,6 +530,7 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_key_is_sha256_of_salt_null_byte_finding_without_id_and_code_context(): void
     {
@@ -281,7 +538,7 @@ final class FilesystemReviewerCacheTest extends TestCase
         $codeContext = '<?php echo 1;';
 
         $finding = $vulnerability->toArray();
-        unset($finding['id']);
+        unset($finding['id'], $finding['detected_at']);
         $signature = "claude-haiku-4-5\0".json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext;
         $expectedKey = hash('sha256', $signature);
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
@@ -296,6 +553,7 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_distinct_key_salts_produce_distinct_cache_entries(): void
     {
@@ -314,6 +572,7 @@ final class FilesystemReviewerCacheTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_empty_salt_keeps_unprefixed_key(): void
     {
@@ -321,7 +580,7 @@ final class FilesystemReviewerCacheTest extends TestCase
         $codeContext = 'ctx';
 
         $finding = $vulnerability->toArray();
-        unset($finding['id']);
+        unset($finding['id'], $finding['detected_at']);
         $expectedKey = hash('sha256', json_encode($finding, \JSON_THROW_ON_ERROR)."\0".$codeContext);
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
 
@@ -334,6 +593,7 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_dump_path_has_trailing_slash_stripped_from_cache_dir(): void
     {
@@ -355,6 +615,7 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_get_logs_debug_cache_hit_with_path(): void
     {
@@ -381,6 +642,7 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_store_logs_debug_stored_with_path(): void
     {
@@ -404,6 +666,7 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_store_failure_logs_warning_with_path_and_error(): void
     {
@@ -429,14 +692,25 @@ final class FilesystemReviewerCacheTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerability(string $filePath, string $title = 'Finding'): Vulnerability
+    {
+        return $this->makeVulnerabilityWithCode($filePath, 'code', $title);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function makeVulnerabilityWithCode(string $filePath, string $vulnerableCode, string $title = 'Finding'): Vulnerability
     {
         return Vulnerability::of(
             new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, $title, 0.9),
             new CodeLocation($filePath, 1, 5),
             new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
-            'code',
+            $vulnerableCode,
         );
     }
 

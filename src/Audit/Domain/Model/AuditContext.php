@@ -14,14 +14,17 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 use DateTimeImmutable;
-use InvalidArgumentException;
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
 final class AuditContext implements CoverageRecorderInterface
 {
     /** @var list<ProjectFile> */
     private array $projectFiles = [];
+
+    /** @var ?list<ProjectFile> */
+    private ?array $mappingFiles = null;
 
     private ?SymfonyMapping $symfonyMapping = null;
 
@@ -33,6 +36,18 @@ final class AuditContext implements CoverageRecorderInterface
 
     /** @var list<array{stage: string, file: string, status: string}> */
     private array $coverage = [];
+
+    /** @var list<Vulnerability> */
+    private array $pendingReviewedFindings = [];
+
+    /** @var list<Vulnerability> */
+    private array $pendingFoundVulnerabilities = [];
+
+    /** @var ?array<string, int> */
+    private ?array $remainingBaselineBudget = null;
+
+    /** @var list<string> */
+    private array $consumedBaselineFingerprints = [];
 
     private DateTimeImmutable $startedAt;
 
@@ -66,15 +81,19 @@ final class AuditContext implements CoverageRecorderInterface
      *                                           baseline fingerprints of accepted
      *                                           findings; matching attacker findings
      *                                           are dropped before the reviewer runs
+     *
+     * @throws InvalidAuditContextException
      */
     public static function forProject(string $projectPath, array $scanPaths = [], bool $cacheBypassed = false, ?string $diffSinceRef = null, array $acceptedFingerprints = []): self
     {
         if (!is_dir($projectPath)) {
-            throw new InvalidArgumentException(\sprintf('Project path "%s" is not a valid directory', $projectPath));
+            throw InvalidAuditContextException::forInvalidProjectPath($projectPath);
         }
 
+        $trimmedProjectPath = rtrim($projectPath, '/');
+
         return new self(
-            projectPath: rtrim($projectPath, '/'),
+            projectPath: '' === $trimmedProjectPath ? '/' : $trimmedProjectPath,
             auditId: \sprintf('AUDIT-%s', strtoupper(bin2hex(random_bytes(4)))),
             scanPaths: $scanPaths,
             cacheBypassed: $cacheBypassed,
@@ -87,6 +106,34 @@ final class AuditContext implements CoverageRecorderInterface
     public function acceptedFingerprints(): array
     {
         return $this->acceptedFingerprints;
+    }
+
+    /**
+     * Spends one baseline credit for `$fingerprint`, shared across every
+     * caller and every attacker/reviewer iteration of this run — the budget
+     * is seeded once from `$acceptedFingerprints` (`array_count_values()`
+     * semantics: an accepted fingerprint repeated N times grants N credits)
+     * and decrements monotonically, so the same accepted occurrence can never
+     * be spent twice regardless of how many times or where it is offered.
+     */
+    public function consumeBaselineCredit(string $fingerprint): bool
+    {
+        $this->remainingBaselineBudget ??= array_count_values($this->acceptedFingerprints);
+
+        if (!\array_key_exists($fingerprint, $this->remainingBaselineBudget) || $this->remainingBaselineBudget[$fingerprint] <= 0) {
+            return false;
+        }
+
+        --$this->remainingBaselineBudget[$fingerprint];
+        $this->consumedBaselineFingerprints[] = $fingerprint;
+
+        return true;
+    }
+
+    /** @return list<string> */
+    public function consumedBaselineFingerprints(): array
+    {
+        return $this->consumedBaselineFingerprints;
     }
 
     public function diffSinceRef(): ?string
@@ -126,6 +173,21 @@ final class AuditContext implements CoverageRecorderInterface
         return $this->projectFiles;
     }
 
+    /**
+     * The files `MappingStage` builds `SymfonyMapping`/`AccessControlMap`
+     * from — the full scan scope, unlike {@see self::projectFiles()}, which
+     * a `--since` diff-mode run narrows to only the changed files. Falls
+     * back to {@see self::projectFiles()} when `IngestionStage` never calls
+     * {@see self::setMappingFiles()} (a full, non-diff run, or a test that
+     * only sets `projectFiles`), since the two are identical in that case.
+     *
+     * @return list<ProjectFile>
+     */
+    public function mappingFiles(): array
+    {
+        return $this->mappingFiles ?? $this->projectFiles;
+    }
+
     public function mapping(): ?SymfonyMapping
     {
         return $this->symfonyMapping;
@@ -141,6 +203,12 @@ final class AuditContext implements CoverageRecorderInterface
     public function setProjectFiles(array $files): void
     {
         $this->projectFiles = $files;
+    }
+
+    /** @param list<ProjectFile> $files */
+    public function setMappingFiles(array $files): void
+    {
+        $this->mappingFiles = $files;
     }
 
     public function setMapping(SymfonyMapping $symfonyMapping): void
@@ -209,5 +277,35 @@ final class AuditContext implements CoverageRecorderInterface
     public function coverage(): array
     {
         return $this->coverage;
+    }
+
+    #[Override]
+    public function recordReviewedFinding(Vulnerability $vulnerability): void
+    {
+        $this->pendingReviewedFindings[] = $vulnerability;
+    }
+
+    #[Override]
+    public function drainReviewedFindings(): array
+    {
+        $drained = $this->pendingReviewedFindings;
+        $this->pendingReviewedFindings = [];
+
+        return $drained;
+    }
+
+    #[Override]
+    public function recordFoundVulnerability(Vulnerability $vulnerability): void
+    {
+        $this->pendingFoundVulnerabilities[] = $vulnerability;
+    }
+
+    #[Override]
+    public function drainFoundVulnerabilities(): array
+    {
+        $drained = $this->pendingFoundVulnerabilities;
+        $this->pendingFoundVulnerabilities = [];
+
+        return $drained;
     }
 }

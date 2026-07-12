@@ -62,8 +62,9 @@ final class BudgetTracker
         }
 
         $maxCostUsd = $this->auditBudget->maxCostUsd();
-        if (null !== $maxCostUsd && $this->costUsdUsed > $maxCostUsd) {
-            throw BudgetExceededException::forCost($this->costUsdUsed, $maxCostUsd);
+        $costUsdUsed = $this->costUsdUsed();
+        if (null !== $maxCostUsd && $costUsdUsed > round($maxCostUsd, 6)) {
+            throw BudgetExceededException::forCost($costUsdUsed, $maxCostUsd);
         }
     }
 
@@ -75,5 +76,11 @@ final class BudgetTracker
     public function costUsdUsed(): float
     {
         return round($this->costUsdUsed, 6);
+    }
+
+    public function reset(): void
+    {
+        $this->tokensUsed = 0;
+        $this->costUsdUsed = 0.0;
     }
 }

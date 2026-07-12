@@ -32,6 +32,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
@@ -54,10 +57,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullSecurityConfigPar
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullVoterCapabilityParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SymfonyYamlSecurityConfigParser;
 
 final class StagesTest extends TestCase
@@ -72,6 +78,10 @@ final class StagesTest extends TestCase
         self::assertSame('ingestion', $ingestionStage->name());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_ingestion_stage_populates_context_with_scanned_files(): void
     {
         $scanner = self::createStub(ProjectFileScannerInterface::class);
@@ -91,6 +101,9 @@ final class StagesTest extends TestCase
         self::assertSame(2, $auditContext->getMeta('ingestion.file_count'));
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_ingestion_stage_handles_empty_scan_result(): void
     {
         $scanner = self::createStub(ProjectFileScannerInterface::class);
@@ -105,6 +118,10 @@ final class StagesTest extends TestCase
         self::assertSame(0, $auditContext->getMeta('ingestion.file_count'));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_ingestion_stage_restricts_files_to_context_scan_paths(): void
     {
         $scanner = self::createStub(ProjectFileScannerInterface::class);
@@ -122,6 +139,10 @@ final class StagesTest extends TestCase
         self::assertSame('apps/api/src/A.php', $auditContext->projectFiles()[0]->relativePath());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_ingestion_stage_filters_to_git_changed_files_and_logs_the_diff(): void
     {
         $scanner = self::createStub(ProjectFileScannerInterface::class);
@@ -151,6 +172,37 @@ final class StagesTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_ingestion_stage_populates_mapping_files_with_the_full_scan_scope_even_when_diff_filtering_project_files(): void
+    {
+        $scanner = self::createStub(ProjectFileScannerInterface::class);
+        $scanner->method('scan')->willReturn([
+            ProjectFile::create('src/ChangedA.php', '/app/src/ChangedA.php', '<?php'),
+            ProjectFile::create('src/Unchanged.php', '/app/src/Unchanged.php', '<?php'),
+        ]);
+
+        $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
+        $gitChangedFilesResolver->method('changedSince')->willReturn(['src/ChangedA.php']);
+
+        $ingestionStage = new IngestionStage($scanner, new NullLogger(), $gitChangedFilesResolver);
+        $auditContext = AuditContext::forProject($this->tmpDir, [], false, 'main');
+
+        $ingestionStage->process($auditContext);
+
+        $projectFilePaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles());
+        $mappingFilePaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->mappingFiles());
+
+        self::assertSame(['src/ChangedA.php'], $projectFilePaths);
+        self::assertSame(['src/ChangedA.php', 'src/Unchanged.php'], $mappingFilePaths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_ingestion_stage_does_not_filter_when_no_resolver_even_with_since_ref(): void
     {
         $scanner = self::createStub(ProjectFileScannerInterface::class);
@@ -174,6 +226,10 @@ final class StagesTest extends TestCase
         self::assertSame('mapping', $mappingStage->name());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_mapping_stage_routes_controllers_through_the_access_control_parser(): void
     {
         $controllerFile = ProjectFile::create('src/Controller/AdminController.php', '/app/x', '<?php class AdminController {}');
@@ -223,6 +279,10 @@ final class StagesTest extends TestCase
         self::assertSame(1, $auditContext->getMeta('mapping.routes_without_access_check'));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_mapping_stage_aggregates_route_access_controls_from_multiple_controllers(): void
     {
         $controllerA = ProjectFile::create('src/Controller/AController.php', '/app/A', '<?php class AController {}');
@@ -251,6 +311,10 @@ final class StagesTest extends TestCase
         self::assertSame([$entryA, $entryB], $mapping->routeAccessControls());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_mapping_stage_routes_voters_through_the_voter_capability_parser(): void
     {
         $voterFileA = ProjectFile::create('src/Security/UserVoter.php', '/app/U', '<?php class UserVoter {}');
@@ -283,6 +347,10 @@ final class StagesTest extends TestCase
         self::assertSame(2, $auditContext->getMeta('mapping.voter_capabilities'));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_mapping_stage_skips_null_voter_parser_results(): void
     {
         $voterFile = ProjectFile::create('src/Security/SilentVoter.php', '/app/x', '<?php class SilentVoter {}');
@@ -305,6 +373,10 @@ final class StagesTest extends TestCase
         self::assertSame([], $mapping->voterCapabilities());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_mapping_stage_routes_controllers_through_the_form_binding_parser(): void
     {
         $controllerA = ProjectFile::create('src/Controller/UserController.php', '/app/U', '<?php class UserController {}');
@@ -338,6 +410,10 @@ final class StagesTest extends TestCase
         self::assertSame(2, $auditContext->getMeta('mapping.form_bindings'));
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_creates_mapping_from_project_files(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
@@ -364,6 +440,34 @@ final class StagesTest extends TestCase
         self::assertCount(1, $mapping->templates());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_stage_builds_the_mapping_from_the_full_scan_scope_not_the_diff_filtered_project_files(): void
+    {
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', '<?php class UserController {}'),
+        ]);
+        $auditContext->setMappingFiles([
+            ProjectFile::create('src/Controller/UserController.php', '/app/src/Controller/UserController.php', '<?php class UserController {}'),
+            ProjectFile::create('src/Security/UserVoter.php', '/app/src/Security/UserVoter.php', '<?php class UserVoter {}'),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertCount(1, $mapping->controllers());
+        self::assertCount(1, $mapping->voters());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_mapping_stage_handles_empty_file_list(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
@@ -377,6 +481,10 @@ final class StagesTest extends TestCase
         self::assertSame(0, $auditContext->mapping()->totalFiles());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_extracts_security_config(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
@@ -403,6 +511,45 @@ final class StagesTest extends TestCase
         self::assertNotEmpty($mapping->firewallRules());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_stage_maps_route_access_control_and_form_bindings_for_a_live_component_extending_abstract_controller(): void
+    {
+        $mappingStage = new MappingStage(new NullLogger(), new PhpParserControllerAccessControlParser(), new NullVoterCapabilityParser(), new PhpParserFormBindingParser(), new NullSecurityConfigParser());
+
+        $source = <<<'PHP'
+            <?php
+            namespace App\Twig\Components;
+            use App\Form\CartCheckoutType;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            #[AsLiveComponent]
+            final class Cart extends AbstractController {
+                #[Route('/cart/checkout')]
+                public function checkout(): void {
+                    $this->denyAccessUnlessGranted('ROLE_ADMIN');
+                    $form = $this->createForm(CartCheckoutType::class);
+                }
+            }
+            PHP;
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('src/Twig/Components/Cart.php', '/app/src/Twig/Components/Cart.php', $source),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertCount(1, $mapping->routeAccessControls());
+        self::assertSame('checkout', $mapping->routeAccessControls()[0]->methodName());
+        self::assertCount(1, $mapping->formBindingsForController('src/Twig/Components/Cart.php'));
+    }
+
     public function test_audit_stage_has_correct_name(): void
     {
         $auditStage = new AuditStage($this->makeOrchestrator(), new NullLogger());
@@ -410,6 +557,9 @@ final class StagesTest extends TestCase
         self::assertSame('audit', $auditStage->name());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_audit_stage_skips_when_no_files(): void
     {
         $attackerLlm = $this->createMock(LLMClientInterface::class);
@@ -427,6 +577,10 @@ final class StagesTest extends TestCase
         self::assertNull($auditContext->getMeta('audit.iterations'));
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_audit_stage_skips_when_no_mapping(): void
     {
         $attackerLlm = $this->createMock(LLMClientInterface::class);
@@ -447,6 +601,11 @@ final class StagesTest extends TestCase
         self::assertNull($auditContext->getMeta('audit.iterations'));
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_audit_stage_calls_orchestrator_when_ready(): void
     {
         $attackerLlm = self::createStub(LLMClientInterface::class);
@@ -466,6 +625,10 @@ final class StagesTest extends TestCase
         self::assertNotNull($auditContext->getMeta('audit.iterations'));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_ingestion_stage_sets_total_lines_meta(): void
     {
         $scanner = self::createStub(ProjectFileScannerInterface::class);
@@ -482,6 +645,10 @@ final class StagesTest extends TestCase
         self::assertSame(5, $auditContext->getMeta('ingestion.total_lines'));
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_sets_meta_counts(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
@@ -501,6 +668,10 @@ final class StagesTest extends TestCase
         self::assertSame(1, $auditContext->getMeta('mapping.no_voter_controllers'));
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_sets_no_voter_controllers_to_zero_when_all_secured(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
@@ -518,6 +689,10 @@ final class StagesTest extends TestCase
         self::assertSame(0, $auditContext->getMeta('mapping.no_voter_controllers'));
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_processes_all_config_files_not_just_first(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
@@ -541,6 +716,10 @@ final class StagesTest extends TestCase
         self::assertContains('^/admin', $rules);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_merges_access_control_from_multiple_config_files(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
@@ -563,6 +742,77 @@ final class StagesTest extends TestCase
         self::assertArrayHasKey('^/api', $routeMap);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_stage_appends_conflicting_access_control_rules_across_config_files_instead_of_overwriting(): void
+    {
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $config1 = "access_control:\n    - path: ^/admin\n      roles: ROLE_ADMIN\n";
+        $config2 = "access_control:\n    - path: ^/admin\n      ips: 10.0.0.0/8\n";
+
+        $auditContext->setProjectFiles([
+            ProjectFile::create('config/packages/security.yaml', '/app/config/packages/security.yaml', $config1),
+            ProjectFile::create('config/packages/dev/security.yaml', '/app/config/packages/dev/security.yaml', $config2),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        $rule = $mapping->routeAccessMap()['^/admin'];
+        self::assertContains('ROLE_ADMIN', $rule);
+        self::assertContains('or: ips: 10.0.0.0/8', $rule);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_mapping_stage_keeps_merging_new_targets_after_an_already_seen_target_within_a_later_config_file(): void
+    {
+        $firstConfigContent = 'FIRST_CONFIG';
+        $secondConfigContent = 'SECOND_CONFIG';
+
+        $securityConfigParser = new readonly class($firstConfigContent) implements SecurityConfigParserInterface {
+            public function __construct(private string $firstConfigContent) {}
+
+            #[Override]
+            public function parseAccessControl(string $configContent): array
+            {
+                return $configContent === $this->firstConfigContent
+                    ? ['^/shared' => ['ROLE_A']]
+                    : ['^/shared' => ['ROLE_B'], '^/new' => ['ROLE_NEW']];
+            }
+
+            #[Override]
+            public function parseFirewallRules(string $configContent): array
+            {
+                return [];
+            }
+        };
+
+        $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), $securityConfigParser);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([
+            ProjectFile::create('config/security.yaml', '/app/config/security.yaml', $firstConfigContent),
+            ProjectFile::create('config/security_admin.yaml', '/app/config/security_admin.yaml', $secondConfigContent),
+        ]);
+
+        $mappingStage->process($auditContext);
+
+        $mapping = $auditContext->mapping();
+        self::assertNotNull($mapping);
+        self::assertArrayHasKey('^/new', $mapping->routeAccessMap());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_trims_firewall_pattern_whitespace(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
@@ -581,6 +831,10 @@ final class StagesTest extends TestCase
         self::assertContains('^/api', $mapping->firewallRules());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_returns_empty_access_control_when_not_present(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
@@ -597,6 +851,10 @@ final class StagesTest extends TestCase
         self::assertEmpty($mapping->routeAccessMap());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_skips_path_roles_pairs_outside_access_control_block(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
@@ -615,6 +873,10 @@ final class StagesTest extends TestCase
         self::assertEmpty($mapping->routeAccessMap());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_extracts_multiple_routes_from_access_control(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
@@ -636,6 +898,10 @@ final class StagesTest extends TestCase
         self::assertArrayHasKey('^/api', $routeMap);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_trims_path_whitespace_in_access_control(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
@@ -655,6 +921,10 @@ final class StagesTest extends TestCase
         self::assertArrayNotHasKey('^/admin   ', $mapping->routeAccessMap());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_trims_roles_in_access_control(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new SymfonyYamlSecurityConfigParser());
@@ -675,6 +945,9 @@ final class StagesTest extends TestCase
         self::assertContains('ROLE_SUPER', $roles);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_ingestion_stage_logs_warning_when_no_files_found(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
@@ -691,6 +964,10 @@ final class StagesTest extends TestCase
         $ingestionStage->process($auditContext);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_ingestion_stage_logs_info_on_completion(): void
     {
         $infoLogs = [];
@@ -714,6 +991,9 @@ final class StagesTest extends TestCase
         self::assertSame(['Ingestion complete', ['files' => 1, 'lines' => 1]], $infoLogs[1]);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_mapping_stage_logs_warning_when_no_files(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
@@ -728,6 +1008,10 @@ final class StagesTest extends TestCase
         $mappingStage->process($auditContext);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_mapping_stage_logs_info_on_completion(): void
     {
         $infoLogs = [];
@@ -753,6 +1037,9 @@ final class StagesTest extends TestCase
         self::assertSame(1, $ctx['unprotected_controllers']);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_audit_stage_logs_warning_when_no_files_to_audit(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
@@ -767,6 +1054,10 @@ final class StagesTest extends TestCase
         $auditStage->process($auditContext);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_audit_stage_logs_warning_when_mapping_not_available(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
@@ -785,6 +1076,11 @@ final class StagesTest extends TestCase
         $auditStage->process($auditContext);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_audit_stage_logs_info_on_completion(): void
     {
         $infoLogs = [];
@@ -822,6 +1118,9 @@ final class StagesTest extends TestCase
         ], $stageCompleteLogs[0][1]);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_mapping_stage_returns_immediately_and_sets_empty_mapping_when_no_files(): void
     {
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());

@@ -14,40 +14,51 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
 use Override;
-use PhpParser\Node\Arg;
-use PhpParser\Node\Attribute;
-use PhpParser\Node\AttributeGroup;
-use PhpParser\Node\Expr\Array_;
+use PhpParser\Node;
 use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\NullsafeMethodCall;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Scalar\String_;
-use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
+use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\ParserFactory;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  *
- * Walks a controller's AST to extract one RouteAccessControl per public action
- * method. Recognises `#[Route(path:, methods:)]` on methods, `#[IsGranted(...)]`
- * on both class and method level (matched by short name to survive aliased
- * imports), and `denyAccessUnlessGranted()` calls in method bodies. Returns
- * [] for any non-controller file or any parse error — the mapping stage must
- * never abort because of a single broken file.
+ * Walks a controller-like file's AST to extract one RouteAccessControl per
+ * stacked `#[Route(path:, methods:)]` attribute on each public action method
+ * (via {@see RouteAttributeParser}), plus `#[IsGranted(...)]`/`#[Security(...)]`
+ * on both class and method level and `denyAccessUnlessGranted()` calls in
+ * method bodies (a first-class callable reference to it does not count — it
+ * is never actually invoked). Attribute names are resolved against their
+ * imports (`NameResolver`) before short-name matching, so an aliased import
+ * (`use Route as Get;`) is still recognised. "Controller-like" also covers
+ * `#[AsLiveComponent]`/`#[ApiResource]` classes ({@see
+ * ProjectFileType::isControllerLike()}), which may still declare routed,
+ * access-controlled actions. Returns [] for any other file type or any parse
+ * error — the mapping stage must never abort because of a single broken file.
  */
 final readonly class PhpParserControllerAccessControlParser implements ControllerAccessControlParserInterface
 {
+    public function __construct(
+        private RouteAttributeParser $routeAttributeParser = new RouteAttributeParser(),
+        private NodeFinder $nodeFinder = new NodeFinder(),
+        private ThisCallReachability $thisCallReachability = new ThisCallReachability(),
+        private IsGrantedAttributeParser $isGrantedAttributeParser = new IsGrantedAttributeParser(),
+    ) {}
+
     #[Override]
     public function parse(ProjectFile $projectFile): array
     {
-        if (ProjectFileType::CONTROLLER !== $projectFile->fileType()) {
+        if (!$projectFile->fileType()->isControllerLike()) {
             return [];
         }
 
@@ -56,12 +67,11 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
             return [];
         }
 
-        $nodeFinder = new NodeFinder();
-        $classes = $nodeFinder->findInstanceOf($ast, Class_::class);
+        $classes = $this->nodeFinder->findInstanceOf($ast, Class_::class);
 
         $entries = [];
         foreach ($classes as $class) {
-            foreach ($this->entriesForClass($projectFile->relativePath(), $class, $nodeFinder) as $entry) {
+            foreach ($this->entriesForClass($projectFile->relativePath(), $class) as $entry) {
                 $entries[] = $entry;
             }
         }
@@ -70,15 +80,19 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
-     * @return Stmt[]|null
+     * @return array<Node>|null
      */
     private function parseToAst(string $content): ?array
     {
         try {
             $parserFactory = new ParserFactory();
             $parser = $parserFactory->createForNewestSupportedVersion();
+            $ast = $parser->parse($content) ?? [];
 
-            return $parser->parse($content);
+            $nodeTraverser = new NodeTraverser();
+            $nodeTraverser->addVisitor(new NameResolver());
+
+            return $nodeTraverser->traverse($ast);
         } catch (Throwable) {
             return null;
         }
@@ -87,9 +101,12 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     /**
      * @return list<RouteAccessControl>
      */
-    private function entriesForClass(string $filePath, Class_ $class, NodeFinder $nodeFinder): array
+    private function entriesForClass(string $filePath, Class_ $class): array
     {
-        $classHasIsGranted = $this->hasIsGrantedAttribute($class->attrGroups);
+        $classHasIsGranted = $this->isGrantedAttributeParser->hasValueArg($class->attrGroups);
+        $classConstants = $this->classConstantStrings($class);
+        $classRouteData = $this->routeAttributeParser->extract($class->attrGroups, $classConstants)[0];
+        $methodsByName = $this->methodsByName($class);
 
         $entries = [];
         foreach ($class->getMethods() as $classMethod) {
@@ -97,172 +114,175 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
                 continue;
             }
 
-            $entries[] = $this->buildEntry($filePath, $classMethod, $classHasIsGranted, $nodeFinder);
+            $accessFlags = [
+                'classHasIsGranted' => $classHasIsGranted,
+                'methodHasDenyAccess' => $this->methodInvokesDenyAccess($classMethod, $methodsByName),
+            ];
+
+            foreach ($this->buildEntries($filePath, $classMethod, $accessFlags, $classRouteData, $classConstants) as $entry) {
+                $entries[] = $entry;
+            }
+        }
+
+        return $this->withInvokableClassRoute($entries, $classRouteData);
+    }
+
+    /**
+     * Symfony's `AttributeClassLoader` routes an invokable controller's
+     * `__invoke()` from the class-level `#[Route]` when no method carries its
+     * own route. Without this the action is parsed as route-less and dropped
+     * from the access-control map, so an unguarded single-action controller is
+     * never flagged. Mirror that: when the class has a route and nothing routed
+     * a method, the `__invoke()` entry inherits the class route.
+     *
+     * @param list<RouteAccessControl>                                                  $entries
+     * @param array{present: bool, path: ?string, methods: list<string>, name: ?string} $classRouteData
+     *
+     * @return list<RouteAccessControl>
+     */
+    private function withInvokableClassRoute(array $entries, array $classRouteData): array
+    {
+        if (!$classRouteData['present'] || $this->anyEntryRouted($entries)) {
+            return $entries;
+        }
+
+        return array_map(
+            static fn (RouteAccessControl $routeAccessControl): RouteAccessControl => '__invoke' === $routeAccessControl->methodName()
+                ? $routeAccessControl->withRouteFromEnclosingClass($classRouteData['path'], $classRouteData['methods'], $classRouteData['name'])
+                : $routeAccessControl,
+            $entries,
+        );
+    }
+
+    /**
+     * @param list<RouteAccessControl> $entries
+     */
+    private function anyEntryRouted(array $entries): bool
+    {
+        return [] !== array_filter($entries, static fn (RouteAccessControl $routeAccessControl): bool => $routeAccessControl->hasRouteAttribute());
+    }
+
+    /**
+     * @return array<string, ClassMethod>
+     */
+    private function methodsByName(Class_ $class): array
+    {
+        $methodsByName = [];
+        foreach ($class->getMethods() as $classMethod) {
+            $methodsByName[$classMethod->name->toString()] = $classMethod;
+        }
+
+        return $methodsByName;
+    }
+
+    /**
+     * A `path: self::ADMIN_PATH`/`path: static::ADMIN_PATH` argument references
+     * a class constant instead of a literal — a common way to centralize a
+     * route prefix. Resolving it to its declared string value (when the
+     * constant lives on this same class and holds a literal string) lets the
+     * renderer match it against `security.yaml` the same way a literal path
+     * already would; a constant declared elsewhere, or not a string literal,
+     * is left unresolved rather than guessed at.
+     *
+     * @return array<string, string>
+     */
+    private function classConstantStrings(Class_ $class): array
+    {
+        $constants = [];
+        foreach ($class->getConstants() as $classConst) {
+            foreach ($classConst->consts as $const) {
+                if ($const->value instanceof String_) {
+                    $constants[$const->name->toString()] = $const->value->value;
+                }
+            }
+        }
+
+        return $constants;
+    }
+
+    /**
+     * A class-level `#[Route('/admin', name: 'admin_')]` acts as a path and
+     * name prefix for every action's own `#[Route]` — Symfony's own attribute
+     * route loader concatenates them, so a security.yaml `access_control`
+     * rule keyed on the full `/admin/dashboard` path or `admin_dashboard`
+     * route name must be matched against the same joined values, not the
+     * method's own attribute in isolation.
+     *
+     * @param array{classHasIsGranted: bool, methodHasDenyAccess: bool}                 $accessFlags
+     * @param array{present: bool, path: ?string, methods: list<string>, name: ?string} $classRouteData
+     * @param array<string, string>                                                     $classConstants
+     *
+     * @return list<RouteAccessControl>
+     */
+    private function buildEntries(string $filePath, ClassMethod $classMethod, array $accessFlags, array $classRouteData, array $classConstants): array
+    {
+        $methodLevelIsGranted = $this->isGrantedAttributeParser->extractValues($classMethod->attrGroups);
+        $methodHasIsGrantedAttribute = $this->isGrantedAttributeParser->hasValueArg($classMethod->attrGroups);
+
+        $entries = [];
+        foreach ($this->routeAttributeParser->extract($classMethod->attrGroups, $classConstants) as $routeData) {
+            $entries[] = new RouteAccessControl(
+                filePath: $filePath,
+                methodName: $classMethod->name->toString(),
+                routePath: $this->prefixedRoutePath($classRouteData['path'], $routeData['path']),
+                routeMethods: $routeData['methods'],
+                hasRouteAttribute: $routeData['present'],
+                methodLevelIsGranted: $methodLevelIsGranted,
+                methodHasDenyAccess: $accessFlags['methodHasDenyAccess'],
+                classHasIsGranted: $accessFlags['classHasIsGranted'],
+                routeName: $this->prefixedRouteName($classRouteData['name'], $routeData['name']),
+                methodHasIsGrantedAttribute: $methodHasIsGrantedAttribute,
+            );
         }
 
         return $entries;
     }
 
-    private function buildEntry(string $filePath, ClassMethod $classMethod, bool $classHasIsGranted, NodeFinder $nodeFinder): RouteAccessControl
+    private function prefixedRoutePath(?string $classPathPrefix, ?string $methodPath): ?string
     {
-        $routeData = $this->extractRouteAttribute($classMethod->attrGroups);
-        $methodLevelIsGranted = $this->extractIsGrantedValues($classMethod->attrGroups);
-        $methodHasDenyAccess = $this->methodInvokesDenyAccess($classMethod, $nodeFinder);
+        if (null === $methodPath || null === $classPathPrefix) {
+            return $methodPath;
+        }
 
-        return new RouteAccessControl(
-            filePath: $filePath,
-            methodName: $classMethod->name->toString(),
-            routePath: $routeData['path'],
-            routeMethods: $routeData['methods'],
-            hasRouteAttribute: $routeData['present'],
-            methodLevelIsGranted: $methodLevelIsGranted,
-            methodHasDenyAccess: $methodHasDenyAccess,
-            classHasIsGranted: $classHasIsGranted,
-        );
+        $trimmedPrefix = rtrim($classPathPrefix, '/');
+        if ('' !== $methodPath && '/' !== $methodPath) {
+            return \sprintf('%s/%s', $trimmedPrefix, ltrim($methodPath, '/'));
+        }
+
+        if ('' === $trimmedPrefix) {
+            return '/';
+        }
+
+        return '/' === $methodPath ? \sprintf('%s/', $trimmedPrefix) : $trimmedPrefix;
+    }
+
+    private function prefixedRouteName(?string $classNamePrefix, ?string $methodName): ?string
+    {
+        if (null === $methodName || null === $classNamePrefix) {
+            return $methodName;
+        }
+
+        return $classNamePrefix.$methodName;
     }
 
     /**
-     * @param array<AttributeGroup> $attributeGroups
+     * A `denyAccessUnlessGranted()` call moved behind a shared private/protected
+     * helper (a common refactor for a repeated check) would otherwise be
+     * invisible, since the action method's own body only calls the helper,
+     * never `denyAccessUnlessGranted()` directly.
      *
-     * @return array{present: bool, path: ?string, methods: list<string>}
+     * @param array<string, ClassMethod> $methodsByName
      */
-    private function extractRouteAttribute(array $attributeGroups): array
+    private function methodInvokesDenyAccess(ClassMethod $classMethod, array $methodsByName): bool
     {
-        foreach ($attributeGroups as $attributeGroup) {
-            foreach ($attributeGroup->attrs as $attribute) {
-                if (!$this->attributeShortNameMatches($attribute->name->toString(), 'Route')) {
-                    continue;
-                }
+        $body = $this->thisCallReachability->reachableBody($classMethod, $methodsByName);
+        $methodCalls = [
+            ...$this->nodeFinder->findInstanceOf($body, MethodCall::class),
+            ...$this->nodeFinder->findInstanceOf($body, NullsafeMethodCall::class),
+        ];
 
-                return $this->routeDataFromArgs($attribute->args);
-            }
-        }
-
-        return ['present' => false, 'path' => null, 'methods' => []];
-    }
-
-    /**
-     * @param array<Arg> $args
-     *
-     * @return array{present: bool, path: ?string, methods: list<string>}
-     */
-    private function routeDataFromArgs(array $args): array
-    {
-        $path = null;
-        $methods = [];
-        $firstPositionalConsumed = false;
-        foreach ($args as $arg) {
-            $argName = $this->resolveRouteArgName($arg->name?->toString(), $firstPositionalConsumed);
-            $firstPositionalConsumed = $firstPositionalConsumed || null === $arg->name;
-
-            $path = $this->routePathFromArg($argName, $arg, $path);
-            $methods = $this->routeMethodsFromArg($argName, $arg) ?? $methods;
-        }
-
-        return ['present' => true, 'path' => $path, 'methods' => $methods];
-    }
-
-    private function routePathFromArg(?string $argName, Arg $arg, ?string $currentPath): ?string
-    {
-        if ('path' === $argName && $arg->value instanceof String_) {
-            return $arg->value->value;
-        }
-
-        return $currentPath;
-    }
-
-    /**
-     * @return list<string>|null
-     */
-    private function routeMethodsFromArg(?string $argName, Arg $arg): ?array
-    {
-        if ('methods' === $argName && $arg->value instanceof Array_) {
-            return $this->stringValuesFromArray($arg->value);
-        }
-
-        return null;
-    }
-
-    private function resolveRouteArgName(?string $argName, bool $firstPositionalConsumed): ?string
-    {
-        if (null === $argName && !$firstPositionalConsumed) {
-            return 'path';
-        }
-
-        return $argName;
-    }
-
-    /**
-     * @param array<AttributeGroup> $attributeGroups
-     *
-     * @return list<string>
-     */
-    private function extractIsGrantedValues(array $attributeGroups): array
-    {
-        $values = [];
-        foreach ($attributeGroups as $attributeGroup) {
-            foreach ($this->isGrantedValuesFromAttributes($attributeGroup->attrs) as $value) {
-                $values[] = $value;
-            }
-        }
-
-        return $values;
-    }
-
-    /**
-     * @param array<Attribute> $attributes
-     *
-     * @return list<string>
-     */
-    private function isGrantedValuesFromAttributes(array $attributes): array
-    {
-        $values = [];
-        foreach ($attributes as $attribute) {
-            if (!$this->attributeShortNameMatches($attribute->name->toString(), 'IsGranted')) {
-                continue;
-            }
-
-            $firstStringArg = $this->firstStringArgValue($attribute->args);
-            if (null !== $firstStringArg) {
-                $values[] = $firstStringArg;
-            }
-        }
-
-        return $values;
-    }
-
-    /**
-     * @param array<Arg> $args
-     */
-    private function firstStringArgValue(array $args): ?string
-    {
-        foreach ($args as $arg) {
-            if ($arg->value instanceof String_) {
-                return $arg->value->value;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param array<AttributeGroup> $attributeGroups
-     */
-    private function hasIsGrantedAttribute(array $attributeGroups): bool
-    {
-        return [] !== $this->extractIsGrantedValues($attributeGroups);
-    }
-
-    private function methodInvokesDenyAccess(ClassMethod $classMethod, NodeFinder $nodeFinder): bool
-    {
-        $stmts = $classMethod->stmts;
-        if (null === $stmts) {
-            return false;
-        }
-
-        $methodCalls = $nodeFinder->findInstanceOf($stmts, MethodCall::class);
         foreach ($methodCalls as $methodCall) {
-            if ($methodCall->name instanceof Identifier && 'denyAccessUnlessGranted' === $methodCall->name->toString()) {
+            if ($this->isDenyAccessCall($methodCall)) {
                 return true;
             }
         }
@@ -270,25 +290,23 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
         return false;
     }
 
-    private function attributeShortNameMatches(string $fullyQualifiedName, string $expectedShortName): bool
-    {
-        $parts = explode('\\', $fullyQualifiedName);
-
-        return end($parts) === $expectedShortName;
-    }
-
     /**
-     * @return list<string>
+     * `isGranted()` is recognized the same way `denyAccessUnlessGranted()`
+     * is — by presence alone, not by verifying it actually guards a
+     * `throw` — matching this parser's existing heuristic style (the class-
+     * level `#[IsGranted]` attribute check applies the identical "presence
+     * is sufficient" rule). `isGranted()` + a manual
+     * `throw $this->createAccessDeniedException(...)` is an equally standard
+     * Symfony idiom to the shorthand `denyAccessUnlessGranted()`, used
+     * whenever the action wants a custom denial message.
      */
-    private function stringValuesFromArray(Array_ $array): array
+    private function isDenyAccessCall(MethodCall|NullsafeMethodCall $methodCall): bool
     {
-        $values = [];
-        foreach ($array->items as $item) {
-            if ($item->value instanceof String_) {
-                $values[] = $item->value->value;
-            }
+        if ($methodCall->isFirstClassCallable()) {
+            return false;
         }
 
-        return $values;
+        return $methodCall->name instanceof Identifier
+            && \in_array($methodCall->name->toString(), ['denyAccessUnlessGranted', 'isGranted'], true);
     }
 }

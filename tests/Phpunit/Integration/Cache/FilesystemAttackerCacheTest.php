@@ -19,6 +19,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
@@ -29,6 +30,9 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     private FilesystemAttackerCache $filesystemAttackerCache;
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_get_returns_null_when_no_entry_exists(): void
     {
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
@@ -38,6 +42,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_get_returns_null_and_skips_read_when_no_entry_exists(): void
     {
@@ -52,6 +57,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertNull($filesystemAttackerCache->get($chunk));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_context_key_addresses_a_distinct_entry(): void
     {
         $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
@@ -65,6 +73,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertSame($contextual, $this->filesystemAttackerCache->getForContext($chunk, 'iteration-2-context'));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_empty_context_key_addresses_the_legacy_entry(): void
     {
         $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
@@ -75,6 +86,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertSame($payload, $this->filesystemAttackerCache->getForContext($chunk, ''));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_distinct_context_keys_address_distinct_entries(): void
     {
         $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
@@ -84,6 +98,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertNull($this->filesystemAttackerCache->getForContext($chunk, 'ctx-b'));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_a_different_chunk_under_the_same_context_is_a_distinct_entry(): void
     {
         $chunkA = [ProjectFile::create('src/A.php', '/app/src/A.php', '<?php // a')];
@@ -94,11 +111,14 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertNull($this->filesystemAttackerCache->getForContext($chunkB, 'ctx'));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_context_entry_is_stored_at_path_derived_from_signature_and_context_key(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
 
-        $expectedKey = hash('sha256', 'src/A.php='.hash('sha256', 'X')."\0context:ctx-42");
+        $expectedKey = hash('sha256', hash('sha256', 'src/A.php='.hash('sha256', 'X'))."\0context:ctx-42");
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
 
         $this->filesystemAttackerCache->storeForContext([$projectFile], 'ctx-42', [['type' => 'sql_injection']]);
@@ -106,6 +126,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertFileExists($expectedPath);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_round_trip_store_and_get_returns_same_payload(): void
     {
         $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
@@ -116,6 +139,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertSame($payload, $this->filesystemAttackerCache->get($chunk));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_round_trip_preserves_all_entries_for_multi_finding_payload(): void
     {
         $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php echo "a";')];
@@ -130,6 +156,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertSame($payload, $this->filesystemAttackerCache->get($chunk));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_get_returns_null_for_chunk_with_modified_content(): void
     {
         $original = [ProjectFile::create('a.php', '/app/a.php', 'one')];
@@ -140,6 +169,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertNull($this->filesystemAttackerCache->get($modified));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_key_is_independent_of_chunk_order(): void
     {
         $projectFile = ProjectFile::create('a.php', '/app/a.php', 'A');
@@ -151,6 +183,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertSame($payload, $this->filesystemAttackerCache->get([$b, $projectFile]));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_get_returns_null_when_cache_file_is_invalid_json(): void
     {
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
@@ -166,6 +201,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertNull($this->filesystemAttackerCache->get($chunk));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_get_returns_null_when_cache_file_contains_non_array_json(): void
     {
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
@@ -186,11 +224,13 @@ final class FilesystemAttackerCacheTest extends TestCase
     public function test_constructor_rejects_empty_cache_dir(): void
     {
         $this->expectException(InvalidCacheConfigurationException::class);
+        $this->expectExceptionMessage('Attacker cache dir cannot be empty');
         new FilesystemAttackerCache('   ', new Filesystem(), new NullLogger());
     }
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_get_returns_null_when_filesystem_read_throws_io_exception(): void
     {
@@ -205,6 +245,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_get_logs_warning_with_path_and_error_keys_when_filesystem_read_throws_io_exception(): void
     {
@@ -233,6 +274,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertSame('permission denied', $context['error']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_get_skips_non_array_entries_in_decoded_cache_payload(): void
     {
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
@@ -249,6 +293,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_get_logs_warning_when_cache_entry_is_unreadable_json(): void
     {
@@ -274,6 +319,145 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertContains('Attacker cache entry was unreadable, ignoring', $warnings);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_store_refuses_to_write_through_a_symlinked_cache_file(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
+        $expectedKey = hash('sha256', $expectedSignature);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
+
+        $outsideTarget = sys_get_temp_dir().'/attacker_cache_symlink_target_'.uniqid('', true);
+        file_put_contents($outsideTarget, 'ORIGINAL');
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($outsideTarget, $expectedPath);
+
+        try {
+            $this->filesystemAttackerCache->store([$projectFile], [['type' => 'sql_injection']]);
+
+            self::assertSame('ORIGINAL', file_get_contents($outsideTarget));
+        } finally {
+            unlink($outsideTarget);
+        }
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_store_refuses_to_write_through_a_symlinked_shard_directory(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
+        $expectedKey = hash('sha256', $expectedSignature);
+        $shardDir = \sprintf('%s/%s', $this->cacheDir, substr($expectedKey, 0, 2));
+
+        $outsideDir = sys_get_temp_dir().'/attacker_cache_symlink_dir_'.uniqid('', true);
+        mkdir($outsideDir);
+        mkdir($this->cacheDir, recursive: true);
+        symlink($outsideDir, $shardDir);
+
+        try {
+            $this->filesystemAttackerCache->store([$projectFile], [['type' => 'sql_injection']]);
+
+            $globResult = glob($outsideDir.'/*.json');
+            self::assertSame([], false !== $globResult ? $globResult : []);
+        } finally {
+            $filesystem = new Filesystem();
+            $filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
+     * A cache path is derived entirely from a project file's own path/content
+     * (attacker-visible), so a malicious contributor can pre-plant a symlink
+     * at the exact path this cache will ever read from — with no `store()`
+     * ever called — turning a routine cached-run into an arbitrary-file read
+     * whose content is trusted as a real, previously-computed finding.
+     *
+     * @throws InvalidProjectFileException
+     */
+    public function test_get_refuses_to_read_through_a_symlinked_cache_file(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
+        $expectedKey = hash('sha256', $expectedSignature);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
+
+        $plantedTarget = sys_get_temp_dir().'/attacker_cache_symlink_read_target_'.uniqid('', true);
+        file_put_contents($plantedTarget, json_encode([['type' => 'PLANTED-BY-SYMLINK']]));
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($plantedTarget, $expectedPath);
+
+        try {
+            self::assertNull($this->filesystemAttackerCache->get([$projectFile]));
+        } finally {
+            unlink($plantedTarget);
+        }
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
+     */
+    public function test_get_logs_a_warning_with_the_path_when_refusing_a_symlinked_cache_file(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
+        $expectedKey = hash('sha256', $expectedSignature);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
+
+        $plantedTarget = sys_get_temp_dir().'/attacker_cache_symlink_log_target_'.uniqid('', true);
+        file_put_contents($plantedTarget, json_encode([['type' => 'PLANTED-BY-SYMLINK']]));
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($plantedTarget, $expectedPath);
+
+        /** @var list<array{string, array<string, string>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        try {
+            (new FilesystemAttackerCache($this->cacheDir, new Filesystem(), $logger))->get([$projectFile]);
+        } finally {
+            unlink($plantedTarget);
+        }
+
+        self::assertSame([['Attacker cache entry path was a symlink, ignoring', ['path' => $expectedPath]]], $warnings);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_get_refuses_to_read_through_a_symlinked_shard_directory(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
+        $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
+        $expectedKey = hash('sha256', $expectedSignature);
+        $shardDir = \sprintf('%s/%s', $this->cacheDir, substr($expectedKey, 0, 2));
+
+        $outsideDir = sys_get_temp_dir().'/attacker_cache_symlink_read_dir_'.uniqid('', true);
+        mkdir($outsideDir);
+        file_put_contents(\sprintf('%s/%s.json', $outsideDir, $expectedKey), json_encode([['type' => 'PLANTED-BY-SYMLINK']]));
+        mkdir($this->cacheDir, recursive: true);
+        symlink($outsideDir, $shardDir);
+
+        try {
+            self::assertNull($this->filesystemAttackerCache->get([$projectFile]));
+        } finally {
+            $filesystem = new Filesystem();
+            $filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_store_creates_nested_shard_directory_from_key_prefix(): void
     {
         $chunk = [ProjectFile::create('a.php', '/app/a.php', '<?php')];
@@ -287,11 +471,14 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertMatchesRegularExpression('#^[a-f0-9]{2}/[a-f0-9]{64}\.json$#', $relative);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_store_writes_file_at_path_derived_from_sha256_of_relative_path_and_content_hash(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
 
-        $expectedSignature = 'src/A.php='.hash('sha256', 'X');
+        $expectedSignature = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
         $expectedKey = hash('sha256', $expectedSignature);
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
 
@@ -300,6 +487,9 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertFileExists($expectedPath);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_two_files_with_identical_content_but_different_paths_use_distinct_cache_entries(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'SAME');
@@ -313,7 +503,23 @@ final class FilesystemAttackerCacheTest extends TestCase
     }
 
     /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_crafted_relative_path_cannot_collide_with_an_unrelated_multi_file_chunk(): void
+    {
+        $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'A-content');
+        $fileB = ProjectFile::create('src/B.php', '/app/src/B.php', 'B-content');
+        $this->filesystemAttackerCache->store([$projectFile, $fileB], [['type' => 'sql_injection', 'title' => 'real-two-file-chunk']]);
+
+        $craftedRelativePath = 'src/A.php='.hash('sha256', 'A-content')."\nsrc/B.php";
+        $craftedFile = ProjectFile::create($craftedRelativePath, '/app/'.$craftedRelativePath, 'B-content');
+
+        self::assertNull($this->filesystemAttackerCache->get([$craftedFile]));
+    }
+
+    /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_distinct_key_salts_produce_distinct_cache_entries(): void
     {
@@ -331,6 +537,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_same_key_salt_yields_same_cache_entry_across_instances(): void
     {
@@ -345,11 +552,14 @@ final class FilesystemAttackerCacheTest extends TestCase
         self::assertSame($payload, $reader->get($chunk));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_empty_salt_keeps_legacy_unprefixed_key(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
 
-        $expectedKey = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
+        $expectedKey = hash('sha256', hash('sha256', 'src/A.php='.hash('sha256', 'X')));
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
 
         $this->filesystemAttackerCache->store([$projectFile], [['type' => 'sql_injection']]);
@@ -359,11 +569,12 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_salted_key_concatenates_salt_null_byte_and_signatures_in_that_order(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', 'X');
-        $signatures = 'src/A.php='.hash('sha256', 'X');
+        $signatures = hash('sha256', 'src/A.php='.hash('sha256', 'X'));
         $expectedKey = hash('sha256', "claude-opus-4-7\0".$signatures);
         $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedKey, 0, 2), $expectedKey);
 
@@ -375,6 +586,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_dump_path_has_trailing_slash_stripped_from_cache_dir(): void
     {
@@ -396,6 +608,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_get_logs_debug_cache_hit_with_path(): void
     {
@@ -425,6 +638,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_store_logs_debug_stored_with_path(): void
     {
@@ -450,6 +664,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_store_failure_warning_includes_path_and_error_keys(): void
     {
@@ -478,6 +693,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_get_failure_warning_includes_path_and_error_keys(): void
     {
@@ -513,6 +729,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_store_calls_mkdir_to_create_shard_directory(): void
     {
@@ -526,6 +743,7 @@ final class FilesystemAttackerCacheTest extends TestCase
 
     /**
      * @throws InvalidCacheConfigurationException
+     * @throws InvalidProjectFileException
      */
     public function test_store_with_unwritable_dir_logs_warning_and_does_not_throw(): void
     {

@@ -15,9 +15,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Advisory;
 
 use Override;
 use PHPUnit\Framework\TestCase;
+use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\Component\Clock\MockClock;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
@@ -68,6 +71,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir,
             new Filesystem(),
             $logger,
+            new NativeClock(),
         );
 
         $lockfileHashedAdvisoryCache->run($this->projectDir);
@@ -119,6 +123,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir,
             new Filesystem(),
             $logger,
+            new NativeClock(),
         );
         $lockfileHashedAdvisoryCache->run($this->projectDir);
 
@@ -216,6 +221,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir,
             $filesystem,
             $logger,
+            new NativeClock(),
         );
 
         $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
@@ -272,6 +278,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir,
             $filesystem,
             $logger,
+            new NativeClock(),
         );
 
         $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
@@ -319,6 +326,88 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
     /**
      * @throws AdvisorySourceUnavailableException
      */
+    public function test_write_refuses_to_write_through_a_dangling_symlinked_cache_file(): void
+    {
+        $lockfileContent = '{"lock": "v1"}';
+        $this->writeLockfile($lockfileContent);
+        $expectedHash = hash('sha256', $lockfileContent);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedHash, 0, 2), $expectedHash);
+
+        $outsideTarget = sys_get_temp_dir().'/advisory_cache_symlink_target_'.uniqid('', true);
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($outsideTarget, $expectedPath);
+
+        try {
+            $lockfileHashedAdvisoryCache = $this->makeCache($this->recordingRunner('{"advisories": {"foo/bar": []}}'));
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+            self::assertFileDoesNotExist($outsideTarget);
+        } finally {
+            if (file_exists($outsideTarget)) {
+                unlink($outsideTarget);
+            }
+        }
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_read_refuses_to_return_content_through_a_symlinked_cache_file(): void
+    {
+        $lockfileContent = '{"lock": "v1"}';
+        $this->writeLockfile($lockfileContent);
+        $expectedHash = hash('sha256', $lockfileContent);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedHash, 0, 2), $expectedHash);
+
+        $outsideTarget = sys_get_temp_dir().'/advisory_cache_symlink_target_'.uniqid('', true);
+        file_put_contents($outsideTarget, 'ORIGINAL');
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($outsideTarget, $expectedPath);
+
+        try {
+            $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {"foo/bar": []}}');
+            $lockfileHashedAdvisoryCache = $this->makeCache($recordingComposerAuditRunner);
+
+            $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+            self::assertSame('{"advisories": {"foo/bar": []}}', $json);
+            self::assertSame(1, $recordingComposerAuditRunner->callCount, 'a symlinked cache entry must not be served as a hit');
+            self::assertSame('ORIGINAL', file_get_contents($outsideTarget));
+        } finally {
+            unlink($outsideTarget);
+        }
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_write_refuses_to_write_through_a_symlinked_shard_directory(): void
+    {
+        $lockfileContent = '{"lock": "v1"}';
+        $this->writeLockfile($lockfileContent);
+        $expectedHash = hash('sha256', $lockfileContent);
+        $shardDir = \sprintf('%s/%s', $this->cacheDir, substr($expectedHash, 0, 2));
+
+        $outsideDir = sys_get_temp_dir().'/advisory_cache_symlink_dir_'.uniqid('', true);
+        mkdir($outsideDir);
+        mkdir($this->cacheDir, recursive: true);
+        symlink($outsideDir, $shardDir);
+
+        try {
+            $lockfileHashedAdvisoryCache = $this->makeCache($this->recordingRunner('{"advisories": {"foo/bar": []}}'));
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+            $globResult = glob($outsideDir.'/*.json');
+            self::assertSame([], false !== $globResult ? $globResult : []);
+        } finally {
+            $filesystem = new Filesystem();
+            $filesystem->remove($outsideDir);
+        }
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
     public function test_cache_dir_with_trailing_slash_is_normalized_before_assembling_path(): void
     {
         $this->writeLockfile('{"lock": "v1"}');
@@ -340,6 +429,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir.'/',
             $filesystem,
             new NullLogger(),
+            new NativeClock(),
         );
         $lockfileHashedAdvisoryCache->run($this->projectDir);
 
@@ -377,6 +467,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir,
             $filesystem,
             $logger,
+            new NativeClock(),
         );
 
         // Must not throw despite the cache write failing.
@@ -417,6 +508,7 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             $this->cacheDir,
             new Filesystem(),
             $logger,
+            new NativeClock(),
         );
         $lockfileHashedAdvisoryCache->run($this->projectDir);
 
@@ -426,6 +518,170 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
         ));
         self::assertCount(1, $storedLogs);
         self::assertSame($expectedHash, $storedLogs[0][1]['lockfile_hash'] ?? null);
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_cache_entry_within_ttl_is_served_without_invoking_inner(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+        $mockClock = new MockClock();
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {"foo/bar": []}}');
+
+        $lockfileHashedAdvisoryCache = $this->makeCacheWithClock($recordingComposerAuditRunner, $mockClock);
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $mockClock->modify('+23 hours');
+        $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame('{"advisories": {"foo/bar": []}}', $json);
+        self::assertSame(1, $recordingComposerAuditRunner->callCount, 'an entry younger than the TTL must be served from cache');
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_cache_entry_past_ttl_is_treated_as_a_miss(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+        $mockClock = new MockClock();
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {"foo/bar": []}}');
+
+        $lockfileHashedAdvisoryCache = $this->makeCacheWithClock($recordingComposerAuditRunner, $mockClock);
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $mockClock->modify('+25 hours');
+        $recordingComposerAuditRunner->payload = '{"advisories": {"new/cve": []}}';
+        $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame('{"advisories": {"new/cve": []}}', $json);
+        self::assertSame(2, $recordingComposerAuditRunner->callCount, 'an entry past the TTL must not be served from cache');
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_expiry_is_computed_from_the_injected_clock_even_when_it_diverges_from_the_real_wall_clock(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+        $mockClock = new MockClock('2000-01-01T00:00:00Z');
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {"foo/bar": []}}');
+
+        $lockfileHashedAdvisoryCache = $this->makeCacheWithClock($recordingComposerAuditRunner, $mockClock);
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $mockClock->modify('+25 hours');
+        $recordingComposerAuditRunner->payload = '{"advisories": {"new/cve": []}}';
+        $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame('{"advisories": {"new/cve": []}}', $json);
+        self::assertSame(2, $recordingComposerAuditRunner->callCount, 'an entry past the TTL per the injected clock must expire regardless of the real OS wall-clock time recorded on the cache file');
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_read_through_symlinked_cache_entry_logs_a_warning_with_the_full_path_context(): void
+    {
+        $lockfileContent = '{"lock": "v1"}';
+        $this->writeLockfile($lockfileContent);
+        $expectedHash = hash('sha256', $lockfileContent);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedHash, 0, 2), $expectedHash);
+
+        $outsideTarget = sys_get_temp_dir().'/advisory_cache_symlink_target_'.uniqid('', true);
+        file_put_contents($outsideTarget, 'ORIGINAL');
+        mkdir(\dirname($expectedPath), recursive: true);
+        symlink($outsideTarget, $expectedPath);
+
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$warnings): void {
+                $warnings[] = [$message, $context];
+            },
+        );
+        $logger->method('debug');
+
+        try {
+            $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache(
+                $this->recordingRunner('{"advisories": {"foo/bar": []}}'),
+                $this->cacheDir,
+                new Filesystem(),
+                $logger,
+                new NativeClock(),
+            );
+            $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+            $symlinkWarnings = array_values(array_filter(
+                $warnings,
+                static fn (array $entry): bool => 'Refusing to read advisory cache entry through symlinked path, falling back to live audit' === $entry[0],
+            ));
+            self::assertCount(1, $symlinkWarnings);
+            self::assertSame(['path' => $expectedPath], $symlinkWarnings[0][1]);
+        } finally {
+            unlink($outsideTarget);
+        }
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_expired_cache_entry_logs_a_debug_with_the_full_path_context(): void
+    {
+        $lockfileContent = '{"lock": "v1"}';
+        $this->writeLockfile($lockfileContent);
+        $expectedHash = hash('sha256', $lockfileContent);
+        $expectedPath = \sprintf('%s/%s/%s.json', $this->cacheDir, substr($expectedHash, 0, 2), $expectedHash);
+
+        $mockClock = new MockClock('2000-01-01T00:00:00Z');
+        $this->makeCacheWithClock($this->recordingRunner('{"advisories": {"foo/bar": []}}'), $mockClock)->run($this->projectDir);
+
+        $debugMessages = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$debugMessages): void {
+                $debugMessages[] = [$message, $context];
+            },
+        );
+
+        $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache(
+            $this->recordingRunner('{"advisories": {"new/cve": []}}'),
+            $this->cacheDir,
+            new Filesystem(),
+            $logger,
+            $mockClock,
+        );
+
+        $mockClock->modify('+25 hours');
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $expiredLogs = array_values(array_filter(
+            $debugMessages,
+            static fn (array $entry): bool => 'Advisory cache entry expired, falling back to live audit' === $entry[0],
+        ));
+        self::assertCount(1, $expiredLogs);
+        self::assertSame(['path' => $expectedPath], $expiredLogs[0][1]);
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_cache_entry_aged_exactly_the_ttl_is_treated_as_expired(): void
+    {
+        $this->writeLockfile('{"lock": "v1"}');
+        $mockClock = new MockClock('2000-01-01T00:00:00Z');
+        $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {"foo/bar": []}}');
+
+        $lockfileHashedAdvisoryCache = $this->makeCacheWithClock($recordingComposerAuditRunner, $mockClock);
+        $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        $mockClock->modify('+24 hours');
+        $recordingComposerAuditRunner->payload = '{"advisories": {"new/cve": []}}';
+        $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
+
+        self::assertSame('{"advisories": {"new/cve": []}}', $json);
+        self::assertSame(2, $recordingComposerAuditRunner->callCount, 'an entry aged exactly the TTL must be treated as expired, not served from cache');
     }
 
     #[Override]
@@ -452,7 +708,12 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
 
     private function makeCache(ComposerAuditRunnerInterface $composerAuditRunner): LockfileHashedAdvisoryCache
     {
-        return new LockfileHashedAdvisoryCache($composerAuditRunner, $this->cacheDir, new Filesystem(), new NullLogger());
+        return new LockfileHashedAdvisoryCache($composerAuditRunner, $this->cacheDir, new Filesystem(), new NullLogger(), new NativeClock());
+    }
+
+    private function makeCacheWithClock(ComposerAuditRunnerInterface $composerAuditRunner, ClockInterface $clock): LockfileHashedAdvisoryCache
+    {
+        return new LockfileHashedAdvisoryCache($composerAuditRunner, $this->cacheDir, new Filesystem(), new NullLogger(), $clock);
     }
 
     private function recordingRunner(string $payload): RecordingComposerAuditRunner

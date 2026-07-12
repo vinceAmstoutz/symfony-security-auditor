@@ -38,7 +38,7 @@ final readonly class EventSubscriberAttackerSkill implements AttackerSkillInterf
             <skills role="event_subscriber">
             Hunt:
             - `KernelEvents::CONTROLLER` / `KernelEvents::REQUEST` subscribers mutating `$event->getRequest()->attributes` to inject privileged values (role, user id) before the controller runs.
-            - `SecurityEvents::AUTHENTICATION_SUCCESS` listeners auto-elevating roles based on payload fields without re-checking the source.
+            - `AuthenticationEvents::AUTHENTICATION_SUCCESS` listeners auto-elevating roles based on payload fields without re-checking the source.
             - `kernel.exception` listeners leaking stack traces, env vars, or internal hostnames in the response body.
             - Subscribers calling `Process` / making HTTP requests with values from the event (SSRF via event payload).
             - Listeners with side effects (DB write, mailer send) NOT wrapped in a Doctrine transaction or messenger envelope — request fails mid-way, state diverges.

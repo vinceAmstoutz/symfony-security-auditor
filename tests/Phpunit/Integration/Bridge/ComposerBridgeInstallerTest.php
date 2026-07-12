@@ -53,6 +53,37 @@ final class ComposerBridgeInstallerTest extends TestCase
     /**
      * @throws BridgeInstallationFailedException
      */
+    public function test_it_wraps_a_manifest_write_io_failure_as_a_bridge_installation_failed_exception(): void
+    {
+        $blockingFile = $this->targetDirectory.'/not-a-directory';
+        $this->filesystem->dumpFile($blockingFile, 'x');
+
+        $this->expectException(BridgeInstallationFailedException::class);
+
+        (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $blockingFile);
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_refuses_to_write_through_a_dangling_symlinked_manifest_path(): void
+    {
+        $this->filesystem->mkdir($this->targetDirectory);
+        $outsideTarget = sys_get_temp_dir().'/ssa-bridge-symlink-target-'.bin2hex(random_bytes(6));
+        symlink($outsideTarget, $this->targetDirectory.'/composer.json');
+
+        try {
+            $this->expectException(BridgeInstallationFailedException::class);
+
+            (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $this->targetDirectory);
+        } finally {
+            self::assertFileDoesNotExist($outsideTarget);
+        }
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
     public function test_it_preserves_an_existing_composer_manifest(): void
     {
         $this->filesystem->dumpFile($this->targetDirectory.'/composer.json', '{"name":"acme/app"}');

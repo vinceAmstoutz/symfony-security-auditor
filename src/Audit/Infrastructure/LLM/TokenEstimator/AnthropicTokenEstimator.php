@@ -25,14 +25,14 @@ final readonly class AnthropicTokenEstimator implements ProviderTokenEstimatorIn
     public const float CHARS_PER_TOKEN_CREATIVE = 2.7;
 
     /** @var list<string> */
-    private const array CREATIVE_PREFIXES = ['claude-fable', 'claude-mythos'];
+    private const array CREATIVE_MARKERS = ['claude-fable', 'claude-mythos'];
 
     public function __construct(private CharacterRatioCounter $characterRatioCounter = new CharacterRatioCounter()) {}
 
     #[Override]
     public function supports(string $model): bool
     {
-        return u($model)->startsWith('claude-');
+        return u($model)->containsAny('claude');
     }
 
     #[Override]
@@ -43,12 +43,6 @@ final readonly class AnthropicTokenEstimator implements ProviderTokenEstimatorIn
 
     private function charsPerToken(string $model): float
     {
-        foreach (self::CREATIVE_PREFIXES as $prefix) {
-            if (u($model)->startsWith($prefix)) {
-                return self::CHARS_PER_TOKEN_CREATIVE;
-            }
-        }
-
-        return self::CHARS_PER_TOKEN;
+        return u($model)->containsAny(self::CREATIVE_MARKERS) ? self::CHARS_PER_TOKEN_CREATIVE : self::CHARS_PER_TOKEN;
     }
 }

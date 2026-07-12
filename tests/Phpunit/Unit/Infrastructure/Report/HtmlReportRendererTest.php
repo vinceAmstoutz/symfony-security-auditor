@@ -14,8 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -39,6 +41,9 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
         self::assertSame('html', $this->renderer->format());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_is_a_complete_document(): void
     {
         $output = $this->renderer->render($this->makeReport());
@@ -47,6 +52,9 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
         self::assertStringContainsString('</html>', $output);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_footer_links_to_the_project_homepage(): void
     {
         $output = $this->renderer->render($this->makeReport());
@@ -57,6 +65,9 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_shows_safe_message_when_no_vulnerabilities(): void
     {
         $output = $this->renderer->render($this->makeReport());
@@ -65,6 +76,9 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
         self::assertStringNotContainsString('<h2>Vulnerabilities', $output);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_renders_risk_level_with_its_lowercased_css_class(): void
     {
         $output = $this->renderer->render($this->makeReport());
@@ -73,6 +87,9 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
         self::assertStringContainsString('>SAFE</span>', $output);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_shows_the_primary_model(): void
     {
         $output = $this->renderer->render($this->makeReportWithCost(AuditCost::zero('claude-test-model')));
@@ -81,6 +98,9 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
         self::assertStringNotContainsString('unknown model', $output);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_render_shows_unknown_model_when_the_primary_model_is_blank(): void
     {
         $output = $this->renderer->render($this->makeReportWithCost(AuditCost::zero('')));
@@ -91,6 +111,8 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_lists_a_validated_vulnerability(): void
     {
@@ -104,6 +126,8 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_summary_counts_only_present_severities(): void
     {
@@ -117,6 +141,23 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_styles_every_summary_row_severity_class(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        foreach (VulnerabilitySeverity::cases() as $severity) {
+            self::assertStringContainsString('table.summary tr.severity-'.$severity->value, $output);
+        }
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_escapes_finding_content_to_prevent_report_xss(): void
     {
@@ -136,6 +177,91 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_strips_unicode_bidi_override_characters_from_finding_content(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, "Real\u{202E}txt.exe\u{202C} SQLi", 0.9),
+            new CodeLocation('src/Foo.php', 1, 2),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('Real', $output);
+        self::assertStringContainsString('txt.exe', $output);
+        self::assertStringNotContainsString("\u{202E}", $output);
+        self::assertStringNotContainsString("\u{202C}", $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_strips_bidi_overrides_even_when_a_field_carries_invalid_utf8(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, "\xFF\u{202E}evil", 0.9),
+            new CodeLocation("src/\xFF\u{202E}cod.php", 1, 2),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringNotContainsString("\u{202E}", $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_includes_the_vulnerable_code(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringContainsString('$q', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_includes_the_synthesized_poc_when_present(): void
+    {
+        $vulnerability = $this->makeValidatedVuln()->withSynthesizedPoC('curl -X POST https://victim.example/admin');
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('curl -X POST https://victim.example/admin', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_omits_the_synthesized_poc_section_when_absent(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringNotContainsString('Synthesized PoC', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_renders_confidence_as_a_percentage(): void
     {
@@ -145,8 +271,28 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_formats_duration_with_a_period_regardless_of_the_process_numeric_locale(): void
+    {
+        $previousLocale = setlocale(\LC_NUMERIC, '0');
+        setlocale(\LC_NUMERIC, 'de_DE.UTF-8');
+
+        try {
+            $auditReport = $this->makeReport();
+            $output = $this->renderer->render($auditReport);
+        } finally {
+            setlocale(\LC_NUMERIC, false !== $previousLocale ? $previousLocale : 'C');
+        }
+
+        self::assertStringContainsString(number_format($auditReport->durationSeconds(), 1, '.', '').'s', $output);
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_replaces_every_template_placeholder(): void
     {
@@ -158,6 +304,8 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_entity_encodes_single_quotes_via_ent_quotes(): void
     {
@@ -170,6 +318,8 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_renders_the_location_with_file_and_line_range(): void
     {
@@ -183,6 +333,8 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_lists_the_cwe_reference_alongside_owasp(): void
     {
@@ -195,6 +347,8 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_render_summary_table_renders_exactly_one_row_per_present_severity(): void
     {

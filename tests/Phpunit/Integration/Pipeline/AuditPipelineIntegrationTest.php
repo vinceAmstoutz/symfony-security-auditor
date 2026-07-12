@@ -31,6 +31,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipelin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
@@ -51,6 +53,10 @@ final class AuditPipelineIntegrationTest extends TestCase
 {
     private string $tmpDir;
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     */
     public function test_ingestion_stage_scans_real_filesystem(): void
     {
         mkdir($this->tmpDir.'/src/Controller', 0o777, true);
@@ -67,6 +73,10 @@ final class AuditPipelineIntegrationTest extends TestCase
         self::assertSame('src/Controller/AdminController.php', $auditContext->projectFiles()[0]->relativePath());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     */
     public function test_mapping_stage_classifies_scanned_files(): void
     {
         mkdir($this->tmpDir.'/src/Controller', 0o777, true);
@@ -87,6 +97,10 @@ final class AuditPipelineIntegrationTest extends TestCase
         self::assertSame(1, $auditContext->getMeta('mapping.voters'));
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     */
     public function test_full_pipeline_produces_validated_vulnerability_from_stub_llm(): void
     {
         mkdir($this->tmpDir.'/src/Controller', 0o777, true);
@@ -106,6 +120,10 @@ final class AuditPipelineIntegrationTest extends TestCase
         self::assertCount(1, $auditContext->validatedVulnerabilities());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     */
     public function test_full_pipeline_stores_no_vulnerabilities_when_attacker_finds_nothing(): void
     {
         mkdir($this->tmpDir.'/src/Controller', 0o777, true);
@@ -121,6 +139,10 @@ final class AuditPipelineIntegrationTest extends TestCase
         self::assertEmpty($auditContext->validatedVulnerabilities());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidTokenUsageException
+     */
     public function test_pipeline_stores_audit_metadata_after_run(): void
     {
         mkdir($this->tmpDir.'/src/Controller', 0o777, true);
@@ -149,6 +171,9 @@ final class AuditPipelineIntegrationTest extends TestCase
         $this->rmdirRecursive($this->tmpDir);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     */
     private function makePipeline(string $attackerResponse, string $reviewerResponse): AuditPipeline
     {
         $attackerLLM = self::createStub(LLMClientInterface::class);

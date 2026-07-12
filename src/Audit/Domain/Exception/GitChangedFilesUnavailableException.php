@@ -34,4 +34,15 @@ final class GitChangedFilesUnavailableException extends RuntimeException
 
         return new self(\sprintf('git diff against "%s" failed: %s', $ref, '' !== $stderr ? $stderr : 'unknown error'), 0, $throwable);
     }
+
+    /**
+     * Covers a git process that never produced a determinate result at
+     * all — a timeout or a process start failure — as opposed to
+     * `forNonGitDirectory()`/`forUnknownRef()`, which report a git process
+     * that ran fine and determinately answered "no".
+     */
+    public static function forProcessFailure(string $operation, Throwable $throwable): self
+    {
+        return new self(\sprintf('Could not %s: %s', $operation, $throwable->getMessage()), 0, $throwable);
+    }
 }

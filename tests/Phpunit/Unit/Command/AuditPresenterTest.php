@@ -21,8 +21,12 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
@@ -104,9 +108,22 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('Pipeline:', $display);
     }
 
+    public function test_header_neutralizes_console_markup_in_the_project_path(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->header($symfonyStyle, '/var/www/<fg=grey>oops</>');
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('/var/www/<fg=grey>oops</>', $display);
+    }
+
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_result_for_failure_exit_omits_success_message(): void
     {
@@ -121,6 +138,45 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString('Audit complete. Risk:', $display);
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_result_for_failure_exit_reflects_the_actual_risk_level_not_a_hardcoded_critical(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->result($symfonyStyle, $this->makeHighRiskReport(), Command::FAILURE);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('Risk: HIGH', $display);
+        self::assertStringNotContainsString('CRITICAL', $display);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_result_for_failure_exit_uses_singular_wording_for_exactly_one_vulnerability(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->result($symfonyStyle, $this->makeSingleVulnerabilityReport(), Command::FAILURE);
+
+        $flattened = preg_replace('/[\s!]+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('1 vulnerability found.', $flattened);
+        self::assertStringNotContainsString('1 vulnerabilities found', $flattened);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_result_for_success_exit_emits_success_message(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -206,6 +262,9 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString('Running audit pipeline', $display);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_dry_run_result_shows_completion_without_audit_language(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -223,6 +282,10 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString('vulnerabilities found', $display);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_dry_run_result_shows_cost_breakdown_when_cost_present(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -239,6 +302,59 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('0.0123', $display);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_formats_cost_with_a_period_regardless_of_the_process_numeric_locale(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 1234.5, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 800, 'output_tokens' => 150, 'estimated_cost_usd' => 567.25],
+        ]));
+
+        $previousLocale = setlocale(\LC_NUMERIC, '0');
+        setlocale(\LC_NUMERIC, 'de_DE.UTF-8');
+
+        try {
+            $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+        } finally {
+            setlocale(\LC_NUMERIC, false !== $previousLocale ? $previousLocale : 'C');
+        }
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('1234.5000', $display);
+        self::assertStringContainsString('567.2500', $display);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_dry_run_result_formats_costs_to_exactly_four_decimal_places(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditReport = AuditReport::fromContext($auditContext, AuditCost::of(1000, 200, 0.0123, 'claude-opus-4-7', [
+            'attacker' => ['model' => 'claude-opus-4-7', 'input_tokens' => 800, 'output_tokens' => 150, 'estimated_cost_usd' => 0.0456],
+        ]));
+
+        $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('$0.0123 (estimate)', $display);
+        self::assertStringNotContainsString('0.01230', $display);
+        self::assertStringNotContainsString('0.04560', $display);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_scanned_files_lists_each_file_grouped_by_type(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -256,6 +372,39 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('config (1)', $flattened);
         self::assertStringContainsString('config/packages/security.yaml', $flattened);
         self::assertStringContainsString('2 file(s) in scope.', $flattened);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_does_not_render_a_crafted_file_path_as_console_markup(): void
+    {
+        $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/PwnController<fg=grey>.php', '/p/src/PwnController<fg=grey>.php', '<?php'),
+        ]);
+
+        self::assertStringContainsString('src/PwnController<fg=grey>.php', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_strips_control_characters_from_a_crafted_file_path(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create("src/Evil.php\n * [CRITICAL] forged\x1b[31m\u{202E}x", '/p/src/Evil.php', '<?php'),
+        ]);
+        $output = $bufferedOutput->fetch();
+
+        self::assertStringNotContainsString("\x1b", $output);
+        self::assertStringNotContainsString("\u{202E}", $output);
+        self::assertDoesNotMatchRegularExpression('/\n\s*\* \[CRITICAL] forged/', $output);
     }
 
     public function test_scanned_files_warns_when_nothing_matched(): void
@@ -283,6 +432,10 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('7 file(s)', $display);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_unsupported_model_warning_names_every_unsupported_model(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -295,6 +448,10 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('made-up-reviewer-model', $display);
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_unsupported_model_warning_ignores_supported_models(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -305,6 +462,10 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString('claude-opus-4-7', $bufferedOutput->fetch());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_unsupported_model_warning_is_silent_when_all_models_supported(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -315,6 +476,9 @@ final class AuditPresenterTest extends TestCase
         self::assertSame('', $bufferedOutput->fetch());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     public function test_unsupported_model_warning_is_silent_when_no_models_present(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -325,6 +489,10 @@ final class AuditPresenterTest extends TestCase
         self::assertSame('', $bufferedOutput->fetch());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
     public function test_unsupported_model_warning_names_a_shared_model_only_once(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -335,6 +503,10 @@ final class AuditPresenterTest extends TestCase
         self::assertSame(1, substr_count($bufferedOutput->fetch(), 'made-up-model'));
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidAuditContextException
+     */
     private function reportWithRoleModels(string $attackerModel, string $reviewerModel): AuditReport
     {
         $auditCost = AuditCost::of(1000, 200, 0.0, $attackerModel, [
@@ -374,6 +546,29 @@ final class AuditPresenterTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function makeSingleVulnerabilityReport(): AuditReport
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability(
+            Vulnerability::of(
+                new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'Critical vuln', 0.9),
+                new CodeLocation('src/File.php', 1, 5),
+                new VulnerabilityNarrative('desc', 'inject', "' OR 1", 'fix'),
+                '$q',
+            )->withReviewerValidation(true),
+        );
+
+        return AuditReport::fromContext($auditContext);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeCriticalReport(): AuditReport
     {
@@ -382,6 +577,29 @@ final class AuditPresenterTest extends TestCase
             $auditContext->addVulnerability(
                 Vulnerability::of(
                     new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL, 'Critical vuln '.$i, 0.9),
+                    new CodeLocation('src/File'.$i.'.php', 1, 5),
+                    new VulnerabilityNarrative('desc', 'inject', "' OR 1", 'fix'),
+                    '$q',
+                )->withReviewerValidation(true),
+            );
+        }
+
+        return AuditReport::fromContext($auditContext);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function makeHighRiskReport(): AuditReport
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        for ($i = 1; $i <= 5; ++$i) {
+            $auditContext->addVulnerability(
+                Vulnerability::of(
+                    new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'High vuln '.$i, 0.9),
                     new CodeLocation('src/File'.$i.'.php', 1, 5),
                     new VulnerabilityNarrative('desc', 'inject', "' OR 1", 'fix'),
                     '$q',

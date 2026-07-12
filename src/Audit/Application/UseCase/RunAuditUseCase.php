@@ -14,13 +14,20 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase;
 
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
 
 final readonly class RunAuditUseCase
@@ -31,6 +38,7 @@ final readonly class RunAuditUseCase
         private ?TokenUsageRecorder $tokenUsageRecorder = null,
         private ?CostCalculator $costCalculator = null,
         private string $primaryModel = '',
+        private ?BudgetTracker $budgetTracker = null,
     ) {}
 
     /**
@@ -50,9 +58,16 @@ final readonly class RunAuditUseCase
      *                                           report
      *
      * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
      */
     public function execute(string $projectPath, array $scanPaths = [], bool $bypassCache = false, ?string $diffSinceRef = null, array $acceptedFingerprints = []): AuditReport
     {
+        $this->tokenUsageRecorder?->reset();
+        $this->budgetTracker?->reset();
+
         $this->logger->info('Starting audit', [
             'project' => $projectPath,
             'scan_paths' => $scanPaths,
@@ -73,6 +88,14 @@ final readonly class RunAuditUseCase
             ]);
 
             throw AuditAbortedByBudgetException::from($budgetExceededException, $partialReport);
+        } catch (LLMProviderException $llmProviderException) {
+            $partialReport = AuditReport::fromContext($auditContext, $this->buildCost());
+            $this->logger->warning('Audit aborted by LLM provider failure', [
+                'audit_id' => $partialReport->auditId(),
+                'error' => $llmProviderException->getMessage(),
+            ]);
+
+            throw AuditAbortedByProviderException::from($llmProviderException, $partialReport);
         }
 
         $auditReport = AuditReport::fromContext($auditContext, $this->buildCost());
@@ -87,6 +110,10 @@ final readonly class RunAuditUseCase
         return $auditReport;
     }
 
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
+     */
     private function buildCost(): ?AuditCost
     {
         if (!$this->tokenUsageRecorder instanceof TokenUsageRecorder) {
@@ -94,10 +121,18 @@ final readonly class RunAuditUseCase
         }
 
         $snapshot = $this->tokenUsageRecorder->snapshot();
-        $estimatedCost = $this->costCalculator instanceof CostCalculator
-            ? $this->costCalculator->costForCall($snapshot->inputTokens(), $snapshot->outputTokens(), $this->primaryModel, $snapshot->cacheReadTokens(), $snapshot->cacheCreationTokens())
-            : 0.0;
 
-        return AuditCost::of($snapshot->inputTokens(), $snapshot->outputTokens(), $estimatedCost, $this->primaryModel);
+        return AuditCost::of($snapshot->inputTokens(), $snapshot->outputTokens(), $this->resolveEstimatedCost($snapshot), $this->primaryModel);
+    }
+
+    private function resolveEstimatedCost(TokenUsageSnapshot $tokenUsageSnapshot): float
+    {
+        if ($this->budgetTracker instanceof BudgetTracker) {
+            return $this->budgetTracker->costUsdUsed();
+        }
+
+        return $this->costCalculator instanceof CostCalculator
+            ? $this->costCalculator->costForCall($tokenUsageSnapshot->inputTokens(), $tokenUsageSnapshot->outputTokens(), $this->primaryModel, $tokenUsageSnapshot->cacheReadTokens(), $tokenUsageSnapshot->cacheCreationTokens())
+            : 0.0;
     }
 }

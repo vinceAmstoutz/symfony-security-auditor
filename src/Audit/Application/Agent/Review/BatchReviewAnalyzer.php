@@ -18,6 +18,7 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -59,6 +60,7 @@ final readonly class BatchReviewAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function analyze(array $vulnerabilities, array $projectFiles, ReviewBatchSettings $reviewBatchSettings): array
     {
@@ -112,19 +114,45 @@ final readonly class BatchReviewAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     private function reviewMissesInBatches(array $reviewed, array $misses, array $missIndexes, ReviewBatchSettings $reviewBatchSettings, ReviewCacheBuckets $reviewCacheBuckets): array
     {
+        $batches = array_chunk($misses, $reviewBatchSettings->batchSize);
         $position = 0;
-        foreach (array_chunk($misses, $reviewBatchSettings->batchSize) as $batch) {
-            $batchReviewed = $reviewBatchSettings->structured
-                ? $this->reviewBatchViaStructuredCollection($batch, $reviewCacheBuckets->codeContexts, $reviewCacheBuckets->cacheContexts, $reviewBatchSettings->coverageRecorder)
-                : $this->reviewBatch($batch, $reviewCacheBuckets->codeContexts, $reviewCacheBuckets->cacheContexts, $reviewBatchSettings->coverageRecorder, $reviewBatchSettings->toolRegistry);
+        foreach ($batches as $batchNumber => $batch) {
+            try {
+                $batchReviewed = $reviewBatchSettings->structured
+                    ? $this->reviewBatchViaStructuredCollection($batch, $reviewCacheBuckets->codeContexts, $reviewCacheBuckets->cacheContexts, $reviewBatchSettings->coverageRecorder)
+                    : $this->reviewBatch($batch, $reviewCacheBuckets->codeContexts, $reviewCacheBuckets->cacheContexts, $reviewBatchSettings->coverageRecorder, $reviewBatchSettings->toolRegistry);
+            } catch (BudgetExceededException $budgetExceededException) {
+                $this->failRemainingBatches($batches, $batchNumber + 1, 'aborted', $reviewBatchSettings->coverageRecorder);
+
+                throw $budgetExceededException;
+            } catch (LLMProviderException $llmProviderException) {
+                $this->failRemainingBatches($batches, $batchNumber + 1, 'errored', $reviewBatchSettings->coverageRecorder);
+
+                throw $llmProviderException;
+            }
 
             [$reviewed, $position] = $this->mergeBatchIntoReviewed($batchReviewed, $missIndexes, $position, $reviewed);
         }
 
         return $reviewed;
+    }
+
+    /**
+     * @param list<list<Vulnerability>> $batches
+     */
+    private function failRemainingBatches(array $batches, int $fromBatchNumber, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        foreach ($batches as $batchNumber => $batch) {
+            if ($batchNumber < $fromBatchNumber) {
+                continue;
+            }
+
+            $this->batchVerdictApplier->markBatchUnreached($batch, $status, $coverageRecorder);
+        }
     }
 
     /**
@@ -172,8 +200,12 @@ final readonly class BatchReviewAnalyzer
 
             return $this->batchVerdictApplier->applyBatchReview($batch, $rawData, $coverageRecorder, $cacheContexts);
         } catch (BudgetExceededException $budgetExceededException) {
+            $this->batchVerdictApplier->markBatchUnreached($batch, 'aborted', $coverageRecorder);
+
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
+            $this->batchVerdictApplier->markBatchUnreached($batch, 'errored', $coverageRecorder);
+
             throw $llmProviderException;
         } catch (JsonException $exception) {
             $this->logger->error('Failed to parse reviewer batch response', [
@@ -197,6 +229,7 @@ final readonly class BatchReviewAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     private function reviewBatchViaStructuredCollection(array $batch, array $codeContexts, array $cacheContexts, CoverageRecorderInterface $coverageRecorder): array
     {
@@ -211,11 +244,103 @@ final readonly class BatchReviewAnalyzer
 
             return $this->batchVerdictApplier->applyBatchReview($batch, $structuredReviewCollectionSession->drain(), $coverageRecorder, $cacheContexts);
         } catch (BudgetExceededException $budgetExceededException) {
+            $this->recordDrainedBatchOrMarkUnreached($batch, $structuredReviewCollectionSession, $cacheContexts, 'aborted', $coverageRecorder);
+
             throw $budgetExceededException;
         } catch (LLMProviderException $llmProviderException) {
+            $this->recordDrainedBatchOrMarkUnreached($batch, $structuredReviewCollectionSession, $cacheContexts, 'errored', $coverageRecorder);
+
             throw $llmProviderException;
         } catch (Throwable $exception) {
-            return $this->batchVerdictApplier->recordBatchError($batch, $exception, $coverageRecorder);
+            $rawData = $structuredReviewCollectionSession->drain();
+
+            return [] !== $rawData
+                ? $this->applyPartialBatchReviewInOriginalOrder($batch, $rawData, $cacheContexts, $coverageRecorder)
+                : $this->batchVerdictApplier->recordBatchError($batch, $exception, $coverageRecorder);
+        }
+    }
+
+    /**
+     * A batch member absent from `$rawData` because the conversation was cut
+     * off before it was ever considered must not be routed through
+     * {@see BatchVerdictApplier::applyBatchReview()}, which treats a missing
+     * verdict as an implicit rejection — it is marked errored instead, like a
+     * fully-empty drain. `mergeBatchIntoReviewed()` maps this method's return
+     * value back to the caller's findings purely by position, so the result
+     * is reassembled in `$batch`'s original order rather than concatenating
+     * the reviewed and errored groups.
+     *
+     * @param list<Vulnerability>      $batch
+     * @param array<int|string, mixed> $rawData
+     * @param array<string, string>    $cacheContexts
+     *
+     * @return list<Vulnerability>
+     */
+    private function applyPartialBatchReviewInOriginalOrder(array $batch, array $rawData, array $cacheContexts, CoverageRecorderInterface $coverageRecorder): array
+    {
+        [$reachedBatch, $unreachedBatch] = $this->partitionByReached($batch, $rawData);
+
+        $byId = [];
+        foreach ($this->batchVerdictApplier->applyBatchReview($reachedBatch, $rawData, $coverageRecorder, $cacheContexts) as $vulnerability) {
+            $byId[$vulnerability->id()] = $vulnerability;
+        }
+
+        foreach ($this->batchVerdictApplier->markBatchErrored($unreachedBatch, $coverageRecorder) as $vulnerability) {
+            $byId[$vulnerability->id()] = $vulnerability;
+        }
+
+        return array_map(static fn (Vulnerability $vulnerability): Vulnerability => $byId[$vulnerability->id()], $batch);
+    }
+
+    /**
+     * @param list<Vulnerability>      $batch
+     * @param array<int|string, mixed> $rawData
+     *
+     * @return array{0: list<Vulnerability>, 1: list<Vulnerability>}
+     */
+    private function partitionByReached(array $batch, array $rawData): array
+    {
+        $reachedIds = $this->batchVerdictApplier->reachedIds($rawData);
+
+        return [
+            array_values(array_filter($batch, static fn (Vulnerability $vulnerability): bool => \in_array($vulnerability->id(), $reachedIds, true))),
+            array_values(array_filter($batch, static fn (Vulnerability $vulnerability): bool => !\in_array($vulnerability->id(), $reachedIds, true))),
+        ];
+    }
+
+    /**
+     * Recovers any verdicts the LLM already recorded via `record_review` tool
+     * calls in an earlier round of this batch's conversation before a later
+     * round aborted it — otherwise they vanish with the exception even
+     * though they were genuinely reached. A batch member with no matching
+     * verdict is marked not-reached rather than routed through
+     * {@see BatchVerdictApplier::applyBatchReview()}, which would otherwise
+     * treat its absence as an implicit rejection — correct when the model
+     * finished the batch and chose not to flag it, but wrong when the
+     * conversation was cut off before it was ever considered. Falls back to
+     * the existing not-reached handling for the whole batch only when
+     * nothing was recorded at all.
+     *
+     * @param list<Vulnerability>   $batch
+     * @param array<string, string> $cacheContexts
+     */
+    private function recordDrainedBatchOrMarkUnreached(array $batch, StructuredReviewCollectionSession $structuredReviewCollectionSession, array $cacheContexts, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        $rawData = $structuredReviewCollectionSession->drain();
+        if ([] === $rawData) {
+            $this->batchVerdictApplier->markBatchUnreached($batch, $status, $coverageRecorder);
+
+            return;
+        }
+
+        [$reachedBatch, $unreachedBatch] = $this->partitionByReached($batch, $rawData);
+
+        if ([] !== $reachedBatch) {
+            $this->batchVerdictApplier->applyBatchReview($reachedBatch, $rawData, $coverageRecorder, $cacheContexts);
+        }
+
+        if ([] !== $unreachedBatch) {
+            $this->batchVerdictApplier->markBatchUnreached($unreachedBatch, $status, $coverageRecorder);
         }
     }
 

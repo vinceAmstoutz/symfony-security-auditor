@@ -135,6 +135,21 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     /**
      * @throws GitChangedFilesUnavailableException
      */
+    public function test_it_includes_a_changed_file_whose_name_contains_a_double_quote(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // initial', 'init');
+        $this->createBranch('feature');
+        $this->commit('src/weird"quote.php', '<?php // odd name', 'add odd name');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+
+        self::assertContains('src/weird"quote.php', $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_includes_uncommitted_changes_against_head(): void
     {
         $this->initRepo();
@@ -179,7 +194,25 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         // throwing. Any mutation that breaks that detection makes this throw.
         $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir.'/src', 'main');
 
-        self::assertContains('src/sub/Bar.php', $changed);
+        self::assertContains('sub/Bar.php', $changed);
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_excludes_a_changed_file_outside_the_audited_subdirectory(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // initial', 'init');
+        $this->createBranch('feature');
+        $this->commit('src/Bar.php', '<?php // new', 'add bar');
+        $this->commit('other/Outside.php', '<?php // outside audited dir', 'add outside');
+
+        $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir.'/src', 'main');
+
+        self::assertContains('Bar.php', $changed);
+        self::assertNotContains('Outside.php', $changed);
+        self::assertNotContains('../other/Outside.php', $changed);
     }
 
     /**
@@ -231,6 +264,33 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     /**
      * @throws GitChangedFilesUnavailableException
      */
+    public function test_it_wraps_a_process_setup_failure_while_verifying_the_ref(): void
+    {
+        $this->initRepo();
+
+        $this->expectException(GitChangedFilesUnavailableException::class);
+        $this->expectExceptionMessage('Could not verify git ref "main"');
+
+        (new ProcessGitChangedFilesResolver(timeoutSeconds: -1))->changedSince($this->tmpDir, 'main');
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_wraps_a_process_setup_failure_while_checking_the_work_tree(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php', 'init');
+
+        $this->expectException(GitChangedFilesUnavailableException::class);
+        $this->expectExceptionMessage('Could not determine whether "'.$this->tmpDir.'/src" is a git working tree');
+
+        (new ProcessGitChangedFilesResolver(timeoutSeconds: -1))->changedSince($this->tmpDir.'/src', 'main');
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
     public function test_it_wraps_a_git_diff_process_failure_when_the_ref_resolves_but_has_no_merge_base(): void
     {
         $this->initRepo();
@@ -242,6 +302,25 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->expectExceptionMessage('git diff against "main...HEAD" failed');
 
         (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'main');
+    }
+
+    /**
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_wraps_a_git_diff_timeout_instead_of_leaking_a_raw_process_exception(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php', 'init');
+
+        $processGitChangedFilesResolver = new ProcessGitChangedFilesResolver(
+            timeoutSeconds: 0.1,
+            gitDiffProcessFactory: static fn (array $argv, string $projectPath): Process => Process::fromShellCommandline('sleep 2'),
+        );
+
+        $this->expectException(GitChangedFilesUnavailableException::class);
+        $this->expectExceptionMessage('Could not diff against "main...HEAD"');
+
+        $processGitChangedFilesResolver->changedSince($this->tmpDir, 'main');
     }
 
     #[Override]

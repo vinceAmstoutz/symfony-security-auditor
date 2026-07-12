@@ -23,20 +23,14 @@ final readonly class MistralTokenEstimator implements ProviderTokenEstimatorInte
     public const float CHARS_PER_TOKEN = 3.7;
 
     /** @var list<string> */
-    private const array PREFIXES = ['mistral-', 'codestral-'];
+    private const array PREFIXES = ['mistral-', 'codestral-', 'devstral-', 'magistral-', 'ministral-', 'open-mistral-', 'open-mixtral-', 'pixtral-'];
 
     public function __construct(private CharacterRatioCounter $characterRatioCounter = new CharacterRatioCounter()) {}
 
     #[Override]
     public function supports(string $model): bool
     {
-        foreach (self::PREFIXES as $prefix) {
-            if (u($model)->startsWith($prefix)) {
-                return true;
-            }
-        }
-
-        return false;
+        return u($model)->containsAny(self::PREFIXES);
     }
 
     #[Override]

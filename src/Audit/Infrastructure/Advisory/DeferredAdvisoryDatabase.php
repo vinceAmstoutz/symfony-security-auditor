@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInter
 /**
  * Defers constructing {@see ComposerAuditAdvisoryDatabase} — and therefore
  * running `composer audit` — until the first {@see self::lookup()} call,
- * memoizing the result across the rest of the run.
+ * memoizing the result for as long as the holder's path stays unchanged.
  *
  * `ComposerAuditAdvisoryDatabase` is `final readonly`, so it cannot be a
  * Symfony `->lazy()` service: proxy generation requires either a native PHP
@@ -29,14 +29,19 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInter
  * the same goal — `AuditedProjectPathHolder::path()` must not be read before
  * `AuditCommand` sets it — without relying on proxy generation.
  *
- * Not readonly: it memoizes the inner database on first use (stateful
- * collaborator carve-out — same shape as `AuditedProjectPathHolder`).
+ * Not readonly: it memoizes the inner database on first use, and rebuilds it
+ * whenever the holder is re-targeted to a different project — a service
+ * instance reused across two audits must not keep serving the first
+ * project's stale snapshot (stateful collaborator carve-out — same shape as
+ * `AuditedProjectPathHolder`).
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final class DeferredAdvisoryDatabase implements AdvisoryDatabaseInterface
 {
     private ?AdvisoryDatabaseInterface $advisoryDatabase = null;
+
+    private ?string $memoizedProjectPath = null;
 
     public function __construct(
         private readonly ComposerAuditRunnerInterface $composerAuditRunner,
@@ -50,8 +55,20 @@ final class DeferredAdvisoryDatabase implements AdvisoryDatabaseInterface
         return $this->innerDatabase()->lookup($packageName, $installedVersion);
     }
 
+    /**
+     * Rebuilds the inner database whenever the holder's path has moved since
+     * the last lookup — otherwise a service instance reused across a second
+     * audit of a different project would keep serving the first project's
+     * stale `composer audit` snapshot.
+     */
     private function innerDatabase(): AdvisoryDatabaseInterface
     {
-        return $this->advisoryDatabase ??= new ComposerAuditAdvisoryDatabase($this->composerAuditRunner, $this->auditedProjectPathHolder, $this->logger);
+        $currentProjectPath = $this->auditedProjectPathHolder->path();
+        if (!$this->advisoryDatabase instanceof AdvisoryDatabaseInterface || $currentProjectPath !== $this->memoizedProjectPath) {
+            $this->advisoryDatabase = new ComposerAuditAdvisoryDatabase($this->composerAuditRunner, $this->auditedProjectPathHolder, $this->logger);
+            $this->memoizedProjectPath = $currentProjectPath;
+        }
+
+        return $this->advisoryDatabase;
     }
 }

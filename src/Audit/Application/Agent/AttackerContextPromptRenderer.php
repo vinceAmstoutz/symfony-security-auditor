@@ -32,7 +32,7 @@ final readonly class AttackerContextPromptRenderer
     {
         $byFile = [];
         foreach ($markers as $marker) {
-            $byFile[$marker->filePath()][] = \sprintf(
+            $byFile[$this->sanitizeFilePath($marker->filePath())][] = \sprintf(
                 'L%d %s — %s',
                 $marker->line(),
                 $marker->pattern(),
@@ -62,7 +62,7 @@ final readonly class AttackerContextPromptRenderer
         foreach ($previousFindings as $previouFinding) {
             $byType[$previouFinding->type()->value][] = \sprintf(
                 '%s:%d-%d',
-                $previouFinding->filePath(),
+                $this->sanitizeFilePath($previouFinding->filePath()),
                 $previouFinding->lineStart(),
                 $previouFinding->lineEnd(),
             );
@@ -92,7 +92,7 @@ final readonly class AttackerContextPromptRenderer
         foreach ($rejectedFindings as $rejectedFinding) {
             $byType[$rejectedFinding->type()->value][] = \sprintf(
                 '%s:%d-%d',
-                $rejectedFinding->filePath(),
+                $this->sanitizeFilePath($rejectedFinding->filePath()),
                 $rejectedFinding->lineStart(),
                 $rejectedFinding->lineEnd(),
             );
@@ -114,5 +114,17 @@ final readonly class AttackerContextPromptRenderer
     private function indent(string $content): string
     {
         return implode("\n", array_map(static fn (string $line): string => \sprintf('  %s', $line), explode("\n", $content)));
+    }
+
+    /**
+     * A file path echoed back from a prior iteration's finding is either
+     * attacker-LLM-reported free text or a real path from the audited
+     * (untrusted) codebase; either way an embedded newline could forge a
+     * fake `##`-prefixed section as unguarded prompt text for the next
+     * iteration's attacker call.
+     */
+    private function sanitizeFilePath(string $filePath): string
+    {
+        return str_replace("\n", ' ', $filePath);
     }
 }

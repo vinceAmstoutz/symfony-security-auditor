@@ -114,6 +114,21 @@ final class DiffCommandTest extends TestCase
         self::assertStringContainsString('exist or is not readable', $commandTester->getDisplay());
     }
 
+    public function test_a_missing_report_file_with_json_format_writes_the_error_to_stderr_keeping_stdout_parseable(): void
+    {
+        $current = $this->writeReport('current.json', []);
+
+        $commandTester = $this->commandTester();
+        $commandTester->execute(
+            ['previous-report' => $this->tmpDir.'/absent.json', 'current-report' => $current, '--format' => 'json'],
+            ['capture_stderr_separately' => true],
+        );
+
+        self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
+        self::assertStringContainsString('exist or is not readable', $commandTester->getErrorOutput());
+        self::assertSame('', trim($commandTester->getDisplay()));
+    }
+
     public function test_json_format_outputs_the_diff_as_structured_json(): void
     {
         $new = $this->vulnerability('SSRF via Webhook', 'src/Service/C.php');

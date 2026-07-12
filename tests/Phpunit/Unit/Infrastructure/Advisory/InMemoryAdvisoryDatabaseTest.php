@@ -47,4 +47,20 @@ final class InMemoryAdvisoryDatabaseTest extends TestCase
 
         self::assertSame([$a, $b], $inMemoryAdvisoryDatabase->lookup('sym/x', '1.0.0'));
     }
+
+    public function test_lookup_matches_a_differently_cased_package_name(): void
+    {
+        $advisory = ['cve' => 'CVE-1', 'title' => 't', 'summary' => 's', 'affected_versions' => '<6.0.5', 'link' => null];
+        $inMemoryAdvisoryDatabase = new InMemoryAdvisoryDatabase(['symfony/http-foundation' => [$advisory]]);
+
+        self::assertSame([$advisory], $inMemoryAdvisoryDatabase->lookup('Symfony/Http-Foundation', '6.0.0'));
+    }
+
+    public function test_lookup_matches_a_package_name_with_leading_or_trailing_whitespace(): void
+    {
+        $advisory = ['cve' => 'CVE-1', 'title' => 't', 'summary' => 's', 'affected_versions' => '<6.0.5', 'link' => null];
+        $inMemoryAdvisoryDatabase = new InMemoryAdvisoryDatabase(['symfony/http-foundation' => [$advisory]]);
+
+        self::assertSame([$advisory], $inMemoryAdvisoryDatabase->lookup(' symfony/http-foundation ', '6.0.0'));
+    }
 }

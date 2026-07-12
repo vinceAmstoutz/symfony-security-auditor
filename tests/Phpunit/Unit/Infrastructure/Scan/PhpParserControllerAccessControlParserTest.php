@@ -15,7 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use Override;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 
 final class PhpParserControllerAccessControlParserTest extends TestCase
@@ -28,6 +30,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         $this->phpParserControllerAccessControlParser = new PhpParserControllerAccessControlParser();
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_empty_for_non_controller_file(): void
     {
         $projectFile = $this->makeFile('src/Service/Mailer.php', '<?php class Mailer { public function send() {} }');
@@ -35,6 +40,35 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame([], $this->phpParserControllerAccessControlParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_recognizes_route_and_is_granted_attributes_imported_under_an_alias(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route as Get;
+            use Symfony\Component\Security\Http\Attribute\IsGranted as RequiresRole;
+            final class AdminController {
+                #[Get('/admin/dashboard', name: 'admin_dashboard')]
+                #[RequiresRole('ROLE_ADMIN')]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertTrue($entries[0]->hasRouteAttribute());
+        self::assertSame('/admin/dashboard', $entries[0]->routePath());
+        self::assertSame(['ROLE_ADMIN'], $entries[0]->methodLevelIsGranted());
+        self::assertTrue($entries[0]->hasAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_action_with_route_and_no_access_check(): void
     {
         $source = <<<'PHP'
@@ -58,6 +92,103 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertTrue($entries[0]->lacksAccessCheck());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_extracts_route_and_access_check_from_a_live_component_that_also_extends_abstract_controller(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Twig\Components;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+            use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+            #[AsLiveComponent]
+            final class Cart extends AbstractController {
+                #[Route('/cart/admin-export')]
+                public function adminExport(): void { $this->denyAccessUnlessGranted('ROLE_ADMIN'); }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Twig/Components/Cart.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertCount(1, $entries);
+        self::assertSame('adminExport', $entries[0]->methodName());
+        self::assertTrue($entries[0]->methodHasDenyAccess());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_extracts_one_entry_per_stacked_route_attribute(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class ItemController {
+                #[Route('/items', name: 'items_list', methods: ['GET'])]
+                #[Route('/items', name: 'items_delete', methods: ['DELETE'])]
+                public function items(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/ItemController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertCount(2, $entries);
+        self::assertSame('items_list', $entries[0]->routeName());
+        self::assertSame(['GET'], $entries[0]->routeMethods());
+        self::assertSame('items_delete', $entries[1]->routeName());
+        self::assertSame(['DELETE'], $entries[1]->routeMethods());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_extracts_the_route_name(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/dashboard', name: 'admin_dashboard')]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('admin_dashboard', $entries[0]->routeName());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_extracts_a_single_string_methods_value(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/users/{id}', methods: 'DELETE')]
+                public function deleteUser(int $id): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['DELETE'], $entries[0]->routeMethods());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_method_level_is_granted(): void
     {
         $source = <<<'PHP'
@@ -80,6 +211,59 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertFalse($entries[0]->lacksAccessCheck());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_records_a_method_level_security_attribute_expression_as_an_access_check(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\Security;
+            final class AdminController {
+                #[Route(path: '/admin/dashboard')]
+                #[Security("is_granted('ROLE_ADMIN')")]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(["is_granted('ROLE_ADMIN')"], $entries[0]->methodLevelIsGranted());
+        self::assertTrue($entries[0]->hasAccessCheck());
+        self::assertFalse($entries[0]->lacksAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_records_a_method_level_security_attribute_expression_passed_as_a_named_argument(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\Security;
+            final class AdminController {
+                #[Route(path: '/admin/dashboard')]
+                #[Security(expression: "is_granted('ROLE_ADMIN')", statusCode: 403)]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(["is_granted('ROLE_ADMIN')"], $entries[0]->methodLevelIsGranted());
+        self::assertTrue($entries[0]->hasAccessCheck());
+        self::assertFalse($entries[0]->lacksAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_class_level_is_granted(): void
     {
         $source = <<<'PHP'
@@ -101,6 +285,202 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertTrue($entries[0]->hasAccessCheck());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_prefixes_the_method_route_path_and_name_with_the_class_level_route(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            #[Route('/admin', name: 'admin_')]
+            final class AdminController {
+                #[Route('/dashboard', name: 'dashboard', methods: ['GET'])]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/admin/dashboard', $entries[0]->routePath());
+        self::assertSame('admin_dashboard', $entries[0]->routeName());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_routes_an_invokable_single_action_controller_from_its_class_level_route(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            #[Route('/admin/dashboard', name: 'admin_dashboard', methods: ['GET'])]
+            final class DashboardController {
+                public function __invoke(): void {}
+            }
+            PHP;
+        $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/DashboardController.php', $source));
+
+        $routeAccessControl = $this->invokeEntry($entries);
+        self::assertTrue($routeAccessControl->hasRouteAttribute());
+        self::assertSame('/admin/dashboard', $routeAccessControl->routePath());
+        self::assertSame('admin_dashboard', $routeAccessControl->routeName());
+        self::assertSame(['GET'], $routeAccessControl->routeMethods());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_does_not_route_invoke_from_the_class_when_a_sibling_method_already_has_its_own_route(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            #[Route('/admin', name: 'admin_')]
+            final class MixedController {
+                #[Route('/list', name: 'list')]
+                public function list(): void {}
+                public function __invoke(): void {}
+            }
+            PHP;
+        $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/MixedController.php', $source));
+
+        self::assertFalse($this->invokeEntry($entries)->hasRouteAttribute());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_leaves_invoke_route_less_when_the_class_has_no_route(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            final class PlainController {
+                public function __invoke(): void {}
+            }
+            PHP;
+        $entries = $this->phpParserControllerAccessControlParser->parse($this->makeFile('src/Controller/PlainController.php', $source));
+
+        self::assertFalse($this->invokeEntry($entries)->hasRouteAttribute());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_joins_a_trailing_slash_class_prefix_with_a_leading_slash_method_path_without_doubling_the_slash(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            #[Route('/admin/')]
+            final class AdminController {
+                #[Route('/dashboard')]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/admin/dashboard', $entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_resolves_a_bare_slash_method_route_path_to_the_class_prefix_with_a_trailing_slash(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            #[Route('/blog')]
+            final class BlogController {
+                #[Route('/', name: 'blog_index')]
+                public function index(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/BlogController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/blog/', $entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_resolves_a_bare_slash_method_route_path_to_a_bare_slash_when_the_class_prefix_trims_to_nothing(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            #[Route('/')]
+            final class HomeController {
+                #[Route('/', name: 'home_index')]
+                public function index(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/HomeController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/', $entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_resolves_an_empty_method_route_path_to_just_the_class_prefix(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            #[Route('/admin')]
+            final class AdminController {
+                #[Route('')]
+                public function index(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/admin', $entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_leaves_the_method_route_path_unchanged_when_the_class_has_no_route_attribute(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route('/dashboard')]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/dashboard', $entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_deny_access_unless_granted_call(): void
     {
         $source = <<<'PHP'
@@ -122,6 +502,173 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertTrue($entries[0]->hasAccessCheck());
     }
 
+    /**
+     * `isGranted()` + a manual `throw $this->createAccessDeniedException(...)`
+     * is an equally standard Symfony access-control idiom, used whenever the
+     * action wants a custom denial message — not just the shorthand
+     * `denyAccessUnlessGranted()`.
+     *
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_records_an_is_granted_call_as_a_deny_access_check(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/users/{id}/edit')]
+                public function edit(int $id): void {
+                    if (!$this->isGranted('EDIT', $id)) {
+                        throw $this->createAccessDeniedException('Not allowed to edit this user.');
+                    }
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertTrue($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->hasAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_records_a_nullsafe_deny_access_unless_granted_call(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/users/{id}/delete')]
+                public function delete(int $id): void {
+                    $this->security?->denyAccessUnlessGranted('DELETE', $id);
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertTrue($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->hasAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_first_class_callable_reference_to_deny_access_unless_granted_does_not_count_as_an_access_check(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/dashboard')]
+                public function dashboard(): void {
+                    $callback = $this->denyAccessUnlessGranted(...);
+                    unset($callback);
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertFalse($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->lacksAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_first_class_callable_reference_to_a_helper_does_not_count_as_reaching_its_access_check(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/users/{id}/edit')]
+                public function edit(int $id): void {
+                    $callback = $this->authorize(...);
+                    unset($callback);
+                }
+                private function authorize(int $id): void {
+                    $this->denyAccessUnlessGranted('EDIT', $id);
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertFalse($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->lacksAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_attributes_a_deny_access_call_inside_a_private_helper_to_the_public_action_that_reaches_it(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/users/{id}/edit')]
+                public function edit(int $id): void {
+                    $this->authorize('EDIT', $id);
+                }
+                private function authorize(string $attribute, int $id): void {
+                    $this->denyAccessUnlessGranted($attribute, $id);
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertTrue($entries[0]->methodHasDenyAccess());
+        self::assertTrue($entries[0]->hasAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_does_not_infinitely_recurse_when_private_helpers_call_each_other_in_a_cycle(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/dashboard')]
+                public function dashboard(): void {
+                    $this->helperOne();
+                }
+                private function helperOne(): void {
+                    $this->helperTwo();
+                }
+                private function helperTwo(): void {
+                    $this->helperOne();
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertFalse($entries[0]->methodHasDenyAccess());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_emits_one_entry_per_public_method(): void
     {
         $source = <<<'PHP'
@@ -147,6 +694,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame('delete', $entries[1]->methodName());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_path_from_positional_route_argument(): void
     {
         $source = <<<'PHP'
@@ -167,6 +717,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['GET'], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_continues_past_private_methods_to_reach_public_action_below(): void
     {
         $source = <<<'PHP'
@@ -188,6 +741,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame('show', $entries[0]->methodName());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_methods_when_route_uses_methods_only(): void
     {
         $source = <<<'PHP'
@@ -208,6 +764,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertNull($entries[0]->routePath());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_extracts_multiple_http_methods_from_route_attribute(): void
     {
         $source = <<<'PHP'
@@ -226,6 +785,97 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['GET', 'POST', 'PATCH'], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_extracts_a_path_from_a_locale_keyed_array_route_path(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class LocalizedController {
+                #[Route(path: ['en' => '/dashboard', 'fr' => '/tableau-de-bord'])]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/LocalizedController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/dashboard', $entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_resolves_a_route_path_expressed_as_a_self_class_constant(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                private const string ADMIN_PATH = '/admin/dashboard';
+
+                #[Route(path: self::ADMIN_PATH, name: 'admin_dashboard')]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/admin/dashboard', $entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_leaves_a_route_path_unresolved_when_it_references_another_classs_constant(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: AdminRoutes::PATH, name: 'admin_dashboard')]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertNull($entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_leaves_a_route_path_unresolved_when_the_class_constant_name_is_dynamic(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                private const string ADMIN_PATH = '/admin/dashboard';
+
+                #[Route(path: self::{$name}, name: 'admin_dashboard')]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertNull($entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_multiple_is_granted_attributes_on_same_method(): void
     {
         $source = <<<'PHP'
@@ -247,6 +897,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['ROLE_USER', 'ROLE_ADMIN'], $entries[0]->methodLevelIsGranted());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_keeps_only_first_string_argument_of_is_granted_attribute(): void
     {
         $source = <<<'PHP'
@@ -267,6 +920,78 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['PRIMARY_ROLE'], $entries[0]->methodLevelIsGranted());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_resolves_the_attribute_named_argument_when_it_is_not_listed_first(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            final class ReorderedNamedArgsController {
+                #[Route(path: '/edit')]
+                #[IsGranted(subject: 'post', attribute: 'EDIT')]
+                public function edit(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/ReorderedNamedArgsController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['EDIT'], $entries[0]->methodLevelIsGranted());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_resolves_the_attribute_named_argument_in_natural_order(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            final class NamedArgsController {
+                #[Route(path: '/edit')]
+                #[IsGranted(attribute: 'EDIT', subject: 'post')]
+                public function edit(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/NamedArgsController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['EDIT'], $entries[0]->methodLevelIsGranted());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_ignores_a_named_argument_that_is_not_attribute_when_no_attribute_arg_is_present(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            final class SubjectOnlyController {
+                #[Route(path: '/edit')]
+                #[IsGranted(subject: 'post')]
+                public function edit(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/SubjectOnlyController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame([], $entries[0]->methodLevelIsGranted());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_finds_is_granted_in_attribute_group_after_a_non_is_granted_attribute(): void
     {
         $source = <<<'PHP'
@@ -286,6 +1011,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['ROLE_GROUPED'], $entries[0]->methodLevelIsGranted());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_non_route_attributes_when_extracting_the_route(): void
     {
         $source = <<<'PHP'
@@ -307,6 +1035,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertTrue($entries[0]->hasRouteAttribute());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_skips_a_non_route_attribute_listed_before_route_in_the_same_group(): void
     {
         $source = <<<'PHP'
@@ -327,6 +1058,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertTrue($entries[0]->hasRouteAttribute());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_resolves_path_from_positional_argument_followed_by_a_named_argument(): void
     {
         $source = <<<'PHP'
@@ -346,7 +1080,10 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['GET'], $entries[0]->routeMethods());
     }
 
-    public function test_it_treats_only_the_first_positional_argument_as_the_path(): void
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_treats_the_first_positional_argument_as_the_path_and_the_second_as_the_name(): void
     {
         $source = <<<'PHP'
             <?php
@@ -362,9 +1099,13 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
         self::assertSame('/two-positional', $entries[0]->routePath());
+        self::assertSame('the_route_name', $entries[0]->routeName());
         self::assertSame(['GET'], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_resolves_the_first_positional_as_path_even_after_a_leading_named_argument(): void
     {
         // nikic/php-parser tolerates a positional after a named arg (PHP's compile-time ordering rule is not enforced here).
@@ -384,6 +1125,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame('/positional-after-named', $entries[0]->routePath());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_resolves_path_from_named_argument_preceded_by_another_named_argument(): void
     {
         $source = <<<'PHP'
@@ -403,6 +1147,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['POST'], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_does_not_treat_a_named_first_argument_as_the_positional_path(): void
     {
         $source = <<<'PHP'
@@ -422,6 +1169,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['GET'], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_resolves_path_when_methods_argument_precedes_the_named_path(): void
     {
         $source = <<<'PHP'
@@ -441,6 +1191,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame(['GET'], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_reports_no_route_attribute_for_a_public_method_without_one(): void
     {
         $source = <<<'PHP'
@@ -460,6 +1213,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame([], $entries[0]->routeMethods());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_ignores_is_granted_attribute_with_no_string_argument(): void
     {
         $source = <<<'PHP'
@@ -479,8 +1235,39 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
 
         self::assertSame([], $entries[0]->methodLevelIsGranted());
+        self::assertFalse($entries[0]->lacksAccessCheck());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_recognizes_an_enum_backed_is_granted_attribute_value_as_an_access_check(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            enum Permission: string {
+                case Edit = 'EDIT';
+            }
+            final class AdminController {
+                #[Route(path: '/admin/post/{id}/edit')]
+                #[IsGranted(Permission::Edit->value)]
+                public function edit(int $id): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame([], $entries[0]->methodLevelIsGranted());
+        self::assertFalse($entries[0]->lacksAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_treats_an_abstract_action_without_a_body_as_lacking_deny_access(): void
     {
         $source = <<<'PHP'
@@ -500,6 +1287,9 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertFalse($entries[0]->methodHasDenyAccess());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_returns_empty_for_unparseable_source(): void
     {
         $projectFile = $this->makeFile('src/Controller/Broken.php', '<?php class Broken { public function');
@@ -507,8 +1297,168 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
         self::assertSame([], $this->phpParserControllerAccessControlParser->parse($projectFile));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_extracts_both_is_granted_values_declared_in_a_single_attribute_group(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            final class GroupedDoubleCheckController {
+                #[Route(path: '/double'), IsGranted('ROLE_USER'), IsGranted('ROLE_ADMIN')]
+                public function doubleCheck(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/GroupedDoubleCheckController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['ROLE_USER', 'ROLE_ADMIN'], $entries[0]->methodLevelIsGranted());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_resolves_the_attribute_named_value_that_follows_a_non_string_leading_argument(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            use Symfony\Component\ExpressionLanguage\Expression;
+            final class LeadingExpressionController {
+                #[Route(path: '/edit')]
+                #[IsGranted(subject: new Expression('user.id'), attribute: 'EDIT')]
+                public function edit(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/LeadingExpressionController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['EDIT'], $entries[0]->methodLevelIsGranted());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_subject_only_is_granted_attribute_leaves_the_route_lacking_an_access_check(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            use Symfony\Component\Security\Http\Attribute\IsGranted;
+            final class SubjectOnlyController {
+                #[Route(path: '/edit')]
+                #[IsGranted(subject: 'post')]
+                public function edit(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/SubjectOnlyController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertTrue($entries[0]->lacksAccessCheck());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_resolves_route_paths_from_multiple_self_class_constants(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                private const string LIST_PATH = '/admin/list';
+                private const string EDIT_PATH = '/admin/edit';
+
+                #[Route(path: self::LIST_PATH)]
+                public function list(): void {}
+
+                #[Route(path: self::EDIT_PATH)]
+                public function edit(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(
+            ['/admin/list', '/admin/edit'],
+            [$entries[0]->routePath(), $entries[1]->routePath()],
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_resolves_an_empty_method_route_path_to_a_bare_slash_when_the_class_prefix_trims_to_nothing(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            #[Route('/')]
+            final class HomeController {
+                #[Route('', name: 'home_index')]
+                public function index(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/HomeController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame('/', $entries[0]->routePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_leaves_the_route_name_null_when_a_named_class_prefix_meets_a_nameless_method_route(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            #[Route('/admin', name: 'admin_')]
+            final class AdminController {
+                #[Route('/dashboard')]
+                public function dashboard(): void {}
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertNull($entries[0]->routeName());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     private function makeFile(string $relativePath, string $content): ProjectFile
     {
         return ProjectFile::create($relativePath, '/app/'.$relativePath, $content);
+    }
+
+    /**
+     * @param list<RouteAccessControl> $entries
+     */
+    private function invokeEntry(array $entries): RouteAccessControl
+    {
+        foreach ($entries as $entry) {
+            if ('__invoke' === $entry->methodName()) {
+                return $entry;
+            }
+        }
+
+        self::fail('No __invoke entry was parsed.');
     }
 }

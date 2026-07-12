@@ -43,7 +43,7 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
             '{{packageUrl}}' => $this->escape(ReportPackage::HOMEPAGE_URL),
             '{{projectPath}}' => $this->escape($auditReport->projectPath()),
             '{{startedAt}}' => $this->escape($auditReport->startedAt()->format('Y-m-d H:i:s')),
-            '{{duration}}' => $this->escape(\sprintf('%.1fs', $auditReport->durationSeconds())),
+            '{{duration}}' => $this->escape(\sprintf('%ss', number_format($auditReport->durationSeconds(), 1, '.', ''))),
             '{{filesScanned}}' => $auditReport->filesScanned(),
             '{{tokens}}' => $this->escape(\sprintf('%s in / %s out', number_format($cost->inputTokens()), number_format($cost->outputTokens()))),
             '{{primaryModel}}' => $this->escape('' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel()),
@@ -112,15 +112,38 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
                 $vulnerability->lineEnd(),
             )),
             '{{description}}' => $this->escape($vulnerability->description()),
+            '{{vulnerableCode}}' => $this->escape($vulnerability->vulnerableCode()),
             '{{attackVector}}' => $this->escape($vulnerability->attackVector()),
             '{{proof}}' => $this->escape($vulnerability->proof()),
+            '{{synthesizedPoc}}' => $this->synthesizedPocSection($vulnerability),
             '{{remediation}}' => $this->escape($vulnerability->remediation()),
             '{{confidence}}' => $this->escape(\sprintf('%.0f', $vulnerability->confidence() * 100)),
         ]);
     }
 
+    private function synthesizedPocSection(Vulnerability $vulnerability): string
+    {
+        $synthesizedPoC = $vulnerability->synthesizedPoC();
+
+        return null === $synthesizedPoC ? '' : \sprintf("<h4>Synthesized PoC</h4>\n  <pre>%s</pre>", $this->escape($synthesizedPoC));
+    }
+
+    /**
+     * `htmlspecialchars()` neutralizes markup injection (`<`, `>`, `&`,
+     * quotes) but a browser still honours the Unicode Bidirectional
+     * Algorithm on the escaped text — a bidi override (`U+202A`-`U+202E`,
+     * `U+2066`-`U+2069`) in an LLM-sourced field can visually reorder the
+     * rendered characters, a Trojan-Source-style spoof of the finding text.
+     * Invalid UTF-8 is repaired with `mb_scrub()` first, the same defense the
+     * sibling console/Markdown/annotation renderers apply: a `/u` regex aborts
+     * (returns `null`) on an invalid subject byte, so without the scrub a
+     * single stray byte would defeat the bidi strip entirely.
+     */
     private function escape(string $value): string
     {
-        return htmlspecialchars($value, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
+        $scrubbed = mb_scrub($value, 'UTF-8');
+        $withoutBidiOverrides = preg_replace('/[\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $scrubbed) ?? $scrubbed;
+
+        return htmlspecialchars($withoutBidiOverrides, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
     }
 }

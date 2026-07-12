@@ -25,11 +25,13 @@ final readonly class AuditReport
 
     /**
      * @param list<array{stage: string, file: string, status: string}> $coverage
+     * @param list<string>                                             $consumedBaselineFingerprints
      */
     private function __construct(
         private ReportIdentity $reportIdentity,
         private array $coverage,
         ?AuditCost $auditCost,
+        private array $consumedBaselineFingerprints,
         Vulnerability ...$vulnerabilities,
     ) {
         $this->vulnerabilities = $this->orderedMostSevereFirst(array_values($vulnerabilities));
@@ -63,8 +65,22 @@ final readonly class AuditReport
             ),
             $auditContext->coverage(),
             $auditCost,
+            $auditContext->consumedBaselineFingerprints(),
             ...$auditContext->validatedVulnerabilities(),
         );
+    }
+
+    /**
+     * Baseline fingerprints already spent skipping a finding before the
+     * reviewer ever saw it this run — lets `BaselineProcessor` avoid granting
+     * the same accepted occurrence a second, unspent credit when it applies
+     * the baseline again against the final report.
+     *
+     * @return list<string>
+     */
+    public function consumedBaselineFingerprints(): array
+    {
+        return $this->consumedBaselineFingerprints;
     }
 
     public function auditId(): string
@@ -126,23 +142,35 @@ final readonly class AuditReport
     }
 
     /**
-     * Copy of the report with every finding whose fingerprint appears in
-     * `$fingerprints` removed — used to suppress baselined (accepted) findings
-     * before rendering and exit-code resolution.
+     * Copy of the report with findings removed by fingerprint, consuming at
+     * most as many findings per fingerprint as `$fingerprints` contains that
+     * value — a plain membership test would let one accepted occurrence of a
+     * shared fingerprint suppress every current finding sharing it, including
+     * ones that were never actually reviewed.
      *
      * @param list<string> $fingerprints
      */
     public function withoutFingerprints(array $fingerprints): self
     {
-        $kept = array_filter(
-            $this->vulnerabilities,
-            static fn (Vulnerability $vulnerability): bool => !\in_array($vulnerability->fingerprint(), $fingerprints, true),
-        );
+        $remainingByFingerprint = array_count_values($fingerprints);
+
+        $kept = [];
+        foreach ($this->vulnerabilities as $vulnerability) {
+            $fingerprint = $vulnerability->fingerprint();
+            if (\array_key_exists($fingerprint, $remainingByFingerprint) && $remainingByFingerprint[$fingerprint] > 0) {
+                --$remainingByFingerprint[$fingerprint];
+
+                continue;
+            }
+
+            $kept[] = $vulnerability;
+        }
 
         return new self(
             $this->reportIdentity,
             $this->coverage,
             $this->auditCost,
+            $this->consumedBaselineFingerprints,
             ...$kept,
         );
     }
@@ -168,13 +196,14 @@ final readonly class AuditReport
             $this->reportIdentity,
             $this->coverage,
             $this->auditCost,
+            $this->consumedBaselineFingerprints,
             ...$kept,
         );
     }
 
     public function durationSeconds(): float
     {
-        return (float) ($this->reportIdentity->completedAt->getTimestamp() - $this->reportIdentity->startedAt->getTimestamp());
+        return $this->reportIdentity->durationSeconds();
     }
 
     public function totalVulnerabilities(): int

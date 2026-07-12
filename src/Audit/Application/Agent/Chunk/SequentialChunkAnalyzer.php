@@ -21,6 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -76,7 +77,22 @@ final readonly class SequentialChunkAnalyzer
             ]);
 
             $start = microtime(true);
-            $chunkResult = $this->analyzeChunk($chunk, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
+            try {
+                $chunkResult = $this->analyzeChunk($chunk, $attackerAnalysisRequest, $coverageRecorder, $toolRegistry, $riskMarkerIndex);
+            } catch (BudgetExceededException $budgetExceededException) {
+                $this->failRemainingChunks($chunks, $index + 1, 'aborted', $coverageRecorder);
+
+                throw $budgetExceededException;
+            } catch (LLMProviderException $llmProviderException) {
+                $this->failRemainingChunks($chunks, $index + 1, 'errored', $coverageRecorder);
+
+                throw $llmProviderException;
+            }
+
+            foreach ($chunkResult->vulnerabilities() as $vulnerability) {
+                $coverageRecorder->recordFoundVulnerability($vulnerability);
+            }
+
             ChunkFindingProgress::report($this->progressReporter, $chunkResult->vulnerabilities());
             $this->progressReporter->report(ProgressEvent::AttackerChunkCompleted->value, [
                 'chunk' => $index + 1,
@@ -98,6 +114,24 @@ final readonly class SequentialChunkAnalyzer
         }
 
         return [$allVulnerabilities, $totalDropsByReason];
+    }
+
+    /**
+     * Marks every chunk from `$fromIndex` onward — the ones the loop never
+     * reached because an earlier chunk aborted the run — under the same
+     * status, mirroring `ConcurrentChunkAnalyzer::failRemainingWindows()`.
+     *
+     * @param list<list<ProjectFile>> $chunks
+     */
+    private function failRemainingChunks(array $chunks, int $fromIndex, string $status, CoverageRecorderInterface $coverageRecorder): void
+    {
+        foreach ($chunks as $index => $chunk) {
+            if ($index < $fromIndex) {
+                continue;
+            }
+
+            ChunkCoverageRecorder::record($chunk, $status, $coverageRecorder);
+        }
     }
 
     /**
@@ -209,6 +243,8 @@ final readonly class SequentialChunkAnalyzer
 
     /**
      * @param list<ProjectFile> $chunk
+     *
+     * @throws InvalidToolRegistryException
      */
     private function analyzeChunkViaStructuredCollection(array $chunk, ChunkContext $chunkContext, CoverageRecorderInterface $coverageRecorder, ?ToolRegistry $toolRegistry): VulnerabilityHydrationResult
     {
@@ -216,7 +252,13 @@ final readonly class SequentialChunkAnalyzer
 
         $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger, $toolRegistry?->tools() ?? []);
 
-        $this->llmClient->completeWithTools($chunkContext->systemPrompt, $chunkContext->userMessage, $structuredVulnerabilityCollectionSession->toolRegistry, $this->maxToolIterations);
+        try {
+            $this->llmClient->completeWithTools($chunkContext->systemPrompt, $chunkContext->userMessage, $structuredVulnerabilityCollectionSession->toolRegistry, $this->maxToolIterations);
+        } catch (Throwable $throwable) {
+            $this->recordDrainedFindings($structuredVulnerabilityCollectionSession, $coverageRecorder);
+
+            throw $throwable;
+        }
 
         $rawData = $structuredVulnerabilityCollectionSession->drain();
 
@@ -227,5 +269,22 @@ final readonly class SequentialChunkAnalyzer
         ChunkCoverageRecorder::record($chunk, 'analyzed', $coverageRecorder);
 
         return $this->vulnerabilityFactory->fromList($rawData);
+    }
+
+    /**
+     * Recovers findings the LLM already recorded via `record_vulnerability`
+     * tool calls in an earlier round of this chunk's own conversation before
+     * a later round aborted it — otherwise they vanish with the exception
+     * even though `drainFoundVulnerabilities()` exists precisely to let a
+     * caller recover candidates found before a mid-run abort.
+     */
+    private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, CoverageRecorderInterface $coverageRecorder): void
+    {
+        $vulnerabilities = $this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain())->vulnerabilities();
+        foreach ($vulnerabilities as $vulnerability) {
+            $coverageRecorder->recordFoundVulnerability($vulnerability);
+        }
+
+        ChunkFindingProgress::report($this->progressReporter, $vulnerabilities);
     }
 }

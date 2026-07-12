@@ -16,7 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Component\String\UnicodeString;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
 use function Symfony\Component\String\u;
@@ -36,7 +38,7 @@ final class AuditCommandInput
     #[Option(description: 'Output format: console, json, sarif, html, markdown, junit or github', shortcut: 'f')]
     public OutputFormat $format = OutputFormat::Console;
 
-    #[Option(description: 'Output file path (for json, sarif, html or markdown format)', shortcut: 'o')]
+    #[Option(description: 'Output file path (any format)', shortcut: 'o')]
     public ?string $output = null;
 
     #[Option(description: 'Estimate token usage and cost without invoking the LLM; emits a report with zero vulnerabilities and an estimated cost block.')]
@@ -73,12 +75,17 @@ final class AuditCommandInput
      */
     public function resolvedProjectPath(?callable $cwdResolver = null): string
     {
+        $trimmedPath = u($this->projectPath ?? '')->trim()->toString();
+        if (Path::isAbsolute($trimmedPath)) {
+            return Path::canonicalize($trimmedPath);
+        }
+
         $cwd = ($cwdResolver ?? \getcwd(...))();
         if (false === $cwd) {
             throw WorkingDirectoryUnavailableException::fromGetcwdFailure();
         }
 
-        return Path::makeAbsolute(u($this->projectPath ?? '')->trim()->toString(), $cwd);
+        return Path::makeAbsolute($trimmedPath, $cwd);
     }
 
     /**
@@ -89,15 +96,54 @@ final class AuditCommandInput
     {
         $normalized = [];
         foreach ($this->paths as $path) {
-            $trimmed = u($path)->trim();
+            $trimmed = $this->stripLeadingCurrentDirSegment(u($path)->trim()->trimEnd('/'));
             if ($trimmed->isEmpty()) {
                 continue;
             }
 
-            $normalized[] = $trimmed->trimEnd('/')->toString();
+            $normalized[] = $trimmed->toString();
         }
 
         return $normalized;
+    }
+
+    /**
+     * `Path::makeRelative()` (used to compute every scanned file's relative
+     * path) never produces a leading `./` in its output, so a `--path ./src`
+     * or bare `--path .` CLI filter could otherwise never match any scanned
+     * real relative path — silently scanning zero files instead of the
+     * intended subdirectory (or, for a bare `.`, the whole project).
+     */
+    private function stripLeadingCurrentDirSegment(UnicodeString $unicodeString): UnicodeString
+    {
+        while ($unicodeString->startsWith('./')) {
+            $unicodeString = $unicodeString->after('/')->trimStart('/');
+        }
+
+        return '.' === $unicodeString->toString() ? u('') : $unicodeString;
+    }
+
+    /**
+     * `--generate-baseline` requires a real audit run to have real findings
+     * to write to the baseline file, but `--dry-run` and `--show-scanned`
+     * both exit before the LLM is ever invoked — combined, one silently wins
+     * over the other with no file written and no diagnostic.
+     *
+     * @throws ConflictingCommandOptionsException
+     */
+    public function assertNoConflictingOptions(): void
+    {
+        if (null === $this->generateBaseline) {
+            return;
+        }
+
+        if ($this->dryRun) {
+            throw ConflictingCommandOptionsException::forGenerateBaselineWithPreviewFlag('--dry-run');
+        }
+
+        if ($this->showScanned) {
+            throw ConflictingCommandOptionsException::forGenerateBaselineWithPreviewFlag('--show-scanned');
+        }
     }
 
     public function isMachineReadableToStdout(): bool

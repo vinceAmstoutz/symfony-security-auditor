@@ -34,9 +34,31 @@ final readonly class ProjectFileInventory
             'voters' => self::filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isVoter()),
             'repositories' => self::filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isRepository()),
             'forms' => self::filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isForm()),
-            'services' => self::filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isService()),
+            'services' => self::filter($files, self::isUncategorizedPhpFile(...)),
             'templates' => self::filter($files, static fn (ProjectFile $projectFile): bool => $projectFile->isTemplate()),
         ]);
+    }
+
+    /**
+     * The residual bucket for every `.php` file not already tracked by one of
+     * the other six buckets — deliberately independent of
+     * {@see ProjectFile::isService()}, whose own, narrower "plain,
+     * non-specialized service" contract additionally excludes authenticators,
+     * messenger handlers, event subscribers, normalizers, webhook consumers,
+     * schedulers, Twig extensions, API resources, and Live Components. None
+     * of those has a bucket of its own here, so relying on `isService()`
+     * silently dropped every one of them from `totalFiles()` and the LLM-
+     * facing project summary instead of counting them as a generic service.
+     */
+    private static function isUncategorizedPhpFile(ProjectFile $projectFile): bool
+    {
+        return !$projectFile->isController()
+            && !$projectFile->isEntity()
+            && !$projectFile->isVoter()
+            && !$projectFile->isRepository()
+            && !$projectFile->isForm()
+            && !$projectFile->isTemplate()
+            && str_ends_with($projectFile->relativePath(), '.php');
     }
 
     /**
@@ -110,8 +132,9 @@ final readonly class ProjectFileInventory
 
     public function hasVoterForEntity(string $entityName): bool
     {
+        $pattern = \sprintf('/\b%s\b/', preg_quote($entityName, '/'));
         foreach ($this->byRole['voters'] as $voter) {
-            if (str_contains($voter->content(), $entityName)) {
+            if (1 === preg_match($pattern, $voter->content())) {
                 return true;
             }
         }

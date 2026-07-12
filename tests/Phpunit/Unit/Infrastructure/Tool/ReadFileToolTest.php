@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Tool;
 
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\ReadFileTool;
 
@@ -21,6 +23,9 @@ final class ReadFileToolTest extends TestCase
 {
     private const int MAX_BYTES = 64 * 1024;
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_definition_matches_expected_full_schema(): void
     {
         $readFileTool = new ReadFileTool([]);
@@ -43,6 +48,9 @@ final class ReadFileToolTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_returns_file_content_for_known_path(): void
     {
         $projectFile = ProjectFile::create('src/A.php', '/app/src/A.php', '<?php echo 1;');
@@ -91,6 +99,9 @@ final class ReadFileToolTest extends TestCase
         self::assertStringContainsString('Error', $result);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_returns_full_content_when_exactly_at_size_limit(): void
     {
         // Boundary: `>` mutated to `>=` would truncate at exactly MAX_BYTES; original passes through.
@@ -101,6 +112,9 @@ final class ReadFileToolTest extends TestCase
         self::assertSame($content, $readFileTool->execute(['relative_path' => 'src/Edge.php']));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_truncates_file_content_over_size_limit(): void
     {
         $largeContent = str_repeat('a', self::MAX_BYTES + 100);
@@ -117,6 +131,9 @@ final class ReadFileToolTest extends TestCase
         self::assertSame(self::MAX_BYTES + \strlen($expectedSuffix), \strlen($result));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_truncation_preserves_original_leading_byte(): void
     {
         // Kills DecrementInteger / IncrementInteger on substr offset: truncated output must start
@@ -130,6 +147,24 @@ final class ReadFileToolTest extends TestCase
         self::assertStringStartsWith('Z', $result);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_execute_truncation_does_not_split_a_multi_byte_character_straddling_the_limit(): void
+    {
+        $content = str_repeat('a', self::MAX_BYTES - 1).'é'.str_repeat('b', 100);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+        $readFileTool = new ReadFileTool([$projectFile]);
+
+        $result = $readFileTool->execute(['relative_path' => 'src/Big.php']);
+
+        [$truncatedContent] = explode("\n\n... [truncated to ", $result);
+        self::assertTrue(mb_check_encoding($truncatedContent, 'UTF-8'));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_execute_does_not_truncate_when_file_fits_in_limit(): void
     {
         $smallContent = str_repeat('x', 1024);

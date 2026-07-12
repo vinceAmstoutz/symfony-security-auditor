@@ -28,6 +28,8 @@ final class RegexSecretScrubberTest extends TestCase
 
     private const string GHO = 'gho';
 
+    private const string GITHUB_PAT = 'github_pat';
+
     private const string STRIPE_LIVE = 'sk_live';
 
     private const string STRIPE_RK = 'rk_test';
@@ -60,6 +62,10 @@ final class RegexSecretScrubberTest extends TestCase
         ];
         yield 'github_oauth_token' => [
             self::GHO.'_1234567890abcdefghijklmnopqrstuvwxyz',
+            '***REDACTED:github_token***',
+        ];
+        yield 'github_fine_grained_pat' => [
+            self::GITHUB_PAT.'_11AABBCCDD0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
             '***REDACTED:github_token***',
         ];
         yield 'stripe_live_key' => [
@@ -197,6 +203,34 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame('password: ***REDACTED:inline_assignment***', $output);
     }
 
+    #[DataProvider('additionalInlineCredentialKeyCases')]
+    public function test_inline_assignment_redacts_additional_credential_keys(string $key): void
+    {
+        $output = $this->regexSecretScrubber->scrub(\sprintf('%s: "aVeryLongSecretValue123"', $key));
+
+        self::assertSame(\sprintf('%s: "***REDACTED:inline_assignment***"', $key), $output);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function additionalInlineCredentialKeyCases(): iterable
+    {
+        yield 'passwd' => ['passwd'];
+        yield 'pwd' => ['pwd'];
+        yield 'private_key' => ['private_key'];
+        yield 'auth_token' => ['auth_token'];
+        yield 'api_token' => ['api_token'];
+        yield 'api-token' => ['api-token'];
+        yield 'credentials' => ['credentials'];
+    }
+
+    public function test_it_redacts_an_encrypted_pem_private_key(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIIBVQIBADANBg\n-----END ENCRYPTED PRIVATE KEY-----");
+
+        self::assertStringContainsString('***REDACTED:pem_private_key***', $output);
+        self::assertStringNotContainsString('MIIBVQIBADANBg', $output);
+    }
+
     public function test_unquoted_inline_assignment_leaves_symfony_placeholder_unmodified(): void
     {
         $input = 'api_key: %env(ANTHROPIC_API_KEY)%';
@@ -204,6 +238,13 @@ final class RegexSecretScrubberTest extends TestCase
         $output = $this->regexSecretScrubber->scrub($input);
 
         self::assertSame($input, $output);
+    }
+
+    public function test_inline_assignment_with_an_empty_value_does_not_swallow_the_next_lines_secret(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("password:\nsecret: hunter2ProdPassword");
+
+        self::assertSame("password:\nsecret: ***REDACTED:inline_assignment***", $output);
     }
 
     public function test_unquoted_all_caps_key_value_is_only_redacted_once_by_env_assignment(): void
@@ -220,11 +261,187 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame('STRIPE_SECRET_KEY=***REDACTED:env_assignment***', $output);
     }
 
+    public function test_env_assignment_with_an_empty_value_does_not_swallow_the_next_lines_secret(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("APP_SECRET=\nDB_PASSWORD=hunter2ProdPassword");
+
+        self::assertSame("APP_SECRET=\nDB_PASSWORD=***REDACTED:env_assignment***", $output);
+    }
+
+    public function test_env_assignment_redacts_a_double_quoted_value_containing_spaces(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('APP_SECRET="correct horse battery staple"');
+
+        self::assertSame('APP_SECRET=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_env_assignment_redacts_a_single_quoted_value_containing_spaces(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("MAIL_PASSWORD='super secret passphrase here'");
+
+        self::assertSame('MAIL_PASSWORD=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_env_assignment_redacts_a_double_quoted_value_containing_an_escaped_quote(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('PASSWORD="ab\"cd1234"');
+
+        self::assertSame('PASSWORD=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_inline_assignment_redacts_a_double_quoted_value_containing_an_escaped_quote(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('password: "abcd\"ef1234"');
+
+        self::assertSame('password: "***REDACTED:inline_assignment***"', $output);
+    }
+
+    public function test_env_assignment_fully_redacts_a_double_quoted_value_containing_an_unescaped_apostrophe(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('MAIL_PASSWORD="don\'t tell anyone 2024!"');
+
+        self::assertSame('MAIL_PASSWORD=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_inline_assignment_fully_redacts_a_single_quoted_value_containing_an_unescaped_double_quote(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('api_key: \'sk_it"s_a_fake_secret_key_1234\'');
+
+        self::assertSame("api_key: '***REDACTED:inline_assignment***'", $output);
+    }
+
+    public function test_unquoted_inline_assignment_redacts_a_multi_word_value(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('password: hunter2 secret pass phrase');
+
+        self::assertSame('password: ***REDACTED:inline_assignment***', $output);
+    }
+
+    public function test_a_value_wrapped_to_the_next_line_is_still_redacted(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("\$config = [\n    'password' =>\n        'SuperSecretValue1234',\n];");
+
+        self::assertSame("\$config = [\n    'password' =>\n'***REDACTED:multiline_assignment***',\n];", $output);
+    }
+
+    public function test_a_multiline_secret_spanning_two_newlines_reproduces_every_newline_it_spanned(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("password\n: \n'SuperSecretValue1234'");
+
+        self::assertSame("password\n:\n\n'***REDACTED:multiline_assignment***'", $output);
+    }
+
+    public function test_a_symfony_placeholder_wrapped_to_the_next_line_is_left_unmodified(): void
+    {
+        $input = "\$config = [\n    'password' =>\n        '%env(APP_SECRET)%',\n];";
+
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame($input, $output);
+    }
+
+    public function test_a_value_wrapped_to_the_next_line_containing_an_escaped_quote_is_fully_redacted(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("password:\n  \"abcd\\\"efgh\"\n");
+
+        self::assertSame("password:\n\"***REDACTED:multiline_assignment***\"\n", $output);
+    }
+
+    public function test_a_value_wrapped_to_the_next_line_containing_an_unescaped_apostrophe_is_fully_redacted(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("password:\n  \"don't tell anyone\"\n");
+
+        self::assertSame("password:\n\"***REDACTED:multiline_assignment***\"\n", $output);
+    }
+
+    public function test_redacting_a_value_wrapped_to_the_next_line_preserves_the_total_line_count(): void
+    {
+        $input = "\$config = [\n    'password' =>\n        'SuperSecretValue1234',\n];";
+
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        self::assertSame(substr_count($input, "\n"), substr_count($output, "\n"));
+    }
+
+    public function test_redacting_a_pem_private_key_preserves_the_total_line_count(): void
+    {
+        $pem = "-----BEGIN RSA PRIVATE KEY-----\n".implode("\n", array_fill(0, 5, 'MIIEowIBAAKCAQEAxYZ'))."\n-----END RSA PRIVATE KEY-----\n";
+        $input = "<?php\n\$key = <<<PEM\n{$pem}PEM;\n\$dangerous = eval(\$_GET['code']);\n";
+
+        $output = $this->regexSecretScrubber->scrub($input);
+
+        $outputLines = explode("\n", $output);
+        self::assertSame(substr_count($input, "\n"), substr_count($output, "\n"));
+        self::assertStringContainsString('eval(', $outputLines[10]);
+    }
+
+    public function test_env_assignment_redacts_a_value_containing_a_literal_hash_character(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('APP_SECRET=abc#def123whichshouldstillberedacted');
+
+        self::assertSame('APP_SECRET=***REDACTED:env_assignment***', $output);
+    }
+
+    public function test_unquoted_inline_assignment_redacts_a_value_containing_a_literal_hash_character(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('password: correcthorse#batterystaple');
+
+        self::assertSame('password: ***REDACTED:inline_assignment***', $output);
+    }
+
+    #[DataProvider('midWordCredentialKeyCases')]
+    public function test_env_assignment_redacts_credential_word_anywhere_in_the_key(string $key, string $value): void
+    {
+        $output = $this->regexSecretScrubber->scrub(\sprintf('%s=%s', $key, $value));
+
+        self::assertSame(\sprintf('%s=***REDACTED:env_assignment***', $key), $output);
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function midWordCredentialKeyCases(): iterable
+    {
+        yield 'secret_as_prefix_segment' => ['SECRET_KEY_BASE', 'zzz999aaa111'];
+        yield 'password_as_middle_segment' => ['MAILER_PASSWORD_ENC', 'qwerty12345'];
+        yield 'token_as_prefix_segment' => ['TOKEN_STORE', 'leakme123456'];
+        yield 'key_as_middle_segment' => ['JWT_PRIVATE_KEY_PATH', '/var/secrets/jwt.pem'];
+        yield 'key_as_suffix_segment_with_prefix' => ['AWS_ACCESS_KEY_ID', 'AKIAABCDEFGHEXAMPLE'];
+    }
+
+    #[DataProvider('nonCredentialKeyContainingCredentialSubstringCases')]
+    public function test_env_assignment_does_not_redact_keys_containing_a_credential_word_as_a_bare_substring(string $line): void
+    {
+        self::assertSame($line, $this->regexSecretScrubber->scrub($line));
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function nonCredentialKeyContainingCredentialSubstringCases(): iterable
+    {
+        yield 'monkey_contains_key' => ['MONKEY_COUNT=5'];
+        yield 'keyspace_contains_key' => ['SESSION_KEYSPACE=xyz'];
+        yield 'keyword_contains_key' => ['MY_KEYWORD_VALUE=abc'];
+    }
+
     public function test_connection_uri_redaction_preserves_scheme_and_host(): void
     {
         $output = $this->regexSecretScrubber->scrub('DATABASE_URL=postgres://app_user:s3cr3tValue@db.internal:5432/app');
 
         self::assertSame('DATABASE_URL=postgres://***REDACTED:connection_uri***@db.internal:5432/app', $output);
+    }
+
+    public function test_connection_uri_redaction_covers_a_password_containing_an_at_sign(): void
+    {
+        $output = $this->regexSecretScrubber->scrub('DATABASE_URL=postgres://appuser:p@ssw0rd@db.example.com:5432/appdb');
+
+        self::assertSame('DATABASE_URL=postgres://***REDACTED:connection_uri***@db.example.com:5432/appdb', $output);
+    }
+
+    public function test_google_api_key_ending_in_a_non_word_character_is_still_redacted(): void
+    {
+        $key = self::GOOGLE.str_repeat('a', 34).'-';
+        $output = $this->regexSecretScrubber->scrub("analytics_key: {$key}\nnext_line: unrelated");
+
+        self::assertStringNotContainsString($key, $output);
+        self::assertStringContainsString('***REDACTED:google_api_key***', $output);
     }
 
     public function test_it_leaves_credential_free_urls_unmodified(): void
@@ -256,6 +473,15 @@ final class RegexSecretScrubberTest extends TestCase
 
         self::assertStringNotContainsString('SECONDARY-123', $output);
         self::assertStringContainsString('***REDACTED:custom_1***', $output);
+    }
+
+    public function test_an_unterminated_quoted_value_full_of_backslashes_does_not_defeat_redaction_of_an_earlier_secret_in_the_same_file(): void
+    {
+        $payload = "password = \"SuperSecretPlaintext123!\"\nsecret = \"".str_repeat('\\', 40);
+
+        $output = $this->regexSecretScrubber->scrub($payload);
+
+        self::assertStringNotContainsString('SuperSecretPlaintext123!', $output);
     }
 
     /**

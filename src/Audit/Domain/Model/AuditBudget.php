@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
-use InvalidArgumentException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditBudgetException;
 
 /**
  * Immutable budget constraint for an audit run.
@@ -34,24 +34,33 @@ final readonly class AuditBudget
         return new self(null, null);
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public static function forTokens(int $maxTokens): self
     {
-        return self::assertPositive('maxTokens', $maxTokens);
+        return self::assertPositive($maxTokens);
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public static function forCost(float $maxCostUsd): self
     {
-        return self::assertPositiveCost('maxCostUsd', $maxCostUsd);
+        return self::assertPositiveCost($maxCostUsd);
     }
 
+    /**
+     * @throws InvalidAuditBudgetException
+     */
     public static function forBoth(int $maxTokens, float $maxCostUsd): self
     {
         if ($maxTokens <= 0) {
-            throw new InvalidArgumentException(\sprintf('maxTokens must be > 0, got %d', $maxTokens));
+            throw InvalidAuditBudgetException::forNonPositiveTokens($maxTokens);
         }
 
-        if ($maxCostUsd <= 0.0) {
-            throw new InvalidArgumentException(\sprintf('maxCostUsd must be > 0.0, got %f', $maxCostUsd));
+        if (!is_finite($maxCostUsd) || $maxCostUsd <= 0.0) {
+            throw InvalidAuditBudgetException::forNonPositiveCost($maxCostUsd);
         }
 
         return new self($maxTokens, $maxCostUsd);
@@ -72,19 +81,25 @@ final readonly class AuditBudget
         return null === $this->maxTokens && null === $this->maxCostUsd;
     }
 
-    private static function assertPositive(string $field, int $value): self
+    /**
+     * @throws InvalidAuditBudgetException
+     */
+    private static function assertPositive(int $value): self
     {
         if ($value <= 0) {
-            throw new InvalidArgumentException(\sprintf('%s must be > 0, got %d', $field, $value));
+            throw InvalidAuditBudgetException::forNonPositiveTokens($value);
         }
 
         return new self($value, null);
     }
 
-    private static function assertPositiveCost(string $field, float $value): self
+    /**
+     * @throws InvalidAuditBudgetException
+     */
+    private static function assertPositiveCost(float $value): self
     {
-        if ($value <= 0.0) {
-            throw new InvalidArgumentException(\sprintf('%s must be > 0.0, got %f', $field, $value));
+        if (!is_finite($value) || $value <= 0.0) {
+            throw InvalidAuditBudgetException::forNonPositiveCost($value);
         }
 
         return new self(null, $value);

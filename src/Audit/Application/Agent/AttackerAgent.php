@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\Concurren
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\SequentialChunkAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
@@ -129,6 +130,7 @@ final readonly class AttackerAgent implements AttackerAgentInterface
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     #[Override]
     public function analyze(AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder): array
@@ -148,6 +150,8 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         if ([] === $effectiveFiles) {
             return $this->skipLeanFilteredAnalysis($files, $coverageRecorder);
         }
+
+        ChunkCoverageRecorder::record($this->droppedByLeanFilter($files, $effectiveFiles), 'skipped', $coverageRecorder);
 
         $this->logStartingAnalysis($files, $effectiveFiles, $markers, $useTools, $attackerAnalysisRequest);
 
@@ -184,6 +188,22 @@ final readonly class AttackerAgent implements AttackerAgentInterface
         ChunkCoverageRecorder::record($files, 'skipped', $coverageRecorder);
 
         return [];
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     * @param list<ProjectFile> $effectiveFiles
+     *
+     * @return list<ProjectFile>
+     */
+    private function droppedByLeanFilter(array $files, array $effectiveFiles): array
+    {
+        $effectivePaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $effectiveFiles);
+
+        return array_values(array_filter(
+            $files,
+            static fn (ProjectFile $projectFile): bool => !\in_array($projectFile->relativePath(), $effectivePaths, true),
+        ));
     }
 
     /**

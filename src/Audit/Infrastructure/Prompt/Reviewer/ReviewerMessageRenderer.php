@@ -23,6 +23,7 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
     public function renderSingle(Vulnerability $vulnerability, string $codeContext, bool $useStructuredCollection): string
     {
         $data = $vulnerability->toArray();
+        $filePath = $this->sanitizeFilePath($data['file']);
 
         return \sprintf(
             <<<'MSG'
@@ -52,7 +53,7 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
                 %s
 
                 ### Confidence
-                %.2f
+                %s
 
                 ## Full File Context
                 <file path="%s">
@@ -64,17 +65,17 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
             $data['id'],
             $data['type'],
             $data['severity'],
-            $data['title'],
-            $data['file'],
+            $this->stripEmbeddedNewline($this->escapeFences($data['title'])),
+            $filePath,
             $data['line_start'],
             $data['line_end'],
-            $data['description'],
-            $data['vulnerable_code'],
-            $data['attack_vector'],
-            $data['proof'],
-            $data['remediation'],
-            $data['confidence'],
-            $data['file'],
+            $this->escapeFences($data['description']),
+            $this->escapeFences($data['vulnerable_code']),
+            $this->escapeFences($data['attack_vector']),
+            $this->escapeFences($data['proof']),
+            $this->escapeFences($data['remediation']),
+            number_format($data['confidence'], 2, '.', ''),
+            $filePath,
             $this->numberLines($codeContext),
             $this->singleClosingInstruction($useStructuredCollection),
         );
@@ -90,6 +91,7 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
         $sections = [];
         foreach ($vulnerabilities as $index => $vulnerability) {
             $data = $vulnerability->toArray();
+            $filePath = $this->sanitizeFilePath($data['file']);
             $codeContext = $codeContexts[$vulnerability->id()] ?? '';
             $sections[] = \sprintf(
                 <<<'MSG'
@@ -118,7 +120,7 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
                     %s
 
                     #### Confidence
-                    %.2f
+                    %s
 
                     #### Full File Context
                     <file path="%s">
@@ -129,17 +131,17 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
                 $data['id'],
                 $data['type'],
                 $data['severity'],
-                $data['title'],
-                $data['file'],
+                $this->stripEmbeddedNewline($this->escapeFences($data['title'])),
+                $filePath,
                 $data['line_start'],
                 $data['line_end'],
-                $data['description'],
-                $data['vulnerable_code'],
-                $data['attack_vector'],
-                $data['proof'],
-                $data['remediation'],
-                $data['confidence'],
-                $data['file'],
+                $this->escapeFences($data['description']),
+                $this->escapeFences($data['vulnerable_code']),
+                $this->escapeFences($data['attack_vector']),
+                $this->escapeFences($data['proof']),
+                $this->escapeFences($data['remediation']),
+                number_format($data['confidence'], 2, '.', ''),
+                $filePath,
                 $this->numberLines($codeContext),
             );
         }
@@ -163,6 +165,43 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
         }
 
         return "\n\nReturn a JSON array of reviews — one entry per finding above. Each entry's \"id\" must match the input; we re-key by id on parse, so a misordered array with correct ids will still be accepted.";
+    }
+
+    /**
+     * The attacker LLM supplies `file_path` as a free-form tool argument,
+     * indirectly influenced by whatever text lives in the audited source it
+     * just analyzed. A crafted value containing `"` or a newline could
+     * otherwise close the `<file path="...">` tag early or forge fake
+     * standalone instruction paragraphs in the plain `File: ...` line.
+     */
+    private function sanitizeFilePath(string $filePath): string
+    {
+        return str_replace(["\n", '"'], [' ', "'"], $filePath);
+    }
+
+    /**
+     * `title` lands in the bare, single-line `Title: ...` slot with no
+     * surrounding fence or heading to contain it — unlike the fenced/heading
+     * -guarded narrative fields `escapeFences()` protects. A raw newline here
+     * would forge a fake standalone instruction paragraph as unguarded
+     * top-level prompt text, the same class of injection
+     * `sanitizeFilePath()` already guards `File: ...` against.
+     */
+    private function stripEmbeddedNewline(string $text): string
+    {
+        return str_replace("\n", ' ', $text);
+    }
+
+    /**
+     * The attacker LLM's narrative fields are interpolated into this prompt's
+     * own ```-delimited code fence and `###`-prefixed section headers; an
+     * unescaped backtick would break out of the fence, and an unescaped `#`
+     * would let the finding forge a fake section (e.g. a bogus
+     * `### SYSTEM OVERRIDE`) as unguarded top-level prompt text.
+     */
+    private function escapeFences(string $text): string
+    {
+        return str_replace(['`', '#'], ['\\`', '\\#'], $text);
     }
 
     private function numberLines(string $content): string

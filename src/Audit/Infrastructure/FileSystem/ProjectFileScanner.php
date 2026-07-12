@@ -197,6 +197,12 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
         $explicitFiles = [];
         foreach ($this->includedPaths as $includedPath) {
             $resolved = $projectPath.\DIRECTORY_SEPARATOR.$includedPath;
+            if (is_link($resolved)) {
+                $this->logger->warning('Skipped symlinked included path', ['path' => $resolved]);
+
+                continue;
+            }
+
             if (is_dir($resolved)) {
                 $directories[] = $resolved;
 
@@ -216,6 +222,12 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
      */
     private function buildProjectFile(SplFileInfo $splFile, string $projectPath, Closure $reader): ?ProjectFile
     {
+        if ($splFile->isLink()) {
+            $this->logger->warning('Skipped symlinked file', ['path' => $splFile->getPathname()]);
+
+            return null;
+        }
+
         try {
             $content = $reader($splFile);
             if ($this->secretScrubber instanceof SecretScrubberInterface) {

@@ -46,7 +46,7 @@ final readonly class FileUploadAttackerSkill implements AttackerSkillInterface
             - A download/serve route for uploaded files that streams by filename or ID without re-checking the requester's access to the owning entity.
             Do NOT flag:
             - Handlers validating the extension against an explicit allow-list (`mimeTypes: ['image/png', 'image/jpeg']` or an equivalent `in_array()` check) AND storing outside the public web root, or with execution disabled for that path.
-            - Filenames generated via `uniqid('', true)`, `Uuid::v4()`, `md5(uniqid())`, or `VichUploaderBundle`'s default namer — these are unpredictable enough to resist enumeration.
+            - Filenames generated via `uniqid('', true)`, `Uuid::v4()`, `md5(uniqid())`, or an explicitly configured `VichUploaderBundle` `Uuid`/hash-based namer — these are unpredictable enough to resist enumeration.
             - Download actions that resolve the owning entity first and call `denyAccessUnlessGranted()` against it before streaming the file.
             </skills>
             SKILL;

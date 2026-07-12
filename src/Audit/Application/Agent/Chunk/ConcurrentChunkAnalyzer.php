@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -35,6 +36,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
  * one `record_vulnerability` registry + collector per chunk, all resolved
  * through the tool-batch-capable client. Cache hits short-circuit first; chunk
  * order, coverage, caching, and drop accounting match the sequential analyzer.
+ *
+ * Pending chunks are dispatched one `maxConcurrent`-sized window at a time —
+ * never as a single oversized batch — so that a failure in a later window
+ * cannot discard the already-completed findings, cache stores, and coverage
+ * of an earlier window.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -59,6 +65,7 @@ final readonly class ConcurrentChunkAnalyzer
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
      */
     public function analyze(array $chunks, AttackerAnalysisRequest $attackerAnalysisRequest, CoverageRecorderInterface $coverageRecorder, RiskMarkerIndex $riskMarkerIndex, ?ToolRegistry $toolRegistry = null): array
     {
@@ -66,9 +73,8 @@ final readonly class ConcurrentChunkAnalyzer
 
         /** @var array<int, VulnerabilityHydrationResult> $cachedResults */
         $cachedResults = [];
-        /** @var array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}> $pending */
+        /** @var array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession, systemPrompt: string, userMessage: string}> $pending */
         $pending = [];
-        $requests = [];
         foreach ($chunks as $index => $chunk) {
             $this->reportChunkStarted($index, $totalChunks);
 
@@ -77,18 +83,19 @@ final readonly class ConcurrentChunkAnalyzer
             $cached = $this->servedCachedResult($chunk, $chunkContext, $coverageRecorder);
             if ($cached instanceof VulnerabilityHydrationResult) {
                 $cachedResults[$index] = $cached;
+                foreach ($cached->vulnerabilities() as $vulnerability) {
+                    $coverageRecorder->recordFoundVulnerability($vulnerability);
+                }
 
                 continue;
             }
 
-            $registered = $this->buildPendingRequest($chunk, $chunkContext, $toolRegistry);
-            $pending[$index] = $registered['pending'];
-            $requests[] = $registered['request'];
+            $pending[$index] = $this->buildPendingChunk($chunk, $chunkContext, $toolRegistry);
         }
 
-        $batchCompleted = [] === $requests || $this->dispatch($requests, $pending, $coverageRecorder);
+        $dispatchedResults = $this->dispatchInWindows($pending, $coverageRecorder);
 
-        return $this->aggregate($chunks, $cachedResults, $pending, $coverageRecorder, $batchCompleted);
+        return $this->aggregate($chunks, $cachedResults, $dispatchedResults);
     }
 
     private function reportChunkStarted(int $index, int $totalChunks): void
@@ -119,37 +126,39 @@ final readonly class ConcurrentChunkAnalyzer
     /**
      * @param list<ProjectFile> $chunk
      *
-     * @return array{pending: array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}, request: array{system: string, user: string, tools: ToolRegistry}}
+     * @return array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession, systemPrompt: string, userMessage: string}
+     *
+     * @throws InvalidToolRegistryException
      */
-    private function buildPendingRequest(array $chunk, ChunkContext $chunkContext, ?ToolRegistry $toolRegistry): array
+    private function buildPendingChunk(array $chunk, ChunkContext $chunkContext, ?ToolRegistry $toolRegistry): array
     {
         $structuredVulnerabilityCollectionSession = StructuredVulnerabilityCollectionSession::begin($this->recordVulnerabilityToolFactory, $this->logger, $toolRegistry?->tools() ?? []);
 
         return [
-            'pending' => [
-                'chunk' => $chunk,
-                'contextKey' => $chunkContext->contextKey,
-                'cacheable' => $chunkContext->cacheable,
-                'session' => $structuredVulnerabilityCollectionSession,
-            ],
-            'request' => ['system' => $chunkContext->systemPrompt, 'user' => $chunkContext->userMessage, 'tools' => $structuredVulnerabilityCollectionSession->toolRegistry],
+            'chunk' => $chunk,
+            'contextKey' => $chunkContext->contextKey,
+            'cacheable' => $chunkContext->cacheable,
+            'session' => $structuredVulnerabilityCollectionSession,
+            'systemPrompt' => $chunkContext->systemPrompt,
+            'userMessage' => $chunkContext->userMessage,
         ];
     }
 
     /**
-     * @param list<list<ProjectFile>>                                                                                                             $chunks
-     * @param array<int, VulnerabilityHydrationResult>                                                                                            $cachedResults
-     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}> $pending
+     * @param list<list<ProjectFile>>                  $chunks
+     * @param array<int, VulnerabilityHydrationResult> $cachedResults
+     * @param array<int, VulnerabilityHydrationResult> $dispatchedResults
      *
      * @return array{0: list<Vulnerability>, 1: array<string, int>}
      */
-    private function aggregate(array $chunks, array $cachedResults, array $pending, CoverageRecorderInterface $coverageRecorder, bool $batchCompleted): array
+    private function aggregate(array $chunks, array $cachedResults, array $dispatchedResults): array
     {
         $totalChunks = \count($chunks);
         $allVulnerabilities = [];
         $totalDropsByReason = [];
+        $chunkResults = $cachedResults + $dispatchedResults;
         foreach (array_keys($chunks) as $index) {
-            $chunkResult = $cachedResults[$index] ?? $this->dispatchedResult($pending[$index], $coverageRecorder, $batchCompleted);
+            $chunkResult = $chunkResults[$index];
             ChunkFindingProgress::report($this->progressReporter, $chunkResult->vulnerabilities());
             $this->reportChunkCompleted($index, $totalChunks);
             $allVulnerabilities = [...$allVulnerabilities, ...$chunkResult->vulnerabilities()];
@@ -157,18 +166,6 @@ final readonly class ConcurrentChunkAnalyzer
         }
 
         return [$allVulnerabilities, $totalDropsByReason];
-    }
-
-    /**
-     * @param array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession} $entry
-     */
-    private function dispatchedResult(array $entry, CoverageRecorderInterface $coverageRecorder, bool $batchCompleted): VulnerabilityHydrationResult
-    {
-        if (!$batchCompleted) {
-            return $this->vulnerabilityFactory->fromList([]);
-        }
-
-        return $this->finalize($entry, $coverageRecorder);
     }
 
     private function reportChunkCompleted(int $index, int $totalChunks): void
@@ -196,52 +193,140 @@ final readonly class ConcurrentChunkAnalyzer
     }
 
     /**
-     * Returns true when the batch completed; false when it failed in a way
-     * that must not abort the audit — the pending chunks are then recorded
-     * as errored and yield no findings, mirroring the sequential analyzer.
+     * Dispatches pending chunks one `maxConcurrent`-sized window at a time.
+     * Each window is finalized (cached + marked analyzed) as soon as it
+     * completes, before the next window is attempted, so a failure partway
+     * through never discards an earlier window's completed work.
      *
-     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                      $requests
-     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}> $pending
+     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession, systemPrompt: string, userMessage: string}> $pending
+     *
+     * @return array<int, VulnerabilityHydrationResult>
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    private function dispatch(array $requests, array $pending, CoverageRecorderInterface $coverageRecorder): bool
+    private function dispatchInWindows(array $pending, CoverageRecorderInterface $coverageRecorder): array
+    {
+        $windows = array_chunk($pending, max(1, $this->maxConcurrent), true);
+        $results = [];
+
+        foreach ($windows as $windowNumber => $window) {
+            try {
+                $results += $this->dispatchWindow($window, $coverageRecorder);
+            } catch (BudgetExceededException $budgetExceededException) {
+                $this->failRemainingWindows($windows, $windowNumber, 'aborted', $coverageRecorder);
+
+                throw $budgetExceededException;
+            } catch (LLMProviderException $llmProviderException) {
+                $this->failRemainingWindows($windows, $windowNumber, 'errored', $coverageRecorder);
+
+                throw $llmProviderException;
+            } catch (Throwable $throwable) {
+                $this->logger->warning('Concurrent attacker batch failed; its chunks are recorded as errored and the audit continues.', [
+                    'error' => $throwable->getMessage(),
+                ]);
+
+                return $results + $this->failRemainingWindows($windows, $windowNumber, 'errored', $coverageRecorder);
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession, systemPrompt: string, userMessage: string}> $window
+     *
+     * @return array<int, VulnerabilityHydrationResult>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    private function dispatchWindow(array $window, CoverageRecorderInterface $coverageRecorder): array
+    {
+        $requests = array_values(array_map(
+            static fn (array $entry): array => ['system' => $entry['systemPrompt'], 'user' => $entry['userMessage'], 'tools' => $entry['session']->toolRegistry],
+            $window,
+        ));
+
+        $this->toolBatchCapableLLMClient->completeBatchWithTools($requests, $this->maxConcurrent, $this->maxToolIterations);
+
+        $results = [];
+        foreach ($window as $index => $entry) {
+            $results[$index] = $this->finalizeOrRecordErrored($entry, $coverageRecorder);
+        }
+
+        return $results;
+    }
+
+    /**
+     * Isolates a single entry's `finalize()` failure (e.g. a cache-store I/O
+     * error) to that entry alone, mirroring `SequentialChunkAnalyzer`'s
+     * per-chunk isolation — a sibling entry in the same window that already
+     * finalized successfully must keep its result.
+     *
+     * @param array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession, systemPrompt: string, userMessage: string} $entry
+     */
+    private function finalizeOrRecordErrored(array $entry, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
     {
         try {
-            $this->toolBatchCapableLLMClient->completeBatchWithTools($requests, $this->maxConcurrent, $this->maxToolIterations);
-
-            return true;
-        } catch (BudgetExceededException $budgetExceededException) {
-            $this->recordPendingCoverage($pending, 'aborted', $coverageRecorder);
-
-            throw $budgetExceededException;
-        } catch (LLMProviderException $llmProviderException) {
-            $this->recordPendingCoverage($pending, 'errored', $coverageRecorder);
-
-            throw $llmProviderException;
+            return $this->finalize($entry, $coverageRecorder);
         } catch (Throwable $throwable) {
-            $this->logger->warning('Concurrent attacker batch failed; its chunks are recorded as errored and the audit continues.', [
+            $this->logger->warning('Finalizing an attacker chunk result failed; the chunk is recorded as errored and its siblings in the same window are preserved.', [
                 'error' => $throwable->getMessage(),
             ]);
-            $this->recordPendingCoverage($pending, 'errored', $coverageRecorder);
+            ChunkCoverageRecorder::record($entry['chunk'], 'errored', $coverageRecorder);
 
-            return false;
+            return $this->vulnerabilityFactory->fromList([]);
         }
     }
 
     /**
-     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession}> $pending
+     * Marks every window from `$fromWindowNumber` onward — the one that just
+     * failed plus any not yet attempted — as failed, without touching windows
+     * that already finalized successfully.
+     *
+     * @param list<array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession, systemPrompt: string, userMessage: string}>> $windows
+     *
+     * @return array<int, VulnerabilityHydrationResult>
      */
-    private function recordPendingCoverage(array $pending, string $status, CoverageRecorderInterface $coverageRecorder): void
+    private function failRemainingWindows(array $windows, int $fromWindowNumber, string $status, CoverageRecorderInterface $coverageRecorder): array
     {
-        foreach ($pending as $entry) {
-            ChunkCoverageRecorder::record($entry['chunk'], $status, $coverageRecorder);
+        $results = [];
+        foreach ($windows as $windowNumber => $window) {
+            if ($windowNumber < $fromWindowNumber) {
+                continue;
+            }
+
+            foreach ($window as $index => $entry) {
+                ChunkCoverageRecorder::record($entry['chunk'], $status, $coverageRecorder);
+                $this->recordDrainedFindings($entry['session'], $coverageRecorder);
+                $results[$index] = $this->vulnerabilityFactory->fromList([]);
+            }
         }
+
+        return $results;
     }
 
     /**
-     * @param array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession} $entry
+     * Recovers findings the LLM already recorded via `record_vulnerability`
+     * tool calls before the batch call carrying this entry's window aborted
+     * — otherwise they vanish with the exception even though
+     * `drainFoundVulnerabilities()` exists precisely to let a caller recover
+     * candidates found before a mid-run abort. A window that was never
+     * dispatched drains empty, which is harmless.
+     */
+    private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, CoverageRecorderInterface $coverageRecorder): void
+    {
+        $vulnerabilities = $this->vulnerabilityFactory->fromList($structuredVulnerabilityCollectionSession->drain())->vulnerabilities();
+        foreach ($vulnerabilities as $vulnerability) {
+            $coverageRecorder->recordFoundVulnerability($vulnerability);
+        }
+
+        ChunkFindingProgress::report($this->progressReporter, $vulnerabilities);
+    }
+
+    /**
+     * @param array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession, systemPrompt: string, userMessage: string} $entry
      */
     private function finalize(array $entry, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
     {
@@ -253,6 +338,11 @@ final readonly class ConcurrentChunkAnalyzer
 
         ChunkCoverageRecorder::record($entry['chunk'], 'analyzed', $coverageRecorder);
 
-        return $this->vulnerabilityFactory->fromList($rawData);
+        $vulnerabilityHydrationResult = $this->vulnerabilityFactory->fromList($rawData);
+        foreach ($vulnerabilityHydrationResult->vulnerabilities() as $vulnerability) {
+            $coverageRecorder->recordFoundVulnerability($vulnerability);
+        }
+
+        return $vulnerabilityHydrationResult;
     }
 }

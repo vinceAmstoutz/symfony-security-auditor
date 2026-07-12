@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
+use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
@@ -35,6 +37,7 @@ final readonly class StandaloneConfigLoader
      * @throws UnresolvableConfigPathException
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
+     * @throws MalformedProjectConfigException
      */
     public function load(): StandaloneConfig
     {
@@ -82,6 +85,8 @@ final readonly class StandaloneConfigLoader
 
     /**
      * @return array<array-key, mixed>
+     *
+     * @throws MalformedProjectConfigException
      */
     private function read(?string $configFile): array
     {
@@ -89,7 +94,11 @@ final readonly class StandaloneConfigLoader
             return [];
         }
 
-        $parsed = Yaml::parseFile($configFile);
+        try {
+            $parsed = Yaml::parseFile($configFile);
+        } catch (ParseException $parseException) {
+            throw MalformedProjectConfigException::fromParseException($configFile, $parseException);
+        }
 
         return \is_array($parsed) ? $parsed : [];
     }

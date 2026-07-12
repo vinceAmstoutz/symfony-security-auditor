@@ -33,6 +33,15 @@ final class ModelsDevPricingProviderTest extends TestCase
         self::assertSame(25.0, $modelsDevPricingProvider->pricePerMillionOutputTokens('claude-opus-4-8'));
     }
 
+    public function test_it_prices_a_model_name_carrying_the_documented_query_string_options_syntax(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('catalog.json');
+
+        self::assertTrue($modelsDevPricingProvider->hasModel('claude-opus-4-8?temperature=0.2'));
+        self::assertSame(5.0, $modelsDevPricingProvider->pricePerMillionInputTokens('claude-opus-4-8?temperature=0.2'));
+        self::assertSame(25.0, $modelsDevPricingProvider->pricePerMillionOutputTokens('claude-opus-4-8?temperature=0.2'));
+    }
+
     public function test_it_prefers_first_party_over_aggregator_for_a_bare_id(): void
     {
         $modelsDevPricingProvider = $this->providerForCatalog('catalog.json');
@@ -105,6 +114,38 @@ final class ModelsDevPricingProviderTest extends TestCase
         self::assertSame(7.0, $modelsDevPricingProvider->pricePerMillionInputTokens('anthropic.claude-opus-4-8'));
         self::assertSame(28.0, $modelsDevPricingProvider->pricePerMillionOutputTokens('anthropic.claude-opus-4-8'));
         self::assertSame(0.7, $modelsDevPricingProvider->cacheReadPricePerMillionTokens('anthropic.claude-opus-4-8'));
+    }
+
+    /**
+     * `qualified/free-tier-collision` is priced at $0 by `302ai` (alphabetically
+     * first) and at $10/$20 by `zzz-collides-on-qualified-key` (alphabetically
+     * last) — an aggregator's stray free-tier listing must never win over a
+     * genuinely paid one for the same qualified id, since that would both
+     * under-report the real cost and, via `hasModel()` returning `true`,
+     * silently bypass `UnpricedModelBudgetGuard`'s "no published pricing"
+     * safety net.
+     */
+    public function test_it_prefers_a_nonzero_price_over_an_alphabetically_earlier_zero_price_for_a_qualified_id(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('catalog.json');
+
+        self::assertTrue($modelsDevPricingProvider->hasModel('qualified/free-tier-collision'));
+        self::assertSame(10.0, $modelsDevPricingProvider->pricePerMillionInputTokens('qualified/free-tier-collision'));
+        self::assertSame(20.0, $modelsDevPricingProvider->pricePerMillionOutputTokens('qualified/free-tier-collision'));
+    }
+
+    public function test_a_partial_first_party_price_with_a_nonzero_input_wins_over_a_later_provider(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('partial-and-free-collisions.json');
+
+        self::assertSame(3.0, $modelsDevPricingProvider->pricePerMillionInputTokens('partial-price-probe'));
+    }
+
+    public function test_a_fully_free_model_keeps_the_first_providers_cache_rate_across_zero_priced_collisions(): void
+    {
+        $modelsDevPricingProvider = $this->providerForCatalog('partial-and-free-collisions.json');
+
+        self::assertSame(0.25, $modelsDevPricingProvider->cacheReadPricePerMillionTokens('fully-free-probe'));
     }
 
     public function test_it_ignores_unrecognised_cost_fields(): void

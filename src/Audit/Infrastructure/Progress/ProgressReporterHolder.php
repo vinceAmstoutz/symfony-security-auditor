@@ -57,10 +57,19 @@ final class ProgressReporterHolder implements ProgressReporterInterface
         try {
             $this->progressReporter->report($event, $context);
         } catch (Throwable $throwable) {
+            $this->logFailure($event, $throwable);
+        }
+    }
+
+    private function logFailure(string $event, Throwable $throwable): void
+    {
+        try {
             $this->logger->debug('Progress reporter failed; audit continues.', [
                 'event' => $event,
                 'exception' => $throwable,
             ]);
+        } catch (Throwable $loggerThrowable) {
+            error_log(\sprintf('ProgressReporterHolder could not log a failed progress event "%s": %s', $event, $loggerThrowable->getMessage()));
         }
     }
 }

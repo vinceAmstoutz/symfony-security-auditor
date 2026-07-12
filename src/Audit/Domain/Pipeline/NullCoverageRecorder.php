@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 final readonly class NullCoverageRecorder implements CoverageRecorderInterface
 {
@@ -21,5 +22,29 @@ final readonly class NullCoverageRecorder implements CoverageRecorderInterface
     public function recordCoverage(string $stage, string $filePath, string $status): void
     {
         // intentionally noop
+    }
+
+    #[Override]
+    public function recordReviewedFinding(Vulnerability $vulnerability): void
+    {
+        // intentionally noop
+    }
+
+    #[Override]
+    public function drainReviewedFindings(): array
+    {
+        return [];
+    }
+
+    #[Override]
+    public function recordFoundVulnerability(Vulnerability $vulnerability): void
+    {
+        // intentionally noop
+    }
+
+    #[Override]
+    public function drainFoundVulnerabilities(): array
+    {
+        return [];
     }
 }

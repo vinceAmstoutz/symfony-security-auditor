@@ -11,6 +11,7 @@
 
 declare(strict_types=1);
 
+use Psr\Clock\ClockInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Validator\Validation;
@@ -68,7 +69,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParser
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
@@ -109,7 +109,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\Attac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AuthenticatorAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfigAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerFileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityFileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EventSubscriberAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FormAttackerSkill;
@@ -259,7 +261,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(AuthenticatorAttackerSkill::class);
     $defaultsConfigurator->set(ConfigAttackerSkill::class);
     $defaultsConfigurator->set(ControllerAttackerSkill::class);
+    $defaultsConfigurator->set(ControllerFileUploadAttackerSkill::class);
     $defaultsConfigurator->set(EntityAttackerSkill::class);
+    $defaultsConfigurator->set(EntityFileUploadAttackerSkill::class);
     $defaultsConfigurator->set(EventSubscriberAttackerSkill::class);
     $defaultsConfigurator->set(FileUploadAttackerSkill::class);
     $defaultsConfigurator->set(FormAttackerSkill::class);
@@ -441,8 +445,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.cache.reviewer_key_salt'),
         ]);
 
-    $defaultsConfigurator->set(InMemoryAdvisoryDatabase::class);
-
     $defaultsConfigurator->set(SymfonyProcessComposerAuditRunner::class);
 
     $defaultsConfigurator->set(LockfileHashedAdvisoryCache::class)
@@ -451,8 +453,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.cache.advisory_dir'),
             service(Filesystem::class),
             service('logger'),
+            service(ClockInterface::class),
         ]);
-    $defaultsConfigurator->alias(ComposerAuditRunnerInterface::class, LockfileHashedAdvisoryCache::class);
 
     $defaultsConfigurator->set(AuditedProjectPathHolder::class)
         ->args([param('kernel.project_dir')]);
@@ -464,8 +466,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('logger'),
         ]);
 
-    // `AdvisoryDatabaseInterface` alias is set in SymfonySecurityAuditorBundle::loadExtension()
-    // based on `audit.advisory_source` (default: in_memory).
     $defaultsConfigurator->set(SymfonyToolRegistryFactory::class)
         ->args([service('logger'), service(AdvisoryDatabaseInterface::class)]);
     $defaultsConfigurator->alias(ToolRegistryFactoryInterface::class, SymfonyToolRegistryFactory::class);
@@ -528,11 +528,14 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             param('symfony_security_auditor.audit.max_iterations'),
             EstimateAuditCostUseCase::DEFAULT_OUTPUT_RATIO,
             param('symfony_security_auditor.reviewer_model'),
+            EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO,
+            service(GitChangedFilesResolverInterface::class),
         ]);
 
     $defaultsConfigurator->set(ListScannedFilesUseCase::class)
         ->args([
             service(ProjectFileScannerInterface::class),
+            service(GitChangedFilesResolverInterface::class),
         ]);
 
     $defaultsConfigurator->set(RunAuditUseCase::class)
@@ -542,6 +545,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(TokenUsageRecorder::class),
             service(CostCalculator::class),
             param('symfony_security_auditor.attacker_model'),
+            service(BudgetTracker::class),
         ]);
 
     $defaultsConfigurator->set(UnpricedModelBudgetGuard::class)

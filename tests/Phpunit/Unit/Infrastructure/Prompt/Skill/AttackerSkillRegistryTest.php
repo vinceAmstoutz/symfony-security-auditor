@@ -23,7 +23,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\Attac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AuthenticatorAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfigAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerFileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityFileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EventSubscriberAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FormAttackerSkill;
@@ -61,6 +63,7 @@ final class AttackerSkillRegistryTest extends TestCase
     public static function everySkill(): iterable
     {
         yield 'controller' => [new ControllerAttackerSkill(), ProjectFileType::CONTROLLER, 10, 'controller'];
+        yield 'file_upload_controller' => [new ControllerFileUploadAttackerSkill(), ProjectFileType::CONTROLLER, 15, 'file_upload_controller'];
         yield 'api_resource' => [new ApiResourceAttackerSkill(), ProjectFileType::API_RESOURCE, 20, 'api_resource'];
         yield 'live_component' => [new LiveComponentAttackerSkill(), ProjectFileType::LIVE_COMPONENT, 30, 'live_component'];
         yield 'authenticator' => [new AuthenticatorAttackerSkill(), ProjectFileType::AUTHENTICATOR, 40, 'authenticator'];
@@ -74,6 +77,7 @@ final class AttackerSkillRegistryTest extends TestCase
         yield 'file_upload' => [new FileUploadAttackerSkill(), ProjectFileType::FORM, 115, 'file_upload'];
         yield 'repository' => [new RepositoryAttackerSkill(), ProjectFileType::REPOSITORY, 120, 'repository'];
         yield 'entity' => [new EntityAttackerSkill(), ProjectFileType::ENTITY, 130, 'entity'];
+        yield 'file_upload_entity' => [new EntityFileUploadAttackerSkill(), ProjectFileType::ENTITY, 135, 'file_upload_entity'];
         yield 'template' => [new TemplateAttackerSkill(), ProjectFileType::TEMPLATE, 140, 'template'];
         yield 'twig_extension' => [new TwigExtensionAttackerSkill(), ProjectFileType::TWIG_EXTENSION, 145, 'twig_extension'];
         yield 'config' => [new ConfigAttackerSkill(), ProjectFileType::CONFIG, 150, 'config'];
@@ -97,7 +101,7 @@ final class AttackerSkillRegistryTest extends TestCase
 
         $output = $attackerSkillRegistry->render([], emitAll: true);
 
-        self::assertSame(18, substr_count($output, '<skills role="'));
+        self::assertSame(20, substr_count($output, '<skills role="'));
     }
 
     public function test_it_emits_blocks_in_attack_surface_priority_order(): void
@@ -110,6 +114,7 @@ final class AttackerSkillRegistryTest extends TestCase
 
         self::assertSame([
             'controller',
+            'file_upload_controller',
             'api_resource',
             'live_component',
             'authenticator',
@@ -123,6 +128,7 @@ final class AttackerSkillRegistryTest extends TestCase
             'file_upload',
             'repository',
             'entity',
+            'file_upload_entity',
             'template',
             'twig_extension',
             'config',
@@ -151,7 +157,7 @@ final class AttackerSkillRegistryTest extends TestCase
      */
     public static function everyFileTypeWithASkill(): iterable
     {
-        yield 'controller' => [ProjectFileType::CONTROLLER, ['controller']];
+        yield 'controller' => [ProjectFileType::CONTROLLER, ['controller', 'file_upload_controller']];
         yield 'api_resource' => [ProjectFileType::API_RESOURCE, ['api_resource']];
         yield 'live_component' => [ProjectFileType::LIVE_COMPONENT, ['live_component']];
         yield 'authenticator' => [ProjectFileType::AUTHENTICATOR, ['authenticator']];
@@ -163,7 +169,7 @@ final class AttackerSkillRegistryTest extends TestCase
         yield 'scheduler' => [ProjectFileType::SCHEDULER, ['scheduler']];
         yield 'form' => [ProjectFileType::FORM, ['form', 'file_upload']];
         yield 'repository' => [ProjectFileType::REPOSITORY, ['repository']];
-        yield 'entity' => [ProjectFileType::ENTITY, ['entity']];
+        yield 'entity' => [ProjectFileType::ENTITY, ['entity', 'file_upload_entity']];
         yield 'template' => [ProjectFileType::TEMPLATE, ['template']];
         yield 'twig_extension' => [ProjectFileType::TWIG_EXTENSION, ['twig_extension']];
         yield 'config' => [ProjectFileType::CONFIG, ['config']];
@@ -203,5 +209,99 @@ final class AttackerSkillRegistryTest extends TestCase
         $output = $attackerSkillRegistry->render([], emitAll: true);
 
         self::assertStringContainsString("</skills>\n\n<skills role=\"voter\">", $output);
+    }
+
+    public function test_entity_file_upload_skill_does_not_wave_off_vich_s_unconfigured_default_namer(): void
+    {
+        $block = (new EntityFileUploadAttackerSkill())->block();
+
+        self::assertStringNotContainsString('using its default namer', $block);
+    }
+
+    public function test_file_upload_skill_does_not_wave_off_vich_s_unconfigured_default_namer(): void
+    {
+        $block = (new FileUploadAttackerSkill())->block();
+
+        self::assertStringNotContainsString("`VichUploaderBundle`'s default namer —", $block);
+    }
+
+    public function test_messenger_handler_skill_references_a_real_amqp_stamp_method(): void
+    {
+        $block = (new MessengerHandlerAttackerSkill())->block();
+
+        self::assertStringNotContainsString('getApplicationHeaders()', $block);
+        self::assertStringContainsString("AmqpStamp::getAttributes()['headers']['x-message-id']", $block);
+    }
+
+    public function test_normalizer_skill_references_a_real_ignored_attributes_mechanism(): void
+    {
+        $block = (new NormalizerAttackerSkill())->block();
+
+        self::assertStringNotContainsString('setIgnoredAttributes()', $block);
+        self::assertStringContainsString('AbstractNormalizer::IGNORED_ATTRIBUTES', $block);
+    }
+
+    public function test_twig_extension_skill_does_not_claim_is_safe_causes_double_escaping(): void
+    {
+        $block = (new TwigExtensionAttackerSkill())->block();
+
+        self::assertStringNotContainsString('double-escape', $block);
+    }
+
+    public function test_webhook_consumer_skill_does_not_reference_a_fictitious_webhook_component(): void
+    {
+        $block = (new WebhookConsumerAttackerSkill())->block();
+
+        self::assertStringNotContainsString('WebhookComponent', $block);
+    }
+
+    public function test_config_skill_references_the_real_html_sanitizer_option_name(): void
+    {
+        $block = (new ConfigAttackerSkill())->block();
+
+        self::assertStringNotContainsString('allowAllStaticAttributes()', $block);
+        self::assertStringContainsString('allow_static_elements: true', $block);
+    }
+
+    /**
+     * Symfony Messenger's real default serializer (when `serializer` is
+     * omitted, the overwhelmingly common case) is native PHP
+     * `serialize()`/`unserialize()` via `messenger.transport.native_php_serializer`
+     * — `messenger.transport.symfony_serializer` is an explicit, safer
+     * opt-in, never the default. Confirmed against
+     * `vendor/symfony/framework-bundle/DependencyInjection/FrameworkExtension.php`'s
+     * `default_serializer` config node, whose default value is literally
+     * `messenger.transport.native_php_serializer`.
+     */
+    public function test_config_skill_does_not_claim_the_symfony_serializer_is_messengers_default(): void
+    {
+        $block = (new ConfigAttackerSkill())->block();
+
+        self::assertStringNotContainsString('the safe default', $block);
+        self::assertStringContainsString('native_php_serializer', $block);
+    }
+
+    public function test_messenger_handler_skill_does_not_claim_json_serializer_is_the_default(): void
+    {
+        $block = (new MessengerHandlerAttackerSkill())->block();
+
+        self::assertStringNotContainsString('the default `JsonSerializer`', $block);
+        self::assertStringContainsString('native_php_serializer', $block);
+    }
+
+    /**
+     * `Email::subject()` RFC-2047-encodes an embedded newline into the
+     * header body, and `Email::from()`/`addBcc()` either strip control
+     * characters or throw `InvalidArgumentException` for them — verified
+     * directly against a real `symfony/mime` `Email` instance. Unconditionally
+     * flagging these calls as header injection is a broad false positive for
+     * one of the most common real-world Mailer patterns (a dynamic subject
+     * or reply-to on a transactional email).
+     */
+    public function test_php_skill_does_not_unconditionally_flag_symfony_mailer_header_fields(): void
+    {
+        $block = (new PhpAttackerSkill())->block();
+
+        self::assertStringContainsString('RFC 2047', $block);
     }
 }

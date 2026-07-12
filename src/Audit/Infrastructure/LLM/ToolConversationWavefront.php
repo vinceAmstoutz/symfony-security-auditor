@@ -24,12 +24,14 @@ use Symfony\AI\Platform\Result\ToolCall;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 
 /**
  * Runs every tool-using conversation in a concurrency window as a wavefront:
@@ -40,11 +42,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Miss
  * per-round invocations overlap on the wire. Any dispatch or resolution
  * failure first retries the same conversation through
  * `RetryingPlatformInvoker` — the same classify-then-retry-or-fail seam the
- * sequential path uses. Only once that retry is exhausted or the failure is
- * non-transient does it give up: a conversation that hasn't run a tool yet
- * falls back to the proven sequential completeWithTools() path (full restart);
- * one that already ran a tool cannot restart from scratch without executing
- * it twice, so it finalizes as an empty `empty_content` response instead.
+ * sequential path uses. Once that retry gives up, a conversation that hasn't
+ * run a tool yet always falls back to the proven sequential
+ * completeWithTools() path (full restart) — safe to retry from scratch
+ * regardless of why the retry failed. One that already ran a tool cannot
+ * restart without executing it twice, so it finalizes as an empty
+ * `empty_content` response instead — unless the retry's own failure was
+ * classified non-transient, which is rethrown instead of masked, per the LLM
+ * seam's contract that non-transient provider failures must never be
+ * swallowed into a false-negative SAFE result.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -70,6 +76,8 @@ final readonly class ToolConversationWavefront
      *
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
      */
     public function resolveToolWindow(array $window, int $maxToolIterations): array
     {
@@ -87,7 +95,7 @@ final readonly class ToolConversationWavefront
     /**
      * @param list<array{system: string, user: string, tools: ToolRegistry}> $window
      *
-     * @return array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}>
+     * @return array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int}>
      */
     private function initializeConversationStates(array $window): array
     {
@@ -104,6 +112,7 @@ final readonly class ToolConversationWavefront
                 'cacheCreation' => 0,
                 'toolsRan' => false,
                 'response' => null,
+                'estimatedInputTokens' => $this->promptTokenEstimator->estimate($request['system'], $request['user']),
             ];
         }
 
@@ -111,16 +120,18 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}> $states
-     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                                                             $window
+     * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int}> $states
+     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                                                                                        $window
      *
-     * @return array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}>
+     * @return array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int}>
      *
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
      */
     private function runWavefrontRound(PlatformInterface $platform, array $states, array $window, int $maxToolIterations): array
     {
-        $deferred = $this->dispatchPendingInvocations($platform, $states, $window);
+        $deferred = $this->dispatchPendingInvocations($platform, $states);
 
         foreach ($deferred as $index => $deferredResult) {
             $states[$index] = $this->advanceConversation($states[$index], $deferredResult, $window[$index], $maxToolIterations);
@@ -130,12 +141,11 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}> $states
-     * @param list<array{system: string, user: string, tools: ToolRegistry}>                                                                                                             $window
+     * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int}> $states
      *
      * @return array<int, DeferredResult|null>
      */
-    private function dispatchPendingInvocations(PlatformInterface $platform, array $states, array $window): array
+    private function dispatchPendingInvocations(PlatformInterface $platform, array $states): array
     {
         $deferred = [];
         foreach ($states as $index => $state) {
@@ -143,7 +153,7 @@ final readonly class ToolConversationWavefront
                 continue;
             }
 
-            $this->rateLimiter->acquire($this->promptTokenEstimator->estimate($window[$index]['system'], $window[$index]['user']));
+            $this->rateLimiter->acquire($state['estimatedInputTokens']);
 
             $deferred[$index] = $this->invokeWithoutThrowing($platform, $state['bag'], $state['options']);
         }
@@ -166,9 +176,11 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}> $states
+     * @param array<int, array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int}> $states
      *
      * @return list<LLMResponse>
+     *
+     * @throws InvalidTokenUsageException
      */
     private function collectResponses(array $states, int $maxToolIterations): array
     {
@@ -183,12 +195,14 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
-     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
+     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int} $state
+     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                                                  $request
      *
-     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
+     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int}
      *
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
      */
     private function advanceConversation(array $state, ?DeferredResult $deferredResult, array $request, int $maxToolIterations): array
     {
@@ -208,12 +222,13 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
-     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
+     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int} $state
+     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                                                  $request
      *
-     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
+     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int}
      *
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
      */
     private function processDeferredResult(array $state, DeferredResult $deferredResult, array $request): array
     {
@@ -260,56 +275,77 @@ final readonly class ToolConversationWavefront
     /**
      * Retries a failed dispatch/resolution through the same
      * classify-then-retry-or-fail seam the sequential path uses. Falls back to
-     * `abortConversation()` only once that retry itself fails — which restarts
+     * `abortConversation()` once that retry itself fails — which restarts
      * from scratch via completeWithTools() for a conversation that hasn't run
      * a tool yet, or finalizes as `empty_content` for one that has (it cannot
-     * restart without executing that tool a second time).
+     * restart without executing that tool a second time). The one exception:
+     * a tool-ran conversation whose retry failure is classified non-transient
+     * is rethrown rather than finalized, since a restart can't happen and
+     * masking the failure would produce a false-negative SAFE result.
      *
-     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
-     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
+     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int} $state
+     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                                                  $request
      *
-     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
+     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int}
      *
      * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
      */
     private function retryOrAbortConversation(array $state, array $request, int $maxToolIterations): array
     {
-        $estimatedInputTokens = $this->promptTokenEstimator->estimate($request['system'], $request['user']);
-
         try {
-            $deferredResult = $this->retryingPlatformInvoker->invoke($state['bag'], $state['options'], $estimatedInputTokens);
+            $deferredResult = $this->retryingPlatformInvoker->invoke($state['bag'], $state['options'], $state['estimatedInputTokens']);
+        } catch (NonTransientLLMFailureException $nonTransientLLMFailureException) {
+            if ($state['toolsRan']) {
+                throw $nonTransientLLMFailureException;
+            }
+
+            return $this->abortConversation($state, $request, $maxToolIterations);
         } catch (Throwable) {
             return $this->abortConversation($state, $request, $maxToolIterations);
         }
 
-        return $this->processDeferredResult($state, $deferredResult, $request);
+        try {
+            return $this->processDeferredResult($state, $deferredResult, $request);
+        } catch (BudgetExceededException $budgetExceededException) {
+            throw $budgetExceededException;
+        } catch (Throwable) {
+            return $this->abortConversation($state, $request, $maxToolIterations);
+        }
     }
 
     /**
-     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
-     * @param list<ToolCall>                                                                                                                                                 $toolCalls
-     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
+     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int} $state
+     * @param list<ToolCall>                                                                                                                                                                            $toolCalls
+     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                                                  $request
      *
-     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
+     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int}
      */
     private function runToolCalls(array $state, array $toolCalls, array $request): array
     {
         $state['bag']->add(new AssistantMessage(...$toolCalls));
+
+        $toolResults = [];
         foreach ($toolCalls as $toolCall) {
             $result = $request['tools']->execute($toolCall->getName(), $toolCall->getArguments());
             $state['bag']->add(new ToolCallMessage($toolCall, $result));
+            $toolResults[] = $result;
         }
 
+        $state['estimatedInputTokens'] += $this->promptTokenEstimator->estimate(...$toolResults);
         $state['toolsRan'] = true;
 
         return $state;
     }
 
     /**
-     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
-     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                       $request
+     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int} $state
+     * @param array{system: string, user: string, tools: ToolRegistry}                                                                                                                                  $request
      *
-     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null}
+     * @return array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int}
+     *
+     * @throws InvalidTokenUsageException
      */
     private function abortConversation(array $state, array $request, int $maxToolIterations): array
     {
@@ -334,7 +370,9 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null} $state
+     * @param array{bag: MessageBag, options: array<string, mixed>, input: int, output: int, cacheRead: int, cacheCreation: int, toolsRan: bool, response: LLMResponse|null, estimatedInputTokens: int} $state
+     *
+     * @throws InvalidTokenUsageException
      */
     private function toolIterationCapResponse(array $state, int $maxToolIterations): LLMResponse
     {

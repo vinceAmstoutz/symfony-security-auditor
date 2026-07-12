@@ -17,10 +17,14 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 final class FileChunkerTest extends TestCase
 {
+    /**
+     * @throws InvalidProjectFileException
+     */
     #[DataProvider('projectFileTypeCases')]
     public function test_type_strategy_orders_every_known_type_before_an_unrecognized_file(string $path, string $content): void
     {
@@ -55,6 +59,9 @@ final class FileChunkerTest extends TestCase
         yield 'plain php' => ['src/Service/FooService.php', '<?php'];
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_strategy_groups_related_files_together(): void
     {
         $files = [
@@ -77,6 +84,29 @@ final class FileChunkerTest extends TestCase
         self::assertNotContains('src/Entity/Order.php', $userChunkPaths);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_feature_strategy_groups_an_api_resource_with_its_repository(): void
+    {
+        $files = [
+            $this->makeFileWithContent('src/ApiResource/Offer.php', "<?php\n#[ApiResource]\nclass Offer {}"),
+            $this->makeFile('src/Repository/OfferRepository.php'),
+            $this->makeFile('src/Entity/Order.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $offerChunk = $this->findChunkContaining($chunks, 'src/ApiResource/Offer.php');
+        self::assertNotNull($offerChunk);
+        $offerChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $offerChunk);
+        self::assertContains('src/Repository/OfferRepository.php', $offerChunkPaths);
+        self::assertNotContains('src/Entity/Order.php', $offerChunkPaths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_strategy_groups_templates_under_matching_directory(): void
     {
         $files = [
@@ -94,6 +124,9 @@ final class FileChunkerTest extends TestCase
         self::assertContains('templates/user/edit.html.twig', $userChunkPaths);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_strategy_keeps_unrelated_files_in_leftover_chunks(): void
     {
         $files = [
@@ -109,6 +142,9 @@ final class FileChunkerTest extends TestCase
         self::assertContains('config/services.yaml', $allChunkedPaths);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_strategy_orders_files_within_chunk_by_attack_surface_priority(): void
     {
         $files = [
@@ -130,6 +166,9 @@ final class FileChunkerTest extends TestCase
         self::assertSame([], (new FileChunker(ChunkingStrategy::Feature))->chunk([]));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_strategy_returns_only_leftovers_when_no_controllers(): void
     {
         $files = [
@@ -143,6 +182,9 @@ final class FileChunkerTest extends TestCase
         self::assertCount(2, $chunks[0]);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_strategy_splits_oversized_feature_into_multiple_chunks(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -165,6 +207,9 @@ final class FileChunkerTest extends TestCase
         self::assertGreaterThan(1, \count($userChunks));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_type_strategy_sorts_by_priority(): void
     {
         $files = [
@@ -179,6 +224,9 @@ final class FileChunkerTest extends TestCase
         self::assertSame('src/Controller/UserController.php', $chunks[0][0]->relativePath());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_type_strategy_chunks_in_fixed_size_windows(): void
     {
         $files = [];
@@ -194,6 +242,9 @@ final class FileChunkerTest extends TestCase
         self::assertCount(5, $chunks[2]);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_default_strategy_is_feature(): void
     {
         $files = [
@@ -207,6 +258,9 @@ final class FileChunkerTest extends TestCase
         self::assertCount(2, $chunks[0]);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_extraction_skips_non_controllers_without_stopping(): void
     {
         $files = [
@@ -224,6 +278,9 @@ final class FileChunkerTest extends TestCase
         self::assertNotContains('src/Service/Foo.php', $paths);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_assignment_continues_past_unrelated_files(): void
     {
         $files = [
@@ -241,6 +298,9 @@ final class FileChunkerTest extends TestCase
         self::assertNotContains('src/Service/Unrelated.php', $paths);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_matches_files_whose_basename_starts_with_the_feature(): void
     {
         $files = [
@@ -256,6 +316,9 @@ final class FileChunkerTest extends TestCase
         self::assertContains('src/Entity/UserProfile.php', $paths);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_directory_match_requires_the_feature_segment_bounded_by_slashes(): void
     {
         $files = [
@@ -273,6 +336,27 @@ final class FileChunkerTest extends TestCase
         self::assertNotContains('src/username/Other.php', $paths);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_feature_matches_a_camel_case_boundary_starting_with_a_non_ascii_uppercase_letter(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/EleveController.php'),
+            $this->makeFile('src/Entity/EleveÉcole.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $eleveChunk = $this->findChunkContaining($chunks, 'src/Controller/EleveController.php');
+        self::assertNotNull($eleveChunk);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $eleveChunk);
+        self::assertContains('src/Entity/EleveÉcole.php', $paths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_each_feature_keeps_its_own_assignments(): void
     {
         $files = [
@@ -292,7 +376,10 @@ final class FileChunkerTest extends TestCase
         self::assertNotContains('src/Service/Misc.php', $paths);
     }
 
-    public function test_feature_strategy_skips_a_feature_whose_files_were_all_claimed_by_an_earlier_prefix_feature(): void
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_feature_strategy_keeps_prefix_colliding_controllers_in_separate_chunks(): void
     {
         $files = [
             $this->makeFile('src/Controller/UserController.php'),
@@ -301,16 +388,57 @@ final class FileChunkerTest extends TestCase
 
         $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
 
-        $allPaths = $this->allPaths($chunks);
-        self::assertContains('src/Controller/UserController.php', $allPaths);
-        self::assertContains('src/Controller/UsersController.php', $allPaths);
-        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UsersController.php');
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        $usersChunk = $this->findChunkContaining($chunks, 'src/Controller/UsersController.php');
         self::assertNotNull($userChunk);
+        self::assertNotNull($usersChunk);
         $userChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
-        self::assertContains('src/Controller/UserController.php', $userChunkPaths);
+        self::assertNotContains('src/Controller/UsersController.php', $userChunkPaths);
     }
 
-    public function test_feature_strategy_continues_past_an_emptied_feature_to_chunk_later_features(): void
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_feature_strategy_prefers_the_longer_more_specific_feature_for_a_prefix_overlapping_controller(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/Controller/UserAddressController.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        $userAddressChunk = $this->findChunkContaining($chunks, 'src/Controller/UserAddressController.php');
+        self::assertNotNull($userChunk);
+        self::assertNotNull($userAddressChunk);
+        $userChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
+        self::assertNotContains('src/Controller/UserAddressController.php', $userChunkPaths);
+        self::assertCount(2, $chunks);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_feature_strategy_leaves_a_feature_with_no_chunk_when_a_longer_feature_claims_its_only_file_via_a_directory_match(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserSettings/UserController.php'),
+            $this->makeFile('src/Controller/UserSettingsController.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        self::assertCount(1, $chunks);
+        $paths = $this->allPaths($chunks);
+        self::assertContains('src/Controller/UserSettings/UserController.php', $paths);
+        self::assertContains('src/Controller/UserSettingsController.php', $paths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_feature_strategy_chunks_later_features_correctly_alongside_prefix_colliding_ones(): void
     {
         $files = [
             $this->makeFile('src/Controller/UserController.php'),
@@ -329,6 +457,46 @@ final class FileChunkerTest extends TestCase
         self::assertNotContains('src/Service/Misc.php', $orderChunkPaths);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_feature_keeps_a_file_matching_two_equal_length_features_with_the_first_matched_feature(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/Controller/PostController.php'),
+            $this->makeFile('src/User/Post/Shared.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        self::assertNotNull($userChunk);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
+        self::assertContains('src/User/Post/Shared.php', $paths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_feature_does_not_group_a_file_whose_remainder_after_the_feature_starts_with_a_digit(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/UserController.php'),
+            $this->makeFile('src/User2Repository.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $userChunk = $this->findChunkContaining($chunks, 'src/Controller/UserController.php');
+        self::assertNotNull($userChunk);
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $userChunk);
+        self::assertNotContains('src/User2Repository.php', $paths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_non_positive_chunk_size_is_clamped_to_one(): void
     {
         $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];
@@ -339,9 +507,20 @@ final class FileChunkerTest extends TestCase
         self::assertCount(1, $chunks[0]);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     private function makeFile(string $path): ProjectFile
     {
         return ProjectFile::create($path, '/app/'.$path, '<?php');
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    private function makeFileWithContent(string $path, string $content): ProjectFile
+    {
+        return ProjectFile::create($path, '/app/'.$path, $content);
     }
 
     /**

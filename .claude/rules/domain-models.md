@@ -14,11 +14,10 @@ paths:
 - `AuditReport` is created exactly once via `AuditReport::fromContext()` after
   the pipeline finishes. It captures only `validatedVulnerabilities()`.
 - Vulnerability `id` is deterministic:
-  `VULN-{sha1(type+filePath+lineStart+microtime)[0..7]}` — do not change this
-  scheme.
+  `VULN-{sha1(type+filePath+lineStart)[0..7]}` (no microtime, no title) — do not
+  change this scheme.
 - Adding a `VulnerabilityType` case requires updating `category()`,
-  `owaspReference()`, `owaspReferenceUrl()`, `cweReference()`, and
-  `cweReferenceUrl()` — nothing else changes.
+  `owaspReference()`, `owaspReferenceUrl()`, and `cwe()` — nothing else changes.
 - Adding a `VulnerabilitySeverity` case requires updating `score()`, `label()`,
   `isExploitable()`, and the `riskLevelEnum()` thresholds in `AuditReport`
   (`riskLevel()` derives its string from that enum).

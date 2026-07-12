@@ -44,7 +44,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
             '{{packageUrl}}' => ReportPackage::HOMEPAGE_URL,
             '{{projectPath}}' => $auditReport->projectPath(),
             '{{startedAt}}' => $auditReport->startedAt()->format('Y-m-d H:i:s'),
-            '{{duration}}' => \sprintf('%.1fs', $auditReport->durationSeconds()),
+            '{{duration}}' => \sprintf('%ss', number_format($auditReport->durationSeconds(), 1, '.', '')),
             '{{filesScanned}}' => $auditReport->filesScanned(),
             '{{tokens}}' => \sprintf('%s in / %s out', number_format($cost->inputTokens()), number_format($cost->outputTokens())),
             '{{primaryModel}}' => '' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel(),
@@ -86,25 +86,59 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
         return strtr($this->templateLoader->load('vulnerability.txt'), [
             '{{id}}' => $vulnerability->id(),
             '{{severity}}' => $vulnerability->severity()->label(),
-            '{{title}}' => $vulnerability->title(),
+            '{{title}}' => $this->sanitizeSingleLineField($vulnerability->title()),
             '{{owasp}}' => $vulnerability->type()->owaspReference(),
             '{{cwe}}' => $vulnerability->type()->cwe()->label(),
-            '{{filePath}}' => $vulnerability->filePath(),
+            '{{filePath}}' => $this->sanitizeSingleLineField($vulnerability->filePath()),
             '{{lineStart}}' => $vulnerability->lineStart(),
             '{{lineEnd}}' => $vulnerability->lineEnd(),
             '{{description}}' => $this->indentChunks($vulnerability->description()),
+            '{{vulnerableCode}}' => $this->indentLines($vulnerability->vulnerableCode()),
             '{{attackVector}}' => $this->indentChunks($vulnerability->attackVector()),
-            '{{proof}}' => $vulnerability->proof(),
+            '{{proof}}' => $this->indentLines($vulnerability->proof()),
+            '{{synthesizedPoc}}' => $this->synthesizedPocSection($vulnerability),
             '{{remediation}}' => $this->indentChunks($vulnerability->remediation()),
             '{{confidence}}' => \sprintf('%.0f', $vulnerability->confidence() * 100),
         ]);
+    }
+
+    private function synthesizedPocSection(Vulnerability $vulnerability): string
+    {
+        $synthesizedPoC = $vulnerability->synthesizedPoC();
+
+        return null === $synthesizedPoC ? '' : \sprintf("\n  Synthesized PoC:\n%s\n", $this->indentLines($synthesizedPoC));
     }
 
     private function indentChunks(string $text): string
     {
         return implode("\n", array_map(
             static fn (string $chunk): string => \sprintf('    %s', $chunk),
-            explode("\n", u($text)->wordwrap(65, "\n", true)->toString()),
+            explode("\n", u(TerminalTextSanitizer::stripControlCharacters(mb_scrub($text, 'UTF-8')))->wordwrap(65, "\n", true)->toString()),
         ));
+    }
+
+    /**
+     * Unlike {@see self::indentChunks()}, this does not word-wrap: `proof` is
+     * often a literal command or request that would be corrupted by
+     * mid-line wrapping, so every existing line is simply prefixed as-is.
+     */
+    private function indentLines(string $text): string
+    {
+        return implode("\n", array_map(
+            static fn (string $line): string => \sprintf('    %s', $line),
+            explode("\n", TerminalTextSanitizer::stripControlCharacters(mb_scrub($text, 'UTF-8'))),
+        ));
+    }
+
+    /**
+     * `title`/`filePath` render on a single template line, unlike
+     * `description`/`attackVector`/`proof`/`remediation`, which are
+     * legitimately multi-line and rendered inside their own indented block —
+     * an embedded newline here would let a crafted finding forge a fake
+     * `[ID] SEVERITY` finding block as unguarded top-level output.
+     */
+    private function sanitizeSingleLineField(string $text): string
+    {
+        return TerminalTextSanitizer::collapseToSingleLine(mb_scrub($text, 'UTF-8'));
     }
 }

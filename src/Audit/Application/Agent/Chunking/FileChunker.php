@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking;
 
+use Symfony\Component\String\UnicodeString;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 
@@ -156,7 +157,7 @@ final readonly class FileChunker
     {
         $names = [];
         foreach ($files as $file) {
-            if (ProjectFileType::CONTROLLER !== $file->fileType()) {
+            if (!$file->fileType()->isControllerLike()) {
                 continue;
             }
 
@@ -172,7 +173,10 @@ final readonly class FileChunker
 
     private function featureNameOf(ProjectFile $projectFile): ?string
     {
-        $featureName = u(basename($projectFile->relativePath(), '.php'))->beforeLast('Controller')->toString();
+        $baseName = basename($projectFile->relativePath(), '.php');
+        $featureName = ProjectFileType::CONTROLLER === $projectFile->fileType()
+            ? u($baseName)->beforeLast('Controller')->toString()
+            : $baseName;
 
         return '' === $featureName ? null : $featureName;
     }
@@ -212,22 +216,52 @@ final readonly class FileChunker
         $baseName = basename(basename($projectFile->relativePath(), '.php'), '.twig');
         $relativePath = $projectFile->relativePath();
 
+        $matchedFeature = null;
         foreach ($featureNames as $featureName) {
-            if ($this->fileBelongsToFeature($baseName, $relativePath, $featureName)) {
-                return $featureName;
+            if (!$this->fileBelongsToFeature($baseName, $relativePath, $featureName)) {
+                continue;
+            }
+
+            if (null === $matchedFeature || \strlen($featureName) > \strlen($matchedFeature)) {
+                $matchedFeature = $featureName;
             }
         }
 
-        return null;
+        return $matchedFeature;
     }
 
     private function fileBelongsToFeature(string $baseName, string $relativePath, string $featureName): bool
     {
-        if (u($baseName)->startsWith($featureName)) {
+        if ($this->baseNameStartsAtFeatureBoundary($baseName, $featureName)) {
             return true;
         }
 
         return u($relativePath)->ignoreCase()->containsAny(\sprintf('/%s/', $featureName));
+    }
+
+    /**
+     * `startsWith()` alone would let `UsersController` match feature `User` —
+     * the prefix stops mid-word instead of at a CamelCase boundary. Requiring
+     * the remainder to be empty or start with an uppercase letter rejects that
+     * false match while still matching `UserController`, `UserRepository`, ….
+     */
+    private function baseNameStartsAtFeatureBoundary(string $baseName, string $featureName): bool
+    {
+        if (!u($baseName)->startsWith($featureName)) {
+            return false;
+        }
+
+        $remainder = u($baseName)->slice(u($featureName)->length());
+        if (0 === $remainder->length()) {
+            return true;
+        }
+
+        return $this->isUppercaseLetter($remainder->slice(0, 1));
+    }
+
+    private function isUppercaseLetter(UnicodeString $unicodeString): bool
+    {
+        return $unicodeString->upper()->equalsTo($unicodeString) && !$unicodeString->lower()->equalsTo($unicodeString);
     }
 
     private function priority(ProjectFile $projectFile): int

@@ -13,12 +13,15 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Tool;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 
 final class ToolDefinitionTest extends TestCase
 {
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_it_exposes_name_description_and_schema(): void
     {
         $toolDefinition = new ToolDefinition('read_file', 'Reads a file', ['type' => 'object']);
@@ -28,27 +31,39 @@ final class ToolDefinitionTest extends TestCase
         self::assertSame(['type' => 'object'], $toolDefinition->parametersSchema);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_it_rejects_empty_name(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidToolDefinitionException::class);
         new ToolDefinition('', 'desc', []);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_it_rejects_whitespace_only_name(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidToolDefinitionException::class);
         new ToolDefinition('  ', 'desc', []);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_it_rejects_empty_description(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidToolDefinitionException::class);
         new ToolDefinition('read_file', '', []);
     }
 
+    /**
+     * @throws InvalidToolDefinitionException
+     */
     public function test_it_rejects_whitespace_only_description(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidToolDefinitionException::class);
         new ToolDefinition('read_file', '  ', []);
     }
 }

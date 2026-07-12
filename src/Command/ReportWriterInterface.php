@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
@@ -24,6 +26,8 @@ interface ReportWriterInterface
      * @param list<string> $baselinedFingerprints fingerprints rendered as suppressed instead of dropped, by formats that support it (currently SARIF)
      *
      * @throws UnsupportedOutputFormatException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
      */
     public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle, array $baselinedFingerprints = []): void;
 }

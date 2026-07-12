@@ -156,16 +156,15 @@ final readonly class LLMResponse
             return null;
         }
 
+        $trackStringLiterals = $this->hasBalancedQuotes($content);
+
         $length = \strlen($content);
-        $inString = false;
-        $escape = false;
+        $state = ['inString' => false, 'escape' => false];
 
         for ($i = 0; $i < $length; ++$i) {
             $char = $content[$i];
-
-            $next = $this->advanceStringLiteralState($char, $inString, $escape);
-            $inString = $next['inString'];
-            $escape = $next['escape'];
+            $next = $this->advanceIfTrackingStringLiterals($trackStringLiterals, $char, $state);
+            $state = ['inString' => $next['inString'], 'escape' => $next['escape']];
 
             if ($next['consumed']) {
                 continue;
@@ -180,6 +179,54 @@ final readonly class LLMResponse
         }
 
         return null;
+    }
+
+    /**
+     * Delegates to {@see self::advanceStringLiteralState()} only when the
+     * content's quotes are genuinely paired — otherwise every character is
+     * reported as not consumed, so `recoverDecodedJsonBlock` tries every
+     * `[`/`{` position directly instead of relying on a toggle a stray
+     * unpaired quote would desync (see {@see self::hasBalancedQuotes()}).
+     *
+     * @param array{inString: bool, escape: bool} $state
+     *
+     * @return array{inString: bool, escape: bool, consumed: bool}
+     */
+    private function advanceIfTrackingStringLiterals(bool $trackStringLiterals, string $char, array $state): array
+    {
+        if (!$trackStringLiterals) {
+            return [...$state, 'consumed' => false];
+        }
+
+        return $this->advanceStringLiteralState($char, $state['inString'], $state['escape']);
+    }
+
+    /**
+     * An unescaped double-quote toggles "inside a string" on and off as
+     * `recoverDecodedJsonBlock` scans for the first genuine `[`/`{` opener —
+     * meant to skip a bracket embedded in a quoted prose phrase (see
+     * `test_it_skips_a_leading_quoted_string_with_escaped_bracket_before_the_real_array`).
+     * That toggle only makes sense when every quote in the content is
+     * genuinely paired; a single unpaired literal quote before the real
+     * JSON (e.g. a measurement like `5"`) would otherwise flip the running
+     * state permanently, hiding every opener after it — including the real
+     * one. Running the same state machine across the whole content and
+     * checking whether it ends still "inside a string" detects that case,
+     * so the scan can fall back to trying every opener directly instead.
+     */
+    private function hasBalancedQuotes(string $content): bool
+    {
+        $length = \strlen($content);
+        $inString = false;
+        $escape = false;
+
+        for ($i = 0; $i < $length; ++$i) {
+            $next = $this->advanceStringLiteralState($content[$i], $inString, $escape);
+            $inString = $next['inString'];
+            $escape = $next['escape'];
+        }
+
+        return !$inString;
     }
 
     private function decodeOpenerCandidate(string $content, int $start, string $char): mixed

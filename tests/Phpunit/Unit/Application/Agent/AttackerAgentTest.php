@@ -35,8 +35,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityCollector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
@@ -71,6 +77,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\StubInvestigationTool;
@@ -105,6 +113,8 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
      */
     #[MaximumDuration(250)]
     public function test_lean_mode_skip_logs_counts_records_skipped_coverage_and_returns_empty(): void
@@ -126,6 +136,24 @@ final class AttackerAgentTest extends TestCase
             public function recordCoverage(string $stage, string $filePath, string $status): void
             {
                 $this->statuses[] = $status;
+            }
+
+            #[Override]
+            public function recordReviewedFinding(Vulnerability $vulnerability): void {}
+
+            #[Override]
+            public function drainReviewedFindings(): array
+            {
+                return [];
+            }
+
+            #[Override]
+            public function recordFoundVulnerability(Vulnerability $vulnerability): void {}
+
+            #[Override]
+            public function drainFoundVulnerabilities(): array
+            {
+                return [];
             }
         };
 
@@ -150,6 +178,9 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidRiskMarkerException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
      */
     public function test_risk_markers_are_prepended_before_the_user_message(): void
     {
@@ -178,6 +209,9 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_previous_findings_are_prepended_before_the_user_message(): void
     {
@@ -207,6 +241,9 @@ final class AttackerAgentTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_rejected_findings_are_prepended_before_the_user_message_with_a_blank_line(): void
     {
@@ -236,6 +273,8 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws BudgetExceededException
      * @throws LLMProviderException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
      */
     public function test_it_sends_the_sliced_content_to_the_llm(): void
     {
@@ -271,6 +310,88 @@ final class AttackerAgentTest extends TestCase
         self::assertStringContainsString('SLICED-MARKER', $captured);
     }
 
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_line_flagged_by_the_static_pre_scanner_survives_code_slicing(): void
+    {
+        $inertLines = str_repeat("        \$x = 1;\n", 40);
+        $content = "<?php\n".$inertLines.'        $qb->where("u.username = $username");'."\n".$inertLines;
+        $projectFile = ProjectFile::create('src/Repository/UserRepository.php', '/app/src/Repository/UserRepository.php', $content);
+
+        $captured = '';
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
+            $captured = $user;
+
+            return LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0));
+        });
+
+        $attackerAgent = new AttackerAgent(
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                codeSlicer: new RegexCodeSlicer(10),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: new NullAttackerCache(),
+                staticPreScanner: new RegexStaticPreScanner(),
+                progressReporter: new NullProgressReporter(),
+            ),
+            new AttackerAnalysisSettings(),
+            new NullLogger(),
+        );
+
+        $attackerAgent->analyze(new AttackerAnalysisRequest([$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())), new NullCoverageRecorder());
+
+        self::assertStringContainsString('$qb->where("u.username = $username");', $captured);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidProjectFileException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_multi_line_risk_marker_restores_its_actually_dangerous_line_not_the_matchs_opening_line(): void
+    {
+        $inertLines = str_repeat("        \$x = 1;\n", 40);
+        $content = "<?php\nclass LoginAuthenticator {\n    public function supports(Request \$request): ?bool\n    {\n        return null;\n    }\n}\n".$inertLines;
+        $projectFile = ProjectFile::create('src/Security/LoginAuthenticator.php', '/app/src/Security/LoginAuthenticator.php', $content);
+
+        $captured = '';
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturnCallback(static function (string $system, string $user) use (&$captured): LLMResponse {
+            $captured = $user;
+
+            return LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(0, 0));
+        });
+
+        $attackerAgent = new AttackerAgent(
+            new AttackerLlmCollaborators(
+                llmClient: $llmClient,
+                attackerPromptBuilder: new AttackerPromptBuilder(),
+                vulnerabilityFactory: new VulnerabilityFactory(new NullLogger(), Validation::createValidator()),
+                codeSlicer: new RegexCodeSlicer(10),
+            ),
+            new AttackerScanCollaborators(
+                attackerCache: new NullAttackerCache(),
+                staticPreScanner: new RegexStaticPreScanner(),
+                progressReporter: new NullProgressReporter(),
+            ),
+            new AttackerAnalysisSettings(),
+            new NullLogger(),
+        );
+
+        $attackerAgent->analyze(new AttackerAnalysisRequest([$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap())), new NullCoverageRecorder());
+
+        self::assertStringContainsString('return null;', $captured);
+    }
+
     public function test_it_returns_empty_array_when_no_files(): void
     {
         $llmClient = $this->createMock(LLMClientInterface::class);
@@ -284,6 +405,10 @@ final class AttackerAgentTest extends TestCase
         self::assertEmpty($result);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_calls_llm_with_files_and_returns_vulnerabilities(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -323,6 +448,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame('Missing access control', $vulnerabilities[0]->title());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_handles_llm_json_parse_error_gracefully(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -343,6 +472,9 @@ final class AttackerAgentTest extends TestCase
         self::assertEmpty($result);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_handles_llm_exception_gracefully(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -361,6 +493,10 @@ final class AttackerAgentTest extends TestCase
         self::assertEmpty($result);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_handles_empty_llm_response(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -381,6 +517,10 @@ final class AttackerAgentTest extends TestCase
         self::assertEmpty($result);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_chunks_files_for_large_projects(): void
     {
         // Create 15 files (> CHUNK_SIZE of 10)
@@ -404,6 +544,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, $symfonyMapping, new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_accumulates_vulnerabilities_from_multiple_chunks(): void
     {
         $files = [];
@@ -461,6 +605,9 @@ final class AttackerAgentTest extends TestCase
         self::assertSame('BAC chunk 2', $result[1]->title());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     #[DataProvider('chunkPriorityCases')]
     public function test_it_orders_files_by_priority_in_chunks(string $higherPriorityPath, string $lowerPriorityPath): void
     {
@@ -510,6 +657,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame([], $result);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_info_when_starting_analysis_with_files(): void
     {
         $loggedMessages = [];
@@ -534,6 +685,10 @@ final class AttackerAgentTest extends TestCase
         self::assertContains('Attacker agent starting analysis', $loggedMessages);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_error_with_json_parse_failure_message(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
@@ -558,6 +713,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame([], $result);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_truncates_long_content_in_parse_failure_log(): void
     {
         $errorLogs = [];
@@ -593,6 +752,9 @@ final class AttackerAgentTest extends TestCase
         self::assertSame(str_repeat('x', self::PARSE_FAILURE_PREVIEW_BYTES), $preview);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_error_with_llm_call_failed_message_on_throwable(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
@@ -614,6 +776,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame([], $result);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_info_starting_analysis_with_exact_file_count(): void
     {
         $infoLogs = [];
@@ -640,6 +806,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame(['Attacker agent complete', ['total_vulnerabilities' => 0, 'total_dropped_entries' => 0, 'dropped_by_reason' => []]], $infoLogs[1]);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_aggregates_drop_counts_across_chunks_in_complete_log(): void
     {
         $infoLogs = [];
@@ -673,6 +843,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame([VulnerabilityDropReason::NON_ARRAY_ENTRY->value => 4], $completeLog[1]['dropped_by_reason']);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_debug_chunk_complete_with_exact_context(): void
     {
         $debugLogs = [];
@@ -701,6 +875,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame(['chunk' => 1, 'found' => 0, 'dropped' => 0, 'total_so_far' => 0], $debugLogs[1][1]);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_debug_analyzing_chunk_with_one_based_index_for_multiple_chunks(): void
     {
         $debugLogs = [];
@@ -736,6 +914,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame('Analyzing chunk 2/2', $analyzingMessages[1][0]);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_does_not_log_error_for_empty_llm_response(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
@@ -757,6 +939,9 @@ final class AttackerAgentTest extends TestCase
         self::assertSame([], $result);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_serves_chunk_from_cache_and_skips_llm(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -791,6 +976,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame('Cached finding', $result[0]->title());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_stores_chunk_results_in_cache_on_cache_miss(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -826,6 +1015,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_filters_non_array_entries_out_of_cached_payload_as_a_list(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -865,6 +1058,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_stores_empty_array_in_cache_when_llm_returns_empty_response(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -885,6 +1082,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_bypass_cache_skips_cache_get_and_calls_llm(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -904,6 +1105,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['bypassCache' => true]);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_bypass_cache_skips_cache_store_after_successful_llm_call(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -939,6 +1144,11 @@ final class AttackerAgentTest extends TestCase
         self::assertCount(1, $result);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_coverage_analyzed_for_each_file_in_chunk_after_llm_call(): void
     {
         $files = [
@@ -966,6 +1176,10 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_coverage_cached_for_each_file_in_chunk_on_cache_hit(): void
     {
         $files = [
@@ -994,6 +1208,10 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_coverage_errored_for_each_file_in_chunk_on_llm_exception(): void
     {
         $files = [
@@ -1021,6 +1239,10 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_coverage_aborted_when_llm_throws_budget_exceeded(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -1051,6 +1273,110 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_records_coverage_aborted_for_chunks_not_yet_reached_when_llm_throws_budget_exceeded_mid_run(): void
+    {
+        $files = $this->makeFiveFiles();
+
+        $callCount = 0;
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturnCallback(static function () use (&$callCount): LLMResponse {
+                ++$callCount;
+                if (2 === $callCount) {
+                    throw BudgetExceededException::forTokens(10, 5);
+                }
+
+                return LLMResponse::of('[]', 'claude', 'end_turn', TokenUsageSnapshot::of(1, 1));
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['fileChunker' => new FileChunker(ChunkingStrategy::Type, 1)]);
+
+        $budgetExceeded = false;
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The agent must rethrow BudgetExceededException.');
+
+        self::assertSame(
+            [
+                ['stage' => 'attacker', 'file' => 'src/A.php', 'status' => 'analyzed'],
+                ['stage' => 'attacker', 'file' => 'src/B.php', 'status' => 'aborted'],
+                ['stage' => 'attacker', 'file' => 'src/C.php', 'status' => 'aborted'],
+                ['stage' => 'attacker', 'file' => 'src/D.php', 'status' => 'aborted'],
+                ['stage' => 'attacker', 'file' => 'src/E.php', 'status' => 'aborted'],
+            ],
+            $auditContext->coverage(),
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_preserves_a_finding_found_before_a_mid_run_budget_abort(): void
+    {
+        $files = $this->makeFiveFiles();
+        $firstChunkResponse = (string) json_encode([[
+            'type' => 'sql_injection',
+            'severity' => 'high',
+            'title' => 'SQL Injection in A',
+            'description' => 'desc',
+            'file_path' => 'src/A.php',
+            'line_start' => 10,
+            'line_end' => 15,
+            'vulnerable_code' => '$q',
+            'attack_vector' => 'inject',
+            'proof' => "' OR 1",
+            'remediation' => 'fix',
+            'confidence' => 0.9,
+        ]]);
+
+        $callCount = 0;
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient
+            ->method('complete')
+            ->willReturnCallback(static function () use (&$callCount, $firstChunkResponse): LLMResponse {
+                ++$callCount;
+                if (2 === $callCount) {
+                    throw BudgetExceededException::forTokens(10, 5);
+                }
+
+                return LLMResponse::of($firstChunkResponse, 'claude', 'end_turn', TokenUsageSnapshot::of(1, 1));
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['fileChunker' => new FileChunker(ChunkingStrategy::Type, 1)]);
+
+        $budgetExceeded = false;
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The agent must rethrow BudgetExceededException.');
+
+        $survived = $auditContext->drainFoundVulnerabilities();
+        self::assertCount(1, $survived);
+        self::assertSame('src/A.php', $survived[0]->filePath());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_coverage_analyzed_when_llm_returns_empty_response(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -1072,6 +1398,11 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_records_coverage_errored_for_each_file_in_chunk_on_json_parse_error(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -1093,6 +1424,11 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_dispatches_to_tool_loop_when_tools_enabled_and_factory_provided(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -1114,6 +1450,11 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_does_not_dispatch_to_tool_loop_when_tools_disabled(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -1134,6 +1475,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_uses_non_tool_path_when_factory_is_null_even_if_enabled(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -1150,6 +1495,11 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_passes_custom_max_tool_iterations_through_to_llm_client(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -1169,6 +1519,11 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_tools_enabled_true_when_tools_active(): void
     {
         $infoLogs = [];
@@ -1200,6 +1555,9 @@ final class AttackerAgentTest extends TestCase
         self::assertTrue($startingLogs[0][1]['tools_enabled']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_logs_info_with_file_count_when_chunk_served_from_cache(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -1244,6 +1602,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame(['files' => 1], $cacheHitLogs[0][1]);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_does_not_store_in_cache_when_llm_returns_invalid_json(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -1262,6 +1624,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_propagates_llm_provider_exception_and_records_errored_coverage(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -1292,6 +1658,10 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_propagates_exhausted_transient_failure_and_records_errored_coverage(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -1340,6 +1710,8 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_injects_previous_findings_section_into_prompt_when_provided(): void
     {
@@ -1372,6 +1744,9 @@ final class AttackerAgentTest extends TestCase
         self::assertStringContainsString('src/Controller/EarlierController.php:42-46', $sentMessages[0]);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_does_not_inject_previous_findings_section_when_empty(): void
     {
         $sentMessages = [];
@@ -1395,6 +1770,9 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_skips_cache_when_previous_findings_present(): void
     {
@@ -1422,6 +1800,8 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_injects_rejected_findings_section_into_prompt_when_provided(): void
     {
@@ -1446,6 +1826,9 @@ final class AttackerAgentTest extends TestCase
         self::assertStringContainsString('src/Controller/RejectedController.php', $sentMessages[0]);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_does_not_inject_rejected_findings_section_when_empty(): void
     {
         $sentMessages = [];
@@ -1469,6 +1852,9 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_it_skips_cache_when_rejected_findings_present(): void
     {
@@ -1486,6 +1872,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['rejectedFindings' => $rejectedFindings]);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_reads_cache_when_no_previous_findings(): void
     {
         $cache = self::createMock(AttackerCacheInterface::class);
@@ -1503,6 +1893,8 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_previous_findings_section_groups_locations_by_vulnerability_type(): void
     {
@@ -1539,6 +1931,9 @@ final class AttackerAgentTest extends TestCase
         self::assertStringContainsString('src/Controller/B.php:20-25', $sentMessages[0]);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_injects_pre_scan_markers_section_when_scanner_reports_markers(): void
     {
         $sentMessages = [];
@@ -1552,6 +1947,9 @@ final class AttackerAgentTest extends TestCase
             });
 
         $scanner = new class implements StaticPreScannerInterface {
+            /**
+             * @throws InvalidRiskMarkerException
+             */
             #[Override]
             public function scan(array $files): array
             {
@@ -1576,6 +1974,9 @@ final class AttackerAgentTest extends TestCase
         self::assertStringContainsString('L7', $sentMessages[0]);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_does_not_inject_markers_section_when_scanner_returns_empty(): void
     {
         $sentMessages = [];
@@ -1596,6 +1997,9 @@ final class AttackerAgentTest extends TestCase
         self::assertStringNotContainsString('Pre-Scan Risk Markers', $sentMessages[0]);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_lean_mode_skips_files_with_no_markers(): void
     {
         $llmClient = self::createMock(LLMClientInterface::class);
@@ -1609,6 +2013,9 @@ final class AttackerAgentTest extends TestCase
         self::assertSame([], $result);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_lean_mode_keeps_files_with_markers(): void
     {
         $sentMessages = [];
@@ -1622,6 +2029,9 @@ final class AttackerAgentTest extends TestCase
             });
 
         $scanner = new class implements StaticPreScannerInterface {
+            /**
+             * @throws InvalidRiskMarkerException
+             */
             #[Override]
             public function scan(array $files): array
             {
@@ -1647,13 +2057,85 @@ final class AttackerAgentTest extends TestCase
         self::assertStringNotContainsString('src/Service/Clean.php', $sentMessages[0]);
     }
 
-    public function test_chunks_with_markers_still_consult_cache(): void
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_lean_mode_records_skipped_coverage_for_a_file_filtered_out_of_a_partial_match(): void
     {
-        $cache = self::createMock(AttackerCacheInterface::class);
-        $cache->expects(self::once())->method('get')->willReturn(null);
-        $cache->expects(self::once())->method('store');
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willReturn(LLMResponse::of('[]', 'test', 'end_turn', TokenUsageSnapshot::of(0, 0)));
 
         $scanner = new class implements StaticPreScannerInterface {
+            /**
+             * @throws InvalidRiskMarkerException
+             */
+            #[Override]
+            public function scan(array $files): array
+            {
+                return [
+                    RiskMarker::create(
+                        'src/Service/Risky.php',
+                        3,
+                        'eval_call',
+                        'eval() on dynamic input',
+                    ),
+                ];
+            }
+        };
+
+        $projectFile = ProjectFile::create('src/Service/Risky.php', '/app/src/Service/Risky.php', '<?php');
+        $clean = ProjectFile::create('src/Service/Clean.php', '/app/src/Service/Clean.php', '<?php');
+        $attackerAgent = $this->makeAttackerAgent($llmClient, ['staticPreScanner' => $scanner, 'leanMode' => true]);
+
+        $coverageRecorder = new class implements CoverageRecorderInterface {
+            /** @var array<string, string> */
+            public array $statusByPath = [];
+
+            #[Override]
+            public function recordCoverage(string $stage, string $filePath, string $status): void
+            {
+                $this->statusByPath[$filePath] = $status;
+            }
+
+            #[Override]
+            public function recordReviewedFinding(Vulnerability $vulnerability): void {}
+
+            #[Override]
+            public function drainReviewedFindings(): array
+            {
+                return [];
+            }
+
+            #[Override]
+            public function recordFoundVulnerability(Vulnerability $vulnerability): void {}
+
+            #[Override]
+            public function drainFoundVulnerabilities(): array
+            {
+                return [];
+            }
+        };
+
+        $this->callAnalyze($attackerAgent, [$projectFile, $clean], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $coverageRecorder);
+
+        self::assertSame('skipped', $coverageRecorder->statusByPath['src/Service/Clean.php'] ?? null);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
+    public function test_chunks_with_markers_still_consult_cache(): void
+    {
+        $cache = self::createMock(ContextAwareAttackerCacheInterface::class);
+        $cache->expects(self::once())->method('getForContext')->willReturn(null);
+        $cache->expects(self::once())->method('storeForContext');
+
+        $scanner = new class implements StaticPreScannerInterface {
+            /**
+             * @throws InvalidRiskMarkerException
+             */
             #[Override]
             public function scan(array $files): array
             {
@@ -1676,6 +2158,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_empty_llm_response_is_persisted_as_negative_cache_entry(): void
     {
         $cache = self::createMock(AttackerCacheInterface::class);
@@ -1692,6 +2178,9 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, [$projectFile], SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     private function makeFile(string $path): ProjectFile
     {
         return ProjectFile::create($path, '/app/'.$path, '<?php class Foo {}');
@@ -1700,6 +2189,7 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVulnerabilityFor(string $filePath): Vulnerability
     {
@@ -1731,6 +2221,9 @@ final class AttackerAgentTest extends TestCase
         self::fail(\sprintf('No log entry with message "%s"', $message));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_structured_collection_drives_findings_via_record_vulnerability_tool_calls(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -1768,6 +2261,93 @@ final class AttackerAgentTest extends TestCase
         self::assertSame('IDOR on user show', $vulnerabilities[0]->title());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_structured_collection_preserves_a_finding_recorded_before_a_later_round_of_the_same_chunk_aborts(): void
+    {
+        $files = [$this->makeFile('src/Controller/UserController.php')];
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
+                $toolRegistry->execute('record_vulnerability', [
+                    'type' => 'broken_access_control',
+                    'severity' => 'high',
+                    'title' => 'IDOR on user show',
+                    'description' => 'No ownership check on the controller.',
+                    'file_path' => 'src/Controller/UserController.php',
+                    'line_start' => 12,
+                    'line_end' => 14,
+                    'vulnerable_code' => '$repo->find($id);',
+                    'attack_vector' => 'GET /user/9999',
+                    'proof' => '200 OK leaking other tenant data',
+                    'remediation' => "Add denyAccessUnlessGranted('VIEW', \$user).",
+                    'confidence' => 0.9,
+                ]);
+
+                throw BudgetExceededException::forTokens(10, 5);
+            });
+
+        $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient);
+        $auditContext = AuditContext::forProject($this->tmpDir);
+
+        $budgetExceeded = false;
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The agent must rethrow BudgetExceededException.');
+
+        $survived = $auditContext->drainFoundVulnerabilities();
+        self::assertCount(1, $survived);
+        self::assertSame('IDOR on user show', $survived[0]->title());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_structured_collection_reports_progress_for_a_finding_recorded_before_a_later_round_of_the_same_chunk_aborts(): void
+    {
+        $files = [$this->makeFile('src/A.php')];
+
+        $llmClient = $this->createMock(LLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeWithTools')
+            ->willReturnCallback(static function (string $system, string $user, ToolRegistry $toolRegistry): LLMResponse {
+                $toolRegistry->execute('record_vulnerability', self::recordedFinding('finding-a'));
+
+                throw BudgetExceededException::forTokens(10, 5);
+            });
+
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient, null, $recordingProgressReporter);
+
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), AuditContext::forProject($this->tmpDir));
+            self::fail('expected BudgetExceededException');
+        } catch (BudgetExceededException) {
+            self::assertSame(
+                [['attacker.finding.recorded', ['severity' => 'high', 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1]]],
+                array_values(array_filter(
+                    $recordingProgressReporter->events,
+                    static fn (array $event): bool => 'attacker.finding.recorded' === $event[0],
+                )),
+            );
+        }
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_structured_collection_returns_empty_when_llm_makes_no_tool_calls(): void
     {
         $files = [$this->makeFile('src/Controller/Safe.php')];
@@ -1785,6 +2365,9 @@ final class AttackerAgentTest extends TestCase
         self::assertSame([], $vulnerabilities);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_structured_collection_drains_collector_between_chunks_so_findings_are_not_duplicated(): void
     {
         $files = [
@@ -1843,6 +2426,9 @@ final class AttackerAgentTest extends TestCase
         self::assertSame(['finding-1', 'finding-2'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_structured_collection_stores_drained_findings_in_the_attacker_cache_when_cacheable(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -1888,6 +2474,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_structured_collection_skips_cache_store_when_bypass_cache_is_requested(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -1905,6 +2495,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['bypassCache' => true]);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_structured_collection_records_chunk_coverage_as_analyzed(): void
     {
         $files = [$this->makeFile('src/Controller/UserController.php')];
@@ -1923,6 +2517,24 @@ final class AttackerAgentTest extends TestCase
             {
                 $this->records[] = ['stage' => $stage, 'file' => $filePath, 'status' => $status];
             }
+
+            #[Override]
+            public function recordReviewedFinding(Vulnerability $vulnerability): void {}
+
+            #[Override]
+            public function drainReviewedFindings(): array
+            {
+                return [];
+            }
+
+            #[Override]
+            public function recordFoundVulnerability(Vulnerability $vulnerability): void {}
+
+            #[Override]
+            public function drainFoundVulnerabilities(): array
+            {
+                return [];
+            }
         };
 
         $attackerAgent = $this->makeStructuredCollectionAttackerAgent($llmClient);
@@ -1932,6 +2544,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame([['stage' => 'attacker', 'file' => 'src/Controller/UserController.php', 'status' => 'analyzed']], $coverageRecorder->records);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_reports_chunk_progress_for_each_chunk(): void
     {
         $files = [
@@ -1976,6 +2592,10 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_reports_each_recorded_finding_with_severity_type_file_and_line(): void
     {
         $llmClient = self::createStub(LLMClientInterface::class);
@@ -2014,6 +2634,10 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_it_reports_each_chunk_completion_with_a_bounded_elapsed_time(): void
     {
         $files = [
@@ -2060,7 +2684,7 @@ final class AttackerAgentTest extends TestCase
         self::assertLessThan(60.0, $completed[0][1]['elapsed_seconds']);
     }
 
-    private function makeStructuredCollectionAttackerAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null): AttackerAgent
+    private function makeStructuredCollectionAttackerAgent(LLMClientInterface $llmClient, ?AttackerCacheInterface $attackerCache = null, ?ProgressReporterInterface $progressReporter = null): AttackerAgent
     {
         return new AttackerAgent(
             new AttackerLlmCollaborators(
@@ -2073,7 +2697,7 @@ final class AttackerAgentTest extends TestCase
             new AttackerScanCollaborators(
                 attackerCache: $attackerCache ?? new NullAttackerCache(),
                 staticPreScanner: new NullStaticPreScanner(),
-                progressReporter: new NullProgressReporter(),
+                progressReporter: $progressReporter ?? new NullProgressReporter(),
             ),
             new AttackerAnalysisSettings(
                 useStructuredCollection: true,
@@ -2082,6 +2706,10 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_concurrent_structured_analysis_records_each_chunk_via_its_own_registry_in_order(): void
     {
         $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];
@@ -2147,6 +2775,10 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_concurrent_structured_analysis_serves_cache_hits_and_dispatches_only_misses(): void
     {
         $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];
@@ -2181,6 +2813,10 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_concurrent_structured_analysis_rethrows_budget_exceeded(): void
     {
         $files = [$this->makeFile('src/A.php')];
@@ -2202,6 +2838,77 @@ final class AttackerAgentTest extends TestCase
         }
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_concurrent_structured_analysis_preserves_a_finding_recorded_before_the_whole_batch_call_aborts_on_budget_exceeded(): void
+    {
+        $files = [$this->makeFile('src/A.php')];
+
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests): array {
+                self::registryOf($requests[0])->execute('record_vulnerability', self::recordedFinding('finding-a'));
+
+                throw BudgetExceededException::forTokens(10, 5);
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient);
+
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+            self::fail('expected BudgetExceededException');
+        } catch (BudgetExceededException) {
+            $survived = $auditContext->drainFoundVulnerabilities();
+            self::assertCount(1, $survived);
+            self::assertSame('finding-a', $survived[0]->title());
+        }
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_concurrent_structured_analysis_reports_progress_for_a_finding_recorded_before_the_whole_batch_call_aborts_on_budget_exceeded(): void
+    {
+        $files = [$this->makeFile('src/A.php')];
+
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests): array {
+                self::registryOf($requests[0])->execute('record_vulnerability', self::recordedFinding('finding-a'));
+
+                throw BudgetExceededException::forTokens(10, 5);
+            });
+
+        $recordingProgressReporter = new RecordingProgressReporter();
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient, null, $recordingProgressReporter);
+
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+            self::fail('expected BudgetExceededException');
+        } catch (BudgetExceededException) {
+            self::assertSame(
+                [['attacker.finding.recorded', ['severity' => 'high', 'type' => 'broken_access_control', 'file' => 'src/A.php', 'line' => 1]]],
+                array_values(array_filter(
+                    $recordingProgressReporter->events,
+                    static fn (array $event): bool => 'attacker.finding.recorded' === $event[0],
+                )),
+            );
+        }
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_concurrent_structured_analysis_rethrows_llm_provider_exception(): void
     {
         $files = [$this->makeFile('src/A.php')];
@@ -2223,6 +2930,10 @@ final class AttackerAgentTest extends TestCase
         }
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_concurrent_structured_analysis_survives_an_unexpected_failure_and_records_errored_coverage(): void
     {
         $files = [$this->makeFile('src/A.php')];
@@ -2242,6 +2953,10 @@ final class AttackerAgentTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_concurrent_structured_analysis_logs_the_unexpected_failure_message_and_error(): void
     {
         $files = [$this->makeFile('src/A.php')];
@@ -2260,6 +2975,226 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
     }
 
+    /**
+     * @return list<ProjectFile>
+     *
+     * @throws InvalidProjectFileException
+     */
+    private function makeFiveFiles(): array
+    {
+        return [
+            $this->makeFile('src/A.php'),
+            $this->makeFile('src/B.php'),
+            $this->makeFile('src/C.php'),
+            $this->makeFile('src/D.php'),
+            $this->makeFile('src/E.php'),
+        ];
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_concurrent_structured_analysis_dispatches_multiple_windows_when_chunks_exceed_max_concurrent(): void
+    {
+        $files = $this->makeFiveFiles();
+
+        $windowSizes = [];
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::exactly(2))
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests) use (&$windowSizes): array {
+                $windowSizes[] = \count($requests);
+                foreach ($requests as $request) {
+                    self::registryOf($request)->execute('record_vulnerability', self::recordedFinding('finding'));
+                }
+
+                return array_fill(0, \count($requests), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient);
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+
+        self::assertSame([4, 1], $windowSizes);
+        self::assertCount(5, $vulnerabilities);
+        self::assertSame(array_fill(0, 5, 'analyzed'), array_column($auditContext->coverage(), 'status'));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_concurrent_structured_analysis_keeps_an_earlier_windows_findings_when_a_later_window_fails(): void
+    {
+        $files = $this->makeFiveFiles();
+
+        $cache = $this->createMock(AttackerCacheInterface::class);
+        $cache->method('get')->willReturn(null);
+        $cache->expects(self::exactly(4))->method('store');
+
+        $callCount = 0;
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::exactly(2))
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests) use (&$callCount): array {
+                ++$callCount;
+                if (2 === $callCount) {
+                    throw new RuntimeException('second window tore');
+                }
+
+                foreach ($requests as $request) {
+                    self::registryOf($request)->execute('record_vulnerability', self::recordedFinding('first-window-finding'));
+                }
+
+                return array_fill(0, \count($requests), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient, $cache);
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+
+        self::assertSame(
+            array_fill(0, 4, 'first-window-finding'),
+            array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities),
+        );
+        self::assertSame(
+            [
+                ['stage' => 'attacker', 'file' => 'src/A.php', 'status' => 'analyzed'],
+                ['stage' => 'attacker', 'file' => 'src/B.php', 'status' => 'analyzed'],
+                ['stage' => 'attacker', 'file' => 'src/C.php', 'status' => 'analyzed'],
+                ['stage' => 'attacker', 'file' => 'src/D.php', 'status' => 'analyzed'],
+                ['stage' => 'attacker', 'file' => 'src/E.php', 'status' => 'errored'],
+            ],
+            $auditContext->coverage(),
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_concurrent_structured_analysis_keeps_a_sibling_chunks_finding_when_one_chunk_fails_to_finalize_in_the_same_window(): void
+    {
+        $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];
+
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::once())
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests): array {
+                self::registryOf($requests[0])->execute('record_vulnerability', self::recordedFinding('finding-a'));
+                self::registryOf($requests[1])->execute('record_vulnerability', self::recordedFinding('finding-b'));
+
+                return array_fill(0, \count($requests), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $coverageRecorder = new class($auditContext) implements CoverageRecorderInterface {
+            public function __construct(private AuditContext $auditContext) {}
+
+            #[Override]
+            public function recordCoverage(string $stage, string $filePath, string $status): void
+            {
+                if ('src/B.php' === $filePath && 'analyzed' === $status) {
+                    throw new RuntimeException('coverage sink unavailable');
+                }
+
+                $this->auditContext->recordCoverage($stage, $filePath, $status);
+            }
+
+            #[Override]
+            public function recordReviewedFinding(Vulnerability $vulnerability): void
+            {
+                $this->auditContext->recordReviewedFinding($vulnerability);
+            }
+
+            #[Override]
+            public function drainReviewedFindings(): array
+            {
+                return $this->auditContext->drainReviewedFindings();
+            }
+
+            #[Override]
+            public function recordFoundVulnerability(Vulnerability $vulnerability): void
+            {
+                $this->auditContext->recordFoundVulnerability($vulnerability);
+            }
+
+            #[Override]
+            public function drainFoundVulnerabilities(): array
+            {
+                return $this->auditContext->drainFoundVulnerabilities();
+            }
+        };
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient);
+
+        $vulnerabilities = $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $coverageRecorder);
+
+        self::assertSame(['finding-a'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
+        self::assertSame(
+            [
+                ['stage' => 'attacker', 'file' => 'src/A.php', 'status' => 'analyzed'],
+                ['stage' => 'attacker', 'file' => 'src/B.php', 'status' => 'errored'],
+            ],
+            $auditContext->coverage(),
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_concurrent_structured_analysis_marks_only_the_failing_and_later_windows_as_aborted_on_budget_exceeded(): void
+    {
+        $files = $this->makeFiveFiles();
+
+        $callCount = 0;
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::exactly(2))
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests) use (&$callCount): array {
+                ++$callCount;
+                if (2 === $callCount) {
+                    throw BudgetExceededException::forTokens(10, 5);
+                }
+
+                foreach ($requests as $request) {
+                    self::registryOf($request)->execute('record_vulnerability', self::recordedFinding('first-window-finding'));
+                }
+
+                return array_fill(0, \count($requests), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+            });
+
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $attackerAgent = $this->makeConcurrentStructuredAgent($llmClient);
+
+        try {
+            $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), $auditContext);
+            self::fail('expected BudgetExceededException');
+        } catch (BudgetExceededException) {
+            self::assertSame(
+                [
+                    ['stage' => 'attacker', 'file' => 'src/A.php', 'status' => 'analyzed'],
+                    ['stage' => 'attacker', 'file' => 'src/B.php', 'status' => 'analyzed'],
+                    ['stage' => 'attacker', 'file' => 'src/C.php', 'status' => 'analyzed'],
+                    ['stage' => 'attacker', 'file' => 'src/D.php', 'status' => 'analyzed'],
+                    ['stage' => 'attacker', 'file' => 'src/E.php', 'status' => 'aborted'],
+                ],
+                $auditContext->coverage(),
+            );
+            self::assertCount(4, $auditContext->drainFoundVulnerabilities());
+        }
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_concurrency_is_ignored_when_the_client_cannot_batch_tools(): void
     {
         $files = [$this->makeFile('src/A.php')];
@@ -2291,6 +3226,9 @@ final class AttackerAgentTest extends TestCase
         return $toolRegistry;
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_max_concurrent_of_one_stays_sequential_even_on_a_tool_batch_capable_client(): void
     {
         $files = [$this->makeFile('src/A.php')];
@@ -2332,6 +3270,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame('sequential', $vulnerabilities[0]->title());
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_concurrency_is_ignored_when_structured_collection_is_off(): void
     {
         $files = [$this->makeFile('src/A.php')];
@@ -2370,6 +3312,9 @@ final class AttackerAgentTest extends TestCase
         self::assertSame('json-path', $vulnerabilities[0]->title());
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_concurrent_structured_analysis_treats_bypass_cache_chunks_as_non_cacheable(): void
     {
         $files = [$this->makeFile('src/A.php')];
@@ -2395,6 +3340,9 @@ final class AttackerAgentTest extends TestCase
         self::assertSame(['fresh'], array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->title(), $vulnerabilities));
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_concurrent_structured_analysis_aggregates_dropped_entries_across_chunks(): void
     {
         $files = [$this->makeFile('src/A.php'), $this->makeFile('src/B.php')];
@@ -2481,6 +3429,10 @@ final class AttackerAgentTest extends TestCase
         ];
     }
 
+    /**
+     * @throws InvalidToolRegistryException
+     * @throws InvalidProjectFileException
+     */
     public function test_structured_collection_keeps_the_investigation_tools_available(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -2503,6 +3455,10 @@ final class AttackerAgentTest extends TestCase
         self::assertSame([], $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder()));
     }
 
+    /**
+     * @throws InvalidToolRegistryException
+     * @throws InvalidProjectFileException
+     */
     public function test_concurrent_structured_collection_keeps_the_investigation_tools_available(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -2590,6 +3546,8 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_context_aware_cache_serves_chunks_carrying_previous_findings(): void
     {
@@ -2616,6 +3574,9 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_context_aware_cache_stores_context_carrying_chunks_after_the_llm_call(): void
     {
@@ -2637,6 +3598,10 @@ final class AttackerAgentTest extends TestCase
         $this->callAnalyze($attackerAgent, $files, SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()), new NullCoverageRecorder(), ['previousFindings' => $previousFindings]);
     }
 
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     */
     public function test_context_free_chunks_use_the_empty_context_key_on_a_context_aware_cache(): void
     {
         $files = [$this->makeFile('src/Controller/A.php')];
@@ -2656,6 +3621,9 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_context_unaware_cache_is_skipped_for_chunks_carrying_previous_findings(): void
     {
@@ -2679,6 +3647,9 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_context_key_is_the_hash_of_the_rendered_context_preambles(): void
     {
@@ -2706,7 +3677,7 @@ final class AttackerAgentTest extends TestCase
         $attackerContextPromptRenderer = new AttackerContextPromptRenderer();
         $expectedKey = hash(
             'sha256',
-            $attackerContextPromptRenderer->renderRejectedFindings([$rejectedFinding])."\0".$attackerContextPromptRenderer->renderPreviousFindings([$vulnerability]),
+            hash('sha256', '').hash('sha256', $attackerContextPromptRenderer->renderRejectedFindings([$rejectedFinding])).hash('sha256', $attackerContextPromptRenderer->renderPreviousFindings([$vulnerability])),
         );
         self::assertSame([$expectedKey], $contextKeys);
     }
@@ -2714,6 +3685,9 @@ final class AttackerAgentTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_previous_and_rejected_findings_produce_distinct_context_keys(): void
     {
@@ -2751,6 +3725,7 @@ final class AttackerAgentTest extends TestCase
      *     maxToolIterations?: int,
      *     staticPreScanner?: StaticPreScannerInterface|null,
      *     leanMode?: bool,
+     *     fileChunker?: FileChunker|null,
      * } $overrides
      */
     private function makeAttackerAgent(LLMClientInterface $llmClient, array $overrides = []): AttackerAgent
@@ -2766,6 +3741,7 @@ final class AttackerAgentTest extends TestCase
                 attackerCache: $overrides['attackerCache'] ?? new NullAttackerCache(),
                 staticPreScanner: $overrides['staticPreScanner'] ?? new NullStaticPreScanner(),
                 progressReporter: new NullProgressReporter(),
+                fileChunker: $overrides['fileChunker'] ?? null,
                 toolRegistryFactory: $overrides['toolRegistryFactory'] ?? null,
             ),
             new AttackerAnalysisSettings(

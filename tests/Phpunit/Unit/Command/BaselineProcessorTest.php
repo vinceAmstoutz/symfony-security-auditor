@@ -17,8 +17,10 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
@@ -50,6 +52,8 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_generate_writes_the_report_fingerprints_and_returns_their_count(): void
     {
@@ -80,6 +84,8 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_generate_records_the_attacker_fingerprint_when_the_reviewer_corrected_the_type(): void
     {
@@ -108,6 +114,8 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_generate_writes_one_entry_per_unique_fingerprint(): void
     {
@@ -122,6 +130,73 @@ final class BaselineProcessorTest extends TestCase
         $count = (new BaselineProcessor($baseline))->generate($auditReport, '/out/baseline.json');
 
         self::assertSame(1, $count);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_generate_keeps_separate_entries_for_two_findings_that_share_a_fingerprint_but_have_different_attacker_fingerprints(): void
+    {
+        $vulnerability = $this->makeVuln('src/A.php');
+        $correctedFromSsrf = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SSRF, VulnerabilitySeverity::HIGH, 'Finding src/A.php', 0.9),
+            new CodeLocation('src/A.php', 20, 25),
+            new VulnerabilityNarrative('desc2', 'vec2', 'proof2', 'fix2'),
+            'code2',
+        )->withReviewerValidation(true)->withCorrectedType(VulnerabilityType::SQL_INJECTION);
+
+        self::assertSame($vulnerability->fingerprint(), $correctedFromSsrf->fingerprint());
+        self::assertNotSame($vulnerability->attackerFingerprint(), $correctedFromSsrf->attackerFingerprint());
+
+        $auditReport = $this->makeReport($vulnerability, $correctedFromSsrf);
+
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::once())
+            ->method('save')
+            ->with('/out/baseline.json', self::countOf(2));
+
+        $count = (new BaselineProcessor($baseline))->generate($auditReport, '/out/baseline.json');
+
+        self::assertSame(2, $count);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_generate_keeps_separate_entries_for_two_distinct_uncorrected_findings_that_share_a_fingerprint(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Shared title', 0.9),
+            new CodeLocation('src/Shared.php', 10, 12),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+        $second = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Shared title', 0.9),
+            new CodeLocation('src/Shared.php', 40, 42),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+
+        self::assertSame($vulnerability->fingerprint(), $second->fingerprint());
+        self::assertNotSame($vulnerability->id(), $second->id());
+
+        $auditReport = $this->makeReport($vulnerability, $second);
+
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::once())
+            ->method('save')
+            ->with('/out/baseline.json', self::countOf(2));
+
+        $count = (new BaselineProcessor($baseline))->generate($auditReport, '/out/baseline.json');
+
+        self::assertSame(2, $count);
     }
 
     public function test_accepted_fingerprints_returns_empty_when_no_path_is_configured(): void
@@ -161,6 +236,8 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_apply_returns_the_report_unchanged_when_no_baseline_path_is_set(): void
     {
@@ -179,6 +256,8 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_apply_suppresses_matching_findings_and_reports_the_suppressed_count(): void
     {
@@ -197,8 +276,40 @@ final class BaselineProcessorTest extends TestCase
     }
 
     /**
+     * `AuditOrchestrator::withoutBaselineAccepted()` already spent this
+     * baseline credit skipping a different, never-reviewed finding before the
+     * reviewer ever ran this run — re-applying the same credit here against a
+     * distinct, genuinely new, already-validated finding that merely shares
+     * its fingerprint must not silently drop it from the final report.
+     *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_apply_does_not_re_spend_a_baseline_credit_already_consumed_earlier_in_the_run(): void
+    {
+        $vulnerability = $this->makeVulnAtLine('src/Shared.php', 200);
+        $auditContext = AuditContext::forProject($this->tmpDir, acceptedFingerprints: [$vulnerability->fingerprint()]);
+        $auditContext->consumeBaselineCredit($vulnerability->fingerprint());
+        $auditContext->addVulnerability($vulnerability);
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        $baseline = self::createStub(BaselineInterface::class);
+        $baseline->method('load')->willReturn([$vulnerability->fingerprint()]);
+
+        $baselineResult = (new BaselineProcessor($baseline))->apply($auditReport, '/baseline.json');
+
+        self::assertSame(1, $baselineResult->report->totalVulnerabilities());
+        self::assertSame(0, $baselineResult->suppressedCount);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_apply_exposes_the_matched_fingerprints_on_the_result(): void
     {
@@ -216,6 +327,8 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_apply_prefers_the_cli_baseline_over_the_configured_path(): void
     {
@@ -235,6 +348,8 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     public function test_apply_falls_back_to_the_configured_path_when_no_cli_override(): void
     {
@@ -251,6 +366,9 @@ final class BaselineProcessorTest extends TestCase
         self::assertSame(1, $baselineResult->report->totalVulnerabilities());
     }
 
+    /**
+     * @throws InvalidAuditContextException
+     */
     private function makeReport(Vulnerability ...$vulnerabilities): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
@@ -264,12 +382,27 @@ final class BaselineProcessorTest extends TestCase
     /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
      */
     private function makeVuln(string $filePath): Vulnerability
     {
+        return $this->makeVulnAtLine($filePath, 1);
+    }
+
+    /**
+     * Same type/file/title as {@see self::makeVuln()} at a different line —
+     * a distinct finding (distinct `id()`) sharing the identical, line-
+     * independent `fingerprint()`.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function makeVulnAtLine(string $filePath, int $lineStart): Vulnerability
+    {
         return Vulnerability::of(
             new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Finding '.$filePath, 0.9),
-            new CodeLocation($filePath, 1, 5),
+            new CodeLocation($filePath, $lineStart, $lineStart + 4),
             new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
             'code',
         )->withReviewerValidation(true);

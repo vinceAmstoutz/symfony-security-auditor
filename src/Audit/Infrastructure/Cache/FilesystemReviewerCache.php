@@ -22,15 +22,16 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\UnsafeCacheWriteException;
 
 use function Symfony\Component\String\u;
 
 /**
  * Filesystem-backed reviewer-verdict cache. The key is the SHA-256 of the
- * finding's stable content (its `toArray()` minus the non-deterministic `id`)
- * plus the reviewed code context, folded behind an optional key salt
- * (reviewer model + cache version) so a model or contract change invalidates
- * every stored verdict.
+ * finding's stable content (its `toArray()` minus the non-deterministic `id`
+ * and `detected_at`) plus the reviewed code context, folded behind an
+ * optional key salt (reviewer model + cache version) so a model or contract
+ * change invalidates every stored verdict.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -53,20 +54,28 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
         private string $keySalt = '',
     ) {
         if (u($cacheDir)->trim()->isEmpty()) {
-            throw InvalidCacheConfigurationException::forEmptyCacheDir();
+            throw InvalidCacheConfigurationException::forEmptyCacheDir('Reviewer');
         }
     }
 
     #[Override]
     public function get(Vulnerability $vulnerability, string $codeContext): ?array
     {
-        $path = $this->pathFor($vulnerability, $codeContext);
-
-        if (!$this->filesystem->exists($path)) {
-            return null;
-        }
+        $path = null;
 
         try {
+            $path = $this->pathFor($vulnerability, $codeContext);
+
+            if (!$this->filesystem->exists($path)) {
+                return null;
+            }
+
+            if ($this->isSymlinkedPath($path)) {
+                $this->logger->warning('Reviewer cache entry path was a symlink, ignoring', ['path' => $path]);
+
+                return null;
+            }
+
             $decoded = json_decode($this->filesystem->readFile($path), true, flags: \JSON_THROW_ON_ERROR);
             if (!\is_array($decoded)) {
                 return null;
@@ -75,17 +84,10 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
             $this->logger->debug('Reviewer cache hit', ['path' => $path]);
 
             return $this->coerceToReview($decoded);
-        } catch (IOException $ioException) {
+        } catch (IOException|JsonException $exception) {
             $this->logger->warning('Reviewer cache entry was unreadable, ignoring', [
                 'path' => $path,
-                'error' => $ioException->getMessage(),
-            ]);
-
-            return null;
-        } catch (JsonException $jsonException) {
-            $this->logger->warning('Reviewer cache entry was unreadable, ignoring', [
-                'path' => $path,
-                'error' => $jsonException->getMessage(),
+                'error' => $exception->getMessage(),
             ]);
 
             return null;
@@ -95,9 +97,11 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
     #[Override]
     public function store(Vulnerability $vulnerability, string $codeContext, array $review): void
     {
-        $path = $this->pathFor($vulnerability, $codeContext);
+        $path = null;
 
         try {
+            $path = $this->pathFor($vulnerability, $codeContext);
+            $this->assertSafeToWrite($path);
             $encoded = json_encode($review, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
             $this->filesystem->mkdir(\dirname($path));
             $this->filesystem->dumpFile($path, $encoded);
@@ -108,6 +112,36 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
                 'error' => $throwable->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * `Filesystem::dumpFile()` transparently writes through a symlink at its
+     * destination, and `Filesystem::mkdir()` treats a symlinked directory as
+     * already existing — a cache path derived entirely from the finding's own
+     * content (attacker-influenced file paths and descriptions) lets a
+     * malicious contributor pre-plant a symlink at the exact path this cache
+     * will write to, turning a routine audit run into an arbitrary-file
+     * overwrite.
+     *
+     * @throws UnsafeCacheWriteException
+     */
+    private function assertSafeToWrite(string $path): void
+    {
+        if ($this->isSymlinkedPath($path)) {
+            throw UnsafeCacheWriteException::forSymlinkedPath($path);
+        }
+    }
+
+    /**
+     * Mirrors {@see self::assertSafeToWrite()}'s check for the read side —
+     * `Filesystem::readFile()` also transparently follows a symlink, so the
+     * same pre-planted symlink that would otherwise corrupt a write turns an
+     * ordinary cache read into an arbitrary-file read whose content is
+     * trusted as a real, previously-computed verdict.
+     */
+    private function isSymlinkedPath(string $path): bool
+    {
+        return is_link($path) || is_link(\dirname($path));
     }
 
     /**
@@ -136,6 +170,8 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
     {
         $finding = $vulnerability->toArray();
         unset($finding['id']);
+        // detected_at is stamped fresh on every construction — keeping it in the key would make every cache entry a same-run-only hit.
+        unset($finding['detected_at']);
 
         $signature = \sprintf("%s\0%s", json_encode($finding, \JSON_THROW_ON_ERROR), $codeContext);
         if ('' !== $this->keySalt) {
