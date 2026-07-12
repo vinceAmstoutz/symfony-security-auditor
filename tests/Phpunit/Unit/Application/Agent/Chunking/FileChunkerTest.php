@@ -438,6 +438,25 @@ final class FileChunkerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_feature_strategy_still_chunks_every_later_feature_after_a_feature_emptied_by_a_directory_claim(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/Order/UserController.php'),
+            $this->makeFile('src/Controller/OrderController.php'),
+            $this->makeFile('src/Controller/ProductController.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        self::assertCount(2, $chunks);
+        $productChunk = $this->findChunkContaining($chunks, 'src/Controller/ProductController.php');
+        self::assertNotNull($productChunk);
+        self::assertCount(1, $productChunk);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_strategy_chunks_later_features_correctly_alongside_prefix_colliding_ones(): void
     {
         $files = [

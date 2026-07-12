@@ -218,6 +218,22 @@ final class PoCSynthesisStageTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_it_does_not_record_count_metadata_when_no_validated_findings(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability($this->makeVulnerability());
+
+        (new PoCSynthesisStage($this->makeNoopSynthesizer(), new NullLogger(), true))->process($auditContext);
+
+        self::assertNull($auditContext->getMeta('audit.poc_synthesized'));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_it_logs_completion_with_enriched_and_total_counts(): void
     {
         $vulnerability = $this->makeVulnerability()->withReviewerValidation(true);

@@ -10,11 +10,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
-A large batch of bug fixes and `@internal` hardening accumulated across many
-review rounds, plus several new user-facing features. No public API is removed
-or altered incompatibly — every change is additive, a bug fix, or an internal
-improvement. The per-change detail that previously lived here is preserved in
-the git history of this branch.
+## [1.13.0] — 2026-07-12 — Groundtruth
+
+A precision release: the auditor's picture of the audited codebase now matches
+reality. Route, security, voter, and form parsing report the truth to the
+attacker LLM; the pre-scanner and code slicer recognize the multi-line and
+idiomatic forms of every construct they target; and four new attack surfaces —
+file uploads, Twig extensions, API Platform resources, and Symfony UX Live
+Components — are first-class. On top of that: findings carry CWE references,
+`audit:diff` compares two reports by fingerprint, JUnit and GitHub-annotation
+output formats land, the auditor ships as a standalone native binary, and LLM
+pricing comes from the daily `symfony/models-dev` catalog. No public API is
+removed or altered incompatibly — every change is additive, a bug fix, or an
+internal improvement.
 
 ### Added
 
@@ -27,6 +35,9 @@ the git history of this branch.
   (`external/cwe/cwe-*`).
 - **New `audit:diff` command** compares two JSON reports and reports new, fixed,
   and persisting findings by fingerprint.
+- **Each finding in JSON output now carries its stable `fingerprint`** — the
+  same `SSA-`-prefixed hash that backs baselines and SARIF `partialFingerprints`
+  — so reports can be diffed and findings tracked across runs.
 - **New output formats**: `--format junit` (JUnit XML for CI test panels) and
   `--format github` (GitHub Actions annotations shown inline on a PR's Files
   Changed view).
@@ -1945,6 +1956,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.13.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.13.0
 [1.12.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.12.0
 [1.11.0]:

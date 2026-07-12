@@ -124,10 +124,6 @@ final readonly class ConcurrentReviewAnalyzer
      */
     private function dispatchPending(array $requests, array $pending, CoverageRecorderInterface $coverageRecorder): array
     {
-        if ([] === $requests) {
-            return [];
-        }
-
         $windowSize = max(1, $this->maxConcurrent);
         $requestWindows = array_chunk($requests, $windowSize);
         $pendingWindows = array_chunk($pending, $windowSize);
