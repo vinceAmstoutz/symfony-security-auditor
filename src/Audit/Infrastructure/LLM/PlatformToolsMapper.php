@@ -50,7 +50,7 @@ final readonly class PlatformToolsMapper
     /**
      * @param array<string, mixed> $schema
      *
-     * @return JsonSchema
+     * @phpstan-return JsonSchema
      */
     private static function normalizeSchema(array $schema): array
     {
