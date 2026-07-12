@@ -44,7 +44,7 @@ final readonly class PoCSynthesisStage implements StageInterface
             return;
         }
 
-        $validated = array_values($auditContext->validatedVulnerabilities());
+        $validated = $auditContext->validatedVulnerabilities();
 
         if ([] === $validated) {
             $this->logger->info('PoC synthesis: no validated findings to enrich');
