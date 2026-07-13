@@ -19,6 +19,7 @@ final readonly class ScanConfiguration
      * @param list<string>                                                            $includedPaths
      * @param list<string>                                                            $additionalScrubberPatterns
      * @param array<string, array<string, array{regex: string, description: string}>> $customRiskPatterns
+     * @param list<string>                                                            $importSarifPaths
      */
     public function __construct(
         public array $includedPaths,
@@ -27,5 +28,6 @@ final readonly class ScanConfiguration
         public bool $secretScrubbingEnabled,
         public array $additionalScrubberPatterns,
         public array $customRiskPatterns = [],
+        public array $importSarifPaths = [],
     ) {}
 }

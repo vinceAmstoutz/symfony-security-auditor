@@ -44,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
@@ -70,6 +71,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMCl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
@@ -207,13 +209,39 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ? LockfileHashedAdvisoryCache::class
             : SymfonyProcessComposerAuditRunner::class);
 
-        $servicesConfigurator->alias(StaticPreScannerInterface::class, $bundleConfiguration->audit->staticPreScanEnabled
-            ? RegexStaticPreScanner::class
-            : NullStaticPreScanner::class);
+        $this->registerStaticPreScanner($servicesConfigurator, $bundleConfiguration);
 
         $servicesConfigurator->alias(CodeSlicerInterface::class, $bundleConfiguration->audit->codeSlicingEnabled
             ? RegexCodeSlicer::class
             : NullCodeSlicer::class);
+    }
+
+    /**
+     * With `scan.import_sarif` configured, the effective pre-scanner is the
+     * SARIF importer decorating whichever scanner `audit.static_prescan`
+     * selected — imports work even with the regex pre-scan disabled.
+     */
+    private function registerStaticPreScanner(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
+    {
+        $staticPreScanner = $bundleConfiguration->audit->staticPreScanEnabled
+            ? RegexStaticPreScanner::class
+            : NullStaticPreScanner::class;
+
+        if ([] === $bundleConfiguration->scan->importSarifPaths) {
+            $servicesConfigurator->alias(StaticPreScannerInterface::class, $staticPreScanner);
+
+            return;
+        }
+
+        $servicesConfigurator->set(SarifImportingPreScanner::class)
+            ->private()
+            ->args([
+                service($staticPreScanner),
+                $bundleConfiguration->scan->importSarifPaths,
+                service(Filesystem::class),
+                service(AuditedProjectPathHolder::class),
+            ]);
+        $servicesConfigurator->alias(StaticPreScannerInterface::class, SarifImportingPreScanner::class);
     }
 
     private function registerEscalation(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void

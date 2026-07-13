@@ -36,6 +36,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `ReviewerFeedbackProviderInterface` Domain port (with the
   `ReviewerFeedback`/`AcceptedFindingFeedback` models) lets integrators plug in
   custom feedback sources.
+- **External SAST results now feed the attacker via SARIF import.** The new
+  `scan.import_sarif` config key takes paths to SARIF 2.1.0 report files
+  produced by taint-tracking tools (Psalm, PHPStan, Progpilot, Semgrep, …); each
+  result is imported as a deterministic `sarif:<tool>:<rule>` risk marker at its
+  file and line (`SarifImportingPreScanner` decorating the configured
+  pre-scanner), so the attacker starts from the external tool's concrete leads
+  and lean mode keeps every externally-flagged file. Relative paths resolve
+  against the audited project root, imports work even with
+  `audit.static_prescan.enabled: false`, results pointing outside the scan
+  surface are dropped, and a missing or malformed file aborts the audit with
+  `"...does not exist or is not readable"` / `"...is not valid JSON"` instead of
+  silently auditing without the imported signal.
 
 ## [1.13.0] — 2026-07-12 — Groundtruth
 
