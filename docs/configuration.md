@@ -23,6 +23,7 @@ bundle registration, bundle-level configuration, platform wiring via
 - [Standalone Configuration](#standalone-configuration)
 - [CLI Reference](#cli-reference)
   - [`audit:diff`](#auditdiff--comparing-two-reports)
+  - [`audit:trend`](#audittrend--tracking-findings-across-reports)
 
 > See also: [Architecture](architecture.md) · [Extending](extending.md) ·
 > [CI](ci.md) · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
@@ -576,4 +577,40 @@ bin/console audit:diff previous.json current.json --format=json
 
 Exit codes: `0` on a successful comparison (regardless of whether any findings
 are new, fixed, or persisting), `1` if a report file is missing or is not valid
+JSON.
+
+### `audit:trend` — tracking findings across reports
+
+Tracks how finding counts evolve across two or more JSON reports produced by
+`audit:run --format=json`, given oldest to newest. Every consecutive report pair
+is compared by the same stable `fingerprint` identity `audit:diff` uses, so each
+report's line shows its total plus how many findings appeared (**new**) and
+disappeared (**fixed**) since the report before it.
+
+```bash
+bin/console audit:trend nightly-01.json nightly-02.json nightly-03.json
+```
+
+```text
+Trend (3 reports)
+  1. nightly-01.json — 5 findings
+  2. nightly-02.json — 4 findings (1 new, 2 fixed)
+  3. nightly-03.json — 6 findings (2 new, 0 fixed)
+Summary: 5 → 6 findings (+1) across 3 reports.
+```
+
+| Argument  | Required | Description                                                  |
+| --------- | -------- | ------------------------------------------------------------ |
+| `reports` | yes      | Paths to two or more JSON reports, ordered oldest to newest. |
+
+| Option     | Short | Default   | Description                        |
+| ---------- | ----- | --------- | ---------------------------------- |
+| `--format` | `-f`  | `console` | Output format: `console` or `json` |
+
+With `--format=json` the trend is emitted as a `points` array — one entry per
+report with `report`, `total`, `new`, and `fixed` keys (`new` and `fixed` are
+`null` on the first point, which has no predecessor to compare against).
+
+Exit codes: `0` on a successful trend (regardless of how the counts evolve), `1`
+if fewer than two reports are given or a report file is missing or is not valid
 JSON.

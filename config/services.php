@@ -158,8 +158,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDifferInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzer;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPresenter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPresenterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 
@@ -341,6 +346,15 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(DiffPresenter::class);
     $defaultsConfigurator->alias(DiffPresenterInterface::class, DiffPresenter::class);
+
+    $defaultsConfigurator->set(ReportTrendAnalyzer::class)
+        ->args([
+            service(ReportDifferInterface::class),
+        ]);
+    $defaultsConfigurator->alias(ReportTrendAnalyzerInterface::class, ReportTrendAnalyzer::class);
+
+    $defaultsConfigurator->set(TrendPresenter::class);
+    $defaultsConfigurator->alias(TrendPresenterInterface::class, TrendPresenter::class);
 
     $defaultsConfigurator->set(ProcessGitChangedFilesResolver::class);
     $defaultsConfigurator->alias(GitChangedFilesResolverInterface::class, ProcessGitChangedFilesResolver::class);
@@ -581,6 +595,13 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->args([
             service(ReportDifferInterface::class),
             service(DiffPresenterInterface::class),
+        ])
+        ->tag('console.command');
+
+    $defaultsConfigurator->set(TrendCommand::class)
+        ->args([
+            service(ReportTrendAnalyzerInterface::class),
+            service(TrendPresenterInterface::class),
         ])
         ->tag('console.command');
 };
