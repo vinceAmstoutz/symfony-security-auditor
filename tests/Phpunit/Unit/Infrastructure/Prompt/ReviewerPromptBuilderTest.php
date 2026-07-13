@@ -550,6 +550,20 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString('Maintainer-accepted findings', (new ReviewerPromptBuilder())->buildSystemPrompt());
     }
 
+    public function test_the_absent_feedback_section_leaves_no_blank_gap_between_prompt_sections(): void
+    {
+        self::assertStringNotContainsString("\n\n\n", (new ReviewerPromptBuilder())->buildSystemPrompt());
+    }
+
+    public function test_the_feedback_section_opens_with_the_maintainer_baseline_header(): void
+    {
+        $reviewerPromptBuilder = $this->builderWithFeedback(false, [
+            new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', 'accepted risk'),
+        ]);
+
+        self::assertStringContainsString("Maintainer-accepted findings from this project's baseline (each with the maintainer's reason):", $reviewerPromptBuilder->buildSystemPrompt());
+    }
+
     #[DataProvider('feedbackPromptVariants')]
     public function test_system_prompts_list_each_baseline_reason_as_a_negative_example(bool $useStructuredCollection, bool $batch): void
     {
