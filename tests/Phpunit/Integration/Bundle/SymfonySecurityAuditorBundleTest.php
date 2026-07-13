@@ -69,6 +69,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPro
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
@@ -790,6 +791,28 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['static_prescan' => ['enabled' => false]]]);
 
         self::assertInstanceOf(NullStaticPreScanner::class, $this->getPrivateService($kernel, StaticPreScannerInterface::class));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(1500)]
+    public function test_bundle_wires_the_sarif_importer_around_the_pre_scanner_when_import_sarif_is_configured(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'scan' => ['import_sarif' => ['psalm.sarif']]]);
+
+        self::assertInstanceOf(SarifImportingPreScanner::class, $this->getPrivateService($kernel, StaticPreScannerInterface::class));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(1500)]
+    public function test_bundle_wires_the_sarif_importer_even_when_the_regex_pre_scan_is_disabled(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'scan' => ['import_sarif' => ['psalm.sarif']],
+            'audit' => ['static_prescan' => ['enabled' => false]],
+        ]);
+
+        self::assertInstanceOf(SarifImportingPreScanner::class, $this->getPrivateService($kernel, StaticPreScannerInterface::class));
     }
 
     #[RunInSeparateProcess]

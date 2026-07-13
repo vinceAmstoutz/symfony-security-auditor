@@ -64,6 +64,11 @@
               "minimum": 1,
               "description": "Skip files larger than this many kilobytes."
             },
+            "import_sarif": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Paths to SARIF 2.1.0 report files (Psalm, PHPStan, Progpilot, Semgrep, …) imported as additional risk markers for the attacker. Relative paths resolve against the audited project root. Default: []."
+            },
             "custom_risk_patterns": {
               "type": "object",
               "description": "Project-specific regex risk markers, keyed by file-type bucket then marker name.",

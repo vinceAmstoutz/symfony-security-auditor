@@ -38,7 +38,7 @@ Every key under `symfony_security_auditor:` documented in
   `provider_json_mode`
 - `scan.included_paths`, `scan.respect_gitignore`, `scan.max_file_size_kb`,
   `scan.secret_scrubbing.enabled`, `scan.secret_scrubbing.additional_patterns`,
-  `scan.custom_risk_patterns`
+  `scan.custom_risk_patterns`, `scan.import_sarif`
 - `profile`
 - `audit.max_iterations`, `audit.min_confidence`, `audit.reviewer_batch_size`,
   `audit.tools_enabled`, `audit.structured_collection`,
