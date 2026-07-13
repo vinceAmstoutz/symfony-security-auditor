@@ -132,6 +132,36 @@ final class TrendCommandTest extends TestCase
         );
     }
 
+    public function test_html_format_outputs_a_self_contained_html_document(): void
+    {
+        $first = $this->writeReport('first.json', []);
+        $second = $this->writeReport('second.json', [$this->vulnerability('SSRF via Webhook', 'src/Service/C.php')]);
+
+        $commandTester = $this->commandTester();
+        $commandTester->execute(['reports' => [$first, $second], '--format' => 'html']);
+
+        $display = $commandTester->getDisplay();
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        self::assertStringStartsWith('<!doctype html>', $display);
+        self::assertStringContainsString('0 → 1 findings (+1) across 2 reports.', $display);
+        self::assertStringContainsString('<polyline', $display);
+    }
+
+    public function test_a_missing_report_file_with_html_format_writes_the_error_to_stderr_keeping_stdout_parseable(): void
+    {
+        $first = $this->writeReport('first.json', []);
+
+        $commandTester = $this->commandTester();
+        $commandTester->execute(
+            ['reports' => [$first, $this->tmpDir.'/absent.json'], '--format' => 'html'],
+            ['capture_stderr_separately' => true],
+        );
+
+        self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
+        self::assertStringContainsString('exist or is not readable', $commandTester->getErrorOutput());
+        self::assertSame('', trim($commandTester->getDisplay()));
+    }
+
     /**
      * @return array{type: string, file: string, title: string, severity: string, fingerprint: string}
      */

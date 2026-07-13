@@ -168,6 +168,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendHtmlRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendHtmlRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPresenterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
@@ -362,7 +364,13 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ]);
     $defaultsConfigurator->alias(ReportTrendAnalyzerInterface::class, ReportTrendAnalyzer::class);
 
-    $defaultsConfigurator->set(TrendPresenter::class);
+    $defaultsConfigurator->set(TrendHtmlRenderer::class);
+    $defaultsConfigurator->alias(TrendHtmlRendererInterface::class, TrendHtmlRenderer::class);
+
+    $defaultsConfigurator->set(TrendPresenter::class)
+        ->args([
+            service(TrendHtmlRendererInterface::class),
+        ]);
     $defaultsConfigurator->alias(TrendPresenterInterface::class, TrendPresenter::class);
 
     $defaultsConfigurator->set(ProcessGitChangedFilesResolver::class);

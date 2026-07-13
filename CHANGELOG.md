@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **`audit:trend` can now render its timeline as a self-contained HTML
+  dashboard.** `audit:trend --format=html` emits a single HTML page — no
+  external assets, light and dark mode — with an SVG line chart of finding
+  totals across the report series and a table of each report's total plus its
+  new/fixed deltas, ready to redirect to a file and publish
+  (`audit:trend nightly-*.json --format=html > trend.html`). Rendering lives in
+  the new `src/Command/TrendHtmlRenderer.php` behind
+  `TrendHtmlRendererInterface`; report paths are HTML-escaped and stripped of
+  bidi-override characters, and — exactly as with `--format=json` — error
+  messages move to stderr so stdout carries the document alone. See
+  [CLI Reference → `audit:trend`](docs/configuration.md#audittrend--tracking-findings-across-reports).
 - **New `audit:trend` command tracks how finding counts evolve across a series
   of reports.** Given two or more JSON reports produced by
   `audit:run --format=json` (ordered oldest to newest), each consecutive pair is
