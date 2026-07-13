@@ -123,6 +123,11 @@ jobs:
           echo "list=${filtered},zlib" >> "$GITHUB_OUTPUT"
 
       - name: Build the static micro PHP runtime
+        env:
+          # Authenticate spc's --prefer-pre-built queries to the GitHub API
+          # (static-php-cli-hosted/releases); the unauthenticated 60-req/hour
+          # limit intermittently 403s a subset of the matrix.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ./spc download --for-extensions="${{ steps.extensions.outputs.list }}" --with-php=8.3 --prefer-pre-built
           ./spc build "${{ steps.extensions.outputs.list }}" --build-micro
@@ -153,6 +158,10 @@ jobs:
           # rebuild does not, so target the tag explicitly (the input on
           # dispatch, the pushed tag on a release event).
           tag_name: ${{ inputs.tag || github.ref_name }}
+          # Replace an asset of the same name instead of erroring or
+          # accumulating duplicates when the workflow is re-dispatched to
+          # repair a partially-published release.
+          overwrite_files: true
           files: |
             ${{ matrix.asset }}
             ${{ matrix.asset }}.sha256
