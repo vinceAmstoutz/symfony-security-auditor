@@ -19,7 +19,6 @@ use UnitEnum;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\AuditExecutionConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ConfigurationNotices;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
@@ -196,17 +195,10 @@ final readonly class ContainerParameterRegistrar
             return '';
         }
 
-        $fingerprint = array_map(
-            static fn (CustomAttackerSkill $customAttackerSkill): array => [
-                $customAttackerSkill->name,
-                $customAttackerSkill->fileType->value,
-                $customAttackerSkill->priority,
-                $customAttackerSkill->instructions,
-            ],
-            $bundleConfiguration->audit->customSkills,
-        );
+        // Every CustomAttackerSkill public property (name, fileType, instructions, priority) is captured by json_encode, so changing any one re-hashes the salt and re-runs the affected attacker chunks.
+        $encoded = json_encode($bundleConfiguration->audit->customSkills, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
 
-        return \sprintf('|custom-skills-%s', substr(hash('sha256', json_encode($fingerprint, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)), 0, 16));
+        return \sprintf('|custom-skills-%s', substr(hash('sha256', $encoded), 0, 16));
     }
 
     private function attackerToolsSalt(BundleConfiguration $bundleConfiguration): string

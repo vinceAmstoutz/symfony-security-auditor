@@ -129,17 +129,21 @@ final class BundleConfigurationTest extends TestCase
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
-    public function test_from_array_maps_custom_skills_into_value_objects(): void
+    public function test_from_array_maps_every_custom_skill_into_a_value_object(): void
     {
         $config = $this->treeBuilderOutput();
         $config['audit']['custom_skills'] = [
             'legacy_db' => ['file_type' => 'repository', 'instructions' => 'Use SafeQuery.', 'priority' => 42],
+            'legacy_voter' => ['file_type' => 'voter', 'instructions' => 'Deny by default.', 'priority' => 43],
         ];
 
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
         self::assertEquals(
-            [new CustomAttackerSkill('legacy_db', ProjectFileType::REPOSITORY, 'Use SafeQuery.', 42)],
+            [
+                new CustomAttackerSkill('legacy_db', ProjectFileType::REPOSITORY, 'Use SafeQuery.', 42),
+                new CustomAttackerSkill('legacy_voter', ProjectFileType::VOTER, 'Deny by default.', 43),
+            ],
             $bundleConfiguration->audit->customSkills,
         );
     }
