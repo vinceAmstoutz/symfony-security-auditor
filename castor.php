@@ -12,6 +12,9 @@
 declare(strict_types=1);
 
 use Castor\Attribute\AsTask;
+use VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval\EvalReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval\EvalScorer;
+use VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval\GroundTruthManifest;
 
 use function Castor\io;
 use function Castor\run;
@@ -64,6 +67,66 @@ function releaseBump(string $version): void
     }
 
     io()->success(sprintf('All version pins now point at %s.', $version));
+}
+
+#[AsTask(name: 'eval', description: 'Audit a ground-truth fixture and score detection precision/recall against its manifest')]
+function evaluate(
+    string $target = 'examples/vulnerable-app',
+    string $groundTruth = 'examples/vulnerable-app/ground-truth.json',
+    float $minPrecision = 0.0,
+    float $minRecall = 0.0,
+): void {
+    $reportPath = sprintf('%s/ssa-eval-%s.json', sys_get_temp_dir(), bin2hex(random_bytes(4)));
+
+    io()->section('Running the auditor against the fixture (uses real LLM calls)');
+    run(sprintf('docker compose exec php bin/console audit:run %s --format=json --output=%s', $target, $reportPath));
+
+    $manifest = GroundTruthManifest::fromFile($groundTruth);
+    $evalReport = (new EvalScorer())->score($manifest, actualFindingsFromReport($reportPath));
+
+    printEvalReport($evalReport);
+
+    if (!$evalReport->meetsThresholds($minPrecision, $minRecall)) {
+        io()->error(sprintf('Below thresholds: precision >= %.2f and recall >= %.2f required.', $minPrecision, $minRecall));
+
+        exit(1);
+    }
+
+    io()->success('Detection quality meets the configured thresholds.');
+}
+
+/**
+ * @return list<array{file: string, type: string}>
+ */
+function actualFindingsFromReport(string $reportPath): array
+{
+    $decoded = json_decode((string) file_get_contents($reportPath), true, flags: \JSON_THROW_ON_ERROR);
+    $vulnerabilities = is_array($decoded) ? ($decoded['vulnerabilities'] ?? []) : [];
+
+    $findings = [];
+    foreach (is_array($vulnerabilities) ? $vulnerabilities : [] as $vulnerability) {
+        if (is_array($vulnerability) && is_string($vulnerability['file'] ?? null) && is_string($vulnerability['type'] ?? null)) {
+            $findings[] = ['file' => $vulnerability['file'], 'type' => $vulnerability['type']];
+        }
+    }
+
+    return $findings;
+}
+
+function printEvalReport(EvalReport $evalReport): void
+{
+    $rows = [];
+    foreach ([$evalReport->overall, ...$evalReport->perClass] as $classScore) {
+        $rows[] = [
+            $classScore->type,
+            sprintf('%.0f%%', $classScore->precision() * 100),
+            sprintf('%.0f%%', $classScore->recall() * 100),
+            sprintf('%.2f', $classScore->f1()),
+            sprintf('%d / %d / %d', $classScore->truePositives, $classScore->falsePositives, $classScore->falseNegatives),
+        ];
+    }
+
+    io()->table(['Class', 'Precision', 'Recall', 'F1', 'TP / FP / FN'], $rows);
 }
 
 #[AsTask(name: 'lint', description: 'Check code style and analyze code')]

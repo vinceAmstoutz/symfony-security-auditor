@@ -40,16 +40,17 @@ to detect vulnerabilities and produce structured reports.
 bin/castor up
 ```
 
-| Task                 | Command                                           |
-| -------------------- | ------------------------------------------------- |
-| Install dependencies | `bin/castor up` (runs `docker compose up --wait`) |
-| Stop containers      | `bin/castor down`                                 |
-| Lint (check only)    | `bin/castor lint`                                 |
-| Lint + auto-fix      | `bin/castor lint:fix`                             |
-| Markdown check only  | `bin/castor lint:docs` (fast pre-push check)      |
-| Run PHP tests        | `docker compose exec php vendor/bin/phpunit`      |
-| Run mutation tests   | `docker compose exec php bin/infection`           |
-| Symfony console      | `docker compose exec php bin/console <command>`   |
+| Task                    | Command                                                                     |
+| ----------------------- | --------------------------------------------------------------------------- |
+| Install dependencies    | `bin/castor up` (runs `docker compose up --wait`)                           |
+| Stop containers         | `bin/castor down`                                                           |
+| Lint (check only)       | `bin/castor lint`                                                           |
+| Lint + auto-fix         | `bin/castor lint:fix`                                                       |
+| Markdown check only     | `bin/castor lint:docs` (fast pre-push check)                                |
+| Run PHP tests           | `docker compose exec php vendor/bin/phpunit`                                |
+| Run mutation tests      | `docker compose exec php bin/infection`                                     |
+| Score detection quality | `bin/castor eval` (audits a ground-truth fixture, reports precision/recall) |
+| Symfony console         | `docker compose exec php bin/console <command>`                             |
 
 `bin/castor lint` runs sequentially: Prettier (check) → Markdown lint
 (markdownlint-cli2) → Composer Normalize → PHP CS Fixer → Rector → PHPStan (max,

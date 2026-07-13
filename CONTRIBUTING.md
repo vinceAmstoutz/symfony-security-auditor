@@ -13,6 +13,7 @@ the dual-agent loop before you touch code.
 - [Daily Dev Loop](#daily-dev-loop)
 - [Running Tests](#running-tests)
 - [Mutation Testing](#mutation-testing)
+- [Evaluating Detection Quality](#evaluating-detection-quality)
 - [Code Quality](#code-quality)
 - [Writing Tests](#writing-tests)
 - [Common Tasks](#common-tasks)
@@ -118,6 +119,38 @@ killed. Suppression directives (`@infection-ignore-all`,
 `ignoreSourceCodeByRegex`, …) are not allowed — fix the underlying test gap
 instead. See
 [CLAUDE.md → Never Silence Quality Gates](CLAUDE.md#5-never-silence-quality-gates).
+
+## Evaluating Detection Quality
+
+Unit and mutation tests prove the code behaves as written; they say nothing
+about whether the auditor actually _finds vulnerabilities_. The eval harness
+closes that gap: it audits a fixture whose vulnerabilities are known ahead of
+time and scores the run against that ground truth.
+
+```bash
+bin/castor eval
+```
+
+This audits `examples/vulnerable-app` (real LLM calls, so it costs tokens), then
+scores the JSON report against
+[`examples/vulnerable-app/ground-truth.json`](examples/vulnerable-app/ground-truth.json)
+— a manifest of `{"file", "type"}` seeds. Scoring is at `(file, type)`
+granularity: a seed the run reproduced is a true positive, a seed it missed a
+false negative, and a reported finding with no matching seed a false positive
+(so a safe decoy file the auditor flags lowers precision). Precision, recall,
+and F1 are printed overall and per vulnerability class.
+
+Point it at another fixture and gate a run on minimum quality:
+
+```bash
+bin/castor eval --target=path/to/app --ground-truth=path/to/manifest.json \
+    --min-precision=0.8 --min-recall=0.9
+```
+
+The harness lives in [`tools/Eval/`](tools/Eval/) (namespace `Tooling\Eval`) —
+`GroundTruthManifest` loads and validates the manifest, `EvalScorer` computes
+the `EvalReport`. It is a maintainer tool, not part of the shipped bundle, so it
+is excluded from coverage and mutation scope like the rest of `tools/`.
 
 ## Code Quality
 
