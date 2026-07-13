@@ -71,6 +71,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   profile; the synthesizer emits `NO_FIX: …` (and the finding keeps only its
   prose remediation) when the issue needs a config change, a new class, or a
   cross-cutting redesign rather than a localized patch.
+- **Every finding now carries a heuristic CVSS v4.0 estimate.** Alongside the
+  existing OWASP and CWE references, each finding exposes a `cvss` object
+  (`version`, `vector`, `base_score`) — a `CvssEstimate` derived from the
+  finding's type and reviewer-assigned severity: the base score is the
+  representative value of the severity's CVSS band and the exploitability/impact
+  metrics follow the type's category. It appears in JSON output and, in SARIF,
+  as each result's `security-severity` (the score GitHub Code Scanning ranks
+  alerts by) plus a `cvssV4_0Vector` property. This is an estimate for
+  triage/dashboards, not an analyst-scored vector.
 
 ## [1.13.0] — 2026-07-12 — Groundtruth
 
