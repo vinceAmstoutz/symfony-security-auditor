@@ -200,6 +200,8 @@ final class AuditExecutionConfigurationTest extends TestCase
         self::assertSame('feature', $auditExecutionConfiguration->chunkingStrategy);
         self::assertFalse($auditExecutionConfiguration->poCSynthesisEnabled);
         self::assertSame('high', $auditExecutionConfiguration->poCSynthesisSeverityFloor);
+        self::assertFalse($auditExecutionConfiguration->fixSynthesisEnabled);
+        self::assertSame('high', $auditExecutionConfiguration->fixSynthesisSeverityFloor);
         self::assertFalse($auditExecutionConfiguration->codeSlicingEnabled);
         self::assertSame(80, $auditExecutionConfiguration->codeSlicingMinLines);
         self::assertFalse($auditExecutionConfiguration->escalationEnabled);

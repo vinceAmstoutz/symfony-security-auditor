@@ -545,7 +545,8 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
 
         $output = $this->renderer->render($this->makeReport($vulnerability));
 
-        self::assertStringContainsString('**Suggested fix:**', $output);
+        // The blank line before the label keeps it from fusing onto the Remediation paragraph in rendered Markdown.
+        self::assertStringContainsString("\n\n**Suggested fix:**\n", $output);
         self::assertStringContainsString('--- a/src/A.php', $output);
     }
 
