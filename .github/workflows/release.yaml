@@ -41,11 +41,13 @@ jobs:
       - name: Verify the PHAR was produced
         run: test -s symfony-security-auditor.phar
 
-      - name: Upload the PHAR build input
+      - name: Upload the PHAR build input with its dependency lock
         uses: actions/upload-artifact@v7
         with:
           name: symfony-security-auditor-phar
-          path: symfony-security-auditor.phar
+          path: |
+            symfony-security-auditor.phar
+            composer.lock
           retention-days: 1
           compression-level: 9
 
@@ -97,7 +99,9 @@ jobs:
 
       - name: Resolve the required extensions
         id: extensions
-        run: echo "list=$(./spc dump-extensions . --format=text)" >> "$GITHUB_OUTPUT"
+        run: |
+          list="$(./spc dump-extensions . --format=text)"
+          echo "list=$list" >> "$GITHUB_OUTPUT"
 
       - name: Build the static micro PHP runtime
         run: |
