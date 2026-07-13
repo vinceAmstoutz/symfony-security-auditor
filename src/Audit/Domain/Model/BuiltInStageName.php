@@ -20,4 +20,5 @@ enum BuiltInStageName: string
     case Mapping = 'mapping';
     case Audit = 'audit';
     case PoCSynthesis = 'poc_synthesis';
+    case FixSynthesis = 'fix_synthesis';
 }

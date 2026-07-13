@@ -117,6 +117,7 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
             '{{proof}}' => $this->escape($vulnerability->proof()),
             '{{synthesizedPoc}}' => $this->synthesizedPocSection($vulnerability),
             '{{remediation}}' => $this->escape($vulnerability->remediation()),
+            '{{suggestedFix}}' => $this->suggestedFixSection($vulnerability),
             '{{confidence}}' => $this->escape(\sprintf('%.0f', $vulnerability->confidence() * 100)),
         ]);
     }
@@ -126,6 +127,13 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
         $synthesizedPoC = $vulnerability->synthesizedPoC();
 
         return null === $synthesizedPoC ? '' : \sprintf("<h4>Synthesized PoC</h4>\n  <pre>%s</pre>", $this->escape($synthesizedPoC));
+    }
+
+    private function suggestedFixSection(Vulnerability $vulnerability): string
+    {
+        $suggestedFix = $vulnerability->suggestedFix();
+
+        return null === $suggestedFix ? '' : \sprintf("<h4>Suggested fix</h4>\n  <pre>%s</pre>", $this->escape($suggestedFix));
     }
 
     /**

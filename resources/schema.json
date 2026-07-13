@@ -240,6 +240,18 @@
                 }
               }
             },
+            "fix_synthesis": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean", "description": "Generate a suggested-fix unified-diff patch for qualifying findings. Default: false (opt in explicitly)." },
+                "severity_floor": {
+                  "type": "string",
+                  "enum": ["critical", "high", "medium", "low", "info"],
+                  "description": "Minimum severity that triggers fix synthesis. Default: high."
+                }
+              }
+            },
             "budget": {
               "type": "object",
               "additionalProperties": false,

@@ -263,6 +263,34 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_includes_the_suggested_fix_when_present(): void
+    {
+        $vulnerability = $this->makeValidatedVuln()->withSuggestedFix('--- a/src/A.php');
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('<h4>Suggested fix</h4>', $output);
+        self::assertStringContainsString('--- a/src/A.php', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_omits_the_suggested_fix_section_when_absent(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringNotContainsString('Suggested fix', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_render_renders_confidence_as_a_percentage(): void
     {
         $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));

@@ -114,6 +114,7 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
             '',
             ...$this->synthesizedPocLines($vulnerability),
             \sprintf('**Remediation:** %s', $this->escapeFences($vulnerability->remediation())),
+            ...$this->suggestedFixLines($vulnerability),
         ]);
     }
 
@@ -128,6 +129,19 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
         }
 
         return ['**Synthesized PoC:**', '', $this->codeBlock($synthesizedPoC), ''];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function suggestedFixLines(Vulnerability $vulnerability): array
+    {
+        $suggestedFix = $vulnerability->suggestedFix();
+        if (null === $suggestedFix) {
+            return [];
+        }
+
+        return ['', '**Suggested fix:**', '', $this->codeBlock($suggestedFix)];
     }
 
     /**

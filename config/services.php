@@ -23,6 +23,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestratorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\ChunkingStrategy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\FixSynthesizer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\FixSynthesizerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\PoCSynthesizerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToolFactoryInterface;
@@ -36,6 +38,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\FixSynthesisStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\PoCSynthesisStage;
@@ -425,6 +428,23 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(PoCSynthesizerInterface::class),
             service('logger'),
             param('symfony_security_auditor.audit.poc_synthesis.enabled'),
+        ]);
+
+    $defaultsConfigurator->set(FixSynthesizer::class)
+        ->args([
+            service('security_auditor.reviewer_client'),
+            service('logger'),
+            inline_service(VulnerabilitySeverity::class)
+                ->factory([VulnerabilitySeverity::class, 'from'])
+                ->args([param('symfony_security_auditor.audit.fix_synthesis.severity_floor')]),
+        ]);
+    $defaultsConfigurator->alias(FixSynthesizerInterface::class, FixSynthesizer::class);
+
+    $defaultsConfigurator->set(FixSynthesisStage::class)
+        ->args([
+            service(FixSynthesizerInterface::class),
+            service('logger'),
+            param('symfony_security_auditor.audit.fix_synthesis.enabled'),
         ]);
 
     $defaultsConfigurator->set(NullProgressReporter::class);

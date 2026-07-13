@@ -40,6 +40,8 @@ final readonly class AuditExecutionConfiguration
         public string $chunkingStrategy = 'feature',
         public bool $poCSynthesisEnabled = false,
         public string $poCSynthesisSeverityFloor = 'high',
+        public bool $fixSynthesisEnabled = false,
+        public string $fixSynthesisSeverityFloor = 'high',
         public bool $codeSlicingEnabled = false,
         public int $codeSlicingMinLines = 80,
         public bool $escalationEnabled = false,

@@ -845,6 +845,34 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_vulnerability_includes_the_suggested_fix_when_present(): void
+    {
+        $vulnerability = $this->makeValidatedVuln()->withSuggestedFix("--- a/src/A.php\n+++ b/src/A.php");
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('Suggested Fix:', $output);
+        self::assertStringContainsString('    --- a/src/A.php', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_vulnerability_omits_the_suggested_fix_section_when_absent(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringNotContainsString('Suggested Fix', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_render_vulnerability_indents_every_line_of_a_multi_line_proof(): void
     {
         $vulnerability = Vulnerability::of(

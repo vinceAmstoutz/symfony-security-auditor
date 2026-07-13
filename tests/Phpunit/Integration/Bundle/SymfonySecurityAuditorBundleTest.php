@@ -1045,6 +1045,21 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         yield 'info' => ['info'];
     }
 
+    #[DataProvider('pocSeverityFloorCases')]
+    public function test_bundle_accepts_each_fix_synthesis_severity_floor(string $severityFloor): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['fix_synthesis' => ['severity_floor' => $severityFloor]]]);
+
+        self::assertSame($severityFloor, $containerBuilder->getParameter('symfony_security_auditor.audit.fix_synthesis.severity_floor'));
+    }
+
+    public function test_bundle_enables_fix_synthesis_when_configured(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['fix_synthesis' => ['enabled' => true]]]);
+
+        self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.fix_synthesis.enabled'));
+    }
+
     public function test_bundle_derives_advisory_cache_dir_from_cache_dir(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'cache' => ['dir' => '/custom/cache']]);
