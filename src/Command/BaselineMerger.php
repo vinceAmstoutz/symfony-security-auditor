@@ -92,7 +92,7 @@ final readonly class BaselineMerger implements BaselineMergerInterface
     private function coveringFingerprint(array $remaining, BaselineEntry $baselineEntry): ?string
     {
         foreach ($baselineEntry->fingerprints() as $fingerprint) {
-            if (($remaining[$fingerprint] ?? 0) > 0) {
+            if (\array_key_exists($fingerprint, $remaining) && $remaining[$fingerprint] > 0) {
                 return $fingerprint;
             }
         }
@@ -117,7 +117,7 @@ final readonly class BaselineMerger implements BaselineMergerInterface
 
         $newFindings = [];
         foreach ($findings as $finding) {
-            if (($credits[$finding->fingerprint] ?? 0) > 0) {
+            if (\array_key_exists($finding->fingerprint, $credits) && $credits[$finding->fingerprint] > 0) {
                 --$credits[$finding->fingerprint];
 
                 continue;

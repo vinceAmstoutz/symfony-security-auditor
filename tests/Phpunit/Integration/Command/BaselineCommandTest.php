@@ -180,6 +180,58 @@ final class BaselineCommandTest extends TestCase
         );
     }
 
+    public function test_without_prune_a_stale_entry_survives(): void
+    {
+        $report = $this->writeReport([]);
+        $baseline = $this->tmpDir.'/baseline.json';
+        $this->filesystem->dumpFile($baseline, json_encode([
+            [
+                'fingerprint' => $this->fingerprint('Long Fixed'),
+                'type' => 'sql_injection',
+                'file' => 'src/Foo.php',
+                'title' => 'Long Fixed',
+                'added_at' => '2026-07-01',
+            ],
+        ], \JSON_THROW_ON_ERROR));
+
+        $commandTester = $this->commandTester();
+        $commandTester->execute(['report' => $report, 'baseline' => $baseline]);
+
+        self::assertStringContainsString('0 added, 1 kept, 0 pruned (1 entries).', $commandTester->getDisplay());
+    }
+
+    public function test_annotate_records_a_distinct_reason_per_new_finding(): void
+    {
+        $report = $this->writeReport([$this->vulnerability('SQL Injection'), $this->vulnerability('XSS')]);
+        $baseline = $this->tmpDir.'/baseline.json';
+
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['bound parameters', 'autoescaped output']);
+        $commandTester->execute(['report' => $report, 'baseline' => $baseline, '--annotate' => true]);
+
+        self::assertSame(
+            [
+                [
+                    'fingerprint' => $this->fingerprint('SQL Injection'),
+                    'type' => 'sql_injection',
+                    'file' => 'src/Foo.php',
+                    'title' => 'SQL Injection',
+                    'added_at' => '2026-07-13',
+                    'reason' => 'bound parameters',
+                ],
+                [
+                    'fingerprint' => $this->fingerprint('XSS'),
+                    'type' => 'sql_injection',
+                    'file' => 'src/Foo.php',
+                    'title' => 'XSS',
+                    'added_at' => '2026-07-13',
+                    'reason' => 'autoescaped output',
+                ],
+            ],
+            $this->decode($baseline),
+        );
+    }
+
     public function test_a_missing_report_fails_with_a_clear_error(): void
     {
         $commandTester = $this->commandTester();

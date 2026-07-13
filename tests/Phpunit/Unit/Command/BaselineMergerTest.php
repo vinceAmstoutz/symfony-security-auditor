@@ -178,6 +178,45 @@ final class BaselineMergerTest extends TestCase
      * @throws MalformedBaselineFileException
      * @throws MalformedReportFileException
      * @throws ReportFileNotReadableException
+     */
+    public function test_prune_keeps_entries_that_follow_a_pruned_one(): void
+    {
+        $report = $this->writeReport([$this->finding('SQL Injection')]);
+        $baseline = $this->writeBaseline([
+            $this->baselineEntry('Long Fixed'),
+            $this->baselineEntry('SQL Injection'),
+        ]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertCount(1, $baselineMergePlan->keptEntries);
+        self::assertSame($this->fingerprint('SQL Injection'), $baselineMergePlan->keptEntries[0]->fingerprint);
+        self::assertSame(1, $baselineMergePlan->prunedCount);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
+     */
+    public function test_prune_keeps_every_entry_matched_by_a_distinct_finding(): void
+    {
+        $report = $this->writeReport([$this->finding('SQL Injection'), $this->finding('XSS')]);
+        $baseline = $this->writeBaseline([
+            $this->baselineEntry('SQL Injection'),
+            $this->baselineEntry('XSS'),
+        ]);
+
+        $baselineMergePlan = $this->baselineMerger->plan($report, $baseline, true);
+
+        self::assertCount(2, $baselineMergePlan->keptEntries);
+        self::assertSame(0, $baselineMergePlan->prunedCount);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws MalformedReportFileException
+     * @throws ReportFileNotReadableException
      * @throws UnsafeBaselineWriteException
      */
     public function test_commit_preserves_kept_entries_verbatim_including_their_reasons(): void
