@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **New `audit:trend` command tracks how finding counts evolve across a series
+  of reports.** Given two or more JSON reports produced by
+  `audit:run --format=json` (ordered oldest to newest), each consecutive pair is
+  compared by the same stable `SSA-` fingerprint identity `audit:diff` uses, and
+  every report's line shows its total finding count plus how many findings
+  appeared and disappeared since the report before it — as a console timeline
+  or, with `--format=json`, a machine-readable `points` array. See
+  `src/Command/TrendCommand.php` and
+  [CLI Reference → `audit:trend`](docs/configuration.md#audittrend--tracking-findings-across-reports).
+
 ## [1.13.0] — 2026-07-12 — Groundtruth
 
 A precision release: the auditor's picture of the audited codebase now matches

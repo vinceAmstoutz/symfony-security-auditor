@@ -99,6 +99,12 @@ is a `MAJOR` change.
   its `previous-report` and `current-report` arguments, its `--format` option
   (`console` or `json`), and its exit codes (`0` on a successful comparison, `1`
   when a report file is missing or is not valid JSON).
+- The command name `audit:trend` (see
+  [CLI Reference → `audit:trend`](configuration.md#audittrend--tracking-findings-across-reports)),
+  its `reports` argument, its `--format` option (`console` or `json`), its JSON
+  output shape (the `points` array), and its exit codes (`0` on a successful
+  trend, `1` when fewer than two reports are given or a report file is missing
+  or is not valid JSON).
 
 ### Standalone executable & XDG configuration
 
