@@ -57,6 +57,9 @@ jobs:
     needs: phar
     permissions:
       contents: write
+    env:
+      SPC_VERSION: '2.8.5'
+
     strategy:
       fail-fast: false
       matrix:
@@ -85,11 +88,17 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.ref }}
 
-      - name: Setup static-php-cli
+      - name: Setup static-php-cli (pinned stable release)
         run: |
-          case "${{ matrix.spc }}" in *.exe) out=spc.exe ;; *) out=spc ;; esac
-          curl -fsSL --retry 3 -o "$out" "https://dl.static-php.dev/v3/spc-bin/nightly/${{ matrix.spc }}"
-          chmod +x "$out"
+          case "${{ matrix.spc }}" in
+            *.exe)
+              curl -fsSL --retry 3 -o spc.exe "https://github.com/crazywhalecc/static-php-cli/releases/download/${SPC_VERSION}/${{ matrix.spc }}"
+              ;;
+            *)
+              curl -fsSL --retry 3 "https://github.com/crazywhalecc/static-php-cli/releases/download/${SPC_VERSION}/${{ matrix.spc }}.tar.gz" | tar -xz
+              chmod +x spc
+              ;;
+          esac
           ./spc --version
 
       - name: Download the PHAR build input
@@ -97,11 +106,11 @@ jobs:
         with:
           name: symfony-security-auditor-phar
 
-      - name: Resolve the required extensions
+      - name: Resolve the required extensions plus zlib for the gz-compressed PHAR
         id: extensions
         run: |
           list="$(./spc dump-extensions . --format=text)"
-          echo "list=$list" >> "$GITHUB_OUTPUT"
+          echo "list=${list},zlib" >> "$GITHUB_OUTPUT"
 
       - name: Build the static micro PHP runtime
         run: |
