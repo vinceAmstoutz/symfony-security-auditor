@@ -29,6 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\RateLimitConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
@@ -69,6 +70,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Toke
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
@@ -111,7 +113,30 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $this->registerRateLimiter($services, $bundleConfiguration);
         $this->registerLlmClients($services, $bundleConfiguration);
         $this->registerImplementationAliases($services, $bundleConfiguration);
+        $this->registerCustomSkills($services, $bundleConfiguration);
         $this->registerEscalation($services, $bundleConfiguration);
+    }
+
+    /**
+     * Each configured `audit.custom_skills` entry becomes a tagged
+     * `ConfiguredAttackerSkill`, so `AttackerSkillRegistry`'s tagged iterator
+     * collects it beside the built-in skills with no registry change.
+     */
+    private function registerCustomSkills(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
+    {
+        foreach ($bundleConfiguration->audit->customSkills as $index => $customSkill) {
+            $servicesConfigurator->set(\sprintf('security_auditor.custom_skill.%d', $index), ConfiguredAttackerSkill::class)
+                ->private()
+                ->args([
+                    inline_service(CustomAttackerSkill::class)->args([
+                        $customSkill->name,
+                        $customSkill->fileType,
+                        $customSkill->instructions,
+                        $customSkill->priority,
+                    ]),
+                ])
+                ->tag('symfony_security_auditor.attacker_skill');
+        }
     }
 
     /**

@@ -41,7 +41,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
@@ -67,6 +69,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Null
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
@@ -1062,6 +1065,75 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         );
 
         self::assertSame($expectedKeySalt, $containerBuilder->getParameter('symfony_security_auditor.cache.key_salt'));
+    }
+
+    public function test_bundle_cache_key_salt_has_no_custom_skills_segment_without_custom_skills(): void
+    {
+        $keySalt = $this->loadParameters(['model' => 'gpt-4o'])->getParameter('symfony_security_auditor.cache.key_salt');
+
+        self::assertIsString($keySalt);
+        self::assertStringNotContainsString('|custom-skills-', $keySalt);
+    }
+
+    public function test_bundle_cache_key_salt_folds_in_configured_custom_skills(): void
+    {
+        $keySalt = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['custom_skills' => ['legacy_db' => ['file_type' => 'repository', 'instructions' => 'Use SafeQuery.']]],
+        ])->getParameter('symfony_security_auditor.cache.key_salt');
+
+        $expectedSegment = \sprintf(
+            '|custom-skills-%s',
+            substr(hash('sha256', json_encode(
+                [new CustomAttackerSkill('legacy_db', ProjectFileType::REPOSITORY, 'Use SafeQuery.', 500)],
+                \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES,
+            )), 0, 16),
+        );
+
+        self::assertIsString($keySalt);
+        self::assertStringEndsWith($expectedSegment, $keySalt);
+    }
+
+    public function test_bundle_cache_key_salt_changes_when_a_custom_skill_instruction_changes(): void
+    {
+        $first = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['custom_skills' => ['legacy_db' => ['file_type' => 'repository', 'instructions' => 'Use SafeQuery.']]],
+        ])->getParameter('symfony_security_auditor.cache.key_salt');
+        $second = $this->loadParameters([
+            'model' => 'gpt-4o',
+            'audit' => ['custom_skills' => ['legacy_db' => ['file_type' => 'repository', 'instructions' => 'Use SafeQuery everywhere.']]],
+        ])->getParameter('symfony_security_auditor.cache.key_salt');
+
+        self::assertNotSame($first, $second);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(1500)]
+    public function test_bundle_registers_a_tagged_attacker_skill_per_custom_skill_entry(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'audit' => ['custom_skills' => ['legacy_db' => ['file_type' => 'repository', 'instructions' => 'All queries go through SafeQuery.']]],
+        ]);
+
+        $configuredAttackerSkill = $this->getPrivateService($kernel, 'security_auditor.custom_skill.0');
+        self::assertInstanceOf(ConfiguredAttackerSkill::class, $configuredAttackerSkill);
+        self::assertStringContainsString('All queries go through SafeQuery.', $configuredAttackerSkill->block());
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(1500)]
+    public function test_bundle_defaults_an_omitted_custom_skill_priority_to_500(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'gpt-4o',
+            'audit' => ['custom_skills' => ['legacy_db' => ['file_type' => 'repository', 'instructions' => 'x']]],
+        ]);
+
+        $configuredAttackerSkill = $this->getPrivateService($kernel, 'security_auditor.custom_skill.0');
+        self::assertInstanceOf(ConfiguredAttackerSkill::class, $configuredAttackerSkill);
+        self::assertSame(500, $configuredAttackerSkill->priority());
     }
 
     public function test_bundle_cache_key_salt_folds_in_the_prescan_toggle(): void

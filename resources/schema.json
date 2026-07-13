@@ -179,6 +179,20 @@
               "items": { "type": "string" },
               "description": "Allowlist of vulnerability types: when non-empty, only findings whose type is listed are reported and counted toward the exit code. Default: [] (includes every type)."
             },
+            "custom_skills": {
+              "type": "object",
+              "description": "Project-defined attacker skill blocks merged into the attacker prompt, keyed by skill name. Each targets a file-type bucket and supplies free-form instructions injected when a file of that type appears in the chunk.",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "file_type": { "type": "string", "description": "File-type bucket the skill applies to (controller, voter, entity, repository, form, template, config, php, …)." },
+                  "instructions": { "type": "string", "description": "Free-form expert instructions injected into the prompt. State both what to hunt and what NOT to flag." },
+                  "priority": { "type": "integer", "description": "Emission rank — lower emits earlier. Default: 500 (after the built-in skills)." }
+                },
+                "required": ["file_type", "instructions"]
+              }
+            },
             "static_prescan": {
               "type": "object",
               "additionalProperties": false,

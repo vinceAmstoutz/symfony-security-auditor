@@ -158,7 +158,7 @@ final readonly class ContainerParameterRegistrar
     private function attackerKeySalt(BundleConfiguration $bundleConfiguration, string $model): string
     {
         return \sprintf(
-            '%s|prompt-v%d|prescan-v%d|prescan-%s|tools-%s|patterns-%s|collect-%s|skills-%s|slice-%s|max-output-%d',
+            '%s|prompt-v%d|prescan-v%d|prescan-%s|tools-%s|patterns-%s|collect-%s|skills-%s|slice-%s|max-output-%d%s',
             $model,
             AttackerPromptBuilder::PROMPT_VERSION,
             RegexStaticPreScanner::CACHE_VERSION,
@@ -176,7 +176,29 @@ final readonly class ContainerParameterRegistrar
             $bundleConfiguration->audit->stableSystemPrompt ? 'full' : 'lean',
             $this->codeSlicingSalt($bundleConfiguration),
             $bundleConfiguration->llm->attackerMaxOutputTokens(),
+            $this->customSkillsSalt($bundleConfiguration),
         );
+    }
+
+    /**
+     * Empty (no `|custom-skills-…` segment) when the project defines no custom
+     * skills, so an unconfigured project's attacker cache keys stay
+     * byte-identical to earlier releases; a change to any custom skill's
+     * bucket, priority, or instructions shifts the hash and re-runs the
+     * attacker.
+     *
+     * @throws JsonException
+     */
+    private function customSkillsSalt(BundleConfiguration $bundleConfiguration): string
+    {
+        if ([] === $bundleConfiguration->audit->customSkills) {
+            return '';
+        }
+
+        // Every CustomAttackerSkill public property (name, fileType, instructions, priority) is captured by json_encode, so changing any one re-hashes the salt and re-runs the affected attacker chunks.
+        $encoded = json_encode($bundleConfiguration->audit->customSkills, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
+
+        return \sprintf('|custom-skills-%s', substr(hash('sha256', $encoded), 0, 16));
     }
 
     private function attackerToolsSalt(BundleConfiguration $bundleConfiguration): string

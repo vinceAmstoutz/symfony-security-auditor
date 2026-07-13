@@ -17,6 +17,7 @@ use Symfony\Component\Config\Definition\Builder\NodeBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AuditOrchestrator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
@@ -225,6 +226,18 @@ final readonly class AuditConfigurationDefinition
                             ->enumPrototype()->values($this->vulnerabilityTypeValues())->end()
                             ->defaultValue([])
                         ->end()
+                        ->arrayNode('custom_skills')
+                            ->info('Project-defined attacker skill blocks, merged into the attacker prompt alongside the built-in ones. Keyed by skill name; each entry targets a file-type bucket and supplies free-form instructions (patterns to hunt, patterns NOT to flag) that are injected whenever a file of that type appears in the chunk. Lets standalone-binary users encode company-specific rules ("all queries to LegacyDb must go through SafeQuery") without owning a PHP AttackerSkillInterface. Default: {} (adds nothing).')
+                            ->useAttributeAsKey('name')
+                            ->arrayPrototype()
+                                ->children()
+                                    ->enumNode('file_type')->isRequired()->values($this->projectFileTypeValues())->info('File-type bucket the skill applies to (controller, voter, entity, repository, form, template, config, php, …).')->end()
+                                    ->scalarNode('instructions')->isRequired()->cannotBeEmpty()->info('Free-form expert instructions injected into the prompt. State both what to hunt and what NOT to flag.')->end()
+                                    ->integerNode('priority')->defaultValue(500)->info('Emission rank — lower emits earlier (weighted more heavily by the LLM). Built-in skills occupy roughly 10–400; the 500 default emits custom skills after them.')->end()
+                                ->end()
+                            ->end()
+                            ->defaultValue([])
+                        ->end()
                         ->arrayNode('static_prescan')
                             ->addDefaultsIfNotSet()
                             ->info('Deterministic zero-token risk-marker scan that runs before the LLM. Flags concrete locations (unserialize, |raw, csrf_protection: false, hardcoded secrets, Doctrine string concatenation, etc.) so the attacker prompt can focus on them. In lean mode, files with zero markers are skipped entirely — biggest token saver on large codebases.')
@@ -401,5 +414,13 @@ final readonly class AuditConfigurationDefinition
     private function vulnerabilityTypeValues(): array
     {
         return array_map(static fn (VulnerabilityType $vulnerabilityType): string => $vulnerabilityType->value, VulnerabilityType::cases());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function projectFileTypeValues(): array
+    {
+        return array_map(static fn (ProjectFileType $projectFileType): string => $projectFileType->value, ProjectFileType::cases());
     }
 }
