@@ -109,8 +109,15 @@ jobs:
       - name: Resolve the required extensions plus zlib for the gz-compressed PHAR
         id: extensions
         run: |
-          list="$(./spc dump-extensions . --format=text)"
-          echo "list=${list},zlib" >> "$GITHUB_OUTPUT"
+          # `spc dump-extensions` scans source usage and emits always-compiled
+          # PHP core extensions (date, …) that `spc download`/`build` reject as
+          # non-buildable packages; drop them, then append zlib for the
+          # GZ-compressed PHAR wrapper (box.json `compression: GZ`).
+          raw="$(./spc dump-extensions . --format=text)"
+          filtered="$(printf '%s' "$raw" | tr ',' '\n' \
+            | grep -vxE 'core|standard|date|hash|json|pcre|spl|reflection|random|zlib' \
+            | paste -sd, -)"
+          echo "list=${filtered},zlib" >> "$GITHUB_OUTPUT"
 
       - name: Build the static micro PHP runtime
         run: |
