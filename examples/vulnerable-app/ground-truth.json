@@ -1,0 +1,14 @@
+{
+  "findings": [
+    { "file": "src/Controller/SearchController.php", "type": "sql_injection" },
+    {
+      "file": "src/Controller/UserController.php",
+      "type": "insecure_direct_object_reference"
+    },
+    {
+      "file": "src/Controller/UserController.php",
+      "type": "broken_access_control"
+    },
+    { "file": "src/Entity/User.php", "type": "mass_assignment" }
+  ]
+}
