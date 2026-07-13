@@ -19,12 +19,15 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 
 final class ReviewerPromptBuilderTest extends TestCase
@@ -540,6 +543,74 @@ final class ReviewerPromptBuilderTest extends TestCase
 
         self::assertStringContainsString('Return ONLY the JSON array', $prompt);
         self::assertStringNotContainsString('record_review', $prompt);
+    }
+
+    public function test_system_prompts_carry_no_feedback_section_without_baseline_feedback(): void
+    {
+        self::assertStringNotContainsString('Maintainer-accepted findings', (new ReviewerPromptBuilder())->buildSystemPrompt());
+    }
+
+    #[DataProvider('feedbackPromptVariants')]
+    public function test_system_prompts_list_each_baseline_reason_as_a_negative_example(bool $useStructuredCollection, bool $batch): void
+    {
+        $reviewerPromptBuilder = $this->builderWithFeedback($useStructuredCollection, [
+            new AcceptedFindingFeedback('sql_injection', 'src/Repository/A.php', 'Raw DQL', 'Goes through SafeQuery, parameterized upstream.'),
+        ]);
+
+        $prompt = $batch ? $reviewerPromptBuilder->buildBatchSystemPrompt() : $reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('- [sql_injection] Raw DQL (src/Repository/A.php): Goes through SafeQuery, parameterized upstream.', $prompt);
+    }
+
+    /** @return iterable<string, array{bool, bool}> */
+    public static function feedbackPromptVariants(): iterable
+    {
+        yield 'json single' => [false, false];
+        yield 'json batch' => [false, true];
+        yield 'structured single' => [true, false];
+        yield 'structured batch' => [true, true];
+    }
+
+    public function test_the_feedback_section_warns_against_blind_rejection(): void
+    {
+        $reviewerPromptBuilder = $this->builderWithFeedback(false, [
+            new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', 'accepted risk'),
+        ]);
+
+        self::assertStringContainsString('Never reject a finding solely because it resembles one of these', $reviewerPromptBuilder->buildSystemPrompt());
+    }
+
+    public function test_feedback_entries_beyond_the_prompt_cap_are_dropped(): void
+    {
+        $entries = [];
+        for ($i = 1; $i <= ReviewerPromptBuilder::MAX_FEEDBACK_PROMPT_ENTRIES + 1; ++$i) {
+            $entries[] = new AcceptedFindingFeedback('sql_injection', \sprintf('src/File%d.php', $i), \sprintf('Finding %d', $i), \sprintf('Reason %d', $i));
+        }
+
+        $prompt = $this->builderWithFeedback(false, $entries)->buildSystemPrompt();
+
+        self::assertStringContainsString(\sprintf('Reason %d', ReviewerPromptBuilder::MAX_FEEDBACK_PROMPT_ENTRIES), $prompt);
+        self::assertStringNotContainsString(\sprintf('Reason %d', ReviewerPromptBuilder::MAX_FEEDBACK_PROMPT_ENTRIES + 1), $prompt);
+    }
+
+    public function test_a_multi_line_reason_is_collapsed_to_a_single_feedback_line(): void
+    {
+        $reviewerPromptBuilder = $this->builderWithFeedback(false, [
+            new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', "first line\nsecond   line"),
+        ]);
+
+        self::assertStringContainsString('(src/A.php): first line second line', $reviewerPromptBuilder->buildSystemPrompt());
+    }
+
+    /**
+     * @param list<AcceptedFindingFeedback> $entries
+     */
+    private function builderWithFeedback(bool $useStructuredCollection, array $entries): ReviewerPromptBuilder
+    {
+        $reviewerFeedbackHolder = new ReviewerFeedbackHolder();
+        $reviewerFeedbackHolder->set(new ReviewerFeedback($entries));
+
+        return new ReviewerPromptBuilder($useStructuredCollection, reviewerFeedbackProvider: $reviewerFeedbackHolder);
     }
 
     /**

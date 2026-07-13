@@ -55,6 +55,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
@@ -276,6 +277,7 @@ final class DiffCommandEndToEndTest extends TestCase
                 new ModelsDevPricingProvider(new NullLogger(), __DIR__.'/Fixture/pricing-catalog.json'),
                 ['stub'],
             ),
+            new ReviewerFeedbackHolder(),
             secretScrubbingEnabled: true,
             findingTypeFilter: new FindingTypeFilter([], []),
         );

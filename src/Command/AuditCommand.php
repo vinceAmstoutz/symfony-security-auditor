@@ -31,6 +31,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedPr
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\PlainProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
@@ -65,6 +66,7 @@ final readonly class AuditCommand
         private AuditedProjectPathHolder $auditedProjectPathHolder,
         private BaselineProcessorInterface $baselineProcessor,
         private UnpricedModelBudgetGuardInterface $unpricedModelBudgetGuard,
+        private ReviewerFeedbackHolder $reviewerFeedbackHolder,
         private bool $secretScrubbingEnabled,
         private FindingTypeFilterInterface $findingTypeFilter,
         private array $configNotices = [],
@@ -129,6 +131,8 @@ final readonly class AuditCommand
                 }
 
                 $this->beginAuditRun($symfonyStyle, $auditCommandInput);
+
+                $this->reviewerFeedbackHolder->set($this->baselineProcessor->feedback($auditCommandInput->baseline));
 
                 $report = $this->runAuditUseCase->execute($projectPath, $scanPaths, $auditCommandInput->noCache, $auditCommandInput->since, $this->acceptedFingerprintsFor($auditCommandInput));
                 $report = $this->findingTypeFilter->apply($report);

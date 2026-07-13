@@ -17,8 +17,12 @@ use JsonException;
 use Override;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
+
+use function Symfony\Component\String\u;
 
 /**
  * Reads and writes the JSON baseline file of accepted-finding fingerprints.
@@ -37,6 +41,40 @@ final readonly class Baseline implements BaselineInterface
     #[Override]
     public function load(string $path): array
     {
+        $fingerprints = [];
+        foreach ($this->decodeEntries($path) as $entry) {
+            foreach ($this->fingerprintsOf($entry, $path) as $fingerprint) {
+                $fingerprints[] = $fingerprint;
+            }
+        }
+
+        return $fingerprints;
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    #[Override]
+    public function feedback(string $path): ReviewerFeedback
+    {
+        $entries = [];
+        foreach ($this->decodeEntries($path) as $entry) {
+            $feedbackEntry = $this->feedbackOf($entry);
+            if ($feedbackEntry instanceof AcceptedFindingFeedback) {
+                $entries[] = $feedbackEntry;
+            }
+        }
+
+        return new ReviewerFeedback($entries);
+    }
+
+    /**
+     * @return list<mixed>
+     *
+     * @throws MalformedBaselineFileException
+     */
+    private function decodeEntries(string $path): array
+    {
         if (!$this->filesystem->exists($path)) {
             return [];
         }
@@ -53,14 +91,36 @@ final readonly class Baseline implements BaselineInterface
             throw MalformedBaselineFileException::notAJsonArrayOfStrings($path);
         }
 
-        $fingerprints = [];
-        foreach ($decoded as $entry) {
-            foreach ($this->fingerprintsOf($entry, $path) as $fingerprint) {
-                $fingerprints[] = $fingerprint;
-            }
+        return $decoded;
+    }
+
+    private function feedbackOf(mixed $entry): ?AcceptedFindingFeedback
+    {
+        if (!\is_array($entry)) {
+            return null;
         }
 
-        return $fingerprints;
+        $reason = $entry['reason'] ?? null;
+        if (!\is_string($reason) || u($reason)->trim()->isEmpty()) {
+            return null;
+        }
+
+        return new AcceptedFindingFeedback(
+            $this->stringField($entry, 'type'),
+            $this->stringField($entry, 'file'),
+            $this->stringField($entry, 'title'),
+            $reason,
+        );
+    }
+
+    /**
+     * @param array<array-key, mixed> $entry
+     */
+    private function stringField(array $entry, string $key): string
+    {
+        $value = $entry[$key] ?? null;
+
+        return \is_string($value) ? $value : '';
     }
 
     /**

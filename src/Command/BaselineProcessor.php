@@ -17,6 +17,7 @@ use Override;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Clock\Clock;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
@@ -67,6 +68,17 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
         }
 
         return $this->baseline->load($baselinePath);
+    }
+
+    #[Override]
+    public function feedback(?string $cliBaseline): ReviewerFeedback
+    {
+        $baselinePath = $cliBaseline ?? $this->configuredBaseline;
+        if (null === $baselinePath) {
+            return ReviewerFeedback::none();
+        }
+
+        return $this->baseline->feedback($baselinePath);
     }
 
     /**

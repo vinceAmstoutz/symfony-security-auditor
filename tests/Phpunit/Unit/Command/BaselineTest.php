@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
@@ -304,6 +305,73 @@ final class BaselineTest extends TestCase
             self::assertSame([], glob($outsideDir.'/*'));
             $this->filesystem->remove($outsideDir);
         }
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_feedback_is_empty_for_a_missing_file(): void
+    {
+        self::assertTrue((new Baseline($this->filesystem))->feedback($this->tmpDir.'/absent.json')->isEmpty());
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_feedback_collects_entries_annotated_with_a_reason(): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+        $entry = $this->entry('SSA-AAA');
+        $entry['reason'] = 'Query goes through SafeQuery, parameterized upstream.';
+        $this->filesystem->dumpFile($path, json_encode([$entry, $this->entry('SSA-BBB')], \JSON_THROW_ON_ERROR));
+
+        $reviewerFeedback = (new Baseline($this->filesystem))->feedback($path);
+
+        self::assertEquals(
+            [new AcceptedFindingFeedback('sql_injection', 'src/Foo.php', 'Test Vuln', 'Query goes through SafeQuery, parameterized upstream.')],
+            $reviewerFeedback->entries,
+        );
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_feedback_skips_a_blank_or_non_string_reason_and_plain_string_entries(): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+        $blankReason = $this->entry('SSA-AAA');
+        $blankReason['reason'] = '   ';
+        $nonStringReason = $this->entry('SSA-BBB');
+        $nonStringReason['reason'] = 42;
+        $this->filesystem->dumpFile($path, json_encode([$blankReason, $nonStringReason, 'SSA-CCC'], \JSON_THROW_ON_ERROR));
+
+        self::assertTrue((new Baseline($this->filesystem))->feedback($path)->isEmpty());
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_feedback_defaults_missing_metadata_fields_to_empty_strings(): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+        $this->filesystem->dumpFile($path, json_encode([['fingerprint' => 'SSA-AAA', 'reason' => 'accepted risk']], \JSON_THROW_ON_ERROR));
+
+        $reviewerFeedback = (new Baseline($this->filesystem))->feedback($path);
+
+        self::assertEquals([new AcceptedFindingFeedback('', '', '', 'accepted risk')], $reviewerFeedback->entries);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_feedback_throws_when_the_file_is_not_valid_json(): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+        $this->filesystem->dumpFile($path, '{not json');
+
+        $this->expectException(MalformedBaselineFileException::class);
+
+        (new Baseline($this->filesystem))->feedback($path);
     }
 
     /**
