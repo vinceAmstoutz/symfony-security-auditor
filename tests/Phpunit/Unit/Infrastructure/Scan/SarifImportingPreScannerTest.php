@@ -167,7 +167,10 @@ final class SarifImportingPreScannerTest extends TestCase
 
         $markers = $this->scanner([$sarif])->scan([$this->projectFile('src/A.php')]);
 
-        self::assertSame(['sarif:Psalm:result', 'result'], [$markers[0]->pattern(), $markers[0]->description()]);
+        self::assertSame(
+            ['sarif:Psalm:result', 'result', 1],
+            [$markers[0]->pattern(), $markers[0]->description(), $markers[0]->line()],
+        );
     }
 
     /**
@@ -197,6 +200,27 @@ final class SarifImportingPreScannerTest extends TestCase
         $markers = $this->scanner([$sarif])->scan([$this->projectFile('src/A.php')]);
 
         self::assertSame('sarif:sarif:R1', $markers[0]->pattern());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     */
+    public function test_every_result_of_a_run_becomes_its_own_marker(): void
+    {
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [
+            $this->sarifResult('R1', 'first lead', 'src/A.php', 3),
+            $this->sarifResult('R2', 'second lead', 'src/A.php', 9),
+        ])]);
+
+        $markers = $this->scanner([$sarif])->scan([$this->projectFile('src/A.php')]);
+
+        self::assertSame(
+            [['sarif:Psalm:R1', 3], ['sarif:Psalm:R2', 9]],
+            array_map(static fn (RiskMarker $riskMarker): array => [$riskMarker->pattern(), $riskMarker->line()], $markers),
+        );
     }
 
     /**
