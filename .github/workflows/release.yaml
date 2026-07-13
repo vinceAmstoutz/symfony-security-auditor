@@ -101,6 +101,9 @@ jobs:
           esac
           ./spc --version
 
+      - name: Prepare the build environment (installs pkg-config, autoconf, …)
+        run: ./spc doctor --auto-fix
+
       - name: Download the PHAR build input
         uses: actions/download-artifact@v8
         with:
