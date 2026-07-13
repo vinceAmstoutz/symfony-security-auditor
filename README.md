@@ -27,6 +27,32 @@ application-level logic flaws they cannot see**.
 Side-by-side comparison with PHPStan, Psalm, Progpilot, Dependabot, and Snyk:
 [FAQ](docs/faq.md#comparisons).
 
+## Detection benchmark
+
+Detection quality is measured against a ground-truth fixture
+([`examples/vulnerable-app`](examples/vulnerable-app)) whose every planted flaw
+is enumerated in a
+[`ground-truth.json`](examples/vulnerable-app/ground-truth.json) manifest — nine
+flaws spanning classic controller bugs and the newer surfaces (file uploads, API
+Platform, Messenger webhooks, Twig extensions, Live Components).
+`bin/castor eval` runs the real auditor against the fixture and scores precision
+(of what it flagged, how much was real) and recall (of the real flaws, how many
+it caught) per vulnerability class. It makes real, paid LLM calls, so it is a
+local, on-demand tool — run it yourself when you want fresh numbers (there is no
+CI job burning tokens on every push):
+
+```bash
+bin/castor up
+ANTHROPIC_API_KEY=… bin/castor eval
+```
+
+| Model             | Precision                           | Recall | Fixture                    |
+| ----------------- | ----------------------------------- | ------ | -------------------------- |
+| `claude-opus-4-8` | _run `bin/castor eval` to populate_ |        | `vulnerable-app` (9 flaws) |
+
+> Scores depend on the model and vary run to run — the LLM is non-deterministic.
+> Treat them as a directional quality signal, not a guarantee.
+
 ## What it does
 
 An adversarial **Attacker** agent hunts for vulnerabilities; a skeptical

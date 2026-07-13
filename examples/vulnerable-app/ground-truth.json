@@ -9,6 +9,23 @@
       "file": "src/Controller/UserController.php",
       "type": "broken_access_control"
     },
-    { "file": "src/Entity/User.php", "type": "mass_assignment" }
+    { "file": "src/Entity/User.php", "type": "mass_assignment" },
+    {
+      "file": "src/Controller/AvatarUploadController.php",
+      "type": "path_traversal"
+    },
+    {
+      "file": "src/Api/Invoice.php",
+      "type": "over_permissive_serializer_group"
+    },
+    {
+      "file": "src/Messenger/GitHubWebhookHandler.php",
+      "type": "webhook_replay"
+    },
+    { "file": "src/Twig/MarkupExtension.php", "type": "twig_injection" },
+    {
+      "file": "src/Twig/Components/UserCard.php",
+      "type": "broken_access_control"
+    }
   ]
 }

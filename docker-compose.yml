@@ -7,6 +7,9 @@ services:
         PHP_VERSION: "8.3"
     environment:
       COMPOSER_ROOT_VERSION: "1.0.0"
+      # Forwarded from the host so `bin/castor eval` can reach the LLM platform;
+      # empty by default, so ordinary `bin/castor up` needs no key.
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     command: sleep infinity
     volumes:
       - .:/app
