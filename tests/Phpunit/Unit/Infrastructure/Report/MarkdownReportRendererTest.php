@@ -539,6 +539,35 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_includes_the_suggested_fix_when_present(): void
+    {
+        $vulnerability = $this->makeValidatedVuln()->withSuggestedFix("--- a/src/A.php\n+++ b/src/A.php");
+
+        $output = $this->renderer->render($this->makeReport($vulnerability));
+
+        self::assertStringContainsString('**Suggested fix:**', $output);
+        self::assertStringContainsString('--- a/src/A.php', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_omits_the_suggested_fix_section_when_absent(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringNotContainsString('Suggested fix', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_render_renders_a_severity_summary_table(): void
     {
         $output = $this->renderer->render($this->makeReport(

@@ -88,6 +88,8 @@ final readonly class ContainerParameterRegistrar
             'audit.chunking.strategy' => $audit->chunkingStrategy,
             'audit.poc_synthesis.enabled' => $audit->poCSynthesisEnabled,
             'audit.poc_synthesis.severity_floor' => $audit->poCSynthesisSeverityFloor,
+            'audit.fix_synthesis.enabled' => $audit->fixSynthesisEnabled,
+            'audit.fix_synthesis.severity_floor' => $audit->fixSynthesisSeverityFloor,
             'audit.code_slicing.enabled' => $audit->codeSlicingEnabled,
             'audit.code_slicing.min_lines_before_slicing' => $audit->codeSlicingMinLines,
             'audit.budget.max_tokens' => $budget->maxTokens,

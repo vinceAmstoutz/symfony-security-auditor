@@ -98,6 +98,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
             '{{proof}}' => $this->indentLines($vulnerability->proof()),
             '{{synthesizedPoc}}' => $this->synthesizedPocSection($vulnerability),
             '{{remediation}}' => $this->indentChunks($vulnerability->remediation()),
+            '{{suggestedFix}}' => $this->suggestedFixSection($vulnerability),
             '{{confidence}}' => \sprintf('%.0f', $vulnerability->confidence() * 100),
         ]);
     }
@@ -107,6 +108,13 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
         $synthesizedPoC = $vulnerability->synthesizedPoC();
 
         return null === $synthesizedPoC ? '' : \sprintf("\n  Synthesized PoC:\n%s\n", $this->indentLines($synthesizedPoC));
+    }
+
+    private function suggestedFixSection(Vulnerability $vulnerability): string
+    {
+        $suggestedFix = $vulnerability->suggestedFix();
+
+        return null === $suggestedFix ? '' : \sprintf("\n  Suggested Fix:\n%s\n", $this->indentLines($suggestedFix));
     }
 
     private function indentChunks(string $text): string

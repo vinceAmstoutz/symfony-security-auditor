@@ -59,6 +59,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   in a bundle. Editing a skill's bucket, priority, or instructions re-runs the
   affected attacker chunks (folded into the attacker cache key); an unconfigured
   project's cache keys stay byte-identical to earlier releases.
+- **Fix synthesis attaches a suggested patch to each confirmed finding.** With
+  the new `audit.fix_synthesis.enabled` key on, a follow-up stage
+  (`FixSynthesisStage` + `FixSynthesizer`, mirroring the PoC synthesizer) asks
+  the reviewer model for a minimal unified-diff patch against the vulnerable
+  file for every validated finding at or above
+  `audit.fix_synthesis.severity_floor` (default `high`), surfaced as the new
+  `suggested_fix` field in JSON output and rendered in console, Markdown, and
+  HTML reports. The attacker's prose `remediation` is preserved — the patch is
+  additive. Off by default and, unlike PoC synthesis, not implied by any
+  profile; the synthesizer emits `NO_FIX: …` (and the finding keeps only its
+  prose remediation) when the issue needs a config change, a new class, or a
+  cross-cutting redesign rather than a localized patch.
 
 ## [1.13.0] — 2026-07-12 — Groundtruth
 

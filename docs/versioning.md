@@ -49,6 +49,7 @@ Every key under `symfony_security_auditor:` documented in
   `audit.static_prescan.lean_mode`, `audit.chunking.strategy`,
   `audit.code_slicing.enabled`, `audit.code_slicing.min_lines_before_slicing`,
   `audit.poc_synthesis.enabled`, `audit.poc_synthesis.severity_floor`,
+  `audit.fix_synthesis.enabled`, `audit.fix_synthesis.severity_floor`,
   `audit.escalation.enabled`, `audit.escalation.cheap_model`, `audit.baseline`,
   `audit.fail_on`, `audit.excluded_types`, `audit.included_types`,
   `audit.custom_skills`, `audit.retry.max_attempts`,

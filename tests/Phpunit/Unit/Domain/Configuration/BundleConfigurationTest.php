@@ -55,6 +55,8 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame('feature', $bundleConfiguration->audit->chunkingStrategy);
         self::assertFalse($bundleConfiguration->audit->poCSynthesisEnabled);
         self::assertSame('high', $bundleConfiguration->audit->poCSynthesisSeverityFloor);
+        self::assertFalse($bundleConfiguration->audit->fixSynthesisEnabled);
+        self::assertSame('high', $bundleConfiguration->audit->fixSynthesisSeverityFloor);
         self::assertFalse($bundleConfiguration->audit->codeSlicingEnabled);
         self::assertSame(80, $bundleConfiguration->audit->codeSlicingMinLines);
         self::assertFalse($bundleConfiguration->audit->escalationEnabled);
@@ -146,6 +148,21 @@ final class BundleConfigurationTest extends TestCase
             ],
             $bundleConfiguration->audit->customSkills,
         );
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
+    public function test_from_array_maps_fix_synthesis_enabled_and_severity_floor(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['audit']['fix_synthesis'] = ['enabled' => true, 'severity_floor' => 'medium'];
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertTrue($bundleConfiguration->audit->fixSynthesisEnabled);
+        self::assertSame('medium', $bundleConfiguration->audit->fixSynthesisSeverityFloor);
     }
 
     /**
@@ -511,7 +528,7 @@ final class BundleConfigurationTest extends TestCase
      *     reviewer_max_output_tokens?: int|null,
      *     provider_json_mode?: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, import_sarif?: list<string>, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, fail_on?: string, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, fail_on?: string, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, fix_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * }
      */
@@ -543,7 +560,7 @@ final class BundleConfigurationTest extends TestCase
      *     reviewer_max_output_tokens?: int|null,
      *     provider_json_mode?: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, import_sarif?: list<string>, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, fail_on?: string, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, fail_on?: string, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, fix_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * }
      */
@@ -585,6 +602,10 @@ final class BundleConfigurationTest extends TestCase
                     'strategy' => 'feature',
                 ],
                 'poc_synthesis' => [
+                    'enabled' => false,
+                    'severity_floor' => 'high',
+                ],
+                'fix_synthesis' => [
                     'enabled' => false,
                     'severity_floor' => 'high',
                 ],
