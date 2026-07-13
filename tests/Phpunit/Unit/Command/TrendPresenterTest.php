@@ -103,6 +103,7 @@ final class TrendPresenterTest extends TestCase
 
         $display = $bufferedOutput->fetch();
         self::assertStringStartsWith('<!doctype html>', $display);
+        self::assertStringEndsWith('</html>'."\n", $display);
         self::assertStringContainsString('previous.json', $display);
         self::assertStringContainsString('current.json', $display);
     }

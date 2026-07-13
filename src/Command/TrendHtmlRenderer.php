@@ -79,8 +79,8 @@ final readonly class TrendHtmlRenderer implements TrendHtmlRendererInterface
                 $index + 1,
                 $this->escape($trendPoint->report),
                 $trendPoint->totalCount,
-                null === $trendPoint->newCount ? '—' : (string) $trendPoint->newCount,
-                null === $trendPoint->fixedCount ? '—' : (string) $trendPoint->fixedCount,
+                $trendPoint->newCount ?? '—',
+                $trendPoint->fixedCount ?? '—',
             );
         }
 

@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use Override;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrend;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendHtmlRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPoint;
@@ -35,6 +36,30 @@ final class TrendHtmlRendererTest extends TestCase
 
         self::assertStringStartsWith('<!doctype html>', $html);
         self::assertStringEndsWith('</html>', $html);
+    }
+
+    public function test_the_page_declares_the_package_as_its_generator(): void
+    {
+        self::assertStringContainsString(
+            \sprintf('<meta name="generator" content="%s" />', ReportPackage::NAME),
+            $this->trendHtmlRenderer->render($this->twoPointTrend()),
+        );
+    }
+
+    public function test_the_footer_links_to_the_project_homepage(): void
+    {
+        self::assertStringContainsString(
+            \sprintf('<a href="%s">%s</a>', ReportPackage::HOMEPAGE_URL, ReportPackage::NAME),
+            $this->trendHtmlRenderer->render($this->twoPointTrend()),
+        );
+    }
+
+    public function test_a_gridline_marks_the_highest_total_at_the_top_of_the_plot(): void
+    {
+        self::assertStringContainsString(
+            '<line class="grid" x1="40" y1="16" x2="584" y2="16" />',
+            $this->trendHtmlRenderer->render($this->twoPointTrend()),
+        );
     }
 
     public function test_the_title_carries_the_report_count(): void
@@ -134,6 +159,7 @@ final class TrendHtmlRendererTest extends TestCase
         $html = $this->trendHtmlRenderer->render($reportTrend);
 
         self::assertSame(2, substr_count($html, 'cy="168.0"'));
+        self::assertStringContainsString('<text class="tick" x="32" y="20" text-anchor="end">1</text>', $html);
     }
 
     public function test_a_single_point_trend_centers_its_marker_and_draws_no_line(): void
@@ -159,6 +185,19 @@ final class TrendHtmlRendererTest extends TestCase
 
         self::assertStringNotContainsString('<script>', $html);
         self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;.json', $html);
+    }
+
+    public function test_quotes_in_a_report_path_are_escaped_for_attribute_contexts(): void
+    {
+        $reportTrend = new ReportTrend([
+            new TrendPoint('a"b\'.json', 1, null, null),
+            new TrendPoint('current.json', 1, 0, 0),
+        ]);
+
+        $html = $this->trendHtmlRenderer->render($reportTrend);
+
+        self::assertStringContainsString('a&quot;b&#039;.json', $html);
+        self::assertStringNotContainsString('a"b\'.json', $html);
     }
 
     public function test_bidi_override_characters_in_a_report_path_are_stripped(): void
