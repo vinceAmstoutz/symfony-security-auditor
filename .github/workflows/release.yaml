@@ -149,6 +149,10 @@ jobs:
       - name: Attach the binary and checksum to the release
         uses: softprops/action-gh-release@v3
         with:
+          # A release event carries its own tag context; a workflow_dispatch
+          # rebuild does not, so target the tag explicitly (the input on
+          # dispatch, the pushed tag on a release event).
+          tag_name: ${{ inputs.tag || github.ref_name }}
           files: |
             ${{ matrix.asset }}
             ${{ matrix.asset }}.sha256
