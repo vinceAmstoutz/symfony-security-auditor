@@ -108,6 +108,11 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
                     ],
                 ],
             ],
+            // `security-severity` is the numeric score GitHub Code Scanning ranks alerts by; the CVSS vector rides alongside for consumers that display it.
+            'properties' => [
+                'security-severity' => \sprintf('%.1f', $vulnerability->cvssEstimate()->baseScore()),
+                'cvssV4_0Vector' => $vulnerability->cvssEstimate()->vector(),
+            ],
         ];
 
         if (\in_array($vulnerability->fingerprint(), $baselinedFingerprints, true)) {

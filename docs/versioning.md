@@ -163,11 +163,16 @@ deprecated by the other.
   in `vulnerabilities[]` also carries a `fingerprint` key (since 1.13) — the
   same stable per-finding identity `Vulnerability::fingerprint()` already used
   by baseline suppression — consumed by `audit:diff` to compare two reports.
+  Each entry additionally carries a `cvss` object (`version`, `vector`,
+  `base_score`) — a heuristic CVSS v4.0 base-metric estimate derived from the
+  finding's type and severity (another additive `MINOR` change).
 - The **SARIF 2.1.0 output** produced by `--format=sarif`. The
   `runs[].tool.driver.name`, `informationUri`, and `version` fields are stable.
   The `version` is sourced dynamically from installed Composer metadata, so it
   tracks the package version automatically. Each rule's `properties.tags` array
-  additionally carries a `external/cwe/cwe-<n>` tag.
+  additionally carries a `external/cwe/cwe-<n>` tag, and each result's
+  `properties` carries the CVSS estimate as `security-severity` (the numeric
+  score GitHub Code Scanning ranks by) plus a `cvssV4_0Vector`.
 
 ### Domain ports (extension points)
 

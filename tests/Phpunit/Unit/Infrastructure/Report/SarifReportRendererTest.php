@@ -179,6 +179,23 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_render_result_carries_the_cvss_security_severity_and_vector(): void
+    {
+        $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::CRITICAL);
+        $decoded = $this->decodeSarif($this->makeReport($vulnerability));
+
+        $result = $decoded['runs'][0]['results'][0];
+        self::assertArrayHasKey('properties', $result);
+        self::assertSame('9.3', $result['properties']['security-severity']);
+        self::assertSame('CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N', $result['properties']['cvssV4_0Vector']);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_a_rule_shared_by_two_types_carries_both_cwe_tags(): void
     {
         $vulnerability = $this->makeValidatedVuln(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH);
@@ -645,7 +662,7 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      *     version: string,
      *     runs: list<array{
      *         tool: array{driver: array{name: string, version: string, informationUri: string, rules: array<int|string, array{id: string, name: string, shortDescription: array{text: string}, helpUri: string, properties: array{tags: list<string>}}>}},
-     *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>}>,
+     *         results: list<array{ruleId: string, level: string, message: array{text: string}, partialFingerprints: array<string, string>, locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int, endLine: int}}}>, properties?: array<string, string>}>,
      *         properties?: array<string, mixed>
      *     }>
      * }
