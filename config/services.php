@@ -153,7 +153,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMergerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffCommand;
@@ -163,6 +166,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDifferInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoaderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
@@ -338,6 +343,13 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(Baseline::class);
     $defaultsConfigurator->alias(BaselineInterface::class, Baseline::class);
 
+    $defaultsConfigurator->set(BaselineMerger::class)
+        ->args([
+            service(ReportFindingsLoaderInterface::class),
+            service(BaselineInterface::class),
+        ]);
+    $defaultsConfigurator->alias(BaselineMergerInterface::class, BaselineMerger::class);
+
     $defaultsConfigurator->set(BaselineProcessor::class)
         ->args([
             service(BaselineInterface::class),
@@ -352,7 +364,13 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ]);
     $defaultsConfigurator->alias(FindingTypeFilterInterface::class, FindingTypeFilter::class);
 
-    $defaultsConfigurator->set(ReportDiffer::class);
+    $defaultsConfigurator->set(ReportFindingsLoader::class);
+    $defaultsConfigurator->alias(ReportFindingsLoaderInterface::class, ReportFindingsLoader::class);
+
+    $defaultsConfigurator->set(ReportDiffer::class)
+        ->args([
+            service(ReportFindingsLoaderInterface::class),
+        ]);
     $defaultsConfigurator->alias(ReportDifferInterface::class, ReportDiffer::class);
 
     $defaultsConfigurator->set(DiffPresenter::class);
@@ -631,6 +649,12 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->args([
             service(ReportDifferInterface::class),
             service(DiffPresenterInterface::class),
+        ])
+        ->tag('console.command');
+
+    $defaultsConfigurator->set(BaselineCommand::class)
+        ->args([
+            service(BaselineMergerInterface::class),
         ])
         ->tag('console.command');
 

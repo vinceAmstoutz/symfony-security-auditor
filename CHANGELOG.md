@@ -23,6 +23,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   bidi-override characters, and — exactly as with `--format=json` — error
   messages move to stderr so stdout carries the document alone. See
   [CLI Reference → `audit:trend`](docs/configuration.md#audittrend--tracking-findings-across-reports).
+- **New `audit:baseline` command maintains the accepted-finding baseline from an
+  existing JSON report — no LLM run required.** Accepting a finding used to mean
+  either hand-editing the baseline or re-running a full (paid) audit with
+  `--generate-baseline`, which also overwrites the file and loses hand-written
+  `reason` annotations. `audit:baseline report.json [baseline.json]` merges
+  instead: existing entries are preserved verbatim — reasons survive — and only
+  findings not yet covered by an entry are appended (matching is count-aware and
+  honors `attacker_fingerprint`, the same rules the audit itself applies).
+  `--prune` drops entries whose findings left the report, and `--annotate` asks
+  a reason for each newly accepted finding, feeding the reviewer-teaching
+  feedback loop. See `src/Command/BaselineCommand.php`, the extracted
+  `ReportFindingsLoader` shared with `audit:diff`, and
+  [CLI Reference → `audit:baseline`](docs/configuration.md#auditbaseline--maintaining-the-accepted-finding-baseline).
+
 - **New `audit:trend` command tracks how finding counts evolve across a series
   of reports.** Given two or more JSON reports produced by
   `audit:run --format=json` (ordered oldest to newest), each consecutive pair is

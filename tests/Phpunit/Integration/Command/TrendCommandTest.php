@@ -20,6 +20,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPresenter;
@@ -189,6 +190,6 @@ final class TrendCommandTest extends TestCase
 
     private function commandTester(): CommandTester
     {
-        return new CommandTester(new TrendCommand(new ReportTrendAnalyzer(new ReportDiffer($this->filesystem)), new TrendPresenter()));
+        return new CommandTester(new TrendCommand(new ReportTrendAnalyzer(new ReportDiffer(new ReportFindingsLoader($this->filesystem))), new TrendPresenter()));
     }
 }

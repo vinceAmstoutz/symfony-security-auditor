@@ -73,6 +73,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 
@@ -120,7 +121,7 @@ final class DiffCommandEndToEndTest extends TestCase
         $previousReport = $this->runAuditAndCapture('previous.json', [$persistingFinding, $fixedFinding]);
         $currentReport = $this->runAuditAndCapture('current.json', [$persistingFinding, $newFinding]);
 
-        $diffCommandTester = new CommandTester(new DiffCommand(new ReportDiffer($this->filesystem), new DiffPresenter()));
+        $diffCommandTester = new CommandTester(new DiffCommand(new ReportDiffer(new ReportFindingsLoader($this->filesystem)), new DiffPresenter()));
         $diffCommandTester->execute(['previous-report' => $previousReport, 'current-report' => $currentReport]);
 
         self::assertSame(Command::SUCCESS, $diffCommandTester->getStatusCode());
@@ -140,7 +141,7 @@ final class DiffCommandEndToEndTest extends TestCase
         $previousReport = $this->runAuditAndCapture('previous.json', [$this->finding($markupTitle, 'src/View1.php')]);
         $currentReport = $this->runAuditAndCapture('current.json', [$this->finding($markupTitle, 'src/View1.php')]);
 
-        $diffCommandTester = new CommandTester(new DiffCommand(new ReportDiffer($this->filesystem), new DiffPresenter()));
+        $diffCommandTester = new CommandTester(new DiffCommand(new ReportDiffer(new ReportFindingsLoader($this->filesystem)), new DiffPresenter()));
         $diffCommandTester->execute([
             'previous-report' => $previousReport,
             'current-report' => $currentReport,

@@ -106,6 +106,9 @@ is a `MAJOR` change.
   output shape (the `points` array), and its exit codes (`0` on a successful
   trend, `1` when fewer than two reports are given or a report file is missing
   or is not valid JSON).
+- The command name `audit:baseline` (see
+  [CLI Reference → `audit:baseline`](configuration.md#auditbaseline--maintaining-the-accepted-finding-baseline)),
+  its arguments, options, and exit codes.
 
 ### Standalone executable & XDG configuration
 

@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffFinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
 
 final class ReportDifferTest extends TestCase
 {
@@ -53,7 +54,7 @@ final class ReportDifferTest extends TestCase
         $previous = $this->writeReport('previous.json', []);
         $current = $this->writeReport('current.json', [$this->vulnerability('SQL Injection')]);
 
-        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
 
         self::assertCount(1, $reportDiff->newFindings);
         self::assertSame('SQL Injection', $reportDiff->newFindings[0]->title);
@@ -73,7 +74,7 @@ final class ReportDifferTest extends TestCase
             $this->vulnerability('Mass Assignment'),
         ]);
 
-        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
 
         self::assertCount(2, $reportDiff->newFindings);
         $titles = array_map(static fn (DiffFinding $diffFinding): string => $diffFinding->title, $reportDiff->newFindings);
@@ -90,7 +91,7 @@ final class ReportDifferTest extends TestCase
         $previous = $this->writeReport('previous.json', [$this->vulnerability('SQL Injection')]);
         $current = $this->writeReport('current.json', []);
 
-        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
 
         self::assertSame([], $reportDiff->newFindings);
         self::assertCount(1, $reportDiff->fixedFindings);
@@ -108,7 +109,7 @@ final class ReportDifferTest extends TestCase
         $previous = $this->writeReport('previous.json', [$vulnerability]);
         $current = $this->writeReport('current.json', [$vulnerability]);
 
-        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
 
         self::assertSame([], $reportDiff->newFindings);
         self::assertSame([], $reportDiff->fixedFindings);
@@ -126,7 +127,7 @@ final class ReportDifferTest extends TestCase
         $previous = $this->writeReport('previous.json', [$vulnerability]);
         $current = $this->writeReport('current.json', [$vulnerability]);
 
-        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
 
         self::assertSame([], $reportDiff->newFindings);
         self::assertSame([], $reportDiff->fixedFindings);
@@ -141,7 +142,7 @@ final class ReportDifferTest extends TestCase
         $previous = $this->writeReport('previous.json', []);
         $current = $this->writeReport('current.json', []);
 
-        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
 
         self::assertSame([], $reportDiff->newFindings);
         self::assertSame([], $reportDiff->fixedFindings);
@@ -159,7 +160,7 @@ final class ReportDifferTest extends TestCase
         $previous = $this->writeReport('previous.json', [$collidingLow]);
         $current = $this->writeReport('current.json', [$collidingLow, $collidingHigh]);
 
-        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
 
         self::assertCount(1, $reportDiff->newFindings);
         self::assertCount(1, $reportDiff->persistingFindings);
@@ -177,7 +178,7 @@ final class ReportDifferTest extends TestCase
         $previous = $this->writeReport('previous.json', [$collidingLow, $collidingHigh]);
         $current = $this->writeReport('current.json', [$collidingLow]);
 
-        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
 
         self::assertSame([], $reportDiff->newFindings);
         self::assertCount(1, $reportDiff->fixedFindings);
@@ -208,7 +209,7 @@ final class ReportDifferTest extends TestCase
             $this->vulnerability('SQL Injection', 'critical'),
         ]);
 
-        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
 
         self::assertSame(['low', 'medium'], $this->severitiesOf($reportDiff->persistingFindings));
         self::assertSame(['high', 'critical'], $this->severitiesOf($reportDiff->newFindings));
@@ -236,7 +237,7 @@ final class ReportDifferTest extends TestCase
         $previous = $this->writeReport('previous.json', [$vulnerability]);
         $current = $this->writeReport('current.json', [$vulnerability]);
 
-        $reportDiff = (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        $reportDiff = (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
 
         self::assertCount(1, $reportDiff->persistingFindings);
         self::assertSame(
@@ -255,7 +256,7 @@ final class ReportDifferTest extends TestCase
 
         $this->expectException(ReportFileNotReadableException::class);
 
-        (new ReportDiffer($this->filesystem))->diff($this->tmpDir.'/absent.json', $current);
+        (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($this->tmpDir.'/absent.json', $current);
     }
 
     /**
@@ -267,7 +268,7 @@ final class ReportDifferTest extends TestCase
         $current = $this->writeReport('current.json', []);
 
         try {
-            (new ReportDiffer($this->filesystem))->diff($this->tmpDir, $current);
+            (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($this->tmpDir, $current);
             self::fail('Expected a ReportFileNotReadableException for a directory path.');
         } catch (ReportFileNotReadableException $reportFileNotReadableException) {
             self::assertInstanceOf(IOException::class, $reportFileNotReadableException->getPrevious());
@@ -286,7 +287,7 @@ final class ReportDifferTest extends TestCase
 
         $this->expectException(MalformedReportFileException::class);
 
-        (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
     }
 
     /**
@@ -301,7 +302,7 @@ final class ReportDifferTest extends TestCase
 
         $this->expectException(MalformedReportFileException::class);
 
-        (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
     }
 
     /**
@@ -316,7 +317,7 @@ final class ReportDifferTest extends TestCase
 
         $this->expectException(MalformedReportFileException::class);
 
-        (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
     }
 
     /**
@@ -332,7 +333,7 @@ final class ReportDifferTest extends TestCase
         $this->expectException(MalformedReportFileException::class);
         $this->expectExceptionMessage('has a vulnerability entry at index 0 that is not a JSON object');
 
-        (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
     }
 
     /**
@@ -351,7 +352,7 @@ final class ReportDifferTest extends TestCase
         $this->expectException(MalformedReportFileException::class);
         $this->expectExceptionMessage('has a vulnerability entry at index 1 that is not a JSON object');
 
-        (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
     }
 
     /**
@@ -369,7 +370,7 @@ final class ReportDifferTest extends TestCase
 
         $this->expectException(MalformedReportFileException::class);
 
-        (new ReportDiffer($this->filesystem))->diff($previous, $current);
+        (new ReportDiffer(new ReportFindingsLoader($this->filesystem)))->diff($previous, $current);
     }
 
     /**

@@ -24,6 +24,7 @@ bundle registration, bundle-level configuration, platform wiring via
 - [CLI Reference](#cli-reference)
   - [`audit:diff`](#auditdiff--comparing-two-reports)
   - [`audit:trend`](#audittrend--tracking-findings-across-reports)
+  - [`audit:baseline`](#auditbaseline--maintaining-the-accepted-finding-baseline)
 
 > See also: [Architecture](architecture.md) · [Extending](extending.md) ·
 > [CI](ci.md) · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
@@ -627,3 +628,37 @@ bin/console audit:trend nightly-*.json --format=html > trend.html
 Exit codes: `0` on a successful trend (regardless of how the counts evolve), `1`
 if fewer than two reports are given or a report file is missing or is not valid
 JSON.
+
+### `audit:baseline` — maintaining the accepted-finding baseline
+
+Creates or updates a baseline file from a JSON report produced by
+`audit:run --format=json`, **without re-running the audit**. Unlike
+`audit:run --generate-baseline` — which needs a fresh (paid) audit run and
+overwrites the file — this command merges: existing entries are preserved
+verbatim, so hand-written `reason` annotations (the ones that teach the
+reviewer, see [`audit.baseline`](#audit--orchestrator-knobs)) survive, and only
+findings not yet covered by an entry are appended.
+
+```bash
+bin/console audit:baseline report.json .security-baseline.json --prune --annotate
+```
+
+| Argument   | Required | Description                                                            |
+| ---------- | -------- | ---------------------------------------------------------------------- |
+| `report`   | yes      | Path to a JSON report produced by `audit:run --format=json`.           |
+| `baseline` | no       | Baseline file to create or update (default `.security-baseline.json`). |
+
+| Option       | Default | Description                                                                        |
+| ------------ | ------- | ---------------------------------------------------------------------------------- |
+| `--prune`    | off     | Drop baseline entries whose findings no longer appear in the report.               |
+| `--annotate` | off     | Ask a reason for each newly accepted finding; reasoned entries teach the reviewer. |
+
+Each appended entry carries `fingerprint`, `type`, `file`, `title`, `added_at`,
+and — when `--annotate` supplied one — `reason`. Matching is count-aware, the
+same rule the audit itself applies: each entry accepts one occurrence, so a
+finding duplicated beyond its accepted count registers as new again. Entries
+whose `attacker_fingerprint` matches a report finding count as covering it.
+
+Exit codes: `0` on success, `1` if the report is missing or malformed, the
+baseline file is malformed, or the baseline path is a symlink (refused, exactly
+as every other writer in this tool refuses symlinked destinations).
