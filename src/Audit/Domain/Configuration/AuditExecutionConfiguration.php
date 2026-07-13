@@ -19,8 +19,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 final readonly class AuditExecutionConfiguration
 {
     /**
-     * @param list<string> $excludedTypes vulnerability-type values dropped from the report and exit code
-     * @param list<string> $includedTypes when non-empty, the only vulnerability-type values kept
+     * @param list<string>              $excludedTypes vulnerability-type values dropped from the report and exit code
+     * @param list<string>              $includedTypes when non-empty, the only vulnerability-type values kept
+     * @param list<CustomAttackerSkill> $customSkills  project-defined attacker skill blocks merged into the prompt
      *
      * @throws InvalidAuditExecutionConfigurationException
      */
@@ -50,6 +51,7 @@ final readonly class AuditExecutionConfiguration
         public RiskLevel $failOn = RiskLevel::Critical,
         public array $excludedTypes = [],
         public array $includedTypes = [],
+        public array $customSkills = [],
     ) {
         if (!is_finite($minConfidence) || $minConfidence < 0.0 || $minConfidence > 1.0) {
             throw InvalidAuditExecutionConfigurationException::forOutOfRangeMinConfidence($minConfidence);

@@ -19,6 +19,7 @@ use UnitEnum;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\AuditExecutionConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ConfigurationNotices;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\LLMConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
@@ -158,7 +159,7 @@ final readonly class ContainerParameterRegistrar
     private function attackerKeySalt(BundleConfiguration $bundleConfiguration, string $model): string
     {
         return \sprintf(
-            '%s|prompt-v%d|prescan-v%d|prescan-%s|tools-%s|patterns-%s|collect-%s|skills-%s|slice-%s|max-output-%d',
+            '%s|prompt-v%d|prescan-v%d|prescan-%s|tools-%s|patterns-%s|collect-%s|skills-%s|slice-%s|max-output-%d%s',
             $model,
             AttackerPromptBuilder::PROMPT_VERSION,
             RegexStaticPreScanner::CACHE_VERSION,
@@ -176,7 +177,36 @@ final readonly class ContainerParameterRegistrar
             $bundleConfiguration->audit->stableSystemPrompt ? 'full' : 'lean',
             $this->codeSlicingSalt($bundleConfiguration),
             $bundleConfiguration->llm->attackerMaxOutputTokens(),
+            $this->customSkillsSalt($bundleConfiguration),
         );
+    }
+
+    /**
+     * Empty (no `|custom-skills-…` segment) when the project defines no custom
+     * skills, so an unconfigured project's attacker cache keys stay
+     * byte-identical to earlier releases; a change to any custom skill's
+     * bucket, priority, or instructions shifts the hash and re-runs the
+     * attacker.
+     *
+     * @throws JsonException
+     */
+    private function customSkillsSalt(BundleConfiguration $bundleConfiguration): string
+    {
+        if ([] === $bundleConfiguration->audit->customSkills) {
+            return '';
+        }
+
+        $fingerprint = array_map(
+            static fn (CustomAttackerSkill $customAttackerSkill): array => [
+                $customAttackerSkill->name,
+                $customAttackerSkill->fileType->value,
+                $customAttackerSkill->priority,
+                $customAttackerSkill->instructions,
+            ],
+            $bundleConfiguration->audit->customSkills,
+        );
+
+        return \sprintf('|custom-skills-%s', substr(hash('sha256', json_encode($fingerprint, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)), 0, 16));
     }
 
     private function attackerToolsSalt(BundleConfiguration $bundleConfiguration): string

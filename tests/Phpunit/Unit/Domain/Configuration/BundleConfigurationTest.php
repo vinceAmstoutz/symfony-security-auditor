@@ -15,8 +15,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Configuration;
 
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\BundleConfiguration;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
 final class BundleConfigurationTest extends TestCase
@@ -60,6 +62,7 @@ final class BundleConfigurationTest extends TestCase
         self::assertSame(RiskLevel::Critical, $bundleConfiguration->audit->failOn);
         self::assertSame([], $bundleConfiguration->audit->excludedTypes);
         self::assertSame([], $bundleConfiguration->audit->includedTypes);
+        self::assertSame([], $bundleConfiguration->audit->customSkills);
 
         self::assertSame(3, $bundleConfiguration->retry->maxAttempts);
         self::assertSame(500, $bundleConfiguration->retry->initialDelayMs);
@@ -120,6 +123,25 @@ final class BundleConfigurationTest extends TestCase
         $bundleConfiguration = BundleConfiguration::fromArray($config);
 
         self::assertSame(RiskLevel::Critical, $bundleConfiguration->audit->failOn);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
+    public function test_from_array_maps_custom_skills_into_value_objects(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['audit']['custom_skills'] = [
+            'legacy_db' => ['file_type' => 'repository', 'instructions' => 'Use SafeQuery.', 'priority' => 42],
+        ];
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertEquals(
+            [new CustomAttackerSkill('legacy_db', ProjectFileType::REPOSITORY, 'Use SafeQuery.', 42)],
+            $bundleConfiguration->audit->customSkills,
+        );
     }
 
     /**

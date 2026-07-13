@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditExecutionConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
 /**
@@ -37,7 +38,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
  *     reviewer_max_output_tokens?: int|null,
  *     provider_json_mode?: bool,
  *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, import_sarif?: list<string>, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
- *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, baseline?: string|null, fail_on?: string, excluded_types?: list<string>, included_types?: list<string>, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+ *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, baseline?: string|null, fail_on?: string, excluded_types?: list<string>, included_types?: list<string>, custom_skills?: array<string, array{file_type: string, instructions: string, priority: int}>, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
  *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
  * }
  */
@@ -108,6 +109,7 @@ final readonly class BundleConfiguration
                 failOn: RiskLevel::from($config['audit']['fail_on'] ?? 'critical'),
                 excludedTypes: $config['audit']['excluded_types'] ?? [],
                 includedTypes: $config['audit']['included_types'] ?? [],
+                customSkills: self::customSkillsFromConfig($config['audit']['custom_skills'] ?? []),
             ),
             retry: new RetryConfiguration(
                 maxAttempts: $config['audit']['retry']['max_attempts'],
@@ -130,5 +132,25 @@ final readonly class BundleConfiguration
                 outputTokensPerMinute: $config['audit']['rate_limit']['output_tokens_per_minute'],
             ),
         );
+    }
+
+    /**
+     * @param array<string, array{file_type: string, instructions: string, priority: int}> $customSkills
+     *
+     * @return list<CustomAttackerSkill>
+     */
+    private static function customSkillsFromConfig(array $customSkills): array
+    {
+        $skills = [];
+        foreach ($customSkills as $name => $skill) {
+            $skills[] = new CustomAttackerSkill(
+                $name,
+                ProjectFileType::from($skill['file_type']),
+                $skill['instructions'],
+                $skill['priority'],
+            );
+        }
+
+        return $skills;
     }
 }

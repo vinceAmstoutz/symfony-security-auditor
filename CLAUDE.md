@@ -69,7 +69,7 @@ Commit messages are validated separately in CI via
 src/
   Audit/
     Domain/          # Pure PHP — no framework, no I/O
-      Configuration/ # Typed config VOs (BundleConfiguration, AuditProfile, LLMConfiguration, …)
+      Configuration/ # Typed config VOs (BundleConfiguration, AuditProfile, LLMConfiguration, CustomAttackerSkill, …)
       Model/         # Value objects and enums (Vulnerability [+ `of()` factory + CodeLocation/VulnerabilityClassification/VulnerabilityNarrative], SymfonyMapping [+ `of()` + ProjectFileInventory/AccessControlMap], AuditReport [+ ReportIdentity], ProjectFile, ProjectFileType, ProjectFileTypeClassifier, RouteAccessControl, VoterCapability, FormBinding, TokenUsageSnapshot, VulnerabilityHydrationResult, VulnerabilityDropReason, ReviewerFeedback/AcceptedFindingFeedback, …) — public factories use `of()`; the wide `create()` is `@deprecated`
       Exception/     # Domain exceptions (LLMProviderException, GitChangedFilesUnavailableException, InvalidCodeLocationException, InvalidVulnerabilityClassificationException)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)
@@ -84,7 +84,7 @@ src/
       FileSystem/    # ProjectFileScanner, RegexSecretScrubber, NullSecretScrubber
       Scan/          # RegexStaticPreScanner, SarifImportingPreScanner (merges scan.import_sarif SARIF results as risk markers), RegexCodeSlicer, PhpParserControllerAccessControlParser, PhpParserVoterCapabilityParser, PhpParserFormBindingParser, SymfonyYamlSecurityConfigParser
       Diff/          # ProcessGitChangedFilesResolver (git diff for --since)
-      Prompt/        # AttackerPromptBuilder (+ SymfonyMappingContextRenderer, NumberedFileContextRenderer, Skill/{AttackerSkillInterface, AttackerSkillRegistry, one *AttackerSkill per attack surface}), ReviewerPromptBuilder (+ Reviewer/{ReviewerPromptSectionsInterface, ReviewerPromptSections, ReviewerMessageRendererInterface, ReviewerMessageRenderer, ReviewerFeedbackHolder})
+      Prompt/        # AttackerPromptBuilder (+ SymfonyMappingContextRenderer, NumberedFileContextRenderer, Skill/{AttackerSkillInterface, AttackerSkillRegistry, one *AttackerSkill per attack surface, ConfiguredAttackerSkill for config-driven audit.custom_skills}), ReviewerPromptBuilder (+ Reviewer/{ReviewerPromptSectionsInterface, ReviewerPromptSections, ReviewerMessageRendererInterface, ReviewerMessageRenderer, ReviewerFeedbackHolder})
       Cache/         # FilesystemAttackerCache, NullAttackerCache, FilesystemReviewerCache, NullReviewerCache
       Advisory/      # ComposerAuditAdvisoryDatabase (default) + LockfileHashedAdvisoryCache (TTL-bounded lockfile-hash cache in front of it, wired when cache.enabled), DeferredAdvisoryDatabase (lazy wrapper), InMemoryAdvisoryDatabase (fallback), ComposerAuditRunnerInterface + SymfonyProcessComposerAuditRunner
       Pricing/       # ModelsDevPricingProvider (default), ModelPrice

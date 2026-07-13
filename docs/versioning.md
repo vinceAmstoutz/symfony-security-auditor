@@ -51,10 +51,10 @@ Every key under `symfony_security_auditor:` documented in
   `audit.poc_synthesis.enabled`, `audit.poc_synthesis.severity_floor`,
   `audit.escalation.enabled`, `audit.escalation.cheap_model`, `audit.baseline`,
   `audit.fail_on`, `audit.excluded_types`, `audit.included_types`,
-  `audit.retry.max_attempts`, `audit.retry.initial_delay_ms`,
-  `audit.retry.backoff_multiplier`, `audit.retry.jitter_ratio`,
-  `audit.budget.max_tokens`, `audit.budget.max_cost_usd`,
-  `audit.rate_limit.requests_per_minute`,
+  `audit.custom_skills`, `audit.retry.max_attempts`,
+  `audit.retry.initial_delay_ms`, `audit.retry.backoff_multiplier`,
+  `audit.retry.jitter_ratio`, `audit.budget.max_tokens`,
+  `audit.budget.max_cost_usd`, `audit.rate_limit.requests_per_minute`,
   `audit.rate_limit.input_tokens_per_minute`,
   `audit.rate_limit.output_tokens_per_minute`
 - `cache.enabled`, `cache.dir`, `cache.prompt_caching` (the last is **deprecated

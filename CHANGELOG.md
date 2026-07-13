@@ -48,6 +48,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   surface are dropped, and a missing or malformed file aborts the audit with
   `"...does not exist or is not readable"` / `"...is not valid JSON"` instead of
   silently auditing without the imported signal.
+- **Projects can now add attacker skills from configuration, no PHP required.**
+  The new `audit.custom_skills` key takes named skill blocks — each with a
+  `file_type` bucket, free-form `instructions`, and an optional `priority` —
+  merged into the attacker prompt beside the built-in skills whenever a file of
+  that type appears in the chunk (`ConfiguredAttackerSkill` collected by the
+  existing `AttackerSkillRegistry` tagged iterator). Standalone-binary users can
+  encode company-specific rules ("all queries to `LegacyDb` must go through
+  `SafeQuery`") that previously required implementing `AttackerSkillInterface`
+  in a bundle. Editing a skill's bucket, priority, or instructions re-runs the
+  affected attacker chunks (folded into the attacker cache key); an unconfigured
+  project's cache keys stay byte-identical to earlier releases.
 
 ## [1.13.0] — 2026-07-12 — Groundtruth
 
