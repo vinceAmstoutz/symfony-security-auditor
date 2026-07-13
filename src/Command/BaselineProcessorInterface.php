@@ -14,10 +14,19 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 interface BaselineProcessorInterface
 {
+    /**
+     * Maintainer-authored false-positive feedback (baseline entries annotated
+     * with a `reason`) from the effective baseline file, resolving the CLI
+     * `--baseline` override against the configured default path. Empty when
+     * neither is set.
+     */
+    public function feedback(?string $cliBaseline): ReviewerFeedback;
+
     /**
      * Writes the report's finding fingerprints to a baseline file and returns
      * how many were written.

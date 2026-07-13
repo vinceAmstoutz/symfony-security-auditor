@@ -60,6 +60,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterf
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
@@ -98,6 +99,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevP
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerPromptSections;
@@ -298,11 +300,15 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(ReviewerMessageRenderer::class);
     $defaultsConfigurator->alias(ReviewerMessageRendererInterface::class, ReviewerMessageRenderer::class);
 
+    $defaultsConfigurator->set(ReviewerFeedbackHolder::class);
+    $defaultsConfigurator->alias(ReviewerFeedbackProviderInterface::class, ReviewerFeedbackHolder::class);
+
     $defaultsConfigurator->set(ReviewerPromptBuilder::class)
         ->args([
             param('symfony_security_auditor.audit.reviewer_structured_collection'),
             service(ReviewerPromptSectionsInterface::class),
             service(ReviewerMessageRendererInterface::class),
+            service(ReviewerFeedbackProviderInterface::class),
         ]);
     $defaultsConfigurator->alias(ReviewerPromptBuilderInterface::class, ReviewerPromptBuilder::class);
 
@@ -457,6 +463,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(Filesystem::class),
             service('logger'),
             param('symfony_security_auditor.cache.reviewer_key_salt'),
+            service(ReviewerFeedbackProviderInterface::class),
         ]);
 
     $defaultsConfigurator->set(SymfonyProcessComposerAuditRunner::class);
@@ -582,6 +589,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(AuditedProjectPathHolder::class),
             service(BaselineProcessorInterface::class),
             service(UnpricedModelBudgetGuardInterface::class),
+            service(ReviewerFeedbackHolder::class),
             param('symfony_security_auditor.scan.secret_scrubbing.enabled'),
             service(FindingTypeFilterInterface::class),
             param('symfony_security_auditor.config_notices'),

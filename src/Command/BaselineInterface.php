@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
+
 /** @internal not part of the BC promise — see docs/versioning.md */
 interface BaselineInterface
 {
@@ -23,6 +25,14 @@ interface BaselineInterface
      * @return list<string>
      */
     public function load(string $path): array;
+
+    /**
+     * Loads the maintainer-authored false-positive feedback from a baseline
+     * file: every entry annotated with a non-empty `reason`. A missing file —
+     * or one whose entries carry no reasons — yields empty feedback; a
+     * malformed file throws.
+     */
+    public function feedback(string $path): ReviewerFeedback;
 
     /**
      * @param list<array<string, string>> $entries accepted-finding entries; each

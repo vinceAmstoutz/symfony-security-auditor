@@ -37,6 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Project
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
@@ -143,6 +144,7 @@ final class AuditCommandConflictingOptionsTest extends TestCase
             new AuditedProjectPathHolder('/app'),
             new BaselineProcessor(new Baseline()),
             new UnpricedModelBudgetGuard($modelsDevPricingProvider, ['stub']),
+            new ReviewerFeedbackHolder(),
             secretScrubbingEnabled: true,
             findingTypeFilter: new FindingTypeFilter([], []),
         );

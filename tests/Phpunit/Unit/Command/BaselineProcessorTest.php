@@ -21,9 +21,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCont
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
@@ -205,6 +207,42 @@ final class BaselineProcessorTest extends TestCase
         $baseline->expects(self::never())->method('load');
 
         self::assertSame([], (new BaselineProcessor($baseline))->acceptedFingerprints(null));
+    }
+
+    public function test_feedback_is_empty_when_no_path_is_configured(): void
+    {
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::never())->method('feedback');
+
+        self::assertTrue((new BaselineProcessor($baseline))->feedback(null)->isEmpty());
+    }
+
+    public function test_feedback_prefers_the_cli_baseline_over_the_configured_path(): void
+    {
+        $reviewerFeedback = new ReviewerFeedback([new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', 'accepted risk')]);
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::once())
+            ->method('feedback')
+            ->with('/cli.json')
+            ->willReturn($reviewerFeedback);
+
+        $baselineProcessor = new BaselineProcessor($baseline, '/configured.json');
+
+        self::assertSame($reviewerFeedback, $baselineProcessor->feedback('/cli.json'));
+    }
+
+    public function test_feedback_falls_back_to_the_configured_path(): void
+    {
+        $reviewerFeedback = new ReviewerFeedback([new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', 'accepted risk')]);
+        $baseline = $this->createMock(BaselineInterface::class);
+        $baseline->expects(self::once())
+            ->method('feedback')
+            ->with('/configured.json')
+            ->willReturn($reviewerFeedback);
+
+        $baselineProcessor = new BaselineProcessor($baseline, '/configured.json');
+
+        self::assertSame($reviewerFeedback, $baselineProcessor->feedback(null));
     }
 
     public function test_accepted_fingerprints_prefers_the_cli_baseline_over_the_configured_path(): void

@@ -21,6 +21,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   or, with `--format=json`, a machine-readable `points` array. See
   `src/Command/TrendCommand.php` and
   [CLI Reference → `audit:trend`](docs/configuration.md#audittrend--tracking-findings-across-reports).
+- **Baseline `reason` annotations now teach the reviewer.** A baseline entry's
+  free-form `reason` key — previously documentation-only — is loaded from the
+  effective baseline file (`--baseline` CLI override or `audit.baseline`) and
+  injected into the reviewer's system prompt as maintainer-trusted
+  false-positive feedback (capped at 20 entries), so the skeptical reviewer
+  recognizes the named mitigating control when judging similar findings instead
+  of re-flagging the same pattern run after run. The prompt explicitly forbids
+  rejecting a finding solely because it resembles an accepted one — the reviewer
+  must verify the named control applies. Reviewer-verdict cache keys
+  (`FilesystemReviewerCache`) fold in a digest of the feedback, so adding or
+  editing a `reason` re-reviews affected findings while reason-free runs keep
+  every previously cached verdict byte-identical. A new
+  `ReviewerFeedbackProviderInterface` Domain port (with the
+  `ReviewerFeedback`/`AcceptedFindingFeedback` models) lets integrators plug in
+  custom feedback sources.
 
 ## [1.13.0] — 2026-07-12 — Groundtruth
 

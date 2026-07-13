@@ -22,7 +22,9 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
@@ -30,6 +32,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 
 final class FilesystemReviewerCacheTest extends TestCase
 {
@@ -77,6 +80,65 @@ final class FilesystemReviewerCacheTest extends TestCase
         $this->filesystemReviewerCache->store($vulnerability, 'code-context', $review);
 
         self::assertSame($review, $this->filesystemReviewerCache->get($vulnerability, 'code-context'));
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_round_trip_hits_under_the_same_baseline_feedback(): void
+    {
+        $filesystemReviewerCache = $this->cacheWithFeedback('accepted risk');
+        $vulnerability = $this->makeVulnerability('src/A.php');
+
+        $filesystemReviewerCache->store($vulnerability, 'code', ['accepted' => true]);
+
+        self::assertSame(['accepted' => true], $filesystemReviewerCache->get($vulnerability, 'code'));
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_get_returns_null_when_the_baseline_feedback_changed(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+
+        $this->cacheWithFeedback('accepted risk')->store($vulnerability, 'code', ['accepted' => true]);
+
+        self::assertNull($this->cacheWithFeedback('guarded by voter')->get($vulnerability, 'code'));
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_get_returns_null_when_feedback_appears_after_a_feedback_free_store(): void
+    {
+        $vulnerability = $this->makeVulnerability('src/A.php');
+
+        $this->filesystemReviewerCache->store($vulnerability, 'code', ['accepted' => true]);
+
+        self::assertNull($this->cacheWithFeedback('accepted risk')->get($vulnerability, 'code'));
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    private function cacheWithFeedback(string $reason): FilesystemReviewerCache
+    {
+        $reviewerFeedbackHolder = new ReviewerFeedbackHolder();
+        $reviewerFeedbackHolder->set(new ReviewerFeedback([
+            new AcceptedFindingFeedback('sql_injection', 'src/Foo.php', 'Accepted', $reason),
+        ]));
+
+        return new FilesystemReviewerCache($this->cacheDir, new Filesystem(), new NullLogger(), reviewerFeedbackProvider: $reviewerFeedbackHolder);
     }
 
     /**

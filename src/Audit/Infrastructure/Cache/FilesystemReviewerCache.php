@@ -20,7 +20,9 @@ use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullReviewerFeedbackProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\UnsafeCacheWriteException;
 
@@ -52,6 +54,7 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
         private Filesystem $filesystem,
         private LoggerInterface $logger,
         private string $keySalt = '',
+        private ReviewerFeedbackProviderInterface $reviewerFeedbackProvider = new NullReviewerFeedbackProvider(),
     ) {
         if (u($cacheDir)->trim()->isEmpty()) {
             throw InvalidCacheConfigurationException::forEmptyCacheDir('Reviewer');
@@ -176,6 +179,12 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
         $signature = \sprintf("%s\0%s", json_encode($finding, \JSON_THROW_ON_ERROR), $codeContext);
         if ('' !== $this->keySalt) {
             $signature = \sprintf("%s\0%s", $this->keySalt, $signature);
+        }
+
+        // An empty-feedback digest is the empty string, keeping pre-feedback cache entries valid.
+        $feedbackDigest = $this->reviewerFeedbackProvider->feedback()->digest();
+        if ('' !== $feedbackDigest) {
+            $signature = \sprintf("%s\0feedback-%s", $signature, $feedbackDigest);
         }
 
         return hash('sha256', $signature);
