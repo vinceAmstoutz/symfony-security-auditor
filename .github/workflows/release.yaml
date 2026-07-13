@@ -4,6 +4,12 @@ on:
   release:
     types:
       - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to build and attach the binaries to (e.g. 1.13.0)'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -15,6 +21,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -53,25 +61,34 @@ jobs:
         include:
           - runner: ubuntu-latest
             asset: symfony-security-auditor-linux-x86_64
+            spc: spc-linux-x86_64
           - runner: ubuntu-24.04-arm
             asset: symfony-security-auditor-linux-aarch64
-          - runner: macos-13
+            spc: spc-linux-aarch64
+          - runner: macos-15-intel
             asset: symfony-security-auditor-darwin-x86_64
+            spc: spc-macos-x86_64
           - runner: macos-14
             asset: symfony-security-auditor-darwin-arm64
+            spc: spc-macos-aarch64
           - runner: windows-latest
             asset: symfony-security-auditor-windows-x86_64.exe
+            spc: spc-windows-x64.exe
     defaults:
       run:
         shell: bash
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Setup static-php-cli
-        uses: static-php-cli/setup-spc@v1
-        with:
-          php-version: '8.3'
+        run: |
+          case "${{ matrix.spc }}" in *.exe) out=spc.exe ;; *) out=spc ;; esac
+          curl -fsSL --retry 3 -o "$out" "https://dl.static-php.dev/v3/spc-bin/nightly/${{ matrix.spc }}"
+          chmod +x "$out"
+          ./spc --version
 
       - name: Download the PHAR build input
         uses: actions/download-artifact@v8
@@ -80,15 +97,15 @@ jobs:
 
       - name: Resolve the required extensions
         id: extensions
-        run: echo "list=$(spc dump-extensions . --format=text)" >> "$GITHUB_OUTPUT"
+        run: echo "list=$(./spc dump-extensions . --format=text)" >> "$GITHUB_OUTPUT"
 
       - name: Build the static micro PHP runtime
         run: |
-          spc download --for-extensions="${{ steps.extensions.outputs.list }}" --with-php=8.3 --prefer-pre-built
-          spc build "${{ steps.extensions.outputs.list }}" --build-micro
+          ./spc download --for-extensions="${{ steps.extensions.outputs.list }}" --with-php=8.3 --prefer-pre-built
+          ./spc build "${{ steps.extensions.outputs.list }}" --build-micro
 
       - name: Combine the micro runtime with the PHAR
-        run: spc micro:combine symfony-security-auditor.phar --output="${{ matrix.asset }}"
+        run: ./spc micro:combine symfony-security-auditor.phar --output="${{ matrix.asset }}"
 
       - name: Verify the binary was produced
         run: test -s "${{ matrix.asset }}"
