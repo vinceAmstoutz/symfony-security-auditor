@@ -43,4 +43,6 @@ $environment = getenv();
     }
 })($environment);
 
-exit(StandaloneApplicationFactory::fromEnvironment($environment)->create()->run());
+$runningBinaryPath = \is_string($_SERVER['SCRIPT_FILENAME'] ?? null) ? $_SERVER['SCRIPT_FILENAME'] : '';
+
+exit(StandaloneApplicationFactory::fromEnvironment($environment, $runningBinaryPath)->create()->run());

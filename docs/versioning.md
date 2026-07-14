@@ -127,6 +127,8 @@ following surface is BC-protected:
 - The `init` command name. The standalone exposes the **identical** `audit:run`
   command (and its `audit` alias), arguments, options, and exit-code surface
   listed above.
+- The `self-update` command name and its `--check` option (see
+  [CLI Reference → `self-update`](configuration.md#self-update--updating-the-standalone-binary)).
 - The configuration path contract. On Linux/macOS the XDG Base Directory spec:
   the config file `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml`
   (falling back to `~/.config/…`), the cache directory

@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **New `self-update` command updates the standalone binary in place.**
+  `symfony-security-auditor self-update` queries the GitHub releases API for the
+  latest version and, when a newer one exists, downloads the asset matching the
+  running platform (mirroring `install.sh`'s OS/arch detection), **verifies its
+  `.sha256` checksum before touching anything**, and atomically replaces the
+  running binary; `--check` only reports whether an update is available without
+  modifying anything. Downloads go through `curl` via Symfony `Process` (no new
+  runtime dependency), and the binary refuses to update when it is not writable,
+  pointing at `sudo`/reinstall instead. Standalone-only — it is not registered
+  in the bundle. Implementation lives in `src/Audit/Infrastructure/SelfUpdate/`.
+  See
+  [CLI Reference → `self-update`](docs/configuration.md#self-update--updating-the-standalone-binary).
+
 ## [1.15.0] — 2026-07-14 — Conduit
 
 A release about reaching the auditor from anywhere. The new `mcp:serve` command
