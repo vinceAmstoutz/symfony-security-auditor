@@ -10,6 +10,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.15.0] — 2026-07-14 — Conduit
+
+A release about reaching the auditor from anywhere. The new `mcp:serve` command
+exposes the audit as a Model Context Protocol tool, so an MCP client can run it
+on demand over the same pipeline as `audit:run`. Alongside it, the standalone
+binary's `init` now resolves the provider bridge for its own bundled PHP, so a
+fresh install no longer aborts on a host-versus-binary PHP mismatch.
+
+### Added
+
+- **New `mcp:serve` command runs a Model Context Protocol (MCP) server, exposing
+  the auditor as a tool to AI assistants.** `bin/console mcp:serve` starts an
+  [MCP](https://modelcontextprotocol.io) server over stdio — built on the
+  official [`mcp/sdk`](https://github.com/modelcontextprotocol/php-sdk) — that
+  advertises an `audit` tool taking a project `path` and returning the JSON
+  vulnerability report, so an MCP client (Claude Desktop, an IDE agent, …) can
+  run a full audit on demand through the same pipeline `audit:run` uses. The
+  server building lives in `src/Command/Mcp/` behind `McpServerFactoryInterface`
+  and `McpTransportFactoryInterface`; the audit runs with the bundle's
+  configured platform, models, and profile. See
+  [CLI Reference → `mcp:serve`](docs/configuration.md#mcpserve--model-context-protocol-server).
+
 ### Fixed
 
 - **The standalone binary's `init` now installs a provider bridge that its own
@@ -39,17 +61,6 @@ in non-root containers via the new `SYMFONY_SECURITY_AUDITOR_HOME` override.
 
 ### Added
 
-- **New `mcp:serve` command runs a Model Context Protocol (MCP) server, exposing
-  the auditor as a tool to AI assistants.** `bin/console mcp:serve` starts an
-  [MCP](https://modelcontextprotocol.io) server over stdio — built on the
-  official [`mcp/sdk`](https://github.com/modelcontextprotocol/php-sdk) — that
-  advertises an `audit` tool taking a project `path` and returning the JSON
-  vulnerability report, so an MCP client (Claude Desktop, an IDE agent, …) can
-  run a full audit on demand through the same pipeline `audit:run` uses. The
-  server building lives in `src/Command/Mcp/` behind `McpServerFactoryInterface`
-  and `McpTransportFactoryInterface`; the audit runs with the bundle's
-  configured platform, models, and profile. See
-  [CLI Reference → `mcp:serve`](docs/configuration.md#mcpserve--model-context-protocol-server).
 - **`audit:trend` can now render its timeline as a self-contained HTML
   dashboard.** `audit:trend --format=html` emits a single HTML page — no
   external assets, light and dark mode — with an SVG line chart of finding
@@ -2139,6 +2150,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.15.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.15.0
 [1.14.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.14.0
 [1.13.0]:
