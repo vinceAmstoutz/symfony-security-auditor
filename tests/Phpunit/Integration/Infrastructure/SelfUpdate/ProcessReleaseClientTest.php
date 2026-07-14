@@ -50,6 +50,16 @@ final class ProcessReleaseClientTest extends TestCase
     /**
      * @throws SelfUpdateFailedException
      */
+    public function test_get_passes_the_requested_url_to_the_process(): void
+    {
+        $processReleaseClient = new ProcessReleaseClient(static fn (array $arguments): Process => Process::fromShellCommandline(\sprintf('printf %%s %s', escapeshellarg(implode(' ', $arguments)))));
+
+        self::assertSame('https://example.test/resource', $processReleaseClient->get('https://example.test/resource'));
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
     public function test_get_throws_when_the_process_reports_failure(): void
     {
         $processReleaseClient = new ProcessReleaseClient(static fn (array $arguments): Process => new Process(['false']));
