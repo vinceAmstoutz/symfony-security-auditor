@@ -42,13 +42,32 @@ final readonly class Baseline implements BaselineInterface
     public function load(string $path): array
     {
         $fingerprints = [];
-        foreach ($this->decodeEntries($path) as $entry) {
-            foreach ($this->fingerprintsOf($entry, $path) as $fingerprint) {
+        foreach ($this->entries($path) as $baselineEntry) {
+            foreach ($baselineEntry->fingerprints() as $fingerprint) {
                 $fingerprints[] = $fingerprint;
             }
         }
 
         return $fingerprints;
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    #[Override]
+    public function entries(string $path): array
+    {
+        $entries = [];
+        foreach ($this->decodeEntries($path) as $entry) {
+            $fingerprint = $this->fingerprintOf($entry, $path);
+            $entries[] = new BaselineEntry(
+                $fingerprint,
+                $this->attackerFingerprintOf($entry),
+                \is_array($entry) ? $entry : $fingerprint,
+            );
+        }
+
+        return $entries;
     }
 
     /**
@@ -121,27 +140,6 @@ final readonly class Baseline implements BaselineInterface
         $value = $entry[$key] ?? null;
 
         return \is_string($value) ? $value : '';
-    }
-
-    /**
-     * A redundant `attacker_fingerprint` equal to its own `fingerprint` (a
-     * hand-edited or merged baseline file could carry one, though the tool's
-     * own writer never produces this — `BaselineProcessor::entryFor()` only
-     * sets it when the two differ) must not grant a count-aware budget of 2
-     * credits for what is really just 1 accepted occurrence.
-     *
-     * @return list<string>
-     *
-     * @throws MalformedBaselineFileException
-     */
-    private function fingerprintsOf(mixed $entry, string $path): array
-    {
-        $fingerprint = $this->fingerprintOf($entry, $path);
-        $attackerFingerprint = $this->attackerFingerprintOf($entry);
-
-        return null !== $attackerFingerprint && $attackerFingerprint !== $fingerprint
-            ? [$fingerprint, $attackerFingerprint]
-            : [$fingerprint];
     }
 
     private function attackerFingerprintOf(mixed $entry): ?string

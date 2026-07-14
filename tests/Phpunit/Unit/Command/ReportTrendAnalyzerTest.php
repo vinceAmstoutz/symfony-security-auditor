@@ -21,6 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InsufficientTrendRepo
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendPoint;
 
@@ -38,7 +39,7 @@ final class ReportTrendAnalyzerTest extends TestCase
         $this->filesystem = new Filesystem();
         $this->tmpDir = sys_get_temp_dir().'/report_trend_analyzer_test_'.uniqid('', true);
         $this->filesystem->mkdir($this->tmpDir);
-        $this->reportTrendAnalyzer = new ReportTrendAnalyzer(new ReportDiffer($this->filesystem));
+        $this->reportTrendAnalyzer = new ReportTrendAnalyzer(new ReportDiffer(new ReportFindingsLoader($this->filesystem)));
     }
 
     #[Override]

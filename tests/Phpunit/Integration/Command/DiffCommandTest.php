@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
 
 final class DiffCommandTest extends TestCase
 {
@@ -184,6 +185,6 @@ final class DiffCommandTest extends TestCase
 
     private function commandTester(): CommandTester
     {
-        return new CommandTester(new DiffCommand(new ReportDiffer($this->filesystem), new DiffPresenter()));
+        return new CommandTester(new DiffCommand(new ReportDiffer(new ReportFindingsLoader($this->filesystem)), new DiffPresenter()));
     }
 }

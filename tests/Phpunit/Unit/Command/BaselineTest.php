@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineEntry;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedBaselineFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
@@ -372,6 +373,69 @@ final class BaselineTest extends TestCase
         $this->expectException(MalformedBaselineFileException::class);
 
         (new Baseline($this->filesystem))->feedback($path);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_entries_returns_an_empty_list_for_a_missing_file(): void
+    {
+        self::assertSame([], (new Baseline($this->filesystem))->entries($this->tmpDir.'/absent.json'));
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
+     */
+    public function test_entries_exposes_each_entry_with_its_fingerprint_and_raw_payload(): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+        $baseline = new Baseline($this->filesystem);
+        $baseline->save($path, [$this->entry('SSA-AAA')]);
+
+        $entries = $baseline->entries($path);
+
+        self::assertCount(1, $entries);
+        self::assertSame('SSA-AAA', $entries[0]->fingerprint);
+        self::assertNull($entries[0]->attackerFingerprint);
+        self::assertSame($this->entry('SSA-AAA'), $entries[0]->raw);
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     * @throws UnsafeBaselineWriteException
+     */
+    public function test_entries_carries_the_attacker_fingerprint_of_a_type_corrected_entry(): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+        $baseline = new Baseline($this->filesystem);
+        $baseline->save($path, [[...$this->entry('SSA-CORRECTED'), 'attacker_fingerprint' => 'SSA-ORIGINAL']]);
+
+        $entries = $baseline->entries($path);
+
+        self::assertSame(['SSA-CORRECTED', 'SSA-ORIGINAL'], $entries[0]->fingerprints());
+    }
+
+    /**
+     * @throws MalformedBaselineFileException
+     */
+    public function test_entries_preserves_a_legacy_plain_string_entry_as_its_raw_payload(): void
+    {
+        $path = $this->tmpDir.'/baseline.json';
+        $this->filesystem->dumpFile($path, '["SSA-LEGACY"]');
+
+        $entries = (new Baseline($this->filesystem))->entries($path);
+
+        self::assertSame('SSA-LEGACY', $entries[0]->fingerprint);
+        self::assertSame('SSA-LEGACY', $entries[0]->raw);
+        self::assertSame(['SSA-LEGACY'], $entries[0]->fingerprints());
+    }
+
+    public function test_a_baseline_entry_lists_a_redundant_attacker_fingerprint_only_once(): void
+    {
+        $baselineEntry = new BaselineEntry('SSA-SAME', 'SSA-SAME', 'SSA-SAME');
+
+        self::assertSame(['SSA-SAME'], $baselineEntry->fingerprints());
     }
 
     /**
