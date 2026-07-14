@@ -118,6 +118,7 @@ final class YamlStandaloneConfigWriterTest extends TestCase
         $filesystem->dumpFile($blockingFile, 'x');
 
         $this->expectException(StandaloneConfigWriteException::class);
+        $this->expectExceptionMessage('SYMFONY_SECURITY_AUDITOR_HOME');
 
         (new YamlStandaloneConfigWriter())->write($blockingFile.'/config.yaml', ['model' => 'claude-opus-4-8']);
     }

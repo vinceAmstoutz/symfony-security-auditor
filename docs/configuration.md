@@ -425,6 +425,19 @@ uses the native app-data directories:
 > uses `git`, so those tools must be present on the host when you use those
 > features (the audit itself needs only the binary).
 
+**Redirecting the base directory (`SYMFONY_SECURITY_AUDITOR_HOME`).** Some
+container base images export `XDG_CONFIG_HOME` to a root-owned path — Caddy and
+FrankenPHP set it to `/config`, for example — so a non-root user running `init`
+there hits `mkdir(): Permission denied`. Set `SYMFONY_SECURITY_AUDITOR_HOME` to
+any writable directory to override where the config, cache, and bridge
+directories live; it outranks the XDG variables and `$HOME`, giving `~/.config`,
+`~/.cache`, and `~/.local/share` beneath it:
+
+```bash
+SYMFONY_SECURITY_AUDITOR_HOME=/app/var/ssa symfony-security-auditor init
+# → /app/var/ssa/.config/symfony-security-auditor/config.yaml
+```
+
 Run `symfony-security-auditor init` to generate the file interactively and fetch
 the provider bridge. The file is **rootless** — the same keys as the bundle
 configuration above, without the `symfony_security_auditor:` wrapper — plus two

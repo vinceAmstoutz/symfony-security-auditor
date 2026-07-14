@@ -84,6 +84,19 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_strips_invalid_characters_when_deriving_the_api_key_variable_from_the_provider(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['open-ai', 'gpt-5.4', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(
+            ['provider' => 'open-ai', 'platform' => ['open-ai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
     public function test_it_leaves_an_existing_configuration_untouched_when_the_overwrite_is_declined(): void
     {
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");

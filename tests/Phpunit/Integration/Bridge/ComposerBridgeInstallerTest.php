@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge;
 
 use Closure;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
@@ -96,7 +97,8 @@ final class ComposerBridgeInstallerTest extends TestCase
     /**
      * @throws BridgeInstallationFailedException
      */
-    public function test_it_requires_the_provider_specific_bridge_package(): void
+    #[DataProvider('providerPackageCases')]
+    public function test_it_requires_the_provider_specific_bridge_package(string $provider, string $expectedPackage): void
     {
         $captured = [];
         $composerBridgeInstaller = new ComposerBridgeInstaller(processBuilder: static function (string $package, string $targetDirectory) use (&$captured): Process {
@@ -105,9 +107,20 @@ final class ComposerBridgeInstallerTest extends TestCase
             return new Process(['true']);
         });
 
-        $composerBridgeInstaller->install('gemini', $this->targetDirectory);
+        $composerBridgeInstaller->install($provider, $this->targetDirectory);
 
-        self::assertSame(['symfony/ai-gemini-platform'], $captured);
+        self::assertSame([$expectedPackage], $captured);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function providerPackageCases(): iterable
+    {
+        yield 'verbatim slug' => ['gemini', 'symfony/ai-gemini-platform'];
+        yield 'openai maps to the hyphenated open-ai package' => ['openai', 'symfony/ai-open-ai-platform'];
+        yield 'deepseek maps to the hyphenated deep-seek package' => ['deepseek', 'symfony/ai-deep-seek-platform'];
+        yield 'vertexai maps to the hyphenated vertex-ai package' => ['vertexai', 'symfony/ai-vertex-ai-platform'];
     }
 
     /**
