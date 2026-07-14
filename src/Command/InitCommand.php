@@ -56,9 +56,9 @@ final readonly class InitCommand
             return Command::SUCCESS;
         }
 
-        $provider = $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, ollama)', 'anthropic');
+        $provider = $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama)', 'anthropic');
         $model = $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8');
-        $environmentVariable = $this->ask($symfonyStyle, 'Which environment variable holds the API key?', \sprintf('%s_API_KEY', u($provider)->upper()));
+        $environmentVariable = $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($provider));
 
         $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $environmentVariable));
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
@@ -80,5 +80,10 @@ final readonly class InitCommand
         \assert(\is_string($answer));
 
         return $answer;
+    }
+
+    private function defaultApiKeyVariable(string $provider): string
+    {
+        return \sprintf('%s_API_KEY', u($provider)->upper()->replaceMatches('/[^A-Z0-9]+/', ''));
     }
 }

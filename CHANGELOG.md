@@ -106,6 +106,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   alerts by) plus a `cvssV4_0Vector` property. This is an estimate for
   triage/dashboards, not an analyst-scored vector.
 
+- **New `SYMFONY_SECURITY_AUDITOR_HOME` environment variable redirects the
+  standalone binary's config, cache, and bridge directories.** Container base
+  images that export `XDG_CONFIG_HOME` to a root-owned path (Caddy and
+  FrankenPHP both set it to `/config`) made `symfony-security-auditor init` fail
+  with `mkdir(): Permission denied` for a non-root user, with no way to point it
+  elsewhere. Setting `SYMFONY_SECURITY_AUDITOR_HOME` to a writable directory now
+  overrides the base location — it outranks the XDG variables and `$HOME`, so
+  `$SYMFONY_SECURITY_AUDITOR_HOME/.config`, `/.cache`, and `/.local/share`
+  become the roots. Resolution lives in
+  `XdgConfigPathResolver::fromEnvironment()`; see
+  [Standalone Configuration](docs/configuration.md#standalone-configuration).
+
 ### Changed
 
 - **Standalone macOS binaries are now named `…-macos-…` instead of
@@ -116,6 +128,32 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   automatically; anyone hardcoding a download URL should switch `darwin` →
   `macos`. Linux and Windows asset names are unchanged. See
   [`docs/versioning.md`](docs/versioning.md).
+
+### Fixed
+
+- **`symfony-security-auditor init` now installs the correct provider bridge for
+  platforms whose package slug is hyphenated.** The `symfony/ai` platform
+  _config_ key `openai` maps to the composer package
+  `symfony/ai-open-ai-platform` (note the hyphens), but `init` built the package
+  name straight from the config key and ran
+  `composer require symfony/ai-openai-platform`, which does not exist — so
+  choosing `openai` (as the prompt suggests) failed, and the `open-ai`
+  workaround wrote a `platform: open-ai` key `symfony/ai` then rejects.
+  `ComposerBridgeInstaller` now maps the config key to the package slug
+  (`openai` → `open-ai`, `deepseek` → `deep-seek`, `vertexai` → `vertex-ai`,
+  `openresponses` → `open-responses`, `huggingface` → `hugging-face`,
+  `elevenlabs` → `eleven-labs`, `amazeeai` → `amazee-ai`), so the config key the
+  audit needs and the package `init` installs finally agree.
+- **`init` no longer proposes an invalid API-key variable for hyphenated
+  provider names.** Deriving the default from a name like `open-ai` produced
+  `OPEN-AI_API_KEY`, which the shell rejects (`-` is not a valid identifier
+  character). `InitCommand` now strips non-alphanumeric characters when deriving
+  the default, yielding `OPENAI_API_KEY`.
+- **Config-write failures now tell you how to recover.** When `init` cannot
+  create the config file (e.g. a read-only or root-owned XDG directory in a
+  container), `StandaloneConfigWriteException` now names the
+  `SYMFONY_SECURITY_AUDITOR_HOME` override alongside the underlying error
+  instead of only reporting `mkdir(): Permission denied`.
 
 ## [1.13.0] — 2026-07-12 — Groundtruth
 

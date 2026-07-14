@@ -192,4 +192,49 @@ final class XdgConfigPathResolverTest extends TestCase
 
         self::assertSame('/xdg/config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
     }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_the_application_home_override_outranks_xdg_and_home_for_every_directory(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver('/xdg/config', '/xdg/cache', '/home/dev', '/xdg/data', '/writable');
+
+        self::assertSame('/writable/.config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
+        self::assertSame('/writable/.cache/symfony-security-auditor', $xdgConfigPathResolver->cacheDir());
+        self::assertSame('/writable/.local/share/symfony-security-auditor', $xdgConfigPathResolver->dataDir());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_ignores_an_empty_application_home_override(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver('/xdg/config', null, '/home/dev', null, '');
+
+        self::assertSame('/xdg/config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_ignores_a_relative_application_home_override(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver('/xdg/config', null, '/home/dev', null, 'relative/dir');
+
+        self::assertSame('/xdg/config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     */
+    public function test_it_reads_the_application_home_override_from_the_environment_above_a_hijacked_xdg_config_home(): void
+    {
+        $xdgConfigPathResolver = XdgConfigPathResolver::fromEnvironment([
+            'XDG_CONFIG_HOME' => '/config',
+            'SYMFONY_SECURITY_AUDITOR_HOME' => '/app/.ssa',
+        ], 'Linux');
+
+        self::assertSame('/app/.ssa/.config/symfony-security-auditor/config.yaml', $xdgConfigPathResolver->configFile());
+    }
 }

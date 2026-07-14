@@ -24,17 +24,25 @@ final readonly class XdgConfigPathResolver
 
     private const string CONFIG_FILENAME = 'config.yaml';
 
+    public const string HOME_OVERRIDE_VARIABLE = 'SYMFONY_SECURITY_AUDITOR_HOME';
+
     public function __construct(
         private ?string $xdgConfigHome,
         private ?string $xdgCacheHome,
         private ?string $home,
         private ?string $xdgDataHome = null,
+        private ?string $applicationHome = null,
     ) {}
 
     /**
-     * XDG variables always win; on Windows the base directories fall back to the
-     * native `%APPDATA%` (config) and `%LOCALAPPDATA%` (cache/data) locations,
-     * with `%USERPROFILE%` as the home, since Windows has no `$HOME`/XDG dirs.
+     * `SYMFONY_SECURITY_AUDITOR_HOME` is a tool-specific home that outranks the
+     * XDG variables and `$HOME`, so a container whose base image hijacks
+     * `XDG_CONFIG_HOME` to a root-owned directory (e.g. Caddy/FrankenPHP's
+     * `/config`) can still redirect the config, cache, and bridge dirs to a
+     * writable location. XDG variables win over the OS home; on Windows the
+     * base directories fall back to the native `%APPDATA%` (config) and
+     * `%LOCALAPPDATA%` (cache/data) locations, with `%USERPROFILE%` as the
+     * home, since Windows has no `$HOME`/XDG dirs.
      *
      * @param array<string, string> $environment
      */
@@ -47,6 +55,7 @@ final readonly class XdgConfigPathResolver
             $environment['XDG_CACHE_HOME'] ?? ($windows ? ($environment['LOCALAPPDATA'] ?? null) : null),
             $environment['HOME'] ?? ($windows ? ($environment['USERPROFILE'] ?? null) : null),
             $environment['XDG_DATA_HOME'] ?? ($windows ? ($environment['LOCALAPPDATA'] ?? null) : null),
+            $environment[self::HOME_OVERRIDE_VARIABLE] ?? null,
         );
     }
 
@@ -86,15 +95,27 @@ final readonly class XdgConfigPathResolver
      */
     private function baseDirectory(?string $xdgBase, string $homeRelativeFallback): string
     {
-        if (null !== $xdgBase && '' !== $xdgBase && $this->isAbsolutePath($xdgBase)) {
-            return $xdgBase;
-        }
+        return $this->applicationHomeBase($homeRelativeFallback)
+            ?? $this->absoluteBase($xdgBase)
+            ?? $this->osHomeBase($homeRelativeFallback)
+            ?? throw UnresolvableConfigPathException::missingHome();
+    }
 
-        if (null !== $this->home && '' !== $this->home) {
-            return \sprintf('%s/%s', $this->home, $homeRelativeFallback);
-        }
+    private function applicationHomeBase(string $homeRelativeFallback): ?string
+    {
+        $applicationHome = $this->absoluteBase($this->applicationHome);
 
-        throw UnresolvableConfigPathException::missingHome();
+        return null !== $applicationHome ? \sprintf('%s/%s', $applicationHome, $homeRelativeFallback) : null;
+    }
+
+    private function osHomeBase(string $homeRelativeFallback): ?string
+    {
+        return null !== $this->home && '' !== $this->home ? \sprintf('%s/%s', $this->home, $homeRelativeFallback) : null;
+    }
+
+    private function absoluteBase(?string $path): ?string
+    {
+        return null !== $path && '' !== $path && $this->isAbsolutePath($path) ? $path : null;
     }
 
     /**

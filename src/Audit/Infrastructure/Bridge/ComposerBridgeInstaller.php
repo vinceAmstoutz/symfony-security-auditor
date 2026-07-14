@@ -22,15 +22,32 @@ use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 
 /**
- * Installs a `symfony/ai-<provider>-platform` bridge into a writable directory
- * via `composer require`. The same convention applies to every provider, so
- * there is no per-provider branching.
+ * Installs a `symfony/ai-<slug>-platform` bridge into a writable directory via
+ * `composer require`. The provider name is the `symfony/ai` platform *config*
+ * key (`openai`, `deepseek`, …); a handful of packages spell that key with
+ * hyphens (`symfony/ai-open-ai-platform` for the `openai` platform), so those
+ * are mapped to their package slug before the package name is built.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
 {
     private const string PACKAGE_TEMPLATE = 'symfony/ai-%s-platform';
+
+    /**
+     * Platform config keys whose bridge package slug is hyphenated.
+     *
+     * @var array<string, string>
+     */
+    private const array PACKAGE_SLUG_OVERRIDES = [
+        'openai' => 'open-ai',
+        'openresponses' => 'open-responses',
+        'deepseek' => 'deep-seek',
+        'vertexai' => 'vertex-ai',
+        'huggingface' => 'hugging-face',
+        'elevenlabs' => 'eleven-labs',
+        'amazeeai' => 'amazee-ai',
+    ];
 
     private const string MANIFEST_FILENAME = 'composer.json';
 
@@ -65,7 +82,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     {
         $this->ensureComposerProject($targetDirectory);
 
-        $package = \sprintf(self::PACKAGE_TEMPLATE, $provider);
+        $package = \sprintf(self::PACKAGE_TEMPLATE, self::PACKAGE_SLUG_OVERRIDES[$provider] ?? $provider);
         $process = ($this->processBuilder)($package, $targetDirectory);
 
         try {
