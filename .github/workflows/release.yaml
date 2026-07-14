@@ -111,6 +111,11 @@ jobs:
           ./spc --version
 
       - name: Prepare the build environment (installs pkg-config, autoconf, …)
+        env:
+          # doctor --auto-fix downloads pkg-config from the GitHub API too;
+          # authenticate it for the same reason the build step is (avoid the
+          # unauthenticated 60-req/hour limit intermittently 403-ing the fix).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # On Unix runners doctor installs the missing toolchain (pkg-config,
           # autoconf) and must pass. On Windows its VS-2019/2022 probe is a
