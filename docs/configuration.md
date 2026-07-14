@@ -25,6 +25,7 @@ bundle registration, bundle-level configuration, platform wiring via
   - [`audit:diff`](#auditdiff--comparing-two-reports)
   - [`audit:trend`](#audittrend--tracking-findings-across-reports)
   - [`audit:baseline`](#auditbaseline--maintaining-the-accepted-finding-baseline)
+  - [`mcp:serve`](#mcpserve--model-context-protocol-server)
 
 > See also: [Architecture](architecture.md) · [Extending](extending.md) ·
 > [CI](ci.md) · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
@@ -675,3 +676,40 @@ whose `attacker_fingerprint` matches a report finding count as covering it.
 Exit codes: `0` on success, `1` if the report is missing or malformed, the
 baseline file is malformed, or the baseline path is a symlink (refused, exactly
 as every other writer in this tool refuses symlinked destinations).
+
+### `mcp:serve` — Model Context Protocol server
+
+Starts a [Model Context Protocol](https://modelcontextprotocol.io) server over
+stdio, exposing the auditor as MCP **tools** so an MCP client (Claude Desktop,
+an IDE agent, …) can run an audit on demand. The server is built on the official
+[`mcp/sdk`](https://github.com/modelcontextprotocol/php-sdk) and speaks JSON-RPC
+on stdin/stdout — so the command prints nothing else to stdout.
+
+```bash
+bin/console mcp:serve
+```
+
+Register it with your MCP client by pointing the client at the command. For
+Claude Desktop (`claude_desktop_config.json`):
+
+```json
+{
+    "mcpServers": {
+        "symfony-security-auditor": {
+            "command": "php",
+            "args": ["bin/console", "mcp:serve"]
+        }
+    }
+}
+```
+
+Exposed tools:
+
+| Tool    | Arguments             | Description                                                                                              |
+| ------- | --------------------- | -------------------------------------------------------------------------------------------------------- |
+| `audit` | `path` (string, req.) | Runs the multi-agent audit on the project directory at `path` and returns the JSON vulnerability report. |
+
+> The audit runs with the bundle's configured platform, models, and profile —
+> `mcp:serve` is a transport in front of the same pipeline `audit:run` uses, so
+> an audit triggered over MCP bills the configured LLM provider exactly as a CLI
+> run would.
