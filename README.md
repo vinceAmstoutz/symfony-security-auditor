@@ -108,8 +108,8 @@ Or download the binary for your platform straight from the
 | ------------------- | ----------------------------------------------- |
 | Linux x86-64        | `symfony-security-auditor-linux-x86_64`         |
 | Linux arm64         | `symfony-security-auditor-linux-aarch64`        |
-| macOS Intel         | `symfony-security-auditor-darwin-x86_64`        |
-| macOS Apple Silicon | `symfony-security-auditor-darwin-arm64`         |
+| macOS Intel         | `symfony-security-auditor-macos-x86_64`         |
+| macOS Apple Silicon | `symfony-security-auditor-macos-arm64`          |
 | Windows x86-64      | `symfony-security-auditor-windows-x86_64.exe` ¹ |
 
 ¹ A native Windows binary is temporarily unavailable pending an upstream

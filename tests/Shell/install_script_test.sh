@@ -53,9 +53,9 @@ assert_asset Linux x86_64 symfony-security-auditor-linux-x86_64
 assert_asset Linux amd64 symfony-security-auditor-linux-x86_64
 assert_asset Linux aarch64 symfony-security-auditor-linux-aarch64
 assert_asset Linux arm64 symfony-security-auditor-linux-aarch64
-assert_asset Darwin x86_64 symfony-security-auditor-darwin-x86_64
-assert_asset Darwin arm64 symfony-security-auditor-darwin-arm64
-assert_asset Darwin aarch64 symfony-security-auditor-darwin-arm64
+assert_asset Darwin x86_64 symfony-security-auditor-macos-x86_64
+assert_asset Darwin arm64 symfony-security-auditor-macos-arm64
+assert_asset Darwin aarch64 symfony-security-auditor-macos-arm64
 
 FAKE_OS=Windows_NT FAKE_ARCH=x86_64
 expect_failure "detect_asset rejects an unsupported OS" detect_asset

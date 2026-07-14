@@ -81,6 +81,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   alerts by) plus a `cvssV4_0Vector` property. This is an estimate for
   triage/dashboards, not an analyst-scored vector.
 
+### Changed
+
+- **Standalone macOS binaries are now named `…-macos-…` instead of
+  `…-darwin-…`.** The download assets and the `install.sh` OS detection use
+  `symfony-security-auditor-macos-x86_64` / `-macos-arm64`, matching the
+  human-facing "macOS" labels in the README and the platform name users expect
+  (`darwin` is the kernel name). `install.sh` selects the new name
+  automatically; anyone hardcoding a download URL should switch `darwin` →
+  `macos`. Linux and Windows asset names are unchanged. See
+  [`docs/versioning.md`](docs/versioning.md).
+
 ## [1.13.0] — 2026-07-12 — Groundtruth
 
 A precision release: the auditor's picture of the audited codebase now matches
