@@ -26,6 +26,7 @@ bundle registration, bundle-level configuration, platform wiring via
   - [`audit:trend`](#audittrend--tracking-findings-across-reports)
   - [`audit:baseline`](#auditbaseline--maintaining-the-accepted-finding-baseline)
   - [`mcp:serve`](#mcpserve--model-context-protocol-server)
+  - [`self-update`](#self-update--updating-the-standalone-binary)
 
 > See also: [Architecture](architecture.md) · [Extending](extending.md) ·
 > [CI](ci.md) · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
@@ -713,3 +714,28 @@ Exposed tools:
 > `mcp:serve` is a transport in front of the same pipeline `audit:run` uses, so
 > an audit triggered over MCP bills the configured LLM provider exactly as a CLI
 > run would.
+
+### `self-update` — updating the standalone binary
+
+Updates the [standalone binary](#standalone-configuration) in place to the
+latest released version. This command exists **only in the standalone binary**
+(the Composer bundle updates through `composer update`).
+
+```bash
+symfony-security-auditor self-update          # download + verify + replace, if newer
+symfony-security-auditor self-update --check  # only report whether a newer version exists
+```
+
+It queries the GitHub releases API for the latest version and, when the running
+binary is older, downloads the asset for your platform (the same OS/arch
+detection `install.sh` uses), **verifies its `.sha256` checksum before replacing
+anything**, and atomically swaps the running executable. Downloads use `curl`,
+so it must be on the host (as it already is for the install script).
+
+| Option    | Default | Description                                                                 |
+| --------- | ------- | --------------------------------------------------------------------------- |
+| `--check` | off     | Report whether a newer version is available; make no changes to the binary. |
+
+If the binary is not writable (e.g. installed in `/usr/local/bin` without write
+access), the command refuses to update and tells you to re-run with the
+necessary permissions (`sudo`) or reinstall with the install script.

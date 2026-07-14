@@ -153,6 +153,17 @@ symfony-security-auditor audit /path/to/your/symfony/project
 [CLI reference](docs/configuration.md#cli-reference) (`--format`, `--output`,
 `--dry-run`, `--since`, `--fail-on`, …) works identically.
 
+### 4. Keep it up to date
+
+```bash
+symfony-security-auditor self-update          # download + verify + replace, if newer
+symfony-security-auditor self-update --check  # only report whether a newer version exists
+```
+
+`self-update` fetches the latest release for your platform, **verifies its
+checksum before replacing the binary**, and swaps it in place — see the
+[CLI reference](docs/configuration.md#self-update--updating-the-standalone-binary).
+
 ## Use it as a Symfony bundle
 
 ### 1. Install — Symfony Flex wires everything

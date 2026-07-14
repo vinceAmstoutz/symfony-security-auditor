@@ -29,8 +29,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneP
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\GitHubBinaryAssetResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ProcessReleaseClient;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\SelfUpdateCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
@@ -51,12 +56,13 @@ final readonly class StandaloneApplicationFactory
         private BridgeInstallerInterface $bridgeInstaller,
         private StandaloneContainerFactory $standaloneContainerFactory = new StandaloneContainerFactory(),
         private StandaloneConsoleCommandFactory $standaloneConsoleCommandFactory = new StandaloneConsoleCommandFactory(),
+        private string $runningBinaryPath = '',
     ) {}
 
     /**
      * @param array<string, string> $environment
      */
-    public static function fromEnvironment(array $environment): self
+    public static function fromEnvironment(array $environment, ?string $runningBinaryPath = null): self
     {
         $xdgConfigPathResolver = self::resolverFromEnvironment($environment);
 
@@ -68,6 +74,7 @@ final readonly class StandaloneApplicationFactory
             ),
             $xdgConfigPathResolver,
             new ComposerBridgeInstaller(ComposerBridgeInstaller::defaultProcessBuilder()),
+            runningBinaryPath: $runningBinaryPath ?? '',
         );
     }
 
@@ -99,6 +106,7 @@ final readonly class StandaloneApplicationFactory
     {
         $application = new Application(self::APPLICATION_NAME, (new ReportPackage())->version());
         $application->addCommand($this->initCommand());
+        $application->addCommand($this->selfUpdateCommand());
         $application->addCommand($this->lazyAuditCommand());
 
         return $application;
@@ -126,6 +134,18 @@ final readonly class StandaloneApplicationFactory
             new StandaloneConfigFactory(),
             new YamlStandaloneConfigWriter(),
             $this->bridgeInstaller,
+        );
+    }
+
+    private function selfUpdateCommand(): SelfUpdateCommand
+    {
+        return new SelfUpdateCommand(
+            new SelfUpdater(
+                new ProcessReleaseClient(ProcessReleaseClient::defaultProcessBuilder()),
+                new GitHubBinaryAssetResolver(\PHP_OS_FAMILY, php_uname('m')),
+                new RunningBinaryLocator('/proc/self/exe', $this->runningBinaryPath),
+            ),
+            (new ReportPackage())->version(),
         );
     }
 
