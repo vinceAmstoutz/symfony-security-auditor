@@ -189,3 +189,48 @@ jobs:
           files: |
             ${{ matrix.asset }}
             ${{ matrix.asset }}.sha256
+
+  prune:
+    name: Prune stale release assets
+    runs-on: ubuntu-latest
+    needs: binary
+    permissions:
+      contents: write
+    steps:
+      - name: Delete release assets no longer produced by the build matrix
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          # Assets this release should carry — keep in sync with the binary
+          # matrix above. Any other asset under our own name prefix (e.g. a
+          # binary from a since-renamed platform slug like the old `darwin-*`)
+          # is an orphan left behind by overwrite_files and gets pruned, so a
+          # rebuild after a rename/removal self-heals instead of accumulating
+          # duplicates.
+          keep='
+          symfony-security-auditor-linux-x86_64
+          symfony-security-auditor-linux-aarch64
+          symfony-security-auditor-macos-x86_64
+          symfony-security-auditor-macos-arm64
+          symfony-security-auditor-windows-x86_64.exe
+          '
+          allow=""
+          for name in $keep; do
+            allow="${allow} ${name} ${name}.sha256"
+          done
+
+          gh release view "$TAG" --json assets --jq '.assets[].name' | while IFS= read -r asset; do
+            case "$asset" in
+              symfony-security-auditor-*) ;;
+              *) continue ;;
+            esac
+            case " $allow " in
+              *" $asset "*) ;;
+              *)
+                echo "Pruning stale asset: $asset"
+                gh release delete-asset "$TAG" "$asset" --yes
+                ;;
+            esac
+          done
