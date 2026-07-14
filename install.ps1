@@ -61,7 +61,25 @@ function Install-Binary {
     New-Item -ItemType Directory -Path $tmp | Out-Null
     try {
         Write-Host "Downloading $asset ($Version)…"
-        Get-Asset "$base/$asset" "$tmp\$asset"
+        try {
+            Get-Asset "$base/$asset" "$tmp\$asset"
+        }
+        catch [System.Net.WebException] {
+            $status = [int]$_.Exception.Response.StatusCode
+            if ($status -eq 404) {
+                throw @"
+No Windows binary is published for this release yet.
+
+A native Windows build is not currently available (tracked upstream in
+static-php-cli). In the meantime, run the auditor on Windows via:
+  - Composer:  composer require --dev $Repo   (as a Symfony bundle, needs PHP 8.3+)
+  - WSL:       run the Linux installer inside WSL
+
+See https://github.com/$Repo/releases for available assets.
+"@
+            }
+            throw
+        }
         Get-Asset "$base/$asset.sha256" "$tmp\$asset.sha256"
         Test-Checksum "$tmp\$asset" "$tmp\$asset.sha256"
 
