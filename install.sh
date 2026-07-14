@@ -36,13 +36,13 @@ detect_asset() {
 
   case "$os" in
     Linux) os_slug="linux" ;;
-    Darwin) os_slug="darwin" ;;
+    Darwin) os_slug="macos" ;;
     *) fail "unsupported OS '$os' — on Windows download symfony-security-auditor-windows-x86_64.exe from the releases page" ;;
   esac
 
   case "$arch" in
     x86_64 | amd64) arch_slug="x86_64" ;;
-    aarch64 | arm64) [ "$os_slug" = "darwin" ] && arch_slug="arm64" || arch_slug="aarch64" ;;
+    aarch64 | arm64) [ "$os_slug" = "macos" ] && arch_slug="arm64" || arch_slug="aarch64" ;;
     *) fail "unsupported architecture '$arch'" ;;
   esac
 

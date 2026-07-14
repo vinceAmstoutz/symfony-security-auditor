@@ -79,10 +79,10 @@ jobs:
             asset: symfony-security-auditor-linux-aarch64
             spc: spc-linux-aarch64
           - runner: macos-15-intel
-            asset: symfony-security-auditor-darwin-x86_64
+            asset: symfony-security-auditor-macos-x86_64
             spc: spc-macos-x86_64
           - runner: macos-14
-            asset: symfony-security-auditor-darwin-arm64
+            asset: symfony-security-auditor-macos-arm64
             spc: spc-macos-aarch64
           - runner: windows-latest
             asset: symfony-security-auditor-windows-x86_64.exe

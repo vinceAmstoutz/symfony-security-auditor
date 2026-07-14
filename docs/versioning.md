@@ -113,7 +113,7 @@ The standalone tool is a supported install method alongside the bundle, and the
 following surface is BC-protected:
 
 - The published per-platform binary assets and their release-asset names
-  (`symfony-security-auditor-{linux-x86_64,linux-aarch64,darwin-x86_64,darwin-arm64}`
+  (`symfony-security-auditor-{linux-x86_64,linux-aarch64,macos-x86_64,macos-arm64}`
   and `symfony-security-auditor-windows-x86_64.exe`), each accompanied by a
   `.sha256` checksum, plus the `install.sh` (Linux/macOS) and `install.ps1`
   (Windows) installer contracts and their `SSA_VERSION` / `SSA_INSTALL_DIR`
