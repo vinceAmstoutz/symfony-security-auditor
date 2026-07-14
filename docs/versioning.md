@@ -109,6 +109,9 @@ is a `MAJOR` change.
 - The command name `audit:baseline` (see
   [CLI Reference → `audit:baseline`](configuration.md#auditbaseline--maintaining-the-accepted-finding-baseline)),
   its arguments, options, and exit codes.
+- The command name `mcp:serve` (see
+  [CLI Reference → `mcp:serve`](configuration.md#mcpserve--model-context-protocol-server))
+  and the names and input schemas of the MCP tools it exposes (`audit`).
 
 ### Standalone executable & XDG configuration
 

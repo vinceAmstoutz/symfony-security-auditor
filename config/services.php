@@ -136,6 +136,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
@@ -164,6 +165,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\AuditTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServerFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServerFactoryInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpTransportFactoryInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\StdioMcpTransportFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDifferInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
@@ -662,6 +669,29 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->args([
             service(ReportTrendAnalyzerInterface::class),
             service(TrendPresenterInterface::class),
+        ])
+        ->tag('console.command');
+
+    $defaultsConfigurator->set(AuditTool::class)
+        ->args([
+            service(RunAuditUseCase::class),
+            service(JsonReportRenderer::class),
+        ]);
+
+    $defaultsConfigurator->set(McpServerFactory::class)
+        ->args([
+            service(AuditTool::class),
+            inline_service(ReportPackage::class),
+        ]);
+    $defaultsConfigurator->alias(McpServerFactoryInterface::class, McpServerFactory::class);
+
+    $defaultsConfigurator->set(StdioMcpTransportFactory::class);
+    $defaultsConfigurator->alias(McpTransportFactoryInterface::class, StdioMcpTransportFactory::class);
+
+    $defaultsConfigurator->set(McpServeCommand::class)
+        ->args([
+            service(McpServerFactoryInterface::class),
+            service(McpTransportFactoryInterface::class),
         ])
         ->tag('console.command');
 };

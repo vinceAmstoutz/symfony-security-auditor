@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **New `mcp:serve` command runs a Model Context Protocol (MCP) server, exposing
+  the auditor as a tool to AI assistants.** `bin/console mcp:serve` starts an
+  [MCP](https://modelcontextprotocol.io) server over stdio — built on the
+  official [`mcp/sdk`](https://github.com/modelcontextprotocol/php-sdk) — that
+  advertises an `audit` tool taking a project `path` and returning the JSON
+  vulnerability report, so an MCP client (Claude Desktop, an IDE agent, …) can
+  run a full audit on demand through the same pipeline `audit:run` uses. The
+  server building lives in `src/Command/Mcp/` behind `McpServerFactoryInterface`
+  and `McpTransportFactoryInterface`; the audit runs with the bundle's
+  configured platform, models, and profile. See
+  [CLI Reference → `mcp:serve`](docs/configuration.md#mcpserve--model-context-protocol-server).
 - **`audit:trend` can now render its timeline as a self-contained HTML
   dashboard.** `audit:trend --format=html` emits a single HTML page — no
   external assets, light and dark mode — with an SVG line chart of finding
