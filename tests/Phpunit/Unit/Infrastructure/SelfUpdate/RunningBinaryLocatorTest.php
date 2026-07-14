@@ -53,6 +53,21 @@ final class RunningBinaryLocatorTest extends TestCase
     /**
      * @throws SelfUpdateFailedException
      */
+    public function test_it_prefers_the_kernel_reported_executable_over_the_invoked_script(): void
+    {
+        $kernelTarget = $this->workingDirectory.'/kernel-binary';
+        (new Filesystem())->touch($kernelTarget);
+        $procSelfExe = $this->workingDirectory.'/proc-self-exe';
+        symlink($kernelTarget, $procSelfExe);
+        $invokedScript = $this->workingDirectory.'/invoked-binary';
+        (new Filesystem())->touch($invokedScript);
+
+        self::assertSame($kernelTarget, (new RunningBinaryLocator($procSelfExe, $invokedScript))->path());
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
     public function test_it_falls_back_to_the_resolved_invoked_script_when_proc_self_exe_is_absent(): void
     {
         $invokedScript = $this->workingDirectory.'/invoked-binary';

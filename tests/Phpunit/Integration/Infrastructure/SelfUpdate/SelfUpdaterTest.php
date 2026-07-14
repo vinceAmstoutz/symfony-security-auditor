@@ -68,6 +68,18 @@ final class SelfUpdaterTest extends TestCase
      * @throws SelfUpdateFailedException
      * @throws UnsupportedSelfUpdatePlatformException
      */
+    public function test_it_marks_the_replaced_binary_as_executable(): void
+    {
+        $payload = 'NEW-BINARY';
+        $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)))->run('1.0.0', false);
+
+        self::assertSame(0o755, fileperms($this->binaryPath) & 0o777);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
     public function test_it_reports_already_up_to_date_without_touching_the_binary(): void
     {
         $selfUpdateResult = $this->selfUpdater($this->clientFor('1.0.0', 'IGNORED', hash('sha256', 'IGNORED')))->run('1.0.0', false);
@@ -136,9 +148,13 @@ final class SelfUpdaterTest extends TestCase
         $payload = 'NEW';
         $selfUpdater = $this->selfUpdater($this->clientFor('9.9.9', $payload, hash('sha256', $payload)), $this->binaryPath, $filesystem);
 
-        $this->expectException(SelfUpdateFailedException::class);
+        try {
+            $this->expectException(SelfUpdateFailedException::class);
 
-        $selfUpdater->run('1.0.0', false);
+            $selfUpdater->run('1.0.0', false);
+        } finally {
+            self::assertFileDoesNotExist($this->workingDirectory.'/.symfony-security-auditor-linux-x86_64.download');
+        }
     }
 
     /**
@@ -176,7 +192,7 @@ final class SelfUpdaterTest extends TestCase
 
         return new FakeReleaseClient([
             self::LATEST_RELEASE_API_URL => \sprintf('{"tag_name":"%s"}', $tagName),
-            $asset->checksumUrl => \sprintf('%s  %s', $checksum, $asset->name),
+            $asset->checksumUrl => \sprintf("%s\n", $checksum),
         ], $payload);
     }
 
