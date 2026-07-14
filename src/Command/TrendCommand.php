@@ -40,7 +40,7 @@ final readonly class TrendCommand
     public function __invoke(
         SymfonyStyle $symfonyStyle,
         #[Argument(description: 'Paths to two or more JSON reports, ordered oldest to newest.', name: 'reports')] array $reports,
-        #[Option(description: 'Output format: console or json', name: 'format', shortcut: 'f')] TrendOutputFormat $trendOutputFormat = TrendOutputFormat::Console,
+        #[Option(description: 'Output format: console, json or html', name: 'format', shortcut: 'f')] TrendOutputFormat $trendOutputFormat = TrendOutputFormat::Console,
     ): int {
         try {
             $reportTrend = $this->reportTrendAnalyzer->analyze($reports);
@@ -57,11 +57,12 @@ final readonly class TrendCommand
 
     /**
      * Human-facing error messages move to stderr when stdout carries a
-     * machine-readable document, so `--format=json > trend.json` receives the
-     * document alone — mirrors `DiffCommand::errorStyle()`.
+     * machine-readable document, so `--format=json > trend.json` and
+     * `--format=html > trend.html` receive the document alone — mirrors
+     * `DiffCommand::errorStyle()`.
      */
     private function errorStyle(SymfonyStyle $symfonyStyle, TrendOutputFormat $trendOutputFormat): SymfonyStyle
     {
-        return TrendOutputFormat::Json === $trendOutputFormat ? $symfonyStyle->getErrorStyle() : $symfonyStyle;
+        return TrendOutputFormat::Console !== $trendOutputFormat ? $symfonyStyle->getErrorStyle() : $symfonyStyle;
     }
 }

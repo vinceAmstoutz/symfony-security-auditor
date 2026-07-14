@@ -94,6 +94,20 @@ final class TrendPresenterTest extends TestCase
         );
     }
 
+    public function test_html_format_outputs_a_self_contained_html_document_listing_every_report(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->trendPresenter->present($symfonyStyle, $this->twoPointTrend(), TrendOutputFormat::Html);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringStartsWith('<!doctype html>', $display);
+        self::assertStringEndsWith('</html>'."\n", $display);
+        self::assertStringContainsString('previous.json', $display);
+        self::assertStringContainsString('current.json', $display);
+    }
+
     private function twoPointTrend(): ReportTrend
     {
         return new ReportTrend([

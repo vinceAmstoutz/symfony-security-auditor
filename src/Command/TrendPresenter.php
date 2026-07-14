@@ -20,19 +20,29 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /**
- * Renders a {@see ReportTrend} as a human-readable console timeline or as a
- * raw JSON document.
+ * Renders a {@see ReportTrend} as a human-readable console timeline, as a
+ * raw JSON document, or as a self-contained HTML page.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class TrendPresenter implements TrendPresenterInterface
 {
+    public function __construct(
+        private TrendHtmlRendererInterface $trendHtmlRenderer = new TrendHtmlRenderer(),
+    ) {}
+
     /**
      * @throws JsonException
      */
     #[Override]
     public function present(SymfonyStyle $symfonyStyle, ReportTrend $reportTrend, TrendOutputFormat $trendOutputFormat): void
     {
+        if (TrendOutputFormat::Html === $trendOutputFormat) {
+            $symfonyStyle->writeln($this->trendHtmlRenderer->render($reportTrend), OutputInterface::OUTPUT_RAW);
+
+            return;
+        }
+
         if (TrendOutputFormat::Json === $trendOutputFormat) {
             // OUTPUT_RAW keeps markup-lookalike text in report paths out of the console formatter.
             $symfonyStyle->writeln(json_encode($reportTrend->toArray(), \JSON_PRETTY_PRINT | \JSON_THROW_ON_ERROR), OutputInterface::OUTPUT_RAW);

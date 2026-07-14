@@ -13,10 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
-/** @internal not part of the BC promise — the enum *values* (`console`, `json`, `html`) are part of the CLI contract, but the PHP enum itself is for internal use only. */
-enum TrendOutputFormat: string
+/** @internal not part of the BC promise — see docs/versioning.md */
+interface TrendHtmlRendererInterface
 {
-    case Console = 'console';
-    case Json = 'json';
-    case Html = 'html';
+    public function render(ReportTrend $reportTrend): string;
 }

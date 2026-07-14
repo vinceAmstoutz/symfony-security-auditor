@@ -607,13 +607,22 @@ Summary: 5 → 6 findings (+1) across 3 reports.
 | --------- | -------- | ------------------------------------------------------------ |
 | `reports` | yes      | Paths to two or more JSON reports, ordered oldest to newest. |
 
-| Option     | Short | Default   | Description                        |
-| ---------- | ----- | --------- | ---------------------------------- |
-| `--format` | `-f`  | `console` | Output format: `console` or `json` |
+| Option     | Short | Default   | Description                                 |
+| ---------- | ----- | --------- | ------------------------------------------- |
+| `--format` | `-f`  | `console` | Output format: `console`, `json`, or `html` |
 
 With `--format=json` the trend is emitted as a `points` array — one entry per
 report with `report`, `total`, `new`, and `fixed` keys (`new` and `fixed` are
 `null` on the first point, which has no predecessor to compare against).
+
+With `--format=html` the trend is emitted as a single self-contained HTML page
+(no external assets, light and dark mode): an SVG line chart of finding totals
+over the report series plus a table of per-report new/fixed deltas — redirect
+stdout to publish it as a dashboard:
+
+```bash
+bin/console audit:trend nightly-*.json --format=html > trend.html
+```
 
 Exit codes: `0` on a successful trend (regardless of how the counts evolve), `1`
 if fewer than two reports are given or a report file is missing or is not valid
