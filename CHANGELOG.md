@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.14.0] — 2026-07-14 — Beacon
+
+A release about sharper signals in and more actionable output out. External SAST
+results now feed the attacker through SARIF import, and projects can teach it
+new attack surfaces from configuration alone — no PHP required. On the way out,
+every finding carries a heuristic CVSS v4.0 score for triage, findings at or
+above the configured floor gain a suggested-fix patch, and `audit:trend` renders
+a self-contained HTML dashboard. Baselines get smarter too: their `reason`
+annotations now coach the reviewer, and the new `audit:baseline` command
+maintains them from a report without spending a token. The standalone macOS
+binaries ship under the clearer `macos` name, and the standalone `init` command
+now installs the correct provider bridge for every platform and stays writable
+in non-root containers via the new `SYMFONY_SECURITY_AUDITOR_HOME` override.
+
 ### Added
 
 - **`audit:trend` can now render its timeline as a self-contained HTML
@@ -2101,6 +2115,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.14.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.14.0
 [1.13.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.13.0
 [1.12.0]:
