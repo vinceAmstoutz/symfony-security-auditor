@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\SelfUpdate;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
@@ -63,10 +64,20 @@ final class RunningBinaryLocatorTest extends TestCase
     /**
      * @throws SelfUpdateFailedException
      */
-    public function test_it_fails_when_neither_source_resolves_a_path(): void
+    #[DataProvider('unresolvableInvokedScriptCases')]
+    public function test_it_fails_when_neither_source_resolves_a_path(string $invokedScriptPath): void
     {
         $this->expectException(SelfUpdateFailedException::class);
 
-        (new RunningBinaryLocator($this->workingDirectory.'/missing', $this->workingDirectory.'/also-missing'))->path();
+        (new RunningBinaryLocator($this->workingDirectory.'/missing', $invokedScriptPath))->path();
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function unresolvableInvokedScriptCases(): iterable
+    {
+        yield 'no invoked script provided' => [''];
+        yield 'invoked script does not exist' => [sys_get_temp_dir().'/ssa-locator-also-missing'];
     }
 }
