@@ -44,11 +44,13 @@ final class ComposerBridgeInstallerTest extends TestCase
     /**
      * @throws BridgeInstallationFailedException
      */
-    public function test_it_initialises_the_target_directory_as_a_composer_project(): void
+    public function test_it_initialises_the_target_directory_as_a_composer_project_pinned_to_the_runtime_php(): void
     {
-        (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess()))->install('anthropic', $this->targetDirectory);
+        (new ComposerBridgeInstaller(processBuilder: $this->succeedingProcess(), platformPhpVersion: '8.3.99'))->install('anthropic', $this->targetDirectory);
 
-        self::assertSame("{}\n", file_get_contents($this->targetDirectory.'/composer.json'));
+        $manifest = file_get_contents($this->targetDirectory.'/composer.json');
+        self::assertNotFalse($manifest);
+        self::assertSame(['config' => ['platform' => ['php' => '8.3.99']]], json_decode($manifest, true, flags: \JSON_THROW_ON_ERROR));
     }
 
     /**

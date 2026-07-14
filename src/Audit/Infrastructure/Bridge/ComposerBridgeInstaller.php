@@ -51,14 +51,14 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
 
     private const string MANIFEST_FILENAME = 'composer.json';
 
-    private const string EMPTY_MANIFEST = "{}\n";
-
     /**
-     * @param Closure(string, string): Process $processBuilder the composer-require command builder (use self::defaultProcessBuilder() in production); tests inject a stub
+     * @param Closure(string, string): Process $processBuilder     the composer-require command builder (use self::defaultProcessBuilder() in production); tests inject a stub
+     * @param string                           $platformPhpVersion the PHP version the bridge tree must resolve for — defaults to the running runtime (`PHP_VERSION`), which for the standalone binary is its own bundled PHP, not the host's
      */
     public function __construct(
         private Closure $processBuilder,
         private Filesystem $filesystem = new Filesystem(),
+        private string $platformPhpVersion = \PHP_VERSION,
     ) {}
 
     /**
@@ -109,10 +109,27 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         }
 
         try {
-            $this->filesystem->dumpFile($manifest, self::EMPTY_MANIFEST);
+            $this->filesystem->dumpFile($manifest, $this->manifestContents());
         } catch (IOException $ioException) {
             throw BridgeInstallationFailedException::forManifestWriteFailure($targetDirectory, $ioException);
         }
+    }
+
+    /**
+     * Pins `config.platform.php` so `composer require` resolves the bridge for
+     * the runtime that will load it. The standalone binary bundles its own PHP;
+     * without this, `init` resolves against the host's (possibly newer) PHP and
+     * the binary then aborts in `vendor/composer/platform_check.php`.
+     */
+    private function manifestContents(): string
+    {
+        return \sprintf(
+            "%s\n",
+            json_encode(
+                ['config' => ['platform' => ['php' => $this->platformPhpVersion]]],
+                \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR,
+            ),
+        );
     }
 
     /**

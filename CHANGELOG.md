@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Fixed
+
+- **The standalone binary's `init` now installs a provider bridge that its own
+  bundled PHP can load.** `ComposerBridgeInstaller` ran `composer require`
+  without constraining the platform, so the bridge tree resolved against the
+  _host's_ PHP (e.g. 8.5) and pulled dependencies requiring PHP `>= 8.4`. The
+  binary — which bundles PHP 8.3 — then aborted at startup in
+  `vendor/composer/platform_check.php`, since the resolved dependencies required
+  a newer PHP than the binary runs. The generated `composer.json` now pins
+  `config.platform.php` to the running runtime's version (`PHP_VERSION`, the
+  binary's bundled PHP), so `composer require` resolves versions the binary can
+  actually run.
+
 ## [1.14.0] — 2026-07-14 — Beacon
 
 A release about sharper signals in and more actionable output out. External SAST
