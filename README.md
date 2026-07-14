@@ -104,13 +104,18 @@ irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/mai
 Or download the binary for your platform straight from the
 [latest release](https://github.com/vinceAmstoutz/symfony-security-auditor/releases/latest):
 
-| Platform            | Asset                                         |
-| ------------------- | --------------------------------------------- |
-| Linux x86-64        | `symfony-security-auditor-linux-x86_64`       |
-| Linux arm64         | `symfony-security-auditor-linux-aarch64`      |
-| macOS Intel         | `symfony-security-auditor-darwin-x86_64`      |
-| macOS Apple Silicon | `symfony-security-auditor-darwin-arm64`       |
-| Windows x86-64      | `symfony-security-auditor-windows-x86_64.exe` |
+| Platform            | Asset                                           |
+| ------------------- | ----------------------------------------------- |
+| Linux x86-64        | `symfony-security-auditor-linux-x86_64`         |
+| Linux arm64         | `symfony-security-auditor-linux-aarch64`        |
+| macOS Intel         | `symfony-security-auditor-darwin-x86_64`        |
+| macOS Apple Silicon | `symfony-security-auditor-darwin-arm64`         |
+| Windows x86-64      | `symfony-security-auditor-windows-x86_64.exe` ¹ |
+
+¹ A native Windows binary is temporarily unavailable pending an upstream
+static-php-cli fix. On Windows, use the
+[Symfony bundle](#use-it-as-a-symfony-bundle) via Composer, or run the Linux
+installer inside WSL, until it returns.
 
 Every binary ships with a `.sha256` checksum, and the install scripts **abort**
 rather than install a binary they cannot verify. To check a manual download
