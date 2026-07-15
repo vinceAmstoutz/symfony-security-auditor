@@ -1,0 +1,112 @@
+# Temporary scaffolding — validates the Windows binary build fix on this
+# branch without publishing anything. Mirrors the phar + Windows binary legs
+# of release.yaml minus the release-attach step. Delete before merging.
+name: Windows Binary Smoke
+
+on:
+  push:
+    branches:
+      - claude/symfony-auditor-pr-155-rhv14w
+
+permissions:
+  contents: read
+
+jobs:
+  phar:
+    name: Compile the PHAR (build input for the binary)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: box
+          ini-values: phar.readonly=0
+
+      - name: Install production dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress --no-dev
+
+      - name: Compile the PHAR
+        run: box compile --no-interaction
+
+      - name: Verify the PHAR was produced
+        run: test -s symfony-security-auditor.phar
+
+      - name: Upload the PHAR build input with its dependency lock
+        uses: actions/upload-artifact@v7
+        with:
+          name: symfony-security-auditor-phar
+          path: |
+            symfony-security-auditor.phar
+            composer.lock
+          retention-days: 1
+          compression-level: 9
+
+  windows-binary:
+    name: symfony-security-auditor-windows-x86_64.exe
+    runs-on: windows-2022
+    needs: phar
+    env:
+      SPC_VERSION: '2.8.5'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup static-php-cli (pinned stable release)
+        run: |
+          curl -fsSL --retry 3 -o spc.exe "https://github.com/crazywhalecc/static-php-cli/releases/download/${SPC_VERSION}/spc-windows-x64.exe"
+          ./spc --version
+
+      - name: Prepare the build environment (installs pkg-config, autoconf, …)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./spc doctor --auto-fix
+
+      - name: Download the PHAR build input
+        uses: actions/download-artifact@v8
+        with:
+          name: symfony-security-auditor-phar
+
+      - name: Resolve the required extensions plus zlib for the gz-compressed PHAR
+        id: extensions
+        run: |
+          raw="$(./spc dump-extensions . --format=text)"
+          filtered="$(printf '%s' "$raw" | tr ',' '\n' \
+            | grep -vxE 'core|standard|date|hash|json|pcre|spl|reflection|random|zlib' \
+            | paste -sd, -)"
+          echo "list=${filtered},zlib" >> "$GITHUB_OUTPUT"
+
+      - name: Build the static micro PHP runtime
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./spc download --for-extensions="${{ steps.extensions.outputs.list }}" --with-php=8.3 --prefer-pre-built
+          ./spc extract php-src,micro --source-only
+          if [ ! -s source/php-src/main/php_version.h ]; then
+            echo "php-src extraction is incomplete (spc swallows Windows 7za/tar failures)" >&2
+            exit 1
+          fi
+          ./spc build "${{ steps.extensions.outputs.list }}" --build-micro
+
+      - name: Combine the micro runtime with the PHAR
+        run: ./spc micro:combine symfony-security-auditor.phar --output=symfony-security-auditor-windows-x86_64.exe
+
+      - name: Verify the binary was produced
+        run: test -s symfony-security-auditor-windows-x86_64.exe
+
+      - name: Smoke-test the binary
+        run: ./symfony-security-auditor-windows-x86_64.exe --version
+
+      - name: Upload the binary for inspection
+        uses: actions/upload-artifact@v7
+        with:
+          name: symfony-security-auditor-windows-x86_64.exe
+          path: symfony-security-auditor-windows-x86_64.exe
+          retention-days: 1
