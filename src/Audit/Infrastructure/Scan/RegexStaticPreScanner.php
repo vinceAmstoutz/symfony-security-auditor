@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 26;
+    public const int CACHE_VERSION = 27;
 
     /**
      * Detects the `s` (DOTALL) flag among a PCRE pattern's trailing modifier
@@ -152,6 +152,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'request_mapping_attribute' => [
                 'regex' => '/#\[Map(?:RequestPayload|QueryString|QueryParameter)\b/',
                 'description' => '#[MapRequestPayload]/#[MapQueryString]/#[MapQueryParameter] — verify the bound DTO has validation constraints and no privileged setters (mass assignment / IDOR)',
+            ],
+            'forwarded_host_usage' => [
+                'regex' => '/->(?:getHost|getSchemeAndHttpHost|getHttpHost)\s*\(/',
+                'description' => 'Request::getHost()/getSchemeAndHttpHost() — verify trusted_proxies/trusted_hosts are configured before this value is used in a link or cache key (host header injection / cache poisoning)',
             ],
         ],
         ProjectFileType::VOTER->value => [
@@ -278,6 +282,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'scrubbed_secret' => [
                 'regex' => '/\*\*\*REDACTED:/',
                 'description' => 'A credential-shaped value was redacted here before analysis — a real secret is committed in this file',
+            ],
+            'trusted_proxies_wildcard' => [
+                'regex' => '/(?:trusted_proxies\s*:|TRUSTED_PROXIES\s*=)\s*[\'"]?(?:0\.0\.0\.0\/0|::\/0)/i',
+                'description' => 'trusted_proxies set to a wildcard CIDR (0.0.0.0/0, ::/0) — any client can spoof X-Forwarded-* headers, defeating IP allowlists and rate limiters',
             ],
         ],
         ProjectFileType::AUTHENTICATOR->value => [

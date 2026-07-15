@@ -1254,7 +1254,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
-        self::assertSame(20, substr_count($prompt, '<skills role="'));
+        self::assertSame(22, substr_count($prompt, '<skills role="'));
     }
 
     /**
@@ -2049,6 +2049,8 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('mailer_header_injection', $prompt);
         self::assertStringContainsString('webhook_replay', $prompt);
         self::assertStringContainsString('authenticator_bypass', $prompt);
+        self::assertStringContainsString('host_header_injection', $prompt);
+        self::assertStringContainsString('trusted_proxy_misconfiguration', $prompt);
     }
 
     public function test_base_prompt_references_modern_symfony_components_in_expertise(): void

@@ -791,6 +791,92 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    #[DataProvider('forwardedHostUsageCases')]
+    public function test_it_flags_forwarded_host_usage_in_a_controller(string $call): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/PasswordResetController.php',
+            '/app/src/Controller/PasswordResetController.php',
+            "<?php\nclass PasswordResetController { public function reset(\$request) { return \$request->{$call}(); } }",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('forwarded_host_usage', $patterns);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function forwardedHostUsageCases(): iterable
+    {
+        yield 'getHost' => ['getHost'];
+        yield 'getSchemeAndHttpHost' => ['getSchemeAndHttpHost'];
+        yield 'getHttpHost' => ['getHttpHost'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_an_unrelated_getter_call(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/ImportController.php',
+            '/app/src/Controller/ImportController.php',
+            "<?php\nclass ImportController { public function import(\$uri) { return \$uri->getPath(); } }",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('forwarded_host_usage', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    #[DataProvider('trustedProxiesWildcardCases')]
+    public function test_it_flags_a_wildcard_trusted_proxies_configuration(string $fileName, string $content): void
+    {
+        $projectFile = ProjectFile::create($fileName, '/app/'.$fileName, $content);
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('trusted_proxies_wildcard', $patterns);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function trustedProxiesWildcardCases(): iterable
+    {
+        yield 'YAML IPv4 wildcard' => ['config/packages/framework.yaml', "framework:\n    trusted_proxies: '0.0.0.0/0'"];
+        yield 'YAML IPv6 wildcard' => ['config/packages/framework.yaml', "framework:\n    trusted_proxies: '::/0'"];
+        yield 'dotenv wildcard' => ['.env', "TRUSTED_PROXIES=0.0.0.0/0\n"];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_trusted_proxies_scoped_to_a_private_cidr(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/framework.yaml',
+            '/app/config/packages/framework.yaml',
+            "framework:\n    trusted_proxies: '10.0.0.0/8'",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('trusted_proxies_wildcard', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_form_submit_with_request_all_split_across_lines(): void
     {
         $projectFile = ProjectFile::create(
