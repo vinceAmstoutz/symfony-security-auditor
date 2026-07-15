@@ -36,7 +36,7 @@
     "require": {
         "php": ">=8.3",
         "composer-runtime-api": "^2.0",
-        "mcp/sdk": "^0.6.0",
+        "mcp/sdk": "^0.7.0",
         "nikic/php-parser": "^5.3",
         "psr/clock": "^1.0",
         "psr/log": "^3.0",
