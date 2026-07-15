@@ -68,14 +68,12 @@ function Install-Binary {
             $status = [int]$_.Exception.Response.StatusCode
             if ($status -eq 404) {
                 throw @"
-No Windows binary is published for this release yet.
+No Windows binary is published for release '$Version'.
 
-A native Windows build is not currently available (tracked upstream in
-static-php-cli). In the meantime, run the auditor on Windows via:
+Some older releases ship without a native Windows binary. Options:
+  - Install a release that has one:  https://github.com/$Repo/releases
   - Composer:  composer require --dev $Repo   (as a Symfony bundle, needs PHP 8.3+)
   - WSL:       run the Linux installer inside WSL
-
-See https://github.com/$Repo/releases for available assets.
 "@
             }
             throw
