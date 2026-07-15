@@ -111,6 +111,14 @@ jobs:
           # unauthenticated 60-req/hour limit intermittently 403-ing the fix).
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Preinstall doctor's Linux packages with apt retries and forced
+          # IPv4: doctor's own single-try 'apt-get install re2c autopoint'
+          # fails the job whenever the runner's mirror flakes (ports.ubuntu.com
+          # on arm64 times out intermittently and has no IPv6 route).
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update -o Acquire::Retries=3 -o Acquire::ForceIPv4=true
+            sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::ForceIPv4=true re2c autopoint
+          fi
           # Must pass everywhere: on Unix it installs pkg-config/autoconf; on
           # Windows it installs php-sdk-binary-tools, whose 7za.exe spc's
           # source extraction silently depends on (exit codes are discarded).
