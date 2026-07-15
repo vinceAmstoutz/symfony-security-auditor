@@ -25,6 +25,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   See
   [CLI Reference → `self-update`](docs/configuration.md#self-update--updating-the-standalone-binary).
 
+### Fixed
+
+- **The native Windows binary is published with releases again.**
+  `windows-latest` lost VS 2022 in GitHub's June 2026 image migration, so
+  `static-php-cli` 2.8.5's doctor aborted before installing the `7za.exe` its
+  source extraction needs, and the tolerated failure surfaced later as
+  "`preg_match(): Argument #2 ($subject) must be of type string, false given`"
+  in `SourcePatcher::patchPhpLibxml212`. The release workflow now pins the
+  Windows leg to `windows-2022`, makes doctor failures fatal, hands spc's
+  extraction Windows bsdtar instead of MSYS tar, and fails fast when the php-src
+  tree is missing — the leg is blocking again instead of best-effort.
+
 ## [1.15.0] — 2026-07-14 — Conduit
 
 A release about reaching the auditor from anywhere. The new `mcp:serve` command
