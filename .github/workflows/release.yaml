@@ -114,10 +114,18 @@ jobs:
           # Preinstall doctor's Linux packages with apt retries and forced
           # IPv4: doctor's own single-try 'apt-get install re2c autopoint'
           # fails the job whenever the runner's mirror flakes (ports.ubuntu.com
-          # on arm64 times out intermittently and has no IPv6 route).
+          # on arm64 times out intermittently and has no IPv6 route). Retries
+          # cannot outlast a sustained mirror outage, so fall back to the same
+          # pinned .debs straight from Launchpad — Canonical's package origin
+          # on separate infrastructure, which keeps every published version.
           if [ "$RUNNER_OS" = "Linux" ]; then
-            sudo apt-get update -o Acquire::Retries=3 -o Acquire::ForceIPv4=true
-            sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::ForceIPv4=true re2c autopoint
+            if ! { sudo apt-get update -o Acquire::Retries=3 -o Acquire::ForceIPv4=true \
+                && sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::ForceIPv4=true re2c autopoint; }; then
+              arch="$(dpkg --print-architecture)"
+              curl -fsSL --retry 3 -o /tmp/autopoint.deb "https://launchpad.net/ubuntu/+archive/primary/+files/autopoint_0.21-14ubuntu2_all.deb"
+              curl -fsSL --retry 3 -o /tmp/re2c.deb "https://launchpad.net/ubuntu/+archive/primary/+files/re2c_3.1-1build1_${arch}.deb"
+              sudo dpkg -i /tmp/autopoint.deb /tmp/re2c.deb
+            fi
           fi
           # The macOS runner image ships the aws/tap Homebrew tap, which
           # Homebrew's tap-trust policy distrusts — every brew call doctor
