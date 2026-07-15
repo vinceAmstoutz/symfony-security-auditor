@@ -147,6 +147,13 @@ jobs:
           # limit intermittently 403s a subset of the matrix.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # spc extracts archives through cmd.exe pipelines ("7za x -so … |
+            # tar -x -C D:\…"). Git bash puts MSYS GNU tar first on PATH, and
+            # it cannot open C:\-style destination paths; spc's Windows
+            # extraction is written against System32's bsdtar, so put it first.
+            export PATH="/c/Windows/System32:$PATH"
+          fi
           ./spc download --for-extensions="${{ steps.extensions.outputs.list }}" --with-php=8.3 --prefer-pre-built
           if [ "$RUNNER_OS" = "Windows" ]; then
             # spc discards extraction exit codes on Windows (bsdtar returns 1
