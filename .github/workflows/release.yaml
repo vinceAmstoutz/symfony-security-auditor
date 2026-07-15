@@ -57,14 +57,6 @@ jobs:
     needs: phar
     permissions:
       contents: write
-    # The Windows leg is best-effort: static-php-cli 2.8.5 (the latest stable)
-    # crashes building php-src on Windows in its own libxml patch hook
-    # (SourcePatcher::patchPhpLibxml212 reads main/php_version.h before it
-    # exists — https://github.com/crazywhalecc/static-php-cli/issues). Until a
-    # fixed spc ships, let that one leg fail without failing the release, so the
-    # four working platforms still publish; the Windows asset attaches
-    # automatically once spc is fixed.
-    continue-on-error: ${{ matrix.experimental || false }}
     env:
       SPC_VERSION: '2.8.5'
 
@@ -84,10 +76,12 @@ jobs:
           - runner: macos-14
             asset: symfony-security-auditor-macos-arm64
             spc: spc-macos-aarch64
-          - runner: windows-latest
+          # Pinned to windows-2022: spc 2.8.5 locates Visual Studio through a
+          # hardcoded list of VS 2019/2022 paths, and windows-latest ships
+          # VS 2026 (no VS 2022) since GitHub's June 2026 image migration.
+          - runner: windows-2022
             asset: symfony-security-auditor-windows-x86_64.exe
             spc: spc-windows-x64.exe
-            experimental: true
     defaults:
       run:
         shell: bash
@@ -117,16 +111,10 @@ jobs:
           # unauthenticated 60-req/hour limit intermittently 403-ing the fix).
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # On Unix runners doctor installs the missing toolchain (pkg-config,
-          # autoconf) and must pass. On Windows its VS-2019/2022 probe is a
-          # false negative on the current runner image — which does ship VS
-          # 2022 with the C++ tools — and hard-fails with "can not be fixed",
-          # so there tolerate the report and let the build use the runner's VS.
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            ./spc doctor --auto-fix || echo "spc doctor flagged Windows (VS detection); continuing — the runner provides VS 2022"
-          else
-            ./spc doctor --auto-fix
-          fi
+          # Must pass everywhere: on Unix it installs pkg-config/autoconf; on
+          # Windows it installs php-sdk-binary-tools, whose 7za.exe spc's
+          # source extraction silently depends on (exit codes are discarded).
+          ./spc doctor --auto-fix
 
       - name: Download the PHAR build input
         uses: actions/download-artifact@v8
@@ -153,7 +141,26 @@ jobs:
           # limit intermittently 403s a subset of the matrix.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # spc extracts archives through cmd.exe pipelines ("7za x -so … |
+            # tar -x -C D:\…"). Git bash puts MSYS GNU tar first on PATH, and
+            # it cannot open C:\-style destination paths; spc's Windows
+            # extraction is written against System32's bsdtar, so put it first.
+            export PATH="/c/Windows/System32:$PATH"
+          fi
           ./spc download --for-extensions="${{ steps.extensions.outputs.list }}" --with-php=8.3 --prefer-pre-built
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # spc discards extraction exit codes on Windows (bsdtar returns 1
+            # on symlink warnings), so a failed extraction resurfaces as an
+            # opaque TypeError mid-build. Extract php-src in its own fail-fast
+            # step and assert the tree is real before compiling; the build
+            # then reuses it via the .spc-hash lock instead of re-extracting.
+            ./spc extract php-src,micro --source-only
+            if [ ! -s source/php-src/main/php_version.h ]; then
+              echo "php-src extraction is incomplete (spc swallows Windows 7za/tar failures)" >&2
+              exit 1
+            fi
+          fi
           ./spc build "${{ steps.extensions.outputs.list }}" --build-micro
 
       - name: Combine the micro runtime with the PHAR
