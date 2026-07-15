@@ -119,6 +119,13 @@ jobs:
             sudo apt-get update -o Acquire::Retries=3 -o Acquire::ForceIPv4=true
             sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::ForceIPv4=true re2c autopoint
           fi
+          # The macOS runner image ships the aws/tap Homebrew tap, which
+          # Homebrew's tap-trust policy distrusts — every brew call doctor
+          # makes then emits a warning annotation. Nothing here uses that
+          # tap, so drop it (untap is Homebrew's own first recommendation).
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew untap aws/tap || true
+          fi
           # Must pass everywhere: on Unix it installs pkg-config/autoconf; on
           # Windows it installs php-sdk-binary-tools, whose 7za.exe spc's
           # source extraction silently depends on (exit codes are discarded).
