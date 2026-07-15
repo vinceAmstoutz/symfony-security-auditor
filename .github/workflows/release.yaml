@@ -111,15 +111,9 @@ jobs:
           # unauthenticated 60-req/hour limit intermittently 403-ing the fix).
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # doctor must pass on every runner. On Unix it installs the missing
-          # toolchain (pkg-config, autoconf). On Windows it validates the
-          # pinned runner's VS 2022 and installs php-sdk-binary-tools — whose
-          # 7za.exe is what spc extracts sources with — plus nasm. Tolerating
-          # a doctor failure here is exactly what broke the Windows leg:
-          # doctor aborted at its unfixable VS probe before installing
-          # 7za.exe, and because spc discards Windows extraction exit codes,
-          # the build crashed much later with an opaque TypeError in
-          # SourcePatcher::patchPhpLibxml212 instead of a readable error.
+          # Must pass everywhere: on Unix it installs pkg-config/autoconf; on
+          # Windows it installs php-sdk-binary-tools, whose 7za.exe spc's
+          # source extraction silently depends on (exit codes are discarded).
           ./spc doctor --auto-fix
 
       - name: Download the PHAR build input
