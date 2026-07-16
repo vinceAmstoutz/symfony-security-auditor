@@ -316,6 +316,7 @@ Install the Composer package for your chosen provider, then configure it under
 | DeepSeek             | `symfony/ai-deep-seek-platform`      | `DEEPSEEK_API_KEY`                              |
 | Mistral AI           | `symfony/ai-mistral-platform`        | `MISTRAL_API_KEY`                               |
 | Meta (Llama)         | `symfony/ai-meta-platform`           | `META_API_KEY`                                  |
+| MiniMax              | `symfony/ai-mini-max-platform`       | `MINIMAX_API_KEY`                               |
 | Ollama (local)       | `symfony/ai-ollama-platform`         | none                                            |
 
 ### Full `ai.yaml` example
@@ -351,6 +352,8 @@ ai:
     #   api_key: '%env(MISTRAL_API_KEY)%'
     # meta:
     #   api_key: '%env(META_API_KEY)%'
+    # minimax:
+    #   api_key: '%env(MINIMAX_API_KEY)%'
     # ollama:
     #   endpoint: 'http://localhost:11434'
 ```

@@ -30,6 +30,7 @@ final readonly class ResolvingTokenEstimator implements TokenEstimatorInterface
             new MistralTokenEstimator(),
             new LlamaTokenEstimator(),
             new DeepSeekTokenEstimator(),
+            new MiniMaxTokenEstimator(),
         ],
         private CharacterRatioCounter $characterRatioCounter = new CharacterRatioCounter(),
         private float $fallbackCharsPerToken = self::CHARS_PER_TOKEN_DEFAULT,

@@ -84,6 +84,7 @@
         "symfony/ai-deep-seek-platform": "DeepSeek platform bridge — deepseek-chat, deepseek-reasoner",
         "symfony/ai-gemini-platform": "Google Gemini platform bridge — gemini-3.1-pro-preview, gemini-3.5-flash",
         "symfony/ai-meta-platform": "Meta (Llama) platform bridge — Llama-4-Scout, Llama-3.3",
+        "symfony/ai-mini-max-platform": "MiniMax platform bridge — MiniMax-M2, MiniMax-M3",
         "symfony/ai-mistral-platform": "Mistral platform bridge — mistral-large, codestral",
         "symfony/ai-ollama-platform": "Ollama local inference bridge — llama3.3, deepseek-r1, qwen3, phi4 (no API key)",
         "symfony/ai-open-ai-platform": "OpenAI platform bridge — gpt-5.4, gpt-4.1, o4-mini",
