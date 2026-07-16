@@ -118,12 +118,24 @@ jobs:
           # cannot outlast a sustained mirror outage, so fall back to the same
           # pinned .debs straight from Launchpad — Canonical's package origin
           # on separate infrastructure, which keeps every published version.
+          # The fallback bypasses APT's signature chain, so each .deb is pinned
+          # to the SHA-256 published in Ubuntu's signed noble Packages index and
+          # verified before install; a mismatch aborts the release build.
           if [ "$RUNNER_OS" = "Linux" ]; then
             if ! { sudo apt-get update -o Acquire::Retries=3 -o Acquire::ForceIPv4=true \
                 && sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::ForceIPv4=true re2c autopoint; }; then
+              set -euo pipefail
               arch="$(dpkg --print-architecture)"
+              autopoint_sha256="42853d892435cf2ed08dfda92ba77b13bca85f31689256096415921d00cd59c8"
+              case "$arch" in
+                amd64) re2c_sha256="418afd09a7abb6878ddec36b60cefb891a8066856a60b757fd0700e072652616" ;;
+                arm64) re2c_sha256="428bb627a228ce9ac0d0d0db7705578ea89ce2c52c67c8ce3a046676f3d4e002" ;;
+                *) echo "::error::no pinned re2c .deb checksum for architecture ${arch}"; exit 1 ;;
+              esac
               curl -fsSL --retry 3 -o /tmp/autopoint.deb "https://launchpad.net/ubuntu/+archive/primary/+files/autopoint_0.21-14ubuntu2_all.deb"
               curl -fsSL --retry 3 -o /tmp/re2c.deb "https://launchpad.net/ubuntu/+archive/primary/+files/re2c_3.1-1build1_${arch}.deb"
+              echo "${autopoint_sha256}  /tmp/autopoint.deb" | sha256sum -c -
+              echo "${re2c_sha256}  /tmp/re2c.deb" | sha256sum -c -
               sudo dpkg -i /tmp/autopoint.deb /tmp/re2c.deb
             fi
           fi

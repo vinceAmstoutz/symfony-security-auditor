@@ -287,6 +287,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   so an embedded newline in a CI-supplied SARIF message could inject an
   unguarded `##`-prefixed section into the next iteration's attacker prompt.
   Every marker field routed into the prompt is now collapsed to a single line.
+- **The release build verifies the checksum of its Launchpad `.deb` fallback
+  before installing it.** When apt fails, the release workflow
+  (`.github/workflows/release.yaml`) fetches pinned `re2c`/`autopoint` `.deb`s
+  straight from Launchpad and `dpkg -i`’d them, bypassing APT’s GPG signature
+  chain with no integrity check — a TLS-interception or CDN compromise could
+  place attacker-controlled build tools into the toolchain that compiles the
+  published binaries. Each `.deb` is now pinned to the SHA-256 published in
+  Ubuntu’s signed `noble` `Packages` index and verified with `sha256sum -c`
+  before install; a mismatch aborts the build.
 
 ## [1.15.0] — 2026-07-14 — Conduit
 
