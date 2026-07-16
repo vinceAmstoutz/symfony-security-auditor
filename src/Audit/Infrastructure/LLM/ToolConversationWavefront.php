@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Psr\Log\LoggerInterface;
 use Symfony\AI\Platform\Message\AssistantMessage;
+use Symfony\AI\Platform\Message\Content\Text;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
@@ -329,7 +330,7 @@ final readonly class ToolConversationWavefront
         $toolResults = [];
         foreach ($toolCalls as $toolCall) {
             $result = $request['tools']->execute($toolCall->getName(), $toolCall->getArguments());
-            $state['bag']->add(new ToolCallMessage($toolCall, $result));
+            $state['bag']->add(new ToolCallMessage($toolCall, new Text($result)));
             $toolResults[] = $result;
         }
 
