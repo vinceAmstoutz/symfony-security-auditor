@@ -9,8 +9,8 @@ GitHub Code Scanning or the GitLab Security Dashboard.
 - [Managing LLM Costs](#managing-llm-costs)
 - [Report Visibility on Public Repositories](#report-visibility-on-public-repositories)
 - [GitHub Actions](#github-actions)
-  - [Sticky PR comment with the audit summary](#sticky-pr-comment-with-the-audit-summary)
   - [Reusable GitHub Action](#reusable-github-action)
+  - [Sticky PR comment with the audit summary](#sticky-pr-comment-with-the-audit-summary)
 - [GitLab CI](#gitlab-ci)
 - [Output Formats Reference](#output-formats-reference)
 
@@ -145,6 +145,117 @@ Add your LLM provider key as a repository secret
 (`Settings → Secrets → Actions`). Example for Anthropic: `ANTHROPIC_API_KEY`.
 
 See [supported platforms](../README.md#supported-platforms) for other providers.
+
+### Reusable GitHub Action
+
+This repository **is** a GitHub Action (published to the
+[GitHub Marketplace](https://github.com/marketplace/actions/symfony-security-auditor)),
+so you can run an audit with `uses:` instead of scripting the steps yourself. It
+sets up PHP, installs Composer dependencies (or, in `mode: standalone`,
+downloads the standalone binary instead), and runs the audit with the inputs you
+pass.
+
+```yaml
+# .github/workflows/security-audit.yaml
+name: Security Audit
+
+on:
+  pull_request: ~
+
+permissions:
+  contents: read
+  security-events: write # required for the Code Scanning upload
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so `since` can diff against the base branch
+
+      - name: Symfony Security Audit
+        uses: vinceamstoutz/symfony-security-auditor@1.15.0
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          since: origin/${{ github.base_ref }}
+          baseline: .security-baseline.json
+          format: sarif
+          output: report.sarif
+
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: report.sarif
+```
+
+Inputs (all optional): `mode` (`bundle`/`standalone`, default `bundle`),
+`project-path` (default `.`), `format`
+(`console`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`, default `sarif`),
+`output` (default `report.sarif`), `baseline`, `generate-baseline`, `since`,
+`fail-on` (`safe`/`low`/`medium`/`high`/`critical`), `extra-args`, `php-version`
+(default `8.3`), `setup-php` (default `true`), `install-dependencies` (default
+`true`, ignored in standalone mode), and `working-directory` (default `.`). Set
+`setup-php: false` / `install-dependencies: false` when your job has already
+done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
+
+Outputs: `exit-code`, `report-path`, and — only when `format: json` —
+`findings-count` and `highest-severity` (the report's aggregate `risk_level`).
+
+```yaml
+      - name: Symfony Security Audit
+        id: audit
+        uses: vinceamstoutz/symfony-security-auditor@1.15.0
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          format: json
+          output: report.json
+
+      - run: echo "found ${{ steps.audit.outputs.findings-count }} findings (${{ steps.audit.outputs.highest-severity }})"
+```
+
+**Standalone mode** (`mode: standalone`) downloads the checksum-verified
+standalone binary instead of requiring the bundle in your project's
+`composer.json` — a host PHP and Composer are still installed by this action
+(`setup-php` stays `true`) since `init` fetches the provider bridge through
+Composer even for the standalone binary. Non-Anthropic providers currently
+require running `symfony-security-auditor init` interactively once outside CI to
+pick a provider; standalone mode in this action always configures the
+`anthropic`/`claude-opus-4-8` default non-interactively.
+
+`mode` defaults to `bundle`, not `standalone`, so upgrading to a newer action
+version never silently changes what an existing workflow does — `bundle` is
+exactly today's behavior with no `mode` input at all. It also avoids opting
+every new adopter into the Anthropic-only standalone path by default when they
+may already have a different provider configured via `config/packages/ai.yaml`.
+Neither install method is otherwise preferred; see the
+[Standalone tool](../README.md#standalone-tool-binary) and
+[bundle](../README.md#use-it-as-a-symfony-bundle) sections for the general
+tradeoffs.
+
+```yaml
+      - name: Symfony Security Audit
+        uses: vinceamstoutz/symfony-security-auditor@1.15.0
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          mode: standalone
+          format: sarif
+          output: report.sarif
+```
+
+Accept the current findings as a baseline once (locally), then commit it so
+future PRs only report new findings:
+
+```bash
+php bin/console audit:run --generate-baseline=.security-baseline.json
+git add .security-baseline.json
+```
+
+Baselined findings are dropped from the report and do **not** affect the exit
+code, so a green PR check means "no new findings since the baseline".
 
 ### Nightly SARIF upload to GitHub Code Scanning
 
@@ -297,117 +408,6 @@ regardless, while the job itself still fails on the `audit:run` step so
 action to its own comment; give a second sticky-comment step in the same
 workflow (e.g. one posting coverage) a different `header` so the two never
 overwrite each other.
-
-### Reusable GitHub Action
-
-This repository **is** a GitHub Action (published to the
-[GitHub Marketplace](https://github.com/marketplace/actions/symfony-security-auditor)),
-so you can run an audit with `uses:` instead of scripting the steps yourself. It
-sets up PHP, installs Composer dependencies (or, in `mode: standalone`,
-downloads the standalone binary instead), and runs the audit with the inputs you
-pass.
-
-```yaml
-# .github/workflows/security-audit.yaml
-name: Security Audit
-
-on:
-  pull_request: ~
-
-permissions:
-  contents: read
-  security-events: write # required for the Code Scanning upload
-
-jobs:
-  audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # full history so `since` can diff against the base branch
-
-      - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.15.0
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        with:
-          since: origin/${{ github.base_ref }}
-          baseline: .security-baseline.json
-          format: sarif
-          output: report.sarif
-
-      - uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: report.sarif
-```
-
-Inputs (all optional): `mode` (`bundle`/`standalone`, default `bundle`),
-`project-path` (default `.`), `format`
-(`console`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`, default `sarif`),
-`output` (default `report.sarif`), `baseline`, `generate-baseline`, `since`,
-`fail-on` (`safe`/`low`/`medium`/`high`/`critical`), `extra-args`, `php-version`
-(default `8.3`), `setup-php` (default `true`), `install-dependencies` (default
-`true`, ignored in standalone mode), and `working-directory` (default `.`). Set
-`setup-php: false` / `install-dependencies: false` when your job has already
-done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
-
-Outputs: `exit-code`, `report-path`, and — only when `format: json` —
-`findings-count` and `highest-severity` (the report's aggregate `risk_level`).
-
-```yaml
-      - name: Symfony Security Audit
-        id: audit
-        uses: vinceamstoutz/symfony-security-auditor@1.15.0
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        with:
-          format: json
-          output: report.json
-
-      - run: echo "found ${{ steps.audit.outputs.findings-count }} findings (${{ steps.audit.outputs.highest-severity }})"
-```
-
-**Standalone mode** (`mode: standalone`) downloads the checksum-verified
-standalone binary instead of requiring the bundle in your project's
-`composer.json` — a host PHP and Composer are still installed by this action
-(`setup-php` stays `true`) since `init` fetches the provider bridge through
-Composer even for the standalone binary. Non-Anthropic providers currently
-require running `symfony-security-auditor init` interactively once outside CI to
-pick a provider; standalone mode in this action always configures the
-`anthropic`/`claude-opus-4-8` default non-interactively.
-
-`mode` defaults to `bundle`, not `standalone`, so upgrading to a newer action
-version never silently changes what an existing workflow does — `bundle` is
-exactly today's behavior with no `mode` input at all. It also avoids opting
-every new adopter into the Anthropic-only standalone path by default when they
-may already have a different provider configured via `config/packages/ai.yaml`.
-Neither install method is otherwise preferred; see the
-[Standalone tool](../README.md#standalone-tool-binary) and
-[bundle](../README.md#use-it-as-a-symfony-bundle) sections for the general
-tradeoffs.
-
-```yaml
-      - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.15.0
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        with:
-          mode: standalone
-          format: sarif
-          output: report.sarif
-```
-
-Accept the current findings as a baseline once (locally), then commit it so
-future PRs only report new findings:
-
-```bash
-php bin/console audit:run --generate-baseline=.security-baseline.json
-git add .security-baseline.json
-```
-
-Baselined findings are dropped from the report and do **not** affect the exit
-code, so a green PR check means "no new findings since the baseline".
 
 ### JSON report as artifact
 
