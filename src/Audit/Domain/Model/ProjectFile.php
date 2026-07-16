@@ -133,6 +133,16 @@ final readonly class ProjectFile
         return ProjectFileType::AUTHENTICATOR === $this->projectFileType;
     }
 
+    public function isLdapService(): bool
+    {
+        return ProjectFileType::LDAP_SERVICE === $this->projectFileType;
+    }
+
+    public function isSonataAdmin(): bool
+    {
+        return ProjectFileType::SONATA_ADMIN === $this->projectFileType;
+    }
+
     public function isEventSubscriber(): bool
     {
         return ProjectFileType::EVENT_SUBSCRIBER === $this->projectFileType;
@@ -161,6 +171,11 @@ final readonly class ProjectFile
     public function isLiveComponent(): bool
     {
         return ProjectFileType::LIVE_COMPONENT === $this->projectFileType;
+    }
+
+    public function isEasyAdminCrud(): bool
+    {
+        return ProjectFileType::EASYADMIN_CRUD === $this->projectFileType;
     }
 
     public function isTwigExtension(): bool
@@ -201,6 +216,10 @@ final readonly class ProjectFile
             return true;
         }
 
+        if ($this->isEasyAdminCrud()) {
+            return true;
+        }
+
         if ($this->isEntity()) {
             return true;
         }
@@ -223,6 +242,14 @@ final readonly class ProjectFile
         }
 
         if ($this->isAuthenticator()) {
+            return true;
+        }
+
+        if ($this->isLdapService()) {
+            return true;
+        }
+
+        if ($this->isSonataAdmin()) {
             return true;
         }
 

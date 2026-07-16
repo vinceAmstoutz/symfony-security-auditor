@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 29;
+    public const int CACHE_VERSION = 30;
 
     /**
      * Detects the `s` (DOTALL) flag among a PCRE pattern's trailing modifier
@@ -311,6 +311,14 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'regex' => '/^APP_DEBUG\s*=\s*(?:1|true)\s*$/i',
                 'description' => 'APP_DEBUG enabled — verify this is not a committed base .env (debug mode in production leaks stack traces, source, and container internals)',
             ],
+            'mercure_default_jwt_secret' => [
+                'regex' => '/ChangeThisMercureHubJWTSecretKey/i',
+                'description' => "Mercure hub JWT secret still uses the recipe's default placeholder value — anyone can forge a JWT and publish/subscribe to any topic",
+            ],
+            'mercure_permissive_topic_claim' => [
+                'regex' => '/mercure\b[\s\S]{0,300}?(?:publish|subscribe)\s*:\s*\[?\s*[\'"]\*[\'"]/si',
+                'description' => "Mercure JWT claim grants publish/subscribe access to every topic ('*') — scope the claim to the specific topics this client needs",
+            ],
         ],
         ProjectFileType::AUTHENTICATOR->value => [
             'self_validating_passport' => [
@@ -320,6 +328,36 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'supports_returns_null' => [
                 'regex' => '/public\s+function\s+supports\s*\([^)]*\)\s*:\s*\??bool\s*\{[\s\S]{0,500}?return\s+null\s*;/s',
                 'description' => 'supports() returning null — Symfony treats null as "supports", silently letting non-matching paths through',
+            ],
+        ],
+        ProjectFileType::LDAP_SERVICE->value => [
+            'ldap_unescaped_filter_concat' => [
+                'regex' => '/->query\s*\([^)]*[\'"][^\'"]*\.\s*\$|ldap_search\s*\([^)]*\.\s*\$/',
+                'description' => 'LDAP filter built with string concatenation — verify the interpolated value is passed through ldap_escape() first (LDAP injection)',
+            ],
+            'ldap_bind_variable_password' => [
+                'regex' => '/->bind\s*\(\s*\$\w+\s*,\s*\$/',
+                'description' => 'Ldap::bind() with a variable password — verify the value cannot be an empty string (anonymous bind bypass)',
+            ],
+        ],
+        ProjectFileType::SONATA_ADMIN->value => [
+            'sonata_admin_sensitive_field_exposed' => [
+                'regex' => '/->add\s*\(\s*[\'"](?:roles?|password|isAdmin|isSuperAdmin)[\'"]/i',
+                'description' => 'Admin form/list field exposes a privileged property (roles/password/isAdmin) — verify only a super-admin role can reach this panel',
+            ],
+            'sonata_admin_batch_action' => [
+                'regex' => '/function\s+getBatchActions\s*\(/',
+                'description' => 'Custom batch actions declared — verify a per-object guard re-validates before a bulk delete/edit executes: a dedicated Security Voter on SonataAdminBundle 4.x (checkAccess()/hasAccess() are final there and can no longer be overridden), or an overridden checkAccess() on 3.x',
+            ],
+        ],
+        ProjectFileType::EASYADMIN_CRUD->value => [
+            'easyadmin_sensitive_field' => [
+                'regex' => '/\w*Field::new\s*\(\s*[\'"](?:roles?|password|isAdmin|isSuperAdmin)[\'"]/i',
+                'description' => "EasyAdmin field exposes a privileged property (roles/password/isAdmin) in configureFields() — verify it is gated with ->setPermission('ROLE_...') so only a super-admin can see/edit it",
+            ],
+            'easyadmin_destructive_action' => [
+                'regex' => '/Action::(?:DELETE|BATCH_DELETE)\b/',
+                'description' => 'EasyAdmin DELETE/BATCH_DELETE action referenced in configureActions() — verify it is scoped with ->setPermission(Action::DELETE, \'ROLE_...\'), not left at the dashboard\'s default role',
             ],
         ],
         ProjectFileType::MESSENGER_HANDLER->value => [
@@ -426,8 +464,9 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
     /**
      * The request-input markers (`request_get`, `redirect_with_input`,
      * `submit_request_all`, `request_mapping_attribute`) live in the CONTROLLER
-     * bucket, but `#[ApiResource]` and `#[AsLiveComponent]` classes classify as
-     * their own type while still declaring `#[Route]`-mapped actions that read
+     * bucket, but `#[ApiResource]` classes, `#[AsLiveComponent]` classes, and
+     * EasyAdmin `AbstractCrudController` classes classify as their own type
+     * while still declaring `#[Route]`-mapped or custom actions that read
      * `$request` — the controller-like pattern the mapping parsers and the
      * chunker already honour via {@see ProjectFileType::isControllerLike()}.
      * Without this merge, such an action produces zero markers and is excluded

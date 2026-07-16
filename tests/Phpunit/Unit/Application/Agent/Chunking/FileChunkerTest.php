@@ -49,6 +49,8 @@ final class FileChunkerTest extends TestCase
         yield 'repository' => ['src/Repository/UserRepository.php', '<?php'];
         yield 'form' => ['src/Form/UserType.php', '<?php'];
         yield 'authenticator' => ['src/Security/LoginFormAuthenticator.php', '<?php'];
+        yield 'ldap service' => ['src/Ldap/DirectoryLookup.php', '<?php'];
+        yield 'sonata admin' => ['src/Admin/StoreManager.php', '<?php'];
         yield 'messenger handler' => ['src/Messenger/SendInvoiceMessageHandler.php', '<?php'];
         yield 'webhook consumer' => ['src/Webhook/StripeWebhookConsumer.php', '<?php'];
         yield 'event subscriber' => ['src/EventSubscriber/AuditSubscriber.php', '<?php'];
@@ -102,6 +104,27 @@ final class FileChunkerTest extends TestCase
         $offerChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $offerChunk);
         self::assertContains('src/Repository/OfferRepository.php', $offerChunkPaths);
         self::assertNotContains('src/Entity/Order.php', $offerChunkPaths);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_feature_strategy_groups_an_easyadmin_crud_controller_with_its_repository(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/Admin/ProductCrudController.php'),
+            $this->makeFile('src/Repository/ProductRepository.php'),
+            $this->makeFile('src/Entity/Order.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $productChunk = $this->findChunkContaining($chunks, 'src/Controller/Admin/ProductCrudController.php');
+        self::assertNotNull($productChunk);
+        $productChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $productChunk);
+        self::assertContains('src/Repository/ProductRepository.php', $productChunkPaths);
+        self::assertNotContains('src/Entity/Order.php', $productChunkPaths);
+        self::assertSame('src/Controller/Admin/ProductCrudController.php', $productChunk[0]->relativePath());
     }
 
     /**

@@ -23,6 +23,9 @@ enum ProjectFileType: string
     case REPOSITORY = 'repository';
     case FORM = 'form';
     case AUTHENTICATOR = 'authenticator';
+    case LDAP_SERVICE = 'ldap_service';
+    case SONATA_ADMIN = 'sonata_admin';
+    case EASYADMIN_CRUD = 'easyadmin_crud';
     case MESSENGER_HANDLER = 'messenger_handler';
     case WEBHOOK_CONSUMER = 'webhook_consumer';
     case EVENT_SUBSCRIBER = 'event_subscriber';
@@ -45,7 +48,7 @@ enum ProjectFileType: string
     public function isControllerLike(): bool
     {
         return match ($this) {
-            self::CONTROLLER, self::LIVE_COMPONENT, self::API_RESOURCE => true,
+            self::CONTROLLER, self::LIVE_COMPONENT, self::API_RESOURCE, self::EASYADMIN_CRUD => true,
             default => false,
         };
     }

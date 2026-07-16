@@ -155,6 +155,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   lives in `src/Audit/Infrastructure/Cache/FilesystemTriageMemoryStore.php` and
   `src/Audit/Application/Agent/Review/ReviewOutcomeRecorder.php`.
 
+- **The attacker now hunts LDAP injection and broken access control in Sonata
+  Admin and EasyAdmin panels.** Three new dedicated `ProjectFileType` cases
+  route to `LdapServiceAttackerSkill`, `SonataAdminAttackerSkill`, and
+  `ControllerEasyAdminAttackerSkill`, which flag unescaped LDAP filter/DN
+  concatenation, admin panels exposing a privileged field (`roles`, `password`,
+  `isAdmin`) or missing per-object access control, and EasyAdmin actions left
+  unscoped by `->setPermission()`. On SonataAdminBundle 4.x, `checkAccess()`/
+  `hasAccess()` are `final`, so the skill looks for a dedicated Security Voter
+  instead of an overridden `checkAccess()`. `RegexStaticPreScanner` gained six
+  matching risk markers (`CACHE_VERSION` bumped to 30). Implementation lives in
+  `src/Audit/Domain/Model/ProjectFileType.php` and
+  `src/Audit/Infrastructure/Prompt/Skill/`.
+
+- **The attacker now hunts permissive Mercure topic scopes.** A new
+  `VulnerabilityType::PERMISSIVE_MERCURE_TOPIC_SELECTOR` (CWE-1220) covers a JWT
+  `publish`/`subscribe` claim scoped to `'*'`; two new `RegexStaticPreScanner`
+  markers flag the recipe's default JWT secret placeholder and a wildcard topic
+  claim. Implementation lives in
+  `src/Audit/Infrastructure/Prompt/Skill/ConfigAttackerSkill.php` and
+  `src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`.
+
 ### Fixed
 
 - **The native Windows binary is published with releases again.**

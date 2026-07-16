@@ -956,6 +956,51 @@ final class ProjectFileTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_detects_ldap_service_by_directory(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Ldap/DirectoryLookup.php',
+            '/app/src/Ldap/DirectoryLookup.php',
+            '<?php',
+        );
+
+        self::assertSame('ldap_service', $projectFile->type());
+        self::assertTrue($projectFile->isLdapService());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_detects_sonata_admin_by_directory(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Admin/StoreManager.php',
+            '/app/src/Admin/StoreManager.php',
+            '<?php',
+        );
+
+        self::assertSame('sonata_admin', $projectFile->type());
+        self::assertTrue($projectFile->isSonataAdmin());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_detects_easyadmin_crud_by_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/Admin/ProductCrudController.php',
+            '/app/src/Controller/Admin/ProductCrudController.php',
+            '<?php',
+        );
+
+        self::assertSame('easyadmin_crud', $projectFile->type());
+        self::assertTrue($projectFile->isEasyAdminCrud());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_messenger_handler_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -1186,6 +1231,48 @@ final class ProjectFileTest extends TestCase
         $projectFile = ProjectFile::create(
             'src/Security/LoginFormAuthenticator.php',
             '/app/src/Security/LoginFormAuthenticator.php',
+            '<?php',
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_is_service_returns_false_for_ldap_service(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Ldap/FooLdap.php',
+            '/app/src/Ldap/FooLdap.php',
+            '<?php',
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_is_service_returns_false_for_sonata_admin(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Admin/FooAdmin.php',
+            '/app/src/Admin/FooAdmin.php',
+            '<?php',
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_is_service_returns_false_for_easyadmin_crud(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/Admin/FooCrudController.php',
+            '/app/src/Controller/Admin/FooCrudController.php',
             '<?php',
         );
 

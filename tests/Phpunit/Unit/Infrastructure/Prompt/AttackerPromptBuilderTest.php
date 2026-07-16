@@ -1254,7 +1254,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
-        self::assertSame(22, substr_count($prompt, '<skills role="'));
+        self::assertSame(25, substr_count($prompt, '<skills role="'));
     }
 
     /**
@@ -2056,6 +2056,7 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('weak_content_security_policy', $prompt);
         self::assertStringContainsString('missing_transport_security', $prompt);
         self::assertStringContainsString('debug_mode_enabled', $prompt);
+        self::assertStringContainsString('permissive_mercure_topic_selector', $prompt);
     }
 
     public function test_base_prompt_references_modern_symfony_components_in_expertise(): void

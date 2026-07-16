@@ -18,6 +18,7 @@ final readonly class ProjectFileTypeClassifier
     public static function classify(string $path, string $content): ProjectFileType
     {
         return match (true) {
+            self::isEasyAdminCrudPath($path), self::looksLikeEasyAdminCrud($path, $content) => ProjectFileType::EASYADMIN_CRUD,
             self::isControllerPath($path) => ProjectFileType::CONTROLLER,
             self::looksLikeApiResource($path, $content) => ProjectFileType::API_RESOURCE,
             self::looksLikeLiveComponent($path, $content) => ProjectFileType::LIVE_COMPONENT,
@@ -27,6 +28,8 @@ final readonly class ProjectFileTypeClassifier
             self::isFormPath($path), self::looksLikeForm($path, $content) => ProjectFileType::FORM,
             self::isEntityPath($path), self::looksLikeEntity($path, $content) => ProjectFileType::ENTITY,
             str_ends_with($path, 'Authenticator.php'), self::looksLikeAuthenticator($path, $content) => ProjectFileType::AUTHENTICATOR,
+            self::isLdapServicePath($path), self::looksLikeLdapService($path, $content) => ProjectFileType::LDAP_SERVICE,
+            self::isSonataAdminPath($path), self::looksLikeSonataAdmin($path, $content) => ProjectFileType::SONATA_ADMIN,
             self::isMessengerHandlerPath($path), self::looksLikeMessengerHandler($path, $content) => ProjectFileType::MESSENGER_HANDLER,
             self::isWebhookConsumerPath($path), self::looksLikeWebhookConsumer($path, $content) => ProjectFileType::WEBHOOK_CONSUMER,
             str_ends_with($path, 'Subscriber.php') || str_ends_with($path, 'EventListener.php'), self::looksLikeEventSubscriber($path, $content) => ProjectFileType::EVENT_SUBSCRIBER,
@@ -38,6 +41,18 @@ final readonly class ProjectFileTypeClassifier
             str_ends_with($path, '.php') => ProjectFileType::PHP,
             default => ProjectFileType::OTHER,
         };
+    }
+
+    private static function isEasyAdminCrudPath(string $path): bool
+    {
+        return str_ends_with($path, 'CrudController.php');
+    }
+
+    private static function looksLikeEasyAdminCrud(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && (str_contains($content, 'extends AbstractCrudController')
+                || str_contains($content, 'implements CrudControllerInterface'));
     }
 
     private static function isControllerPath(string $path): bool
@@ -130,6 +145,30 @@ final readonly class ProjectFileTypeClassifier
         return str_ends_with($path, '.php')
             && (str_contains($content, 'implements ExtensionInterface')
                 || str_contains($content, 'extends AbstractExtension'));
+    }
+
+    private static function isLdapServicePath(string $path): bool
+    {
+        return str_ends_with($path, 'Ldap.php')
+            || (str_contains($path, '/Ldap/') && str_ends_with($path, '.php'));
+    }
+
+    private static function looksLikeLdapService(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && str_contains($content, 'Symfony\\Component\\Ldap');
+    }
+
+    private static function isSonataAdminPath(string $path): bool
+    {
+        return str_ends_with($path, 'Admin.php')
+            || (str_contains($path, '/Admin/') && str_ends_with($path, '.php'));
+    }
+
+    private static function looksLikeSonataAdmin(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && str_contains($content, 'extends AbstractAdmin');
     }
 
     private static function isMessengerHandlerPath(string $path): bool

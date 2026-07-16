@@ -229,6 +229,7 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringContainsString('weak_content_security_policy', $prompt);
         self::assertStringContainsString('missing_transport_security', $prompt);
         self::assertStringContainsString('debug_mode_enabled', $prompt);
+        self::assertStringContainsString('permissive_mercure_topic_selector', $prompt);
     }
 
     public function test_decision_rules_restrict_rejection_to_a_named_mitigating_control(): void

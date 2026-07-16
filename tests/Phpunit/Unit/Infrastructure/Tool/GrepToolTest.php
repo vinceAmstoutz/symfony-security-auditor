@@ -43,7 +43,7 @@ final class GrepToolTest extends TestCase
                     ],
                     'file_type' => [
                         'type' => 'string',
-                        'description' => 'Optional ProjectFile::type() to restrict the search to: controller, api_resource, live_component, entity, voter, repository, form, authenticator, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other.',
+                        'description' => 'Optional ProjectFile::type() to restrict the search to: controller, api_resource, live_component, entity, voter, repository, form, authenticator, ldap_service, sonata_admin, easyadmin_crud, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other.',
                     ],
                 ],
                 'required' => ['pattern'],

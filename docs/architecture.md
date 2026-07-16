@@ -254,7 +254,7 @@ Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`,
 
 ### `VulnerabilityType` — backed enum with OWASP and CWE references
 
-47 cases in six categories:
+48 cases in six categories:
 
 | Category              | Examples                                                                   |
 | --------------------- | -------------------------------------------------------------------------- |
@@ -279,7 +279,8 @@ and `linesCount`. `type()` returns the enum's string value (stable wire format);
 construction time by `ProjectFileTypeClassifier::classify()` (the single
 `match(true)` over path/content heuristics — pure Domain, no I/O).
 Classification methods (`isController()`, `isEntity()`, `isVoter()`,
-`isRepository()`, `isForm()`, `isAuthenticator()`, `isMessengerHandler()`,
+`isRepository()`, `isForm()`, `isAuthenticator()`, `isLdapService()`,
+`isSonataAdmin()`, `isEasyAdminCrud()`, `isMessengerHandler()`,
 `isEventSubscriber()`, `isNormalizer()`, `isWebhookConsumer()`, `isScheduler()`,
 `isTemplate()`) are thin comparisons against `fileType()`, so they can never
 disagree with it; `isService()` is the one derived predicate (true for a `.php`

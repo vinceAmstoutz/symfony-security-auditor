@@ -1110,6 +1110,286 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    public function test_it_flags_the_mercure_default_jwt_secret_placeholder(): void
+    {
+        $projectFile = ProjectFile::create('.env', '/app/.env', 'MERCURE_JWT_SECRET="!ChangeThisMercureHubJWTSecretKey!"');
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('mercure_default_jwt_secret', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_a_rotated_mercure_jwt_secret(): void
+    {
+        $projectFile = ProjectFile::create('.env', '/app/.env', 'MERCURE_JWT_SECRET="a-real-rotated-secret-value"');
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('mercure_default_jwt_secret', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_a_permissive_mercure_topic_claim(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/mercure.yaml',
+            '/app/config/packages/mercure.yaml',
+            "mercure:\n    hubs:\n        default:\n            jwt:\n                secret: '%env(MERCURE_JWT_SECRET)%'\n                publish: '*'",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('mercure_permissive_topic_claim', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_a_scoped_mercure_topic_claim(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/mercure.yaml',
+            '/app/config/packages/mercure.yaml',
+            "mercure:\n    hubs:\n        default:\n            jwt:\n                secret: '%env(MERCURE_JWT_SECRET)%'\n                publish: ['/books/1']",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('mercure_permissive_topic_claim', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_an_unescaped_ldap_filter_built_with_concatenation(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Ldap/DirectoryLookup.php',
+            '/app/src/Ldap/DirectoryLookup.php',
+            "<?php\nclass DirectoryLookup {\n    public function find(string \$username): void {\n        \$this->ldap->query('ou=users,dc=example,dc=com', '(uid=' . \$username . ')');\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('ldap_unescaped_filter_concat', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_a_static_ldap_filter(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Ldap/DirectoryLookup.php',
+            '/app/src/Ldap/DirectoryLookup.php',
+            "<?php\nclass DirectoryLookup {\n    public function find(): void {\n        \$this->ldap->query('ou=users,dc=example,dc=com', '(objectClass=person)');\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('ldap_unescaped_filter_concat', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_ldap_bind_with_a_variable_password(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Ldap/DirectoryLookup.php',
+            '/app/src/Ldap/DirectoryLookup.php',
+            "<?php\nclass DirectoryLookup {\n    public function bind(string \$dn, string \$password): void {\n        \$this->ldap->bind(\$dn, \$password);\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('ldap_bind_variable_password', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_ldap_bind_with_a_literal_password(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Ldap/DirectoryLookup.php',
+            '/app/src/Ldap/DirectoryLookup.php',
+            "<?php\nclass DirectoryLookup {\n    public function bind(string \$dn): void {\n        \$this->ldap->bind(\$dn, 'service-account-password');\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('ldap_bind_variable_password', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_a_sonata_admin_exposing_the_roles_field(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Admin/UserAdmin.php',
+            '/app/src/Admin/UserAdmin.php',
+            "<?php\nclass UserAdmin extends AbstractAdmin {\n    protected function configureFormFields(FormMapper \$form): void {\n        \$form->add('roles');\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('sonata_admin_sensitive_field_exposed', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_a_sonata_admin_exposing_only_non_sensitive_fields(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Admin/UserAdmin.php',
+            '/app/src/Admin/UserAdmin.php',
+            "<?php\nclass UserAdmin extends AbstractAdmin {\n    protected function configureFormFields(FormMapper \$form): void {\n        \$form->add('email');\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('sonata_admin_sensitive_field_exposed', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_a_custom_sonata_admin_batch_action(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Admin/UserAdmin.php',
+            '/app/src/Admin/UserAdmin.php',
+            "<?php\nclass UserAdmin extends AbstractAdmin {\n    public function getBatchActions(): array {\n        return [];\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('sonata_admin_batch_action', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_a_sonata_admin_without_custom_batch_actions(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Admin/UserAdmin.php',
+            '/app/src/Admin/UserAdmin.php',
+            "<?php\nclass UserAdmin extends AbstractAdmin {\n    protected function configureListFields(ListMapper \$list): void {\n        \$list->add('email');\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('sonata_admin_batch_action', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_an_easyadmin_field_exposing_the_roles_property(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/Admin/UserCrudController.php',
+            '/app/src/Controller/Admin/UserCrudController.php',
+            "<?php\nclass UserCrudController extends AbstractCrudController {\n    public function configureFields(string \$pageName): iterable {\n        yield TextField::new('roles');\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('easyadmin_sensitive_field', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_an_easyadmin_field_exposing_only_non_sensitive_properties(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/Admin/UserCrudController.php',
+            '/app/src/Controller/Admin/UserCrudController.php',
+            "<?php\nclass UserCrudController extends AbstractCrudController {\n    public function configureFields(string \$pageName): iterable {\n        yield TextField::new('email');\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('easyadmin_sensitive_field', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_an_easyadmin_destructive_action(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/Admin/UserCrudController.php',
+            '/app/src/Controller/Admin/UserCrudController.php',
+            "<?php\nclass UserCrudController extends AbstractCrudController {\n    public function configureActions(Actions \$actions): Actions {\n        return \$actions->add(Crud::PAGE_INDEX, Action::DELETE);\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('easyadmin_destructive_action', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_an_easyadmin_controller_without_destructive_actions(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/Admin/UserCrudController.php',
+            '/app/src/Controller/Admin/UserCrudController.php',
+            "<?php\nclass UserCrudController extends AbstractCrudController {\n    public function configureActions(Actions \$actions): Actions {\n        return \$actions->add(Crud::PAGE_INDEX, Action::DETAIL);\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('easyadmin_destructive_action', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_form_submit_with_request_all_split_across_lines(): void
     {
         $projectFile = ProjectFile::create(
