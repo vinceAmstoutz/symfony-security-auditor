@@ -178,14 +178,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **The new `audit.triage_memory` constructor argument no longer breaks a 1.15.0
+  positional caller of `AuditExecutionConfiguration`.** The argument was
+  inserted mid-signature (before `failOn`), shifting the positional slots of
+  `failOn`/`excludedTypes`/`includedTypes`/`customSkills` — a BC break for a
+  public `Audit\Domain\Configuration\*` value object (see `docs/versioning.md`).
+  It is now appended after `customSkills`/`sinceClosure`, restoring the 1.15.0
+  positional signature.
+- **Imported SARIF taint paths now mark dropped steps with an `...` ellipsis
+  instead of silently misattributing the source.** `SarifImportingPreScanner`
+  drops taint-flow steps that point outside the scan surface; with the leading
+  step(s) dropped, the first surviving step was presented to the attacker as the
+  taint _source_ (and a single-surviving-step flow as a full path), so the
+  rendered evidence was misleading. Gaps now render as `... -> src/Sink.php:42`
+  (leading), `src/Source.php:1 -> ... -> src/Sink.php:42` (internal) and
+  `src/Source.php:1 -> ...` (trailing).
 - **Enabling `audit.triage_memory` no longer silently disables the reviewer
   verdict cache.** The reviewer cache key folds in a digest of the feedback set
   (`ReviewerFeedback::digest()`), and `CompositeReviewerFeedbackProvider`
   re-read the triage-memory file live on every lookup. Because the reviewer
-  *writes* that file mid-run (each rejection appends an entry), the digest
-  shifted between findings within a single run, so every verdict after the
-  first missed its own freshly-written cache entry — and a cache *hit* re-wrote
-  the file too, compounding the churn. The composite now snapshots the merged
+  _writes_ that file mid-run (each rejection appends an entry), the digest
+  shifted between findings within a single run, so every verdict after the first
+  missed its own freshly-written cache entry — and a cache _hit_ re-wrote the
+  file too, compounding the churn. The composite now snapshots the merged
   feedback once per run, and `ReviewerFeedback::digest()` is order-independent,
   so a stable set produces a stable key across runs. The cache is functional
   again with triage memory on: findings are re-reviewed once after the feedback
@@ -194,14 +209,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   its newest entries are surfaced first.** The reviewer system prompt presented
   every feedback entry as a “Maintainer-accepted finding from this project's
   baseline” and told the model to “treat each reason as a trusted hint”, even
-  though triage entries are the reviewer's *own* prior-run rejections that a
-  later commit may have invalidated (`ReviewerPromptBuilder::feedbackSection()`).
-  The heading now states the entries come from the baseline and/or earlier
-  automated reviews, that the reasons are **not authoritative**, and that the
-  code may since have changed. The prompt keeps only the first
-  `MAX_FEEDBACK_PROMPT_ENTRIES` (20) entries, and `FilesystemTriageMemoryStore`
-  yielded them oldest-first, so the most recent — most relevant — rejections
-  were never shown once 20 accumulated; feedback is now surfaced newest-first.
+  though triage entries are the reviewer's _own_ prior-run rejections that a
+  later commit may have invalidated
+  (`ReviewerPromptBuilder::feedbackSection()`). The heading now states the
+  entries come from the baseline and/or earlier automated reviews, that the
+  reasons are **not authoritative**, and that the code may since have changed.
+  The prompt keeps only the first `MAX_FEEDBACK_PROMPT_ENTRIES` (20) entries,
+  and `FilesystemTriageMemoryStore` yielded them oldest-first, so the most
+  recent — most relevant — rejections were never shown once 20 accumulated;
+  feedback is now surfaced newest-first.
 - **A reviewer-rejection reason persisted to triage memory is now length-capped
   (`FilesystemTriageMemoryStore::MAX_REASON_LENGTH`, 5000 chars).** In the JSON
   review path the reason was persisted and replayed into later runs' system
@@ -214,15 +230,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   the fail-on gate (1) or budget abort (2), the very cases the outputs exist to
   report — aborted the step before the `$GITHUB_OUTPUT` writes. `exit-code`
   could therefore only ever be `0` or empty and `findings-count` /
-  `highest-severity` were never set on a failing run. The audit exit code is
-  now captured with `|| exit_code=$?` so every output is written before the
-  step exits with the audit's real code.
-- **The GitHub Action's `standalone` mode now respects the pinned action
-  version instead of always running `main`.** The install step piped
-  `install.sh` from `main` (`raw.githubusercontent.com/.../main/install.sh`)
-  and never set `SSA_VERSION`, so a workflow pinned to `@<tag>`/`@<sha>` still
-  executed whatever `install.sh` was on `main` and installed the latest release
-  binary. It now runs the `install.sh` from the action's own checkout
+  `highest-severity` were never set on a failing run. The audit exit code is now
+  captured with `|| exit_code=$?` so every output is written before the step
+  exits with the audit's real code.
+- **The GitHub Action's `standalone` mode now respects the pinned action version
+  instead of always running `main`.** The install step piped `install.sh` from
+  `main` (`raw.githubusercontent.com/.../main/install.sh`) and never set
+  `SSA_VERSION`, so a workflow pinned to `@<tag>`/`@<sha>` still executed
+  whatever `install.sh` was on `main` and installed the latest release binary.
+  It now runs the `install.sh` from the action's own checkout
   (`$GITHUB_ACTION_PATH`) and, when pinned to a release tag, installs that exact
   version's binary (branch/sha pins fall back to the latest release, since no
   binary is published per arbitrary ref).
@@ -236,8 +252,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   checksum verification, and rename it over the running `php` — bricking the
   interpreter while reporting `Updated …`. The locator now refuses unless it is
   running as the self-contained standalone binary (the phpmicro `micro` SAPI),
-  throwing `self-update is only supported for the standalone binary, but it is
-  running under the "<sapi>" PHP SAPI` instead.
+  throwing
+  `self-update is only supported for the standalone binary, but it is running under the "<sapi>" PHP SAPI`
+  instead.
 - **`self-update` can no longer hang forever on a stalled network.**
   `ProcessReleaseClient::defaultProcessBuilder()` disabled the Symfony `Process`
   timeout (`setTimeout(null)`) while its `curl` invocation carried no transfer
@@ -250,7 +267,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   install a partially-written, checksum-unverified binary, and a failure between
   download and rename stranded a ~50 MB dotfile. The download now goes to a
   unique per-run temporary file (`Filesystem::tempnam()`), and every failure
-  path — including a failed checksum *fetch* — removes it.
+  path — including a failed checksum _fetch_ — removes it.
 - **The native Windows binary is published with releases again.**
   `windows-latest` lost VS 2022 in GitHub's June 2026 image migration, so
   `static-php-cli` 2.8.5's doctor aborted before installing the `7za.exe` its
@@ -260,6 +277,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   Windows leg to `windows-2022`, makes doctor failures fatal, hands spc's
   extraction Windows bsdtar instead of MSYS tar, and fails fast when the php-src
   tree is missing — the leg is blocking again instead of best-effort.
+
+### Security
+
+- **Imported SARIF marker descriptions and patterns can no longer forge fake
+  prompt sections in the attacker context.** `AttackerContextPromptRenderer`
+  newline-sanitized the risk-marker _file path_ but injected the marker
+  `description()` (e.g. imported SARIF `message.text`) and `pattern()` verbatim,
+  so an embedded newline in a CI-supplied SARIF message could inject an
+  unguarded `##`-prefixed section into the next iteration's attacker prompt.
+  Every marker field routed into the prompt is now collapsed to a single line.
 
 ## [1.15.0] — 2026-07-14 — Conduit
 

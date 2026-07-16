@@ -211,7 +211,9 @@ final readonly class SarifImportingPreScanner implements StaticPreScannerInterfa
      * A SARIF `codeFlows[0].threadFlows[0].locations` array is the taint-
      * tracking tool's source-to-sink path — richer evidence than the single
      * primary location. Steps outside the scan surface are dropped, same as
-     * the primary location, so the attacker never sees an unscanned file.
+     * the primary location, so the attacker never sees an unscanned file; an
+     * `...` placeholder marks each gap so a surviving step is never mistaken
+     * for the source (or the whole path for a single relabeled sink).
      *
      * @param array<array-key, mixed> $result
      * @param array<string, true>     $scannedPaths
@@ -225,12 +227,42 @@ final readonly class SarifImportingPreScanner implements StaticPreScannerInterfa
             return [];
         }
 
-        $steps = [];
+        $rawSteps = [];
         foreach ($locations as $location) {
-            $step = \is_array($location) ? $this->taintPathStep($location, $scannedPaths) : null;
-            if (null !== $step) {
-                $steps[] = $step;
+            $rawSteps[] = \is_array($location) ? $this->taintPathStep($location, $scannedPaths) : null;
+        }
+
+        return $this->collapseDroppedStepsToEllipses($rawSteps);
+    }
+
+    /**
+     * @param list<string|null> $rawSteps each dropped (null) step collapses to
+     *                                    a single `...` so a surviving step is
+     *                                    never mistaken for the taint source
+     *
+     * @return list<string>
+     */
+    private function collapseDroppedStepsToEllipses(array $rawSteps): array
+    {
+        $steps = [];
+        $droppedSincePreviousStep = false;
+        foreach ($rawSteps as $rawStep) {
+            if (null === $rawStep) {
+                $droppedSincePreviousStep = true;
+
+                continue;
             }
+
+            if ($droppedSincePreviousStep) {
+                $steps[] = '...';
+            }
+
+            $steps[] = $rawStep;
+            $droppedSincePreviousStep = false;
+        }
+
+        if ($droppedSincePreviousStep && [] !== $steps) {
+            $steps[] = '...';
         }
 
         return $steps;

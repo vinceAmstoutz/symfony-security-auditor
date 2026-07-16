@@ -32,11 +32,11 @@ final readonly class AttackerContextPromptRenderer
     {
         $byFile = [];
         foreach ($markers as $marker) {
-            $byFile[$this->sanitizeFilePath($marker->filePath())][] = \sprintf(
+            $byFile[$this->sanitizeLine($marker->filePath())][] = \sprintf(
                 'L%d %s — %s',
                 $marker->line(),
-                $marker->pattern(),
-                $marker->description(),
+                $this->sanitizeLine($marker->pattern()),
+                $this->sanitizeLine($marker->description()),
             );
         }
 
@@ -62,7 +62,7 @@ final readonly class AttackerContextPromptRenderer
         foreach ($previousFindings as $previouFinding) {
             $byType[$previouFinding->type()->value][] = \sprintf(
                 '%s:%d-%d',
-                $this->sanitizeFilePath($previouFinding->filePath()),
+                $this->sanitizeLine($previouFinding->filePath()),
                 $previouFinding->lineStart(),
                 $previouFinding->lineEnd(),
             );
@@ -92,7 +92,7 @@ final readonly class AttackerContextPromptRenderer
         foreach ($rejectedFindings as $rejectedFinding) {
             $byType[$rejectedFinding->type()->value][] = \sprintf(
                 '%s:%d-%d',
-                $this->sanitizeFilePath($rejectedFinding->filePath()),
+                $this->sanitizeLine($rejectedFinding->filePath()),
                 $rejectedFinding->lineStart(),
                 $rejectedFinding->lineEnd(),
             );
@@ -117,14 +117,15 @@ final readonly class AttackerContextPromptRenderer
     }
 
     /**
-     * A file path echoed back from a prior iteration's finding is either
-     * attacker-LLM-reported free text or a real path from the audited
-     * (untrusted) codebase; either way an embedded newline could forge a
-     * fake `##`-prefixed section as unguarded prompt text for the next
-     * iteration's attacker call.
+     * Risk-marker descriptions/patterns (e.g. imported SARIF `message.text`)
+     * and file paths are attacker-influenced free text or come from the
+     * audited (untrusted) codebase; an embedded newline could forge a fake
+     * `##`-prefixed section as unguarded prompt text for the next attacker
+     * call, so every such value is collapsed to a single line before it enters
+     * the prompt.
      */
-    private function sanitizeFilePath(string $filePath): string
+    private function sanitizeLine(string $value): string
     {
-        return str_replace("\n", ' ', $filePath);
+        return str_replace(["\r", "\n"], ' ', $value);
     }
 }
