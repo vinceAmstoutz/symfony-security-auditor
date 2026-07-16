@@ -129,6 +129,62 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
      */
+    public function test_a_taint_path_step_with_a_non_positive_start_line_clamps_to_line_one(): void
+    {
+        $result = $this->sarifResultWithCodeFlow(
+            'TaintedSql',
+            'Detected tainted SQL',
+            'src/Repository/UserRepository.php',
+            42,
+            [['src/Controller/UserController.php', 0], ['src/Repository/UserRepository.php', 42]],
+        );
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [$result])]);
+
+        $markers = $this->scanner([$sarif])->scan([
+            $this->projectFile('src/Repository/UserRepository.php'),
+            $this->projectFile('src/Controller/UserController.php'),
+        ]);
+
+        self::assertSame(
+            'Detected tainted SQL (taint path: src/Controller/UserController.php:1 -> src/Repository/UserRepository.php:42)',
+            $markers[0]->description(),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     */
+    public function test_a_taint_path_step_without_a_start_line_defaults_to_line_one(): void
+    {
+        $result = [
+            ...$this->sarifResult('TaintedSql', 'Detected tainted SQL', 'src/Repository/UserRepository.php', 42),
+            'codeFlows' => [['threadFlows' => [['locations' => [
+                ['location' => ['physicalLocation' => ['artifactLocation' => ['uri' => 'src/Controller/UserController.php']]]],
+                ['location' => ['physicalLocation' => ['artifactLocation' => ['uri' => 'src/Repository/UserRepository.php'], 'region' => ['startLine' => 42]]]],
+            ]]]]],
+        ];
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [$result])]);
+
+        $markers = $this->scanner([$sarif])->scan([
+            $this->projectFile('src/Repository/UserRepository.php'),
+            $this->projectFile('src/Controller/UserController.php'),
+        ]);
+
+        self::assertSame(
+            'Detected tainted SQL (taint path: src/Controller/UserController.php:1 -> src/Repository/UserRepository.php:42)',
+            $markers[0]->description(),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     */
     public function test_a_taint_path_step_without_a_location_uri_is_skipped(): void
     {
         $result = [
