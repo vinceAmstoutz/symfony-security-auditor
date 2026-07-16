@@ -78,8 +78,14 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "regex": { "type": "string", "description": "PCRE pattern with delimiters, matched per line." },
-                    "description": { "type": "string", "description": "Short description rendered in the prompt." }
+                    "regex": {
+                      "type": "string",
+                      "description": "PCRE pattern with delimiters, matched per line."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Short description rendered in the prompt."
+                    }
                   },
                   "required": ["regex", "description"]
                 }
@@ -90,7 +96,10 @@
               "additionalProperties": false,
               "description": "Redact secrets before file contents are sent to the LLM.",
               "properties": {
-                "enabled": { "type": "boolean", "description": "Enable secret scrubbing. Default: true." },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enable secret scrubbing. Default: true."
+                },
                 "additional_patterns": {
                   "type": "array",
                   "items": { "type": "string" },
@@ -171,7 +180,7 @@
             },
             "since_closure": {
               "enum": ["none", "direct"],
-              "description": "When a --since diff-mode run is active, whether to widen the audited file set beyond the raw git diff. Default: none (audits exactly the changed files). direct additionally pulls in a changed voter's first-degree dependents (controllers guarded by an #[IsGranted] attribute the voter's supports() accepts) from the full project mapping."
+              "description": "When a --since diff-mode run is active, whether to widen the audited file set beyond the raw git diff. none audits exactly the changed files. direct additionally pulls in a changed voter's first-degree dependents (controllers guarded by an #[IsGranted] attribute the voter's supports() accepts) from the full project mapping. Default: profile-dependent (balanced/fast: none, thorough: direct)."
             },
             "excluded_types": {
               "type": "array",
@@ -190,9 +199,18 @@
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
-                  "file_type": { "type": "string", "description": "File-type bucket the skill applies to (controller, voter, entity, repository, form, template, config, php, …)." },
-                  "instructions": { "type": "string", "description": "Free-form expert instructions injected into the prompt. State both what to hunt and what NOT to flag." },
-                  "priority": { "type": "integer", "description": "Emission rank — lower emits earlier. Default: 500 (after the built-in skills)." }
+                  "file_type": {
+                    "type": "string",
+                    "description": "File-type bucket the skill applies to (controller, voter, entity, repository, form, template, config, php, …)."
+                  },
+                  "instructions": {
+                    "type": "string",
+                    "description": "Free-form expert instructions injected into the prompt. State both what to hunt and what NOT to flag."
+                  },
+                  "priority": {
+                    "type": "integer",
+                    "description": "Emission rank — lower emits earlier. Default: 500 (after the built-in skills)."
+                  }
                 },
                 "required": ["file_type", "instructions"]
               }
@@ -201,8 +219,14 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": { "type": "boolean", "description": "Run the deterministic risk-marker pre-scan. Default: true." },
-                "lean_mode": { "type": ["boolean", "null"], "description": "Drop marker-free files before the LLM. Defaults to the active profile." }
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Run the deterministic risk-marker pre-scan. Default: true."
+                },
+                "lean_mode": {
+                  "type": ["boolean", "null"],
+                  "description": "Drop marker-free files before the LLM. Defaults to the active profile."
+                }
               }
             },
             "chunking": {
@@ -220,23 +244,39 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": { "type": "boolean", "description": "Run a cheap-model sweep first, escalating only flagged files. Default: false." },
-                "cheap_model": { "type": ["string", "null"], "description": "Model id for the cheap first pass. Falls back to the reviewer model when null." }
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Run a cheap-model sweep first, escalating only flagged files. Default: false."
+                },
+                "cheap_model": {
+                  "type": ["string", "null"],
+                  "description": "Model id for the cheap first pass. Falls back to the reviewer model when null."
+                }
               }
             },
             "code_slicing": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": { "type": ["boolean", "null"], "description": "Trim large PHP files to security-relevant slices. Defaults to the active profile." },
-                "min_lines_before_slicing": { "type": "integer", "minimum": 10, "description": "Skip slicing for files shorter than this. Default: 80." }
+                "enabled": {
+                  "type": ["boolean", "null"],
+                  "description": "Trim large PHP files to security-relevant slices. Defaults to the active profile."
+                },
+                "min_lines_before_slicing": {
+                  "type": "integer",
+                  "minimum": 10,
+                  "description": "Skip slicing for files shorter than this. Default: 80."
+                }
               }
             },
             "poc_synthesis": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": { "type": ["boolean", "null"], "description": "Generate concrete PoC artifacts for qualifying findings. Defaults to the active profile." },
+                "enabled": {
+                  "type": ["boolean", "null"],
+                  "description": "Generate concrete PoC artifacts for qualifying findings. Defaults to the active profile."
+                },
                 "severity_floor": {
                   "type": "string",
                   "enum": ["critical", "high", "medium", "low", "info"],
@@ -248,7 +288,10 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": { "type": "boolean", "description": "Generate a suggested-fix unified-diff patch for qualifying findings. Default: false (opt in explicitly)." },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Generate a suggested-fix unified-diff patch for qualifying findings. Default: false (opt in explicitly)."
+                },
                 "severity_floor": {
                   "type": "string",
                   "enum": ["critical", "high", "medium", "low", "info"],
@@ -260,27 +303,64 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "max_tokens": { "type": ["integer", "null"], "minimum": 1, "description": "Abort the audit past this many total tokens. null = unlimited." },
-                "max_cost_usd": { "type": ["number", "null"], "minimum": 0.01, "description": "Abort the audit past this estimated USD cost. null = unlimited." }
+                "max_tokens": {
+                  "type": ["integer", "null"],
+                  "minimum": 1,
+                  "description": "Abort the audit past this many total tokens. null = unlimited."
+                },
+                "max_cost_usd": {
+                  "type": ["number", "null"],
+                  "minimum": 0.01,
+                  "description": "Abort the audit past this estimated USD cost. null = unlimited."
+                }
               }
             },
             "retry": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "max_attempts": { "type": "integer", "minimum": 1, "description": "Attempts per LLM call including the first. 1 disables retries." },
-                "initial_delay_ms": { "type": "integer", "minimum": 0, "description": "Base delay before the first retry, in milliseconds." },
-                "backoff_multiplier": { "type": "number", "minimum": 1, "description": "Exponential growth factor between retries." },
-                "jitter_ratio": { "type": "number", "minimum": 0, "maximum": 1, "description": "Jitter fraction applied to each delay." }
+                "max_attempts": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Attempts per LLM call including the first. 1 disables retries."
+                },
+                "initial_delay_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Base delay before the first retry, in milliseconds."
+                },
+                "backoff_multiplier": {
+                  "type": "number",
+                  "minimum": 1,
+                  "description": "Exponential growth factor between retries."
+                },
+                "jitter_ratio": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "Jitter fraction applied to each delay."
+                }
               }
             },
             "rate_limit": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "requests_per_minute": { "type": ["integer", "null"], "minimum": 1, "description": "Max LLM requests per minute. null disables this dimension." },
-                "input_tokens_per_minute": { "type": ["integer", "null"], "minimum": 1, "description": "Max input tokens per minute. null disables this dimension." },
-                "output_tokens_per_minute": { "type": ["integer", "null"], "minimum": 1, "description": "Max output tokens per minute. null disables this dimension." }
+                "requests_per_minute": {
+                  "type": ["integer", "null"],
+                  "minimum": 1,
+                  "description": "Max LLM requests per minute. null disables this dimension."
+                },
+                "input_tokens_per_minute": {
+                  "type": ["integer", "null"],
+                  "minimum": 1,
+                  "description": "Max input tokens per minute. null disables this dimension."
+                },
+                "output_tokens_per_minute": {
+                  "type": ["integer", "null"],
+                  "minimum": 1,
+                  "description": "Max output tokens per minute. null disables this dimension."
+                }
               }
             }
           }
@@ -290,9 +370,18 @@
           "additionalProperties": false,
           "description": "Caching layers.",
           "properties": {
-            "enabled": { "type": "boolean", "description": "Enable the attacker-chunk and reviewer-verdict filesystem caches. Default: true." },
-            "dir": { "type": "string", "description": "Cache storage path. Default: %kernel.cache_dir%/symfony_security_auditor/attacker." },
-            "prompt_caching": { "type": "boolean", "description": "Deprecated since 1.7 and ignored. Configure prompt caching on the AI platform in ai.yaml instead." }
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable the attacker-chunk and reviewer-verdict filesystem caches. Default: true."
+            },
+            "dir": {
+              "type": "string",
+              "description": "Cache storage path. Default: %kernel.cache_dir%/symfony_security_auditor/attacker."
+            },
+            "prompt_caching": {
+              "type": "boolean",
+              "description": "Deprecated since 1.7 and ignored. Configure prompt caching on the AI platform in ai.yaml instead."
+            }
           }
         }
       }
@@ -303,7 +392,9 @@
       "type": "object",
       "description": "Symfony environment-scoped configuration block (when@dev, when@test, …). Mirrors the root schema so editors give completion and validation for symfony_security_auditor nested under when@<env>.",
       "properties": {
-        "symfony_security_auditor": { "$ref": "#/properties/symfony_security_auditor" }
+        "symfony_security_auditor": {
+          "$ref": "#/properties/symfony_security_auditor"
+        }
       }
     }
   }

@@ -1315,6 +1315,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.poc_synthesis.enabled'));
         self::assertSame(4, $containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_max_concurrent'));
         self::assertSame(4, $containerBuilder->getParameter('symfony_security_auditor.audit.attacker_max_concurrent'));
+        self::assertSame('none', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
     }
 
     public function test_bundle_thorough_profile_enables_poc_synthesis(): void
@@ -1323,6 +1324,20 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.poc_synthesis.enabled'));
         self::assertSame(3, $containerBuilder->getParameter('symfony_security_auditor.audit.max_iterations'));
+    }
+
+    public function test_bundle_thorough_profile_widens_since_closure_to_direct(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'profile' => 'thorough']);
+
+        self::assertSame('direct', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
+    }
+
+    public function test_bundle_explicit_since_closure_overrides_the_thorough_profile(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'profile' => 'thorough', 'audit' => ['since_closure' => 'none']]);
+
+        self::assertSame('none', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
     }
 
     public function test_bundle_explicit_key_overrides_the_profile(): void

@@ -86,8 +86,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `src/Audit/Infrastructure/Prompt/Skill/`.
 
 - **`--since` diff-mode runs can now widen the audited file set to a changed
-  voter's guarded controllers.** New `audit.since_closure: none|direct` key
-  (default `none`, matching every prior release exactly). With `direct`, the new
+  voter's guarded controllers.** New `audit.since_closure: none|direct` key,
+  profile-dependent like its sibling cost/depth levers (balanced/fast: `none`,
+  matching every prior release exactly; thorough: `direct`, since that profile
+  already trades cost for detection depth). With `direct`, the new
   `DependencyExpansionStage` reads the full-project `AccessControlMap`
   `MappingStage` already builds even in diff mode, finds every changed voter in
   the `--since` file set, and pulls in any controller (from the full scan scope)
@@ -95,8 +97,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   so a voter edit that silently weakens an unrelated controller's access control
   is still caught by a diff-scoped CI run. Sets a
   `dependency_expansion.files_added` metadata counter. `direct` increases the
-  cost and finding scope of `--since` runs, so it stays opt-in. Implementation
-  lives in `src/Audit/Application/Pipeline/Stage/DependencyExpansionStage.php`.
+  cost and finding scope of `--since` runs; an explicit `since_closure` value
+  always wins over the profile. Implementation lives in
+  `src/Audit/Application/Pipeline/Stage/DependencyExpansionStage.php` and
+  `src/Audit/Domain/Configuration/AuditProfile.php`.
 
 ### Fixed
 

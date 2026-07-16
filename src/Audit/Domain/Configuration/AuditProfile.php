@@ -22,8 +22,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
  *   security-relevant lines, and up to four concurrent attacker and reviewer
  *   calls.
  * - `balanced` — the default; identical to configuring nothing.
- * - `thorough` — adds PoC synthesis for high-severity validated findings on
- *   top of the balanced depth.
+ * - `thorough` — adds PoC synthesis for high-severity validated findings, and
+ *   widens `--since` diff-mode runs to a changed voter's guarded controllers
+ *   (`since_closure: direct`), on top of the balanced depth.
  */
 enum AuditProfile: string
 {
@@ -68,5 +69,10 @@ enum AuditProfile: string
             self::Fast => 4,
             self::Balanced, self::Thorough => 1,
         };
+    }
+
+    public function sinceClosure(): string
+    {
+        return self::Thorough === $this ? 'direct' : 'none';
     }
 }
