@@ -159,12 +159,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   access control in Sonata Admin and EasyAdmin panels, and permissive Mercure
   topic scopes.** Two new `ProjectFileType` cases — `ldap_service` (classified
   by `Ldap`-suffixed files, an `/Ldap/` directory, or `Symfony\Component\Ldap`
-  usage) and `sonata_admin` (classified by `Admin`-suffixed files, an
-  `/Admin/` directory, or a class `extends AbstractAdmin`) — route to two new
-  attacker skills. `LdapServiceAttackerSkill` hunts LDAP filters/DNs built by
-  string concatenation without `ldap_escape()` (LDAP injection) and
-  `Ldap::bind()` calls with a variable password that could be empty
-  (anonymous-bind bypass). `SonataAdminAttackerSkill` hunts Sonata
+  usage) and `sonata_admin` (classified by `Admin`-suffixed files, an `/Admin/`
+  directory, or a class `extends AbstractAdmin`) — route to two new attacker
+  skills. `LdapServiceAttackerSkill` hunts LDAP filters/DNs built by string
+  concatenation without `ldap_escape()` (LDAP injection) and `Ldap::bind()`
+  calls with a variable password that could be empty (anonymous-bind bypass).
+  `SonataAdminAttackerSkill` hunts Sonata
   `configureFormFields()`/`configureListFields()` exposing a privileged field
   (`roles`, `password`, `isAdmin`) to every role that can reach the panel, and
   admins without an overridden `checkAccess()` guarding multi-tenant data
