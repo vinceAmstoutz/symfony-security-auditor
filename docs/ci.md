@@ -9,6 +9,7 @@ GitHub Code Scanning or the GitLab Security Dashboard.
 - [Managing LLM Costs](#managing-llm-costs)
 - [Report Visibility on Public Repositories](#report-visibility-on-public-repositories)
 - [GitHub Actions](#github-actions)
+  - [Sticky PR comment with the audit summary](#sticky-pr-comment-with-the-audit-summary)
   - [Reusable GitHub Action](#reusable-github-action)
 - [GitLab CI](#gitlab-ci)
 - [Output Formats Reference](#output-formats-reference)
@@ -235,6 +236,67 @@ Critical and high-severity findings become `::error`, medium becomes
 how GitHub displays the finding, not the job's exit code; combine with
 `--fail-on` to also fail the check run. Don't pass `--output` — annotations must
 reach stdout for GitHub to parse them.
+
+### Sticky PR comment with the audit summary
+
+Inline annotations are easy to miss once a PR has more than a couple of review
+comments, and a fresh top-level comment on every push spams the thread.
+[`marocchino/sticky-pull-request-comment`](https://github.com/marketplace/actions/sticky-pull-request-comment)
+solves both: it finds its own previous comment (matched by the `header` input)
+and edits it in place, so the PR always shows exactly one up-to-date audit
+comment regardless of how many times the workflow reruns. Pair it with
+`--format markdown` so the comment renders as native GitHub markdown — headings,
+a findings table — rather than a log dump.
+
+```yaml
+# .github/workflows/security-audit.yaml
+name: Security Audit
+
+on:
+  pull_request: ~
+
+permissions:
+  contents: read
+  pull-requests: write # required to post/update the sticky comment
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so `since` can diff against the base branch
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3' # Or 8.4 or 8.5
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run security audit
+        id: audit
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          php bin/console audit:run --since origin/${{ github.base_ref }} --format markdown --output report.md --fail-on high
+
+      - name: Post sticky PR comment
+        uses: marocchino/sticky-pull-request-comment@v3
+        if: always() # post the summary even when audit:run exits non-zero on --fail-on
+        with:
+          header: security-audit
+          path: report.md
+```
+
+The report file is written before the exit code is computed, so it exists even
+on a failing run — `if: always()` on the comment step is what lets it post
+regardless, while the job itself still fails on the `audit:run` step so
+`--fail-on` still gates the check run. `header: security-audit` scopes this
+action to its own comment; give a second sticky-comment step in the same
+workflow (e.g. one posting coverage) a different `header` so the two never
+overwrite each other.
 
 ### Reusable GitHub Action
 
