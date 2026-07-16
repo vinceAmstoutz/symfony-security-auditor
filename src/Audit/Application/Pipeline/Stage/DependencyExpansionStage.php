@@ -63,12 +63,9 @@ final readonly class DependencyExpansionStage implements StageInterface
 
         $projectFiles = $auditContext->projectFiles();
         $changedVoterAttributes = $this->changedVoterAttributes($projectFiles, $mapping->voterCapabilities());
-        if ([] === $changedVoterAttributes) {
-            return;
-        }
+        $guardedPaths = $this->guardedControllerPaths($mapping->routeAccessControls(), $changedVoterAttributes);
 
         $changedPaths = array_flip(array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFiles));
-        $guardedPaths = $this->guardedControllerPaths($mapping->routeAccessControls(), $changedVoterAttributes);
         $newPaths = array_values(array_filter($guardedPaths, static fn (string $path): bool => !\array_key_exists($path, $changedPaths)));
 
         $added = $this->resolveFiles($newPaths, $auditContext->mappingFiles());
@@ -95,12 +92,8 @@ final readonly class DependencyExpansionStage implements StageInterface
     {
         $changedVoterPaths = array_flip(array_map(
             static fn (ProjectFile $projectFile): string => $projectFile->relativePath(),
-            array_values(array_filter($projectFiles, static fn (ProjectFile $projectFile): bool => $projectFile->isVoter())),
+            array_filter($projectFiles, static fn (ProjectFile $projectFile): bool => $projectFile->isVoter()),
         ));
-
-        if ([] === $changedVoterPaths) {
-            return [];
-        }
 
         $attributes = [];
         foreach ($voterCapabilities as $voterCapability) {

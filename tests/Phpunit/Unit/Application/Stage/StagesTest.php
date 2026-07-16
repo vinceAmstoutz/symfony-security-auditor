@@ -607,6 +607,61 @@ final class StagesTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidAuditContextException
      */
+    public function test_dependency_expansion_stage_accumulates_paths_across_multiple_changed_voters_and_attributes(): void
+    {
+        $postVoter = ProjectFile::create('src/Security/PostVoter.php', '/app/PV', '<?php class PostVoter {}');
+        $commentVoter = ProjectFile::create('src/Security/CommentVoter.php', '/app/CV', '<?php class CommentVoter {}');
+        $alreadyChanged = ProjectFile::create('src/Service/Mailer.php', '/app/M', '<?php class Mailer {}');
+
+        $postEditController = ProjectFile::create('src/Controller/PostEditController.php', '/app/PEC', '<?php class PostEditController {}');
+        $postViewController = ProjectFile::create('src/Controller/PostViewController.php', '/app/PVC', '<?php class PostViewController {}');
+        $commentController = ProjectFile::create('src/Controller/CommentController.php', '/app/CC', '<?php class CommentController {}');
+        $unrelatedController = ProjectFile::create('src/Controller/UnrelatedController.php', '/app/UC', '<?php class UnrelatedController {}');
+
+        $auditContext = AuditContext::forProject($this->tmpDir, [], false, 'main');
+        $auditContext->setProjectFiles([$postVoter, $commentVoter, $alreadyChanged]);
+        $auditContext->setMappingFiles([
+            $postVoter, $commentVoter, $alreadyChanged,
+            $postEditController, $postViewController, $commentController, $unrelatedController,
+        ]);
+        $auditContext->setMapping(SymfonyMapping::of(
+            ProjectFileInventory::fromFiles([
+                $postVoter, $commentVoter, $alreadyChanged,
+                $postEditController, $postViewController, $commentController, $unrelatedController,
+            ]),
+            new AccessControlMap(
+                routeAccessControls: [
+                    new RouteAccessControl('src/Controller/PostEditController.php', 'edit', '/posts/edit', ['POST'], true, ['EDIT'], false, false),
+                    new RouteAccessControl('src/Controller/PostViewController.php', 'view', '/posts/view', ['GET'], true, ['VIEW'], false, false),
+                    new RouteAccessControl('src/Controller/CommentController.php', 'delete', '/comments/delete', ['POST'], true, ['DELETE'], false, false),
+                    new RouteAccessControl('src/Controller/UnrelatedController.php', 'index', '/unrelated', ['GET'], true, ['VIEW_UNRELATED'], false, false),
+                ],
+                voterCapabilities: [
+                    new VoterCapability('src/Security/PostVoter.php', 'PostVoter', ['EDIT', 'VIEW'], ['Post']),
+                    new VoterCapability('src/Security/CommentVoter.php', 'CommentVoter', ['DELETE'], ['Comment']),
+                ],
+            ),
+        ));
+
+        $dependencyExpansionStage = new DependencyExpansionStage(new NullLogger(), 'direct');
+        $dependencyExpansionStage->process($auditContext);
+
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles());
+        self::assertCount(6, $paths);
+        self::assertContains('src/Security/PostVoter.php', $paths);
+        self::assertContains('src/Security/CommentVoter.php', $paths);
+        self::assertContains('src/Service/Mailer.php', $paths);
+        self::assertContains('src/Controller/PostEditController.php', $paths);
+        self::assertContains('src/Controller/PostViewController.php', $paths);
+        self::assertContains('src/Controller/CommentController.php', $paths);
+        self::assertNotContains('src/Controller/UnrelatedController.php', $paths);
+        self::assertSame(3, $auditContext->getMeta('dependency_expansion.files_added'));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_dependency_expansion_stage_does_not_duplicate_a_guarded_controller_already_in_the_diff(): void
     {
         $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/V', '<?php class PostVoter {}');
