@@ -87,7 +87,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 
         $verdictApplier = new VerdictApplier($reviewerAgentCollaborators->logger);
         $reviewerVerdictCache = new ReviewerVerdictCache($reviewerAgentCollaborators->reviewerCache, $reviewerAgentCollaborators->logger);
-        $reviewOutcomeRecorder = new ReviewOutcomeRecorder($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger, $reviewerAgentCollaborators->progressReporter);
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger, $reviewerAgentCollaborators->progressReporter, $reviewerAgentCollaborators->triageMemoryRecorder);
 
         $this->sequentialReviewAnalyzer = new SequentialReviewAnalyzer(
             $reviewerAgentCollaborators->llmClient,

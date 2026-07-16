@@ -572,6 +572,20 @@ in `config/services.yaml` to override the bundled behaviour (see
   logs). Implement it to stream audit progress to a dashboard, metrics system,
   or chat webhook; the stable event names are the cases of the
   `Audit\Domain\Model\ProgressEvent` enum.
+- `ReviewerFeedbackProviderInterface` — `feedback(): ReviewerFeedback` supplying
+  the maintainer-trusted false-positive feedback injected into the reviewer
+  prompt (default: the baseline-backed `ReviewerFeedbackHolder`, composed with
+  `FilesystemTriageMemoryStore` via `CompositeReviewerFeedbackProvider` when
+  `audit.triage_memory: true`). Implement it to source feedback from elsewhere —
+  a shared team knowledge base, a ticketing system's "won't fix" list.
+- `TriageMemoryRecorderInterface` —
+  `record(string $type, string $file, string $title, string $reason): void`
+  called whenever the reviewer rejects a finding with a non-empty
+  `reviewer_notes` explanation (default: `NullTriageMemoryRecorder`, or
+  `FilesystemTriageMemoryStore` when `audit.triage_memory: true`). Implement it
+  to persist rejections somewhere other than the local filesystem — a shared
+  cache reachable by every CI runner, for example — so the cross-run memory
+  survives across ephemeral containers.
 
 ## 6. Schema-Enforced Collection (`audit.structured_collection`)
 
