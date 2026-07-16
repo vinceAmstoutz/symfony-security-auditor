@@ -33,7 +33,7 @@ final readonly class FileChunker
         ProjectFileType::LIVE_COMPONENT,
         ProjectFileType::AUTHENTICATOR,
         ProjectFileType::LDAP_SERVICE,
-        ProjectFileType::ADMIN_PANEL,
+        ProjectFileType::SONATA_ADMIN,
         ProjectFileType::VOTER,
         ProjectFileType::WEBHOOK_CONSUMER,
         ProjectFileType::MESSENGER_HANDLER,

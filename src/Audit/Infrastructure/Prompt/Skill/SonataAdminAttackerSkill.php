@@ -17,12 +17,12 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
-final readonly class AdminPanelAttackerSkill implements AttackerSkillInterface
+final readonly class SonataAdminAttackerSkill implements AttackerSkillInterface
 {
     #[Override]
     public function fileType(): ProjectFileType
     {
-        return ProjectFileType::ADMIN_PANEL;
+        return ProjectFileType::SONATA_ADMIN;
     }
 
     #[Override]
@@ -35,7 +35,7 @@ final readonly class AdminPanelAttackerSkill implements AttackerSkillInterface
     public function block(): string
     {
         return <<<'SKILL'
-            <skills role="admin_panel">
+            <skills role="sonata_admin">
             Hunt:
             - `configureFormFields()`/`configureListFields()` exposing a privileged field (`roles`, `password`, `isAdmin`, `isSuperAdmin`) for edit by every role that can reach this admin class — Sonata Admin routes a class-level role by default, so any field surfaced here is editable by everyone with access to the panel, not only a super-admin.
             - No overridden `checkAccess()` on an admin whose entity is scoped to a tenant/owner — Sonata's default access check is class-level only; verify a per-object ownership check (custom `checkAccess()` or a delegated voter) gates `edit`/`delete`/`show` before this admin is trusted with multi-tenant data.

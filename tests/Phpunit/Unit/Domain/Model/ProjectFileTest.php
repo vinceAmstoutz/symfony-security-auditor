@@ -971,7 +971,7 @@ final class ProjectFileTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
-    public function test_it_detects_admin_panel_by_directory(): void
+    public function test_it_detects_sonata_admin_by_directory(): void
     {
         $projectFile = ProjectFile::create(
             'src/Admin/StoreManager.php',
@@ -979,8 +979,8 @@ final class ProjectFileTest extends TestCase
             '<?php',
         );
 
-        self::assertSame('admin_panel', $projectFile->type());
-        self::assertTrue($projectFile->isAdminPanel());
+        self::assertSame('sonata_admin', $projectFile->type());
+        self::assertTrue($projectFile->isSonataAdmin());
     }
 
     /**
@@ -1239,7 +1239,7 @@ final class ProjectFileTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
-    public function test_is_service_returns_false_for_admin_panel(): void
+    public function test_is_service_returns_false_for_sonata_admin(): void
     {
         $projectFile = ProjectFile::create(
             'src/Admin/FooAdmin.php',

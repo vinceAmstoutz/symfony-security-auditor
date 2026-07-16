@@ -138,9 +138,9 @@ final readonly class ProjectFile
         return ProjectFileType::LDAP_SERVICE === $this->projectFileType;
     }
 
-    public function isAdminPanel(): bool
+    public function isSonataAdmin(): bool
     {
-        return ProjectFileType::ADMIN_PANEL === $this->projectFileType;
+        return ProjectFileType::SONATA_ADMIN === $this->projectFileType;
     }
 
     public function isEventSubscriber(): bool
@@ -240,7 +240,7 @@ final readonly class ProjectFile
             return true;
         }
 
-        if ($this->isAdminPanel()) {
+        if ($this->isSonataAdmin()) {
             return true;
         }
 

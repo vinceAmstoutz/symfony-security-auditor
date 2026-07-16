@@ -24,7 +24,7 @@ enum ProjectFileType: string
     case FORM = 'form';
     case AUTHENTICATOR = 'authenticator';
     case LDAP_SERVICE = 'ldap_service';
-    case ADMIN_PANEL = 'admin_panel';
+    case SONATA_ADMIN = 'sonata_admin';
     case MESSENGER_HANDLER = 'messenger_handler';
     case WEBHOOK_CONSUMER = 'webhook_consumer';
     case EVENT_SUBSCRIBER = 'event_subscriber';

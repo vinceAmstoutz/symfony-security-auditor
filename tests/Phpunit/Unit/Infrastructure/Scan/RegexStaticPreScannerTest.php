@@ -1246,7 +1246,7 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
-    public function test_it_flags_an_admin_panel_exposing_the_roles_field(): void
+    public function test_it_flags_a_sonata_admin_exposing_the_roles_field(): void
     {
         $projectFile = ProjectFile::create(
             'src/Admin/UserAdmin.php',
@@ -1257,14 +1257,14 @@ final class RegexStaticPreScannerTest extends TestCase
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);
 
         $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
-        self::assertContains('admin_sensitive_field_exposed', $patterns);
+        self::assertContains('sonata_admin_sensitive_field_exposed', $patterns);
     }
 
     /**
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
-    public function test_it_does_not_flag_an_admin_panel_exposing_only_non_sensitive_fields(): void
+    public function test_it_does_not_flag_a_sonata_admin_exposing_only_non_sensitive_fields(): void
     {
         $projectFile = ProjectFile::create(
             'src/Admin/UserAdmin.php',
@@ -1275,14 +1275,14 @@ final class RegexStaticPreScannerTest extends TestCase
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);
 
         $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
-        self::assertNotContains('admin_sensitive_field_exposed', $patterns);
+        self::assertNotContains('sonata_admin_sensitive_field_exposed', $patterns);
     }
 
     /**
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
-    public function test_it_flags_a_custom_admin_batch_action(): void
+    public function test_it_flags_a_custom_sonata_admin_batch_action(): void
     {
         $projectFile = ProjectFile::create(
             'src/Admin/UserAdmin.php',
@@ -1293,14 +1293,14 @@ final class RegexStaticPreScannerTest extends TestCase
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);
 
         $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
-        self::assertContains('admin_batch_action', $patterns);
+        self::assertContains('sonata_admin_batch_action', $patterns);
     }
 
     /**
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
-    public function test_it_does_not_flag_an_admin_without_custom_batch_actions(): void
+    public function test_it_does_not_flag_a_sonata_admin_without_custom_batch_actions(): void
     {
         $projectFile = ProjectFile::create(
             'src/Admin/UserAdmin.php',
@@ -1311,7 +1311,79 @@ final class RegexStaticPreScannerTest extends TestCase
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);
 
         $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
-        self::assertNotContains('admin_batch_action', $patterns);
+        self::assertNotContains('sonata_admin_batch_action', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_an_easyadmin_field_exposing_the_roles_property(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/Admin/UserCrudController.php',
+            '/app/src/Controller/Admin/UserCrudController.php',
+            "<?php\nclass UserCrudController extends AbstractCrudController {\n    public function configureFields(string \$pageName): iterable {\n        yield TextField::new('roles');\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('easyadmin_sensitive_field', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_an_easyadmin_field_exposing_only_non_sensitive_properties(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/Admin/UserCrudController.php',
+            '/app/src/Controller/Admin/UserCrudController.php',
+            "<?php\nclass UserCrudController extends AbstractCrudController {\n    public function configureFields(string \$pageName): iterable {\n        yield TextField::new('email');\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('easyadmin_sensitive_field', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_an_easyadmin_destructive_action(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/Admin/UserCrudController.php',
+            '/app/src/Controller/Admin/UserCrudController.php',
+            "<?php\nclass UserCrudController extends AbstractCrudController {\n    public function configureActions(Actions \$actions): Actions {\n        return \$actions->add(Crud::PAGE_INDEX, Action::DELETE);\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('easyadmin_destructive_action', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_an_easyadmin_controller_without_destructive_actions(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/Admin/UserCrudController.php',
+            '/app/src/Controller/Admin/UserCrudController.php',
+            "<?php\nclass UserCrudController extends AbstractCrudController {\n    public function configureActions(Actions \$actions): Actions {\n        return \$actions->add(Crud::PAGE_INDEX, Action::DETAIL);\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('easyadmin_destructive_action', $patterns);
     }
 
     /**

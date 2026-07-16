@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 30;
+    public const int CACHE_VERSION = 31;
 
     /**
      * Detects the `s` (DOTALL) flag among a PCRE pattern's trailing modifier
@@ -156,6 +156,14 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'forwarded_host_usage' => [
                 'regex' => '/->(?:getHost|getSchemeAndHttpHost|getHttpHost)\s*\(/',
                 'description' => 'Request::getHost()/getSchemeAndHttpHost() — verify trusted_proxies/trusted_hosts are configured before this value is used in a link or cache key (host header injection / cache poisoning)',
+            ],
+            'easyadmin_sensitive_field' => [
+                'regex' => '/\w*Field::new\s*\(\s*[\'"](?:roles?|password|isAdmin|isSuperAdmin)[\'"]/i',
+                'description' => "EasyAdmin field exposes a privileged property (roles/password/isAdmin) in configureFields() — verify it is gated with ->setPermission('ROLE_...') so only a super-admin can see/edit it",
+            ],
+            'easyadmin_destructive_action' => [
+                'regex' => '/Action::(?:DELETE|BATCH_DELETE)\b/',
+                'description' => 'EasyAdmin DELETE/BATCH_DELETE action referenced in configureActions() — verify it is scoped with ->setPermission(Action::DELETE, \'ROLE_...\'), not left at the dashboard\'s default role',
             ],
         ],
         ProjectFileType::VOTER->value => [
@@ -340,12 +348,12 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'Ldap::bind() with a variable password — verify the value cannot be an empty string (anonymous bind bypass)',
             ],
         ],
-        ProjectFileType::ADMIN_PANEL->value => [
-            'admin_sensitive_field_exposed' => [
+        ProjectFileType::SONATA_ADMIN->value => [
+            'sonata_admin_sensitive_field_exposed' => [
                 'regex' => '/->add\s*\(\s*[\'"](?:roles?|password|isAdmin|isSuperAdmin)[\'"]/i',
                 'description' => 'Admin form/list field exposes a privileged property (roles/password/isAdmin) — verify only a super-admin role can reach this panel',
             ],
-            'admin_batch_action' => [
+            'sonata_admin_batch_action' => [
                 'regex' => '/function\s+getBatchActions\s*\(/',
                 'description' => 'Custom batch actions declared — verify checkAccess() re-validates per-object before a bulk delete/edit executes',
             ],

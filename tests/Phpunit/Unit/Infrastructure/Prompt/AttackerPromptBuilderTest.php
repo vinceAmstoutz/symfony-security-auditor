@@ -1254,7 +1254,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $attackerPromptBuilder->buildSystemPrompt([$projectFile]);
 
-        self::assertSame(24, substr_count($prompt, '<skills role="'));
+        self::assertSame(25, substr_count($prompt, '<skills role="'));
     }
 
     /**

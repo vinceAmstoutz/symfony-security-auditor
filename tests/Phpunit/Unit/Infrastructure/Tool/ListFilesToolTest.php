@@ -37,7 +37,7 @@ final class ListFilesToolTest extends TestCase
                 'properties' => [
                     'file_type' => [
                         'type' => 'string',
-                        'description' => 'Optional ProjectFile::type() to filter by: controller, api_resource, live_component, entity, voter, repository, form, authenticator, ldap_service, admin_panel, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other.',
+                        'description' => 'Optional ProjectFile::type() to filter by: controller, api_resource, live_component, entity, voter, repository, form, authenticator, ldap_service, sonata_admin, messenger_handler, webhook_consumer, event_subscriber, normalizer, scheduler, twig_extension, template, config, php, other.',
                     ],
                 ],
             ],

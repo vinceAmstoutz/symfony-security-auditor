@@ -49,9 +49,9 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'ldap service by suffix' => ['src/Directory/UserLdap.php', '<?php', ProjectFileType::LDAP_SERVICE];
         yield 'ldap service by directory' => ['src/Ldap/DirectoryLookup.php', '<?php', ProjectFileType::LDAP_SERVICE];
         yield 'ldap service by namespace usage without suffix or directory' => ['src/Service/DirectoryBind.php', "<?php\nuse Symfony\\Component\\Ldap\\LdapInterface;\nclass DirectoryBind {}", ProjectFileType::LDAP_SERVICE];
-        yield 'admin panel by suffix' => ['src/Backoffice/StoreAdmin.php', '<?php', ProjectFileType::ADMIN_PANEL];
-        yield 'admin panel by directory' => ['src/Admin/StoreManager.php', '<?php', ProjectFileType::ADMIN_PANEL];
-        yield 'admin panel by base class without suffix or directory' => ['src/Backoffice/StoreManager.php', "<?php\nclass StoreManager extends AbstractAdmin {}", ProjectFileType::ADMIN_PANEL];
+        yield 'sonata admin by suffix' => ['src/Backoffice/StoreAdmin.php', '<?php', ProjectFileType::SONATA_ADMIN];
+        yield 'sonata admin by directory' => ['src/Admin/StoreManager.php', '<?php', ProjectFileType::SONATA_ADMIN];
+        yield 'sonata admin by base class without suffix or directory' => ['src/Backoffice/StoreManager.php', "<?php\nclass StoreManager extends AbstractAdmin {}", ProjectFileType::SONATA_ADMIN];
         yield 'messenger handler by suffix' => ['src/Messenger/SendInvoiceMessageHandler.php', '<?php', ProjectFileType::MESSENGER_HANDLER];
         yield 'messenger handler by attribute' => ['src/Handler/ProcessPaymentAction.php', "<?php\n#[AsMessageHandler]\nclass ProcessPaymentAction {}", ProjectFileType::MESSENGER_HANDLER];
         yield 'webhook consumer by suffix' => ['src/Webhook/StripeWebhookConsumer.php', '<?php', ProjectFileType::WEBHOOK_CONSUMER];
@@ -96,7 +96,7 @@ final class ProjectFileTypeClassifierTest extends TestCase
         self::assertSame(ProjectFileType::CONFIG, $projectFileType);
     }
 
-    public function test_a_non_php_file_in_an_admin_directory_is_not_forced_into_admin_panel(): void
+    public function test_a_non_php_file_in_an_admin_directory_is_not_forced_into_sonata_admin(): void
     {
         $projectFileType = ProjectFileTypeClassifier::classify('src/Admin/config.yaml', 'foo: bar');
 

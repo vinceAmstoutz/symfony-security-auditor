@@ -50,7 +50,7 @@ final class FileChunkerTest extends TestCase
         yield 'form' => ['src/Form/UserType.php', '<?php'];
         yield 'authenticator' => ['src/Security/LoginFormAuthenticator.php', '<?php'];
         yield 'ldap service' => ['src/Ldap/DirectoryLookup.php', '<?php'];
-        yield 'admin panel' => ['src/Admin/StoreManager.php', '<?php'];
+        yield 'sonata admin' => ['src/Admin/StoreManager.php', '<?php'];
         yield 'messenger handler' => ['src/Messenger/SendInvoiceMessageHandler.php', '<?php'];
         yield 'webhook consumer' => ['src/Webhook/StripeWebhookConsumer.php', '<?php'];
         yield 'event subscriber' => ['src/EventSubscriber/AuditSubscriber.php', '<?php'];

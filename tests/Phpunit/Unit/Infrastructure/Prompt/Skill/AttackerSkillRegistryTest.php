@@ -17,13 +17,13 @@ use ArrayIterator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AdminPanelAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ApiResourceAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AuthenticatorAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfigAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerEasyAdminAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerFileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerTrustBoundaryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityAttackerSkill;
@@ -38,6 +38,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\Norma
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\PhpAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\RepositoryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SchedulerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SonataAdminAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TemplateAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TrustBoundaryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TwigExtensionAttackerSkill;
@@ -69,11 +70,12 @@ final class AttackerSkillRegistryTest extends TestCase
         yield 'controller' => [new ControllerAttackerSkill(), ProjectFileType::CONTROLLER, 10, 'controller'];
         yield 'file_upload_controller' => [new ControllerFileUploadAttackerSkill(), ProjectFileType::CONTROLLER, 15, 'file_upload_controller'];
         yield 'controller_trust_boundary' => [new ControllerTrustBoundaryAttackerSkill(), ProjectFileType::CONTROLLER, 17, 'controller_trust_boundary'];
+        yield 'controller_easyadmin' => [new ControllerEasyAdminAttackerSkill(), ProjectFileType::CONTROLLER, 18, 'controller_easyadmin'];
         yield 'api_resource' => [new ApiResourceAttackerSkill(), ProjectFileType::API_RESOURCE, 20, 'api_resource'];
         yield 'live_component' => [new LiveComponentAttackerSkill(), ProjectFileType::LIVE_COMPONENT, 30, 'live_component'];
         yield 'authenticator' => [new AuthenticatorAttackerSkill(), ProjectFileType::AUTHENTICATOR, 40, 'authenticator'];
         yield 'ldap_service' => [new LdapServiceAttackerSkill(), ProjectFileType::LDAP_SERVICE, 42, 'ldap_service'];
-        yield 'admin_panel' => [new AdminPanelAttackerSkill(), ProjectFileType::ADMIN_PANEL, 45, 'admin_panel'];
+        yield 'sonata_admin' => [new SonataAdminAttackerSkill(), ProjectFileType::SONATA_ADMIN, 45, 'sonata_admin'];
         yield 'voter' => [new VoterAttackerSkill(), ProjectFileType::VOTER, 50, 'voter'];
         yield 'webhook_consumer' => [new WebhookConsumerAttackerSkill(), ProjectFileType::WEBHOOK_CONSUMER, 60, 'webhook_consumer'];
         yield 'messenger_handler' => [new MessengerHandlerAttackerSkill(), ProjectFileType::MESSENGER_HANDLER, 70, 'messenger_handler'];
@@ -109,7 +111,7 @@ final class AttackerSkillRegistryTest extends TestCase
 
         $output = $attackerSkillRegistry->render([], emitAll: true);
 
-        self::assertSame(24, substr_count($output, '<skills role="'));
+        self::assertSame(25, substr_count($output, '<skills role="'));
     }
 
     public function test_it_emits_blocks_in_attack_surface_priority_order(): void
@@ -124,11 +126,12 @@ final class AttackerSkillRegistryTest extends TestCase
             'controller',
             'file_upload_controller',
             'controller_trust_boundary',
+            'controller_easyadmin',
             'api_resource',
             'live_component',
             'authenticator',
             'ldap_service',
-            'admin_panel',
+            'sonata_admin',
             'voter',
             'webhook_consumer',
             'messenger_handler',
@@ -169,12 +172,12 @@ final class AttackerSkillRegistryTest extends TestCase
      */
     public static function everyFileTypeWithASkill(): iterable
     {
-        yield 'controller' => [ProjectFileType::CONTROLLER, ['controller', 'file_upload_controller', 'controller_trust_boundary']];
+        yield 'controller' => [ProjectFileType::CONTROLLER, ['controller', 'file_upload_controller', 'controller_trust_boundary', 'controller_easyadmin']];
         yield 'api_resource' => [ProjectFileType::API_RESOURCE, ['api_resource']];
         yield 'live_component' => [ProjectFileType::LIVE_COMPONENT, ['live_component']];
         yield 'authenticator' => [ProjectFileType::AUTHENTICATOR, ['authenticator']];
         yield 'ldap_service' => [ProjectFileType::LDAP_SERVICE, ['ldap_service']];
-        yield 'admin_panel' => [ProjectFileType::ADMIN_PANEL, ['admin_panel']];
+        yield 'sonata_admin' => [ProjectFileType::SONATA_ADMIN, ['sonata_admin']];
         yield 'voter' => [ProjectFileType::VOTER, ['voter']];
         yield 'webhook_consumer' => [ProjectFileType::WEBHOOK_CONSUMER, ['webhook_consumer']];
         yield 'messenger_handler' => [ProjectFileType::MESSENGER_HANDLER, ['messenger_handler']];
@@ -317,5 +320,18 @@ final class AttackerSkillRegistryTest extends TestCase
         $block = (new PhpAttackerSkill())->block();
 
         self::assertStringContainsString('RFC 2047', $block);
+    }
+
+    /**
+     * EasyAdminBundle's real field/action permission method is `setPermission()`
+     * (`Field::new('x')->setPermission('ROLE_ADMIN')`,
+     * `$actions->setPermission(Action::DELETE, 'ROLE_SUPER_ADMIN')`) — confirmed
+     * against the bundle's published security documentation.
+     */
+    public function test_easyadmin_skill_references_the_real_permission_method(): void
+    {
+        $block = (new ControllerEasyAdminAttackerSkill())->block();
+
+        self::assertStringContainsString('setPermission(', $block);
     }
 }
