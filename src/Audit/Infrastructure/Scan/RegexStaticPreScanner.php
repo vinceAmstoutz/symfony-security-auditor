@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 32;
+    public const int CACHE_VERSION = 30;
 
     /**
      * Detects the `s` (DOTALL) flag among a PCRE pattern's trailing modifier

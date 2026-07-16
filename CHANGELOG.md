@@ -155,48 +155,25 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   lives in `src/Audit/Infrastructure/Cache/FilesystemTriageMemoryStore.php` and
   `src/Audit/Application/Agent/Review/ReviewOutcomeRecorder.php`.
 
-- **The attacker now hunts LDAP injection in dedicated LDAP services.** A new
-  `ProjectFileType::LDAP_SERVICE` (an `Ldap`-suffixed file, an `/Ldap/`
-  directory, or `Symfony\Component\Ldap` usage) routes to
-  `LdapServiceAttackerSkill`, which hunts filters/DNs built by string
-  concatenation without `ldap_escape()` and `Ldap::bind()` calls with a variable
-  password that could be empty (anonymous-bind bypass).
-
-- **The attacker now hunts broken access control in Sonata Admin panels.** A new
-  `ProjectFileType::SONATA_ADMIN` (an `Admin`-suffixed file, an `/Admin/`
-  directory, or `extends AbstractAdmin`) routes to `SonataAdminAttackerSkill`,
-  which hunts `configureFormFields()`/`configureListFields()` exposing a
-  privileged field (`roles`, `password`, `isAdmin`) and admins with no
-  per-object ownership check guarding multi-tenant data. On SonataAdminBundle
-  4.x, `checkAccess()`/`hasAccess()` are `final` and can no longer be
-  overridden, so the skill looks for a dedicated Security Voter wired via
-  `getAccessMapping()` there, or an overridden `checkAccess()` on 3.x.
-
-- **The attacker now hunts the same gap in EasyAdmin CRUD controllers.** A new
-  `ProjectFileType::EASYADMIN_CRUD` (a `CrudController.php` suffix,
-  `extends AbstractCrudController`, or `implements CrudControllerInterface` —
-  stable across EasyAdmin 3.x/4.x/5.x) routes to
-  `ControllerEasyAdminAttackerSkill`, which hunts `configureFields()` fields
-  exposing `roles`/`password`/`isAdmin` with no `->setPermission('ROLE_...')`
-  scoping, and `configureActions()` leaving
-  `Action::DELETE`/`Action::BATCH_DELETE` unscoped.
+- **The attacker now hunts LDAP injection and broken access control in Sonata
+  Admin and EasyAdmin panels.** Three new dedicated `ProjectFileType` cases
+  route to `LdapServiceAttackerSkill`, `SonataAdminAttackerSkill`, and
+  `ControllerEasyAdminAttackerSkill`, which flag unescaped LDAP filter/DN
+  concatenation, admin panels exposing a privileged field (`roles`, `password`,
+  `isAdmin`) or missing per-object access control, and EasyAdmin actions left
+  unscoped by `->setPermission()`. On SonataAdminBundle 4.x, `checkAccess()`/
+  `hasAccess()` are `final`, so the skill looks for a dedicated Security Voter
+  instead of an overridden `checkAccess()`. `RegexStaticPreScanner` gained six
+  matching risk markers (`CACHE_VERSION` bumped to 30). Implementation lives in
+  `src/Audit/Domain/Model/ProjectFileType.php` and
+  `src/Audit/Infrastructure/Prompt/Skill/`.
 
 - **The attacker now hunts permissive Mercure topic scopes.** A new
-  `VulnerabilityType::PERMISSIVE_MERCURE_TOPIC_SELECTOR` (CWE-1220, OWASP
-  A02:2025 - Security Misconfiguration) covers a Mercure JWT
-  `publish`/`subscribe` claim scoped to `'*'` instead of specific topics; two
-  new `ConfigAttackerSkill`-backed `RegexStaticPreScanner` markers,
-  `mercure_default_jwt_secret` and `mercure_permissive_topic_claim`, flag the
-  recipe's unrotated default JWT secret and a wildcard topic claim.
-
-  `RegexStaticPreScanner` gained six risk markers across the four features above
-  (`CACHE_VERSION` bumped to 32): `ldap_unescaped_filter_concat`,
-  `ldap_bind_variable_password`, `sonata_admin_sensitive_field_exposed`,
-  `sonata_admin_batch_action`, `easyadmin_sensitive_field`,
-  `easyadmin_destructive_action`. Implementation lives in
-  `src/Audit/Domain/Model/ProjectFileType.php`,
-  `src/Audit/Domain/Model/ProjectFileTypeClassifier.php`,
-  `src/Audit/Infrastructure/Prompt/Skill/`, and
+  `VulnerabilityType::PERMISSIVE_MERCURE_TOPIC_SELECTOR` (CWE-1220) covers a JWT
+  `publish`/`subscribe` claim scoped to `'*'`; two new `RegexStaticPreScanner`
+  markers flag the recipe's default JWT secret placeholder and a wildcard topic
+  claim. Implementation lives in
+  `src/Audit/Infrastructure/Prompt/Skill/ConfigAttackerSkill.php` and
   `src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`.
 
 ### Fixed
