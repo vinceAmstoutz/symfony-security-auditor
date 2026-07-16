@@ -112,7 +112,7 @@ final readonly class BatchWindowResolver
             $llmResponse = LLMResponse::of(
                 $content,
                 $this->model,
-                'end_turn',
+                $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
                 TokenUsageSnapshot::of($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens),
             );
             $this->budgetTracker?->recordCall($llmResponse);

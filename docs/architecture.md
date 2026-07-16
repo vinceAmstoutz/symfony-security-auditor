@@ -615,9 +615,10 @@ above), `SequentialToolLoop` (the autonomous tool-using conversation behind
 `completeWithTools()`), `BatchWindowResolver` and `ToolConversationWavefront`
 (the `completeBatch()` / `completeBatchWithTools()` concurrency windows, falling
 back to the sequential paths on failure), `PlatformResultExtractor` (token
-usage, tool calls, text), `PlatformOptionsFactory` (temperature +
-Anthropic-dialect options), and `PlatformToolsMapper` (Domain `ToolDefinition` →
-platform `Tool` schema mapping).
+usage, tool calls, text, and the provider finish reason — warning when a
+response was truncated or content-filtered), `PlatformOptionsFactory`
+(temperature + Anthropic-dialect options), and `PlatformToolsMapper` (Domain
+`ToolDefinition` → platform `Tool` schema mapping).
 
 ### `LLMResponse`
 

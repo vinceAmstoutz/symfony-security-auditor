@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
+use Symfony\AI\Platform\Exception\ServerException;
 use Throwable;
 
 use function Symfony\Component\String\u;
@@ -74,6 +75,10 @@ final readonly class TransientFailureClassifier
 
     public function isTransient(Throwable $throwable): bool
     {
+        if ($throwable instanceof ServerException) {
+            return true;
+        }
+
         $joined = $this->joinMessages($throwable);
 
         if (u($joined)->containsAny(self::NON_TRANSIENT_HINTS) || $this->containsStatusCode($joined, self::NON_TRANSIENT_STATUS_CODES)) {

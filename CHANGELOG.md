@@ -12,6 +12,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **Truncated and content-filtered LLM responses are now called out
+  explicitly.** `symfony/ai` 0.11 exposes a normalized `finish_reason` on every
+  platform result; `PlatformResultExtractor` now reads it, so `LLMResponse`
+  carries the real provider stop reason (e.g. `max_tokens`) instead of a
+  hard-coded `end_turn`, and the auditor logs an actionable
+  `LLM response was truncated by the output token limit` warning (pointing at
+  `max_output_tokens`) when a response was truncated, or a
+  `suppressed by the provider content filter` warning when the provider filtered
+  it out — both previously surfaced only as silent finding loss or empty-chunk
+  noise. `TransientFailureClassifier` additionally recognizes symfony/ai's typed
+  `ServerException` (HTTP 5xx) as transient, so server-side hiccups are retried
+  even when the provider's error wording matches no known heuristic.
+
 - **MiniMax is now a first-class provider.** `symfony/ai-bundle` 0.11 ships a
   `minimax` platform configuration backed by the new
   `symfony/ai-mini-max-platform` bridge, so the auditor can run on
