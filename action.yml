@@ -95,9 +95,18 @@ runs:
       shell: bash
       env:
         SSA_INSTALL_DIR: ${{ github.action_path }}/.bin
+        SSA_ACTION_REF: ${{ github.action_ref }}
       run: |
         set -euo pipefail
-        curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | sh
+        # Run the install script from this action's own checkout, not a live
+        # fetch of main — a pinned `uses: …@<ref>` must not execute whatever
+        # install.sh currently is on main. When pinned to a release tag, install
+        # that exact version's binary; branch/sha pins fall back to the latest
+        # release (no binary is published per arbitrary ref).
+        if printf '%s' "$SSA_ACTION_REF" | grep -qE '^v?[0-9]+\.[0-9]+\.[0-9]+$'; then
+          export SSA_VERSION="${SSA_ACTION_REF#v}"
+        fi
+        sh "$GITHUB_ACTION_PATH/install.sh"
         echo "$SSA_INSTALL_DIR" >> "$GITHUB_PATH"
 
     - name: Configure the standalone binary
@@ -130,12 +139,15 @@ runs:
         # shellcheck disable=SC2206 -- intentional word-splitting of caller-supplied extra args
         if [ -n "$SSA_EXTRA_ARGS" ]; then args+=($SSA_EXTRA_ARGS); fi
 
+        # Capture the audit exit code without letting the inherited errexit
+        # abort before the outputs below are written — the fail-on gate exit 1
+        # (and budget-abort exit 2) are the cases those outputs exist to report.
+        exit_code=0
         if [ "$SSA_MODE" = "standalone" ]; then
-          symfony-security-auditor audit "${args[@]}"
+          symfony-security-auditor audit "${args[@]}" || exit_code=$?
         else
-          php bin/console audit:run "${args[@]}"
+          php bin/console audit:run "${args[@]}" || exit_code=$?
         fi
-        exit_code=$?
 
         echo "exit-code=$exit_code" >> "$GITHUB_OUTPUT"
         echo "report-path=$SSA_OUTPUT" >> "$GITHUB_OUTPUT"

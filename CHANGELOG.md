@@ -208,6 +208,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   prompts with no bound, an unbounded cross-run prompt-injection surface for a
   hostile audited repository; the structured path's schema cap now applies to
   both paths.
+- **The GitHub Action now writes its step outputs even when the audit fails.**
+  The `Run security audit` step's `set -uo pipefail` did not clear the errexit
+  (`-e`) GitHub injects into composite `bash` steps, so a non-zero audit exit —
+  the fail-on gate (1) or budget abort (2), the very cases the outputs exist to
+  report — aborted the step before the `$GITHUB_OUTPUT` writes. `exit-code`
+  could therefore only ever be `0` or empty and `findings-count` /
+  `highest-severity` were never set on a failing run. The audit exit code is
+  now captured with `|| exit_code=$?` so every output is written before the
+  step exits with the audit's real code.
+- **The GitHub Action's `standalone` mode now respects the pinned action
+  version instead of always running `main`.** The install step piped
+  `install.sh` from `main` (`raw.githubusercontent.com/.../main/install.sh`)
+  and never set `SSA_VERSION`, so a workflow pinned to `@<tag>`/`@<sha>` still
+  executed whatever `install.sh` was on `main` and installed the latest release
+  binary. It now runs the `install.sh` from the action's own checkout
+  (`$GITHUB_ACTION_PATH`) and, when pinned to a release tag, installs that exact
+  version's binary (branch/sha pins fall back to the latest release, since no
+  binary is published per arbitrary ref).
 - **`self-update` no longer risks destroying the PHP interpreter when run
   outside the standalone binary.** `RunningBinaryLocator::path()`
   (`src/Audit/Infrastructure/SelfUpdate/RunningBinaryLocator.php`) returned
