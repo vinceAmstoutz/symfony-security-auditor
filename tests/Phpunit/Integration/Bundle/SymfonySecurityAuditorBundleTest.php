@@ -1099,6 +1099,13 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertSame('direct', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
     }
 
+    public function test_bundle_accepts_an_explicit_none_since_closure(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['since_closure' => 'none']]);
+
+        self::assertSame('none', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
+    }
+
     public function test_bundle_rejects_an_invalid_since_closure(): void
     {
         $this->expectException(Throwable::class);

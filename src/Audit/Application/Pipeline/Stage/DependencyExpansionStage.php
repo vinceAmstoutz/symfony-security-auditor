@@ -62,10 +62,10 @@ final readonly class DependencyExpansionStage implements StageInterface
         }
 
         $projectFiles = $auditContext->projectFiles();
-        $changedVoterAttributes = $this->changedVoterAttributes($projectFiles, $mapping->voterCapabilities());
+        $changedPaths = array_flip(array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFiles));
+        $changedVoterAttributes = $this->changedVoterAttributes($changedPaths, $mapping->voterCapabilities());
         $guardedPaths = $this->guardedControllerPaths($mapping->routeAccessControls(), $changedVoterAttributes);
 
-        $changedPaths = array_flip(array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFiles));
         $newPaths = array_values(array_filter($guardedPaths, static fn (string $path): bool => !\array_key_exists($path, $changedPaths)));
 
         $added = $this->resolveFiles($newPaths, $auditContext->mappingFiles());
@@ -83,21 +83,16 @@ final readonly class DependencyExpansionStage implements StageInterface
     }
 
     /**
-     * @param list<ProjectFile>     $projectFiles
+     * @param array<string, int>    $changedPaths
      * @param list<VoterCapability> $voterCapabilities
      *
      * @return list<string>
      */
-    private function changedVoterAttributes(array $projectFiles, array $voterCapabilities): array
+    private function changedVoterAttributes(array $changedPaths, array $voterCapabilities): array
     {
-        $changedVoterPaths = array_flip(array_map(
-            static fn (ProjectFile $projectFile): string => $projectFile->relativePath(),
-            array_filter($projectFiles, static fn (ProjectFile $projectFile): bool => $projectFile->isVoter()),
-        ));
-
         $attributes = [];
         foreach ($voterCapabilities as $voterCapability) {
-            if (\array_key_exists($voterCapability->filePath(), $changedVoterPaths)) {
+            if (\array_key_exists($voterCapability->filePath(), $changedPaths)) {
                 $attributes = [...$attributes, ...$voterCapability->supportedAttributes()];
             }
         }
