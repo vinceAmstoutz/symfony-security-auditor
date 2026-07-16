@@ -224,6 +224,11 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringContainsString('authenticator_bypass', $prompt);
         self::assertStringContainsString('host_header_injection', $prompt);
         self::assertStringContainsString('trusted_proxy_misconfiguration', $prompt);
+        self::assertStringContainsString('weak_password_hashing', $prompt);
+        self::assertStringContainsString('permissive_cors_origin', $prompt);
+        self::assertStringContainsString('weak_content_security_policy', $prompt);
+        self::assertStringContainsString('missing_transport_security', $prompt);
+        self::assertStringContainsString('debug_mode_enabled', $prompt);
     }
 
     public function test_decision_rules_restrict_rejection_to_a_named_mitigating_control(): void

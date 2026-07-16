@@ -253,7 +253,7 @@ Fields: `id`, `type` (enum), `severity` (enum), `title`, `description`,
 
 ### `VulnerabilityType` — backed enum with OWASP and CWE references
 
-42 cases in six categories:
+47 cases in six categories:
 
 | Category              | Examples                                                                   |
 | --------------------- | -------------------------------------------------------------------------- |

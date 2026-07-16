@@ -58,6 +58,33 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `fail-on` input (previously reachable only through `extra-args`).
   Implementation lives in `action.yml`.
 
+- **The attacker now hunts weak password hashing, permissive CORS, weak CSP,
+  missing HSTS, and debug mode left enabled.** Five new `VulnerabilityType`
+  cases — `weak_password_hashing` (CWE-916), `permissive_cors_origin` (CWE-942),
+  `weak_content_security_policy` (CWE-693), `missing_transport_security`
+  (CWE-319), and `debug_mode_enabled` (CWE-489), all under OWASP A02:2025 -
+  Security Misconfiguration except `weak_password_hashing` (OWASP A04:2025 -
+  Cryptographic Failures). `RegexStaticPreScanner` gained six matching `CONFIG`
+  risk markers (`CACHE_VERSION` bumped to 29): `weak_password_hasher_algorithm`
+  flags `security.password_hashers.*.algorithm` set to `plaintext`, `md5`, or
+  `sha1` instead of `auto`; `remember_me_secure_false` flags a `remember_me`
+  firewall cookie configured with `secure: false`;
+  `unanchored_cors_origin_regex` flags NelmioCors `origin_regex: true`,
+  prompting a check that every `allow_origin` pattern is anchored with `^...$`
+  (an unanchored regex matches as a substring and can allow unintended origins);
+  `csp_unsafe_inline_or_eval` flags a Content-Security-Policy directive allowing
+  `'unsafe-inline'` or `'unsafe-eval'`; `hsts_disabled` flags NelmioSecurity
+  `forced_ssl.enabled: false`; `app_debug_enabled` flags `APP_DEBUG=1`/`=true`
+  in a dotenv file. `ConfigAttackerSkill` gained matching hunt bullets, and
+  `AuthenticatorAttackerSkill`'s blanket "do not flag `RememberMeBadge`"
+  carve-out was narrowed to only exempt conditionally-attached badges — a
+  `RememberMeBadge` attached unconditionally (not gated on a user-submitted
+  "remember me" flag) is now flagged, since it issues a long-lived
+  authentication cookie for every login regardless of consent. Implementation
+  lives in `src/Audit/Domain/Model/VulnerabilityType.php`,
+  `src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`, and
+  `src/Audit/Infrastructure/Prompt/Skill/`.
+
 ### Fixed
 
 - **The native Windows binary is published with releases again.**

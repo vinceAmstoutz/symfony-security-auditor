@@ -45,9 +45,10 @@ final readonly class AuthenticatorAttackerSkill implements AttackerSkillInterfac
             - Missing `CsrfTokenBadge` on form-based login authenticators where CSRF was previously enforced.
             - OAuth/OIDC handlers omitting `state` parameter verification (CSRF on auth callback) or PKCE for public clients.
             - `UserBadge::setUserLoader()` query running with a user-controlled `identifier` without normalization (`User WHERE email = :id` accepting wildcards/case-insensitive variants).
+            - `RememberMeBadge` attached unconditionally — not gated on a user-submitted "remember me" request parameter — issuing a long-lived authentication cookie for every login regardless of consent.
             Do NOT flag:
             - Authenticators that explicitly throw `AuthenticationException` on missing credentials.
-            - `RememberMeBadge` on long-lived auth — that is the documented opt-in pattern.
+            - `RememberMeBadge` conditionally attached based on a user-submitted "remember me" flag — that is the documented opt-in pattern.
             </skills>
             SKILL;
     }

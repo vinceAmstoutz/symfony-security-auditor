@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 27;
+    public const int CACHE_VERSION = 29;
 
     /**
      * Detects the `s` (DOTALL) flag among a PCRE pattern's trailing modifier
@@ -286,6 +286,30 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'trusted_proxies_wildcard' => [
                 'regex' => '/(?:trusted_proxies\s*:|TRUSTED_PROXIES\s*=)\s*[\'"]?(?:0\.0\.0\.0\/0|::\/0)/i',
                 'description' => 'trusted_proxies set to a wildcard CIDR (0.0.0.0/0, ::/0) — any client can spoof X-Forwarded-* headers, defeating IP allowlists and rate limiters',
+            ],
+            'weak_password_hasher_algorithm' => [
+                'regex' => '/password_hashers\b[\s\S]{0,300}?algorithm\s*:\s*[\'"]?(?:plaintext|md5|sha1)[\'"]?/si',
+                'description' => 'password_hashers using a weak algorithm (plaintext/md5/sha1) — use auto (bcrypt/argon2id) instead',
+            ],
+            'remember_me_secure_false' => [
+                'regex' => '/remember_me\b[\s\S]{0,300}?secure\s*:\s*false/s',
+                'description' => 'remember_me cookie secure: false — long-lived authentication cookie sent over plain HTTP',
+            ],
+            'unanchored_cors_origin_regex' => [
+                'regex' => '/origin_regex\s*:\s*true/',
+                'description' => 'NelmioCors origin_regex: true — verify every allow_origin pattern is anchored (^...$); an unanchored regex matches as a substring and can allow unintended origins',
+            ],
+            'csp_unsafe_inline_or_eval' => [
+                'regex' => '/[\'"]unsafe-(?:inline|eval)[\'"]/',
+                'description' => "Content-Security-Policy directive allows 'unsafe-inline'/'unsafe-eval' — defeats CSP's main protection against script injection",
+            ],
+            'hsts_disabled' => [
+                'regex' => '/forced_ssl\b[\s\S]{0,100}?enabled\s*:\s*false/s',
+                'description' => 'NelmioSecurity forced_ssl.enabled: false — HSTS not enforced, leaving the app open to SSL-stripping on the first plaintext request',
+            ],
+            'app_debug_enabled' => [
+                'regex' => '/^APP_DEBUG\s*=\s*(?:1|true)\s*$/i',
+                'description' => 'APP_DEBUG enabled — verify this is not a committed base .env (debug mode in production leaks stack traces, source, and container internals)',
             ],
         ],
         ProjectFileType::AUTHENTICATOR->value => [

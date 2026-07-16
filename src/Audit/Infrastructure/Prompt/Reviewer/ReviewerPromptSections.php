@@ -89,7 +89,9 @@ final readonly class ReviewerPromptSections implements ReviewerPromptSectionsInt
         log_injection, path_traversal, ssrf, xxe, open_redirect, weak_cryptography, insecure_random,
         hardcoded_secret, missing_signature_verification, messenger_handler_unsafe, missing_rate_limiting,
         cache_poisoning, mailer_header_injection, webhook_replay, authenticator_bypass,
-        over_permissive_serializer_group, host_header_injection, trusted_proxy_misconfiguration
+        over_permissive_serializer_group, host_header_injection, trusted_proxy_misconfiguration,
+        weak_password_hashing, permissive_cors_origin, weak_content_security_policy,
+        missing_transport_security, debug_mode_enabled
         SCHEMA;
 
     private const string DECISION_RULES = <<<'RULES'
