@@ -27,6 +27,7 @@ final class AuditProfileTest extends TestCase
      *     poCSynthesis: bool,
      *     reviewerMaxConcurrent: int,
      *     attackerMaxConcurrent: int,
+     *     sinceClosure: string,
      * } $expected
      */
     #[DataProvider('profileDefaults')]
@@ -40,6 +41,7 @@ final class AuditProfileTest extends TestCase
         self::assertSame($expected['poCSynthesis'], $auditProfile->poCSynthesisEnabled());
         self::assertSame($expected['reviewerMaxConcurrent'], $auditProfile->reviewerMaxConcurrent());
         self::assertSame($expected['attackerMaxConcurrent'], $auditProfile->attackerMaxConcurrent());
+        self::assertSame($expected['sinceClosure'], $auditProfile->sinceClosure());
     }
 
     /**
@@ -50,6 +52,7 @@ final class AuditProfileTest extends TestCase
      *     poCSynthesis: bool,
      *     reviewerMaxConcurrent: int,
      *     attackerMaxConcurrent: int,
+     *     sinceClosure: string,
      * }}>
      */
     public static function profileDefaults(): iterable
@@ -61,6 +64,7 @@ final class AuditProfileTest extends TestCase
             'poCSynthesis' => false,
             'reviewerMaxConcurrent' => 4,
             'attackerMaxConcurrent' => 4,
+            'sinceClosure' => 'none',
         ]];
         yield 'balanced' => [AuditProfile::Balanced, [
             'maxIterations' => 3,
@@ -69,6 +73,7 @@ final class AuditProfileTest extends TestCase
             'poCSynthesis' => false,
             'reviewerMaxConcurrent' => 1,
             'attackerMaxConcurrent' => 1,
+            'sinceClosure' => 'none',
         ]];
         yield 'thorough' => [AuditProfile::Thorough, [
             'maxIterations' => 3,
@@ -77,6 +82,7 @@ final class AuditProfileTest extends TestCase
             'poCSynthesis' => true,
             'reviewerMaxConcurrent' => 1,
             'attackerMaxConcurrent' => 1,
+            'sinceClosure' => 'direct',
         ]];
     }
 }

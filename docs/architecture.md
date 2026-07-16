@@ -66,7 +66,7 @@ src/
 │   │       └── Tool/    # ToolInterface, ToolDefinition, ToolRegistry, ToolRegistryFactoryInterface
 │   ├── Application/     # Orchestration — no I/O, depends only on Domain
 │   │   ├── UseCase/     # Entry points: RunAuditUseCase, EstimateAuditCostUseCase
-│   │   ├── Pipeline/    # AuditPipeline + Stage/{IngestionStage, MappingStage, AuditStage, PoCSynthesisStage}
+│   │   ├── Pipeline/    # AuditPipeline + Stage/{IngestionStage, MappingStage, DependencyExpansionStage, AuditStage, PoCSynthesisStage}
 │   │   └── Agent/       # AttackerAgent (+ Chunk/* collaborators),
 │   │                      ReviewerAgent (+ Review/* collaborators),
 │   │                      EscalatingAttackerAgent,
@@ -150,6 +150,7 @@ flowchart TD
     UC["RunAuditUseCase::execute()\ncreate AuditContext · call pipeline · seal report"]
     ING["IngestionStage\nProjectFileScanner::scan()\nsetProjectFiles()"]
     MAP["MappingStage\nclassify files into roles\nbuild SymfonyMapping · setMapping()"]
+    DEP["DependencyExpansionStage (optional)\nwiden --since diff by changed\nvoters' guarded controllers"]
     AUD["AuditStage\nAuditOrchestrator::orchestrate()"]
     ATK["AttackerAgent::analyze()\noptional pre-scan · chunk by feature\nLLM call per chunk · parse JSON"]
     CONF{"confidence ≥ 0.6?"}
@@ -161,7 +162,7 @@ flowchart TD
     RENDER["ReportRenderer\nrenderConsole() or renderJson()"]
 
     CLI --> CMD --> UC
-    UC --> ING --> MAP --> AUD --> ATK
+    UC --> ING --> MAP --> DEP --> AUD --> ATK
     ATK --> CONF
     CONF -- yes --> REV --> DEDUP --> LOOP
     CONF -- none pass --> POC
@@ -184,7 +185,7 @@ AuditContext {
   projectPath: string           (immutable, set at construction)
   auditId: string               (immutable, generated: AUDIT-{8hex})
   startedAt: DateTimeImmutable  (immutable, set at construction)
-  projectFiles: list<ProjectFile>   (set by IngestionStage)
+  projectFiles: list<ProjectFile>   (set by IngestionStage, optionally widened by DependencyExpansionStage)
   mapping: SymfonyMapping|null      (set by MappingStage)
   vulnerabilities: array<id, Vulnerability>  (accumulated by AuditStage)
   metadata: array<string, mixed>    (arbitrary stage metadata)
@@ -378,6 +379,16 @@ list-form and scalar `roles`, `allow_if` expressions,
 `methods`/`ips`/`requires_channel` constraints, `when@<env>` overrides, and
 firewall `security: false` / `stateless` flags all land in the map the attacker
 prompt renders.
+
+**`DependencyExpansionStage`** — no-op unless `audit.since_closure: direct` and
+a `--since` diff-mode run is active (`AuditContext::diffSinceRef() !== null`).
+When both hold, reads the `AccessControlMap` `MappingStage` just built from the
+full project scope, finds every changed file in `AuditContext::projectFiles()`
+that is a voter, collects the attributes its `supports()` accepts, and widens
+`projectFiles()` with any controller (resolved from `mappingFiles()`, the full
+scan scope) whose `#[IsGranted]` attribute matches one of those — so a voter
+edit that silently weakens an unrelated controller's access control is still
+caught by a diff-scoped CI run. Sets `dependency_expansion.files_added`.
 
 **`AuditStage`** — delegates entirely to
 `AuditOrchestrator::orchestrate(AuditContext)`.

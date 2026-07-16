@@ -54,6 +54,7 @@ final readonly class AuditExecutionConfiguration
         public array $excludedTypes = [],
         public array $includedTypes = [],
         public array $customSkills = [],
+        public string $sinceClosure = 'none',
     ) {
         if (!is_finite($minConfidence) || $minConfidence < 0.0 || $minConfidence > 1.0) {
             throw InvalidAuditExecutionConfigurationException::forOutOfRangeMinConfidence($minConfidence);

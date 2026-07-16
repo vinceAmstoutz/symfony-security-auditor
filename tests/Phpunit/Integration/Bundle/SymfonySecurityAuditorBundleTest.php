@@ -40,6 +40,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerLlmColl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EscalatingAttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
@@ -89,6 +93,27 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $kernel = $this->boot(['model' => 'gpt-4o']);
 
         self::assertInstanceOf(AuditCommand::class, $this->getPrivateService($kernel, AuditCommand::class));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(1500)]
+    public function test_bundle_wires_dependency_expansion_stage_between_mapping_and_audit(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        $auditPipeline = $this->getPrivateService($kernel, AuditPipeline::class);
+        self::assertInstanceOf(AuditPipeline::class, $auditPipeline);
+
+        $stageClasses = array_map(static fn (object $stage): string => $stage::class, $auditPipeline->stages());
+        $mappingIndex = array_search(MappingStage::class, $stageClasses, true);
+        $dependencyExpansionIndex = array_search(DependencyExpansionStage::class, $stageClasses, true);
+        $auditIndex = array_search(AuditStage::class, $stageClasses, true);
+
+        self::assertNotFalse($mappingIndex);
+        self::assertNotFalse($dependencyExpansionIndex);
+        self::assertNotFalse($auditIndex);
+        self::assertGreaterThan($mappingIndex, $dependencyExpansionIndex);
+        self::assertLessThan($auditIndex, $dependencyExpansionIndex);
     }
 
     #[RunInSeparateProcess]
@@ -1060,6 +1085,34 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.fix_synthesis.enabled'));
     }
 
+    public function test_bundle_defaults_since_closure_to_none(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        self::assertSame('none', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
+    }
+
+    public function test_bundle_accepts_a_direct_since_closure(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['since_closure' => 'direct']]);
+
+        self::assertSame('direct', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
+    }
+
+    public function test_bundle_accepts_an_explicit_none_since_closure(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['since_closure' => 'none']]);
+
+        self::assertSame('none', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
+    }
+
+    public function test_bundle_rejects_an_invalid_since_closure(): void
+    {
+        $this->expectException(Throwable::class);
+
+        $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['since_closure' => 'feature']]);
+    }
+
     public function test_bundle_derives_advisory_cache_dir_from_cache_dir(): void
     {
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'cache' => ['dir' => '/custom/cache']]);
@@ -1262,6 +1315,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.poc_synthesis.enabled'));
         self::assertSame(4, $containerBuilder->getParameter('symfony_security_auditor.audit.reviewer_max_concurrent'));
         self::assertSame(4, $containerBuilder->getParameter('symfony_security_auditor.audit.attacker_max_concurrent'));
+        self::assertSame('none', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
     }
 
     public function test_bundle_thorough_profile_enables_poc_synthesis(): void
@@ -1270,6 +1324,20 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.poc_synthesis.enabled'));
         self::assertSame(3, $containerBuilder->getParameter('symfony_security_auditor.audit.max_iterations'));
+    }
+
+    public function test_bundle_thorough_profile_widens_since_closure_to_direct(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'profile' => 'thorough']);
+
+        self::assertSame('direct', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
+    }
+
+    public function test_bundle_explicit_since_closure_overrides_the_thorough_profile(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'profile' => 'thorough', 'audit' => ['since_closure' => 'none']]);
+
+        self::assertSame('none', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
     }
 
     public function test_bundle_explicit_key_overrides_the_profile(): void

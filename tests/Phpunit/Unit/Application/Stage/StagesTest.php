@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentCo
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerModeConfiguration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
@@ -548,6 +549,232 @@ final class StagesTest extends TestCase
         self::assertCount(1, $mapping->routeAccessControls());
         self::assertSame('checkout', $mapping->routeAccessControls()[0]->methodName());
         self::assertCount(1, $mapping->formBindingsForController('src/Twig/Components/Cart.php'));
+    }
+
+    public function test_dependency_expansion_stage_has_correct_name(): void
+    {
+        $dependencyExpansionStage = new DependencyExpansionStage(new NullLogger());
+
+        self::assertSame('dependency_expansion', $dependencyExpansionStage->name());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_dependency_expansion_stage_does_nothing_when_since_closure_is_none(): void
+    {
+        $dependencyExpansionStage = new DependencyExpansionStage(new NullLogger(), 'none');
+        $auditContext = $this->auditContextForDependencyExpansion();
+
+        $dependencyExpansionStage->process($auditContext);
+
+        self::assertCount(1, $auditContext->projectFiles());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_dependency_expansion_stage_does_nothing_when_not_in_diff_mode(): void
+    {
+        $dependencyExpansionStage = new DependencyExpansionStage(new NullLogger(), 'direct');
+        $auditContext = $this->auditContextForDependencyExpansion(diffSinceRef: null);
+
+        $dependencyExpansionStage->process($auditContext);
+
+        self::assertCount(1, $auditContext->projectFiles());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_dependency_expansion_stage_adds_controllers_guarded_by_a_changed_voter(): void
+    {
+        $dependencyExpansionStage = new DependencyExpansionStage(new NullLogger(), 'direct');
+        $auditContext = $this->auditContextForDependencyExpansion();
+
+        $dependencyExpansionStage->process($auditContext);
+
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles());
+        self::assertContains('src/Controller/PostController.php', $paths);
+        self::assertNotContains('src/Controller/UnrelatedController.php', $paths);
+        self::assertSame(1, $auditContext->getMeta('dependency_expansion.files_added'));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_dependency_expansion_stage_accumulates_paths_across_multiple_changed_voters_and_attributes(): void
+    {
+        $postVoter = ProjectFile::create('src/Security/PostVoter.php', '/app/PV', '<?php class PostVoter {}');
+        $commentVoter = ProjectFile::create('src/Security/CommentVoter.php', '/app/CV', '<?php class CommentVoter {}');
+        $alreadyChanged = ProjectFile::create('src/Service/Mailer.php', '/app/M', '<?php class Mailer {}');
+
+        $postEditController = ProjectFile::create('src/Controller/PostEditController.php', '/app/PEC', '<?php class PostEditController {}');
+        $postViewController = ProjectFile::create('src/Controller/PostViewController.php', '/app/PVC', '<?php class PostViewController {}');
+        $commentController = ProjectFile::create('src/Controller/CommentController.php', '/app/CC', '<?php class CommentController {}');
+        $unrelatedController = ProjectFile::create('src/Controller/UnrelatedController.php', '/app/UC', '<?php class UnrelatedController {}');
+
+        $auditContext = AuditContext::forProject($this->tmpDir, [], false, 'main');
+        $auditContext->setProjectFiles([$postVoter, $commentVoter, $alreadyChanged]);
+        $auditContext->setMappingFiles([
+            $postVoter, $commentVoter, $alreadyChanged,
+            $postEditController, $postViewController, $commentController, $unrelatedController,
+        ]);
+        $auditContext->setMapping(SymfonyMapping::of(
+            ProjectFileInventory::fromFiles([
+                $postVoter, $commentVoter, $alreadyChanged,
+                $postEditController, $postViewController, $commentController, $unrelatedController,
+            ]),
+            new AccessControlMap(
+                routeAccessControls: [
+                    new RouteAccessControl('src/Controller/PostEditController.php', 'edit', '/posts/edit', ['POST'], true, ['EDIT'], false, false),
+                    new RouteAccessControl('src/Controller/PostViewController.php', 'view', '/posts/view', ['GET'], true, ['VIEW'], false, false),
+                    new RouteAccessControl('src/Controller/CommentController.php', 'delete', '/comments/delete', ['POST'], true, ['DELETE'], false, false),
+                    new RouteAccessControl('src/Controller/UnrelatedController.php', 'index', '/unrelated', ['GET'], true, ['VIEW_UNRELATED'], false, false),
+                ],
+                voterCapabilities: [
+                    new VoterCapability('src/Security/PostVoter.php', 'PostVoter', ['EDIT', 'VIEW'], ['Post']),
+                    new VoterCapability('src/Security/CommentVoter.php', 'CommentVoter', ['DELETE'], ['Comment']),
+                ],
+            ),
+        ));
+
+        $dependencyExpansionStage = new DependencyExpansionStage(new NullLogger(), 'direct');
+        $dependencyExpansionStage->process($auditContext);
+
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles());
+        self::assertCount(6, $paths);
+        self::assertContains('src/Security/PostVoter.php', $paths);
+        self::assertContains('src/Security/CommentVoter.php', $paths);
+        self::assertContains('src/Service/Mailer.php', $paths);
+        self::assertContains('src/Controller/PostEditController.php', $paths);
+        self::assertContains('src/Controller/PostViewController.php', $paths);
+        self::assertContains('src/Controller/CommentController.php', $paths);
+        self::assertNotContains('src/Controller/UnrelatedController.php', $paths);
+        self::assertSame(3, $auditContext->getMeta('dependency_expansion.files_added'));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_dependency_expansion_stage_does_not_duplicate_a_guarded_controller_already_in_the_diff(): void
+    {
+        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/V', '<?php class PostVoter {}');
+        $controllerFile = ProjectFile::create('src/Controller/PostController.php', '/app/C', '<?php class PostController {}');
+
+        $auditContext = AuditContext::forProject($this->tmpDir, [], false, 'main');
+        $auditContext->setProjectFiles([$projectFile, $controllerFile]);
+        $auditContext->setMappingFiles([$projectFile, $controllerFile]);
+        $auditContext->setMapping(SymfonyMapping::of(
+            ProjectFileInventory::fromFiles([$projectFile, $controllerFile]),
+            new AccessControlMap(
+                routeAccessControls: [new RouteAccessControl('src/Controller/PostController.php', 'edit', '/posts/edit', ['POST'], true, ['EDIT'], false, false)],
+                voterCapabilities: [new VoterCapability('src/Security/PostVoter.php', 'PostVoter', ['EDIT'], ['Post'])],
+            ),
+        ));
+
+        $dependencyExpansionStage = new DependencyExpansionStage(new NullLogger(), 'direct');
+        $dependencyExpansionStage->process($auditContext);
+
+        self::assertCount(2, $auditContext->projectFiles());
+        self::assertNull($auditContext->getMeta('dependency_expansion.files_added'));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_dependency_expansion_stage_ignores_a_changed_controller_with_no_changed_voter(): void
+    {
+        $projectFile = ProjectFile::create('src/Controller/PostController.php', '/app/C', '<?php class PostController {}');
+        $voterFile = ProjectFile::create('src/Security/PostVoter.php', '/app/V', '<?php class PostVoter {}');
+
+        $auditContext = AuditContext::forProject($this->tmpDir, [], false, 'main');
+        $auditContext->setProjectFiles([$projectFile]);
+        $auditContext->setMappingFiles([$projectFile, $voterFile]);
+        $auditContext->setMapping(SymfonyMapping::of(
+            ProjectFileInventory::fromFiles([$projectFile, $voterFile]),
+            new AccessControlMap(
+                routeAccessControls: [new RouteAccessControl('src/Controller/PostController.php', 'edit', '/posts/edit', ['POST'], true, ['EDIT'], false, false)],
+                voterCapabilities: [new VoterCapability('src/Security/PostVoter.php', 'PostVoter', ['EDIT'], ['Post'])],
+            ),
+        ));
+
+        $dependencyExpansionStage = new DependencyExpansionStage(new NullLogger(), 'direct');
+        $dependencyExpansionStage->process($auditContext);
+
+        self::assertCount(1, $auditContext->projectFiles());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_dependency_expansion_stage_does_nothing_without_a_mapping(): void
+    {
+        $dependencyExpansionStage = new DependencyExpansionStage(new NullLogger(), 'direct');
+        $auditContext = AuditContext::forProject($this->tmpDir, [], false, 'main');
+        // No mapping set
+
+        $dependencyExpansionStage->process($auditContext);
+
+        self::assertNull($auditContext->getMeta('dependency_expansion.files_added'));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_dependency_expansion_stage_logs_info_on_completion(): void
+    {
+        $infoLogs = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            static function (string $message, array $ctx = []) use (&$infoLogs): void {
+                $infoLogs[] = [$message, $ctx];
+            },
+        );
+
+        $dependencyExpansionStage = new DependencyExpansionStage($logger, 'direct');
+        $auditContext = $this->auditContextForDependencyExpansion();
+
+        $dependencyExpansionStage->process($auditContext);
+
+        self::assertSame(
+            ['Dependency expansion complete', ['changed_voter_attributes' => ['EDIT'], 'files_added' => 1]],
+            $infoLogs[0],
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    private function auditContextForDependencyExpansion(?string $diffSinceRef = 'main'): AuditContext
+    {
+        $projectFile = ProjectFile::create('src/Security/PostVoter.php', '/app/V', '<?php class PostVoter {}');
+        $guardedController = ProjectFile::create('src/Controller/PostController.php', '/app/C', '<?php class PostController {}');
+        $unrelatedController = ProjectFile::create('src/Controller/UnrelatedController.php', '/app/U', '<?php class UnrelatedController {}');
+
+        $auditContext = AuditContext::forProject($this->tmpDir, [], false, $diffSinceRef);
+        $auditContext->setProjectFiles([$projectFile]);
+        $auditContext->setMappingFiles([$projectFile, $guardedController, $unrelatedController]);
+        $auditContext->setMapping(SymfonyMapping::of(
+            ProjectFileInventory::fromFiles([$projectFile, $guardedController, $unrelatedController]),
+            new AccessControlMap(
+                routeAccessControls: [
+                    new RouteAccessControl('src/Controller/PostController.php', 'edit', '/posts/edit', ['POST'], true, ['EDIT'], false, false),
+                    new RouteAccessControl('src/Controller/UnrelatedController.php', 'view', '/unrelated', ['GET'], true, ['VIEW'], false, false),
+                ],
+                voterCapabilities: [new VoterCapability('src/Security/PostVoter.php', 'PostVoter', ['EDIT'], ['Post'])],
+            ),
+        ));
+
+        return $auditContext;
     }
 
     public function test_audit_stage_has_correct_name(): void

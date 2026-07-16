@@ -79,6 +79,7 @@ final readonly class ContainerParameterRegistrar
             'audit.reviewer_max_tool_iterations' => $audit->reviewerMaxToolIterations,
             'audit.baseline' => $audit->baseline,
             'audit.fail_on' => $audit->failOn->value,
+            'audit.since_closure' => $audit->sinceClosure,
             'audit.excluded_types' => $audit->excludedTypes,
             'audit.included_types' => $audit->includedTypes,
             'audit.reviewer_max_concurrent' => $audit->reviewerMaxConcurrent,
