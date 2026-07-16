@@ -148,11 +148,12 @@ deprecated by the other.
 ### GitHub Action
 
 - The composite action defined by `action.yml` at the repository root and its
-  input names: `project-path`, `format`, `output`, `baseline`,
-  `generate-baseline`, `since`, `extra-args`, `php-version`, `setup-php`,
-  `install-dependencies`, `working-directory`. New inputs may be added in a
-  `MINOR`; renaming or removing one is a `MAJOR`. The Marketplace `name`
-  (`Symfony Security Auditor`) is also stable.
+  input names: `mode`, `project-path`, `format`, `output`, `baseline`,
+  `generate-baseline`, `since`, `fail-on`, `extra-args`, `php-version`,
+  `setup-php`, `install-dependencies`, `working-directory`, and its output
+  names: `exit-code`, `report-path`, `findings-count`, `highest-severity`. New
+  inputs/outputs may be added in a `MINOR`; renaming or removing one is a
+  `MAJOR`. The Marketplace `name` (`Symfony Security Auditor`) is also stable.
 - **Version pinning.** Consumers pin the action to an exact release tag —
   `uses: vinceamstoutz/symfony-security-auditor@1.15.0` — matching the tag
   format used on Packagist. Bump the pin when upgrading. There is intentionally

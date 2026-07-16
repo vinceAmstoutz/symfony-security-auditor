@@ -42,6 +42,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `src/Audit/Infrastructure/Prompt/Skill/` and
   `src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`.
 
+- **The GitHub Action can now run the standalone binary instead of requiring the
+  bundle, and exposes first-class outputs.** A new `mode: bundle|standalone`
+  input (default `bundle`, matching prior behavior) downloads the
+  checksum-verified standalone binary via `install.sh` and configures it with
+  `symfony-security-auditor init --no-interaction` instead of running
+  `composer install` + `bin/console audit:run` — the target project no longer
+  needs the bundle in its `composer.json`. A host PHP + Composer are still
+  required in standalone mode (`setup-php` stays `true`) since `init` fetches
+  the provider bridge through Composer; standalone mode in this action always
+  configures the `anthropic`/`claude-opus-4-8` default non-interactively. The
+  action also gained an `outputs:` block (`exit-code`, `report-path`, and, when
+  `format: json`, `findings-count`/`highest-severity` read from the report's
+  `total_vulnerabilities`/`risk_level` fields via `jq`) and a first-class
+  `fail-on` input (previously reachable only through `extra-args`).
+  Implementation lives in `action.yml`.
+
 ### Fixed
 
 - **The native Windows binary is published with releases again.**
