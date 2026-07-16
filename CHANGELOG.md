@@ -102,6 +102,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `src/Audit/Application/Pipeline/Stage/DependencyExpansionStage.php` and
   `src/Audit/Domain/Configuration/AuditProfile.php`.
 
+- **Imported SARIF results with a taint-tracking `codeFlows` path now carry the
+  full source-to-sink evidence, not just the sink line.**
+  `SarifImportingPreScanner` reads `codeFlows[0].threadFlows[0].locations` when
+  present and appends the path as `(taint path: file:line -> file:line -> …)` to
+  the marker's description, so the attacker sees exactly how tainted data
+  reaches the sink instead of only the single flagged line. Steps pointing
+  outside the scan surface are dropped, same as the primary location.
+  Implementation lives in
+  `src/Audit/Infrastructure/Scan/SarifImportingPreScanner.php`.
+
 ### Fixed
 
 - **The native Windows binary is published with releases again.**
