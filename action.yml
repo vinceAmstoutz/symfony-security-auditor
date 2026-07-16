@@ -7,6 +7,10 @@ branding:
   color: purple
 
 inputs:
+  mode:
+    description: 'How to run the audit: "bundle" (require the Symfony bundle in the target project via Composer, then run `bin/console audit:run`) or "standalone" (download the checksum-verified standalone binary — no bundle dependency needed in the target project). Composer + a host PHP are still required in standalone mode to fetch the provider bridge via `init`.'
+    required: false
+    default: bundle
   project-path:
     description: Path to the Symfony project to audit.
     required: false
@@ -31,6 +35,10 @@ inputs:
     description: Diff mode — audit only files changed against this git ref (e.g. origin/main).
     required: false
     default: ""
+  fail-on:
+    description: Minimum aggregate risk level (safe, low, medium, high, critical) that makes the audit exit 1. Leave empty to use the project's audit.fail_on configuration (default critical).
+    required: false
+    default: ""
   extra-args:
     description: Additional raw arguments appended verbatim to the audit:run invocation (e.g. "--path=src --no-cache").
     required: false
@@ -40,17 +48,31 @@ inputs:
     required: false
     default: "8.3"
   setup-php:
-    description: Whether this action installs PHP via shivammathur/setup-php. Set to false if your workflow already set PHP up.
+    description: Whether this action installs PHP via shivammathur/setup-php. Set to false if your workflow already set PHP up. Still required in standalone mode — a host PHP + Composer are needed to fetch the provider bridge via `init`.
     required: false
     default: "true"
   install-dependencies:
-    description: Whether this action runs `composer install` before auditing. Set to false if your workflow already installed dependencies.
+    description: Whether this action runs `composer install` before auditing. Only applies in bundle mode; ignored in standalone mode. Set to false if your workflow already installed dependencies.
     required: false
     default: "true"
   working-directory:
     description: Directory to run composer and the console command from.
     required: false
     default: "."
+
+outputs:
+  exit-code:
+    description: The audit command's exit code (0 = passed, 1 = failed the fail-on gate, 2 = budget aborted).
+    value: ${{ steps.audit.outputs.exit-code }}
+  report-path:
+    description: The path the report was written to (mirrors the output input; empty when the report was printed to stdout).
+    value: ${{ steps.audit.outputs.report-path }}
+  findings-count:
+    description: Total number of findings in the report. Only populated when format is json (empty for other formats).
+    value: ${{ steps.audit.outputs.findings-count }}
+  highest-severity:
+    description: The report's aggregate risk level (safe, low, medium, high, critical). Only populated when format is json (empty for other formats).
+    value: ${{ steps.audit.outputs.highest-severity }}
 
 runs:
   using: composite
@@ -63,29 +85,63 @@ runs:
         coverage: none
 
     - name: Install Composer dependencies
-      if: ${{ inputs.install-dependencies == 'true' }}
+      if: ${{ inputs.install-dependencies == 'true' && inputs.mode == 'bundle' }}
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: composer install --no-interaction --prefer-dist --no-progress
 
+    - name: Install the standalone binary
+      if: ${{ inputs.mode == 'standalone' }}
+      shell: bash
+      env:
+        SSA_INSTALL_DIR: ${{ github.action_path }}/.bin
+      run: |
+        set -euo pipefail
+        curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | sh
+        echo "$SSA_INSTALL_DIR" >> "$GITHUB_PATH"
+
+    - name: Configure the standalone binary
+      if: ${{ inputs.mode == 'standalone' }}
+      shell: bash
+      run: symfony-security-auditor init --no-interaction
+
     - name: Run security audit
+      id: audit
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
+        SSA_MODE: ${{ inputs.mode }}
         SSA_PROJECT_PATH: ${{ inputs.project-path }}
         SSA_FORMAT: ${{ inputs.format }}
         SSA_OUTPUT: ${{ inputs.output }}
         SSA_BASELINE: ${{ inputs.baseline }}
         SSA_GENERATE_BASELINE: ${{ inputs.generate-baseline }}
         SSA_SINCE: ${{ inputs.since }}
+        SSA_FAIL_ON: ${{ inputs.fail-on }}
         SSA_EXTRA_ARGS: ${{ inputs.extra-args }}
       run: |
-        set -euo pipefail
+        set -uo pipefail
         args=("$SSA_PROJECT_PATH" "--format=$SSA_FORMAT")
         if [ -n "$SSA_OUTPUT" ]; then args+=("--output=$SSA_OUTPUT"); fi
         if [ -n "$SSA_BASELINE" ]; then args+=("--baseline=$SSA_BASELINE"); fi
         if [ -n "$SSA_GENERATE_BASELINE" ]; then args+=("--generate-baseline=$SSA_GENERATE_BASELINE"); fi
         if [ -n "$SSA_SINCE" ]; then args+=("--since=$SSA_SINCE"); fi
+        if [ -n "$SSA_FAIL_ON" ]; then args+=("--fail-on=$SSA_FAIL_ON"); fi
         # shellcheck disable=SC2206 -- intentional word-splitting of caller-supplied extra args
         if [ -n "$SSA_EXTRA_ARGS" ]; then args+=($SSA_EXTRA_ARGS); fi
-        php bin/console audit:run "${args[@]}"
+
+        if [ "$SSA_MODE" = "standalone" ]; then
+          symfony-security-auditor audit "${args[@]}"
+        else
+          php bin/console audit:run "${args[@]}"
+        fi
+        exit_code=$?
+
+        echo "exit-code=$exit_code" >> "$GITHUB_OUTPUT"
+        echo "report-path=$SSA_OUTPUT" >> "$GITHUB_OUTPUT"
+        if [ "$SSA_FORMAT" = "json" ] && [ -n "$SSA_OUTPUT" ] && [ -f "$SSA_OUTPUT" ]; then
+          echo "findings-count=$(jq -r '.total_vulnerabilities' "$SSA_OUTPUT")" >> "$GITHUB_OUTPUT"
+          echo "highest-severity=$(jq -r '.risk_level' "$SSA_OUTPUT")" >> "$GITHUB_OUTPUT"
+        fi
+
+        exit "$exit_code"
