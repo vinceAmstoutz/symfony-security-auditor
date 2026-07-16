@@ -15,7 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Psr\Log\LoggerInterface;
 use Symfony\AI\Platform\Message\AssistantMessage;
-use Symfony\AI\Platform\Message\Content\Text;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
@@ -139,7 +138,7 @@ final readonly class SequentialToolLoop
             $toolResults = [];
             foreach ($toolCalls as $toolCall) {
                 $result = $toolRegistry->execute($toolCall->getName(), $toolCall->getArguments());
-                $messageBag->add(new ToolCallMessage($toolCall, new Text($result)));
+                $messageBag->add(new ToolCallMessage($toolCall, $result));
                 $toolResults[] = $result;
                 $this->logger->debug('Tool invoked', [
                     'tool' => $toolCall->getName(),

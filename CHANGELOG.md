@@ -144,6 +144,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Every attacker/reviewer tool call was broken by the `symfony/ai-bundle` 0.11
+  upgrade.** `SequentialToolLoop` and `ToolConversationWavefront` both wrapped a
+  tool's string result in a `Content\Text` object before handing it to
+  `new ToolCallMessage($toolCall, ...)`, but 0.11 tightened that constructor's
+  second parameter to a plain `string` — every tool invocation (`read_file`,
+  `grep`, `list_files`, `lookup_advisory`) threw a `TypeError` (argument
+  `$content` must be `string`, `Content\Text` given) instead of feeding the
+  result back to the model. Both call sites now pass the result string directly.
+  Implementation lives in `src/Audit/Infrastructure/LLM/SequentialToolLoop.php`
+  and `src/Audit/Infrastructure/LLM/ToolConversationWavefront.php`.
+
 - **The native Windows binary is published with releases again.**
   `windows-latest` lost VS 2022 in GitHub's June 2026 image migration, so
   `static-php-cli` 2.8.5's doctor aborted before installing the `7za.exe` its
