@@ -413,7 +413,7 @@ final class RegexStaticPreScannerTest extends TestCase
         $projectFile = ProjectFile::create(
             '.env',
             '/app/.env',
-            "APP_ENV=dev\nAPP_SECRET=\nAPP_DEBUG=1\n",
+            "APP_ENV=dev\nAPP_SECRET=\nAPP_DEBUG=0\n",
         );
 
         self::assertSame([], $this->regexStaticPreScanner->scan([$projectFile]));
@@ -988,6 +988,122 @@ final class RegexStaticPreScannerTest extends TestCase
 
         $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
         self::assertNotContains('unanchored_cors_origin_regex', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    #[DataProvider('cspUnsafeDirectiveCases')]
+    public function test_it_flags_a_csp_directive_allowing_unsafe_inline_or_eval(string $directive): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/nelmio_security.yaml',
+            '/app/config/packages/nelmio_security.yaml',
+            "nelmio_security:\n    csp:\n        default:\n            script-src:\n                - '{$directive}'",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('csp_unsafe_inline_or_eval', $patterns);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function cspUnsafeDirectiveCases(): iterable
+    {
+        yield 'unsafe-inline' => ['unsafe-inline'];
+        yield 'unsafe-eval' => ['unsafe-eval'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_a_csp_directive_without_unsafe_keywords(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/nelmio_security.yaml',
+            '/app/config/packages/nelmio_security.yaml',
+            "nelmio_security:\n    csp:\n        default:\n            script-src:\n                - 'self'",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('csp_unsafe_inline_or_eval', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_hsts_disabled_via_forced_ssl(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/nelmio_security.yaml',
+            '/app/config/packages/nelmio_security.yaml',
+            "nelmio_security:\n    forced_ssl:\n        enabled: false",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('hsts_disabled', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_hsts_enabled_via_forced_ssl(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/nelmio_security.yaml',
+            '/app/config/packages/nelmio_security.yaml',
+            "nelmio_security:\n    forced_ssl:\n        enabled: true",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('hsts_disabled', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    #[DataProvider('appDebugEnabledCases')]
+    public function test_it_flags_app_debug_enabled_in_a_dotenv_file(string $value): void
+    {
+        $projectFile = ProjectFile::create('.env', '/app/.env', "APP_ENV=prod\n{$value}\n");
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('app_debug_enabled', $patterns);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function appDebugEnabledCases(): iterable
+    {
+        yield 'numeric 1' => ['APP_DEBUG=1'];
+        yield 'literal true' => ['APP_DEBUG=true'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_app_debug_disabled_in_a_dotenv_file(): void
+    {
+        $projectFile = ProjectFile::create('.env', '/app/.env', "APP_ENV=prod\nAPP_DEBUG=0\n");
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('app_debug_enabled', $patterns);
     }
 
     /**

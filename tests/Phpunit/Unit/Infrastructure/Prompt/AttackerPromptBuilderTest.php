@@ -2053,6 +2053,9 @@ final class AttackerPromptBuilderTest extends TestCase
         self::assertStringContainsString('trusted_proxy_misconfiguration', $prompt);
         self::assertStringContainsString('weak_password_hashing', $prompt);
         self::assertStringContainsString('permissive_cors_origin', $prompt);
+        self::assertStringContainsString('weak_content_security_policy', $prompt);
+        self::assertStringContainsString('missing_transport_security', $prompt);
+        self::assertStringContainsString('debug_mode_enabled', $prompt);
     }
 
     public function test_base_prompt_references_modern_symfony_components_in_expertise(): void

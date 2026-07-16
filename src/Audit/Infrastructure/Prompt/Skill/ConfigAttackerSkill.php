@@ -53,6 +53,9 @@ final readonly class ConfigAttackerSkill implements AttackerSkillInterface
             - `security.password_hashers.*.algorithm` set to `plaintext`, `md5`, or `sha1` instead of `auto` (bcrypt/argon2id) — fast, unsalted or reversible hashing.
             - `remember_me` cookie configured with `secure: false` — a long-lived authentication cookie sent over plain HTTP.
             - NelmioCors `origin_regex: true` paired with an `allow_origin` pattern that is not anchored with `^...$` — an unanchored regex matches as a substring and can allow unintended origins.
+            - A Content-Security-Policy directive allowing `'unsafe-inline'` or `'unsafe-eval'` — defeats CSP's main protection against injected/inline script execution.
+            - NelmioSecurity `forced_ssl.enabled: false` — HSTS not enforced, leaving the first plaintext request open to SSL-stripping.
+            - `APP_DEBUG=1` (or `=true`) in a committed base `.env` file with no environment-specific override visible — if it reaches production, the Symfony error page leaks stack traces, source paths, and environment variables.
             Do NOT flag:
             - Environment-variable references like `%env(DATABASE_URL)%` — those are externalized, not hardcoded.
             - `_profiler` / `_wdt` declarations gated by `when@dev` / `when@test`.
