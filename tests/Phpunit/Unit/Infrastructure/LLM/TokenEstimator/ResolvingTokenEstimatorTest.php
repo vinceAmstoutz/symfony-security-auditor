@@ -46,6 +46,7 @@ final class ResolvingTokenEstimatorTest extends TestCase
         yield 'concatenated llama routes to llama' => ['llama3', 28];
         yield 'meta-llama routes to llama' => ['meta-llama/Llama-3.3-70B-Instruct', 28];
         yield 'deepseek routes to deepseek' => ['deepseek-chat', 30];
+        yield 'minimax routes to minimax' => ['MiniMax-M2', 29];
     }
 
     public function test_unknown_model_falls_back_to_the_default_ratio(): void

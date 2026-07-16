@@ -12,6 +12,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **MiniMax is now a first-class provider.** `symfony/ai-bundle` 0.11 ships a
+  `minimax` platform configuration backed by the new
+  `symfony/ai-mini-max-platform` bridge, so the auditor can run on
+  `MiniMax-M2`-family models like any other provider. A new
+  `MiniMaxTokenEstimator`
+  (`src/Audit/Infrastructure/LLM/TokenEstimator/MiniMaxTokenEstimator.php`)
+  joins the `ResolvingTokenEstimator` chain so cost previews and rate-limit
+  pacing use a MiniMax-calibrated characters-per-token ratio instead of the
+  generic fallback. The bridge is listed in `composer.json` `suggest`, and the
+  provider tables in `README.md` and
+  [`docs/configuration.md`](docs/configuration.md) document the package and its
+  `MINIMAX_API_KEY` env var.
+
 - **New `self-update` command updates the standalone binary in place.**
   `symfony-security-auditor self-update` queries the GitHub releases API for the
   latest version and, when a newer one exists, downloads the asset matching the

@@ -94,6 +94,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\DeepSeekTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\GeminiTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\LlamaTokenEstimator;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\MiniMaxTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\MistralTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\OpenAiTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ProviderTokenEstimatorInterface;
@@ -252,6 +253,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(MistralTokenEstimator::class);
     $defaultsConfigurator->set(LlamaTokenEstimator::class);
     $defaultsConfigurator->set(DeepSeekTokenEstimator::class);
+    $defaultsConfigurator->set(MiniMaxTokenEstimator::class);
     $defaultsConfigurator->set(ResolvingTokenEstimator::class)
         ->args([tagged_iterator('symfony_security_auditor.token_estimator')]);
     $defaultsConfigurator->alias(TokenEstimatorInterface::class, ResolvingTokenEstimator::class);

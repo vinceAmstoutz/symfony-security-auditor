@@ -362,6 +362,7 @@ then override individual keys as needed.
 | DeepSeek             | `symfony/ai-deep-seek-platform`      | `DEEPSEEK_API_KEY`     |
 | Mistral              | `symfony/ai-mistral-platform`        | `MISTRAL_API_KEY`      |
 | Meta (Llama)         | `symfony/ai-meta-platform`           | `META_API_KEY`         |
+| MiniMax              | `symfony/ai-mini-max-platform`       | `MINIMAX_API_KEY`      |
 | Ollama (local)       | `symfony/ai-ollama-platform`         | _(none)_               |
 
 Swapping providers requires only a `config/packages/ai.yaml` change — no PHP
