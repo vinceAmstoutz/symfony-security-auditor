@@ -10,6 +10,7 @@ GitHub Code Scanning or the GitLab Security Dashboard.
 - [Report Visibility on Public Repositories](#report-visibility-on-public-repositories)
 - [GitHub Actions](#github-actions)
   - [Reusable GitHub Action](#reusable-github-action)
+  - [Sticky PR comment with the audit summary](#sticky-pr-comment-with-the-audit-summary)
 - [GitLab CI](#gitlab-ci)
 - [Output Formats Reference](#output-formats-reference)
 
@@ -145,97 +146,6 @@ Add your LLM provider key as a repository secret
 
 See [supported platforms](../README.md#supported-platforms) for other providers.
 
-### Nightly SARIF upload to GitHub Code Scanning
-
-```yaml
-# .github/workflows/security-audit.yaml
-name: Security Audit
-
-on:
-  schedule:
-    - cron: '0 2 * * *'  # nightly at 02:00 UTC
-  workflow_dispatch: ~    # allow manual trigger
-
-permissions:
-  contents: read
-  security-events: write  # required for Code Scanning upload
-
-jobs:
-  audit:
-    name: Symfony Security Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3' # Or 8.4 or 8.5
-          coverage: none
-
-      - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-
-      - name: Run security audit
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          php bin/console audit:run --format sarif --output report.sarif
-
-      - name: Upload to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: report.sarif
-```
-
-### Inline PR annotations (no SARIF upload step)
-
-`--format github` renders each finding as a GitHub Actions workflow-command
-annotation (`::error`/`::warning`/`::notice`). GitHub parses these directly from
-the step's log output, so findings show up inline on the pull request's **Files
-changed** view, next to the vulnerable line — no SARIF upload step, no
-`security-events: write` permission, and no Code Scanning setup required.
-
-```yaml
-# .github/workflows/security-audit.yaml
-name: Security Audit
-
-on:
-  pull_request: ~
-
-permissions:
-  contents: read
-
-jobs:
-  audit:
-    name: Symfony Security Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # full history so `since` can diff against the base branch
-
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3' # Or 8.4 or 8.5
-          coverage: none
-
-      - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-
-      - name: Run security audit
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          php bin/console audit:run --since origin/${{ github.base_ref }} --format github
-```
-
-Critical and high-severity findings become `::error`, medium becomes
-`::warning`, and low/info become `::notice` — the annotation level only affects
-how GitHub displays the finding, not the job's exit code; combine with
-`--fail-on` to also fail the check run. Don't pass `--output` — annotations must
-reach stdout for GitHub to parse them.
-
 ### Reusable GitHub Action
 
 This repository **is** a GitHub Action (published to the
@@ -346,6 +256,158 @@ git add .security-baseline.json
 
 Baselined findings are dropped from the report and do **not** affect the exit
 code, so a green PR check means "no new findings since the baseline".
+
+### Nightly SARIF upload to GitHub Code Scanning
+
+```yaml
+# .github/workflows/security-audit.yaml
+name: Security Audit
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # nightly at 02:00 UTC
+  workflow_dispatch: ~    # allow manual trigger
+
+permissions:
+  contents: read
+  security-events: write  # required for Code Scanning upload
+
+jobs:
+  audit:
+    name: Symfony Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3' # Or 8.4 or 8.5
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run security audit
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          php bin/console audit:run --format sarif --output report.sarif
+
+      - name: Upload to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: report.sarif
+```
+
+### Inline PR annotations (no SARIF upload step)
+
+`--format github` renders each finding as a GitHub Actions workflow-command
+annotation (`::error`/`::warning`/`::notice`). GitHub parses these directly from
+the step's log output, so findings show up inline on the pull request's **Files
+changed** view, next to the vulnerable line — no SARIF upload step, no
+`security-events: write` permission, and no Code Scanning setup required.
+
+```yaml
+# .github/workflows/security-audit.yaml
+name: Security Audit
+
+on:
+  pull_request: ~
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Symfony Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so `since` can diff against the base branch
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3' # Or 8.4 or 8.5
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run security audit
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          php bin/console audit:run --since origin/${{ github.base_ref }} --format github
+```
+
+Critical and high-severity findings become `::error`, medium becomes
+`::warning`, and low/info become `::notice` — the annotation level only affects
+how GitHub displays the finding, not the job's exit code; combine with
+`--fail-on` to also fail the check run. Don't pass `--output` — annotations must
+reach stdout for GitHub to parse them.
+
+### Sticky PR comment with the audit summary
+
+Inline annotations are easy to miss once a PR has more than a couple of review
+comments, and a fresh top-level comment on every push spams the thread.
+[`marocchino/sticky-pull-request-comment`](https://github.com/marketplace/actions/sticky-pull-request-comment)
+solves both: it finds its own previous comment (matched by the `header` input)
+and edits it in place, so the PR always shows exactly one up-to-date audit
+comment regardless of how many times the workflow reruns. Pair it with
+`--format markdown` so the comment renders as native GitHub markdown — headings,
+a findings table — rather than a log dump.
+
+```yaml
+# .github/workflows/security-audit.yaml
+name: Security Audit
+
+on:
+  pull_request: ~
+
+permissions:
+  contents: read
+  pull-requests: write # required to post/update the sticky comment
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so `since` can diff against the base branch
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3' # Or 8.4 or 8.5
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run security audit
+        id: audit
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          php bin/console audit:run --since origin/${{ github.base_ref }} --format markdown --output report.md --fail-on high
+
+      - name: Post sticky PR comment
+        uses: marocchino/sticky-pull-request-comment@v3
+        if: always() # post the summary even when audit:run exits non-zero on --fail-on
+        with:
+          header: security-audit
+          path: report.md
+```
+
+The report file is written before the exit code is computed, so it exists even
+on a failing run — `if: always()` on the comment step is what lets it post
+regardless, while the job itself still fails on the `audit:run` step so
+`--fail-on` still gates the check run. `header: security-audit` scopes this
+action to its own comment; give a second sticky-comment step in the same
+workflow (e.g. one posting coverage) a different `header` so the two never
+overwrite each other.
 
 ### JSON report as artifact
 
