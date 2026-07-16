@@ -30,6 +30,12 @@ final readonly class ProcessReleaseClient implements ReleaseClientInterface
 {
     private const string USER_AGENT = 'symfony-security-auditor-self-update';
 
+    private const int CONNECT_TIMEOUT_SECONDS = 30;
+
+    private const int MAX_TRANSFER_SECONDS = 600;
+
+    private const float PROCESS_TIMEOUT_SECONDS = 660.0;
+
     /**
      * @param Closure(list<string>): Process $processBuilder the curl command builder (use self::defaultProcessBuilder() in production); tests inject a stub
      */
@@ -46,9 +52,19 @@ final readonly class ProcessReleaseClient implements ReleaseClientInterface
             /** @param list<string> $arguments */
             static function (array $arguments): Process {
                 /** @var list<string> $command */
-                $command = ['curl', '-fsSL', '-H', \sprintf('User-Agent: %s', self::USER_AGENT), ...$arguments];
+                $command = [
+                    'curl',
+                    '-fsSL',
+                    '--connect-timeout',
+                    (string) self::CONNECT_TIMEOUT_SECONDS,
+                    '--max-time',
+                    (string) self::MAX_TRANSFER_SECONDS,
+                    '-H',
+                    \sprintf('User-Agent: %s', self::USER_AGENT),
+                    ...$arguments,
+                ];
                 $process = new Process($command);
-                $process->setTimeout(null);
+                $process->setTimeout(self::PROCESS_TIMEOUT_SECONDS);
 
                 return $process;
             };

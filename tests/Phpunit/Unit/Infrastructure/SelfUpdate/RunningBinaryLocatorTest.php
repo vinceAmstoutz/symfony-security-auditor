@@ -47,7 +47,7 @@ final class RunningBinaryLocatorTest extends TestCase
         $procSelfExe = $this->workingDirectory.'/proc-self-exe';
         symlink($target, $procSelfExe);
 
-        self::assertSame($target, (new RunningBinaryLocator($procSelfExe, ''))->path());
+        self::assertSame($target, (new RunningBinaryLocator($procSelfExe, '', 'micro'))->path());
     }
 
     /**
@@ -62,7 +62,7 @@ final class RunningBinaryLocatorTest extends TestCase
         $invokedScript = $this->workingDirectory.'/invoked-binary';
         (new Filesystem())->touch($invokedScript);
 
-        self::assertSame($kernelTarget, (new RunningBinaryLocator($procSelfExe, $invokedScript))->path());
+        self::assertSame($kernelTarget, (new RunningBinaryLocator($procSelfExe, $invokedScript, 'micro'))->path());
     }
 
     /**
@@ -73,7 +73,7 @@ final class RunningBinaryLocatorTest extends TestCase
         $invokedScript = $this->workingDirectory.'/invoked-binary';
         (new Filesystem())->touch($invokedScript);
 
-        self::assertSame($invokedScript, (new RunningBinaryLocator($this->workingDirectory.'/missing', $invokedScript))->path());
+        self::assertSame($invokedScript, (new RunningBinaryLocator($this->workingDirectory.'/missing', $invokedScript, 'micro'))->path());
     }
 
     /**
@@ -84,7 +84,7 @@ final class RunningBinaryLocatorTest extends TestCase
     {
         $this->expectException(SelfUpdateFailedException::class);
 
-        (new RunningBinaryLocator($this->workingDirectory.'/missing', $invokedScriptPath))->path();
+        (new RunningBinaryLocator($this->workingDirectory.'/missing', $invokedScriptPath, 'micro'))->path();
     }
 
     /**
@@ -94,5 +94,21 @@ final class RunningBinaryLocatorTest extends TestCase
     {
         yield 'no invoked script provided' => [''];
         yield 'invoked script does not exist' => [sys_get_temp_dir().'/ssa-locator-also-missing'];
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    public function test_it_refuses_to_resolve_a_path_when_not_running_as_the_standalone_binary(): void
+    {
+        $target = $this->workingDirectory.'/php-interpreter';
+        (new Filesystem())->touch($target);
+        $procSelfExe = $this->workingDirectory.'/proc-self-exe';
+        symlink($target, $procSelfExe);
+
+        $this->expectException(SelfUpdateFailedException::class);
+        $this->expectExceptionMessage('running under the "cli" PHP SAPI');
+
+        (new RunningBinaryLocator($procSelfExe, '', 'cli'))->path();
     }
 }

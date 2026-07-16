@@ -178,6 +178,31 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **`self-update` no longer risks destroying the PHP interpreter when run
+  outside the standalone binary.** `RunningBinaryLocator::path()`
+  (`src/Audit/Infrastructure/SelfUpdate/RunningBinaryLocator.php`) returned
+  `readlink('/proc/self/exe')` unconditionally, which under a normal PHP
+  interpreter resolves to the interpreter itself (e.g. `/usr/bin/php`), so
+  `symfony-security-auditor self-update` invoked as `php bin/…​ self-update` (or
+  via `docker compose exec php`) would download the release binary, pass
+  checksum verification, and rename it over the running `php` — bricking the
+  interpreter while reporting `Updated …`. The locator now refuses unless it is
+  running as the self-contained standalone binary (the phpmicro `micro` SAPI),
+  throwing `self-update is only supported for the standalone binary, but it is
+  running under the "<sapi>" PHP SAPI` instead.
+- **`self-update` can no longer hang forever on a stalled network.**
+  `ProcessReleaseClient::defaultProcessBuilder()` disabled the Symfony `Process`
+  timeout (`setTimeout(null)`) while its `curl` invocation carried no transfer
+  bound, so a blackholed connection blocked the command indefinitely with no
+  output. `curl` now runs with `--connect-timeout 30 --max-time 600` and the
+  process carries a finite backstop timeout.
+- **`self-update` no longer races concurrent runs onto a predictable download
+  path.** The download target was a fixed `dirname/.{asset}.download` shared by
+  every invocation (`SelfUpdater::replaceBinary()`), so overlapping runs could
+  install a partially-written, checksum-unverified binary, and a failure between
+  download and rename stranded a ~50 MB dotfile. The download now goes to a
+  unique per-run temporary file (`Filesystem::tempnam()`), and every failure
+  path — including a failed checksum *fetch* — removes it.
 - **The native Windows binary is published with releases again.**
   `windows-latest` lost VS 2022 in GitHub's June 2026 image migration, so
   `static-php-cli` 2.8.5's doctor aborted before installing the `7za.exe` its

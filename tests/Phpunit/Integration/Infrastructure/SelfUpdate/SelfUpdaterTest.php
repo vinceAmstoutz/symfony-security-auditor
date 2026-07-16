@@ -18,6 +18,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Finder\Finder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\UnsupportedSelfUpdatePlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\GitHubBinaryAsset;
@@ -114,7 +115,7 @@ final class SelfUpdaterTest extends TestCase
             $selfUpdater->run('1.0.0', false);
         } finally {
             self::assertStringEqualsFile($this->binaryPath, 'OLD-BINARY');
-            self::assertFileDoesNotExist($this->workingDirectory.'/.symfony-security-auditor-linux-x86_64.download');
+            self::assertCount(0, (new Finder())->in($this->workingDirectory)->files()->name('*.download')->ignoreDotFiles(false));
         }
     }
 
@@ -153,7 +154,7 @@ final class SelfUpdaterTest extends TestCase
 
             $selfUpdater->run('1.0.0', false);
         } finally {
-            self::assertFileDoesNotExist($this->workingDirectory.'/.symfony-security-auditor-linux-x86_64.download');
+            self::assertCount(0, (new Finder())->in($this->workingDirectory)->files()->name('*.download')->ignoreDotFiles(false));
         }
     }
 
