@@ -222,6 +222,8 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringContainsString('messenger_handler_unsafe', $prompt);
         self::assertStringContainsString('webhook_replay', $prompt);
         self::assertStringContainsString('authenticator_bypass', $prompt);
+        self::assertStringContainsString('host_header_injection', $prompt);
+        self::assertStringContainsString('trusted_proxy_misconfiguration', $prompt);
     }
 
     public function test_decision_rules_restrict_rejection_to_a_named_mitigating_control(): void

@@ -25,6 +25,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   See
   [CLI Reference → `self-update`](docs/configuration.md#self-update--updating-the-standalone-binary).
 
+- **The attacker now hunts HTTP trust-boundary misconfigurations: wildcard
+  `trusted_proxies`, and Host-header injection / cache poisoning.** Two new
+  `AttackerSkillInterface` strategies — `TrustBoundaryAttackerSkill` (`CONFIG`)
+  and `ControllerTrustBoundaryAttackerSkill` (`CONTROLLER`) — teach the attacker
+  to flag `framework.trusted_proxies`/`TRUSTED_PROXIES` set to a wildcard CIDR
+  (`0.0.0.0/0`, `::/0`), which lets any client spoof `X-Forwarded-*` headers and
+  defeat IP allowlists and rate limiters, and to flag `Request::getHost()` /
+  `getSchemeAndHttpHost()` / `getHttpHost()` used to build links or cache
+  decisions without `trusted_hosts` configured. `RegexStaticPreScanner` gained
+  matching `trusted_proxies_wildcard` and `forwarded_host_usage` risk markers
+  (`CACHE_VERSION` bumped to 27). Two new `VulnerabilityType` cases —
+  `host_header_injection` (CWE-20) and `trusted_proxy_misconfiguration`
+  (CWE-290) — cover the new findings, both under OWASP A02:2025 - Security
+  Misconfiguration. Implementation lives in
+  `src/Audit/Infrastructure/Prompt/Skill/` and
+  `src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`.
+
 ### Fixed
 
 - **The native Windows binary is published with releases again.**

@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\Authe
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfigAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerFileUploadAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerTrustBoundaryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityFileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EventSubscriberAttackerSkill;
@@ -36,6 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\PhpAt
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\RepositoryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SchedulerAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TemplateAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TrustBoundaryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TwigExtensionAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\VoterAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\WebhookConsumerAttackerSkill;
@@ -64,6 +66,7 @@ final class AttackerSkillRegistryTest extends TestCase
     {
         yield 'controller' => [new ControllerAttackerSkill(), ProjectFileType::CONTROLLER, 10, 'controller'];
         yield 'file_upload_controller' => [new ControllerFileUploadAttackerSkill(), ProjectFileType::CONTROLLER, 15, 'file_upload_controller'];
+        yield 'controller_trust_boundary' => [new ControllerTrustBoundaryAttackerSkill(), ProjectFileType::CONTROLLER, 17, 'controller_trust_boundary'];
         yield 'api_resource' => [new ApiResourceAttackerSkill(), ProjectFileType::API_RESOURCE, 20, 'api_resource'];
         yield 'live_component' => [new LiveComponentAttackerSkill(), ProjectFileType::LIVE_COMPONENT, 30, 'live_component'];
         yield 'authenticator' => [new AuthenticatorAttackerSkill(), ProjectFileType::AUTHENTICATOR, 40, 'authenticator'];
@@ -81,6 +84,7 @@ final class AttackerSkillRegistryTest extends TestCase
         yield 'template' => [new TemplateAttackerSkill(), ProjectFileType::TEMPLATE, 140, 'template'];
         yield 'twig_extension' => [new TwigExtensionAttackerSkill(), ProjectFileType::TWIG_EXTENSION, 145, 'twig_extension'];
         yield 'config' => [new ConfigAttackerSkill(), ProjectFileType::CONFIG, 150, 'config'];
+        yield 'trust_boundary' => [new TrustBoundaryAttackerSkill(), ProjectFileType::CONFIG, 155, 'trust_boundary'];
         yield 'php' => [new PhpAttackerSkill(), ProjectFileType::PHP, 160, 'php'];
     }
 
@@ -101,7 +105,7 @@ final class AttackerSkillRegistryTest extends TestCase
 
         $output = $attackerSkillRegistry->render([], emitAll: true);
 
-        self::assertSame(20, substr_count($output, '<skills role="'));
+        self::assertSame(22, substr_count($output, '<skills role="'));
     }
 
     public function test_it_emits_blocks_in_attack_surface_priority_order(): void
@@ -115,6 +119,7 @@ final class AttackerSkillRegistryTest extends TestCase
         self::assertSame([
             'controller',
             'file_upload_controller',
+            'controller_trust_boundary',
             'api_resource',
             'live_component',
             'authenticator',
@@ -132,6 +137,7 @@ final class AttackerSkillRegistryTest extends TestCase
             'template',
             'twig_extension',
             'config',
+            'trust_boundary',
             'php',
         ], $matches[1]);
     }
@@ -157,7 +163,7 @@ final class AttackerSkillRegistryTest extends TestCase
      */
     public static function everyFileTypeWithASkill(): iterable
     {
-        yield 'controller' => [ProjectFileType::CONTROLLER, ['controller', 'file_upload_controller']];
+        yield 'controller' => [ProjectFileType::CONTROLLER, ['controller', 'file_upload_controller', 'controller_trust_boundary']];
         yield 'api_resource' => [ProjectFileType::API_RESOURCE, ['api_resource']];
         yield 'live_component' => [ProjectFileType::LIVE_COMPONENT, ['live_component']];
         yield 'authenticator' => [ProjectFileType::AUTHENTICATOR, ['authenticator']];
@@ -172,7 +178,7 @@ final class AttackerSkillRegistryTest extends TestCase
         yield 'entity' => [ProjectFileType::ENTITY, ['entity', 'file_upload_entity']];
         yield 'template' => [ProjectFileType::TEMPLATE, ['template']];
         yield 'twig_extension' => [ProjectFileType::TWIG_EXTENSION, ['twig_extension']];
-        yield 'config' => [ProjectFileType::CONFIG, ['config']];
+        yield 'config' => [ProjectFileType::CONFIG, ['config', 'trust_boundary']];
         yield 'php' => [ProjectFileType::PHP, ['php']];
     }
 
