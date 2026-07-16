@@ -84,7 +84,7 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
     }
 
     #[Override]
-    public function record(string $type, string $file, string $title, string $reason): void
+    public function record(string $type, string $file, string $title, int $line, string $reason): void
     {
         if ($this->isSymlinkedPath($this->path)) {
             $this->logger->warning('Triage memory path was a symlink, skipping write', ['path' => $this->path]);
@@ -93,7 +93,8 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
         }
 
         try {
-            $entries = $this->upsert($this->readEntries(), $type, $file, $title, $this->cappedReason($reason));
+            $entry = ['type' => $type, 'file' => $file, 'title' => $title, 'line' => $line, 'reason' => $this->cappedReason($reason)];
+            $entries = $this->upsert($this->readEntries(), $entry);
             $encoded = json_encode(\array_slice($entries, -$this->maxEntries), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
             $this->filesystem->dumpFile($this->path, $encoded);
         } catch (Throwable $throwable) {
@@ -140,25 +141,39 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
 
     /**
      * @param list<array<array-key, mixed>> $entries
+     * @param array<array-key, mixed>       $newEntry
      *
      * @return list<array<array-key, mixed>>
      */
-    private function upsert(array $entries, string $type, string $file, string $title, string $reason): array
+    private function upsert(array $entries, array $newEntry): array
     {
-        $key = $this->keyOf($type, $file, $title);
+        $key = $this->keyOf($newEntry);
         $withoutExisting = array_values(array_filter(
             $entries,
-            fn (array $entry): bool => $key !== $this->keyOf($this->stringField($entry, 'type'), $this->stringField($entry, 'file'), $this->stringField($entry, 'title')),
+            fn (array $entry): bool => $key !== $this->keyOf($entry),
         ));
 
-        $withoutExisting[] = ['type' => $type, 'file' => $file, 'title' => $title, 'reason' => $reason];
+        $withoutExisting[] = $newEntry;
 
         return $withoutExisting;
     }
 
-    private function keyOf(string $type, string $file, string $title): string
+    /**
+     * The line is part of the key so two distinct findings that share a
+     * type/file/title (a generic title reused at different locations) do not
+     * collide — the second rejection would otherwise overwrite the first.
+     *
+     * @param array<array-key, mixed> $entry
+     */
+    private function keyOf(array $entry): string
     {
-        return \sprintf("%s\0%s\0%s", $type, $file, $title);
+        return \sprintf(
+            "%s\0%s\0%s\0%d",
+            $this->stringField($entry, 'type'),
+            $this->stringField($entry, 'file'),
+            $this->stringField($entry, 'title'),
+            $this->intField($entry, 'line'),
+        );
     }
 
     private function cappedReason(string $reason): string
@@ -192,6 +207,16 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
         $value = $entry[$key] ?? null;
 
         return \is_string($value) ? $value : '';
+    }
+
+    /**
+     * @param array<array-key, mixed> $entry
+     */
+    private function intField(array $entry, string $key): int
+    {
+        $value = $entry[$key] ?? null;
+
+        return \is_int($value) ? $value : 0;
     }
 
     /**

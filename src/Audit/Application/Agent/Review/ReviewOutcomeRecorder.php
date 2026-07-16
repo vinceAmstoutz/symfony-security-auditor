@@ -84,7 +84,7 @@ final readonly class ReviewOutcomeRecorder
             return;
         }
 
-        $this->triageMemoryRecorder->record($vulnerability->type()->value, $vulnerability->filePath(), $vulnerability->title(), $reviewerNotes);
+        $this->triageMemoryRecorder->record($vulnerability->type()->value, $vulnerability->filePath(), $vulnerability->title(), $vulnerability->lineStart(), $reviewerNotes);
     }
 
     public function recordReviewError(Vulnerability $vulnerability, Throwable $throwable, CoverageRecorderInterface $coverageRecorder): Vulnerability

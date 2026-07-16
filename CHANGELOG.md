@@ -224,6 +224,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   prompts with no bound, an unbounded cross-run prompt-injection surface for a
   hostile audited repository; the structured path's schema cap now applies to
   both paths.
+- **Triage-memory entries are now keyed by line, so two distinct findings that
+  share a type/file/title no longer overwrite each other.**
+  `FilesystemTriageMemoryStore` deduplicated entries by `type + file + title`
+  only, so a second finding reusing a generic title in the same file (e.g. two
+  `Possible SQLi` hits at different lines) silently replaced the first's stored
+  reason. The finding's `lineStart` is now part of the key
+  (`TriageMemoryRecorderInterface::record()` gained a `$line` argument), so
+  distinct locations are remembered independently.
 - **The GitHub Action now writes its step outputs even when the audit fails.**
   The `Run security audit` step's `set -uo pipefail` did not clear the errexit
   (`-e`) GitHub injects into composite `bash` steps, so a non-zero audit exit —

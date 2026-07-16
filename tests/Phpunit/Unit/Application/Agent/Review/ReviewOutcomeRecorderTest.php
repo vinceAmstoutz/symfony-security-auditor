@@ -249,7 +249,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
     public function test_a_rejected_verdict_with_reviewer_notes_is_recorded_to_triage_memory(): void
     {
         $triageMemoryRecorder = $this->createMock(TriageMemoryRecorderInterface::class);
-        $triageMemoryRecorder->expects(self::once())->method('record')->with('sql_injection', 'src/A.php', 'T', 'not exploitable: input is validated upstream');
+        $triageMemoryRecorder->expects(self::once())->method('record')->with('sql_injection', 'src/A.php', 'T', 18, 'not exploitable: input is validated upstream');
 
         $reviewOutcomeRecorder = new ReviewOutcomeRecorder(
             new VerdictApplier(new NullLogger()),

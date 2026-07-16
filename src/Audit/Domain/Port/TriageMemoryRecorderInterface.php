@@ -22,5 +22,5 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
  */
 interface TriageMemoryRecorderInterface
 {
-    public function record(string $type, string $file, string $title, string $reason): void;
+    public function record(string $type, string $file, string $title, int $line, string $reason): void;
 }
