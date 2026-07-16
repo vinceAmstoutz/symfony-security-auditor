@@ -281,19 +281,18 @@ construction time by `ProjectFileTypeClassifier::classify()` (the single
 Classification methods (`isController()`, `isEntity()`, `isVoter()`,
 `isRepository()`, `isForm()`, `isAuthenticator()`, `isLdapService()`,
 `isSonataAdmin()`, `isEasyAdminCrud()`, `isMessengerHandler()`,
-`isEventSubscriber()`, `isNormalizer()`, `isWebhookConsumer()`,
-`isScheduler()`, `isTemplate()`) are
-thin comparisons against `fileType()`, so they can never disagree with it;
-`isService()` is the one derived predicate (true for a `.php` file whose
-`fileType()` is none of the above). `isConfiguration()` is deliberately
-independent of `fileType()` — it matches every `.yaml`/`.yml`/`.xml`/dotenv path
-regardless of directory, which `MappingStage` relies on to extract security
-config from every config file in the project. These predicates and
-`SymfonyMapping` construction (`ProjectFileInventory`) drive metadata/reporting
-buckets; `AttackerAgent` chunking priority and skill selection key off
-`fileType()` directly. `ProjectFileType` is the single source of truth for the
-file-type vocabulary, referenced by the chunker, the static pre-scanner buckets,
-and the attacker skill-block ordering.
+`isEventSubscriber()`, `isNormalizer()`, `isWebhookConsumer()`, `isScheduler()`,
+`isTemplate()`) are thin comparisons against `fileType()`, so they can never
+disagree with it; `isService()` is the one derived predicate (true for a `.php`
+file whose `fileType()` is none of the above). `isConfiguration()` is
+deliberately independent of `fileType()` — it matches every
+`.yaml`/`.yml`/`.xml`/dotenv path regardless of directory, which `MappingStage`
+relies on to extract security config from every config file in the project.
+These predicates and `SymfonyMapping` construction (`ProjectFileInventory`)
+drive metadata/reporting buckets; `AttackerAgent` chunking priority and skill
+selection key off `fileType()` directly. `ProjectFileType` is the single source
+of truth for the file-type vocabulary, referenced by the chunker, the static
+pre-scanner buckets, and the attacker skill-block ordering.
 
 ### `SymfonyMapping` — immutable project structure snapshot
 
