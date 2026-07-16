@@ -75,6 +75,141 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
      */
+    public function test_a_result_with_a_code_flow_gets_the_taint_path_appended_to_its_description(): void
+    {
+        $result = $this->sarifResultWithCodeFlow(
+            'TaintedSql',
+            'Detected tainted SQL',
+            'src/Repository/UserRepository.php',
+            42,
+            [['src/Controller/UserController.php', 10], ['src/Repository/UserRepository.php', 42]],
+        );
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [$result])]);
+
+        $markers = $this->scanner([$sarif])->scan([
+            $this->projectFile('src/Repository/UserRepository.php'),
+            $this->projectFile('src/Controller/UserController.php'),
+        ]);
+
+        self::assertCount(1, $markers);
+        self::assertSame(
+            'Detected tainted SQL (taint path: src/Controller/UserController.php:10 -> src/Repository/UserRepository.php:42)',
+            $markers[0]->description(),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     */
+    public function test_a_taint_path_step_outside_the_scan_surface_is_omitted(): void
+    {
+        $result = $this->sarifResultWithCodeFlow(
+            'TaintedSql',
+            'Detected tainted SQL',
+            'src/Repository/UserRepository.php',
+            42,
+            [['vendor/lib/Source.php', 5], ['src/Repository/UserRepository.php', 42]],
+        );
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [$result])]);
+
+        $markers = $this->scanner([$sarif])->scan([$this->projectFile('src/Repository/UserRepository.php')]);
+
+        self::assertSame(
+            'Detected tainted SQL (taint path: src/Repository/UserRepository.php:42)',
+            $markers[0]->description(),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     */
+    public function test_a_taint_path_step_with_a_non_positive_start_line_clamps_to_line_one(): void
+    {
+        $result = $this->sarifResultWithCodeFlow(
+            'TaintedSql',
+            'Detected tainted SQL',
+            'src/Repository/UserRepository.php',
+            42,
+            [['src/Controller/UserController.php', 0], ['src/Repository/UserRepository.php', 42]],
+        );
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [$result])]);
+
+        $markers = $this->scanner([$sarif])->scan([
+            $this->projectFile('src/Repository/UserRepository.php'),
+            $this->projectFile('src/Controller/UserController.php'),
+        ]);
+
+        self::assertSame(
+            'Detected tainted SQL (taint path: src/Controller/UserController.php:1 -> src/Repository/UserRepository.php:42)',
+            $markers[0]->description(),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     */
+    public function test_a_taint_path_step_without_a_start_line_defaults_to_line_one(): void
+    {
+        $result = [
+            ...$this->sarifResult('TaintedSql', 'Detected tainted SQL', 'src/Repository/UserRepository.php', 42),
+            'codeFlows' => [['threadFlows' => [['locations' => [
+                ['location' => ['physicalLocation' => ['artifactLocation' => ['uri' => 'src/Controller/UserController.php']]]],
+                ['location' => ['physicalLocation' => ['artifactLocation' => ['uri' => 'src/Repository/UserRepository.php'], 'region' => ['startLine' => 42]]]],
+            ]]]]],
+        ];
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [$result])]);
+
+        $markers = $this->scanner([$sarif])->scan([
+            $this->projectFile('src/Repository/UserRepository.php'),
+            $this->projectFile('src/Controller/UserController.php'),
+        ]);
+
+        self::assertSame(
+            'Detected tainted SQL (taint path: src/Controller/UserController.php:1 -> src/Repository/UserRepository.php:42)',
+            $markers[0]->description(),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     */
+    public function test_a_taint_path_step_without_a_location_uri_is_skipped(): void
+    {
+        $result = [
+            ...$this->sarifResult('TaintedSql', 'Detected tainted SQL', 'src/Repository/UserRepository.php', 42),
+            'codeFlows' => [['threadFlows' => [['locations' => [
+                ['location' => ['message' => ['text' => 'no physical location here']]],
+                ['location' => ['physicalLocation' => ['artifactLocation' => ['uri' => 'src/Repository/UserRepository.php'], 'region' => ['startLine' => 42]]]],
+            ]]]]],
+        ];
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [$result])]);
+
+        $markers = $this->scanner([$sarif])->scan([$this->projectFile('src/Repository/UserRepository.php')]);
+
+        self::assertSame(
+            'Detected tainted SQL (taint path: src/Repository/UserRepository.php:42)',
+            $markers[0]->description(),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     */
     public function test_imported_markers_are_merged_after_the_inner_scanner_markers(): void
     {
         $sarif = $this->writeSarif([$this->sarifRun('Psalm', [
@@ -442,6 +577,31 @@ final class SarifImportingPreScannerTest extends TestCase
                     'artifactLocation' => ['uri' => $uri],
                     'region' => ['startLine' => $startLine],
                 ],
+            ]],
+        ];
+    }
+
+    /**
+     * @param list<array{string, int}> $codeFlowSteps
+     *
+     * @return array<string, mixed>
+     */
+    private function sarifResultWithCodeFlow(string $ruleId, string $message, string $uri, int $startLine, array $codeFlowSteps): array
+    {
+        return [
+            ...$this->sarifResult($ruleId, $message, $uri, $startLine),
+            'codeFlows' => [[
+                'threadFlows' => [[
+                    'locations' => array_map(
+                        static fn (array $step): array => ['location' => [
+                            'physicalLocation' => [
+                                'artifactLocation' => ['uri' => $step[0]],
+                                'region' => ['startLine' => $step[1]],
+                            ],
+                        ]],
+                        $codeFlowSteps,
+                    ),
+                ]],
             ]],
         ];
     }

@@ -189,8 +189,72 @@ final readonly class SarifImportingPreScanner implements StaticPreScannerInterfa
             $relativePath,
             $this->startLineOf($result),
             \sprintf('sarif:%s:%s', $toolName, $ruleId),
-            $message,
+            $this->describeWithTaintPath($message, $result, $scannedPaths),
         );
+    }
+
+    /**
+     * @param array<array-key, mixed> $result
+     * @param array<string, true>     $scannedPaths
+     */
+    private function describeWithTaintPath(string $message, array $result, array $scannedPaths): string
+    {
+        $steps = $this->taintPathSteps($result, $scannedPaths);
+        if ([] === $steps) {
+            return $message;
+        }
+
+        return \sprintf('%s (taint path: %s)', $message, implode(' -> ', $steps));
+    }
+
+    /**
+     * A SARIF `codeFlows[0].threadFlows[0].locations` array is the taint-
+     * tracking tool's source-to-sink path — richer evidence than the single
+     * primary location. Steps outside the scan surface are dropped, same as
+     * the primary location, so the attacker never sees an unscanned file.
+     *
+     * @param array<array-key, mixed> $result
+     * @param array<string, true>     $scannedPaths
+     *
+     * @return list<string>
+     */
+    private function taintPathSteps(array $result, array $scannedPaths): array
+    {
+        $locations = $this->valueAt($result, ['codeFlows', 0, 'threadFlows', 0, 'locations']);
+        if (!\is_array($locations)) {
+            return [];
+        }
+
+        $steps = [];
+        foreach ($locations as $location) {
+            $step = \is_array($location) ? $this->taintPathStep($location, $scannedPaths) : null;
+            if (null !== $step) {
+                $steps[] = $step;
+            }
+        }
+
+        return $steps;
+    }
+
+    /**
+     * @param array<array-key, mixed> $location
+     * @param array<string, true>     $scannedPaths
+     */
+    private function taintPathStep(array $location, array $scannedPaths): ?string
+    {
+        $uri = $this->stringAt($location, ['location', 'physicalLocation', 'artifactLocation', 'uri']);
+        if (null === $uri) {
+            return null;
+        }
+
+        $relativePath = $this->normalizeUri($uri);
+        if (!\array_key_exists($relativePath, $scannedPaths)) {
+            return null;
+        }
+
+        $startLine = $this->valueAt($location, ['location', 'physicalLocation', 'region', 'startLine']);
+
+        return \sprintf('%s:%d', $relativePath, \is_int($startLine) ? max(1, $startLine) : 1);
     }
 
     /**
