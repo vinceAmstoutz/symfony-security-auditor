@@ -50,6 +50,7 @@ final readonly class AuditExecutionConfiguration
         public bool $reviewerStructuredCollection = true,
         public bool $stableSystemPrompt = true,
         public ?string $baseline = null,
+        public bool $triageMemory = false,
         public RiskLevel $failOn = RiskLevel::Critical,
         public array $excludedTypes = [],
         public array $includedTypes = [],

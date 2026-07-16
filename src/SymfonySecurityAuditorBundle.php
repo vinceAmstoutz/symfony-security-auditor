@@ -40,11 +40,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
@@ -52,6 +55,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileH
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AttackerAgentDefinitionFactory;
@@ -70,6 +74,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Toke
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
@@ -235,10 +241,31 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             : SymfonyProcessComposerAuditRunner::class);
 
         $this->registerStaticPreScanner($servicesConfigurator, $bundleConfiguration);
+        $this->registerTriageMemory($servicesConfigurator, $bundleConfiguration);
 
         $servicesConfigurator->alias(CodeSlicerInterface::class, $bundleConfiguration->audit->codeSlicingEnabled
             ? RegexCodeSlicer::class
             : NullCodeSlicer::class);
+    }
+
+    /**
+     * With `audit.triage_memory` enabled, the reviewer's own rejections
+     * persist across runs and merge with any baseline-sourced feedback via
+     * {@see CompositeReviewerFeedbackProvider}; disabled (the default), the
+     * feedback seam is exactly the baseline-only behaviour of earlier
+     * releases.
+     */
+    private function registerTriageMemory(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
+    {
+        if (!$bundleConfiguration->audit->triageMemory) {
+            $servicesConfigurator->alias(TriageMemoryRecorderInterface::class, NullTriageMemoryRecorder::class);
+            $servicesConfigurator->alias(ReviewerFeedbackProviderInterface::class, ReviewerFeedbackHolder::class);
+
+            return;
+        }
+
+        $servicesConfigurator->alias(TriageMemoryRecorderInterface::class, FilesystemTriageMemoryStore::class);
+        $servicesConfigurator->alias(ReviewerFeedbackProviderInterface::class, CompositeReviewerFeedbackProvider::class);
     }
 
     /**

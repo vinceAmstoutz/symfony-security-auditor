@@ -36,6 +36,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecor
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
@@ -238,6 +239,127 @@ final class ReviewOutcomeRecorderTest extends TestCase
         );
 
         self::assertSame([$vulnerability], $recordingCoverageRecorder->reviewed);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_rejected_verdict_with_reviewer_notes_is_recorded_to_triage_memory(): void
+    {
+        $triageMemoryRecorder = $this->createMock(TriageMemoryRecorderInterface::class);
+        $triageMemoryRecorder->expects(self::once())->method('record')->with('sql_injection', 'src/A.php', 'T', 'not exploitable: input is validated upstream');
+
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder(
+            new VerdictApplier(new NullLogger()),
+            new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()),
+            new NullLogger(),
+            self::createStub(ProgressReporterInterface::class),
+            $triageMemoryRecorder,
+        );
+
+        $reviewOutcomeRecorder->recordVerdict(
+            $this->vulnerability(),
+            ['accepted' => false, 'reviewer_notes' => 'not exploitable: input is validated upstream'],
+            new NullCoverageRecorder(),
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_accepted_verdict_is_not_recorded_to_triage_memory(): void
+    {
+        $triageMemoryRecorder = $this->createMock(TriageMemoryRecorderInterface::class);
+        $triageMemoryRecorder->expects(self::never())->method('record');
+
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder(
+            new VerdictApplier(new NullLogger()),
+            new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()),
+            new NullLogger(),
+            self::createStub(ProgressReporterInterface::class),
+            $triageMemoryRecorder,
+        );
+
+        $reviewOutcomeRecorder->recordVerdict(
+            $this->vulnerability(),
+            ['accepted' => true, 'reviewer_notes' => 'confirmed exploitable'],
+            new NullCoverageRecorder(),
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_rejected_verdict_without_reviewer_notes_is_not_recorded_to_triage_memory(): void
+    {
+        $triageMemoryRecorder = $this->createMock(TriageMemoryRecorderInterface::class);
+        $triageMemoryRecorder->expects(self::never())->method('record');
+
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder(
+            new VerdictApplier(new NullLogger()),
+            new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()),
+            new NullLogger(),
+            self::createStub(ProgressReporterInterface::class),
+            $triageMemoryRecorder,
+        );
+
+        $reviewOutcomeRecorder->recordVerdict(
+            $this->vulnerability(),
+            ['accepted' => false],
+            new NullCoverageRecorder(),
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_rejected_verdict_with_whitespace_only_reviewer_notes_is_not_recorded_to_triage_memory(): void
+    {
+        $triageMemoryRecorder = $this->createMock(TriageMemoryRecorderInterface::class);
+        $triageMemoryRecorder->expects(self::never())->method('record');
+
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder(
+            new VerdictApplier(new NullLogger()),
+            new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()),
+            new NullLogger(),
+            self::createStub(ProgressReporterInterface::class),
+            $triageMemoryRecorder,
+        );
+
+        $reviewOutcomeRecorder->recordVerdict(
+            $this->vulnerability(),
+            ['accepted' => false, 'reviewer_notes' => '   '],
+            new NullCoverageRecorder(),
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_finding_without_any_verdict_is_not_recorded_to_triage_memory(): void
+    {
+        $triageMemoryRecorder = $this->createMock(TriageMemoryRecorderInterface::class);
+        $triageMemoryRecorder->expects(self::never())->method('record');
+
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder(
+            new VerdictApplier(new NullLogger()),
+            new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()),
+            new NullLogger(),
+            self::createStub(ProgressReporterInterface::class),
+            $triageMemoryRecorder,
+        );
+
+        $reviewOutcomeRecorder->recordVerdict($this->vulnerability(), null, new NullCoverageRecorder());
     }
 
     private function expectingReviewedEvent(bool $accepted): ProgressReporterInterface

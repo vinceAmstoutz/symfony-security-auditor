@@ -19,7 +19,9 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
 
 /**
  * Turns a single-finding review outcome — a verdict payload, a raw LLM
@@ -37,6 +39,7 @@ final readonly class ReviewOutcomeRecorder
         private ReviewerVerdictCache $reviewerVerdictCache,
         private LoggerInterface $logger,
         private ProgressReporterInterface $progressReporter,
+        private TriageMemoryRecorderInterface $triageMemoryRecorder = new NullTriageMemoryRecorder(),
     ) {}
 
     /**
@@ -64,7 +67,24 @@ final readonly class ReviewOutcomeRecorder
         );
         $coverageRecorder->recordReviewedFinding($reviewed);
 
+        if (!$reviewed->isReviewerValidated()) {
+            $this->recordRejectionToTriageMemory($reviewed, $review);
+        }
+
         return $reviewed;
+    }
+
+    /**
+     * @param array<string, mixed>|list<array<string, mixed>> $review
+     */
+    private function recordRejectionToTriageMemory(Vulnerability $vulnerability, array $review): void
+    {
+        $reviewerNotes = $this->verdictApplier->normalize($review)['reviewer_notes'] ?? null;
+        if (!\is_string($reviewerNotes) || '' === trim($reviewerNotes)) {
+            return;
+        }
+
+        $this->triageMemoryRecorder->record($vulnerability->type()->value, $vulnerability->filePath(), $vulnerability->title(), $reviewerNotes);
     }
 
     public function recordReviewError(Vulnerability $vulnerability, Throwable $throwable, CoverageRecorderInterface $coverageRecorder): Vulnerability

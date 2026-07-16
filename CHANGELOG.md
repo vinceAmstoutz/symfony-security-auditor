@@ -112,6 +112,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   Implementation lives in
   `src/Audit/Infrastructure/Scan/SarifImportingPreScanner.php`.
 
+- **The reviewer can now remember its own rejections across runs.** A new
+  `audit.triage_memory` boolean (default `false`) opts into persisting every
+  finding the reviewer rejects with a non-empty `reviewer_notes` explanation to
+  a cross-run memory file (`<cache.dir>/triage-memory.json`, keyed by
+  type+file+title, capped at 500 entries) and surfacing it back to the reviewer
+  on later runs — the same "maintainer-trusted false-positive feedback"
+  treatment `audit.baseline` entries with a `reason` already get, but recorded
+  automatically from the reviewer's own reasoning instead of hand-curated.
+  Merges with any baseline-sourced feedback via the new
+  `CompositeReviewerFeedbackProvider`; reviewer-verdict cache keys incorporate
+  the combined feedback, so a newly recorded reason re-reviews affected
+  findings. Two new Domain ports — `ReviewerFeedbackProviderInterface`
+  (pre-existing, now composable) and the new `TriageMemoryRecorderInterface` —
+  are documented as extension points in `docs/extending.md`. Implementation
+  lives in `src/Audit/Infrastructure/Cache/FilesystemTriageMemoryStore.php` and
+  `src/Audit/Application/Agent/Review/ReviewOutcomeRecorder.php`.
+
 ### Fixed
 
 - **The native Windows binary is published with releases again.**

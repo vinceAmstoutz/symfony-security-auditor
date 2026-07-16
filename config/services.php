@@ -60,6 +60,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolv
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
@@ -70,6 +71,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterfa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
@@ -78,6 +80,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileH
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AttackerAgentDefinitionFactory;
@@ -103,6 +106,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevP
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\LoggerProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerMessageRendererInterface;
@@ -319,7 +323,21 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->alias(ReviewerMessageRendererInterface::class, ReviewerMessageRenderer::class);
 
     $defaultsConfigurator->set(ReviewerFeedbackHolder::class);
-    $defaultsConfigurator->alias(ReviewerFeedbackProviderInterface::class, ReviewerFeedbackHolder::class);
+
+    $defaultsConfigurator->set(NullTriageMemoryRecorder::class);
+
+    $defaultsConfigurator->set(FilesystemTriageMemoryStore::class)
+        ->args([
+            param('symfony_security_auditor.cache.triage_memory_path'),
+            service(Filesystem::class),
+            service('logger'),
+        ]);
+
+    $defaultsConfigurator->set(CompositeReviewerFeedbackProvider::class)
+        ->args([
+            service(ReviewerFeedbackHolder::class),
+            service(FilesystemTriageMemoryStore::class),
+        ]);
 
     $defaultsConfigurator->set(ReviewerPromptBuilder::class)
         ->args([
@@ -586,6 +604,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
                 service(RecordReviewToolFactoryInterface::class),
                 service(ReviewerCacheInterface::class),
                 service(ProgressReporterHolder::class),
+                service(TriageMemoryRecorderInterface::class),
             ]),
             inline_service(ReviewerModeConfiguration::class)->args([
                 param('symfony_security_auditor.audit.reviewer_batch_size'),

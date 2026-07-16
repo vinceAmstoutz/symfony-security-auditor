@@ -432,6 +432,34 @@ final class BundleConfigurationTest extends TestCase
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
+    public function test_from_array_defaults_triage_memory_to_false_when_audit_key_omits_it(): void
+    {
+        $config = $this->treeBuilderOutput();
+        unset($config['audit']['triage_memory']);
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertFalse($bundleConfiguration->audit->triageMemory);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
+    public function test_from_array_propagates_triage_memory_opt_in(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['audit']['triage_memory'] = true;
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertTrue($bundleConfiguration->audit->triageMemory);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_resolves_fast_profile_for_unset_keys(): void
     {
         $config = $this->profileShapedConfig('fast');
@@ -528,7 +556,7 @@ final class BundleConfigurationTest extends TestCase
      *     reviewer_max_output_tokens?: int|null,
      *     provider_json_mode?: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, import_sarif?: list<string>, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, fail_on?: string, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, fix_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, triage_memory?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, fail_on?: string, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, fix_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * }
      */
@@ -560,7 +588,7 @@ final class BundleConfigurationTest extends TestCase
      *     reviewer_max_output_tokens?: int|null,
      *     provider_json_mode?: bool,
      *     scan: array{included_paths: list<string>, respect_gitignore: bool, max_file_size_kb: int, import_sarif?: list<string>, custom_risk_patterns: array<string, array<string, array{regex: string, description: string}>>, secret_scrubbing: array{enabled: bool, additional_patterns: list<string>}},
-     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, fail_on?: string, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, fix_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
+     *     audit: array{max_iterations: int|null, min_confidence: float, reviewer_batch_size: int, tools_enabled: bool, structured_collection?: bool, reviewer_structured_collection?: bool, stable_system_prompt?: bool, triage_memory?: bool, max_tool_iterations: int, reviewer_tools_enabled: bool, reviewer_max_tool_iterations: int, fail_on?: string, reviewer_max_concurrent: int|null, attacker_max_concurrent: int|null, static_prescan: array{enabled: bool, lean_mode: bool|null}, chunking: array{strategy: string}, poc_synthesis: array{enabled: bool|null, severity_floor: string}, fix_synthesis: array{enabled: bool, severity_floor: string}, code_slicing: array{enabled: bool|null, min_lines_before_slicing: int}, escalation: array{enabled: bool, cheap_model: string|null}, budget: array{max_tokens: int|null, max_cost_usd: float|null}, retry: array{max_attempts: int, initial_delay_ms: int, backoff_multiplier: float, jitter_ratio: float}, rate_limit: array{requests_per_minute: int|null, input_tokens_per_minute: int|null, output_tokens_per_minute: int|null}},
      *     cache: array{enabled: bool, dir: string, prompt_caching: bool},
      * }
      */

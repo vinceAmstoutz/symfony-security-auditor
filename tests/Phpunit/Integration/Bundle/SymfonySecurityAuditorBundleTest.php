@@ -54,10 +54,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
@@ -65,6 +68,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileH
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemReviewerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
@@ -72,6 +76,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSe
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
@@ -681,6 +687,26 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
+    #[MaximumDuration(1250)]
+    public function test_bundle_wires_null_triage_memory_recorder_when_triage_memory_disabled(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+
+        self::assertInstanceOf(NullTriageMemoryRecorder::class, $this->getPrivateService($kernel, TriageMemoryRecorderInterface::class));
+        self::assertInstanceOf(ReviewerFeedbackHolder::class, $this->getPrivateService($kernel, ReviewerFeedbackProviderInterface::class));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(1500)]
+    public function test_bundle_wires_filesystem_triage_memory_store_when_triage_memory_enabled(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['triage_memory' => true]]);
+
+        self::assertInstanceOf(FilesystemTriageMemoryStore::class, $this->getPrivateService($kernel, TriageMemoryRecorderInterface::class));
+        self::assertInstanceOf(CompositeReviewerFeedbackProvider::class, $this->getPrivateService($kernel, ReviewerFeedbackProviderInterface::class));
+    }
+
+    #[RunInSeparateProcess]
     #[MaximumDuration(1500)]
     public function test_bundle_wires_the_ttl_bounded_advisory_cache_when_cache_enabled(): void
     {
@@ -1118,6 +1144,27 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'cache' => ['dir' => '/custom/cache']]);
 
         self::assertSame('/custom/cache/advisory', $containerBuilder->getParameter('symfony_security_auditor.cache.advisory_dir'));
+    }
+
+    public function test_bundle_derives_triage_memory_path_from_cache_dir(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'cache' => ['dir' => '/custom/cache']]);
+
+        self::assertSame('/custom/cache/triage-memory.json', $containerBuilder->getParameter('symfony_security_auditor.cache.triage_memory_path'));
+    }
+
+    public function test_bundle_defaults_triage_memory_to_disabled(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        self::assertFalse($containerBuilder->getParameter('symfony_security_auditor.audit.triage_memory'));
+    }
+
+    public function test_bundle_enables_triage_memory_when_configured(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['triage_memory' => true]]);
+
+        self::assertTrue($containerBuilder->getParameter('symfony_security_auditor.audit.triage_memory'));
     }
 
     public function test_bundle_cache_key_salt_embeds_a_sixteen_char_truncated_pattern_hash(): void
