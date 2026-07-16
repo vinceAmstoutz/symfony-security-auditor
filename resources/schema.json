@@ -169,6 +169,10 @@
               "enum": ["safe", "low", "medium", "high", "critical"],
               "description": "Minimum aggregate risk level that makes audit:run exit 1 (the CI gate). Default: critical (only a CRITICAL risk level fails; planned to become high in the next major). The --fail-on CLI option overrides this."
             },
+            "since_closure": {
+              "enum": ["none", "direct"],
+              "description": "When a --since diff-mode run is active, whether to widen the audited file set beyond the raw git diff. Default: none (audits exactly the changed files). direct additionally pulls in a changed voter's first-degree dependents (controllers guarded by an #[IsGranted] attribute the voter's supports() accepts) from the full project mapping."
+            },
             "excluded_types": {
               "type": "array",
               "items": { "type": "string" },

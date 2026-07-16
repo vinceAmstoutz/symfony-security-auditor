@@ -38,6 +38,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\FixSynthesisStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
@@ -428,6 +429,12 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(VoterCapabilityParserInterface::class),
             service(FormBindingParserInterface::class),
             service(SecurityConfigParserInterface::class),
+        ]);
+
+    $defaultsConfigurator->set(DependencyExpansionStage::class)
+        ->args([
+            service('logger'),
+            param('symfony_security_auditor.audit.since_closure'),
         ]);
 
     $defaultsConfigurator->set(AuditOrchestrator::class)
