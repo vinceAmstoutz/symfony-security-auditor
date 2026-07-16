@@ -22,6 +22,8 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Symfony\AI\Platform\Exception\UnexpectedResultTypeException;
+use Symfony\AI\Platform\FinishReason\FinishReason;
+use Symfony\AI\Platform\FinishReason\FinishReasonCase;
 use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\ToolCallMessage;
@@ -102,6 +104,93 @@ final class SymfonyAiLLMClientTest extends TestCase
         self::assertSame('end_turn', $llmResponse->stopReason());
         self::assertSame(0, $llmResponse->inputTokens());
         self::assertSame(0, $llmResponse->outputTokens());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_surfaces_the_provider_finish_reason_as_stop_reason(): void
+    {
+        $textResult = new TextResult('truncated output');
+        $textResult->getMetadata()->add('finish_reason', new FinishReason(FinishReasonCase::LENGTH, 'max_tokens'));
+        $platform = $this->scriptedPlatform([$textResult]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'test-model', new NullLogger()));
+
+        $llmResponse = $symfonyAiLLMClient->complete('sys', 'usr');
+
+        self::assertSame('max_tokens', $llmResponse->stopReason());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_complete_with_tools_surfaces_the_provider_finish_reason_as_stop_reason(): void
+    {
+        $textResult = new TextResult('truncated output');
+        $textResult->getMetadata()->add('finish_reason', new FinishReason(FinishReasonCase::LENGTH, 'max_tokens'));
+        $platform = $this->scriptedPlatform([$textResult]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'test-model', new NullLogger()));
+
+        $llmResponse = $symfonyAiLLMClient->completeWithTools(
+            'sys',
+            'usr',
+            new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger()),
+            3,
+        );
+
+        self::assertSame('max_tokens', $llmResponse->stopReason());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_complete_batch_surfaces_the_provider_finish_reason_as_stop_reason(): void
+    {
+        $textResult = new TextResult('truncated output');
+        $textResult->getMetadata()->add('finish_reason', new FinishReason(FinishReasonCase::LENGTH, 'max_tokens'));
+        $platform = $this->scriptedPlatform([$textResult]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'test-model', new NullLogger()));
+
+        $responses = $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
+
+        self::assertSame('max_tokens', $responses[0]->stopReason());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_complete_batch_with_tools_surfaces_the_provider_finish_reason_as_stop_reason(): void
+    {
+        $textResult = new TextResult('truncated output');
+        $textResult->getMetadata()->add('finish_reason', new FinishReason(FinishReasonCase::LENGTH, 'max_tokens'));
+        $platform = $this->scriptedPlatform([$textResult]);
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'test-model', new NullLogger()));
+
+        $responses = $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger())],
+        ], 4, 3);
+
+        self::assertSame('max_tokens', $responses[0]->stopReason());
     }
 
     /**

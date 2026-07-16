@@ -266,7 +266,7 @@ final readonly class ToolConversationWavefront
         $state['response'] = LLMResponse::of(
             $this->platformResultExtractor->extractText($platformResult),
             $this->model,
-            'end_turn',
+            $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
             TokenUsageSnapshot::of($state['input'], $state['output'], $state['cacheRead'], $state['cacheCreation']),
         );
 

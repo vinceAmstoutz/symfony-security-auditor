@@ -129,7 +129,7 @@ final readonly class SequentialToolLoop
                 return LLMResponse::of(
                     $content,
                     $this->model,
-                    'end_turn',
+                    $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
                     TokenUsageSnapshot::of($totalInputTokens, $totalOutputTokens, $totalCacheReadTokens, $totalCacheCreationTokens),
                 );
             }

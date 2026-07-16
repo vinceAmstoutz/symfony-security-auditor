@@ -176,6 +176,12 @@ When raising the cap, raise `audit.rate_limit.output_tokens_per_minute`
 proportionally — otherwise the output-tokens bucket becomes the binding
 throttle.
 
+When the provider reports why generation stopped (`symfony/ai` ≥ 0.11 exposes a
+normalized finish reason), the auditor logs an explicit
+`LLM response was truncated by the output token limit` warning — no output-token
+forensics needed. A `LLM response was suppressed by the provider content filter`
+warning likewise flags responses the provider filtered out.
+
 ### `Ollama: model not found`
 
 Pull the model first:

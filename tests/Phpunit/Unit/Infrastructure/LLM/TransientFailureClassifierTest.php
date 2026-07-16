@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Symfony\AI\Platform\Exception\ServerException;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
 
@@ -30,6 +31,7 @@ final class TransientFailureClassifierTest extends TestCase
     /** @return iterable<string, array{Throwable}> */
     public static function transientCases(): iterable
     {
+        yield 'typed_server_exception_without_transient_hints' => [new ServerException(null, 'provider hiccup')];
         yield 'http_429' => [new RuntimeException('HTTP 429 Too Many Requests')];
         yield 'http_500' => [new RuntimeException('Server returned HTTP 500')];
         yield 'http_502' => [new RuntimeException('Bad Gateway 502')];
