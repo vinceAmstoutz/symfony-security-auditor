@@ -92,7 +92,36 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
 
         $entries = $filesystemTriageMemoryStore->feedback()->entries;
 
-        self::assertSame(['src/File1.php', 'src/File2.php'], array_map(static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->file, $entries));
+        self::assertSame(['src/File2.php', 'src/File1.php'], array_map(static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->file, $entries));
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    public function test_feedback_surfaces_the_newest_rejections_first(): void
+    {
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/Old.php', 'title', 'older reason');
+        $this->filesystemTriageMemoryStore->record('xxe', 'src/New.php', 'title', 'newer reason');
+
+        $files = array_map(
+            static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->file,
+            $this->filesystemTriageMemoryStore->feedback()->entries,
+        );
+
+        self::assertSame(['src/New.php', 'src/Old.php'], $files);
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    public function test_a_recorded_reason_is_capped_before_it_is_persisted(): void
+    {
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'title', str_repeat('a', FilesystemTriageMemoryStore::MAX_REASON_LENGTH + 500));
+
+        $entries = $this->filesystemTriageMemoryStore->feedback()->entries;
+
+        self::assertCount(1, $entries);
+        self::assertSame(FilesystemTriageMemoryStore::MAX_REASON_LENGTH, mb_strlen($entries[0]->reason));
     }
 
     /**

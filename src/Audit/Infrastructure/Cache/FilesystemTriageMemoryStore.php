@@ -46,6 +46,14 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
     public const int DEFAULT_MAX_ENTRIES = 500;
 
     /**
+     * Upper bound on a persisted rejection reason. A reason is
+     * reviewer-authored free text replayed into a later run's system prompt;
+     * capping it bounds the injected feedback the JSON review path would
+     * otherwise persist unbounded.
+     */
+    public const int MAX_REASON_LENGTH = 5_000;
+
+    /**
      * @throws InvalidCacheConfigurationException
      */
     public function __construct(
@@ -70,7 +78,9 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
             }
         }
 
-        return new ReviewerFeedback($entries);
+        // Newest first: entries are appended oldest-to-newest on disk, but the
+        // prompt keeps only the first N, so the most recent rejections must lead.
+        return new ReviewerFeedback(array_reverse($entries));
     }
 
     #[Override]
@@ -83,7 +93,7 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
         }
 
         try {
-            $entries = $this->upsert($this->readEntries(), $type, $file, $title, $reason);
+            $entries = $this->upsert($this->readEntries(), $type, $file, $title, $this->cappedReason($reason));
             $encoded = json_encode(\array_slice($entries, -$this->maxEntries), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
             $this->filesystem->dumpFile($this->path, $encoded);
         } catch (Throwable $throwable) {
@@ -149,6 +159,11 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
     private function keyOf(string $type, string $file, string $title): string
     {
         return \sprintf("%s\0%s\0%s", $type, $file, $title);
+    }
+
+    private function cappedReason(string $reason): string
+    {
+        return u($reason)->truncate(self::MAX_REASON_LENGTH)->toString();
     }
 
     /**

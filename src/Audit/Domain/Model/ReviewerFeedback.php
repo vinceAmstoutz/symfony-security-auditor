@@ -41,6 +41,11 @@ final readonly class ReviewerFeedback
     /**
      * Empty feedback digests to the empty string so cache signatures built
      * without feedback stay byte-identical to those of earlier releases.
+     *
+     * The digest is order-independent: the entries are sorted before hashing
+     * so that re-ordering the same set (e.g. the triage-memory store re-writing
+     * its file in a different order between runs) does not spuriously
+     * invalidate cached reviewer verdicts.
      */
     public function digest(): string
     {
@@ -58,6 +63,7 @@ final readonly class ReviewerFeedback
             ),
             $this->entries,
         );
+        sort($lines);
 
         return hash('sha256', implode("\n", $lines));
     }

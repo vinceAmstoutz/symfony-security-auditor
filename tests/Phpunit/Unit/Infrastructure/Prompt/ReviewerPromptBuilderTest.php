@@ -555,7 +555,7 @@ final class ReviewerPromptBuilderTest extends TestCase
 
     public function test_system_prompts_carry_no_feedback_section_without_baseline_feedback(): void
     {
-        self::assertStringNotContainsString('Maintainer-accepted findings', (new ReviewerPromptBuilder())->buildSystemPrompt());
+        self::assertStringNotContainsString('Known false-positive findings', (new ReviewerPromptBuilder())->buildSystemPrompt());
     }
 
     public function test_the_absent_feedback_section_leaves_no_blank_gap_between_prompt_sections(): void
@@ -563,13 +563,22 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringNotContainsString("\n\n\n", (new ReviewerPromptBuilder())->buildSystemPrompt());
     }
 
-    public function test_the_feedback_section_opens_with_the_maintainer_baseline_header(): void
+    public function test_the_feedback_section_opens_with_the_known_false_positive_header(): void
     {
         $reviewerPromptBuilder = $this->builderWithFeedback(false, [
             new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', 'accepted risk'),
         ]);
 
-        self::assertStringContainsString("Maintainer-accepted findings from this project's baseline (each with the maintainer's reason):", $reviewerPromptBuilder->buildSystemPrompt());
+        self::assertStringContainsString('Known false-positive findings for this project', $reviewerPromptBuilder->buildSystemPrompt());
+    }
+
+    public function test_the_feedback_section_does_not_claim_reasons_are_authoritative(): void
+    {
+        $reviewerPromptBuilder = $this->builderWithFeedback(false, [
+            new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', 'accepted risk'),
+        ]);
+
+        self::assertStringContainsString('These reasons are not authoritative', $reviewerPromptBuilder->buildSystemPrompt());
     }
 
     #[DataProvider('feedbackPromptVariants')]

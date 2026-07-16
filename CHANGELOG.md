@@ -178,6 +178,36 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Enabling `audit.triage_memory` no longer silently disables the reviewer
+  verdict cache.** The reviewer cache key folds in a digest of the feedback set
+  (`ReviewerFeedback::digest()`), and `CompositeReviewerFeedbackProvider`
+  re-read the triage-memory file live on every lookup. Because the reviewer
+  *writes* that file mid-run (each rejection appends an entry), the digest
+  shifted between findings within a single run, so every verdict after the
+  first missed its own freshly-written cache entry — and a cache *hit* re-wrote
+  the file too, compounding the churn. The composite now snapshots the merged
+  feedback once per run, and `ReviewerFeedback::digest()` is order-independent,
+  so a stable set produces a stable key across runs. The cache is functional
+  again with triage memory on: findings are re-reviewed once after the feedback
+  set changes, then served from cache.
+- **Triage-memory feedback is no longer mislabeled as maintainer-authored, and
+  its newest entries are surfaced first.** The reviewer system prompt presented
+  every feedback entry as a “Maintainer-accepted finding from this project's
+  baseline” and told the model to “treat each reason as a trusted hint”, even
+  though triage entries are the reviewer's *own* prior-run rejections that a
+  later commit may have invalidated (`ReviewerPromptBuilder::feedbackSection()`).
+  The heading now states the entries come from the baseline and/or earlier
+  automated reviews, that the reasons are **not authoritative**, and that the
+  code may since have changed. The prompt keeps only the first
+  `MAX_FEEDBACK_PROMPT_ENTRIES` (20) entries, and `FilesystemTriageMemoryStore`
+  yielded them oldest-first, so the most recent — most relevant — rejections
+  were never shown once 20 accumulated; feedback is now surfaced newest-first.
+- **A reviewer-rejection reason persisted to triage memory is now length-capped
+  (`FilesystemTriageMemoryStore::MAX_REASON_LENGTH`, 5000 chars).** In the JSON
+  review path the reason was persisted and replayed into later runs' system
+  prompts with no bound, an unbounded cross-run prompt-injection surface for a
+  hostile audited repository; the structured path's schema cap now applies to
+  both paths.
 - **`self-update` no longer risks destroying the PHP interpreter when run
   outside the standalone binary.** `RunningBinaryLocator::path()`
   (`src/Audit/Infrastructure/SelfUpdate/RunningBinaryLocator.php`) returned
