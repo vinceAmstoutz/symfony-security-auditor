@@ -34,6 +34,7 @@ final readonly class FileChunker
         ProjectFileType::AUTHENTICATOR,
         ProjectFileType::LDAP_SERVICE,
         ProjectFileType::SONATA_ADMIN,
+        ProjectFileType::EASYADMIN_CRUD,
         ProjectFileType::VOTER,
         ProjectFileType::WEBHOOK_CONSUMER,
         ProjectFileType::MESSENGER_HANDLER,
@@ -176,9 +177,11 @@ final readonly class FileChunker
     private function featureNameOf(ProjectFile $projectFile): ?string
     {
         $baseName = basename($projectFile->relativePath(), '.php');
-        $featureName = ProjectFileType::CONTROLLER === $projectFile->fileType()
-            ? u($baseName)->beforeLast('Controller')->toString()
-            : $baseName;
+        $featureName = match ($projectFile->fileType()) {
+            ProjectFileType::CONTROLLER => u($baseName)->beforeLast('Controller')->toString(),
+            ProjectFileType::EASYADMIN_CRUD => u($baseName)->beforeLast('CrudController')->toString(),
+            default => $baseName,
+        };
 
         return '' === $featureName ? null : $featureName;
     }

@@ -22,7 +22,7 @@ final readonly class ControllerEasyAdminAttackerSkill implements AttackerSkillIn
     #[Override]
     public function fileType(): ProjectFileType
     {
-        return ProjectFileType::CONTROLLER;
+        return ProjectFileType::EASYADMIN_CRUD;
     }
 
     #[Override]

@@ -52,6 +52,9 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'sonata admin by suffix' => ['src/Backoffice/StoreAdmin.php', '<?php', ProjectFileType::SONATA_ADMIN];
         yield 'sonata admin by directory' => ['src/Admin/StoreManager.php', '<?php', ProjectFileType::SONATA_ADMIN];
         yield 'sonata admin by base class without suffix or directory' => ['src/Backoffice/StoreManager.php', "<?php\nclass StoreManager extends AbstractAdmin {}", ProjectFileType::SONATA_ADMIN];
+        yield 'easyadmin crud by suffix wins over the controller directory' => ['src/Controller/Admin/ProductCrudController.php', '<?php', ProjectFileType::EASYADMIN_CRUD];
+        yield 'easyadmin crud by base class without suffix' => ['src/Controller/Admin/ProductManager.php', "<?php\nclass ProductManager extends AbstractCrudController {}", ProjectFileType::EASYADMIN_CRUD];
+        yield 'easyadmin crud by interface without suffix' => ['src/Controller/Admin/ProductManager.php', "<?php\nclass ProductManager implements CrudControllerInterface {}", ProjectFileType::EASYADMIN_CRUD];
         yield 'messenger handler by suffix' => ['src/Messenger/SendInvoiceMessageHandler.php', '<?php', ProjectFileType::MESSENGER_HANDLER];
         yield 'messenger handler by attribute' => ['src/Handler/ProcessPaymentAction.php', "<?php\n#[AsMessageHandler]\nclass ProcessPaymentAction {}", ProjectFileType::MESSENGER_HANDLER];
         yield 'webhook consumer by suffix' => ['src/Webhook/StripeWebhookConsumer.php', '<?php', ProjectFileType::WEBHOOK_CONSUMER];

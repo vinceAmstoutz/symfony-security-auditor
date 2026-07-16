@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 31;
+    public const int CACHE_VERSION = 32;
 
     /**
      * Detects the `s` (DOTALL) flag among a PCRE pattern's trailing modifier
@@ -156,14 +156,6 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'forwarded_host_usage' => [
                 'regex' => '/->(?:getHost|getSchemeAndHttpHost|getHttpHost)\s*\(/',
                 'description' => 'Request::getHost()/getSchemeAndHttpHost() — verify trusted_proxies/trusted_hosts are configured before this value is used in a link or cache key (host header injection / cache poisoning)',
-            ],
-            'easyadmin_sensitive_field' => [
-                'regex' => '/\w*Field::new\s*\(\s*[\'"](?:roles?|password|isAdmin|isSuperAdmin)[\'"]/i',
-                'description' => "EasyAdmin field exposes a privileged property (roles/password/isAdmin) in configureFields() — verify it is gated with ->setPermission('ROLE_...') so only a super-admin can see/edit it",
-            ],
-            'easyadmin_destructive_action' => [
-                'regex' => '/Action::(?:DELETE|BATCH_DELETE)\b/',
-                'description' => 'EasyAdmin DELETE/BATCH_DELETE action referenced in configureActions() — verify it is scoped with ->setPermission(Action::DELETE, \'ROLE_...\'), not left at the dashboard\'s default role',
             ],
         ],
         ProjectFileType::VOTER->value => [
@@ -355,7 +347,17 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             ],
             'sonata_admin_batch_action' => [
                 'regex' => '/function\s+getBatchActions\s*\(/',
-                'description' => 'Custom batch actions declared — verify checkAccess() re-validates per-object before a bulk delete/edit executes',
+                'description' => 'Custom batch actions declared — verify a per-object guard re-validates before a bulk delete/edit executes: a dedicated Security Voter on SonataAdminBundle 4.x (checkAccess()/hasAccess() are final there and can no longer be overridden), or an overridden checkAccess() on 3.x',
+            ],
+        ],
+        ProjectFileType::EASYADMIN_CRUD->value => [
+            'easyadmin_sensitive_field' => [
+                'regex' => '/\w*Field::new\s*\(\s*[\'"](?:roles?|password|isAdmin|isSuperAdmin)[\'"]/i',
+                'description' => "EasyAdmin field exposes a privileged property (roles/password/isAdmin) in configureFields() — verify it is gated with ->setPermission('ROLE_...') so only a super-admin can see/edit it",
+            ],
+            'easyadmin_destructive_action' => [
+                'regex' => '/Action::(?:DELETE|BATCH_DELETE)\b/',
+                'description' => 'EasyAdmin DELETE/BATCH_DELETE action referenced in configureActions() — verify it is scoped with ->setPermission(Action::DELETE, \'ROLE_...\'), not left at the dashboard\'s default role',
             ],
         ],
         ProjectFileType::MESSENGER_HANDLER->value => [
@@ -462,8 +464,9 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
     /**
      * The request-input markers (`request_get`, `redirect_with_input`,
      * `submit_request_all`, `request_mapping_attribute`) live in the CONTROLLER
-     * bucket, but `#[ApiResource]` and `#[AsLiveComponent]` classes classify as
-     * their own type while still declaring `#[Route]`-mapped actions that read
+     * bucket, but `#[ApiResource]` classes, `#[AsLiveComponent]` classes, and
+     * EasyAdmin `AbstractCrudController` classes classify as their own type
+     * while still declaring `#[Route]`-mapped or custom actions that read
      * `$request` — the controller-like pattern the mapping parsers and the
      * chunker already honour via {@see ProjectFileType::isControllerLike()}.
      * Without this merge, such an action produces zero markers and is excluded

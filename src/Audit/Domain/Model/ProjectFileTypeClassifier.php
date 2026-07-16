@@ -18,6 +18,7 @@ final readonly class ProjectFileTypeClassifier
     public static function classify(string $path, string $content): ProjectFileType
     {
         return match (true) {
+            self::isEasyAdminCrudPath($path), self::looksLikeEasyAdminCrud($path, $content) => ProjectFileType::EASYADMIN_CRUD,
             self::isControllerPath($path) => ProjectFileType::CONTROLLER,
             self::looksLikeApiResource($path, $content) => ProjectFileType::API_RESOURCE,
             self::looksLikeLiveComponent($path, $content) => ProjectFileType::LIVE_COMPONENT,
@@ -40,6 +41,18 @@ final readonly class ProjectFileTypeClassifier
             str_ends_with($path, '.php') => ProjectFileType::PHP,
             default => ProjectFileType::OTHER,
         };
+    }
+
+    private static function isEasyAdminCrudPath(string $path): bool
+    {
+        return str_ends_with($path, 'CrudController.php');
+    }
+
+    private static function looksLikeEasyAdminCrud(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && (str_contains($content, 'extends AbstractCrudController')
+                || str_contains($content, 'implements CrudControllerInterface'));
     }
 
     private static function isControllerPath(string $path): bool

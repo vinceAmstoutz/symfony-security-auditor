@@ -173,6 +173,11 @@ final readonly class ProjectFile
         return ProjectFileType::LIVE_COMPONENT === $this->projectFileType;
     }
 
+    public function isEasyAdminCrud(): bool
+    {
+        return ProjectFileType::EASYADMIN_CRUD === $this->projectFileType;
+    }
+
     public function isTwigExtension(): bool
     {
         return ProjectFileType::TWIG_EXTENSION === $this->projectFileType;
@@ -208,6 +213,10 @@ final readonly class ProjectFile
         }
 
         if ($this->isLiveComponent()) {
+            return true;
+        }
+
+        if ($this->isEasyAdminCrud()) {
             return true;
         }
 

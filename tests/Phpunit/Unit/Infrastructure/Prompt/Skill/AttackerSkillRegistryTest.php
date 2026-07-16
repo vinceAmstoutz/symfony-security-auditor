@@ -70,7 +70,7 @@ final class AttackerSkillRegistryTest extends TestCase
         yield 'controller' => [new ControllerAttackerSkill(), ProjectFileType::CONTROLLER, 10, 'controller'];
         yield 'file_upload_controller' => [new ControllerFileUploadAttackerSkill(), ProjectFileType::CONTROLLER, 15, 'file_upload_controller'];
         yield 'controller_trust_boundary' => [new ControllerTrustBoundaryAttackerSkill(), ProjectFileType::CONTROLLER, 17, 'controller_trust_boundary'];
-        yield 'controller_easyadmin' => [new ControllerEasyAdminAttackerSkill(), ProjectFileType::CONTROLLER, 18, 'controller_easyadmin'];
+        yield 'controller_easyadmin' => [new ControllerEasyAdminAttackerSkill(), ProjectFileType::EASYADMIN_CRUD, 18, 'controller_easyadmin'];
         yield 'api_resource' => [new ApiResourceAttackerSkill(), ProjectFileType::API_RESOURCE, 20, 'api_resource'];
         yield 'live_component' => [new LiveComponentAttackerSkill(), ProjectFileType::LIVE_COMPONENT, 30, 'live_component'];
         yield 'authenticator' => [new AuthenticatorAttackerSkill(), ProjectFileType::AUTHENTICATOR, 40, 'authenticator'];
@@ -172,12 +172,13 @@ final class AttackerSkillRegistryTest extends TestCase
      */
     public static function everyFileTypeWithASkill(): iterable
     {
-        yield 'controller' => [ProjectFileType::CONTROLLER, ['controller', 'file_upload_controller', 'controller_trust_boundary', 'controller_easyadmin']];
+        yield 'controller' => [ProjectFileType::CONTROLLER, ['controller', 'file_upload_controller', 'controller_trust_boundary']];
         yield 'api_resource' => [ProjectFileType::API_RESOURCE, ['api_resource']];
         yield 'live_component' => [ProjectFileType::LIVE_COMPONENT, ['live_component']];
         yield 'authenticator' => [ProjectFileType::AUTHENTICATOR, ['authenticator']];
         yield 'ldap_service' => [ProjectFileType::LDAP_SERVICE, ['ldap_service']];
         yield 'sonata_admin' => [ProjectFileType::SONATA_ADMIN, ['sonata_admin']];
+        yield 'easyadmin_crud' => [ProjectFileType::EASYADMIN_CRUD, ['controller_easyadmin']];
         yield 'voter' => [ProjectFileType::VOTER, ['voter']];
         yield 'webhook_consumer' => [ProjectFileType::WEBHOOK_CONSUMER, ['webhook_consumer']];
         yield 'messenger_handler' => [ProjectFileType::MESSENGER_HANDLER, ['messenger_handler']];

@@ -986,6 +986,21 @@ final class ProjectFileTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_detects_easyadmin_crud_by_suffix(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/Admin/ProductCrudController.php',
+            '/app/src/Controller/Admin/ProductCrudController.php',
+            '<?php',
+        );
+
+        self::assertSame('easyadmin_crud', $projectFile->type());
+        self::assertTrue($projectFile->isEasyAdminCrud());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_messenger_handler_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -1244,6 +1259,20 @@ final class ProjectFileTest extends TestCase
         $projectFile = ProjectFile::create(
             'src/Admin/FooAdmin.php',
             '/app/src/Admin/FooAdmin.php',
+            '<?php',
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_is_service_returns_false_for_easyadmin_crud(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/Admin/FooCrudController.php',
+            '/app/src/Controller/Admin/FooCrudController.php',
             '<?php',
         );
 

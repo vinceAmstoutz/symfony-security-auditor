@@ -280,8 +280,9 @@ construction time by `ProjectFileTypeClassifier::classify()` (the single
 `match(true)` over path/content heuristics — pure Domain, no I/O).
 Classification methods (`isController()`, `isEntity()`, `isVoter()`,
 `isRepository()`, `isForm()`, `isAuthenticator()`, `isLdapService()`,
-`isSonataAdmin()`, `isMessengerHandler()`, `isEventSubscriber()`,
-`isNormalizer()`, `isWebhookConsumer()`, `isScheduler()`, `isTemplate()`) are
+`isSonataAdmin()`, `isEasyAdminCrud()`, `isMessengerHandler()`,
+`isEventSubscriber()`, `isNormalizer()`, `isWebhookConsumer()`,
+`isScheduler()`, `isTemplate()`) are
 thin comparisons against `fileType()`, so they can never disagree with it;
 `isService()` is the one derived predicate (true for a `.php` file whose
 `fileType()` is none of the above). `isConfiguration()` is deliberately

@@ -38,7 +38,7 @@ final readonly class SonataAdminAttackerSkill implements AttackerSkillInterface
             <skills role="sonata_admin">
             Hunt:
             - `configureFormFields()`/`configureListFields()` exposing a privileged field (`roles`, `password`, `isAdmin`, `isSuperAdmin`) for edit by every role that can reach this admin class — Sonata Admin routes a class-level role by default, so any field surfaced here is editable by everyone with access to the panel, not only a super-admin.
-            - No overridden `checkAccess()` on an admin whose entity is scoped to a tenant/owner — Sonata's default access check is class-level only; verify a per-object ownership check (custom `checkAccess()` or a delegated voter) gates `edit`/`delete`/`show` before this admin is trusted with multi-tenant data.
+            - No per-object ownership check on an admin whose entity is scoped to a tenant/owner — Sonata's default access check is class-level only. On SonataAdminBundle 4.x, `checkAccess()`/`hasAccess()` are `final` and can no longer be overridden, so the guard must come from a dedicated Security Voter wired via `getAccessMapping()`; on 3.x, an overridden `checkAccess()` is still valid. Flag a tenant-scoped admin with neither before trusting it with multi-tenant data.
             - `configureRoutes()` leaving destructive actions (`delete`, `batch`) enabled for an entity whose workflow never needs them — an action left in inherits the class-level role rather than a narrower one.
             - A custom action (`getAccessMapping()` / a route added via `configureRoutes()->add(...)`) with no matching role declared — Sonata falls back to its default role for anything not explicitly mapped.
             Do NOT flag:

@@ -167,15 +167,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `SonataAdminAttackerSkill` hunts Sonata
   `configureFormFields()`/`configureListFields()` exposing a privileged field
   (`roles`, `password`, `isAdmin`) to every role that can reach the panel, and
-  admins without an overridden `checkAccess()` guarding multi-tenant data
-  (Sonata's default access check is class-level, not per-object). A third new
-  skill, `ControllerEasyAdminAttackerSkill` (`CONTROLLER`-typed, since EasyAdmin
-  CRUD controllers already classify that way), hunts the equivalent gap in
-  EasyAdmin: `configureFields()` fields exposing `roles`/`password`/`isAdmin`
+  admins with no per-object ownership check guarding multi-tenant data (Sonata's
+  default access check is class-level, not per-object) — on SonataAdminBundle
+  4.x `checkAccess()`/`hasAccess()` are `final` and can no longer be overridden,
+  so the skill looks for a dedicated Security Voter wired via
+  `getAccessMapping()` there, or an overridden `checkAccess()` on 3.x. A third
+  new `ProjectFileType` case, `easyadmin_crud` (classified by a
+  `CrudController.php` suffix, `extends AbstractCrudController`, or
+  `implements CrudControllerInterface` — stable across EasyAdmin 3.x/4.x/5.x),
+  routes to `ControllerEasyAdminAttackerSkill`, which hunts the equivalent gap
+  in EasyAdmin: `configureFields()` fields exposing `roles`/`password`/`isAdmin`
   with no `->setPermission('ROLE_...')` scoping, and `configureActions()`
   leaving `Action::DELETE`/`Action::BATCH_DELETE` without a matching
   `->setPermission(Action::…, 'ROLE_...')` call. `RegexStaticPreScanner` gained
-  six matching risk markers (`CACHE_VERSION` bumped to 31):
+  six matching risk markers (`CACHE_VERSION` bumped to 32):
   `ldap_unescaped_filter_concat`, `ldap_bind_variable_password`,
   `sonata_admin_sensitive_field_exposed`, `sonata_admin_batch_action`,
   `easyadmin_sensitive_field`, `easyadmin_destructive_action`. A new

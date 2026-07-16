@@ -109,6 +109,27 @@ final class FileChunkerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_feature_strategy_groups_an_easyadmin_crud_controller_with_its_repository(): void
+    {
+        $files = [
+            $this->makeFile('src/Controller/Admin/ProductCrudController.php'),
+            $this->makeFile('src/Repository/ProductRepository.php'),
+            $this->makeFile('src/Entity/Order.php'),
+        ];
+
+        $chunks = (new FileChunker(ChunkingStrategy::Feature, 10))->chunk($files);
+
+        $productChunk = $this->findChunkContaining($chunks, 'src/Controller/Admin/ProductCrudController.php');
+        self::assertNotNull($productChunk);
+        $productChunkPaths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $productChunk);
+        self::assertContains('src/Repository/ProductRepository.php', $productChunkPaths);
+        self::assertNotContains('src/Entity/Order.php', $productChunkPaths);
+        self::assertSame('src/Controller/Admin/ProductCrudController.php', $productChunk[0]->relativePath());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_feature_strategy_groups_templates_under_matching_directory(): void
     {
         $files = [
