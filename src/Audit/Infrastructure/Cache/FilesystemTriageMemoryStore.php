@@ -85,7 +85,6 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
         try {
             $entries = $this->upsert($this->readEntries(), $type, $file, $title, $reason);
             $encoded = json_encode(\array_slice($entries, -$this->maxEntries), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
-            $this->filesystem->mkdir(\dirname($this->path));
             $this->filesystem->dumpFile($this->path, $encoded);
         } catch (Throwable $throwable) {
             $this->logger->warning('Failed to write triage memory entry', [

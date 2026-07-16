@@ -321,6 +321,31 @@ final class ReviewOutcomeRecorderTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_a_rejected_verdict_with_whitespace_only_reviewer_notes_is_not_recorded_to_triage_memory(): void
+    {
+        $triageMemoryRecorder = $this->createMock(TriageMemoryRecorderInterface::class);
+        $triageMemoryRecorder->expects(self::never())->method('record');
+
+        $reviewOutcomeRecorder = new ReviewOutcomeRecorder(
+            new VerdictApplier(new NullLogger()),
+            new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()),
+            new NullLogger(),
+            self::createStub(ProgressReporterInterface::class),
+            $triageMemoryRecorder,
+        );
+
+        $reviewOutcomeRecorder->recordVerdict(
+            $this->vulnerability(),
+            ['accepted' => false, 'reviewer_notes' => '   '],
+            new NullCoverageRecorder(),
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_a_finding_without_any_verdict_is_not_recorded_to_triage_memory(): void
     {
         $triageMemoryRecorder = $this->createMock(TriageMemoryRecorderInterface::class);

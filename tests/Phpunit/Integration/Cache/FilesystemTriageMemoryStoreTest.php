@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Cache;
 
 use Override;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
@@ -174,17 +175,78 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
     /**
      * @throws InvalidCacheConfigurationException
      */
-    public function test_record_logs_a_warning_and_does_not_throw_when_the_write_fails(): void
+    public function test_record_logs_the_path_and_error_and_does_not_throw_when_the_write_fails(): void
     {
         $filesystem = self::createStub(Filesystem::class);
         $filesystem->method('exists')->willReturn(false);
         $filesystem->method('dumpFile')->willThrowException(new IOException('disk full'));
 
-        $filesystemTriageMemoryStore = new FilesystemTriageMemoryStore($this->memoryPath, $filesystem, new NullLogger());
+        /** @var list<array{string, array<string, string>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
 
+        $filesystemTriageMemoryStore = new FilesystemTriageMemoryStore($this->memoryPath, $filesystem, $logger);
         $filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'T', 'reason');
 
         self::assertTrue($filesystemTriageMemoryStore->feedback()->isEmpty());
+        self::assertSame([['Failed to write triage memory entry', ['path' => $this->memoryPath, 'error' => 'disk full']]], $warnings);
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    public function test_record_logs_the_path_when_refusing_a_symlinked_memory_file(): void
+    {
+        $outsideTarget = sys_get_temp_dir().'/triage_memory_symlink_log_target_'.uniqid('', true);
+        file_put_contents($outsideTarget, 'ORIGINAL');
+        mkdir(\dirname($this->memoryPath), recursive: true);
+        symlink($outsideTarget, $this->memoryPath);
+
+        /** @var list<array{string, array<string, string>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        try {
+            (new FilesystemTriageMemoryStore($this->memoryPath, $this->filesystem(), $logger))->record('sql_injection', 'src/A.php', 'T', 'reason');
+        } finally {
+            unlink($outsideTarget);
+        }
+
+        self::assertSame([['Triage memory path was a symlink, skipping write', ['path' => $this->memoryPath]]], $warnings);
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    public function test_feedback_logs_the_path_and_error_when_the_file_cannot_be_read(): void
+    {
+        $filesystem = self::createStub(Filesystem::class);
+        $filesystem->method('exists')->willReturn(true);
+        $filesystem->method('readFile')->willThrowException(new IOException('permission denied'));
+
+        /** @var list<array{string, array<string, string>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $feedback = (new FilesystemTriageMemoryStore($this->memoryPath, $filesystem, $logger))->feedback();
+
+        self::assertTrue($feedback->isEmpty());
+        self::assertSame([['Triage memory file was unreadable, ignoring', ['path' => $this->memoryPath, 'error' => 'permission denied']]], $warnings);
     }
 
     /**
