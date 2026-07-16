@@ -58,6 +58,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `fail-on` input (previously reachable only through `extra-args`).
   Implementation lives in `action.yml`.
 
+- **The attacker now hunts weak password hashing and permissive CORS
+  configuration.** Two new `VulnerabilityType` cases — `weak_password_hashing`
+  (CWE-916, OWASP A04:2025 - Cryptographic Failures) and
+  `permissive_cors_origin` (CWE-942, OWASP A02:2025 - Security
+  Misconfiguration). `RegexStaticPreScanner` gained three matching `CONFIG` risk
+  markers (`CACHE_VERSION` bumped to 28): `weak_password_hasher_algorithm` flags
+  `security.password_hashers.*.algorithm` set to `plaintext`, `md5`, or `sha1`
+  instead of `auto`; `remember_me_secure_false` flags a `remember_me` firewall
+  cookie configured with `secure: false`; `unanchored_cors_origin_regex` flags
+  NelmioCors `origin_regex: true`, prompting a check that every `allow_origin`
+  pattern is anchored with `^...$` (an unanchored regex matches as a substring
+  and can allow unintended origins). `ConfigAttackerSkill` gained matching hunt
+  bullets, and `AuthenticatorAttackerSkill`'s blanket "do not flag
+  `RememberMeBadge`" carve-out was narrowed to only exempt
+  conditionally-attached badges — a `RememberMeBadge` attached unconditionally
+  (not gated on a user-submitted "remember me" flag) is now flagged, since it
+  issues a long-lived authentication cookie for every login regardless of
+  consent. Implementation lives in
+  `src/Audit/Domain/Model/VulnerabilityType.php`,
+  `src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`, and
+  `src/Audit/Infrastructure/Prompt/Skill/`.
+
 ### Fixed
 
 - **The native Windows binary is published with releases again.**

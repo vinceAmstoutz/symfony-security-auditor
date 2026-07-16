@@ -877,6 +877,123 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    #[DataProvider('weakPasswordHasherAlgorithmCases')]
+    public function test_it_flags_a_weak_password_hasher_algorithm(string $algorithm): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/security.yaml',
+            '/app/config/packages/security.yaml',
+            \sprintf("security:\n    password_hashers:\n        App\\Entity\\User:\n            algorithm: %s", $algorithm),
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('weak_password_hasher_algorithm', $patterns);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function weakPasswordHasherAlgorithmCases(): iterable
+    {
+        yield 'plaintext' => ['plaintext'];
+        yield 'md5' => ['md5'];
+        yield 'sha1' => ['sha1'];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_the_default_password_hasher_algorithm(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/security.yaml',
+            '/app/config/packages/security.yaml',
+            "security:\n    password_hashers:\n        App\\Entity\\User:\n            algorithm: auto",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('weak_password_hasher_algorithm', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_a_remember_me_cookie_without_secure(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/security.yaml',
+            '/app/config/packages/security.yaml',
+            "security:\n    firewalls:\n        main:\n            remember_me:\n                secret: '%kernel.secret%'\n                secure: false",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('remember_me_secure_false', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_a_remember_me_cookie_marked_secure(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/security.yaml',
+            '/app/config/packages/security.yaml',
+            "security:\n    firewalls:\n        main:\n            remember_me:\n                secret: '%kernel.secret%'\n                secure: true",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('remember_me_secure_false', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_flags_an_unanchored_cors_origin_regex(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/nelmio_cors.yaml',
+            '/app/config/packages/nelmio_cors.yaml',
+            "nelmio_cors:\n    paths:\n        '^/api/':\n            allow_origin: ['^https://.*\\.example\\.com']\n            origin_regex: true",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('unanchored_cors_origin_regex', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_cors_config_without_a_regex_origin(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/nelmio_cors.yaml',
+            '/app/config/packages/nelmio_cors.yaml',
+            "nelmio_cors:\n    paths:\n        '^/api/':\n            allow_origin: ['https://example.com']",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('unanchored_cors_origin_regex', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     public function test_it_flags_form_submit_with_request_all_split_across_lines(): void
     {
         $projectFile = ProjectFile::create(

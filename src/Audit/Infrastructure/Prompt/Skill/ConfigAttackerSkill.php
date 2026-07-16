@@ -50,6 +50,9 @@ final readonly class ConfigAttackerSkill implements AttackerSkillInterface
             - `framework.html_sanitizer` sanitizers with `allow_static_elements: true` plus a broad `allow_elements`/`allow_attributes` list — XSS via "sanitized" output.
             - `framework.http_client.scoped_clients.*.verify_peer: false` / `verify_host: false` — MITM exposure.
             - `messenger.routing` directing privileged commands to a transport with `failure_transport: null` — silent loss of audit trail.
+            - `security.password_hashers.*.algorithm` set to `plaintext`, `md5`, or `sha1` instead of `auto` (bcrypt/argon2id) — fast, unsalted or reversible hashing.
+            - `remember_me` cookie configured with `secure: false` — a long-lived authentication cookie sent over plain HTTP.
+            - NelmioCors `origin_regex: true` paired with an `allow_origin` pattern that is not anchored with `^...$` — an unanchored regex matches as a substring and can allow unintended origins.
             Do NOT flag:
             - Environment-variable references like `%env(DATABASE_URL)%` — those are externalized, not hardcoded.
             - `_profiler` / `_wdt` declarations gated by `when@dev` / `when@test`.
