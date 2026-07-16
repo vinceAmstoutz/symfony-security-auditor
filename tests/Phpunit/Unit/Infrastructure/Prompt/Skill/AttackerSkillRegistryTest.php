@@ -17,6 +17,7 @@ use ArrayIterator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AdminPanelAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ApiResourceAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
@@ -30,6 +31,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\Entit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EventSubscriberAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FormAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\LdapServiceAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\LiveComponentAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\MessengerHandlerAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\NormalizerAttackerSkill;
@@ -70,6 +72,8 @@ final class AttackerSkillRegistryTest extends TestCase
         yield 'api_resource' => [new ApiResourceAttackerSkill(), ProjectFileType::API_RESOURCE, 20, 'api_resource'];
         yield 'live_component' => [new LiveComponentAttackerSkill(), ProjectFileType::LIVE_COMPONENT, 30, 'live_component'];
         yield 'authenticator' => [new AuthenticatorAttackerSkill(), ProjectFileType::AUTHENTICATOR, 40, 'authenticator'];
+        yield 'ldap_service' => [new LdapServiceAttackerSkill(), ProjectFileType::LDAP_SERVICE, 42, 'ldap_service'];
+        yield 'admin_panel' => [new AdminPanelAttackerSkill(), ProjectFileType::ADMIN_PANEL, 45, 'admin_panel'];
         yield 'voter' => [new VoterAttackerSkill(), ProjectFileType::VOTER, 50, 'voter'];
         yield 'webhook_consumer' => [new WebhookConsumerAttackerSkill(), ProjectFileType::WEBHOOK_CONSUMER, 60, 'webhook_consumer'];
         yield 'messenger_handler' => [new MessengerHandlerAttackerSkill(), ProjectFileType::MESSENGER_HANDLER, 70, 'messenger_handler'];
@@ -105,7 +109,7 @@ final class AttackerSkillRegistryTest extends TestCase
 
         $output = $attackerSkillRegistry->render([], emitAll: true);
 
-        self::assertSame(22, substr_count($output, '<skills role="'));
+        self::assertSame(24, substr_count($output, '<skills role="'));
     }
 
     public function test_it_emits_blocks_in_attack_surface_priority_order(): void
@@ -123,6 +127,8 @@ final class AttackerSkillRegistryTest extends TestCase
             'api_resource',
             'live_component',
             'authenticator',
+            'ldap_service',
+            'admin_panel',
             'voter',
             'webhook_consumer',
             'messenger_handler',
@@ -167,6 +173,8 @@ final class AttackerSkillRegistryTest extends TestCase
         yield 'api_resource' => [ProjectFileType::API_RESOURCE, ['api_resource']];
         yield 'live_component' => [ProjectFileType::LIVE_COMPONENT, ['live_component']];
         yield 'authenticator' => [ProjectFileType::AUTHENTICATOR, ['authenticator']];
+        yield 'ldap_service' => [ProjectFileType::LDAP_SERVICE, ['ldap_service']];
+        yield 'admin_panel' => [ProjectFileType::ADMIN_PANEL, ['admin_panel']];
         yield 'voter' => [ProjectFileType::VOTER, ['voter']];
         yield 'webhook_consumer' => [ProjectFileType::WEBHOOK_CONSUMER, ['webhook_consumer']];
         yield 'messenger_handler' => [ProjectFileType::MESSENGER_HANDLER, ['messenger_handler']];

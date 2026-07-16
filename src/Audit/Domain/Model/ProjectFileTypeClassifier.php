@@ -27,6 +27,8 @@ final readonly class ProjectFileTypeClassifier
             self::isFormPath($path), self::looksLikeForm($path, $content) => ProjectFileType::FORM,
             self::isEntityPath($path), self::looksLikeEntity($path, $content) => ProjectFileType::ENTITY,
             str_ends_with($path, 'Authenticator.php'), self::looksLikeAuthenticator($path, $content) => ProjectFileType::AUTHENTICATOR,
+            self::isLdapServicePath($path), self::looksLikeLdapService($path, $content) => ProjectFileType::LDAP_SERVICE,
+            self::isAdminPanelPath($path), self::looksLikeAdminPanel($path, $content) => ProjectFileType::ADMIN_PANEL,
             self::isMessengerHandlerPath($path), self::looksLikeMessengerHandler($path, $content) => ProjectFileType::MESSENGER_HANDLER,
             self::isWebhookConsumerPath($path), self::looksLikeWebhookConsumer($path, $content) => ProjectFileType::WEBHOOK_CONSUMER,
             str_ends_with($path, 'Subscriber.php') || str_ends_with($path, 'EventListener.php'), self::looksLikeEventSubscriber($path, $content) => ProjectFileType::EVENT_SUBSCRIBER,
@@ -130,6 +132,30 @@ final readonly class ProjectFileTypeClassifier
         return str_ends_with($path, '.php')
             && (str_contains($content, 'implements ExtensionInterface')
                 || str_contains($content, 'extends AbstractExtension'));
+    }
+
+    private static function isLdapServicePath(string $path): bool
+    {
+        return str_ends_with($path, 'Ldap.php')
+            || (str_contains($path, '/Ldap/') && str_ends_with($path, '.php'));
+    }
+
+    private static function looksLikeLdapService(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && str_contains($content, 'Symfony\\Component\\Ldap');
+    }
+
+    private static function isAdminPanelPath(string $path): bool
+    {
+        return str_ends_with($path, 'Admin.php')
+            || (str_contains($path, '/Admin/') && str_ends_with($path, '.php'));
+    }
+
+    private static function looksLikeAdminPanel(string $path, string $content): bool
+    {
+        return str_ends_with($path, '.php')
+            && str_contains($content, 'extends AbstractAdmin');
     }
 
     private static function isMessengerHandlerPath(string $path): bool

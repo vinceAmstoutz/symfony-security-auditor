@@ -56,6 +56,8 @@ final readonly class ConfigAttackerSkill implements AttackerSkillInterface
             - A Content-Security-Policy directive allowing `'unsafe-inline'` or `'unsafe-eval'` — defeats CSP's main protection against injected/inline script execution.
             - NelmioSecurity `forced_ssl.enabled: false` — HSTS not enforced, leaving the first plaintext request open to SSL-stripping.
             - `APP_DEBUG=1` (or `=true`) in a committed base `.env` file with no environment-specific override visible — if it reaches production, the Symfony error page leaks stack traces, source paths, and environment variables.
+            - `MERCURE_JWT_SECRET` still set to the recipe's default placeholder value — anyone can forge a JWT and publish/subscribe to any topic on the hub.
+            - A Mercure JWT `publish`/`subscribe` claim scoped to `'*'` — grants access to every topic instead of the specific ones this client needs.
             Do NOT flag:
             - Environment-variable references like `%env(DATABASE_URL)%` — those are externalized, not hardcoded.
             - `_profiler` / `_wdt` declarations gated by `when@dev` / `when@test`.

@@ -32,6 +32,8 @@ final readonly class FileChunker
         ProjectFileType::API_RESOURCE,
         ProjectFileType::LIVE_COMPONENT,
         ProjectFileType::AUTHENTICATOR,
+        ProjectFileType::LDAP_SERVICE,
+        ProjectFileType::ADMIN_PANEL,
         ProjectFileType::VOTER,
         ProjectFileType::WEBHOOK_CONSUMER,
         ProjectFileType::MESSENGER_HANDLER,

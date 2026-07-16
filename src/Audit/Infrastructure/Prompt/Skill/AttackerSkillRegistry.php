@@ -69,6 +69,8 @@ final readonly class AttackerSkillRegistry
             new ApiResourceAttackerSkill(),
             new LiveComponentAttackerSkill(),
             new AuthenticatorAttackerSkill(),
+            new LdapServiceAttackerSkill(),
+            new AdminPanelAttackerSkill(),
             new VoterAttackerSkill(),
             new WebhookConsumerAttackerSkill(),
             new MessengerHandlerAttackerSkill(),

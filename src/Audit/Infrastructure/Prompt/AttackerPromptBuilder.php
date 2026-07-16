@@ -212,7 +212,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
             cache_poisoning, mailer_header_injection, webhook_replay, authenticator_bypass,
             over_permissive_serializer_group, host_header_injection, trusted_proxy_misconfiguration,
             weak_password_hashing, permissive_cors_origin, weak_content_security_policy,
-            missing_transport_security, debug_mode_enabled
+            missing_transport_security, debug_mode_enabled, permissive_mercure_topic_selector
 
             Severity rubric (calibrate every finding against this scale — do NOT inflate severity for emphasis):
             - critical: unauthenticated RCE, full authentication bypass, mass data exfiltration without auth, hardcoded production secret in a committed file.

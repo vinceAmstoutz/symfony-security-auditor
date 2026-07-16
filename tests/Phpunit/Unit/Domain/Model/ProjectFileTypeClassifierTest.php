@@ -46,6 +46,12 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'repository by suffix wins over a colocated entity-directory path' => ['src/Entity/PostRepository.php', "<?php\nclass PostRepository extends EntityRepository {}", ProjectFileType::REPOSITORY];
         yield 'form by suffix wins over a colocated entity-directory path' => ['src/Entity/Form/PostType.php', "<?php\nclass PostType extends AbstractType {}", ProjectFileType::FORM];
         yield 'authenticator by suffix' => ['src/Security/LoginFormAuthenticator.php', '<?php', ProjectFileType::AUTHENTICATOR];
+        yield 'ldap service by suffix' => ['src/Directory/UserLdap.php', '<?php', ProjectFileType::LDAP_SERVICE];
+        yield 'ldap service by directory' => ['src/Ldap/DirectoryLookup.php', '<?php', ProjectFileType::LDAP_SERVICE];
+        yield 'ldap service by namespace usage without suffix or directory' => ['src/Service/DirectoryBind.php', "<?php\nuse Symfony\\Component\\Ldap\\LdapInterface;\nclass DirectoryBind {}", ProjectFileType::LDAP_SERVICE];
+        yield 'admin panel by suffix' => ['src/Backoffice/StoreAdmin.php', '<?php', ProjectFileType::ADMIN_PANEL];
+        yield 'admin panel by directory' => ['src/Admin/StoreManager.php', '<?php', ProjectFileType::ADMIN_PANEL];
+        yield 'admin panel by base class without suffix or directory' => ['src/Backoffice/StoreManager.php', "<?php\nclass StoreManager extends AbstractAdmin {}", ProjectFileType::ADMIN_PANEL];
         yield 'messenger handler by suffix' => ['src/Messenger/SendInvoiceMessageHandler.php', '<?php', ProjectFileType::MESSENGER_HANDLER];
         yield 'messenger handler by attribute' => ['src/Handler/ProcessPaymentAction.php', "<?php\n#[AsMessageHandler]\nclass ProcessPaymentAction {}", ProjectFileType::MESSENGER_HANDLER];
         yield 'webhook consumer by suffix' => ['src/Webhook/StripeWebhookConsumer.php', '<?php', ProjectFileType::WEBHOOK_CONSUMER];
@@ -79,6 +85,20 @@ final class ProjectFileTypeClassifierTest extends TestCase
     public function test_a_non_php_file_in_a_message_handler_directory_is_not_forced_into_messenger_handler(): void
     {
         $projectFileType = ProjectFileTypeClassifier::classify('src/MessageHandler/config.yaml', 'foo: bar');
+
+        self::assertSame(ProjectFileType::CONFIG, $projectFileType);
+    }
+
+    public function test_a_non_php_file_in_a_ldap_directory_is_not_forced_into_ldap_service(): void
+    {
+        $projectFileType = ProjectFileTypeClassifier::classify('src/Ldap/config.yaml', 'foo: bar');
+
+        self::assertSame(ProjectFileType::CONFIG, $projectFileType);
+    }
+
+    public function test_a_non_php_file_in_an_admin_directory_is_not_forced_into_admin_panel(): void
+    {
+        $projectFileType = ProjectFileTypeClassifier::classify('src/Admin/config.yaml', 'foo: bar');
 
         self::assertSame(ProjectFileType::CONFIG, $projectFileType);
     }

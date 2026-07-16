@@ -133,6 +133,16 @@ final readonly class ProjectFile
         return ProjectFileType::AUTHENTICATOR === $this->projectFileType;
     }
 
+    public function isLdapService(): bool
+    {
+        return ProjectFileType::LDAP_SERVICE === $this->projectFileType;
+    }
+
+    public function isAdminPanel(): bool
+    {
+        return ProjectFileType::ADMIN_PANEL === $this->projectFileType;
+    }
+
     public function isEventSubscriber(): bool
     {
         return ProjectFileType::EVENT_SUBSCRIBER === $this->projectFileType;
@@ -223,6 +233,14 @@ final readonly class ProjectFile
         }
 
         if ($this->isAuthenticator()) {
+            return true;
+        }
+
+        if ($this->isLdapService()) {
+            return true;
+        }
+
+        if ($this->isAdminPanel()) {
             return true;
         }
 

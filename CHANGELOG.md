@@ -155,6 +155,42 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   lives in `src/Audit/Infrastructure/Cache/FilesystemTriageMemoryStore.php` and
   `src/Audit/Application/Agent/Review/ReviewOutcomeRecorder.php`.
 
+- **The attacker now hunts LDAP injection in dedicated LDAP services, broken
+  access control in Sonata Admin and EasyAdmin panels, and permissive Mercure
+  topic scopes.** Two new `ProjectFileType` cases — `ldap_service` (classified
+  by `Ldap`-suffixed files, an `/Ldap/` directory, or `Symfony\Component\Ldap`
+  usage) and `sonata_admin` (classified by `Admin`-suffixed files, an
+  `/Admin/` directory, or a class `extends AbstractAdmin`) — route to two new
+  attacker skills. `LdapServiceAttackerSkill` hunts LDAP filters/DNs built by
+  string concatenation without `ldap_escape()` (LDAP injection) and
+  `Ldap::bind()` calls with a variable password that could be empty
+  (anonymous-bind bypass). `SonataAdminAttackerSkill` hunts Sonata
+  `configureFormFields()`/`configureListFields()` exposing a privileged field
+  (`roles`, `password`, `isAdmin`) to every role that can reach the panel, and
+  admins without an overridden `checkAccess()` guarding multi-tenant data
+  (Sonata's default access check is class-level, not per-object). A third new
+  skill, `ControllerEasyAdminAttackerSkill` (`CONTROLLER`-typed, since EasyAdmin
+  CRUD controllers already classify that way), hunts the equivalent gap in
+  EasyAdmin: `configureFields()` fields exposing `roles`/`password`/`isAdmin`
+  with no `->setPermission('ROLE_...')` scoping, and `configureActions()`
+  leaving `Action::DELETE`/`Action::BATCH_DELETE` without a matching
+  `->setPermission(Action::…, 'ROLE_...')` call. `RegexStaticPreScanner` gained
+  six matching risk markers (`CACHE_VERSION` bumped to 31):
+  `ldap_unescaped_filter_concat`, `ldap_bind_variable_password`,
+  `sonata_admin_sensitive_field_exposed`, `sonata_admin_batch_action`,
+  `easyadmin_sensitive_field`, `easyadmin_destructive_action`. A new
+  `VulnerabilityType` case — `permissive_mercure_topic_selector` (CWE-1220,
+  OWASP A02:2025 - Security Misconfiguration) — covers a Mercure JWT
+  `publish`/`subscribe` claim scoped to `'*'` instead of the specific topics a
+  client needs; two more `RegexStaticPreScanner` `CONFIG` markers,
+  `mercure_default_jwt_secret` and `mercure_permissive_topic_claim`, flag the
+  Mercure recipe's unrotated default JWT secret placeholder and a wildcard topic
+  claim respectively, with matching `ConfigAttackerSkill` hunt bullets.
+  Implementation lives in `src/Audit/Domain/Model/ProjectFileType.php`,
+  `src/Audit/Domain/Model/ProjectFileTypeClassifier.php`,
+  `src/Audit/Infrastructure/Prompt/Skill/`, and
+  `src/Audit/Infrastructure/Scan/RegexStaticPreScanner.php`.
+
 ### Fixed
 
 - **The native Windows binary is published with releases again.**

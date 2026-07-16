@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 29;
+    public const int CACHE_VERSION = 30;
 
     /**
      * Detects the `s` (DOTALL) flag among a PCRE pattern's trailing modifier
@@ -311,6 +311,14 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'regex' => '/^APP_DEBUG\s*=\s*(?:1|true)\s*$/i',
                 'description' => 'APP_DEBUG enabled — verify this is not a committed base .env (debug mode in production leaks stack traces, source, and container internals)',
             ],
+            'mercure_default_jwt_secret' => [
+                'regex' => '/ChangeThisMercureHubJWTSecretKey/i',
+                'description' => "Mercure hub JWT secret still uses the recipe's default placeholder value — anyone can forge a JWT and publish/subscribe to any topic",
+            ],
+            'mercure_permissive_topic_claim' => [
+                'regex' => '/mercure\b[\s\S]{0,300}?(?:publish|subscribe)\s*:\s*\[?\s*[\'"]\*[\'"]/si',
+                'description' => "Mercure JWT claim grants publish/subscribe access to every topic ('*') — scope the claim to the specific topics this client needs",
+            ],
         ],
         ProjectFileType::AUTHENTICATOR->value => [
             'self_validating_passport' => [
@@ -320,6 +328,26 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
             'supports_returns_null' => [
                 'regex' => '/public\s+function\s+supports\s*\([^)]*\)\s*:\s*\??bool\s*\{[\s\S]{0,500}?return\s+null\s*;/s',
                 'description' => 'supports() returning null — Symfony treats null as "supports", silently letting non-matching paths through',
+            ],
+        ],
+        ProjectFileType::LDAP_SERVICE->value => [
+            'ldap_unescaped_filter_concat' => [
+                'regex' => '/->query\s*\([^)]*[\'"][^\'"]*\.\s*\$|ldap_search\s*\([^)]*\.\s*\$/',
+                'description' => 'LDAP filter built with string concatenation — verify the interpolated value is passed through ldap_escape() first (LDAP injection)',
+            ],
+            'ldap_bind_variable_password' => [
+                'regex' => '/->bind\s*\(\s*\$\w+\s*,\s*\$/',
+                'description' => 'Ldap::bind() with a variable password — verify the value cannot be an empty string (anonymous bind bypass)',
+            ],
+        ],
+        ProjectFileType::ADMIN_PANEL->value => [
+            'admin_sensitive_field_exposed' => [
+                'regex' => '/->add\s*\(\s*[\'"](?:roles?|password|isAdmin|isSuperAdmin)[\'"]/i',
+                'description' => 'Admin form/list field exposes a privileged property (roles/password/isAdmin) — verify only a super-admin role can reach this panel',
+            ],
+            'admin_batch_action' => [
+                'regex' => '/function\s+getBatchActions\s*\(/',
+                'description' => 'Custom batch actions declared — verify checkAccess() re-validates per-object before a bulk delete/edit executes',
             ],
         ],
         ProjectFileType::MESSENGER_HANDLER->value => [

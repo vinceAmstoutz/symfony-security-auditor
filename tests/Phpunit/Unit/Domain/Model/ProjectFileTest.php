@@ -956,6 +956,36 @@ final class ProjectFileTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_it_detects_ldap_service_by_directory(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Ldap/DirectoryLookup.php',
+            '/app/src/Ldap/DirectoryLookup.php',
+            '<?php',
+        );
+
+        self::assertSame('ldap_service', $projectFile->type());
+        self::assertTrue($projectFile->isLdapService());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_detects_admin_panel_by_directory(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Admin/StoreManager.php',
+            '/app/src/Admin/StoreManager.php',
+            '<?php',
+        );
+
+        self::assertSame('admin_panel', $projectFile->type());
+        self::assertTrue($projectFile->isAdminPanel());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_it_detects_messenger_handler_by_suffix(): void
     {
         $projectFile = ProjectFile::create(
@@ -1186,6 +1216,34 @@ final class ProjectFileTest extends TestCase
         $projectFile = ProjectFile::create(
             'src/Security/LoginFormAuthenticator.php',
             '/app/src/Security/LoginFormAuthenticator.php',
+            '<?php',
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_is_service_returns_false_for_ldap_service(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Ldap/FooLdap.php',
+            '/app/src/Ldap/FooLdap.php',
+            '<?php',
+        );
+
+        self::assertFalse($projectFile->isService());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_is_service_returns_false_for_admin_panel(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Admin/FooAdmin.php',
+            '/app/src/Admin/FooAdmin.php',
             '<?php',
         );
 
