@@ -132,7 +132,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $attackerSkillRegistry = $this->getPrivateService($kernel, AttackerSkillRegistry::class);
         self::assertInstanceOf(AttackerSkillRegistry::class, $attackerSkillRegistry);
 
-        self::assertSame(new AttackerSkillRegistry()->render([], true), $attackerSkillRegistry->render([], true));
+        self::assertSame((new AttackerSkillRegistry())->render([], true), $attackerSkillRegistry->render([], true));
     }
 
     #[RunInSeparateProcess]
