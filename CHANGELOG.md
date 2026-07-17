@@ -260,9 +260,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   checksum verification, and rename it over the running `php` — bricking the
   interpreter while reporting `Updated …`. The locator now refuses unless it is
   running as the self-contained standalone binary (the phpmicro `micro` SAPI),
-  throwing
-  `self-update is only supported for the standalone binary, but it is running under the "<sapi>" PHP SAPI`
-  instead.
+  throwing a `self-update is only supported for the standalone binary …` error
+  that names the offending PHP SAPI instead.
 - **`self-update` can no longer hang forever on a stalled network.**
   `ProcessReleaseClient::defaultProcessBuilder()` disabled the Symfony `Process`
   timeout (`setTimeout(null)`) while its `curl` invocation carried no transfer
