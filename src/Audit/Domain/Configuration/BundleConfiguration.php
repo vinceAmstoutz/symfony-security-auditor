@@ -108,12 +108,12 @@ final readonly class BundleConfiguration
                 reviewerStructuredCollection: $config['audit']['reviewer_structured_collection'] ?? true,
                 stableSystemPrompt: $config['audit']['stable_system_prompt'] ?? true,
                 baseline: $config['audit']['baseline'] ?? null,
-                triageMemory: $config['audit']['triage_memory'] ?? false,
                 failOn: RiskLevel::from($config['audit']['fail_on'] ?? 'critical'),
                 excludedTypes: $config['audit']['excluded_types'] ?? [],
                 includedTypes: $config['audit']['included_types'] ?? [],
                 customSkills: self::customSkillsFromConfig($config['audit']['custom_skills'] ?? []),
                 sinceClosure: $config['audit']['since_closure'] ?? $auditProfile->sinceClosure(),
+                triageMemory: $config['audit']['triage_memory'] ?? false,
             ),
             retry: new RetryConfiguration(
                 maxAttempts: $config['audit']['retry']['max_attempts'],
