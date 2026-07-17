@@ -87,6 +87,23 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
     /**
      * @throws InvalidCacheConfigurationException
      */
+    public function test_re_recording_an_existing_finding_leaves_other_stored_entries_intact(): void
+    {
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 10, 'reason A');
+        $this->filesystemTriageMemoryStore->record('xxe', 'src/B.php', 'XML parsing', 20, 'reason B');
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 10, 'reworded reason A');
+
+        $reasons = array_map(
+            static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->reason,
+            $this->filesystemTriageMemoryStore->feedback()->entries,
+        );
+
+        self::assertEqualsCanonicalizing(['reason A', 'reason B'], $reasons);
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_two_findings_sharing_a_type_file_and_title_but_at_different_lines_do_not_collide(): void
     {
         $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 10, 'first location');

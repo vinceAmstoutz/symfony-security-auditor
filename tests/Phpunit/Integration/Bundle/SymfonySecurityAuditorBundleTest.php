@@ -58,6 +58,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecor
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
@@ -710,6 +711,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         self::assertInstanceOf(FilesystemTriageMemoryStore::class, $this->getPrivateService($kernel, TriageMemoryRecorderInterface::class));
         self::assertInstanceOf(CompositeReviewerFeedbackProvider::class, $this->getPrivateService($kernel, ReviewerFeedbackProviderInterface::class));
+        self::assertInstanceOf(CompositeReviewerFeedbackProvider::class, $this->getPrivateService($kernel, ReviewerFeedbackSnapshotInterface::class));
     }
 
     #[RunInSeparateProcess]
