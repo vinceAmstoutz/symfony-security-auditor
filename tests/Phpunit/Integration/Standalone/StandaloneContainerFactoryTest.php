@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Standalone;
 
+use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
@@ -49,6 +50,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws UnknownPlatformProviderException
      */
     #[RunInSeparateProcess]
+    #[MaximumDuration(2500)]
     public function test_it_builds_a_container_exposing_a_fully_wired_audit_command(): void
     {
         $containerBuilder = (new StandaloneContainerFactory())->create(
@@ -65,6 +67,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws UnknownPlatformProviderException
      */
     #[RunInSeparateProcess]
+    #[MaximumDuration(2500)]
     public function test_it_configures_a_non_debug_kernel_with_a_public_event_dispatcher(): void
     {
         $containerBuilder = (new StandaloneContainerFactory())->create(
@@ -83,6 +86,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws UnknownPlatformProviderException
      */
     #[RunInSeparateProcess]
+    #[MaximumDuration(2500)]
     public function test_it_aliases_the_selected_provider_when_several_are_configured(): void
     {
         $containerBuilder = (new StandaloneContainerFactory())->create(

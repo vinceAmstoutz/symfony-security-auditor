@@ -340,9 +340,6 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     private function initRepo(): void
     {
         $this->runGit(['git', 'init', '--initial-branch=main']);
-        $this->runGit(['git', 'config', 'user.email', 'test@example.com']);
-        $this->runGit(['git', 'config', 'user.name', 'Test']);
-        $this->runGit(['git', 'config', 'commit.gpgsign', 'false']);
     }
 
     private function commit(string $relativePath, string $content, string $message): void
@@ -372,7 +369,14 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     /** @param list<string> $argv */
     private function runGit(array $argv): void
     {
-        $process = new Process($argv, $this->tmpDir);
+        $process = new Process($argv, $this->tmpDir, [
+            'GIT_AUTHOR_NAME' => 'Test',
+            'GIT_AUTHOR_EMAIL' => 'test@example.com',
+            'GIT_COMMITTER_NAME' => 'Test',
+            'GIT_COMMITTER_EMAIL' => 'test@example.com',
+            'GIT_CONFIG_GLOBAL' => '/dev/null',
+            'GIT_CONFIG_SYSTEM' => '/dev/null',
+        ]);
         $process->mustRun();
     }
 }

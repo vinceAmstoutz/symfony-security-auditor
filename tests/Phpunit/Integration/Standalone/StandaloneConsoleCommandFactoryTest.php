@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Standalone;
 
+use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
@@ -52,6 +53,7 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
      * @throws UnresolvableAuditCommandException
      */
     #[RunInSeparateProcess]
+    #[MaximumDuration(2500)]
     public function test_it_wraps_the_invokable_audit_command_under_its_name_and_alias(): void
     {
         $containerBuilder = (new StandaloneContainerFactory())->create(
