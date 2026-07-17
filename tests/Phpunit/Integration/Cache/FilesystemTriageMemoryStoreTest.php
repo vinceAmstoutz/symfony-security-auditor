@@ -98,6 +98,25 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
     /**
      * @throws InvalidCacheConfigurationException
      */
+    public function test_a_persisted_entry_without_a_line_is_keyed_as_line_zero(): void
+    {
+        $this->filesystem()->dumpFile($this->memoryPath, json_encode([
+            ['type' => 'sql_injection', 'file' => 'src/A.php', 'title' => 'Injectable query', 'reason' => 'legacy reason'],
+        ], \JSON_THROW_ON_ERROR));
+
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 0, 'refreshed reason');
+
+        $reasons = array_map(
+            static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->reason,
+            $this->filesystemTriageMemoryStore->feedback()->entries,
+        );
+
+        self::assertSame(['refreshed reason'], $reasons);
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_recording_more_than_the_entry_cap_drops_the_oldest_entries(): void
     {
         $filesystemTriageMemoryStore = new FilesystemTriageMemoryStore($this->memoryPath, $this->filesystem(), new NullLogger(), 2);

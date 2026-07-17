@@ -187,6 +187,18 @@ final class AttackerContextPromptRendererTest extends TestCase
     }
 
     /**
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_neutralizes_a_bare_carriage_return_in_a_risk_marker_description(): void
+    {
+        $output = (new AttackerContextPromptRenderer())->renderRiskMarkers([
+            RiskMarker::create('src/Foo.php', 42, 'request_get', "before\rafter"),
+        ]);
+
+        self::assertStringNotContainsString("\r", $output);
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
