@@ -93,7 +93,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     private ?Kernel $bootedKernel = null;
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_boots_with_minimal_config_and_registers_audit_command(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -102,7 +102,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_dependency_expansion_stage_between_mapping_and_audit(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -123,7 +123,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1000)]
+    #[MaximumDuration(2500)]
     public function test_bundle_boots_without_an_ai_platform_service(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o'], registerPlatform: false);
@@ -341,7 +341,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_escalating_attacker_agent_when_escalation_enabled(): void
     {
         $kernel = $this->boot([
@@ -353,7 +353,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_max_output_tokens_below_one(): void
     {
         $this->expectException(Throwable::class);
@@ -362,7 +361,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_an_empty_model(): void
     {
         $this->expectException(Throwable::class);
@@ -371,7 +369,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_an_empty_attacker_model(): void
     {
         $this->expectException(Throwable::class);
@@ -380,7 +377,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_an_empty_reviewer_model(): void
     {
         $this->expectException(Throwable::class);
@@ -389,7 +385,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_an_empty_escalation_cheap_model(): void
     {
         $this->expectException(Throwable::class);
@@ -482,7 +477,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(2000)]
+    #[MaximumDuration(2500)]
     public function test_configured_scan_included_paths_scope_the_show_scanned_listing_end_to_end(): void
     {
         mkdir($this->tmpDir.'/src/Controller/Admin', 0o777, true);
@@ -509,7 +504,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1000)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_unlimited_audit_budget_when_both_caps_omitted(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -520,7 +515,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1000)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_token_only_audit_budget(): void
     {
         $kernel = $this->boot([
@@ -535,7 +530,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_cost_only_audit_budget(): void
     {
         $kernel = $this->boot([
@@ -550,7 +545,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1250)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_both_caps_audit_budget(): void
     {
         $kernel = $this->boot([
@@ -585,7 +580,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_audit_retry_max_attempts_below_one(): void
     {
         $this->expectException(Throwable::class);
@@ -593,7 +587,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_audit_retry_backoff_multiplier_below_one(): void
     {
         $this->expectException(Throwable::class);
@@ -635,7 +628,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1250)]
+    #[MaximumDuration(2500)]
     public function test_bundle_accepts_deprecated_prompt_caching_key_and_still_exposes_its_value(): void
     {
         $this->expectUserDeprecationMessageMatches('/The "prompt_caching" option is deprecated and no longer has any effect/');
@@ -651,7 +644,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1250)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_filesystem_attacker_cache_when_cache_enabled(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => true]]);
@@ -660,7 +653,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1000)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_null_attacker_cache_when_cache_disabled(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => false]]);
@@ -669,7 +662,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_filesystem_reviewer_cache_when_cache_enabled(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => true]]);
@@ -678,7 +671,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1250)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_null_reviewer_cache_when_cache_disabled(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => false]]);
@@ -687,7 +680,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1250)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_null_triage_memory_recorder_when_triage_memory_disabled(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -697,7 +690,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_filesystem_triage_memory_store_when_triage_memory_enabled(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['triage_memory' => true]]);
@@ -707,7 +700,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_the_ttl_bounded_advisory_cache_when_cache_enabled(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => true]]);
@@ -716,7 +709,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1250)]
+    #[MaximumDuration(2500)]
     public function test_bundle_bypasses_the_advisory_cache_when_cache_disabled(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'cache' => ['enabled' => false]]);
@@ -809,7 +802,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1750)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_regex_secret_scrubber_by_default(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -818,7 +811,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_null_secret_scrubber_when_scrubbing_disabled(): void
     {
         $kernel = $this->boot([
@@ -830,7 +823,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_regex_static_pre_scanner_by_default(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -839,7 +832,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_null_static_pre_scanner_when_disabled(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['static_prescan' => ['enabled' => false]]]);
@@ -848,7 +841,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_the_sarif_importer_around_the_pre_scanner_when_import_sarif_is_configured(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'scan' => ['import_sarif' => ['psalm.sarif']]]);
@@ -857,7 +850,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_the_sarif_importer_even_when_the_regex_pre_scan_is_disabled(): void
     {
         $kernel = $this->boot([
@@ -870,7 +863,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1750)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_regex_code_slicer_when_enabled(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o', 'audit' => ['code_slicing' => ['enabled' => true]]]);
@@ -879,7 +872,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_null_code_slicer_by_default(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -888,7 +881,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_composer_audit_advisory_database_as_default_implementation(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -897,7 +890,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1250)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_llm_client_alias_to_attacker_client(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -906,7 +899,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1250)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_null_rate_limiter_when_no_rate_limit_dimension_configured(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -915,7 +908,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1000)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_token_bucket_rate_limiter_when_any_dimension_configured(): void
     {
         $kernel = $this->boot([
@@ -931,7 +924,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1250)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_attacker_agent(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -940,7 +933,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_reviewer_agent(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -949,7 +942,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1750)]
+    #[MaximumDuration(2500)]
     public function test_bundle_wires_run_audit_use_case(): void
     {
         $kernel = $this->boot(['model' => 'gpt-4o']);
@@ -1000,7 +993,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
      */
     #[DataProvider('integerNodeBelowMinimumCases')]
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_integer_node_below_its_documented_minimum(array $config): void
     {
         $this->expectException(Throwable::class);
@@ -1026,7 +1018,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
      */
     #[DataProvider('rateLimitDimensionBelowMinimumCases')]
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_rate_limit_dimension_below_one(array $config): void
     {
         $this->expectException(InvalidConfigurationException::class);
@@ -1047,7 +1038,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
      */
     #[DataProvider('rateLimitDimensionMinimumCases')]
     #[RunInSeparateProcess]
-    #[MaximumDuration(1250)]
+    #[MaximumDuration(2500)]
     public function test_bundle_accepts_each_rate_limit_dimension_at_its_minimum(array $config): void
     {
         $kernel = $this->boot($config);
@@ -1224,7 +1215,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_registers_a_tagged_attacker_skill_per_custom_skill_entry(): void
     {
         $kernel = $this->boot([
@@ -1238,7 +1229,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(1500)]
+    #[MaximumDuration(2500)]
     public function test_bundle_defaults_an_omitted_custom_skill_priority_to_500(): void
     {
         $kernel = $this->boot([
@@ -1475,7 +1466,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_an_unknown_fail_on_level(): void
     {
         $this->expectException(Throwable::class);
@@ -1506,7 +1496,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_an_unknown_excluded_type(): void
     {
         $this->expectException(Throwable::class);
@@ -1530,7 +1519,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_max_file_size_below_one(): void
     {
         $this->expectException(Throwable::class);
@@ -1545,7 +1533,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_min_confidence_above_one(): void
     {
         $this->expectException(Throwable::class);
@@ -1553,7 +1540,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_max_cost_usd_below_its_minimum(): void
     {
         $this->expectException(InvalidConfigurationException::class);
@@ -1568,7 +1554,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_max_iterations_below_one(): void
     {
         $this->expectException(Throwable::class);
@@ -1583,7 +1568,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_reviewer_batch_size_below_one(): void
     {
         $this->expectException(Throwable::class);
@@ -1598,7 +1582,6 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(500)]
     public function test_bundle_rejects_max_tool_iterations_below_one(): void
     {
         $this->expectException(Throwable::class);

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 
+use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
@@ -74,6 +75,7 @@ final class StandaloneAuditEndToEndTest extends TestCase
      * @throws UnresolvableAuditCommandException
      */
     #[RunInSeparateProcess]
+    #[MaximumDuration(2500)]
     public function test_the_standalone_application_audits_a_project_end_to_end_in_dry_run(): void
     {
         $application = StandaloneApplicationFactory::fromEnvironment([

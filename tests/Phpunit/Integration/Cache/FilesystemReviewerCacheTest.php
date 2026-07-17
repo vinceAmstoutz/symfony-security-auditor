@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Cache;
 
+use DateTimeImmutable;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -196,13 +197,10 @@ final class FilesystemReviewerCacheTest extends TestCase
      */
     public function test_get_hits_across_runs_despite_a_different_detected_at_timestamp(): void
     {
-        $vulnerability = $this->makeVulnerability('src/A.php', title: 'same');
+        $vulnerability = $this->makeVulnerability('src/A.php', title: 'same', detectedAt: new DateTimeImmutable('2020-01-01T00:00:00+00:00'));
+        $secondRun = $this->makeVulnerability('src/A.php', title: 'same', detectedAt: new DateTimeImmutable('2021-06-15T12:30:00+00:00'));
         $review = ['accepted' => true];
         $this->filesystemReviewerCache->store($vulnerability, 'code', $review);
-
-        usleep(1_100_000);
-
-        $secondRun = $this->makeVulnerability('src/A.php', title: 'same');
 
         self::assertNotEquals($vulnerability->toArray()['detected_at'], $secondRun->toArray()['detected_at']);
         self::assertSame($review, $this->filesystemReviewerCache->get($secondRun, 'code'));
@@ -756,9 +754,9 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    private function makeVulnerability(string $filePath, string $title = 'Finding'): Vulnerability
+    private function makeVulnerability(string $filePath, string $title = 'Finding', ?DateTimeImmutable $detectedAt = null): Vulnerability
     {
-        return $this->makeVulnerabilityWithCode($filePath, 'code', $title);
+        return $this->makeVulnerabilityWithCode($filePath, 'code', $title, $detectedAt);
     }
 
     /**
@@ -766,13 +764,14 @@ final class FilesystemReviewerCacheTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    private function makeVulnerabilityWithCode(string $filePath, string $vulnerableCode, string $title = 'Finding'): Vulnerability
+    private function makeVulnerabilityWithCode(string $filePath, string $vulnerableCode, string $title = 'Finding', ?DateTimeImmutable $detectedAt = null): Vulnerability
     {
         return Vulnerability::of(
             new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, $title, 0.9),
             new CodeLocation($filePath, 1, 5),
             new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
             $vulnerableCode,
+            $detectedAt,
         );
     }
 

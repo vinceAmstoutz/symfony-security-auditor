@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **`Vulnerability::of()` accepts an optional `detectedAt` timestamp.** The
+  factory still defaults to `new DateTimeImmutable()` when the argument is
+  omitted, so existing callers are unaffected; passing an explicit
+  `DateTimeImmutable` lets a finding be reconstructed with a known detection
+  time (and lets tests assert timestamp-dependent behaviour deterministically
+  instead of sleeping).
 - **Truncated and content-filtered LLM responses are now called out
   explicitly.** `symfony/ai` 0.11 exposes a normalized `finish_reason` on every
   platform result; `PlatformResultExtractor` now reads it, so `LLMResponse`
