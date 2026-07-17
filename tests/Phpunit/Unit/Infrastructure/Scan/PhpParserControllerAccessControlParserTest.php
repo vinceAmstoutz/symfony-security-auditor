@@ -505,6 +505,30 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
     }
 
     /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_records_every_deny_access_attribute_when_an_action_checks_more_than_one(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/posts/{id}/publish')]
+                public function publish(int $id): void {
+                    $this->denyAccessUnlessGranted('EDIT', $id);
+                    $this->denyAccessUnlessGranted('PUBLISH', $id);
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['EDIT', 'PUBLISH'], $entries[0]->guardAttributes());
+    }
+
+    /**
      * `isGranted()` + a manual `throw $this->createAccessDeniedException(...)`
      * is an equally standard Symfony access-control idiom, used whenever the
      * action wants a custom denial message — not just the shorthand
