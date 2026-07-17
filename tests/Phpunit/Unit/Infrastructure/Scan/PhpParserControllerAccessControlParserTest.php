@@ -283,6 +283,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         self::assertTrue($entries[0]->classHasIsGranted());
         self::assertTrue($entries[0]->hasAccessCheck());
+        self::assertSame(['ROLE_USER'], $entries[0]->guardAttributes());
     }
 
     /**
@@ -500,6 +501,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         self::assertTrue($entries[0]->methodHasDenyAccess());
         self::assertTrue($entries[0]->hasAccessCheck());
+        self::assertSame(['EDIT'], $entries[0]->guardAttributes());
     }
 
     /**

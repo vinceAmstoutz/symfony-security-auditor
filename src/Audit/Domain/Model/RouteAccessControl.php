@@ -19,6 +19,8 @@ final readonly class RouteAccessControl
      * @param list<string> $routeMethods                HTTP methods declared on the route, empty list when not specified
      * @param list<string> $methodLevelIsGranted        attribute names referenced by `#[IsGranted(...)]` on the action method
      * @param bool         $methodHasIsGrantedAttribute true when the method's `#[IsGranted]`/`#[Security]` carries a value present but not resolvable to a literal string (e.g. an enum case, `new Expression(...)`)
+     * @param list<string> $classLevelIsGranted         attribute names referenced by a class-level `#[IsGranted(...)]`
+     * @param list<string> $denyAccessAttributes        attribute names passed as the first argument of a reachable `denyAccessUnlessGranted()`/`isGranted()` call
      */
     public function __construct(
         private string $filePath,
@@ -31,6 +33,8 @@ final readonly class RouteAccessControl
         private bool $classHasIsGranted,
         private ?string $routeName = null,
         private bool $methodHasIsGrantedAttribute = false,
+        private array $classLevelIsGranted = [],
+        private array $denyAccessAttributes = [],
     ) {}
 
     public function filePath(): string
@@ -90,6 +94,23 @@ final readonly class RouteAccessControl
     }
 
     /**
+     * Every voter attribute name this route is guarded by, from any recognized
+     * guard: a method-level or class-level `#[IsGranted(...)]`, or a reachable
+     * `denyAccessUnlessGranted()`/`isGranted()` call. Lets a changed voter's
+     * dependents be found regardless of which guard form the controller uses.
+     *
+     * @return list<string>
+     */
+    public function guardAttributes(): array
+    {
+        return array_values(array_unique([
+            ...$this->methodLevelIsGranted,
+            ...$this->classLevelIsGranted,
+            ...$this->denyAccessAttributes,
+        ]));
+    }
+
+    /**
      * Returns a copy routed from the enclosing class's `#[Route]` — the way
      * Symfony routes an invokable single-action controller's `__invoke()` when
      * the method carries no route of its own. All access-control flags are
@@ -110,6 +131,8 @@ final readonly class RouteAccessControl
             classHasIsGranted: $this->classHasIsGranted,
             routeName: $routeName,
             methodHasIsGrantedAttribute: $this->methodHasIsGrantedAttribute,
+            classLevelIsGranted: $this->classLevelIsGranted,
+            denyAccessAttributes: $this->denyAccessAttributes,
         );
     }
 

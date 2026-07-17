@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
 use Override;
 use PhpParser\Node;
+use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\NullsafeMethodCall;
 use PhpParser\Node\Identifier;
@@ -104,6 +105,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     private function entriesForClass(string $filePath, Class_ $class): array
     {
         $classHasIsGranted = $this->isGrantedAttributeParser->hasValueArg($class->attrGroups);
+        $classLevelIsGranted = $this->isGrantedAttributeParser->extractValues($class->attrGroups);
         $classConstants = $this->classConstantStrings($class);
         $classRouteData = $this->routeAttributeParser->extract($class->attrGroups, $classConstants)[0];
         $methodsByName = $this->methodsByName($class);
@@ -114,9 +116,12 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
                 continue;
             }
 
+            $denyAccessCalls = $this->denyAccessCalls($classMethod, $methodsByName);
             $accessFlags = [
                 'classHasIsGranted' => $classHasIsGranted,
-                'methodHasDenyAccess' => $this->methodInvokesDenyAccess($classMethod, $methodsByName),
+                'classLevelIsGranted' => $classLevelIsGranted,
+                'methodHasDenyAccess' => [] !== $denyAccessCalls,
+                'denyAccessAttributes' => $this->attributesFromCalls($denyAccessCalls),
             ];
 
             foreach ($this->buildEntries($filePath, $classMethod, $accessFlags, $classRouteData, $classConstants) as $entry) {
@@ -208,9 +213,9 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
      * route name must be matched against the same joined values, not the
      * method's own attribute in isolation.
      *
-     * @param array{classHasIsGranted: bool, methodHasDenyAccess: bool}                 $accessFlags
-     * @param array{present: bool, path: ?string, methods: list<string>, name: ?string} $classRouteData
-     * @param array<string, string>                                                     $classConstants
+     * @param array{classHasIsGranted: bool, classLevelIsGranted: list<string>, methodHasDenyAccess: bool, denyAccessAttributes: list<string>} $accessFlags
+     * @param array{present: bool, path: ?string, methods: list<string>, name: ?string}                                                        $classRouteData
+     * @param array<string, string>                                                                                                            $classConstants
      *
      * @return list<RouteAccessControl>
      */
@@ -232,6 +237,8 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
                 classHasIsGranted: $accessFlags['classHasIsGranted'],
                 routeName: $this->prefixedRouteName($classRouteData['name'], $routeData['name']),
                 methodHasIsGrantedAttribute: $methodHasIsGrantedAttribute,
+                classLevelIsGranted: $accessFlags['classLevelIsGranted'],
+                denyAccessAttributes: $accessFlags['denyAccessAttributes'],
             );
         }
 
@@ -266,14 +273,17 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
-     * A `denyAccessUnlessGranted()` call moved behind a shared private/protected
-     * helper (a common refactor for a repeated check) would otherwise be
-     * invisible, since the action method's own body only calls the helper,
-     * never `denyAccessUnlessGranted()` directly.
+     * The reachable `denyAccessUnlessGranted()`/`isGranted()` calls of an action
+     * — including ones moved behind a shared private/protected helper (a common
+     * refactor for a repeated check), which would otherwise be invisible since
+     * the action method's own body only calls the helper, never the guard
+     * directly.
      *
      * @param array<string, ClassMethod> $methodsByName
+     *
+     * @return list<MethodCall|NullsafeMethodCall>
      */
-    private function methodInvokesDenyAccess(ClassMethod $classMethod, array $methodsByName): bool
+    private function denyAccessCalls(ClassMethod $classMethod, array $methodsByName): array
     {
         $body = $this->thisCallReachability->reachableBody($classMethod, $methodsByName);
         $methodCalls = [
@@ -281,13 +291,35 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
             ...$this->nodeFinder->findInstanceOf($body, NullsafeMethodCall::class),
         ];
 
-        foreach ($methodCalls as $methodCall) {
-            if ($this->isDenyAccessCall($methodCall)) {
-                return true;
+        return array_values(array_filter(
+            $methodCalls,
+            fn (MethodCall|NullsafeMethodCall $methodCall): bool => $this->isDenyAccessCall($methodCall),
+        ));
+    }
+
+    /**
+     * The attribute names guarded by the given `denyAccessUnlessGranted()`/
+     * `isGranted()` calls — the first argument of each, when it is a string
+     * literal. A non-literal attribute (enum case, variable, `new
+     * Expression(...)`) is left out rather than guessed at, mirroring how route
+     * paths are only resolved from literals. Duplicates are collapsed once,
+     * across every guard form, by {@see RouteAccessControl::guardAttributes()}.
+     *
+     * @param list<MethodCall|NullsafeMethodCall> $denyAccessCalls
+     *
+     * @return list<string>
+     */
+    private function attributesFromCalls(array $denyAccessCalls): array
+    {
+        $attributes = [];
+        foreach ($denyAccessCalls as $denyAccessCall) {
+            $firstArgument = $denyAccessCall->args[0] ?? null;
+            if ($firstArgument instanceof Arg && $firstArgument->value instanceof String_) {
+                $attributes[] = $firstArgument->value->value;
             }
         }
 
-        return false;
+        return $attributes;
     }
 
     /**

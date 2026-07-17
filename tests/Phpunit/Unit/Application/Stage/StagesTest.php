@@ -607,6 +607,42 @@ final class StagesTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidAuditContextException
      */
+    public function test_dependency_expansion_stage_adds_controllers_guarded_by_a_class_level_is_granted_or_deny_access_call(): void
+    {
+        $postVoter = ProjectFile::create('src/Security/PostVoter.php', '/app/PV', '<?php class PostVoter {}');
+        $classGuarded = ProjectFile::create('src/Controller/ClassGuardedController.php', '/app/CG', '<?php class ClassGuardedController {}');
+        $denyGuarded = ProjectFile::create('src/Controller/DenyGuardedController.php', '/app/DG', '<?php class DenyGuardedController {}');
+        $unrelated = ProjectFile::create('src/Controller/UnrelatedController.php', '/app/UC', '<?php class UnrelatedController {}');
+
+        $auditContext = AuditContext::forProject($this->tmpDir, [], false, 'main');
+        $auditContext->setProjectFiles([$postVoter]);
+        $auditContext->setMappingFiles([$postVoter, $classGuarded, $denyGuarded, $unrelated]);
+        $auditContext->setMapping(SymfonyMapping::of(
+            ProjectFileInventory::fromFiles([$postVoter, $classGuarded, $denyGuarded, $unrelated]),
+            new AccessControlMap(
+                routeAccessControls: [
+                    new RouteAccessControl('src/Controller/ClassGuardedController.php', 'edit', '/c/edit', ['POST'], true, [], false, true, classLevelIsGranted: ['EDIT']),
+                    new RouteAccessControl('src/Controller/DenyGuardedController.php', 'edit', '/d/edit', ['POST'], true, [], true, false, denyAccessAttributes: ['EDIT']),
+                    new RouteAccessControl('src/Controller/UnrelatedController.php', 'index', '/u', ['GET'], true, [], false, true, classLevelIsGranted: ['ROLE_OTHER']),
+                ],
+                voterCapabilities: [new VoterCapability('src/Security/PostVoter.php', 'PostVoter', ['EDIT'], ['Post'])],
+            ),
+        ));
+
+        $dependencyExpansionStage = new DependencyExpansionStage(new NullLogger(), 'direct');
+        $dependencyExpansionStage->process($auditContext);
+
+        $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles());
+        self::assertContains('src/Controller/ClassGuardedController.php', $paths);
+        self::assertContains('src/Controller/DenyGuardedController.php', $paths);
+        self::assertNotContains('src/Controller/UnrelatedController.php', $paths);
+        self::assertSame(2, $auditContext->getMeta('dependency_expansion.files_added'));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
     public function test_dependency_expansion_stage_accumulates_paths_across_multiple_changed_voters_and_attributes(): void
     {
         $postVoter = ProjectFile::create('src/Security/PostVoter.php', '/app/PV', '<?php class PostVoter {}');
