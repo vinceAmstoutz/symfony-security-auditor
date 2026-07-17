@@ -1095,6 +1095,29 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    public function test_it_still_flags_hsts_disabled_after_a_large_enabled_forced_ssl_block(): void
+    {
+        $allowlist = '';
+        for ($i = 0; $i < 400; ++$i) {
+            $allowlist .= "        - '10.0.{$i}.1'\n";
+        }
+
+        $projectFile = ProjectFile::create(
+            'config/packages/nelmio_security.yaml',
+            '/app/config/packages/nelmio_security.yaml',
+            "firewall_a:\n    forced_ssl:\n        enabled: true\n{$allowlist}firewall_b:\n    forced_ssl:\n        enabled: false\n",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('hsts_disabled', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     #[DataProvider('appDebugEnabledCases')]
     public function test_it_flags_app_debug_enabled_in_a_dotenv_file(string $value): void
     {

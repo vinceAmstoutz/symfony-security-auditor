@@ -273,8 +273,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   any sibling section within 100 characters of `forced_ssl`, so a correctly
   hardened `forced_ssl: { enabled: true }` followed by a disabled `csp:` was
   flagged as HSTS-off; it now only fires when the `enabled: false` is a child of
-  the `forced_ssl` block (or its inline map). `RegexStaticPreScanner`'s
-  `CACHE_VERSION` is bumped to 31.
+  the `forced_ssl` block (or its inline map), and the block-matching pattern
+  uses possessive quantifiers so a large `forced_ssl` block can no longer
+  exhaust PCRE's backtrack limit and abort the file scan.
+  `RegexStaticPreScanner`'s `CACHE_VERSION` is bumped to 31.
 - **A YAML config file with numeric top-level keys no longer crashes the
   audit.** `SymfonyYamlSecurityConfigParser::securitySections()` passed every
   top-level key to `securityBlockOf(string $key, …)`, so a document like

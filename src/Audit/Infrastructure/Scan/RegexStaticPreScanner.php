@@ -304,7 +304,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => "Content-Security-Policy directive allows 'unsafe-inline'/'unsafe-eval' — defeats CSP's main protection against script injection",
             ],
             'hsts_disabled' => [
-                'regex' => '/forced_ssl\s*:[^\n]*\benabled\s*:\s*false\b|^(\h*)forced_ssl\s*:[^\n]*(?:\n\1\h+[^\n]*)*?\n\1\h+enabled\s*:\s*false\b/sm',
+                'regex' => '/forced_ssl\s*:[^\n]*\benabled\s*:\s*false\b|^(\h*)forced_ssl\s*:[^\n]*+(?:\n\1\h++[^\n]*+)*?\n\1\h++enabled\s*:\s*false\b/sm',
                 'description' => 'NelmioSecurity forced_ssl.enabled: false — HSTS not enforced, leaving the app open to SSL-stripping on the first plaintext request',
             ],
             'app_debug_enabled' => [
