@@ -45,4 +45,16 @@ final class CompositeReviewerFeedbackProviderTest extends TestCase
 
         self::assertEquals([$baselineEntry, $triageMemoryEntry], $compositeReviewerFeedbackProvider->feedback()->entries);
     }
+
+    public function test_feedback_is_snapshotted_on_first_read_and_ignores_later_secondary_writes(): void
+    {
+        $reviewerFeedbackHolder = new ReviewerFeedbackHolder();
+        $compositeReviewerFeedbackProvider = new CompositeReviewerFeedbackProvider(new NullReviewerFeedbackProvider(), $reviewerFeedbackHolder);
+
+        $reviewerFeedback = $compositeReviewerFeedbackProvider->feedback();
+        $reviewerFeedbackHolder->set(new ReviewerFeedback([new AcceptedFindingFeedback('xxe', 'src/B.php', 'B', 'recorded mid-run')]));
+
+        self::assertSame($reviewerFeedback, $compositeReviewerFeedbackProvider->feedback());
+        self::assertTrue($compositeReviewerFeedbackProvider->feedback()->isEmpty());
+    }
 }

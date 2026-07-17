@@ -42,7 +42,7 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
      */
     public function test_a_recorded_rejection_is_surfaced_as_feedback(): void
     {
-        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 'input is bound via a prepared statement');
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 10, 'input is bound via a prepared statement');
 
         $feedback = $this->filesystemTriageMemoryStore->feedback();
 
@@ -57,8 +57,8 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
      */
     public function test_recording_the_same_finding_again_replaces_its_reason_instead_of_duplicating(): void
     {
-        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 'first reason');
-        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 'second, more precise reason');
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 10, 'first reason');
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 10, 'second, more precise reason');
 
         $feedback = $this->filesystemTriageMemoryStore->feedback();
 
@@ -73,10 +73,45 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
      */
     public function test_recording_a_different_finding_keeps_both_entries(): void
     {
-        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 'reason A');
-        $this->filesystemTriageMemoryStore->record('xxe', 'src/B.php', 'XML parsing', 'reason B');
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 10, 'reason A');
+        $this->filesystemTriageMemoryStore->record('xxe', 'src/B.php', 'XML parsing', 10, 'reason B');
 
         self::assertCount(2, $this->filesystemTriageMemoryStore->feedback()->entries);
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    public function test_two_findings_sharing_a_type_file_and_title_but_at_different_lines_do_not_collide(): void
+    {
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 10, 'first location');
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 99, 'second location');
+
+        $reasons = array_map(
+            static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->reason,
+            $this->filesystemTriageMemoryStore->feedback()->entries,
+        );
+
+        self::assertEqualsCanonicalizing(['first location', 'second location'], $reasons);
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    public function test_a_persisted_entry_without_a_line_is_keyed_as_line_zero(): void
+    {
+        $this->filesystem()->dumpFile($this->memoryPath, json_encode([
+            ['type' => 'sql_injection', 'file' => 'src/A.php', 'title' => 'Injectable query', 'reason' => 'legacy reason'],
+        ], \JSON_THROW_ON_ERROR));
+
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 0, 'refreshed reason');
+
+        $reasons = array_map(
+            static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->reason,
+            $this->filesystemTriageMemoryStore->feedback()->entries,
+        );
+
+        self::assertSame(['refreshed reason'], $reasons);
     }
 
     /**
@@ -86,13 +121,42 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
     {
         $filesystemTriageMemoryStore = new FilesystemTriageMemoryStore($this->memoryPath, $this->filesystem(), new NullLogger(), 2);
 
-        $filesystemTriageMemoryStore->record('sql_injection', 'src/File0.php', 'title', 'reason');
-        $filesystemTriageMemoryStore->record('sql_injection', 'src/File1.php', 'title', 'reason');
-        $filesystemTriageMemoryStore->record('sql_injection', 'src/File2.php', 'title', 'reason');
+        $filesystemTriageMemoryStore->record('sql_injection', 'src/File0.php', 'title', 10, 'reason');
+        $filesystemTriageMemoryStore->record('sql_injection', 'src/File1.php', 'title', 10, 'reason');
+        $filesystemTriageMemoryStore->record('sql_injection', 'src/File2.php', 'title', 10, 'reason');
 
         $entries = $filesystemTriageMemoryStore->feedback()->entries;
 
-        self::assertSame(['src/File1.php', 'src/File2.php'], array_map(static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->file, $entries));
+        self::assertSame(['src/File2.php', 'src/File1.php'], array_map(static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->file, $entries));
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    public function test_feedback_surfaces_the_newest_rejections_first(): void
+    {
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/Old.php', 'title', 10, 'older reason');
+        $this->filesystemTriageMemoryStore->record('xxe', 'src/New.php', 'title', 10, 'newer reason');
+
+        $files = array_map(
+            static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->file,
+            $this->filesystemTriageMemoryStore->feedback()->entries,
+        );
+
+        self::assertSame(['src/New.php', 'src/Old.php'], $files);
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    public function test_a_recorded_reason_is_capped_before_it_is_persisted(): void
+    {
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'title', 10, str_repeat('a', FilesystemTriageMemoryStore::MAX_REASON_LENGTH + 500));
+
+        $entries = $this->filesystemTriageMemoryStore->feedback()->entries;
+
+        self::assertCount(1, $entries);
+        self::assertSame(FilesystemTriageMemoryStore::MAX_REASON_LENGTH, mb_strlen($entries[0]->reason));
     }
 
     /**
@@ -142,7 +206,7 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
         symlink($outsideTarget, $this->memoryPath);
 
         try {
-            $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'T', 'reason');
+            $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'T', 10, 'reason');
 
             self::assertSame('ORIGINAL', file_get_contents($outsideTarget));
         } finally {
@@ -191,7 +255,7 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
         );
 
         $filesystemTriageMemoryStore = new FilesystemTriageMemoryStore($this->memoryPath, $filesystem, $logger);
-        $filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'T', 'reason');
+        $filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'T', 10, 'reason');
 
         self::assertTrue($filesystemTriageMemoryStore->feedback()->isEmpty());
         self::assertSame([['Failed to write triage memory entry', ['path' => $this->memoryPath, 'error' => 'disk full']]], $warnings);
@@ -217,7 +281,7 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
         );
 
         try {
-            (new FilesystemTriageMemoryStore($this->memoryPath, $this->filesystem(), $logger))->record('sql_injection', 'src/A.php', 'T', 'reason');
+            (new FilesystemTriageMemoryStore($this->memoryPath, $this->filesystem(), $logger))->record('sql_injection', 'src/A.php', 'T', 10, 'reason');
         } finally {
             unlink($outsideTarget);
         }

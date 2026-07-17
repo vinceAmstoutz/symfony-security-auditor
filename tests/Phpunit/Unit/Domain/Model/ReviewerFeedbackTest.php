@@ -51,6 +51,17 @@ final class ReviewerFeedbackTest extends TestCase
         self::assertNotSame($this->feedback('accepted risk')->digest(), $reviewerFeedback->digest());
     }
 
+    public function test_the_digest_is_independent_of_entry_order(): void
+    {
+        $first = new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Alpha', 'guarded by voter');
+        $second = new AcceptedFindingFeedback('xss', 'src/B.php', 'Beta', 'output escaped');
+
+        self::assertSame(
+            (new ReviewerFeedback([$first, $second]))->digest(),
+            (new ReviewerFeedback([$second, $first]))->digest(),
+        );
+    }
+
     private function feedback(string $reason): ReviewerFeedback
     {
         return new ReviewerFeedback([new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', $reason)]);

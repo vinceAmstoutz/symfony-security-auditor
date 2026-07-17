@@ -114,8 +114,10 @@ final class ProcessReleaseClientTest extends TestCase
         $commandLine = $process->getCommandLine();
         self::assertStringContainsString("'curl'", $commandLine);
         self::assertStringContainsString("'-fsSL'", $commandLine);
+        self::assertStringContainsString("'--connect-timeout' '30'", $commandLine);
+        self::assertStringContainsString("'--max-time' '600'", $commandLine);
         self::assertStringContainsString("'User-Agent: symfony-security-auditor-self-update'", $commandLine);
         self::assertStringContainsString("'https://example.test/asset'", $commandLine);
-        self::assertNull($process->getTimeout());
+        self::assertSame(660.0, $process->getTimeout());
     }
 }

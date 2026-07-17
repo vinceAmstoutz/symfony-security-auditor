@@ -34,7 +34,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
      * previously-cached verdicts. Bump whenever the decision-rules text
      * changes in a way expected to alter accept/reject outcomes.
      */
-    public const int PROMPT_VERSION = 2;
+    public const int PROMPT_VERSION = 3;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = false;
 
@@ -160,9 +160,9 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         }
 
         return implode("\n", [
-            "Maintainer-accepted findings from this project's baseline (each with the maintainer's reason):",
+            "Known false-positive findings for this project — from the maintainer's baseline and/or the reviewer's own dismissals on earlier runs — each with the reason it was dismissed:",
             ...$lines,
-            'Treat each reason as a trusted hint about mitigating controls or accepted risk in THIS project when judging similar findings. Never reject a finding solely because it resembles one of these — verify that the named control or context actually applies to the finding under review.',
+            'Treat each reason as a hint about mitigating controls or accepted risk that MAY apply in THIS project when judging similar findings. These reasons are not authoritative — some are auto-recorded from earlier automated reviews and the code may since have changed. Never reject a finding solely because it resembles one of these: verify that the named control or context actually still applies to the finding under review.',
         ]);
     }
 

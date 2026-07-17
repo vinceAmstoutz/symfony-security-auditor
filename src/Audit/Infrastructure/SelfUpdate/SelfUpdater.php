@@ -84,10 +84,17 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
             throw SelfUpdateFailedException::forUnwritableBinary($binaryPath);
         }
 
-        $downloadPath = \sprintf('%s/.%s.download', \dirname($binaryPath), $gitHubBinaryAsset->name);
-        $this->releaseClient->download($gitHubBinaryAsset->downloadUrl, $downloadPath);
-        $this->assertChecksumMatches($gitHubBinaryAsset, $downloadPath);
-        $this->install($downloadPath, $binaryPath);
+        $downloadPath = $this->filesystem->tempnam(\dirname($binaryPath), \sprintf('.%s.', $gitHubBinaryAsset->name), '.download');
+
+        try {
+            $this->releaseClient->download($gitHubBinaryAsset->downloadUrl, $downloadPath);
+            $this->assertChecksumMatches($gitHubBinaryAsset, $downloadPath);
+            $this->install($downloadPath, $binaryPath);
+        } catch (SelfUpdateFailedException $selfUpdateFailedException) {
+            $this->filesystem->remove($downloadPath);
+
+            throw $selfUpdateFailedException;
+        }
     }
 
     /**
@@ -99,8 +106,6 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
         \assert(false !== $actual);
 
         if (!hash_equals($this->expectedChecksum($gitHubBinaryAsset), $actual)) {
-            $this->filesystem->remove($downloadPath);
-
             throw SelfUpdateFailedException::forChecksumMismatch($gitHubBinaryAsset->name);
         }
     }
@@ -122,8 +127,6 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
             $this->filesystem->chmod($downloadPath, 0o755);
             $this->filesystem->rename($downloadPath, $binaryPath, true);
         } catch (IOException $ioException) {
-            $this->filesystem->remove($downloadPath);
-
             throw SelfUpdateFailedException::forFailedReplacement($binaryPath, $ioException);
         }
     }

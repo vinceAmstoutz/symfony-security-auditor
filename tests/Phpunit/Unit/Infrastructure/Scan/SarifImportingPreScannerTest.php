@@ -104,7 +104,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
      */
-    public function test_a_taint_path_step_outside_the_scan_surface_is_omitted(): void
+    public function test_a_leading_taint_path_step_outside_the_scan_surface_becomes_an_ellipsis(): void
     {
         $result = $this->sarifResultWithCodeFlow(
             'TaintedSql',
@@ -118,7 +118,60 @@ final class SarifImportingPreScannerTest extends TestCase
         $markers = $this->scanner([$sarif])->scan([$this->projectFile('src/Repository/UserRepository.php')]);
 
         self::assertSame(
-            'Detected tainted SQL (taint path: src/Repository/UserRepository.php:42)',
+            'Detected tainted SQL (taint path: ... -> src/Repository/UserRepository.php:42)',
+            $markers[0]->description(),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     */
+    public function test_an_internal_taint_path_step_outside_the_scan_surface_becomes_an_ellipsis(): void
+    {
+        $result = $this->sarifResultWithCodeFlow(
+            'TaintedSql',
+            'Detected tainted SQL',
+            'src/Repository/UserRepository.php',
+            42,
+            [['src/Controller/UserController.php', 10], ['vendor/lib/Middle.php', 5], ['src/Repository/UserRepository.php', 42]],
+        );
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [$result])]);
+
+        $markers = $this->scanner([$sarif])->scan([
+            $this->projectFile('src/Controller/UserController.php'),
+            $this->projectFile('src/Repository/UserRepository.php'),
+        ]);
+
+        self::assertSame(
+            'Detected tainted SQL (taint path: src/Controller/UserController.php:10 -> ... -> src/Repository/UserRepository.php:42)',
+            $markers[0]->description(),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws SarifFileNotReadableException
+     * @throws MalformedSarifFileException
+     */
+    public function test_a_trailing_taint_path_step_outside_the_scan_surface_becomes_an_ellipsis(): void
+    {
+        $result = $this->sarifResultWithCodeFlow(
+            'TaintedSql',
+            'Detected tainted SQL',
+            'src/Repository/UserRepository.php',
+            42,
+            [['src/Repository/UserRepository.php', 42], ['vendor/lib/Sink.php', 9]],
+        );
+        $sarif = $this->writeSarif([$this->sarifRun('Psalm', [$result])]);
+
+        $markers = $this->scanner([$sarif])->scan([$this->projectFile('src/Repository/UserRepository.php')]);
+
+        self::assertSame(
+            'Detected tainted SQL (taint path: src/Repository/UserRepository.php:42 -> ...)',
             $markers[0]->description(),
         );
     }
@@ -185,7 +238,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
      */
-    public function test_a_taint_path_step_without_a_location_uri_is_skipped(): void
+    public function test_a_taint_path_step_without_a_location_uri_becomes_an_ellipsis(): void
     {
         $result = [
             ...$this->sarifResult('TaintedSql', 'Detected tainted SQL', 'src/Repository/UserRepository.php', 42),
@@ -199,7 +252,7 @@ final class SarifImportingPreScannerTest extends TestCase
         $markers = $this->scanner([$sarif])->scan([$this->projectFile('src/Repository/UserRepository.php')]);
 
         self::assertSame(
-            'Detected tainted SQL (taint path: src/Repository/UserRepository.php:42)',
+            'Detected tainted SQL (taint path: ... -> src/Repository/UserRepository.php:42)',
             $markers[0]->description(),
         );
     }

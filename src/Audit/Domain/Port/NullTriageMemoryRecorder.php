@@ -19,5 +19,5 @@ use Override;
 final readonly class NullTriageMemoryRecorder implements TriageMemoryRecorderInterface
 {
     #[Override]
-    public function record(string $type, string $file, string $title, string $reason): void {}
+    public function record(string $type, string $file, string $title, int $line, string $reason): void {}
 }

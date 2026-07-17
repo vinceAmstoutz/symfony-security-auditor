@@ -50,12 +50,12 @@ final readonly class AuditExecutionConfiguration
         public bool $reviewerStructuredCollection = true,
         public bool $stableSystemPrompt = true,
         public ?string $baseline = null,
-        public bool $triageMemory = false,
         public RiskLevel $failOn = RiskLevel::Critical,
         public array $excludedTypes = [],
         public array $includedTypes = [],
         public array $customSkills = [],
         public string $sinceClosure = 'none',
+        public bool $triageMemory = false,
     ) {
         if (!is_finite($minConfidence) || $minConfidence < 0.0 || $minConfidence > 1.0) {
             throw InvalidAuditExecutionConfigurationException::forOutOfRangeMinConfidence($minConfidence);

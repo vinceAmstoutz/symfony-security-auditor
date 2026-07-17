@@ -34,6 +34,11 @@ final class SelfUpdateFailedException extends RuntimeException
         return new self('Could not determine the path of the running binary to replace; self-update is only supported for the standalone binary.');
     }
 
+    public static function forNonStandaloneRuntime(string $sapi): self
+    {
+        return new self(\sprintf('self-update is only supported for the standalone binary, but it is running under the "%s" PHP SAPI; reinstall with Composer or the install script instead.', $sapi));
+    }
+
     public static function forChecksumMismatch(string $asset): self
     {
         return new self(\sprintf('Checksum verification failed for "%s"; the download was not trusted and has been discarded.', $asset));

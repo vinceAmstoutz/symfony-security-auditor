@@ -17,16 +17,23 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 
 /**
- * Locates the running executable to replace. On Linux the kernel exposes it at
- * `/proc/self/exe`; elsewhere it falls back to the resolved entry-script path.
+ * Locates the running executable to replace. Only the self-contained standalone
+ * binary (the phpmicro `micro` SAPI) may be replaced: under a normal PHP
+ * interpreter `/proc/self/exe` resolves to the interpreter itself, so resolving
+ * a path there and renaming a downloaded binary over it would destroy the
+ * interpreter. When running as `micro`, the kernel exposes the binary at
+ * `/proc/self/exe` (Linux); elsewhere it falls back to the resolved entry path.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class RunningBinaryLocator implements RunningBinaryLocatorInterface
 {
+    private const string STANDALONE_SAPI = 'micro';
+
     public function __construct(
         private string $procSelfExePath = '/proc/self/exe',
         private string $invokedScriptPath = '',
+        private string $sapi = \PHP_SAPI,
     ) {}
 
     /**
@@ -35,6 +42,10 @@ final readonly class RunningBinaryLocator implements RunningBinaryLocatorInterfa
     #[Override]
     public function path(): string
     {
+        if (self::STANDALONE_SAPI !== $this->sapi) {
+            throw SelfUpdateFailedException::forNonStandaloneRuntime($this->sapi);
+        }
+
         return $this->kernelReportedPath()
             ?? $this->resolvedInvokedScriptPath()
             ?? throw SelfUpdateFailedException::forUndeterminedBinaryPath();
