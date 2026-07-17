@@ -207,13 +207,15 @@ with `BREAKING CHANGE:` footer.
 
 ## CI Pipeline
 
-Six jobs must all pass before merging: **Prettier Check** (markdown formatting)
-→ **Markdown Lint** (markdownlint-cli2 semantics) → **Commit Lint** (commitlint,
-conventional commits) → **Lint** (Composer Normalize, PHP CS Fixer, Rector,
-PHPStan max, Deptrac, Swiss Knife, `composer audit`, install-script shell tests,
-zizmor GitHub Actions security scan) → **Tests + Mutation** (PHPUnit matrix on
-PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1 with 100% coverage, then Infection 100%
-MSI; coverage uploads to Codecov and the mutation report uploads to the Stryker
+Seven jobs must all pass before merging: **Prettier Check** (markdown
+formatting) → **Markdown Lint** (markdownlint-cli2 semantics) → **Commit Lint**
+(commitlint, conventional commits) → **Lint** (Composer Normalize, PHP CS Fixer,
+Rector, PHPStan max, Deptrac, Swiss Knife, `composer audit`, install-script
+shell tests) → **zizmor** (GitHub Actions security scan via
+[`zizmorcore/zizmor-action`](https://github.com/zizmorcore/zizmor-action), SARIF
+uploaded to Code Scanning) → **Tests + Mutation** (PHPUnit matrix on PHP
+8.3/8.4/8.5 × Symfony 7.4/8.0/8.1 with 100% coverage, then Infection 100% MSI;
+coverage uploads to Codecov and the mutation report uploads to the Stryker
 dashboard via Infection's `stryker` logger — the badge tracks `main`, and
 same-repo branches publish their own report).
 
@@ -248,10 +250,14 @@ Consequences for contributors:
   [Never Silence Quality Gates](#5-never-silence-quality-gates) rule.
 
 The same "don't ship what we hunt" posture applies to the project's own GitHub
-Actions: `zizmor` scans `.github/workflows/` and `action.yml` in the **Lint**
-job, and every third-party `uses:` is pinned to a commit SHA (never a mutable
-tag) for the same reason `Process` is required over raw exec — a moving
-reference is an unreviewed-code-execution surface.
+Actions: a dedicated **zizmor** job scans `.github/workflows/` and `action.yml`
+on every push and pull request, and every third-party `uses:` — including
+`zizmor-action` itself — is pinned to a commit SHA (never a mutable tag) for the
+same reason `Process` is required over raw exec: a moving reference is an
+unreviewed-code-execution surface. These pins aren't manually-maintained dead
+weight — the existing `github-actions` entry in `.github/dependabot.yaml`
+recognizes the `# vX.Y.Z` trailing-comment convention and opens a PR bumping
+both the SHA and the comment whenever a pinned action releases.
 
 ## Behavioral Guidelines
 
