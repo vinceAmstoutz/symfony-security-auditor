@@ -986,12 +986,12 @@ final class ProjectFileTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
-    public function test_it_detects_easyadmin_crud_by_suffix(): void
+    public function test_it_detects_easyadmin_crud_by_base_class(): void
     {
         $projectFile = ProjectFile::create(
             'src/Controller/Admin/ProductCrudController.php',
             '/app/src/Controller/Admin/ProductCrudController.php',
-            '<?php',
+            "<?php\nclass ProductCrudController extends AbstractCrudController {}",
         );
 
         self::assertSame('easyadmin_crud', $projectFile->type());
@@ -1273,7 +1273,7 @@ final class ProjectFileTest extends TestCase
         $projectFile = ProjectFile::create(
             'src/Controller/Admin/FooCrudController.php',
             '/app/src/Controller/Admin/FooCrudController.php',
-            '<?php',
+            "<?php\nclass FooCrudController extends AbstractCrudController {}",
         );
 
         self::assertFalse($projectFile->isService());

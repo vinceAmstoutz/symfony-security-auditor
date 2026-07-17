@@ -57,4 +57,18 @@ final class CompositeReviewerFeedbackProviderTest extends TestCase
         self::assertSame($reviewerFeedback, $compositeReviewerFeedbackProvider->feedback());
         self::assertTrue($compositeReviewerFeedbackProvider->feedback()->isEmpty());
     }
+
+    public function test_resetting_for_a_new_run_picks_up_secondary_writes_recorded_during_the_previous_run(): void
+    {
+        $acceptedFindingFeedback = new AcceptedFindingFeedback('xxe', 'src/B.php', 'B', 'recorded during the previous run');
+        $reviewerFeedbackHolder = new ReviewerFeedbackHolder();
+        $compositeReviewerFeedbackProvider = new CompositeReviewerFeedbackProvider(new NullReviewerFeedbackProvider(), $reviewerFeedbackHolder);
+
+        self::assertTrue($compositeReviewerFeedbackProvider->feedback()->isEmpty());
+
+        $reviewerFeedbackHolder->set(new ReviewerFeedback([$acceptedFindingFeedback]));
+        $compositeReviewerFeedbackProvider->resetForNewRun();
+
+        self::assertEquals([$acceptedFindingFeedback], $compositeReviewerFeedbackProvider->feedback()->entries);
+    }
 }

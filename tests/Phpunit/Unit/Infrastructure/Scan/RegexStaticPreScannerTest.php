@@ -852,6 +852,9 @@ final class RegexStaticPreScannerTest extends TestCase
     {
         yield 'YAML IPv4 wildcard' => ['config/packages/framework.yaml', "framework:\n    trusted_proxies: '0.0.0.0/0'"];
         yield 'YAML IPv6 wildcard' => ['config/packages/framework.yaml', "framework:\n    trusted_proxies: '::/0'"];
+        yield 'YAML flow-array wildcard' => ['config/packages/framework.yaml', "framework:\n    trusted_proxies: ['0.0.0.0/0']"];
+        yield 'YAML wildcard appended after another value' => ['config/packages/framework.yaml', "framework:\n    trusted_proxies: 'REMOTE_ADDR,0.0.0.0/0'"];
+        yield 'YAML block-list wildcard' => ['config/packages/framework.yaml', "framework:\n    trusted_proxies:\n        - '127.0.0.1'\n        - '0.0.0.0/0'"];
         yield 'dotenv wildcard' => ['.env', "TRUSTED_PROXIES=0.0.0.0/0\n"];
     }
 
@@ -1062,6 +1065,24 @@ final class RegexStaticPreScannerTest extends TestCase
             'config/packages/nelmio_security.yaml',
             '/app/config/packages/nelmio_security.yaml',
             "nelmio_security:\n    forced_ssl:\n        enabled: true",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('hsts_disabled', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_does_not_flag_hsts_disabled_when_a_sibling_section_is_the_disabled_one(): void
+    {
+        $projectFile = ProjectFile::create(
+            'config/packages/nelmio_security.yaml',
+            '/app/config/packages/nelmio_security.yaml',
+            "nelmio_security:\n    forced_ssl:\n        enabled: true\n        hsts_max_age: 31536000\n    csp:\n        enabled: false",
         );
 
         $markers = $this->regexStaticPreScanner->scan([$projectFile]);

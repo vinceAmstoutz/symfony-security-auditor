@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedb
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 
 use function Symfony\Component\String\u;
@@ -34,6 +35,12 @@ use function Symfony\Component\String\u;
  * {@see ReviewerFeedbackProviderInterface} feedback on later runs — so a
  * recurring false positive teaches the reviewer once instead of every run,
  * without a maintainer hand-curating a baseline entry for it.
+ *
+ * Memory is scoped to the audited project: each project gets its own file
+ * under the configured directory, keyed by a hash of its path. A user-global
+ * cache directory (the standalone binary's default) is therefore not a
+ * cross-project channel — project A's rejections never surface in, or
+ * overwrite, project B's feedback.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -57,14 +64,27 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
      * @throws InvalidCacheConfigurationException
      */
     public function __construct(
-        private string $path,
+        private string $directory,
         private Filesystem $filesystem,
         private LoggerInterface $logger,
+        private AuditedProjectPathHolder $auditedProjectPathHolder,
         private int $maxEntries = self::DEFAULT_MAX_ENTRIES,
     ) {
-        if (u($path)->trim()->isEmpty()) {
+        if (u($directory)->trim()->isEmpty()) {
             throw InvalidCacheConfigurationException::forEmptyCacheDir('Triage memory');
         }
+    }
+
+    /**
+     * Read lazily — never at construction — so the audited project path set on
+     * {@see AuditedProjectPathHolder} once the command resolves its argument is
+     * the one that scopes the file (mirrors {@see DeferredAdvisoryDatabase}).
+     */
+    private function path(): string
+    {
+        $projectScope = substr(hash('sha256', $this->auditedProjectPathHolder->path()), 0, 16);
+
+        return \sprintf('%s/%s.json', $this->directory, $projectScope);
     }
 
     #[Override]
@@ -86,20 +106,21 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
     #[Override]
     public function record(string $type, string $file, string $title, int $line, string $reason): void
     {
-        if ($this->isSymlinkedPath($this->path)) {
-            $this->logger->warning('Triage memory path was a symlink, skipping write', ['path' => $this->path]);
+        $path = $this->path();
+        if ($this->isSymlinkedPath($path)) {
+            $this->logger->warning('Triage memory path was a symlink, skipping write', ['path' => $path]);
 
             return;
         }
 
         try {
             $entry = ['type' => $type, 'file' => $file, 'title' => $title, 'line' => $line, 'reason' => $this->cappedReason($reason)];
-            $entries = $this->upsert($this->readEntries(), $entry);
+            $entries = $this->insertIfAbsent($this->readEntries(), $entry);
             $encoded = json_encode(\array_slice($entries, -$this->maxEntries), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
-            $this->filesystem->dumpFile($this->path, $encoded);
+            $this->filesystem->dumpFile($path, $encoded);
         } catch (Throwable $throwable) {
             $this->logger->warning('Failed to write triage memory entry', [
-                'path' => $this->path,
+                'path' => $path,
                 'error' => $throwable->getMessage(),
             ]);
         }
@@ -110,15 +131,16 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
      */
     private function readEntries(): array
     {
-        if (!$this->filesystem->exists($this->path) || $this->isSymlinkedPath($this->path)) {
+        $path = $this->path();
+        if (!$this->filesystem->exists($path) || $this->isSymlinkedPath($path)) {
             return [];
         }
 
         try {
-            $decoded = json_decode($this->filesystem->readFile($this->path), true, flags: \JSON_THROW_ON_ERROR);
+            $decoded = json_decode($this->filesystem->readFile($path), true, flags: \JSON_THROW_ON_ERROR);
         } catch (IOException|JsonException $exception) {
             $this->logger->warning('Triage memory file was unreadable, ignoring', [
-                'path' => $this->path,
+                'path' => $path,
                 'error' => $exception->getMessage(),
             ]);
 
@@ -140,22 +162,31 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
     }
 
     /**
+     * Keeps the first-recorded reason for a given finding: a recurring
+     * rejection re-recorded on a later cache-miss run leaves the stored reason
+     * untouched, so the {@see ReviewerFeedback::digest()} the reviewer cache
+     * keys on stops changing and the finding is re-reviewed once after the
+     * feedback set grows, then served from cache — instead of the reviewer's
+     * freshly-worded notes churning the digest and forcing a full re-review
+     * every run.
+     *
      * @param list<array<array-key, mixed>> $entries
      * @param array<array-key, mixed>       $newEntry
      *
      * @return list<array<array-key, mixed>>
      */
-    private function upsert(array $entries, array $newEntry): array
+    private function insertIfAbsent(array $entries, array $newEntry): array
     {
         $key = $this->keyOf($newEntry);
-        $withoutExisting = array_values(array_filter(
-            $entries,
-            fn (array $entry): bool => $key !== $this->keyOf($entry),
-        ));
+        foreach ($entries as $entry) {
+            if ($key === $this->keyOf($entry)) {
+                return $entries;
+            }
+        }
 
-        $withoutExisting[] = $newEntry;
+        $entries[] = $newEntry;
 
-        return $withoutExisting;
+        return $entries;
     }
 
     /**

@@ -66,6 +66,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserInterface;
@@ -120,19 +121,24 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\Attac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AuthenticatorAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfigAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerEasyAdminAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerFileUploadAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ControllerTrustBoundaryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EntityFileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\EventSubscriberAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FileUploadAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\FormAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\LdapServiceAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\LiveComponentAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\MessengerHandlerAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\NormalizerAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\PhpAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\RepositoryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SchedulerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\SonataAdminAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TemplateAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TrustBoundaryAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TwigExtensionAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\VoterAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\WebhookConsumerAttackerSkill;
@@ -292,19 +298,24 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(AuthenticatorAttackerSkill::class);
     $defaultsConfigurator->set(ConfigAttackerSkill::class);
     $defaultsConfigurator->set(ControllerAttackerSkill::class);
+    $defaultsConfigurator->set(ControllerEasyAdminAttackerSkill::class);
     $defaultsConfigurator->set(ControllerFileUploadAttackerSkill::class);
+    $defaultsConfigurator->set(ControllerTrustBoundaryAttackerSkill::class);
     $defaultsConfigurator->set(EntityAttackerSkill::class);
     $defaultsConfigurator->set(EntityFileUploadAttackerSkill::class);
     $defaultsConfigurator->set(EventSubscriberAttackerSkill::class);
     $defaultsConfigurator->set(FileUploadAttackerSkill::class);
     $defaultsConfigurator->set(FormAttackerSkill::class);
+    $defaultsConfigurator->set(LdapServiceAttackerSkill::class);
     $defaultsConfigurator->set(LiveComponentAttackerSkill::class);
     $defaultsConfigurator->set(MessengerHandlerAttackerSkill::class);
     $defaultsConfigurator->set(NormalizerAttackerSkill::class);
     $defaultsConfigurator->set(PhpAttackerSkill::class);
     $defaultsConfigurator->set(RepositoryAttackerSkill::class);
     $defaultsConfigurator->set(SchedulerAttackerSkill::class);
+    $defaultsConfigurator->set(SonataAdminAttackerSkill::class);
     $defaultsConfigurator->set(TemplateAttackerSkill::class);
+    $defaultsConfigurator->set(TrustBoundaryAttackerSkill::class);
     $defaultsConfigurator->set(TwigExtensionAttackerSkill::class);
     $defaultsConfigurator->set(VoterAttackerSkill::class);
     $defaultsConfigurator->set(WebhookConsumerAttackerSkill::class);
@@ -330,9 +341,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(FilesystemTriageMemoryStore::class)
         ->args([
-            param('symfony_security_auditor.cache.triage_memory_path'),
+            param('symfony_security_auditor.cache.triage_memory_dir'),
             service(Filesystem::class),
             service('logger'),
+            service(AuditedProjectPathHolder::class),
         ]);
 
     $defaultsConfigurator->set(CompositeReviewerFeedbackProvider::class)
@@ -648,6 +660,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(CostCalculator::class),
             param('symfony_security_auditor.attacker_model'),
             service(BudgetTracker::class),
+            service(ReviewerFeedbackSnapshotInterface::class)->ignoreOnInvalid(),
         ]);
 
     $defaultsConfigurator->set(UnpricedModelBudgetGuard::class)

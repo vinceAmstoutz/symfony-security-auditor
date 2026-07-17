@@ -34,7 +34,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * alter scan output for existing chunk content. Folded into the attacker
      * cache key so stale entries are invalidated.
      */
-    public const int CACHE_VERSION = 30;
+    public const int CACHE_VERSION = 31;
 
     /**
      * Detects the `s` (DOTALL) flag among a PCRE pattern's trailing modifier
@@ -284,7 +284,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'A credential-shaped value was redacted here before analysis — a real secret is committed in this file',
             ],
             'trusted_proxies_wildcard' => [
-                'regex' => '/(?:trusted_proxies\s*:|TRUSTED_PROXIES\s*=)\s*[\'"]?(?:0\.0\.0\.0\/0|::\/0)/i',
+                'regex' => '/(?:trusted_proxies\s*:|TRUSTED_PROXIES\s*=)[^\n]*(?:0\.0\.0\.0\/0|::\/0)|trusted_proxies\s*:[^\S\n]*\n(?:[^\S\n]*-[^\n]*\n)*?[^\S\n]*-[^\n]*(?:0\.0\.0\.0\/0|::\/0)/is',
                 'description' => 'trusted_proxies set to a wildcard CIDR (0.0.0.0/0, ::/0) — any client can spoof X-Forwarded-* headers, defeating IP allowlists and rate limiters',
             ],
             'weak_password_hasher_algorithm' => [
@@ -304,7 +304,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => "Content-Security-Policy directive allows 'unsafe-inline'/'unsafe-eval' — defeats CSP's main protection against script injection",
             ],
             'hsts_disabled' => [
-                'regex' => '/forced_ssl\b[\s\S]{0,100}?enabled\s*:\s*false/s',
+                'regex' => '/forced_ssl\s*:[^\n]*\benabled\s*:\s*false\b|^(\h*)forced_ssl\s*:[^\n]*(?:\n\1\h+[^\n]*)*?\n\1\h+enabled\s*:\s*false\b/sm',
                 'description' => 'NelmioSecurity forced_ssl.enabled: false — HSTS not enforced, leaving the app open to SSL-stripping on the first plaintext request',
             ],
             'app_debug_enabled' => [

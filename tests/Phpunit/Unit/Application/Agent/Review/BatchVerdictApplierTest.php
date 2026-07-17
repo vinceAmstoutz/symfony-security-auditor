@@ -30,7 +30,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\NullCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 
@@ -196,18 +198,55 @@ final class BatchVerdictApplierTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_rejected_fresh_batch_verdict_with_reviewer_notes_is_recorded_to_triage_memory(): void
+    {
+        $vulnerability = $this->vulnerability(title: 'T');
+        $triageMemoryRecorder = $this->createMock(TriageMemoryRecorderInterface::class);
+        $triageMemoryRecorder->expects(self::once())->method('record')->with('sql_injection', 'src/A.php', 'T', 18, 'not exploitable: input is validated upstream');
+
+        $this->applier(triageMemoryRecorder: $triageMemoryRecorder)->applyBatchReview(
+            [$vulnerability],
+            [['id' => $vulnerability->id(), 'accepted' => false, 'reviewer_notes' => 'not exploitable: input is validated upstream']],
+            new NullCoverageRecorder(),
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_accepted_fresh_batch_verdict_is_not_recorded_to_triage_memory(): void
+    {
+        $vulnerability = $this->vulnerability();
+        $triageMemoryRecorder = $this->createMock(TriageMemoryRecorderInterface::class);
+        $triageMemoryRecorder->expects(self::never())->method('record');
+
+        $this->applier(triageMemoryRecorder: $triageMemoryRecorder)->applyBatchReview(
+            [$vulnerability],
+            [['id' => $vulnerability->id(), 'accepted' => true, 'reviewer_notes' => 'confirmed exploitable']],
+            new NullCoverageRecorder(),
+        );
+    }
+
     private function recordingCoverageRecorder(): RecordingCoverageRecorder
     {
         return new RecordingCoverageRecorder();
     }
 
-    private function applier(?ReviewerCacheInterface $reviewerCache = null): BatchVerdictApplier
+    private function applier(?ReviewerCacheInterface $reviewerCache = null, ?TriageMemoryRecorderInterface $triageMemoryRecorder = null): BatchVerdictApplier
     {
         return new BatchVerdictApplier(
             new VerdictApplier(new NullLogger()),
             new ReviewerVerdictCache($reviewerCache ?? new NullReviewerCache(), new NullLogger()),
             new NullLogger(),
             new NullProgressReporter(),
+            $triageMemoryRecorder ?? new NullTriageMemoryRecorder(),
         );
     }
 

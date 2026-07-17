@@ -67,24 +67,9 @@ final readonly class ReviewOutcomeRecorder
         );
         $coverageRecorder->recordReviewedFinding($reviewed);
 
-        if (!$reviewed->isReviewerValidated()) {
-            $this->recordRejectionToTriageMemory($reviewed, $review);
-        }
+        RejectionTriageRecorder::record($this->verdictApplier, $this->triageMemoryRecorder, $reviewed, $review);
 
         return $reviewed;
-    }
-
-    /**
-     * @param array<string, mixed>|list<array<string, mixed>> $review
-     */
-    private function recordRejectionToTriageMemory(Vulnerability $vulnerability, array $review): void
-    {
-        $reviewerNotes = $this->verdictApplier->normalize($review)['reviewer_notes'] ?? null;
-        if (!\is_string($reviewerNotes) || '' === trim($reviewerNotes)) {
-            return;
-        }
-
-        $this->triageMemoryRecorder->record($vulnerability->type()->value, $vulnerability->filePath(), $vulnerability->title(), $vulnerability->lineStart(), $reviewerNotes);
     }
 
     public function recordReviewError(Vulnerability $vulnerability, Throwable $throwable, CoverageRecorderInterface $coverageRecorder): Vulnerability

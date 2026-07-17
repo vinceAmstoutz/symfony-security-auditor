@@ -147,18 +147,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 - **The reviewer can now remember its own rejections across runs.** A new
   `audit.triage_memory` boolean (default `false`) opts into persisting every
   finding the reviewer rejects with a non-empty `reviewer_notes` explanation to
-  a cross-run memory file (`<cache.dir>/triage-memory.json`, keyed by
-  type+file+title, capped at 500 entries) and surfacing it back to the reviewer
-  on later runs — the same "maintainer-trusted false-positive feedback"
-  treatment `audit.baseline` entries with a `reason` already get, but recorded
-  automatically from the reviewer's own reasoning instead of hand-curated.
+  cross-run memory (one file per audited project under
+  `<cache.dir>/triage-memory/`, keyed by type+file+title+line, capped at 500
+  entries) and surfacing it back to the reviewer on later runs — the same
+  "maintainer-trusted false-positive feedback" treatment `audit.baseline`
+  entries with a `reason` already get, but recorded automatically from the
+  reviewer's own reasoning instead of hand-curated. Memory is scoped to the
+  audited project, so a shared (user-global) cache directory — the standalone
+  binary's default — never leaks one project's rejections into another's review.
   Merges with any baseline-sourced feedback via the new
   `CompositeReviewerFeedbackProvider`; reviewer-verdict cache keys incorporate
-  the combined feedback, so a newly recorded reason re-reviews affected
-  findings. Two new Domain ports — `ReviewerFeedbackProviderInterface`
-  (pre-existing, now composable) and the new `TriageMemoryRecorderInterface` —
-  are documented as extension points in `docs/extending.md`. Implementation
-  lives in `src/Audit/Infrastructure/Cache/FilesystemTriageMemoryStore.php` and
+  the combined feedback, and the first reason recorded for a finding is kept on
+  later runs so the feedback set stabilizes — affected findings are re-reviewed
+  once when the feedback set grows, then served from cache. Two new Domain ports
+  — `ReviewerFeedbackProviderInterface` (pre-existing, now composable) and the
+  new `TriageMemoryRecorderInterface` — are documented as extension points in
+  `docs/extending.md`. Implementation lives in
+  `src/Audit/Infrastructure/Cache/FilesystemTriageMemoryStore.php` and
   `src/Audit/Application/Agent/Review/ReviewOutcomeRecorder.php`.
 
 - **The attacker now hunts LDAP injection and broken access control in Sonata
@@ -208,9 +213,77 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   missed its own freshly-written cache entry — and a cache _hit_ re-wrote the
   file too, compounding the churn. The composite now snapshots the merged
   feedback once per run, and `ReviewerFeedback::digest()` is order-independent,
-  so a stable set produces a stable key across runs. The cache is functional
-  again with triage memory on: findings are re-reviewed once after the feedback
-  set changes, then served from cache.
+  so a stable set produces a stable key. Two remaining sources of cross-run
+  churn are also closed: `FilesystemTriageMemoryStore` now keeps the **first**
+  reason recorded for a finding instead of overwriting it with each run's
+  freshly-worded notes (a rewritten reason changed the digest every run, so the
+  cache never converged), and the per-run snapshot is now discarded at the start
+  of each run via `ReviewerFeedbackSnapshotInterface::resetForNewRun()` (called
+  from `RunAuditUseCase::execute()`) — previously the `??=` memo lived for the
+  whole process, so a long-lived process (`mcp:serve`) served the first audit's
+  frozen feedback to every later audit. The cache is functional again with
+  triage memory on: findings are re-reviewed once after the feedback set grows,
+  then served from cache, run after run.
+- **`audit.triage_memory` no longer leaks one project's rejections into another
+  project's review, and now records rejections in every review mode.** The
+  memory file lived at a single `<cache.dir>/triage-memory.json` with entries
+  keyed only by type+file+title+line, so under a shared (user-global) cache
+  directory — the standalone binary's default — two projects with a same-named
+  file (`src/Controller/UserController.php`) cross-contaminated: project A's
+  rejection was surfaced to project B's reviewer as a "known false positive for
+  this project" and its title/notes were sent to B's configured LLM provider,
+  and a matching key silently overwrote the other's entry.
+  `FilesystemTriageMemoryStore` now writes one file per audited project under
+  `<cache.dir>/triage-memory/` (keyed by a hash of the project path).
+  Separately, a reviewer rejection produced by batch mode
+  (`audit.reviewer_batch_size > 1`) was applied by `BatchVerdictApplier`, which
+  bypassed `ReviewOutcomeRecorder` and so never recorded the rejection to triage
+  memory — the opt-in feature did nothing in batch mode. Both fresh-verdict
+  paths now route the rejection through the shared `RejectionTriageRecorder`, so
+  every review mode records consistently.
+- **The release's new attacker skills are now actually wired into the audit.**
+  `TrustBoundaryAttackerSkill`, `ControllerTrustBoundaryAttackerSkill`,
+  `LdapServiceAttackerSkill`, `SonataAdminAttackerSkill`, and
+  `ControllerEasyAdminAttackerSkill` were added only to
+  `AttackerSkillRegistry::defaultSkills()` (the null-constructed fallback used
+  in unit tests) but never `set()` in `config/services.php`, so the DI-tagged
+  registry the shipped bundle and standalone binary build omitted them entirely
+  — the advertised LDAP/Sonata/EasyAdmin/trust-boundary hunts, and (for the new
+  file types) any skill block at all, never reached the attacker prompt. All
+  five are now registered, and a bundle integration test asserts the DI-built
+  registry renders exactly the built-in set so a future skill cannot regress the
+  same way.
+- **`ProjectFileTypeClassifier` no longer misroutes plain classes into the new
+  panel/LDAP file types.** A controller named `*CrudController.php` was
+  classified `EASYADMIN_CRUD` on filename alone — losing the generic controller
+  attack skills and dropping out of the no-voter-controllers mapping — even with
+  no EasyAdmin base class; classification now requires the content signal
+  (`extends AbstractCrudController` / `implements CrudControllerInterface`).
+  Likewise a message handler, event subscriber, normalizer, or scheduler that
+  merely referenced the Symfony LDAP component was reclassified `LDAP_SERVICE`
+  before its own attribute-verified arm ran; the LDAP/Sonata arms now sit after
+  those precise types, and the LDAP content sniff requires the LDAP _client_
+  (`Symfony\Component\Ldap\Ldap`) rather than any `Symfony\Component\Ldap`
+  import.
+- **The `trusted_proxies_wildcard` and `hsts_disabled` pre-scan markers are more
+  accurate.** `trusted_proxies_wildcard` only matched a wildcard CIDR placed
+  immediately after the key, missing the common `trusted_proxies: ['0.0.0.0/0']`
+  flow-array, block-list, and `'REMOTE_ADDR,0.0.0.0/0'` appended forms; it now
+  matches all of them. `hsts_disabled` matched an `enabled: false` belonging to
+  any sibling section within 100 characters of `forced_ssl`, so a correctly
+  hardened `forced_ssl: { enabled: true }` followed by a disabled `csp:` was
+  flagged as HSTS-off; it now only fires when the `enabled: false` is a child of
+  the `forced_ssl` block (or its inline map). `RegexStaticPreScanner`'s
+  `CACHE_VERSION` is bumped to 31.
+- **A YAML config file with numeric top-level keys no longer crashes the
+  audit.** `SymfonyYamlSecurityConfigParser::securitySections()` passed every
+  top-level key to `securityBlockOf(string $key, …)`, so a document like
+  `1: { question: … }` produced `int` keys and a fatal
+  `TypeError: Argument #1 ($key) must be of type string, int given` before any
+  LLM call (reported for the standalone binary in
+  [#187](https://github.com/vinceAmstoutz/symfony-security-auditor/issues/187)).
+  Non-string keys are now skipped, so a config carrying no `security` block is
+  ignored as intended.
 - **Triage-memory feedback is no longer mislabeled as maintainer-authored, and
   its newest entries are surfaced first.** The reviewer system prompt presented
   every feedback entry as a “Maintainer-accepted finding from this project's

@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Revie
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
 
 /**
  * Merges feedback from two sources — the baseline-backed
@@ -28,15 +29,20 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProvi
  * it live would shift the reviewer cache-key digest between findings within a
  * single run, making every verdict after the first miss its own freshly-written
  * cache entry. Freezing the set on first read keeps the digest and the reviewer
- * system prompt stable for the whole run; the next run picks up the entries
- * recorded during this one.
+ * system prompt stable for the whole run.
+ *
+ * The snapshot is discarded at the start of each run via
+ * {@see resetForNewRun()} — called by `RunAuditUseCase::execute()` — so a
+ * long-lived process (`mcp:serve`) picks up the entries recorded during the
+ * previous run instead of serving the first run's frozen feedback forever.
  *
  * Mutable by design — non-readonly because the snapshot is filled lazily on
- * first read. See .claude/rules/php-classes.md for the opt-out policy.
+ * first read and cleared per run. See .claude/rules/php-classes.md for the
+ * opt-out policy.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final class CompositeReviewerFeedbackProvider implements ReviewerFeedbackProviderInterface
+final class CompositeReviewerFeedbackProvider implements ReviewerFeedbackProviderInterface, ReviewerFeedbackSnapshotInterface
 {
     private ?ReviewerFeedback $reviewerFeedback = null;
 
@@ -52,5 +58,11 @@ final class CompositeReviewerFeedbackProvider implements ReviewerFeedbackProvide
             ...$this->primary->feedback()->entries,
             ...$this->secondary->feedback()->entries,
         ]);
+    }
+
+    #[Override]
+    public function resetForNewRun(): void
+    {
+        $this->reviewerFeedback = null;
     }
 }
