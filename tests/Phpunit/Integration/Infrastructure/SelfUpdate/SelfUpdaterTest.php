@@ -115,7 +115,7 @@ final class SelfUpdaterTest extends TestCase
             $selfUpdater->run('1.0.0', false);
         } finally {
             self::assertStringEqualsFile($this->binaryPath, 'OLD-BINARY');
-            self::assertCount(0, (new Finder())->in($this->workingDirectory)->files()->name('*.download')->ignoreDotFiles(false));
+            self::assertCount(0, (new Finder())->in($this->workingDirectory)->files()->name('/\.download$/')->ignoreDotFiles(false));
         }
     }
 
@@ -154,7 +154,7 @@ final class SelfUpdaterTest extends TestCase
 
             $selfUpdater->run('1.0.0', false);
         } finally {
-            self::assertCount(0, (new Finder())->in($this->workingDirectory)->files()->name('*.download')->ignoreDotFiles(false));
+            self::assertCount(0, (new Finder())->in($this->workingDirectory)->files()->name('/\.download$/')->ignoreDotFiles(false));
         }
     }
 

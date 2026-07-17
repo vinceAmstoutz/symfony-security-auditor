@@ -30,9 +30,9 @@ final readonly class ProcessReleaseClient implements ReleaseClientInterface
 {
     private const string USER_AGENT = 'symfony-security-auditor-self-update';
 
-    private const int CONNECT_TIMEOUT_SECONDS = 30;
+    private const string CONNECT_TIMEOUT_SECONDS = '30';
 
-    private const int MAX_TRANSFER_SECONDS = 600;
+    private const string MAX_TRANSFER_SECONDS = '600';
 
     private const float PROCESS_TIMEOUT_SECONDS = 660.0;
 
@@ -56,9 +56,9 @@ final readonly class ProcessReleaseClient implements ReleaseClientInterface
                     'curl',
                     '-fsSL',
                     '--connect-timeout',
-                    (string) self::CONNECT_TIMEOUT_SECONDS,
+                    self::CONNECT_TIMEOUT_SECONDS,
                     '--max-time',
-                    (string) self::MAX_TRANSFER_SECONDS,
+                    self::MAX_TRANSFER_SECONDS,
                     '-H',
                     \sprintf('User-Agent: %s', self::USER_AGENT),
                     ...$arguments,
