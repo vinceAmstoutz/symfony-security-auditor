@@ -79,7 +79,7 @@ runs:
   steps:
     - name: Set up PHP
       if: ${{ inputs.setup-php == 'true' }}
-      uses: shivammathur/setup-php@v2
+      uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
       with:
         php-version: ${{ inputs.php-version }}
         coverage: none
@@ -96,7 +96,7 @@ runs:
       env:
         SSA_INSTALL_DIR: ${{ github.action_path }}/.bin
         SSA_ACTION_REF: ${{ github.action_ref }}
-      run: |
+      run: | # zizmor: ignore[github-env] SSA_INSTALL_DIR is derived from github.action_path, not attacker input
         set -euo pipefail
         # Run the install script from this action's own checkout, not a live
         # fetch of main — a pinned `uses: …@<ref>` must not execute whatever

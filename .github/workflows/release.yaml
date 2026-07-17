@@ -20,12 +20,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: '8.3'
           coverage: none
@@ -42,7 +43,7 @@ jobs:
         run: test -s symfony-security-auditor.phar
 
       - name: Upload the PHAR build input with its dependency lock
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: symfony-security-auditor-phar
           path: |
@@ -87,9 +88,10 @@ jobs:
         shell: bash
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
 
       - name: Setup static-php-cli (pinned stable release)
         run: |
@@ -152,7 +154,7 @@ jobs:
           ./spc doctor --auto-fix
 
       - name: Download the PHAR build input
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: symfony-security-auditor-phar
 
@@ -175,6 +177,7 @@ jobs:
           # (static-php-cli-hosted/releases); the unauthenticated 60-req/hour
           # limit intermittently 403s a subset of the matrix.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EXTENSIONS_LIST: ${{ steps.extensions.outputs.list }}
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
             # spc extracts archives through cmd.exe pipelines ("7za x -so … |
@@ -183,7 +186,7 @@ jobs:
             # extraction is written against System32's bsdtar, so put it first.
             export PATH="/c/Windows/System32:$PATH"
           fi
-          ./spc download --for-extensions="${{ steps.extensions.outputs.list }}" --with-php=8.3 --prefer-pre-built
+          ./spc download --for-extensions="$EXTENSIONS_LIST" --with-php=8.3 --prefer-pre-built
           if [ "$RUNNER_OS" = "Windows" ]; then
             # spc discards extraction exit codes on Windows (bsdtar returns 1
             # on symlink warnings), so a failed extraction resurfaces as an
@@ -196,7 +199,7 @@ jobs:
               exit 1
             fi
           fi
-          ./spc build "${{ steps.extensions.outputs.list }}" --build-micro
+          ./spc build "$EXTENSIONS_LIST" --build-micro
 
       - name: Combine the micro runtime with the PHAR
         run: ./spc micro:combine symfony-security-auditor.phar --output="${{ matrix.asset }}"
@@ -218,7 +221,7 @@ jobs:
           fi
 
       - name: Attach the binary and checksum to the release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           # A release event carries its own tag context; a workflow_dispatch
           # rebuild does not, so target the tag explicitly (the input on

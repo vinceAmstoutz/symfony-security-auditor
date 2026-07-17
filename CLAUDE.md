@@ -33,6 +33,7 @@ to detect vulnerabilities and produce structured reports.
 | Complexity        | tomasvotruba/cognitive-complexity (function ≤ 7, class ≤ 40)                                                                                                                                                                                             |
 | Dead code         | rector/swiss-knife (`check-commented-code`, `check-conflicts`)                                                                                                                                                                                           |
 | Style             | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets)                                                                                                                                                                                                             |
+| CI/CD security    | zizmor (static analysis for GitHub Actions — scans `.github/workflows/` + `action.yml`)                                                                                                                                                                  |
 
 ## Build, Test & Lint Commands
 
@@ -209,12 +210,12 @@ with `BREAKING CHANGE:` footer.
 Six jobs must all pass before merging: **Prettier Check** (markdown formatting)
 → **Markdown Lint** (markdownlint-cli2 semantics) → **Commit Lint** (commitlint,
 conventional commits) → **Lint** (Composer Normalize, PHP CS Fixer, Rector,
-PHPStan max, Deptrac, Swiss Knife, `composer audit`, install-script shell tests)
-→ **Tests + Mutation** (PHPUnit matrix on PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1
-with 100% coverage, then Infection 100% MSI; coverage uploads to Codecov and the
-mutation report uploads to the Stryker dashboard via Infection's `stryker`
-logger — the badge tracks `main`, and same-repo branches publish their own
-report).
+PHPStan max, Deptrac, Swiss Knife, `composer audit`, install-script shell tests,
+zizmor GitHub Actions security scan) → **Tests + Mutation** (PHPUnit matrix on
+PHP 8.3/8.4/8.5 × Symfony 7.4/8.0/8.1 with 100% coverage, then Infection 100%
+MSI; coverage uploads to Codecov and the mutation report uploads to the Stryker
+dashboard via Infection's `stryker` logger — the badge tracks `main`, and
+same-repo branches publish their own report).
 
 Details: [`docs/ci.md`](docs/ci.md)
 
@@ -245,6 +246,12 @@ Consequences for contributors:
 - Never satisfy a disallowed-call error with an `allowIn`/exclusion entry; route
   through `Process` instead. Suppressing this gate is covered by the
   [Never Silence Quality Gates](#5-never-silence-quality-gates) rule.
+
+The same "don't ship what we hunt" posture applies to the project's own GitHub
+Actions: `zizmor` scans `.github/workflows/` and `action.yml` in the **Lint**
+job, and every third-party `uses:` is pinned to a commit SHA (never a mutable
+tag) for the same reason `Process` is required over raw exec — a moving
+reference is an unreviewed-code-execution surface.
 
 ## Behavioral Guidelines
 
