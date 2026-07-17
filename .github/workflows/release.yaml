@@ -221,7 +221,7 @@ jobs:
           fi
 
       - name: Attach the binary and checksum to the release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # zizmor: ignore[superfluous-actions] v3.0.2 -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
         with:
           # A release event carries its own tag context; a workflow_dispatch
           # rebuild does not, so target the tag explicitly (the input on
