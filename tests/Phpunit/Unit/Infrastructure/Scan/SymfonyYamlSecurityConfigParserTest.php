@@ -146,6 +146,22 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         self::assertSame(['ROLE_ADMIN'], $accessControl['^/admin']);
     }
 
+    public function test_merging_a_later_duplicate_retains_earlier_recorded_paths(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            security:
+                access_control:
+                    - { path: ^/admin, roles: ROLE_ADMIN }
+                    - { path: ^/api, roles: ROLE_USER }
+                    - { path: ^/admin, roles: ROLE_SUPER }
+            YAML);
+
+        self::assertSame(
+            ['^/admin' => ['ROLE_ADMIN', 'or: ROLE_SUPER'], '^/api' => ['ROLE_USER']],
+            $accessControl,
+        );
+    }
+
     public function test_it_surfaces_allow_if_expressions(): void
     {
         $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
