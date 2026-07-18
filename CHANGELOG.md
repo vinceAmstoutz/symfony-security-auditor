@@ -157,12 +157,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   audited project, so a shared (user-global) cache directory — the standalone
   binary's default — never leaks one project's rejections into another's review.
   Merges with any baseline-sourced feedback via the new
-  `CompositeReviewerFeedbackProvider`; reviewer-verdict cache keys incorporate
-  the combined feedback, and the first reason recorded for a finding is kept on
-  later runs so the feedback set stabilizes — affected findings are re-reviewed
-  once when the feedback set grows, then served from cache. Two new Domain ports
-  — `ReviewerFeedbackProviderInterface` (pre-existing, now composable) and the
-  new `TriageMemoryRecorderInterface` — are documented as extension points in
+  `CompositeReviewerFeedbackProvider` — deduplicated by finding identity
+  (type+file+title) so a finding present in both the baseline and triage memory
+  occupies a single reviewer-prompt slot, with the baseline reason winning.
+  Reviewer-verdict cache keys incorporate the combined feedback, and the first
+  reason recorded for a finding is kept on later runs so the feedback set
+  stabilizes — affected findings are re-reviewed once when the feedback set
+  grows, then served from cache. Two new Domain ports —
+  `ReviewerFeedbackProviderInterface` (pre-existing, now composable) and the new
+  `TriageMemoryRecorderInterface` — are documented as extension points in
   `docs/extending.md`. Implementation lives in
   `src/Audit/Infrastructure/Cache/FilesystemTriageMemoryStore.php` and
   `src/Audit/Application/Agent/Review/ReviewOutcomeRecorder.php`.

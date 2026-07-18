@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
@@ -54,10 +55,37 @@ final class CompositeReviewerFeedbackProvider implements ReviewerFeedbackProvide
     #[Override]
     public function feedback(): ReviewerFeedback
     {
-        return $this->reviewerFeedback ??= new ReviewerFeedback([
+        return $this->reviewerFeedback ??= new ReviewerFeedback($this->deduplicated([
             ...$this->primary->feedback()->entries,
             ...$this->secondary->feedback()->entries,
-        ]);
+        ]));
+    }
+
+    /**
+     * Keeps the first entry per finding identity (type+file+title) so a finding
+     * present in both the baseline (primary) and triage memory (secondary)
+     * occupies a single reviewer-prompt slot instead of two — the baseline
+     * reason wins, since primary is spread first.
+     *
+     * @param list<AcceptedFindingFeedback> $entries
+     *
+     * @return list<AcceptedFindingFeedback>
+     */
+    private function deduplicated(array $entries): array
+    {
+        $seen = [];
+        $unique = [];
+        foreach ($entries as $entry) {
+            $key = \sprintf("%s\0%s\0%s", $entry->type, $entry->file, $entry->title);
+            if (\array_key_exists($key, $seen)) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $unique[] = $entry;
+        }
+
+        return $unique;
     }
 
     #[Override]
