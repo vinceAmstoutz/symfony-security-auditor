@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.16.0] — 2026-07-18 — Perimeter
+
+A release about the security perimeter. The attacker gains a wave of
+misconfiguration hunts — HTTP trust boundaries (wildcard `trusted_proxies`,
+Host-header injection / cache poisoning), permissive CORS, weak CSP, missing
+HSTS, weak password hashing, debug mode left on, permissive Mercure topics, plus
+LDAP and admin-panel surfaces — and the reviewer learns across runs through
+opt-in triage memory. The standalone binary can now update itself in place with
+`self-update`, MiniMax joins as a first-class provider, and truncated /
+content-filtered LLM responses are finally surfaced instead of lost. A large
+batch of fixes hardens triage memory (per-project isolation, stable cache keys,
+bounded prompt injection surface) and wires the new attacker skills that were
+built but never registered.
+
 ### Added
 
 - **`Vulnerability::of()` accepts an optional `detectedAt` timestamp.** The
@@ -2529,6 +2543,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.16.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.16.0
 [1.15.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.15.0
 [1.14.0]:
