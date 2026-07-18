@@ -35,6 +35,40 @@ final class RouteAccessControlTest extends TestCase
         self::assertTrue($routeAccessControl->lacksAccessCheck());
     }
 
+    public function test_guard_attributes_unions_and_deduplicates_every_guard_form(): void
+    {
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/PostController.php',
+            methodName: 'edit',
+            routePath: '/posts/{id}/edit',
+            routeMethods: ['POST'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: ['EDIT'],
+            methodHasDenyAccess: true,
+            classHasIsGranted: true,
+            classLevelIsGranted: ['ROLE_USER', 'EDIT'],
+            denyAccessAttributes: ['PUBLISH'],
+        );
+
+        self::assertSame(['EDIT', 'ROLE_USER', 'PUBLISH'], $routeAccessControl->guardAttributes());
+    }
+
+    public function test_guard_attributes_is_empty_when_no_guard_is_present(): void
+    {
+        $routeAccessControl = new RouteAccessControl(
+            filePath: 'src/Controller/PublicController.php',
+            methodName: 'index',
+            routePath: '/',
+            routeMethods: ['GET'],
+            hasRouteAttribute: true,
+            methodLevelIsGranted: [],
+            methodHasDenyAccess: false,
+            classHasIsGranted: false,
+        );
+
+        self::assertSame([], $routeAccessControl->guardAttributes());
+    }
+
     public function test_action_with_method_level_is_granted_has_access_check(): void
     {
         $routeAccessControl = new RouteAccessControl(

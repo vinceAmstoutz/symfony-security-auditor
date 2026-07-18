@@ -112,7 +112,7 @@ final class FileChunkerTest extends TestCase
     public function test_feature_strategy_groups_an_easyadmin_crud_controller_with_its_repository(): void
     {
         $files = [
-            $this->makeFile('src/Controller/Admin/ProductCrudController.php'),
+            $this->makeFileWithContent('src/Controller/Admin/ProductCrudController.php', "<?php\nclass ProductCrudController extends AbstractCrudController {}"),
             $this->makeFile('src/Repository/ProductRepository.php'),
             $this->makeFile('src/Entity/Order.php'),
         ];

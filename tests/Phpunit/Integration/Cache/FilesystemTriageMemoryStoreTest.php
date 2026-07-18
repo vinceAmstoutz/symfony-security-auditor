@@ -20,11 +20,16 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\Exception\InvalidCacheConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
 
 final class FilesystemTriageMemoryStoreTest extends TestCase
 {
+    private const string PROJECT_PATH = '/project/alpha';
+
+    private string $directory;
+
     private string $memoryPath;
 
     private FilesystemTriageMemoryStore $filesystemTriageMemoryStore;
@@ -55,7 +60,7 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
     /**
      * @throws InvalidCacheConfigurationException
      */
-    public function test_recording_the_same_finding_again_replaces_its_reason_instead_of_duplicating(): void
+    public function test_recording_the_same_finding_again_keeps_the_first_reason_so_the_feedback_digest_stays_stable(): void
     {
         $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 10, 'first reason');
         $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 10, 'second, more precise reason');
@@ -63,7 +68,7 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
         $feedback = $this->filesystemTriageMemoryStore->feedback();
 
         self::assertEquals(
-            [new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Injectable query', 'second, more precise reason')],
+            [new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Injectable query', 'first reason')],
             $feedback->entries,
         );
     }
@@ -77,6 +82,23 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
         $this->filesystemTriageMemoryStore->record('xxe', 'src/B.php', 'XML parsing', 10, 'reason B');
 
         self::assertCount(2, $this->filesystemTriageMemoryStore->feedback()->entries);
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    public function test_re_recording_an_existing_finding_leaves_other_stored_entries_intact(): void
+    {
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 10, 'reason A');
+        $this->filesystemTriageMemoryStore->record('xxe', 'src/B.php', 'XML parsing', 20, 'reason B');
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Injectable query', 10, 'reworded reason A');
+
+        $reasons = array_map(
+            static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->reason,
+            $this->filesystemTriageMemoryStore->feedback()->entries,
+        );
+
+        self::assertEqualsCanonicalizing(['reason A', 'reason B'], $reasons);
     }
 
     /**
@@ -111,7 +133,7 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
             $this->filesystemTriageMemoryStore->feedback()->entries,
         );
 
-        self::assertSame(['refreshed reason'], $reasons);
+        self::assertSame(['legacy reason'], $reasons);
     }
 
     /**
@@ -119,7 +141,7 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
      */
     public function test_recording_more_than_the_entry_cap_drops_the_oldest_entries(): void
     {
-        $filesystemTriageMemoryStore = new FilesystemTriageMemoryStore($this->memoryPath, $this->filesystem(), new NullLogger(), 2);
+        $filesystemTriageMemoryStore = new FilesystemTriageMemoryStore($this->directory, $this->filesystem(), new NullLogger(), $this->projectPathHolder(), 2);
 
         $filesystemTriageMemoryStore->record('sql_injection', 'src/File0.php', 'title', 10, 'reason');
         $filesystemTriageMemoryStore->record('sql_injection', 'src/File1.php', 'title', 10, 'reason');
@@ -254,7 +276,7 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
             },
         );
 
-        $filesystemTriageMemoryStore = new FilesystemTriageMemoryStore($this->memoryPath, $filesystem, $logger);
+        $filesystemTriageMemoryStore = new FilesystemTriageMemoryStore($this->directory, $filesystem, $logger, $this->projectPathHolder());
         $filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'T', 10, 'reason');
 
         self::assertTrue($filesystemTriageMemoryStore->feedback()->isEmpty());
@@ -281,7 +303,7 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
         );
 
         try {
-            (new FilesystemTriageMemoryStore($this->memoryPath, $this->filesystem(), $logger))->record('sql_injection', 'src/A.php', 'T', 10, 'reason');
+            (new FilesystemTriageMemoryStore($this->directory, $this->filesystem(), $logger, $this->projectPathHolder()))->record('sql_injection', 'src/A.php', 'T', 10, 'reason');
         } finally {
             unlink($outsideTarget);
         }
@@ -307,7 +329,7 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
             },
         );
 
-        $feedback = (new FilesystemTriageMemoryStore($this->memoryPath, $filesystem, $logger))->feedback();
+        $feedback = (new FilesystemTriageMemoryStore($this->directory, $filesystem, $logger, $this->projectPathHolder()))->feedback();
 
         self::assertTrue($feedback->isEmpty());
         self::assertSame([['Triage memory file was unreadable, ignoring', ['path' => $this->memoryPath, 'error' => 'permission denied']]], $warnings);
@@ -316,11 +338,27 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
     /**
      * @throws InvalidCacheConfigurationException
      */
-    public function test_constructor_rejects_an_empty_path(): void
+    public function test_constructor_rejects_an_empty_directory(): void
     {
         $this->expectException(InvalidCacheConfigurationException::class);
 
-        new FilesystemTriageMemoryStore('', new Filesystem(), new NullLogger());
+        new FilesystemTriageMemoryStore('', new Filesystem(), new NullLogger(), $this->projectPathHolder());
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
+    public function test_a_rejection_recorded_for_one_project_is_not_surfaced_to_another_project(): void
+    {
+        $projectA = new AuditedProjectPathHolder('/project/alpha');
+        $projectB = new AuditedProjectPathHolder('/project/beta');
+
+        (new FilesystemTriageMemoryStore($this->directory, $this->filesystem(), new NullLogger(), $projectA))
+            ->record('sql_injection', 'src/Controller/UserController.php', 'Injectable query', 10, 'project A false positive');
+
+        $reviewerFeedback = (new FilesystemTriageMemoryStore($this->directory, $this->filesystem(), new NullLogger(), $projectB))->feedback();
+
+        self::assertTrue($reviewerFeedback->isEmpty());
     }
 
     /**
@@ -329,17 +367,23 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
     #[Override]
     protected function setUp(): void
     {
-        $this->memoryPath = sys_get_temp_dir().'/triage_memory_'.uniqid('', true).'/memory.json';
-        $this->filesystemTriageMemoryStore = new FilesystemTriageMemoryStore($this->memoryPath, $this->filesystem(), new NullLogger());
+        $this->directory = sys_get_temp_dir().'/triage_memory_'.uniqid('', true);
+        $this->memoryPath = \sprintf('%s/%s.json', $this->directory, substr(hash('sha256', self::PROJECT_PATH), 0, 16));
+        $this->filesystemTriageMemoryStore = new FilesystemTriageMemoryStore($this->directory, $this->filesystem(), new NullLogger(), $this->projectPathHolder());
     }
 
     #[Override]
     protected function tearDown(): void
     {
         $filesystem = $this->filesystem();
-        if ($filesystem->exists(\dirname($this->memoryPath))) {
-            $filesystem->remove(\dirname($this->memoryPath));
+        if ($filesystem->exists($this->directory)) {
+            $filesystem->remove($this->directory);
         }
+    }
+
+    private function projectPathHolder(): AuditedProjectPathHolder
+    {
+        return new AuditedProjectPathHolder(self::PROJECT_PATH);
     }
 
     private function filesystem(): Filesystem

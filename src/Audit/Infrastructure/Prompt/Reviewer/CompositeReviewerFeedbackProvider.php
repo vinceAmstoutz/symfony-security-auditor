@@ -14,8 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer;
 
 use Override;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AcceptedFindingFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
 
 /**
  * Merges feedback from two sources — the baseline-backed
@@ -28,15 +30,20 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProvi
  * it live would shift the reviewer cache-key digest between findings within a
  * single run, making every verdict after the first miss its own freshly-written
  * cache entry. Freezing the set on first read keeps the digest and the reviewer
- * system prompt stable for the whole run; the next run picks up the entries
- * recorded during this one.
+ * system prompt stable for the whole run.
+ *
+ * The snapshot is discarded at the start of each run via
+ * {@see resetForNewRun()} — called by `RunAuditUseCase::execute()` — so a
+ * long-lived process (`mcp:serve`) picks up the entries recorded during the
+ * previous run instead of serving the first run's frozen feedback forever.
  *
  * Mutable by design — non-readonly because the snapshot is filled lazily on
- * first read. See .claude/rules/php-classes.md for the opt-out policy.
+ * first read and cleared per run. See .claude/rules/php-classes.md for the
+ * opt-out policy.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final class CompositeReviewerFeedbackProvider implements ReviewerFeedbackProviderInterface
+final class CompositeReviewerFeedbackProvider implements ReviewerFeedbackProviderInterface, ReviewerFeedbackSnapshotInterface
 {
     private ?ReviewerFeedback $reviewerFeedback = null;
 
@@ -48,9 +55,35 @@ final class CompositeReviewerFeedbackProvider implements ReviewerFeedbackProvide
     #[Override]
     public function feedback(): ReviewerFeedback
     {
-        return $this->reviewerFeedback ??= new ReviewerFeedback([
+        return $this->reviewerFeedback ??= new ReviewerFeedback($this->deduplicated([
             ...$this->primary->feedback()->entries,
             ...$this->secondary->feedback()->entries,
-        ]);
+        ]));
+    }
+
+    /**
+     * Keeps the first entry per finding identity (type+file+title) so a finding
+     * present in both the baseline (primary) and triage memory (secondary)
+     * occupies a single reviewer-prompt slot instead of two — the baseline
+     * reason wins, since primary is spread first.
+     *
+     * @param list<AcceptedFindingFeedback> $entries
+     *
+     * @return list<AcceptedFindingFeedback>
+     */
+    private function deduplicated(array $entries): array
+    {
+        $unique = [];
+        foreach ($entries as $entry) {
+            $unique[\sprintf("%s\0%s\0%s", $entry->type, $entry->file, $entry->title)] ??= $entry;
+        }
+
+        return array_values($unique);
+    }
+
+    #[Override]
+    public function resetForNewRun(): void
+    {
+        $this->reviewerFeedback = null;
     }
 }

@@ -49,10 +49,13 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'ldap service by suffix' => ['src/Directory/UserLdap.php', '<?php', ProjectFileType::LDAP_SERVICE];
         yield 'ldap service by directory' => ['src/Ldap/DirectoryLookup.php', '<?php', ProjectFileType::LDAP_SERVICE];
         yield 'ldap service by namespace usage without suffix or directory' => ['src/Service/DirectoryBind.php', "<?php\nuse Symfony\\Component\\Ldap\\LdapInterface;\nclass DirectoryBind {}", ProjectFileType::LDAP_SERVICE];
+        yield 'importing only an ldap value object is not an ldap service' => ['src/Service/EntryMapper.php', "<?php\nuse Symfony\\Component\\Ldap\\Entry;\nclass EntryMapper {}", ProjectFileType::PHP];
+        yield 'message handler using the ldap client stays a message handler' => ['src/Sync/ProvisionUser.php', "<?php\nuse Symfony\\Component\\Ldap\\Ldap;\n#[AsMessageHandler]\nclass ProvisionUser {}", ProjectFileType::MESSENGER_HANDLER];
         yield 'sonata admin by suffix' => ['src/Backoffice/StoreAdmin.php', '<?php', ProjectFileType::SONATA_ADMIN];
         yield 'sonata admin by directory' => ['src/Admin/StoreManager.php', '<?php', ProjectFileType::SONATA_ADMIN];
         yield 'sonata admin by base class without suffix or directory' => ['src/Backoffice/StoreManager.php', "<?php\nclass StoreManager extends AbstractAdmin {}", ProjectFileType::SONATA_ADMIN];
-        yield 'easyadmin crud by suffix wins over the controller directory' => ['src/Controller/Admin/ProductCrudController.php', '<?php', ProjectFileType::EASYADMIN_CRUD];
+        yield 'a crud-suffixed controller without the easyadmin base class stays a controller' => ['src/Controller/Admin/ProductCrudController.php', '<?php', ProjectFileType::CONTROLLER];
+        yield 'easyadmin crud by base class wins over the controller directory' => ['src/Controller/Admin/ProductCrudController.php', "<?php\nclass ProductCrudController extends AbstractCrudController {}", ProjectFileType::EASYADMIN_CRUD];
         yield 'easyadmin crud by base class without suffix' => ['src/Controller/Admin/ProductManager.php', "<?php\nclass ProductManager extends AbstractCrudController {}", ProjectFileType::EASYADMIN_CRUD];
         yield 'easyadmin crud by interface without suffix' => ['src/Controller/Admin/ProductManager.php', "<?php\nclass ProductManager implements CrudControllerInterface {}", ProjectFileType::EASYADMIN_CRUD];
         yield 'messenger handler by suffix' => ['src/Messenger/SendInvoiceMessageHandler.php', '<?php', ProjectFileType::MESSENGER_HANDLER];

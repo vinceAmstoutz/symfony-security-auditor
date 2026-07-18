@@ -18,7 +18,7 @@ final readonly class ProjectFileTypeClassifier
     public static function classify(string $path, string $content): ProjectFileType
     {
         return match (true) {
-            self::isEasyAdminCrudPath($path), self::looksLikeEasyAdminCrud($path, $content) => ProjectFileType::EASYADMIN_CRUD,
+            self::looksLikeEasyAdminCrud($path, $content) => ProjectFileType::EASYADMIN_CRUD,
             self::isControllerPath($path) => ProjectFileType::CONTROLLER,
             self::looksLikeApiResource($path, $content) => ProjectFileType::API_RESOURCE,
             self::looksLikeLiveComponent($path, $content) => ProjectFileType::LIVE_COMPONENT,
@@ -28,24 +28,19 @@ final readonly class ProjectFileTypeClassifier
             self::isFormPath($path), self::looksLikeForm($path, $content) => ProjectFileType::FORM,
             self::isEntityPath($path), self::looksLikeEntity($path, $content) => ProjectFileType::ENTITY,
             str_ends_with($path, 'Authenticator.php'), self::looksLikeAuthenticator($path, $content) => ProjectFileType::AUTHENTICATOR,
-            self::isLdapServicePath($path), self::looksLikeLdapService($path, $content) => ProjectFileType::LDAP_SERVICE,
-            self::isSonataAdminPath($path), self::looksLikeSonataAdmin($path, $content) => ProjectFileType::SONATA_ADMIN,
             self::isMessengerHandlerPath($path), self::looksLikeMessengerHandler($path, $content) => ProjectFileType::MESSENGER_HANDLER,
             self::isWebhookConsumerPath($path), self::looksLikeWebhookConsumer($path, $content) => ProjectFileType::WEBHOOK_CONSUMER,
             str_ends_with($path, 'Subscriber.php') || str_ends_with($path, 'EventListener.php'), self::looksLikeEventSubscriber($path, $content) => ProjectFileType::EVENT_SUBSCRIBER,
             str_ends_with($path, 'Normalizer.php') || str_ends_with($path, 'Denormalizer.php'), self::looksLikeNormalizer($path, $content) => ProjectFileType::NORMALIZER,
             str_ends_with($path, 'ScheduleProvider.php') || str_ends_with($path, 'Schedule.php'), self::looksLikeScheduler($path, $content) => ProjectFileType::SCHEDULER,
+            self::isLdapServicePath($path), self::looksLikeLdapService($path, $content) => ProjectFileType::LDAP_SERVICE,
+            self::isSonataAdminPath($path), self::looksLikeSonataAdmin($path, $content) => ProjectFileType::SONATA_ADMIN,
             self::looksLikeTwigExtension($path, $content) => ProjectFileType::TWIG_EXTENSION,
             str_ends_with($path, '.twig') => ProjectFileType::TEMPLATE,
             str_ends_with($path, '.yaml') || str_ends_with($path, '.yml') || str_ends_with($path, '.xml'), self::isDotenvPath($path) => ProjectFileType::CONFIG,
             str_ends_with($path, '.php') => ProjectFileType::PHP,
             default => ProjectFileType::OTHER,
         };
-    }
-
-    private static function isEasyAdminCrudPath(string $path): bool
-    {
-        return str_ends_with($path, 'CrudController.php');
     }
 
     private static function looksLikeEasyAdminCrud(string $path, string $content): bool
@@ -156,7 +151,7 @@ final readonly class ProjectFileTypeClassifier
     private static function looksLikeLdapService(string $path, string $content): bool
     {
         return str_ends_with($path, '.php')
-            && str_contains($content, 'Symfony\\Component\\Ldap');
+            && str_contains($content, 'Symfony\\Component\\Ldap\\Ldap');
     }
 
     private static function isSonataAdminPath(string $path): bool

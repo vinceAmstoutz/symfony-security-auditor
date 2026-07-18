@@ -46,6 +46,24 @@ final class CompositeReviewerFeedbackProviderTest extends TestCase
         self::assertEquals([$baselineEntry, $triageMemoryEntry], $compositeReviewerFeedbackProvider->feedback()->entries);
     }
 
+    public function test_feedback_deduplicates_by_finding_identity_keeping_the_primary_entry(): void
+    {
+        $baselineA = new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'A', 'baseline reason');
+        $baselineB = new AcceptedFindingFeedback('xxe', 'src/B.php', 'B', 'baseline B');
+        $triageA = new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'A', 'triage-memory reason');
+        $triageC = new AcceptedFindingFeedback('csrf', 'src/C.php', 'C', 'triage C');
+
+        $reviewerFeedbackHolder = new ReviewerFeedbackHolder();
+        $reviewerFeedbackHolder->set(new ReviewerFeedback([$baselineA, $baselineB]));
+
+        $triageMemoryProvider = self::createStub(ReviewerFeedbackProviderInterface::class);
+        $triageMemoryProvider->method('feedback')->willReturn(new ReviewerFeedback([$triageA, $triageC]));
+
+        $compositeReviewerFeedbackProvider = new CompositeReviewerFeedbackProvider($reviewerFeedbackHolder, $triageMemoryProvider);
+
+        self::assertEquals([$baselineA, $baselineB, $triageC], $compositeReviewerFeedbackProvider->feedback()->entries);
+    }
+
     public function test_feedback_is_snapshotted_on_first_read_and_ignores_later_secondary_writes(): void
     {
         $reviewerFeedbackHolder = new ReviewerFeedbackHolder();
@@ -56,5 +74,19 @@ final class CompositeReviewerFeedbackProviderTest extends TestCase
 
         self::assertSame($reviewerFeedback, $compositeReviewerFeedbackProvider->feedback());
         self::assertTrue($compositeReviewerFeedbackProvider->feedback()->isEmpty());
+    }
+
+    public function test_resetting_for_a_new_run_picks_up_secondary_writes_recorded_during_the_previous_run(): void
+    {
+        $acceptedFindingFeedback = new AcceptedFindingFeedback('xxe', 'src/B.php', 'B', 'recorded during the previous run');
+        $reviewerFeedbackHolder = new ReviewerFeedbackHolder();
+        $compositeReviewerFeedbackProvider = new CompositeReviewerFeedbackProvider(new NullReviewerFeedbackProvider(), $reviewerFeedbackHolder);
+
+        self::assertTrue($compositeReviewerFeedbackProvider->feedback()->isEmpty());
+
+        $reviewerFeedbackHolder->set(new ReviewerFeedback([$acceptedFindingFeedback]));
+        $compositeReviewerFeedbackProvider->resetForNewRun();
+
+        self::assertEquals([$acceptedFindingFeedback], $compositeReviewerFeedbackProvider->feedback()->entries);
     }
 }

@@ -29,6 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
 
 final readonly class RunAuditUseCase
 {
@@ -39,6 +40,7 @@ final readonly class RunAuditUseCase
         private ?CostCalculator $costCalculator = null,
         private string $primaryModel = '',
         private ?BudgetTracker $budgetTracker = null,
+        private ?ReviewerFeedbackSnapshotInterface $reviewerFeedbackSnapshot = null,
     ) {}
 
     /**
@@ -67,6 +69,7 @@ final readonly class RunAuditUseCase
     {
         $this->tokenUsageRecorder?->reset();
         $this->budgetTracker?->reset();
+        $this->reviewerFeedbackSnapshot?->resetForNewRun();
 
         $this->logger->info('Starting audit', [
             'project' => $projectPath,

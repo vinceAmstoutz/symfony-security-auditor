@@ -17,7 +17,9 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
 
 /**
  * Turns a batch review outcome into the reviewed findings plus their reviewer
@@ -33,6 +35,7 @@ final readonly class BatchVerdictApplier
         private ReviewerVerdictCache $reviewerVerdictCache,
         private LoggerInterface $logger,
         private ProgressReporterInterface $progressReporter,
+        private TriageMemoryRecorderInterface $triageMemoryRecorder = new NullTriageMemoryRecorder(),
     ) {}
 
     /**
@@ -160,6 +163,8 @@ final readonly class BatchVerdictApplier
             $this->progressReporter,
         );
         $coverageRecorder->recordReviewedFinding($applied);
+
+        RejectionTriageRecorder::record($this->verdictApplier, $this->triageMemoryRecorder, $applied, $review);
 
         return $applied;
     }

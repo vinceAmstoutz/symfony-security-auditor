@@ -283,6 +283,7 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         self::assertTrue($entries[0]->classHasIsGranted());
         self::assertTrue($entries[0]->hasAccessCheck());
+        self::assertSame(['ROLE_USER'], $entries[0]->guardAttributes());
     }
 
     /**
@@ -500,6 +501,31 @@ final class PhpParserControllerAccessControlParserTest extends TestCase
 
         self::assertTrue($entries[0]->methodHasDenyAccess());
         self::assertTrue($entries[0]->hasAccessCheck());
+        self::assertSame(['EDIT'], $entries[0]->guardAttributes());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_records_every_deny_access_attribute_when_an_action_checks_more_than_one(): void
+    {
+        $source = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            use Symfony\Component\Routing\Attribute\Route;
+            final class AdminController {
+                #[Route(path: '/admin/posts/{id}/publish')]
+                public function publish(int $id): void {
+                    $this->denyAccessUnlessGranted('EDIT', $id);
+                    $this->denyAccessUnlessGranted('PUBLISH', $id);
+                }
+            }
+            PHP;
+        $projectFile = $this->makeFile('src/Controller/AdminController.php', $source);
+
+        $entries = $this->phpParserControllerAccessControlParser->parse($projectFile);
+
+        self::assertSame(['EDIT', 'PUBLISH'], $entries[0]->guardAttributes());
     }
 
     /**

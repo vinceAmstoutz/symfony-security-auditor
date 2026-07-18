@@ -317,11 +317,6 @@ final readonly class SymfonyYamlSecurityConfigParser implements SecurityConfigPa
             return [];
         }
 
-        $map = [];
-        foreach ($value as $key => $item) {
-            $map[(string) $key] = $item;
-        }
-
-        return $map;
+        return array_filter($value, static fn (int|string $key): bool => \is_string($key), \ARRAY_FILTER_USE_KEY);
     }
 }

@@ -28,6 +28,19 @@ final class SymfonyYamlSecurityConfigParserTest extends TestCase
         $this->symfonyYamlSecurityConfigParser = new SymfonyYamlSecurityConfigParser();
     }
 
+    public function test_a_document_with_numeric_top_level_keys_is_ignored_instead_of_crashing(): void
+    {
+        $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'
+            1:
+                question: Example question
+
+            2:
+                question: Another question
+            YAML);
+
+        self::assertSame([], $accessControl);
+    }
+
     public function test_it_parses_scalar_roles(): void
     {
         $accessControl = $this->symfonyYamlSecurityConfigParser->parseAccessControl(<<<'YAML'

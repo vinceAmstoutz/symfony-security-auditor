@@ -36,6 +36,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\RecordingStage;
 
 final class RunAuditUseCaseTest extends TestCase
@@ -288,6 +289,28 @@ final class RunAuditUseCaseTest extends TestCase
 
         self::assertSame(1000, $auditReport->cost()->inputTokens());
         self::assertSame(500, $auditReport->cost()->outputTokens());
+    }
+
+    /**
+     * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_resets_the_reviewer_feedback_snapshot_at_the_start_of_every_run(): void
+    {
+        $reviewerFeedbackSnapshot = $this->createMock(ReviewerFeedbackSnapshotInterface::class);
+        $reviewerFeedbackSnapshot->expects(self::exactly(2))->method('resetForNewRun');
+
+        $runAuditUseCase = new RunAuditUseCase(
+            $this->makePipeline(),
+            new NullLogger(),
+            reviewerFeedbackSnapshot: $reviewerFeedbackSnapshot,
+        );
+
+        $runAuditUseCase->execute($this->tmpDir);
+        $runAuditUseCase->execute($this->tmpDir);
     }
 
     /**

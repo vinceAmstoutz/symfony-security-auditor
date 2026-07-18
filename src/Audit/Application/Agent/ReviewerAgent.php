@@ -135,7 +135,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         $this->batchReviewAnalyzer = new BatchReviewAnalyzer(
             $reviewerAgentCollaborators->llmClient,
             $reviewerAgentCollaborators->reviewerPromptBuilder,
-            new BatchVerdictApplier($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger, $reviewerAgentCollaborators->progressReporter),
+            new BatchVerdictApplier($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger, $reviewerAgentCollaborators->progressReporter, $reviewerAgentCollaborators->triageMemoryRecorder),
             $reviewerVerdictCache,
             $reviewOutcomeRecorder,
             $reviewerAgentCollaborators->logger,
