@@ -175,7 +175,7 @@ jobs:
           fetch-depth: 0 # full history so `since` can diff against the base branch
 
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.15.0
+        uses: vinceamstoutz/symfony-security-auditor@1.16.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
@@ -206,7 +206,7 @@ Outputs: `exit-code`, `report-path`, and — only when `format: json` —
 ```yaml
       - name: Symfony Security Audit
         id: audit
-        uses: vinceamstoutz/symfony-security-auditor@1.15.0
+        uses: vinceamstoutz/symfony-security-auditor@1.16.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
@@ -237,7 +237,7 @@ tradeoffs.
 
 ```yaml
       - name: Symfony Security Audit
-        uses: vinceamstoutz/symfony-security-auditor@1.15.0
+        uses: vinceamstoutz/symfony-security-auditor@1.16.0
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
