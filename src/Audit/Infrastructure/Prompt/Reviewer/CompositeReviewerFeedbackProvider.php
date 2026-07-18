@@ -73,19 +73,12 @@ final class CompositeReviewerFeedbackProvider implements ReviewerFeedbackProvide
      */
     private function deduplicated(array $entries): array
     {
-        $seen = [];
         $unique = [];
         foreach ($entries as $entry) {
-            $key = \sprintf("%s\0%s\0%s", $entry->type, $entry->file, $entry->title);
-            if (\array_key_exists($key, $seen)) {
-                continue;
-            }
-
-            $seen[$key] = true;
-            $unique[] = $entry;
+            $unique[\sprintf("%s\0%s\0%s", $entry->type, $entry->file, $entry->title)] ??= $entry;
         }
 
-        return $unique;
+        return array_values($unique);
     }
 
     #[Override]

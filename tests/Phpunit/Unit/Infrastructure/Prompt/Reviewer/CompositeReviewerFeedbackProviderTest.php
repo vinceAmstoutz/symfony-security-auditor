@@ -46,20 +46,22 @@ final class CompositeReviewerFeedbackProviderTest extends TestCase
         self::assertEquals([$baselineEntry, $triageMemoryEntry], $compositeReviewerFeedbackProvider->feedback()->entries);
     }
 
-    public function test_feedback_keeps_a_single_entry_for_a_finding_present_in_both_sources_with_the_primary_reason(): void
+    public function test_feedback_deduplicates_by_finding_identity_keeping_the_primary_entry(): void
     {
-        $baselineEntry = new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'A', 'baseline reason');
-        $triageEntry = new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'A', 'triage-memory reason');
+        $baselineA = new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'A', 'baseline reason');
+        $baselineB = new AcceptedFindingFeedback('xxe', 'src/B.php', 'B', 'baseline B');
+        $triageA = new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'A', 'triage-memory reason');
+        $triageC = new AcceptedFindingFeedback('csrf', 'src/C.php', 'C', 'triage C');
 
         $reviewerFeedbackHolder = new ReviewerFeedbackHolder();
-        $reviewerFeedbackHolder->set(new ReviewerFeedback([$baselineEntry]));
+        $reviewerFeedbackHolder->set(new ReviewerFeedback([$baselineA, $baselineB]));
 
         $triageMemoryProvider = self::createStub(ReviewerFeedbackProviderInterface::class);
-        $triageMemoryProvider->method('feedback')->willReturn(new ReviewerFeedback([$triageEntry]));
+        $triageMemoryProvider->method('feedback')->willReturn(new ReviewerFeedback([$triageA, $triageC]));
 
         $compositeReviewerFeedbackProvider = new CompositeReviewerFeedbackProvider($reviewerFeedbackHolder, $triageMemoryProvider);
 
-        self::assertEquals([$baselineEntry], $compositeReviewerFeedbackProvider->feedback()->entries);
+        self::assertEquals([$baselineA, $baselineB, $triageC], $compositeReviewerFeedbackProvider->feedback()->entries);
     }
 
     public function test_feedback_is_snapshotted_on_first_read_and_ignores_later_secondary_writes(): void
