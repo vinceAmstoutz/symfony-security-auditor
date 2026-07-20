@@ -257,7 +257,11 @@ same reason `Process` is required over raw exec: a moving reference is an
 unreviewed-code-execution surface. These pins aren't manually-maintained dead
 weight — the existing `github-actions` entry in `.github/dependabot.yaml`
 recognizes the `# vX.Y.Z` trailing-comment convention and opens a PR bumping
-both the SHA and the comment whenever a pinned action releases.
+both the SHA and the comment whenever a pinned action releases. Both
+`dependabot.yaml` update entries also carry a 7-day `cooldown`
+(`default-days: 7`), so Dependabot never opens a bump PR for a release younger
+than a week — the window in which a compromised or yanked supply-chain release
+is typically caught — which also clears zizmor's `dependabot-cooldown` audit.
 
 ## Behavioral Guidelines
 
