@@ -102,6 +102,32 @@ else
   echo "ok - verify_checksum fails closed when no digest tool is available"
 fi
 
+init_stub_dir=$(mktemp -d)
+trap 'rm -rf "$checksum_dir" "$init_stub_dir"' EXIT
+init_log="$init_stub_dir/args"
+cat >"$init_stub_dir/bin" <<STUB
+#!/bin/sh
+printf '%s' "\$*" >"$init_log"
+STUB
+chmod +x "$init_stub_dir/bin"
+
+unset SSA_INIT 2>/dev/null || true
+rm -f "$init_log"
+run_init "$init_stub_dir/bin" >/dev/null 2>&1
+if [ -f "$init_log" ]; then
+  echo "NOT OK - run_init invoked init without SSA_INIT=1"
+  failures=$((failures + 1))
+else
+  echo "ok - run_init is a no-op unless SSA_INIT=1"
+fi
+
+SSA_INIT=1
+init_can_prompt() { return 1; }
+rm -f "$init_log"
+run_init "$init_stub_dir/bin" >/dev/null 2>&1
+expect_equals "run_init passes --no-interaction when no terminal is attached" "init --no-interaction" "$(cat "$init_log")"
+unset SSA_INIT
+
 if [ "$failures" -eq 0 ]; then
   echo "All install.sh tests passed."
   exit 0

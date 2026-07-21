@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **One command installs _and_ configures the standalone binary via
+  `SSA_INIT`.** `install.sh` now honors an `SSA_INIT` environment variable: with
+  `SSA_INIT=1`, after the binary is downloaded and its SHA-256 checksum
+  verified, the installer runs `<binary> init` — so
+  `curl -fsSL …/install.sh | SSA_INIT=1 sh` installs and configures the tool in
+  a single command instead of the previous two (`install.sh`, then `init`). When
+  a controlling terminal is reachable (the installer test-opens `/dev/tty`)
+  `init` runs interactively, so the provider/model prompts still work through a
+  `curl | sh` pipe; in a pipe or CI with no terminal it falls back to
+  `init --no-interaction` (Anthropic defaults). The installer invokes the binary
+  by its absolute install path, so `init` runs even when the target directory is
+  not yet on `PATH`. A failed `init` (e.g. `composer` unavailable) is non-fatal
+  — the installed binary is kept and a note points the user to run `init`
+  themselves. Documented in `README.md` and the `install.sh` header, and covered
+  by `tests/Shell/install_script_test.sh`.
+
 ## [1.16.0] — 2026-07-18 — Perimeter
 
 A release about the security perimeter. The attacker gains a wave of

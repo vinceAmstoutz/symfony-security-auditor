@@ -123,8 +123,8 @@ following surface is BC-protected:
   (`symfony-security-auditor-{linux-x86_64,linux-aarch64,macos-x86_64,macos-arm64}`
   and `symfony-security-auditor-windows-x86_64.exe`), each accompanied by a
   `.sha256` checksum, plus the `install.sh` (Linux/macOS) and `install.ps1`
-  (Windows) installer contracts and their `SSA_VERSION` / `SSA_INSTALL_DIR`
-  environment variables.
+  (Windows) installer contracts and their `SSA_VERSION` / `SSA_INSTALL_DIR` /
+  `SSA_INIT` environment variables.
 - The `init` command name. The standalone exposes the **identical** `audit:run`
   command (and its `audit` alias), arguments, options, and exit-code surface
   listed above.
