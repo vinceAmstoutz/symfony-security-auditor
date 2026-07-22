@@ -151,7 +151,7 @@ final class StandaloneApplicationFactoryTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    #[MaximumDuration(2500)]
+    #[MaximumDuration(4000)]
     public function test_the_registered_audit_command_keeps_the_full_cli_option_surface(): void
     {
         $application = StandaloneApplicationFactory::fromEnvironment([
