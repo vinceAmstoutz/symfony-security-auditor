@@ -91,13 +91,19 @@ Linux, macOS, and Windows.
 
 ### 1. Install
 
+**One command — Linux, macOS, and Windows (under WSL or Git Bash):**
+
 ```bash
-# Linux / macOS — detects your OS + architecture, downloads and verifies the binary
 curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | sh
 ```
 
+`install.sh` detects your OS and CPU architecture, downloads the matching
+binary, and verifies its SHA-256 checksum before installing — anywhere you have
+a POSIX shell.
+
+**Native Windows (PowerShell)** — when you are not using WSL or Git Bash:
+
 ```powershell
-# Windows (PowerShell)
 irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.ps1 | iex
 ```
 
