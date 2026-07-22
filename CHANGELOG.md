@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Fixed
+
+- **`install.sh` no longer fails silently when the `wget` fallback hits an HTTP
+  error.** The `wget` download path in `download()` used `-q`, which suppresses
+  wget's error output, so a failed request (e.g. a 404 for a missing release
+  asset) aborted the installer under `set -eu` with no diagnostic — unlike the
+  `curl` path (`curl -fSL`), which prints the HTTP error. Dropping `-q` restores
+  a visible failure reason on the `wget` path.
+- **`install.ps1` now shows its "no Windows binary for this release" guidance on
+  PowerShell 7, not only Windows PowerShell 5.1.** The friendly 404 handler
+  caught `[System.Net.WebException]`, which only Windows PowerShell 5.1 throws;
+  PowerShell 7+ (the common `irm | iex` host, built on .NET Core) throws
+  `Microsoft.PowerShell.Commands.HttpResponseException`, so the typed `catch`
+  never matched and users saw a raw transport error instead of the Composer/WSL
+  fallback instructions. A new `Get-ResponseStatusCode` helper reads the status
+  from the error record's shared `Response` property regardless of the thrown
+  exception type, so the guidance appears on both PowerShell editions.
+
 ## [1.16.0] — 2026-07-18 — Perimeter
 
 A release about the security perimeter. The attacker gains a wave of
