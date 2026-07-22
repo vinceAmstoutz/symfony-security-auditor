@@ -53,7 +53,7 @@ download() {
   if command -v curl >/dev/null 2>&1; then
     curl -fSL "$1" -o "$2"
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO "$2" "$1"
+    wget -O "$2" "$1"
   else
     fail "need either 'curl' or 'wget'"
   fi

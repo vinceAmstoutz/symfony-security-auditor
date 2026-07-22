@@ -35,6 +35,18 @@ function Get-Asset([string]$Url, [string]$OutFile) {
     Invoke-WebRequest -Uri $Url -OutFile $OutFile -UseBasicParsing
 }
 
+function Get-ResponseStatusCode {
+    param([System.Management.Automation.ErrorRecord]$ErrorRecord)
+
+    # 5.1 throws WebException, 7+ throws HttpResponseException — read the shared Response property instead of a version-specific catch type.
+    $responseProperty = $ErrorRecord.Exception.PSObject.Properties['Response']
+    if ($responseProperty -and $responseProperty.Value) {
+        return [int]$responseProperty.Value.StatusCode
+    }
+
+    return 0
+}
+
 function Test-Checksum([string]$File, [string]$ChecksumFile) {
     $expected = ((Get-Content -Raw $ChecksumFile).Trim() -split '\s+')[0]
     $actual = (Get-FileHash -Path $File -Algorithm SHA256).Hash
@@ -64,9 +76,8 @@ function Install-Binary {
         try {
             Get-Asset "$base/$asset" "$tmp\$asset"
         }
-        catch [System.Net.WebException] {
-            $status = [int]$_.Exception.Response.StatusCode
-            if ($status -eq 404) {
+        catch {
+            if ((Get-ResponseStatusCode $_) -eq 404) {
                 throw @"
 No Windows binary is published for release '$Version'.
 
