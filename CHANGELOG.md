@@ -27,6 +27,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   — the installed binary is kept and a note points the user to run `init`
   themselves. Documented in `README.md` and the `install.sh` header, and covered
   by `tests/Shell/install_script_test.sh`.
+- **`init` is now scriptable via `--provider`, `--model`, and `--env-var`
+  options.** Previously `symfony-security-auditor init` only asked interactively
+  and, under `--no-interaction`, always wrote the Anthropic defaults — so a
+  non-interactive install could not target a different provider. Each option now
+  skips its matching prompt; any option left out still falls back to its prompt
+  (or, non-interactively, to its default: `anthropic`, `claude-opus-4-8`, and a
+  `<PROVIDER>_API_KEY` variable derived from the resolved provider). This lets a
+  single command configure any provider — e.g.
+  `init --provider=openai --model=gpt-5.4 --no-interaction` — which the
+  standalone installer's `SSA_INIT` flow and the GitHub Action use to set up
+  non-interactively. Documented in
+  [`docs/configuration.md`](docs/configuration.md#standalone-configuration).
 
 ### Changed
 
