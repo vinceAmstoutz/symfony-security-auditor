@@ -62,6 +62,17 @@ expect_failure "detect_asset rejects an unsupported OS" detect_asset
 FAKE_OS=Linux FAKE_ARCH=riscv64
 expect_failure "detect_asset rejects an unsupported architecture" detect_asset
 
+FAKE_OS=MINGW64_NT-10.0-19045 FAKE_ARCH=x86_64
+if windows_shell_message=$(detect_asset 2>&1); then
+  echo "NOT OK - detect_asset should fail in a Windows POSIX shell (Git Bash/MSYS)"
+  failures=$((failures + 1))
+elif printf '%s' "$windows_shell_message" | grep -q 'install.ps1'; then
+  echo "ok - detect_asset points a Windows POSIX shell to the PowerShell installer"
+else
+  echo "NOT OK - detect_asset failed without pointing to the PowerShell installer: [$windows_shell_message]"
+  failures=$((failures + 1))
+fi
+
 SSA_INSTALL_DIR=/opt/tools/bin
 expect_equals "resolve_install_dir honours SSA_INSTALL_DIR" /opt/tools/bin "$(resolve_install_dir)"
 unset SSA_INSTALL_DIR

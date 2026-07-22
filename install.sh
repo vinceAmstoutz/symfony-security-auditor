@@ -45,6 +45,9 @@ detect_asset() {
   case "$os" in
     Linux) os_slug="linux" ;;
     Darwin) os_slug="macos" ;;
+    MINGW* | MSYS* | CYGWIN*)
+      fail "this is a Windows POSIX shell (Git Bash / MSYS / Cygwin); install the native Windows binary from PowerShell instead:
+  irm https://raw.githubusercontent.com/${REPO}/main/install.ps1 | iex" ;;
     *) fail "unsupported OS '$os' — on Windows download symfony-security-auditor-windows-x86_64.exe from the releases page" ;;
   esac
 

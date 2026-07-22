@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   themselves. Documented in `README.md` and the `install.sh` header, and covered
   by `tests/Shell/install_script_test.sh`.
 
+### Changed
+
+- **The standalone install docs now lead with the cross-platform `curl … | sh`
+  one-liner**, with the PowerShell `irm … | iex` command demoted to the
+  native-Windows fallback — the single `curl` command covers Linux, macOS, and
+  Windows under WSL or Git Bash.
+- **`install.sh` now points Windows POSIX-shell users (Git Bash / MSYS / Cygwin)
+  at the PowerShell installer.** It previously failed there with a generic
+  "download the `.exe`" message; it now detects a `MINGW*`/`MSYS*`/`CYGWIN*`
+  `uname` and prints the exact `irm …/install.ps1 | iex` command to run instead.
+  (A bare PowerShell session can't execute `install.sh` at all — there is no
+  `sh` to pipe into — so this guidance targets the POSIX shells on Windows that
+  can.)
+
 ### Fixed
 
 - **`install.sh` no longer fails silently when the `wget` fallback hits an HTTP
