@@ -71,10 +71,6 @@ final readonly class RunningBinaryLocator implements RunningBinaryLocatorInterfa
 
     private function resolvedEntryPath(): ?string
     {
-        if ('' === $this->invokedScriptPath) {
-            return null;
-        }
-
         $resolved = $this->executableFile(realpath($this->invokedScriptPath));
         if (null !== $resolved) {
             return $resolved;
