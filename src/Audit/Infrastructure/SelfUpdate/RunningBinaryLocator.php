@@ -22,7 +22,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
  * interpreter `/proc/self/exe` resolves to the interpreter itself, so resolving
  * a path there and renaming a downloaded binary over it would destroy the
  * interpreter. When running as `micro`, the kernel exposes the binary at
- * `/proc/self/exe` (Linux); elsewhere it falls back to the resolved entry path.
+ * `/proc/self/exe` (Linux); elsewhere (notably macOS, which has no
+ * `/proc/self/exe`) it falls back to the resolved entry path, and — when the
+ * binary was invoked by a bare name found on `PATH` so the entry path is not a
+ * resolvable file — to a `PATH` lookup of that name.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -34,6 +37,7 @@ final readonly class RunningBinaryLocator implements RunningBinaryLocatorInterfa
         private string $procSelfExePath = '/proc/self/exe',
         private string $invokedScriptPath = '',
         private string $sapi = \PHP_SAPI,
+        private string $pathEnvironment = '',
     ) {}
 
     /**
@@ -47,7 +51,7 @@ final readonly class RunningBinaryLocator implements RunningBinaryLocatorInterfa
         }
 
         return $this->kernelReportedPath()
-            ?? $this->resolvedInvokedScriptPath()
+            ?? $this->resolvedEntryPath()
             ?? throw SelfUpdateFailedException::forUndeterminedBinaryPath();
     }
 
@@ -62,14 +66,33 @@ final readonly class RunningBinaryLocator implements RunningBinaryLocatorInterfa
         return \is_string($resolved) ? $resolved : null;
     }
 
-    private function resolvedInvokedScriptPath(): ?string
+    private function resolvedEntryPath(): ?string
     {
         if ('' === $this->invokedScriptPath) {
             return null;
         }
 
         $resolved = realpath($this->invokedScriptPath);
+        if (false !== $resolved) {
+            return $resolved;
+        }
 
-        return false !== $resolved ? $resolved : null;
+        return $this->resolvedFromPathEnvironment();
+    }
+
+    private function resolvedFromPathEnvironment(): ?string
+    {
+        foreach (explode(\PATH_SEPARATOR, $this->pathEnvironment) as $directory) {
+            if ('' === $directory) {
+                continue;
+            }
+
+            $candidate = realpath($directory.\DIRECTORY_SEPARATOR.$this->invokedScriptPath);
+            if (false !== $candidate) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 }

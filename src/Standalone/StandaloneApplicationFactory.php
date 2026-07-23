@@ -57,6 +57,7 @@ final readonly class StandaloneApplicationFactory
         private StandaloneContainerFactory $standaloneContainerFactory = new StandaloneContainerFactory(),
         private StandaloneConsoleCommandFactory $standaloneConsoleCommandFactory = new StandaloneConsoleCommandFactory(),
         private string $runningBinaryPath = '',
+        private string $pathEnvironment = '',
     ) {}
 
     /**
@@ -75,6 +76,7 @@ final readonly class StandaloneApplicationFactory
             $xdgConfigPathResolver,
             new ComposerBridgeInstaller(ComposerBridgeInstaller::defaultProcessBuilder()),
             runningBinaryPath: $runningBinaryPath ?? '',
+            pathEnvironment: $environment['PATH'] ?? '',
         );
     }
 
@@ -143,7 +145,7 @@ final readonly class StandaloneApplicationFactory
             new SelfUpdater(
                 new ProcessReleaseClient(ProcessReleaseClient::defaultProcessBuilder()),
                 new GitHubBinaryAssetResolver(\PHP_OS_FAMILY, php_uname('m')),
-                new RunningBinaryLocator('/proc/self/exe', $this->runningBinaryPath),
+                new RunningBinaryLocator('/proc/self/exe', $this->runningBinaryPath, pathEnvironment: $this->pathEnvironment),
             ),
             (new ReportPackage())->version(),
         );

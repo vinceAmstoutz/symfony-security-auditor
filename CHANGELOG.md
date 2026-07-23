@@ -59,6 +59,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   fallback instructions. A new `Get-ResponseStatusCode` helper reads the status
   from the error record's shared `Response` property regardless of the thrown
   exception type, so the guidance appears on both PowerShell editions.
+- **`self-update` now resolves the running binary on macOS when it was launched
+  by a bare name found on `PATH`.** `RunningBinaryLocator` located the
+  executable via `/proc/self/exe` (Linux-only) and, failing that, `realpath()`
+  of the invoked entry path. macOS has no `/proc/self/exe`, and a binary started
+  as a bare command name (e.g. `symfony-security-auditor self-update` resolved
+  through `PATH`) has an entry path that `realpath()` cannot resolve against the
+  working directory, so `self-update` aborted with "could not determine the path
+  of the running binary". The locator now adds a final fallback that looks the
+  bare name up across the `PATH` directories (the same way the shell found it),
+  threaded in from the process environment via `StandaloneApplicationFactory`.
+  Linux behavior (kernel-reported `/proc/self/exe`) is unchanged.
 
 ## [1.16.0] — 2026-07-18 — Perimeter
 

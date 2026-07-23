@@ -79,6 +79,59 @@ final class RunningBinaryLocatorTest extends TestCase
     /**
      * @throws SelfUpdateFailedException
      */
+    public function test_it_resolves_a_bare_invoked_name_via_the_path_environment(): void
+    {
+        $binDirectory = $this->workingDirectory.'/real-bin';
+        $decoyDirectory = $this->workingDirectory.'/decoy-bin';
+        (new Filesystem())->mkdir([$decoyDirectory, $binDirectory]);
+        (new Filesystem())->touch($binDirectory.'/symfony-security-auditor');
+        $pathEnvironment = $decoyDirectory.\PATH_SEPARATOR.$binDirectory;
+
+        self::assertSame(
+            $binDirectory.'/symfony-security-auditor',
+            (new RunningBinaryLocator($this->workingDirectory.'/missing', 'symfony-security-auditor', 'micro', $pathEnvironment))->path(),
+        );
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    public function test_it_skips_empty_path_entries_and_keeps_searching(): void
+    {
+        $binDirectory = $this->workingDirectory.'/real-bin';
+        (new Filesystem())->mkdir($binDirectory);
+        (new Filesystem())->touch($binDirectory.'/symfony-security-auditor');
+        $pathEnvironment = \PATH_SEPARATOR.$binDirectory;
+
+        self::assertSame(
+            $binDirectory.'/symfony-security-auditor',
+            (new RunningBinaryLocator($this->workingDirectory.'/missing', 'symfony-security-auditor', 'micro', $pathEnvironment))->path(),
+        );
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    public function test_it_fails_when_a_bare_invoked_name_is_not_found_on_the_path(): void
+    {
+        $this->expectException(SelfUpdateFailedException::class);
+
+        (new RunningBinaryLocator($this->workingDirectory.'/missing', 'symfony-security-auditor', 'micro', $this->workingDirectory.'/empty-bin'))->path();
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    public function test_it_does_not_mistake_a_path_directory_for_the_binary_when_the_invoked_name_is_empty(): void
+    {
+        $this->expectException(SelfUpdateFailedException::class);
+
+        (new RunningBinaryLocator($this->workingDirectory.'/missing', '', 'micro', $this->workingDirectory))->path();
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
     #[DataProvider('unresolvableInvokedScriptCases')]
     public function test_it_fails_when_neither_source_resolves_a_path(string $invokedScriptPath): void
     {
