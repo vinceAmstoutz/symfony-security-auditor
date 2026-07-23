@@ -364,12 +364,27 @@ See [Configuration → Model Options](configuration.md#model-options).
 
 ### What PHP versions are supported?
 
-PHP **8.3+**. PHP 8.4 and 8.5 are supported via the CI matrix.
+Installing the **bundle** requires PHP **8.3+** in the host application (PHP 8.4
+and 8.5 are covered by the CI matrix). The **standalone binary** bundles its own
+PHP runtime, so the PHP version of the audited project does not matter.
 
 ### What Symfony versions are supported?
 
-Symfony **7.4+** and Symfony **8.x**. Check `composer.json` for the
-authoritative constraint.
+Installing the **bundle** requires Symfony **7.4+** or **8.x** in the host
+application — check `composer.json` for the authoritative constraint. The
+**standalone binary** imposes no Symfony version on the project it audits.
+
+### Can I audit a project on an older Symfony or PHP version?
+
+Yes — use the [standalone binary](../README.md#standalone-tool-binary) (or the
+GitHub Action, which installs it for you). The auditor never executes the
+audited project's code — it reads the sources — so a Symfony 4/5 app on an older
+PHP can be audited without adding any dependency to it. One caveat: detection is
+tuned for attribute- and YAML-era Symfony (`#[Route]`, `#[IsGranted]`,
+`security.yaml`). On annotation-based apps (`@Route`, `@IsGranted`) the LLM
+still reads the annotations in context, but the deterministic parsers that
+enrich the mapping stage target attributes, so route and access-control mapping
+may be less complete.
 
 ### Does it work on non-Symfony PHP projects?
 
