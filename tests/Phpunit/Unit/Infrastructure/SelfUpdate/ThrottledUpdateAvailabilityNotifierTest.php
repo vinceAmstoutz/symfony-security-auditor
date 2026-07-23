@@ -134,6 +134,7 @@ final class ThrottledUpdateAvailabilityNotifierTest extends TestCase
         $throttledUpdateAvailabilityNotifier = new ThrottledUpdateAvailabilityNotifier($fakeSelfUpdater, new InMemoryUpdateCheckStore(), $mockClock);
 
         $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0');
+
         $mockClock->sleep(86_400);
         $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0');
 
