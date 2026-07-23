@@ -21,6 +21,7 @@ use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\ConsoleOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateAvailabilityNotifierInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\SelfUpdateCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\UpdateAvailabilityConsoleListener;
 
 final class UpdateAvailabilityConsoleListenerTest extends TestCase
@@ -74,6 +75,15 @@ final class UpdateAvailabilityConsoleListenerTest extends TestCase
         self::assertSame('', $bufferedOutput->fetch());
     }
 
+    public function test_it_stays_silent_after_self_update_itself(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+
+        ($this->listenerReturning(self::NOTICE))($this->terminateEvent($bufferedOutput, true, SelfUpdateCommand::NAME));
+
+        self::assertSame('', $bufferedOutput->fetch());
+    }
+
     private function listenerReturning(?string $notice, bool $disabled = false): UpdateAvailabilityConsoleListener
     {
         $updateAvailabilityNotifier = self::createStub(UpdateAvailabilityNotifierInterface::class);
@@ -82,11 +92,11 @@ final class UpdateAvailabilityConsoleListenerTest extends TestCase
         return new UpdateAvailabilityConsoleListener($updateAvailabilityNotifier, '1.0.0', $disabled);
     }
 
-    private function terminateEvent(OutputInterface $output, bool $interactive): ConsoleTerminateEvent
+    private function terminateEvent(OutputInterface $output, bool $interactive, string $commandName = 'test'): ConsoleTerminateEvent
     {
         $arrayInput = new ArrayInput([]);
         $arrayInput->setInteractive($interactive);
 
-        return new ConsoleTerminateEvent(new Command('test'), $arrayInput, $output, 0);
+        return new ConsoleTerminateEvent(new Command($commandName), $arrayInput, $output, 0);
     }
 }

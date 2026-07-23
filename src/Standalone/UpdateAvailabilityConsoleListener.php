@@ -17,12 +17,15 @@ use Symfony\Component\Console\Event\ConsoleTerminateEvent;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateAvailabilityNotifierInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\SelfUpdateCommand;
 
 /**
  * Prints an "update available" notice to stderr once a command finishes, but
  * only on an interactive run so machine-readable stdout (e.g. `--format=json`)
- * and CI logs stay clean. The version check itself is delegated and best-effort,
- * so this never changes the exit code.
+ * and CI logs stay clean, and never after `self-update` itself — the running
+ * process still reports the replaced binary's version, so the notice would
+ * advertise the release that was just installed. The version check itself is
+ * delegated and best-effort, so this never changes the exit code.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -41,6 +44,10 @@ final readonly class UpdateAvailabilityConsoleListener
         }
 
         if (!$consoleTerminateEvent->getInput()->isInteractive()) {
+            return;
+        }
+
+        if (SelfUpdateCommand::NAME === $consoleTerminateEvent->getCommand()?->getName()) {
             return;
         }
 
