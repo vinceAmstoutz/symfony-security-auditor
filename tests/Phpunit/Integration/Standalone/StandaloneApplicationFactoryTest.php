@@ -138,6 +138,8 @@ final class StandaloneApplicationFactoryTest extends TestCase
         yield 'opt-out variable set' => [['SSA_NO_UPDATE_CHECK' => '1'], true];
         yield 'opt-out variable absent' => [[], false];
         yield 'opt-out variable empty' => [['SSA_NO_UPDATE_CHECK' => ''], false];
+        yield 'opt-out variable explicitly zero' => [['SSA_NO_UPDATE_CHECK' => '0'], false];
+        yield 'opt-out variable set to an arbitrary value' => [['SSA_NO_UPDATE_CHECK' => 'true'], true];
     }
 
     public function test_it_registers_the_audit_command_as_visible(): void
