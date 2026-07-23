@@ -38,6 +38,15 @@ final readonly class GitHubBinaryAssetResolver
     /**
      * @throws UnsupportedSelfUpdatePlatformException
      */
+    public function assertSupportedPlatform(): void
+    {
+        $this->osSlug();
+        $this->architectureSlug();
+    }
+
+    /**
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
     public function resolve(string $version): GitHubBinaryAsset
     {
         $assetName = \sprintf('%s-%s-%s', self::BINARY_NAME, $this->osSlug(), $this->architectureSlug());

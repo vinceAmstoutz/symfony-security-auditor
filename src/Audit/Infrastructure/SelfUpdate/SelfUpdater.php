@@ -39,6 +39,8 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
     #[Override]
     public function run(string $currentVersion, bool $checkOnly): SelfUpdateResult
     {
+        $this->gitHubBinaryAssetResolver->assertSupportedPlatform();
+
         $latestVersion = $this->latestVersion();
 
         if (!version_compare($latestVersion, $currentVersion, '>')) {

@@ -21,6 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Release
 
 final class FakeReleaseClient implements ReleaseClientInterface
 {
+    public int $requests = 0;
+
     /**
      * @param array<string, string> $bodies keyed by URL
      */
@@ -32,6 +34,8 @@ final class FakeReleaseClient implements ReleaseClientInterface
     #[Override]
     public function get(string $url): string
     {
+        ++$this->requests;
+
         return $this->bodies[$url] ?? throw SelfUpdateFailedException::forFailedDownload($url);
     }
 
@@ -41,6 +45,8 @@ final class FakeReleaseClient implements ReleaseClientInterface
     #[Override]
     public function download(string $url, string $destination): void
     {
+        ++$this->requests;
+
         try {
             (new Filesystem())->dumpFile($destination, $this->downloadPayload);
         } catch (IOException $ioException) {
