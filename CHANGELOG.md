@@ -10,6 +10,38 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **One command installs _and_ configures the standalone binary via
+  `SSA_INIT`.** `install.sh` now honors an `SSA_INIT` environment variable: with
+  `SSA_INIT=1`, after the binary is downloaded and its SHA-256 checksum
+  verified, the installer runs `<binary> init` — so
+  `curl -fsSL …/install.sh | SSA_INIT=1 sh` installs and configures the tool in
+  a single command instead of the previous two (`install.sh`, then `init`). When
+  a controlling terminal is reachable (the installer test-opens `/dev/tty`)
+  `init` runs interactively, so the provider/model prompts still work through a
+  `curl | sh` pipe; in a pipe or CI with no terminal it falls back to
+  `init --no-interaction` (Anthropic defaults). The installer invokes the binary
+  by its absolute install path, so `init` runs even when the target directory is
+  not yet on `PATH`. A failed `init` (e.g. `composer` unavailable) is non-fatal
+  — the installed binary is kept and a note points the user to run `init`
+  themselves. Documented in `README.md` and the `install.sh` header, and covered
+  by `tests/Shell/install_script_test.sh`.
+
+### Changed
+
+- **The standalone install docs now lead with the cross-platform `curl … | sh`
+  one-liner**, with the PowerShell `irm … | iex` command demoted to the
+  native-Windows fallback — the single `curl` command covers Linux, macOS, and
+  Windows under WSL or Git Bash.
+- **`install.sh` now points Windows POSIX-shell users (Git Bash / MSYS / Cygwin)
+  at the PowerShell installer.** It previously failed there with a generic
+  "download the `.exe`" message; it now detects a `MINGW*`/`MSYS*`/`CYGWIN*`
+  `uname` and prints the exact `irm …/install.ps1 | iex` command to run instead.
+  (A bare PowerShell session can't execute `install.sh` at all — there is no
+  `sh` to pipe into — so this guidance targets the POSIX shells on Windows that
+  can.)
+
 ### Fixed
 
 - **`install.sh` no longer fails silently when the `wget` fallback hits an HTTP

@@ -62,6 +62,17 @@ expect_failure "detect_asset rejects an unsupported OS" detect_asset
 FAKE_OS=Linux FAKE_ARCH=riscv64
 expect_failure "detect_asset rejects an unsupported architecture" detect_asset
 
+FAKE_OS=MINGW64_NT-10.0-19045 FAKE_ARCH=x86_64
+if windows_shell_message=$(detect_asset 2>&1); then
+  echo "NOT OK - detect_asset should fail in a Windows POSIX shell (Git Bash/MSYS)"
+  failures=$((failures + 1))
+elif printf '%s' "$windows_shell_message" | grep -q 'install.ps1'; then
+  echo "ok - detect_asset points a Windows POSIX shell to the PowerShell installer"
+else
+  echo "NOT OK - detect_asset failed without pointing to the PowerShell installer: [$windows_shell_message]"
+  failures=$((failures + 1))
+fi
+
 SSA_INSTALL_DIR=/opt/tools/bin
 expect_equals "resolve_install_dir honours SSA_INSTALL_DIR" /opt/tools/bin "$(resolve_install_dir)"
 unset SSA_INSTALL_DIR
@@ -101,6 +112,32 @@ if (PATH= verify_checksum "$checksum_dir/artifact" "$checksum_dir/artifact.sha25
 else
   echo "ok - verify_checksum fails closed when no digest tool is available"
 fi
+
+init_stub_dir=$(mktemp -d)
+trap 'rm -rf "$checksum_dir" "$init_stub_dir"' EXIT
+init_log="$init_stub_dir/args"
+cat >"$init_stub_dir/bin" <<STUB
+#!/bin/sh
+printf '%s' "\$*" >"$init_log"
+STUB
+chmod +x "$init_stub_dir/bin"
+
+unset SSA_INIT 2>/dev/null || true
+rm -f "$init_log"
+run_init "$init_stub_dir/bin" >/dev/null 2>&1
+if [ -f "$init_log" ]; then
+  echo "NOT OK - run_init invoked init without SSA_INIT=1"
+  failures=$((failures + 1))
+else
+  echo "ok - run_init is a no-op unless SSA_INIT=1"
+fi
+
+SSA_INIT=1
+init_can_prompt() { return 1; }
+rm -f "$init_log"
+run_init "$init_stub_dir/bin" >/dev/null 2>&1
+expect_equals "run_init passes --no-interaction when no terminal is attached" "init --no-interaction" "$(cat "$init_log")"
+unset SSA_INIT
 
 if [ "$failures" -eq 0 ]; then
   echo "All install.sh tests passed."

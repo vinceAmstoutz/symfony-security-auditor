@@ -8,9 +8,17 @@
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | sh
 #
+# One command to install *and* configure (installs the binary, then runs its
+# guided `init`):
+#   curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | SSA_INIT=1 sh
+#
 # Environment variables:
 #   SSA_VERSION      release tag to install (default: latest)
 #   SSA_INSTALL_DIR  target directory (default: /usr/local/bin, else ~/.local/bin)
+#   SSA_INIT         when "1", run "<binary> init" after installing so a single
+#                    command installs and configures the tool; prompts read from
+#                    /dev/tty when a terminal is attached, else fall back to
+#                    "init --no-interaction" (needs composer, like init itself)
 #
 # The SHA-256 checksum is always verified; the install aborts if no checksum
 # tool is available.
@@ -37,6 +45,9 @@ detect_asset() {
   case "$os" in
     Linux) os_slug="linux" ;;
     Darwin) os_slug="macos" ;;
+    MINGW* | MSYS* | CYGWIN*)
+      fail "this is a Windows POSIX shell (Git Bash / MSYS / Cygwin); install the native Windows binary from PowerShell instead:
+  irm https://raw.githubusercontent.com/${REPO}/main/install.ps1 | iex" ;;
     *) fail "unsupported OS '$os' — on Windows download symfony-security-auditor-windows-x86_64.exe from the releases page" ;;
   esac
 
@@ -82,6 +93,26 @@ resolve_install_dir() {
   fi
 }
 
+init_can_prompt() {
+  { : </dev/tty; } 2>/dev/null
+}
+
+run_init() {
+  [ "${SSA_INIT:-0}" = "1" ] || return 0
+
+  binary="$1"
+  echo "Configuring ${BINARY_NAME} (running 'init')…"
+  if init_can_prompt; then
+    "$binary" init </dev/tty || warn_init_incomplete
+  else
+    "$binary" init --no-interaction || warn_init_incomplete
+  fi
+}
+
+warn_init_incomplete() {
+  echo "note: '${BINARY_NAME} init' did not complete — run it yourself to finish configuration." >&2
+}
+
 main() {
   need uname
 
@@ -106,6 +137,9 @@ main() {
   mv "${tmp}/${asset}" "${install_dir}/${BINARY_NAME}"
 
   echo "Installed ${BINARY_NAME} to ${install_dir}/${BINARY_NAME}"
+
+  run_init "${install_dir}/${BINARY_NAME}"
+
   case ":${PATH}:" in
     *":${install_dir}:"*) ;;
     *) echo "note: ${install_dir} is not on your PATH — add it to run '${BINARY_NAME}' directly" ;;

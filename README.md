@@ -91,15 +91,34 @@ Linux, macOS, and Windows.
 
 ### 1. Install
 
+**One command — Linux, macOS, and Windows (under WSL or Git Bash):**
+
 ```bash
-# Linux / macOS — detects your OS + architecture, downloads and verifies the binary
 curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | sh
 ```
 
+`install.sh` detects your OS and CPU architecture, downloads the matching
+binary, and verifies its SHA-256 checksum before installing — anywhere you have
+a POSIX shell.
+
+**Native Windows (PowerShell)** — when you are not using WSL or Git Bash:
+
 ```powershell
-# Windows (PowerShell)
 irm https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.ps1 | iex
 ```
+
+> [!TIP]
+>
+> **One command, installed _and_ configured.** Set `SSA_INIT=1` and the
+> installer runs the guided [`init`](#2-configure--the-guided-init) for you
+> right after downloading — so you skip step 2. It prompts for your provider
+> when a terminal is attached, and falls back to the Anthropic defaults
+> non-interactively in a pipe or CI. `init` fetches the provider bridge with
+> `composer`, so composer must be available for this combined step.
+>
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh | SSA_INIT=1 sh
+> ```
 
 Or download the binary for your platform straight from the
 [latest release](https://github.com/vinceAmstoutz/symfony-security-auditor/releases/latest):
