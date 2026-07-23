@@ -95,6 +95,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **`self-update`'s macOS fallbacks accept only executable regular files, so a
+  same-named stray file or directory is never replaced instead of the running
+  binary.** Without `/proc/self/exe`, `RunningBinaryLocator` `realpath()`ed the
+  invoked name against the working directory and then across `PATH`, taking the
+  first hit of any kind — unlike the shell, it never checked what it found. A
+  stray `symfony-security-auditor` file in the current directory (or a directory
+  on `PATH`) could be selected: a regular file was silently overwritten by the
+  downloaded release while the real binary stayed outdated (and the update
+  notice kept re-appearing), and a directory made the replacement fail. Both
+  fallbacks now require an executable regular file, the way the shell resolves
+  commands.
 - **`init` no longer writes an unbootable configuration when the provider is
   spelled as a bridge package slug (`open-ai`, `deep-seek`, …).** `init` never
   validated the provider value: for the seven hyphenated package slugs

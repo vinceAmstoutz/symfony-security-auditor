@@ -71,7 +71,7 @@ final class RunningBinaryLocatorTest extends TestCase
     public function test_it_falls_back_to_the_resolved_invoked_script_when_proc_self_exe_is_absent(): void
     {
         $invokedScript = $this->workingDirectory.'/invoked-binary';
-        (new Filesystem())->touch($invokedScript);
+        $this->createExecutableBinary($invokedScript);
 
         self::assertSame($invokedScript, (new RunningBinaryLocator($this->workingDirectory.'/missing', $invokedScript, 'micro'))->path());
     }
@@ -84,7 +84,7 @@ final class RunningBinaryLocatorTest extends TestCase
         $binDirectory = $this->workingDirectory.'/real-bin';
         $decoyDirectory = $this->workingDirectory.'/decoy-bin';
         (new Filesystem())->mkdir([$decoyDirectory, $binDirectory]);
-        (new Filesystem())->touch($binDirectory.'/symfony-security-auditor');
+        $this->createExecutableBinary($binDirectory.'/symfony-security-auditor');
         $pathEnvironment = $decoyDirectory.\PATH_SEPARATOR.$binDirectory;
 
         self::assertSame(
@@ -100,13 +100,74 @@ final class RunningBinaryLocatorTest extends TestCase
     {
         $binDirectory = $this->workingDirectory.'/real-bin';
         (new Filesystem())->mkdir($binDirectory);
-        (new Filesystem())->touch($binDirectory.'/symfony-security-auditor');
+        $this->createExecutableBinary($binDirectory.'/symfony-security-auditor');
         $pathEnvironment = \PATH_SEPARATOR.$binDirectory;
 
         self::assertSame(
             $binDirectory.'/symfony-security-auditor',
             (new RunningBinaryLocator($this->workingDirectory.'/missing', 'symfony-security-auditor', 'micro', $pathEnvironment))->path(),
         );
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    public function test_it_skips_a_non_executable_path_entry_and_keeps_searching(): void
+    {
+        $decoyDirectory = $this->workingDirectory.'/decoy-bin';
+        $binDirectory = $this->workingDirectory.'/real-bin';
+        (new Filesystem())->mkdir([$decoyDirectory, $binDirectory]);
+        (new Filesystem())->dumpFile($decoyDirectory.'/symfony-security-auditor', 'not the binary');
+        (new Filesystem())->chmod($decoyDirectory.'/symfony-security-auditor', 0o644);
+        $this->createExecutableBinary($binDirectory.'/symfony-security-auditor');
+        $pathEnvironment = $decoyDirectory.\PATH_SEPARATOR.$binDirectory;
+
+        self::assertSame(
+            $binDirectory.'/symfony-security-auditor',
+            (new RunningBinaryLocator($this->workingDirectory.'/missing', 'symfony-security-auditor', 'micro', $pathEnvironment))->path(),
+        );
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    public function test_it_skips_a_path_directory_entry_named_like_the_binary(): void
+    {
+        $decoyDirectory = $this->workingDirectory.'/decoy-bin';
+        $binDirectory = $this->workingDirectory.'/real-bin';
+        (new Filesystem())->mkdir([$decoyDirectory.'/symfony-security-auditor', $binDirectory]);
+        $this->createExecutableBinary($binDirectory.'/symfony-security-auditor');
+        $pathEnvironment = $decoyDirectory.\PATH_SEPARATOR.$binDirectory;
+
+        self::assertSame(
+            $binDirectory.'/symfony-security-auditor',
+            (new RunningBinaryLocator($this->workingDirectory.'/missing', 'symfony-security-auditor', 'micro', $pathEnvironment))->path(),
+        );
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    public function test_it_skips_a_same_named_non_executable_working_directory_entry(): void
+    {
+        $workingDirectoryBefore = getcwd();
+        self::assertIsString($workingDirectoryBefore);
+        (new Filesystem())->dumpFile($this->workingDirectory.'/symfony-security-auditor', 'not the binary');
+        (new Filesystem())->chmod($this->workingDirectory.'/symfony-security-auditor', 0o644);
+        $binDirectory = $this->workingDirectory.'/real-bin';
+        (new Filesystem())->mkdir($binDirectory);
+        $this->createExecutableBinary($binDirectory.'/symfony-security-auditor');
+
+        chdir($this->workingDirectory);
+
+        try {
+            self::assertSame(
+                $binDirectory.'/symfony-security-auditor',
+                (new RunningBinaryLocator($this->workingDirectory.'/missing', 'symfony-security-auditor', 'micro', $binDirectory))->path(),
+            );
+        } finally {
+            chdir($workingDirectoryBefore);
+        }
     }
 
     /**
@@ -163,5 +224,11 @@ final class RunningBinaryLocatorTest extends TestCase
         $this->expectExceptionMessage('running under the "cli" PHP SAPI');
 
         (new RunningBinaryLocator($procSelfExe, '', 'cli'))->path();
+    }
+
+    private function createExecutableBinary(string $path): void
+    {
+        (new Filesystem())->dumpFile($path, 'binary');
+        (new Filesystem())->chmod($path, 0o755);
     }
 }
