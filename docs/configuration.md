@@ -471,8 +471,11 @@ model: claude-opus-4-8
 `init` is also scriptable: pass `--provider`, `--model`, and `--env-var` to skip
 the matching prompt. Any option left out falls back to its interactive prompt
 (or, under `--no-interaction`, to its default — `anthropic`, `claude-opus-4-8`,
-and `<PROVIDER>_API_KEY` respectively). This is what the `SSA_INIT` installer
-flag and the GitHub Action rely on to configure non-interactively:
+and `<PROVIDER>_API_KEY` respectively). When a configuration already exists,
+`init` asks before overwriting it — and declines by default under
+`--no-interaction` — so scripted reconfiguration needs `--force` to replace the
+existing file without asking. This is what the `SSA_INIT` installer flag and the
+GitHub Action rely on to configure non-interactively:
 
 ```bash
 symfony-security-auditor init --provider=openai --model=gpt-5.4 --no-interaction

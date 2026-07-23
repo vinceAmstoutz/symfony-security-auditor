@@ -55,11 +55,13 @@ final readonly class InitCommand
         ?string $model = null,
         #[Option(description: 'Environment variable holding the API key; defaults to <PROVIDER>_API_KEY')]
         ?string $envVar = null,
+        #[Option(description: 'Overwrite an existing configuration without asking')]
+        bool $force = false,
     ): int {
         $configFile = $this->xdgConfigPathResolver->configFile();
 
-        if ($this->isOverwriteDeclined($symfonyStyle, $configFile)) {
-            $symfonyStyle->warning('Aborted; the existing configuration was left untouched.');
+        if (!$force && $this->isOverwriteDeclined($symfonyStyle, $configFile)) {
+            $symfonyStyle->warning('Aborted; the existing configuration was left untouched (use --force to overwrite).');
 
             return Command::SUCCESS;
         }

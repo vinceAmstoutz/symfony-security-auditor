@@ -163,6 +163,50 @@ final class InitCommandTest extends TestCase
         self::assertSame([], $this->recordingBridgeInstaller->installations);
     }
 
+    public function test_it_overwrites_an_existing_configuration_with_force_without_asking(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
+
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'openai', '--model' => 'gpt-5.4', '--force' => true],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_skips_the_overwrite_confirmation_when_forced(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
+
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
+
+        $commandTester->execute(['--force' => true]);
+
+        self::assertSame(
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_points_at_force_when_the_overwrite_is_declined(): void
+    {
+        (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
+
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['no']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('--force', $commandTester->getDisplay());
+    }
+
     public function test_it_overwrites_an_existing_configuration_when_confirmed(): void
     {
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");

@@ -53,6 +53,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   standalone installer's `SSA_INIT` flow and the GitHub Action use to set up
   non-interactively. Documented in
   [`docs/configuration.md`](docs/configuration.md#standalone-configuration).
+- **`init --force` overwrites an existing configuration without asking.**
+  Non-interactive reconfiguration was previously impossible: with a
+  `config.yaml` already present, the overwrite confirmation defaults to "no"
+  under `--no-interaction`, so `init --provider=… --no-interaction` warned,
+  changed nothing, and still exited 0 — a CI pipeline switching providers
+  silently kept auditing with the stale configuration. `--force` skips the
+  confirmation in both interactive and non-interactive runs, and the abort
+  warning now points at it ("use `--force` to overwrite").
 - **New `doctor` command preflights the standalone environment before an
   audit.** `symfony-security-auditor doctor` runs three checks and prints one
   line each: **Configuration** (`config.yaml` resolves, a `platform:` block is
