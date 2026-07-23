@@ -25,7 +25,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
  * `/proc/self/exe` (Linux); elsewhere (notably macOS, which has no
  * `/proc/self/exe`) it falls back to the resolved entry path, and — when the
  * binary was invoked by a bare name found on `PATH` so the entry path is not a
- * resolvable file — to a `PATH` lookup of that name.
+ * resolvable file — to a `PATH` lookup of that name. Both fallbacks accept only
+ * an executable regular file, the way the shell resolves commands, so a
+ * same-named stray file or directory is never mistaken for the running binary
+ * and overwritten by an update.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -72,8 +75,8 @@ final readonly class RunningBinaryLocator implements RunningBinaryLocatorInterfa
             return null;
         }
 
-        $resolved = realpath($this->invokedScriptPath);
-        if (false !== $resolved) {
+        $resolved = $this->executableFile(realpath($this->invokedScriptPath));
+        if (null !== $resolved) {
             return $resolved;
         }
 
@@ -87,12 +90,17 @@ final readonly class RunningBinaryLocator implements RunningBinaryLocatorInterfa
                 continue;
             }
 
-            $candidate = realpath($directory.\DIRECTORY_SEPARATOR.$this->invokedScriptPath);
-            if (false !== $candidate) {
+            $candidate = $this->executableFile(realpath($directory.\DIRECTORY_SEPARATOR.$this->invokedScriptPath));
+            if (null !== $candidate) {
                 return $candidate;
             }
         }
 
         return null;
+    }
+
+    private function executableFile(false|string $path): ?string
+    {
+        return \is_string($path) && is_file($path) && is_executable($path) ? $path : null;
     }
 }
