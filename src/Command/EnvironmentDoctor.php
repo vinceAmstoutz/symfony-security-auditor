@@ -21,6 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 
+use function Symfony\Component\String\u;
+
 /**
  * Preflight for the standalone binary: confirms the configuration resolves
  * (file present, valid, provider selected, API-key variable set), the provider
@@ -96,7 +98,16 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
 
         return null === $failureReason
             ? new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed and the audit boots with it.')
-            : new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, \sprintf('Installed, but the audit cannot start with it: %s', $failureReason));
+            : new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, $this->bootFailureDetail($failureReason));
+    }
+
+    private function bootFailureDetail(string $failureReason): string
+    {
+        $reason = u($failureReason)->trim()->toString();
+
+        return '' === $reason
+            ? 'Installed, but the audit cannot start with it (the boot failed without an error message).'
+            : \sprintf('Installed, but the audit cannot start with it: %s', $reason);
     }
 
     private function composerCheck(): DoctorCheckResult

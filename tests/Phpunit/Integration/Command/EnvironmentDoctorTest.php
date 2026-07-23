@@ -77,6 +77,19 @@ final class EnvironmentDoctorTest extends TestCase
         );
     }
 
+    public function test_it_reports_a_boot_failure_without_a_message_in_plain_words(): void
+    {
+        $this->writeConfig("provider: openai\nplatform:\n    openai:\n        api_key: 'sk-test'\n");
+        $this->installBridge();
+
+        $results = $this->doctorWith($this->resolver(), [], true, '   ')->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, 'Installed, but the audit cannot start with it (the boot failed without an error message).'),
+            $results[1],
+        );
+    }
+
     public function test_it_reports_the_bridge_installed_without_a_boot_probe_when_the_configuration_check_fails(): void
     {
         $this->writeConfig("model: 'gpt-4'\n");
