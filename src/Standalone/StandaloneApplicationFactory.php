@@ -106,7 +106,7 @@ final readonly class StandaloneApplicationFactory
      */
     public static function updateChecksDisabled(array $environment): bool
     {
-        return '' !== ($environment[self::UPDATE_CHECK_OPT_OUT_VARIABLE] ?? '');
+        return !\in_array($environment[self::UPDATE_CHECK_OPT_OUT_VARIABLE] ?? '', ['', '0'], true);
     }
 
     /**
