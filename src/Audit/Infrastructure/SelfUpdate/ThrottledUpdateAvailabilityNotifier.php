@@ -22,8 +22,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
  * Resolves the latest released version through the shared self-update machinery,
  * throttling the network call to at most once per `throttleSeconds` by caching
  * the answer. The GitHub call only ever happens when the cache is missing or
- * stale; a failed call falls back to the last cached answer (or no notice), so
- * the check is silent when offline and never blocks a run more than once a day.
+ * stale; a failed call falls back to the last cached answer (or no notice) and
+ * still refreshes the throttle window, so the check is silent when offline and
+ * never blocks a run more than once a day.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -50,9 +51,6 @@ final readonly class ThrottledUpdateAvailabilityNotifier implements UpdateAvaila
         }
 
         $latestVersion = $this->latestVersion($currentVersion);
-        if (null === $latestVersion) {
-            return null;
-        }
 
         if (!version_compare($latestVersion, $currentVersion, '>')) {
             return null;
@@ -61,7 +59,7 @@ final readonly class ThrottledUpdateAvailabilityNotifier implements UpdateAvaila
         return \sprintf(self::NOTICE_TEMPLATE, $latestVersion);
     }
 
-    private function latestVersion(string $currentVersion): ?string
+    private function latestVersion(string $currentVersion): string
     {
         $cachedState = $this->updateCheckStore->read();
         if ($cachedState instanceof UpdateCheckState && !$this->isStale($cachedState)) {
@@ -71,12 +69,12 @@ final readonly class ThrottledUpdateAvailabilityNotifier implements UpdateAvaila
         return $this->refreshedLatestVersion($currentVersion, $cachedState);
     }
 
-    private function refreshedLatestVersion(string $currentVersion, ?UpdateCheckState $updateCheckState): ?string
+    private function refreshedLatestVersion(string $currentVersion, ?UpdateCheckState $updateCheckState): string
     {
         try {
             $latestVersion = $this->selfUpdater->run($currentVersion, true)->latestVersion;
         } catch (SelfUpdateFailedException|UnsupportedSelfUpdatePlatformException) {
-            return $updateCheckState?->latestVersion;
+            $latestVersion = $updateCheckState?->latestVersion ?? $currentVersion;
         }
 
         $this->updateCheckStore->write(new UpdateCheckState($this->clock->now(), $latestVersion));

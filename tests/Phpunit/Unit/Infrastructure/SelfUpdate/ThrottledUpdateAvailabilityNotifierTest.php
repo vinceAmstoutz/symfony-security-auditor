@@ -112,6 +112,48 @@ final class ThrottledUpdateAvailabilityNotifierTest extends TestCase
         self::assertSame(self::EXPECTED_NOTICE, $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0'));
     }
 
+    public function test_it_throttles_the_lookup_after_a_failed_check(): void
+    {
+        $fakeSelfUpdater = new FakeSelfUpdater(throws: true);
+        $throttledUpdateAvailabilityNotifier = new ThrottledUpdateAvailabilityNotifier(
+            $fakeSelfUpdater,
+            new InMemoryUpdateCheckStore(),
+            new MockClock('2026-01-01 00:00:00'),
+        );
+
+        $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0');
+        $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0');
+
+        self::assertSame(1, $fakeSelfUpdater->calls);
+    }
+
+    public function test_it_re_checks_a_failed_lookup_once_the_throttle_window_elapses(): void
+    {
+        $mockClock = new MockClock('2026-01-01 00:00:00');
+        $fakeSelfUpdater = new FakeSelfUpdater(throws: true);
+        $throttledUpdateAvailabilityNotifier = new ThrottledUpdateAvailabilityNotifier($fakeSelfUpdater, new InMemoryUpdateCheckStore(), $mockClock);
+
+        $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0');
+        $mockClock->sleep(86_400);
+        $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0');
+
+        self::assertSame(2, $fakeSelfUpdater->calls);
+    }
+
+    public function test_it_keeps_the_cached_answer_across_a_failed_refresh(): void
+    {
+        $mockClock = new MockClock('2026-01-01 00:00:00');
+        $throttledUpdateAvailabilityNotifier = new ThrottledUpdateAvailabilityNotifier(
+            new FakeSelfUpdater(throws: true),
+            new InMemoryUpdateCheckStore(new UpdateCheckState($mockClock->now()->modify('-2 days'), '2.0.0')),
+            $mockClock,
+        );
+
+        $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0');
+
+        self::assertSame(self::EXPECTED_NOTICE, $throttledUpdateAvailabilityNotifier->availableUpdateNotice('1.0.0'));
+    }
+
     public function test_it_serves_the_cached_version_just_under_the_daily_throttle_window(): void
     {
         $mockClock = new MockClock('2026-01-01 00:00:00');
