@@ -94,7 +94,8 @@ resolve_install_dir() {
 }
 
 init_can_prompt() {
-  { : </dev/tty; } 2>/dev/null
+  # POSIX: a redirection error on a special builtin like ':' aborts a non-interactive shell — the subshell contains it.
+  ( : </dev/tty; ) 2>/dev/null
 }
 
 run_init() {

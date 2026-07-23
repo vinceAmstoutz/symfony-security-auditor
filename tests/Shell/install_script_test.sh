@@ -139,6 +139,20 @@ run_init "$init_stub_dir/bin" >/dev/null 2>&1
 expect_equals "run_init passes --no-interaction when no terminal is attached" "init --no-interaction" "$(cat "$init_log")"
 unset SSA_INIT
 
+if command -v setsid >/dev/null 2>&1; then
+  probe_script='SSA_INSTALL_SOURCED=1; export SSA_INSTALL_SOURCED; . "$1"; if init_can_prompt; then echo tty; else echo no-tty; fi; echo survived'
+  probe_output=$(setsid --wait sh -c "$probe_script" probe "$script_dir/install.sh" </dev/null 2>/dev/null || true)
+  case "$probe_output" in
+    *survived*) echo "ok - init_can_prompt returns instead of aborting the shell without a controlling terminal" ;;
+    *)
+      echo "NOT OK - init_can_prompt aborted the shell without a controlling terminal: [$probe_output]"
+      failures=$((failures + 1))
+      ;;
+  esac
+else
+  echo "ok - init_can_prompt no-terminal probe skipped (setsid unavailable)"
+fi
+
 if [ "$failures" -eq 0 ]; then
   echo "All install.sh tests passed."
   exit 0
