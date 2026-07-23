@@ -21,6 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPreflightInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckStatus;
@@ -58,9 +59,61 @@ final class EnvironmentDoctorTest extends TestCase
 
         self::assertEquals([
             new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and the API-key variable is set.'),
-            new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed.'),
+            new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed and the audit boots with it.'),
             new DoctorCheckResult('Composer', DoctorCheckStatus::Ok, 'Available.'),
         ], $results);
+    }
+
+    public function test_it_fails_the_bridge_check_when_the_installed_bridge_cannot_boot_the_audit(): void
+    {
+        $this->writeConfig("provider: openai\nplatform:\n    openai:\n        api_key: 'sk-test'\n");
+        $this->installBridge();
+
+        $results = $this->doctorWith($this->resolver(), [], true, 'The "openai" platform is not registered.')->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, 'Installed, but the audit cannot start with it: The "openai" platform is not registered.'),
+            $results[1],
+        );
+    }
+
+    public function test_it_reports_a_boot_failure_whose_message_is_not_valid_utf8(): void
+    {
+        $this->writeConfig("provider: openai\nplatform:\n    openai:\n        api_key: 'sk-test'\n");
+        $this->installBridge();
+
+        $results = $this->doctorWith($this->resolver(), [], true, "boom in \xAF\xFE dir")->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, "Installed, but the audit cannot start with it: boom in \xAF\xFE dir"),
+            $results[1],
+        );
+    }
+
+    public function test_it_reports_a_boot_failure_without_a_message_in_plain_words(): void
+    {
+        $this->writeConfig("provider: openai\nplatform:\n    openai:\n        api_key: 'sk-test'\n");
+        $this->installBridge();
+
+        $results = $this->doctorWith($this->resolver(), [], true, '   ')->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, 'Installed, but the audit cannot start with it (the boot failed without an error message).'),
+            $results[1],
+        );
+    }
+
+    public function test_it_reports_the_bridge_installed_without_a_boot_probe_when_the_configuration_check_fails(): void
+    {
+        $this->writeConfig("model: 'gpt-4'\n");
+        $this->installBridge();
+
+        $results = $this->doctorWith($this->resolver(), [], true, 'would only repeat the configuration failure')->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed.'),
+            $results[1],
+        );
     }
 
     public function test_it_fails_the_configuration_check_when_no_provider_is_configured(): void
@@ -137,15 +190,19 @@ final class EnvironmentDoctorTest extends TestCase
     /**
      * @param array<string, string> $environment
      */
-    private function doctorWith(XdgConfigPathResolver $xdgConfigPathResolver, array $environment, bool $composerAvailable): EnvironmentDoctor
+    private function doctorWith(XdgConfigPathResolver $xdgConfigPathResolver, array $environment, bool $composerAvailable, ?string $preflightFailure = null): EnvironmentDoctor
     {
         $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
         $composerAvailabilityChecker->method('isAvailable')->willReturn($composerAvailable);
+
+        $auditPreflight = self::createStub(AuditPreflightInterface::class);
+        $auditPreflight->method('failureReason')->willReturn($preflightFailure);
 
         return new EnvironmentDoctor(
             new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver($environment)),
             $xdgConfigPathResolver,
             $composerAvailabilityChecker,
+            $auditPreflight,
         );
     }
 

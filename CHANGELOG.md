@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.17.0] — 2026-07-23 — Preflight
+
+A release about the standalone binary looking after itself. The binary now tells
+you when a newer release is available (throttled, interactive-only,
+stderr-only), a single `curl … | SSA_INIT=1 sh` installs _and_ configures it,
+`init` is fully scriptable (`--provider`/`--model`/`--env-var`/`--force`) with
+its inputs validated before anything is written, and the new `doctor` command
+preflights the whole environment — including actually booting the audit with the
+installed provider bridge — before a run. A pre-release bug hunt hardened the
+same surface: `v`-prefixed tags can no longer disable update detection, metadata
+lookups are tightly bounded, and non-UTF-8 input is rejected instead of
+crashing.
+
 ### Added
 
 - **The standalone binary now tells you when a newer release is available.**
@@ -49,8 +62,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (or, non-interactively, to its default: `anthropic`, `claude-opus-4-8`, and a
   `<PROVIDER>_API_KEY` variable derived from the resolved provider). This lets a
   single command configure any provider — e.g.
-  `init --provider=openai --model=gpt-5.4 --no-interaction`. The standalone
-  installer's `SSA_INIT` no-terminal fallback and the GitHub Action run plain
+  `init --provider=openai --model=gpt-5.4 --no-interaction`. Inputs are
+  validated before anything happens: a blank provider or model, or an
+  `--env-var` value that is not a valid environment variable name (which would
+  produce an unresolvable `%env(...)%` placeholder), aborts with exit code `2`
+  and leaves both the configuration and the bridge untouched. The bridge is
+  installed **before** the configuration file is written, so a failed bridge
+  download (offline, `composer` missing) leaves the previous, working
+  configuration in place instead of a half-switched setup whose config names one
+  provider while the installed bridge serves another. The standalone installer's
+  `SSA_INIT` no-terminal fallback and the GitHub Action run plain
   `init --no-interaction` (the Anthropic defaults); pass the options yourself to
   script a different provider. Documented in
   [`docs/configuration.md`](docs/configuration.md#standalone-configuration).
@@ -67,14 +88,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   line each: **Configuration** (`config.yaml` resolves, a `platform:` block is
   present, and any `%env(...)%` API-key variable it references is set),
   **Provider bridge** (the `symfony/ai-*` bridge autoloader is installed under
-  the data directory), and **Composer** (a runnable `composer` is reachable). A
+  the data directory _and the audit actually boots with it_ — the probe runs the
+  exact configuration-load → container-build → command-instantiation path
+  `audit` uses at startup, so a leftover bridge from a previously configured
+  provider is reported as a failure instead of green-lighting an audit that
+  would abort at boot), and **Composer** (a runnable `composer` is reachable). A
   missing `composer` is a warning — auditing still works — while a
-  missing/invalid configuration or an uninstalled bridge is a failure. The
-  command exits `0` when every check passes or only warns and `1` when any check
-  fails, so it drops into a CI preflight step
+  missing/invalid configuration or an uninstalled/unbootable bridge is a
+  failure. The boot probe is skipped while the configuration check fails, so a
+  config problem is reported once, by the check that owns it. The command exits
+  `0` when every check passes or only warns and `1` when any check fails, so it
+  drops into a CI preflight step
   (`symfony-security-auditor doctor && symfony-security-auditor audit`). The
   command exists only in the standalone binary. Implemented by `DoctorCommand`
-  delegating to `EnvironmentDoctor` (`src/Command/`), wired into the standalone
+  delegating to `EnvironmentDoctor` (`src/Command/`), with the boot probe behind
+  `AuditPreflightInterface` (`src/Command/`) implemented by
+  `StandaloneAuditPreflight` (`src/Standalone/`), wired into the standalone
   application by `StandaloneApplicationFactory`.
 
 ### Changed
@@ -95,6 +124,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A `v`-prefixed release tag can no longer silently disable update
+  detection.** `SelfUpdater` compared GitHub's `tag_name` verbatim, and PHP's
+  `version_compare()` ranks any `v`-prefixed string _below_ every plain version
+  — `version_compare('v1.18.0', '1.16.0', '>')` is `false` — so if a release
+  were ever tagged `v1.18.0` instead of `1.18.0`, `self-update` would report
+  "Already up to date" and the update notice would stay silent, with no error
+  anywhere. The tag is now compared and displayed with any leading `v`/`V`
+  stripped, while download URLs keep the tag verbatim (that is the path the
+  release assets publish under).
+- **The update check can no longer stall an interactive command on a black-holed
+  network.** `ProcessReleaseClient` gave every request the binary-download
+  budget — `--connect-timeout 30` and `--max-time 600` — so a firewall that
+  silently drops packets could hold the after-command update notice (and
+  `self-update`'s metadata lookups) for up to 30 seconds on connect and minutes
+  on a stalled transfer. Release-metadata `get()` requests are now bounded to
+  `--connect-timeout 10` / `--max-time 20`; binary `download()` transfers keep
+  the generous 600-second window they need on slow links.
 - **`self-update`'s macOS fallbacks accept only executable regular files, so a
   same-named stray file or directory is never replaced instead of the running
   binary.** Without `/proc/self/exe`, `RunningBinaryLocator` `realpath()`ed the
@@ -2689,6 +2735,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.17.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.17.0
 [1.16.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.16.0
 [1.15.0]:

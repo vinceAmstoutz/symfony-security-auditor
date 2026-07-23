@@ -21,7 +21,10 @@ use Symfony\Component\Process\Process;
 /**
  * Probes for a runnable `composer` by executing `composer --version` through
  * Symfony `Process` — the same subprocess-only convention the rest of the tool
- * uses (no raw shell, no argument-interpolation surface).
+ * uses (no raw shell, no argument-interpolation surface). A bare `composer`
+ * argv[0] is sufficient on every platform: `Process` resolves it through its
+ * own `ExecutableFinder`, which consults `PATHEXT` on Windows and so finds the
+ * `composer.bat`/`composer.cmd` shims too.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */

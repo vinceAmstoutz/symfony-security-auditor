@@ -22,7 +22,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
 /**
  * Fetches release metadata and assets with `curl` through Symfony `Process` —
  * the same subprocess-only convention `ComposerBridgeInstaller` uses — so the
- * binary needs no bundled HTTP client.
+ * binary needs no bundled HTTP client. Metadata lookups (`get()`) run behind
+ * the after-command update notice, so they are bounded tightly; only binary
+ * downloads (`download()`) keep a transfer window sized for a large asset on
+ * a slow link.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -30,9 +33,11 @@ final readonly class ProcessReleaseClient implements ReleaseClientInterface
 {
     private const string USER_AGENT = 'symfony-security-auditor-self-update';
 
-    private const string CONNECT_TIMEOUT_SECONDS = '30';
+    private const string CONNECT_TIMEOUT_SECONDS = '10';
 
-    private const string MAX_TRANSFER_SECONDS = '600';
+    private const string METADATA_MAX_TRANSFER_SECONDS = '20';
+
+    private const string DOWNLOAD_MAX_TRANSFER_SECONDS = '600';
 
     private const float PROCESS_TIMEOUT_SECONDS = 660.0;
 
@@ -57,8 +62,6 @@ final readonly class ProcessReleaseClient implements ReleaseClientInterface
                     '-fsSL',
                     '--connect-timeout',
                     self::CONNECT_TIMEOUT_SECONDS,
-                    '--max-time',
-                    self::MAX_TRANSFER_SECONDS,
                     '-H',
                     \sprintf('User-Agent: %s', self::USER_AGENT),
                     ...$arguments,
@@ -76,7 +79,7 @@ final readonly class ProcessReleaseClient implements ReleaseClientInterface
     #[Override]
     public function get(string $url): string
     {
-        return $this->run([$url], $url)->getOutput();
+        return $this->run(['--max-time', self::METADATA_MAX_TRANSFER_SECONDS, $url], $url)->getOutput();
     }
 
     /**
@@ -85,7 +88,7 @@ final readonly class ProcessReleaseClient implements ReleaseClientInterface
     #[Override]
     public function download(string $url, string $destination): void
     {
-        $this->run(['--output', $destination, $url], $url);
+        $this->run(['--max-time', self::DOWNLOAD_MAX_TRANSFER_SECONDS, '--output', $destination, $url], $url);
     }
 
     /**

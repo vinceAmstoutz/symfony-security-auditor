@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 
+use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -47,11 +49,13 @@ final class StandaloneDoctorEndToEndTest extends TestCase
         $this->filesystem->remove([$this->configHome, $this->cacheHome, $this->dataHome]);
     }
 
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_the_standalone_doctor_reports_a_ready_environment_end_to_end(): void
     {
         $this->filesystem->dumpFile(
             $this->configHome.'/symfony-security-auditor/config.yaml',
-            "platform:\n    openai:\n        api_key: 'sk-e2e'\nmodel: 'gpt-4'\n",
+            "platform:\n    generic:\n        default:\n            base_url: 'http://localhost'\nmodel: 'gpt-4'\n",
         );
         $this->filesystem->dumpFile($this->dataHome.'/symfony-security-auditor/vendor/autoload.php', "<?php\n");
 
@@ -63,6 +67,24 @@ final class StandaloneDoctorEndToEndTest extends TestCase
         $display = $commandTester->getDisplay();
         self::assertStringContainsString('[OK] Configuration:', $display);
         self::assertStringContainsString('[OK] Provider bridge:', $display);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_standalone_doctor_fails_end_to_end_when_the_installed_bridge_does_not_match_the_provider(): void
+    {
+        $this->filesystem->dumpFile(
+            $this->configHome.'/symfony-security-auditor/config.yaml',
+            "provider: openai\nplatform:\n    openai:\n        api_key: 'sk-e2e'\nmodel: 'gpt-4'\n",
+        );
+        $this->filesystem->dumpFile($this->dataHome.'/symfony-security-auditor/vendor/autoload.php', "<?php\n");
+
+        $commandTester = $this->doctorCommandTester();
+
+        $exitCode = $commandTester->execute([]);
+
+        self::assertSame(Command::FAILURE, $exitCode);
+        self::assertStringContainsString('Installed, but the audit cannot start with it', $commandTester->getDisplay());
     }
 
     public function test_the_standalone_doctor_fails_end_to_end_when_the_environment_is_not_configured(): void

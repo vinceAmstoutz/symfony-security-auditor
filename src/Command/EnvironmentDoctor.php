@@ -21,11 +21,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 
+use function Symfony\Component\String\b;
+
 /**
  * Preflight for the standalone binary: confirms the configuration resolves
  * (file present, valid, provider selected, API-key variable set), the provider
- * bridge is installed, and `composer` is reachable — the prerequisites for a
- * successful audit run.
+ * bridge is installed *and actually boots the audit for the configured
+ * provider* (a leftover bridge from a previously configured provider passes a
+ * file-existence check but not a boot), and `composer` is reachable — the
+ * prerequisites for a successful audit run. The boot probe is skipped while
+ * the configuration check fails, so a config problem is reported once, by the
+ * check that owns it.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -37,6 +43,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         private StandaloneConfigLoader $standaloneConfigLoader,
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private ComposerAvailabilityCheckerInterface $composerAvailabilityChecker,
+        private AuditPreflightInterface $auditPreflight,
     ) {}
 
     /**
@@ -45,9 +52,11 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     #[Override]
     public function diagnose(): array
     {
+        $doctorCheckResult = $this->configurationCheck();
+
         return [
-            $this->configurationCheck(),
-            $this->bridgeCheck(),
+            $doctorCheckResult,
+            $this->bridgeCheck(DoctorCheckStatus::Ok === $doctorCheckResult->status),
             $this->composerCheck(),
         ];
     }
@@ -69,7 +78,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         return new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and the API-key variable is set.');
     }
 
-    private function bridgeCheck(): DoctorCheckResult
+    private function bridgeCheck(bool $configurationResolves): DoctorCheckResult
     {
         try {
             $bridgeAutoloadFile = \sprintf('%s/%s', $this->xdgConfigPathResolver->dataDir(), self::BRIDGE_AUTOLOAD_RELATIVE_PATH);
@@ -77,9 +86,33 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
             return new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, $unresolvableConfigPathException->getMessage());
         }
 
-        return is_file($bridgeAutoloadFile)
-            ? new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed.')
-            : new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, 'Not installed — run "init" to download it.');
+        if (!is_file($bridgeAutoloadFile)) {
+            return new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, 'Not installed — run "init" to download it.');
+        }
+
+        if (!$configurationResolves) {
+            return new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed.');
+        }
+
+        $failureReason = $this->auditPreflight->failureReason();
+
+        return null === $failureReason
+            ? new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed and the audit boots with it.')
+            : new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, $this->bootFailureDetail($failureReason));
+    }
+
+    /**
+     * The reason is an arbitrary `Throwable` message from the boot probe and
+     * may contain non-UTF-8 bytes (paths, quoted file contents), so it is
+     * handled byte-safely — `u()` would throw on it and mask the diagnosis.
+     */
+    private function bootFailureDetail(string $failureReason): string
+    {
+        $reason = b($failureReason)->trim()->toString();
+
+        return '' === $reason
+            ? 'Installed, but the audit cannot start with it (the boot failed without an error message).'
+            : \sprintf('Installed, but the audit cannot start with it: %s', $reason);
     }
 
     private function composerCheck(): DoctorCheckResult
