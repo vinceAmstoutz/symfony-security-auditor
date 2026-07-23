@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 
-use function Symfony\Component\String\u;
+use function Symfony\Component\String\b;
 
 /**
  * Preflight for the standalone binary: confirms the configuration resolves
@@ -101,9 +101,14 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
             : new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, $this->bootFailureDetail($failureReason));
     }
 
+    /**
+     * The reason is an arbitrary `Throwable` message from the boot probe and
+     * may contain non-UTF-8 bytes (paths, quoted file contents), so it is
+     * handled byte-safely — `u()` would throw on it and mask the diagnosis.
+     */
     private function bootFailureDetail(string $failureReason): string
     {
-        $reason = u($failureReason)->trim()->toString();
+        $reason = b($failureReason)->trim()->toString();
 
         return '' === $reason
             ? 'Installed, but the audit cannot start with it (the boot failed without an error message).'

@@ -787,9 +787,9 @@ It runs three checks and prints one line for each:
 | Composer        | a runnable `composer` is reachable — needed only to run `init` or switch providers, not to audit                                                                                                               |
 
 A missing `composer` is reported as a **warning** (auditing still works); a
-missing/invalid configuration or an uninstalled bridge is a **failure**. The
-command exits `0` when every check passes or only warns, and `1` when any check
-fails, so it drops into a CI preflight step:
+missing/invalid configuration or an uninstalled — or unbootable — bridge is a
+**failure**. The command exits `0` when every check passes or only warns, and
+`1` when any check fails, so it drops into a CI preflight step:
 
 ```bash
 symfony-security-auditor doctor && symfony-security-auditor audit path/to/app

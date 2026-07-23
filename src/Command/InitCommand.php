@@ -26,6 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 
+use function Symfony\Component\String\b;
 use function Symfony\Component\String\u;
 
 /** @internal not part of the BC promise — the command *name* (`init`) is public, but the PHP class itself is for internal use only. */
@@ -70,14 +71,21 @@ final readonly class InitCommand
             return Command::SUCCESS;
         }
 
-        $provider ??= $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama)', 'anthropic');
-        $provider = $this->providerKeyNormalizer->normalize($provider);
-        $model = u($model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8'))->trim()->toString();
-        $envVar = u($envVar ?? $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($provider)))->trim()->toString();
+        $provider = b($provider ?? $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama)', 'anthropic'))->trim()->toString();
+        $model = b($model ?? $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8'))->trim()->toString();
 
-        $violation = $this->inputViolation($provider, $model, $envVar);
+        $violation = $this->identityViolation($provider, $model);
         if (null !== $violation) {
             $symfonyStyle->error($violation);
+
+            return Command::INVALID;
+        }
+
+        $provider = $this->providerKeyNormalizer->normalize($provider);
+        $envVar = b($envVar ?? $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($provider)))->trim()->toString();
+
+        if (1 !== preg_match(self::ENV_VAR_NAME_PATTERN, $envVar)) {
+            $symfonyStyle->error(\sprintf('"%s" is not a valid environment variable name (letters, digits, and underscores only; must not start with a digit).', $envVar));
 
             return Command::INVALID;
         }
@@ -90,21 +98,20 @@ final readonly class InitCommand
         return Command::SUCCESS;
     }
 
-    private function inputViolation(string $provider, string $model, string $envVar): ?string
+    /**
+     * Checked on the raw bytes, before `ProviderKeyNormalizer` — its `u()`
+     * call throws on non-UTF-8 input, which must reject with exit code 2
+     * instead of crashing.
+     */
+    private function identityViolation(string $provider, string $model): ?string
     {
-        if ('' === $provider) {
-            return 'The provider must not be empty.';
-        }
-
-        if ('' === $model) {
-            return 'The model must not be empty.';
-        }
-
-        if (1 !== preg_match(self::ENV_VAR_NAME_PATTERN, $envVar)) {
-            return \sprintf('"%s" is not a valid environment variable name (letters, digits, and underscores only; must not start with a digit).', $envVar);
-        }
-
-        return null;
+        return match (true) {
+            1 !== preg_match('//u', $provider) => 'The provider must be valid UTF-8 text.',
+            '' === $provider => 'The provider must not be empty.',
+            1 !== preg_match('//u', $model) => 'The model must be valid UTF-8 text.',
+            '' === $model => 'The model must not be empty.',
+            default => null,
+        };
     }
 
     private function isOverwriteDeclined(SymfonyStyle $symfonyStyle, string $configFile): bool

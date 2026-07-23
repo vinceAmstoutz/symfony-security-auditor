@@ -16,16 +16,15 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Closure;
 use Override;
 use Symfony\Component\Process\Exception\ExceptionInterface;
-use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /**
  * Probes for a runnable `composer` by executing `composer --version` through
  * Symfony `Process` — the same subprocess-only convention the rest of the tool
- * uses (no raw shell, no argument-interpolation surface). The executable is
- * resolved through `ExecutableFinder` first: `Process` does not consult
- * `PATHEXT`, so a bare `composer` misses the `composer.bat`/`composer.cmd`
- * shims a Windows shell would find.
+ * uses (no raw shell, no argument-interpolation surface). A bare `composer`
+ * argv[0] is sufficient on every platform: `Process` resolves it through its
+ * own `ExecutableFinder`, which consults `PATHEXT` on Windows and so finds the
+ * `composer.bat`/`composer.cmd` shims too.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
@@ -46,8 +45,7 @@ final readonly class ProcessComposerAvailabilityChecker implements ComposerAvail
     public static function defaultProcessBuilder(): Closure
     {
         return static function (): Process {
-            $composer = (new ExecutableFinder())->find('composer') ?? 'composer';
-            $process = new Process([$composer, '--version']);
+            $process = new Process(['composer', '--version']);
             $process->setTimeout(self::PROCESS_TIMEOUT_SECONDS);
 
             return $process;

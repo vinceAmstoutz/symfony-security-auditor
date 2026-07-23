@@ -77,6 +77,19 @@ final class EnvironmentDoctorTest extends TestCase
         );
     }
 
+    public function test_it_reports_a_boot_failure_whose_message_is_not_valid_utf8(): void
+    {
+        $this->writeConfig("provider: openai\nplatform:\n    openai:\n        api_key: 'sk-test'\n");
+        $this->installBridge();
+
+        $results = $this->doctorWith($this->resolver(), [], true, "boom in \xAF\xFE dir")->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Failure, "Installed, but the audit cannot start with it: boom in \xAF\xFE dir"),
+            $results[1],
+        );
+    }
+
     public function test_it_reports_a_boot_failure_without_a_message_in_plain_words(): void
     {
         $this->writeConfig("provider: openai\nplatform:\n    openai:\n        api_key: 'sk-test'\n");

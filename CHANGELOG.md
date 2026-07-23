@@ -79,14 +79,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   exact configuration-load → container-build → command-instantiation path
   `audit` uses at startup, so a leftover bridge from a previously configured
   provider is reported as a failure instead of green-lighting an audit that
-  would abort at boot), and **Composer** (a runnable `composer` is reachable,
-  resolved the way a shell resolves it — including the `composer.bat`/`.cmd`
-  shims on Windows, which `Process` alone does not find). A missing `composer`
-  is a warning — auditing still works — while a missing/invalid configuration or
-  an uninstalled/unbootable bridge is a failure. The boot probe is skipped while
-  the configuration check fails, so a config problem is reported once, by the
-  check that owns it. The command exits `0` when every check passes or only
-  warns and `1` when any check fails, so it drops into a CI preflight step
+  would abort at boot), and **Composer** (a runnable `composer` is reachable). A
+  missing `composer` is a warning — auditing still works — while a
+  missing/invalid configuration or an uninstalled/unbootable bridge is a
+  failure. The boot probe is skipped while the configuration check fails, so a
+  config problem is reported once, by the check that owns it. The command exits
+  `0` when every check passes or only warns and `1` when any check fails, so it
+  drops into a CI preflight step
   (`symfony-security-auditor doctor && symfony-security-auditor audit`). The
   command exists only in the standalone binary. Implemented by `DoctorCommand`
   delegating to `EnvironmentDoctor` (`src/Command/`), with the boot probe behind

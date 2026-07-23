@@ -286,6 +286,9 @@ final class InitCommandTest extends TestCase
         yield 'env var starting with a digit' => [['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => '1KEY']];
         yield 'env var with a parenthesis' => [['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => 'KEY)']];
         yield 'empty env var' => [['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => '']];
+        yield 'provider with invalid utf-8 bytes' => [['--provider' => "caf\xE9", '--model' => 'gpt-5.4']];
+        yield 'model with invalid utf-8 bytes' => [['--provider' => 'openai', '--model' => "caf\xE9"]];
+        yield 'env var with invalid utf-8 bytes' => [['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => "\xE9KEY"]];
     }
 
     public function test_it_does_not_install_a_bridge_for_a_blank_provider(): void
@@ -297,13 +300,29 @@ final class InitCommandTest extends TestCase
         self::assertSame([], $this->recordingBridgeInstaller->installations);
     }
 
-    public function test_it_explains_why_an_invalid_env_var_name_was_rejected(): void
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('violationMessages')]
+    public function test_it_explains_why_an_input_was_rejected(array $options, string $expectedMessage): void
     {
         $commandTester = $this->commandTester();
 
-        $commandTester->execute(['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => 'MY KEY'], ['interactive' => false]);
+        $commandTester->execute($options, ['interactive' => false]);
 
-        self::assertStringContainsString('not a valid environment variable name', $commandTester->getDisplay());
+        self::assertStringContainsString($expectedMessage, $commandTester->getDisplay());
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, string}>
+     */
+    public static function violationMessages(): iterable
+    {
+        yield 'empty provider' => [['--provider' => '', '--model' => 'gpt-5.4'], 'The provider must not be empty.'];
+        yield 'invalid utf-8 provider' => [['--provider' => "caf\xE9", '--model' => 'gpt-5.4'], 'The provider must be valid UTF-8 text.'];
+        yield 'blank model' => [['--provider' => 'openai', '--model' => ' '], 'The model must not be empty.'];
+        yield 'invalid utf-8 model' => [['--provider' => 'openai', '--model' => "caf\xE9"], 'The model must be valid UTF-8 text.'];
+        yield 'invalid env var name' => [['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => 'MY KEY'], 'not a valid environment variable name'];
     }
 
     public function test_it_trims_surrounding_whitespace_from_the_model_and_env_var_options(): void
