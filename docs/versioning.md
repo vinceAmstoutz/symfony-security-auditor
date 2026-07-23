@@ -162,7 +162,7 @@ deprecated by the other.
   inputs/outputs may be added in a `MINOR`; renaming or removing one is a
   `MAJOR`. The Marketplace `name` (`Symfony Security Auditor`) is also stable.
 - **Version pinning.** Consumers pin the action to an exact release tag —
-  `uses: vinceamstoutz/symfony-security-auditor@1.16.0` — matching the tag
+  `uses: vinceamstoutz/symfony-security-auditor@1.17.0` — matching the tag
   format used on Packagist. Bump the pin when upgrading. There is intentionally
   no floating `v1` tag: the `uses:` ref and the config-schema URL both point at
   the same release tag, so a given pin always resolves to one immutable release.

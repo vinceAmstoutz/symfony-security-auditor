@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.17.0] — 2026-07-23 — Preflight
+
+A release about the standalone binary looking after itself. The binary now tells
+you when a newer release is available (throttled, interactive-only,
+stderr-only), a single `curl … | SSA_INIT=1 sh` installs _and_ configures it,
+`init` is fully scriptable (`--provider`/`--model`/`--env-var`/`--force`) with
+its inputs validated before anything is written, and the new `doctor` command
+preflights the whole environment — including actually booting the audit with the
+installed provider bridge — before a run. A pre-release bug hunt hardened the
+same surface: `v`-prefixed tags can no longer disable update detection, metadata
+lookups are tightly bounded, and non-UTF-8 input is rejected instead of
+crashing.
+
 ### Added
 
 - **The standalone binary now tells you when a newer release is available.**
@@ -2722,6 +2735,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.17.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.17.0
 [1.16.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.16.0
 [1.15.0]:
