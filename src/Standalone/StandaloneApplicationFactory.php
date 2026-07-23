@@ -34,7 +34,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Process
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ProcessComposerAvailabilityChecker;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\SelfUpdateCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
@@ -109,6 +112,7 @@ final readonly class StandaloneApplicationFactory
         $application = new Application(self::APPLICATION_NAME, (new ReportPackage())->version());
         $application->addCommand($this->initCommand());
         $application->addCommand($this->selfUpdateCommand());
+        $application->addCommand($this->doctorCommand());
         $application->addCommand($this->lazyAuditCommand());
 
         return $application;
@@ -148,6 +152,17 @@ final readonly class StandaloneApplicationFactory
                 new RunningBinaryLocator('/proc/self/exe', $this->runningBinaryPath, pathEnvironment: $this->pathEnvironment),
             ),
             (new ReportPackage())->version(),
+        );
+    }
+
+    private function doctorCommand(): DoctorCommand
+    {
+        return new DoctorCommand(
+            new EnvironmentDoctor(
+                $this->standaloneConfigLoader,
+                $this->xdgConfigPathResolver,
+                new ProcessComposerAvailabilityChecker(ProcessComposerAvailabilityChecker::defaultProcessBuilder()),
+            ),
         );
     }
 

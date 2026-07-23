@@ -27,6 +27,7 @@ bundle registration, bundle-level configuration, platform wiring via
   - [`audit:baseline`](#auditbaseline--maintaining-the-accepted-finding-baseline)
   - [`mcp:serve`](#mcpserve--model-context-protocol-server)
   - [`self-update`](#self-update--updating-the-standalone-binary)
+  - [`doctor`](#doctor--preflight-environment-check)
 
 > See also: [Architecture](architecture.md) · [Extending](extending.md) ·
 > [CI](ci.md) · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
@@ -755,3 +756,31 @@ so it must be on the host (as it already is for the install script).
 If the binary is not writable (e.g. installed in `/usr/local/bin` without write
 access), the command refuses to update and tells you to re-run with the
 necessary permissions (`sudo`) or reinstall with the install script.
+
+### `doctor` — preflight environment check
+
+Verifies that the [standalone binary](#standalone-configuration) is ready to run
+an audit before you start one. Like `self-update` and `init`, this command
+exists **only in the standalone binary** — the Composer bundle relies on your
+application's own container and Composer autoloader.
+
+```bash
+symfony-security-auditor doctor
+```
+
+It runs three checks and prints one line for each:
+
+| Check           | What it verifies                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Configuration   | `config.yaml` resolves, a `platform:` block is present, and any `%env(...)%` API-key variable it references is set |
+| Provider bridge | the `symfony/ai-*` bridge autoloader is installed under the data directory (`init` downloads it)                   |
+| Composer        | a runnable `composer` is reachable — needed only to run `init` or switch providers, not to audit                   |
+
+A missing `composer` is reported as a **warning** (auditing still works); a
+missing/invalid configuration or an uninstalled bridge is a **failure**. The
+command exits `0` when every check passes or only warns, and `1` when any check
+fails, so it drops into a CI preflight step:
+
+```bash
+symfony-security-auditor doctor && symfony-security-auditor audit path/to/app
+```

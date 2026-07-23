@@ -39,6 +39,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   standalone installer's `SSA_INIT` flow and the GitHub Action use to set up
   non-interactively. Documented in
   [`docs/configuration.md`](docs/configuration.md#standalone-configuration).
+- **New `doctor` command preflights the standalone environment before an
+  audit.** `symfony-security-auditor doctor` runs three checks and prints one
+  line each: **Configuration** (`config.yaml` resolves, a `platform:` block is
+  present, and any `%env(...)%` API-key variable it references is set),
+  **Provider bridge** (the `symfony/ai-*` bridge autoloader is installed under
+  the data directory), and **Composer** (a runnable `composer` is reachable). A
+  missing `composer` is a warning — auditing still works — while a
+  missing/invalid configuration or an uninstalled bridge is a failure. The
+  command exits `0` when every check passes or only warns and `1` when any check
+  fails, so it drops into a CI preflight step
+  (`symfony-security-auditor doctor && symfony-security-auditor audit`). The
+  command exists only in the standalone binary. Implemented by `DoctorCommand`
+  delegating to `EnvironmentDoctor` (`src/Command/`), wired into the standalone
+  application by `StandaloneApplicationFactory`.
 
 ### Changed
 
