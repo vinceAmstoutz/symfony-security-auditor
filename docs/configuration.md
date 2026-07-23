@@ -474,8 +474,10 @@ the matching prompt. Any option left out falls back to its interactive prompt
 and `<PROVIDER>_API_KEY` respectively). When a configuration already exists,
 `init` asks before overwriting it — and declines by default under
 `--no-interaction` — so scripted reconfiguration needs `--force` to replace the
-existing file without asking. This is what the `SSA_INIT` installer flag and the
-GitHub Action rely on to configure non-interactively:
+existing file without asking. The `SSA_INIT` installer flag's no-terminal
+fallback and the GitHub Action run plain `init --no-interaction`, which keeps
+those Anthropic defaults — pass the options yourself to script any other
+provider:
 
 ```bash
 symfony-security-auditor init --provider=openai --model=gpt-5.4 --no-interaction
