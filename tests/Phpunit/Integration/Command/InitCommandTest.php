@@ -14,15 +14,18 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\FailingBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingBridgeInstaller;
 
 final class InitCommandTest extends TestCase
@@ -255,6 +258,86 @@ final class InitCommandTest extends TestCase
         $commandTester->setInputs(['openai', 'gpt-5.4', 'OPENAI_API_KEY']);
 
         self::assertSame(Command::SUCCESS, $commandTester->execute([]));
+    }
+
+    /**
+     * @param array<string, string> $options
+     */
+    #[DataProvider('blankOrInvalidInputs')]
+    public function test_it_rejects_a_blank_or_invalid_input_without_writing_configuration(array $options): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute($options, ['interactive' => false]);
+
+        self::assertSame(Command::INVALID, $exitCode);
+        self::assertFileDoesNotExist($this->configFile());
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>}>
+     */
+    public static function blankOrInvalidInputs(): iterable
+    {
+        yield 'empty provider' => [['--provider' => '', '--model' => 'gpt-5.4']];
+        yield 'whitespace provider' => [['--provider' => '   ', '--model' => 'gpt-5.4']];
+        yield 'blank model' => [['--provider' => 'openai', '--model' => '   ']];
+        yield 'env var with a space' => [['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => 'MY KEY']];
+        yield 'env var starting with a digit' => [['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => '1KEY']];
+        yield 'env var with a parenthesis' => [['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => 'KEY)']];
+        yield 'empty env var' => [['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => '']];
+    }
+
+    public function test_it_does_not_install_a_bridge_for_a_blank_provider(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => '', '--model' => 'gpt-5.4'], ['interactive' => false]);
+
+        self::assertSame([], $this->recordingBridgeInstaller->installations);
+    }
+
+    public function test_it_explains_why_an_invalid_env_var_name_was_rejected(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => 'MY KEY'], ['interactive' => false]);
+
+        self::assertStringContainsString('not a valid environment variable name', $commandTester->getDisplay());
+    }
+
+    public function test_it_trims_surrounding_whitespace_from_the_model_and_env_var_options(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'openai', '--model' => ' gpt-5.4 ', '--env-var' => ' MY_KEY '],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(MY_KEY)%']], 'model' => 'gpt-5.4'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_leaves_the_configuration_unwritten_when_the_bridge_install_fails(): void
+    {
+        $initCommand = new InitCommand(
+            new XdgConfigPathResolver($this->configHome, null, null, $this->dataHome),
+            new StandaloneConfigFactory(),
+            new YamlStandaloneConfigWriter(),
+            new FailingBridgeInstaller(),
+        );
+        $commandTester = new CommandTester($initCommand);
+
+        try {
+            $this->expectException(BridgeInstallationFailedException::class);
+
+            $commandTester->execute(['--provider' => 'openai', '--model' => 'gpt-5.4'], ['interactive' => false]);
+        } finally {
+            self::assertFileDoesNotExist($this->configFile());
+        }
     }
 
     public function test_it_confirms_where_the_configuration_was_written(): void

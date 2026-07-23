@@ -46,7 +46,7 @@ final class ProcessComposerAvailabilityCheckerTest extends TestCase
         $process = (ProcessComposerAvailabilityChecker::defaultProcessBuilder())();
 
         $commandLine = $process->getCommandLine();
-        self::assertStringContainsString("'composer'", $commandLine);
+        self::assertStringContainsString('composer', $commandLine);
         self::assertStringContainsString("'--version'", $commandLine);
         self::assertSame(30.0, $process->getTimeout());
     }

@@ -50,11 +50,36 @@ final class ProcessReleaseClientTest extends TestCase
     /**
      * @throws SelfUpdateFailedException
      */
-    public function test_get_passes_the_requested_url_to_the_process(): void
+    public function test_get_bounds_the_transfer_tightly_and_passes_the_url(): void
     {
-        $processReleaseClient = new ProcessReleaseClient(static fn (array $arguments): Process => Process::fromShellCommandline(\sprintf('printf %%s %s', escapeshellarg(implode(' ', $arguments)))));
+        $captured = [];
+        $processReleaseClient = new ProcessReleaseClient(static function (array $arguments) use (&$captured): Process {
+            $captured = $arguments;
 
-        self::assertSame('https://example.test/resource', $processReleaseClient->get('https://example.test/resource'));
+            return Process::fromShellCommandline('printf %s BODY');
+        });
+
+        $processReleaseClient->get('https://example.test/resource');
+
+        self::assertSame(['--max-time', '20', 'https://example.test/resource'], $captured);
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     */
+    public function test_download_keeps_a_generous_transfer_bound_and_targets_the_destination(): void
+    {
+        $captured = [];
+        $destination = $this->workingDirectory.'/asset';
+        $processReleaseClient = new ProcessReleaseClient(static function (array $arguments) use (&$captured): Process {
+            $captured = $arguments;
+
+            return Process::fromShellCommandline('true');
+        });
+
+        $processReleaseClient->download('https://example.test/asset', $destination);
+
+        self::assertSame(['--max-time', '600', '--output', $destination, 'https://example.test/asset'], $captured);
     }
 
     /**
@@ -75,7 +100,7 @@ final class ProcessReleaseClientTest extends TestCase
     public function test_download_writes_the_response_to_the_destination(): void
     {
         $destination = $this->workingDirectory.'/asset';
-        $processReleaseClient = new ProcessReleaseClient(static fn (array $arguments): Process => Process::fromShellCommandline(\sprintf('printf CONTENT > %s', escapeshellarg($arguments[1]))));
+        $processReleaseClient = new ProcessReleaseClient(static fn (array $arguments): Process => Process::fromShellCommandline(\sprintf('printf CONTENT > %s', escapeshellarg($arguments[3]))));
 
         $processReleaseClient->download('https://example.test/asset', $destination);
 
@@ -109,12 +134,12 @@ final class ProcessReleaseClientTest extends TestCase
 
     public function test_default_process_builder_uses_authenticated_curl(): void
     {
-        $process = (ProcessReleaseClient::defaultProcessBuilder())(['--output', '/tmp/asset', 'https://example.test/asset']);
+        $process = (ProcessReleaseClient::defaultProcessBuilder())(['--max-time', '600', '--output', '/tmp/asset', 'https://example.test/asset']);
 
         $commandLine = $process->getCommandLine();
         self::assertStringContainsString("'curl'", $commandLine);
         self::assertStringContainsString("'-fsSL'", $commandLine);
-        self::assertStringContainsString("'--connect-timeout' '30'", $commandLine);
+        self::assertStringContainsString("'--connect-timeout' '10'", $commandLine);
         self::assertStringContainsString("'--max-time' '600'", $commandLine);
         self::assertStringContainsString("'User-Agent: symfony-security-auditor-self-update'", $commandLine);
         self::assertStringContainsString("'https://example.test/asset'", $commandLine);

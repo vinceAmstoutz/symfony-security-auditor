@@ -20,7 +20,17 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\UnsupportedSelfUpdatePlatformException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+use function Symfony\Component\String\u;
+
+/**
+ * The GitHub release tag is compared and reported with any leading `v`/`V`
+ * stripped — `version_compare()` ranks a raw `v1.2.3` *below* every plain
+ * `1.2.3`, which would silently disable update detection if a release were
+ * ever tagged with the prefix — while asset URLs keep the tag verbatim, since
+ * that is the path the release publishes under.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
+ */
 final readonly class SelfUpdater implements SelfUpdaterInterface
 {
     private const string LATEST_RELEASE_API_URL = 'https://api.github.com/repos/vinceAmstoutz/symfony-security-auditor/releases/latest';
@@ -41,7 +51,8 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
     {
         $this->gitHubBinaryAssetResolver->assertSupportedPlatform();
 
-        $latestVersion = $this->latestVersion();
+        $latestTag = $this->latestTag();
+        $latestVersion = u($latestTag)->trimPrefix(['v', 'V'])->toString();
 
         if (!version_compare($latestVersion, $currentVersion, '>')) {
             return new SelfUpdateResult(SelfUpdateStatus::AlreadyUpToDate, $currentVersion, $latestVersion);
@@ -51,7 +62,7 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
             return new SelfUpdateResult(SelfUpdateStatus::UpdateAvailable, $currentVersion, $latestVersion);
         }
 
-        $this->replaceBinary($this->gitHubBinaryAssetResolver->resolve($latestVersion));
+        $this->replaceBinary($this->gitHubBinaryAssetResolver->resolve($latestTag));
 
         return new SelfUpdateResult(SelfUpdateStatus::Updated, $currentVersion, $latestVersion);
     }
@@ -59,7 +70,7 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
     /**
      * @throws SelfUpdateFailedException
      */
-    private function latestVersion(): string
+    private function latestTag(): string
     {
         $payload = $this->releaseClient->get(self::LATEST_RELEASE_API_URL);
 

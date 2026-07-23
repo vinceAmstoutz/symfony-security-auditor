@@ -81,6 +81,29 @@ final class SelfUpdaterTest extends TestCase
      * @throws SelfUpdateFailedException
      * @throws UnsupportedSelfUpdatePlatformException
      */
+    #[DataProvider('vPrefixedTags')]
+    public function test_it_updates_from_a_v_prefixed_release_tag(string $tagName): void
+    {
+        $payload = 'NEW-BINARY';
+        $selfUpdateResult = $this->selfUpdater($this->clientFor($tagName, $payload, hash('sha256', $payload)))->run('1.0.0', false);
+
+        self::assertSame('9.9.9', $selfUpdateResult->latestVersion);
+        self::assertStringEqualsFile($this->binaryPath, $payload);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function vPrefixedTags(): iterable
+    {
+        yield 'lowercase v' => ['v9.9.9'];
+        yield 'uppercase V' => ['V9.9.9'];
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
     public function test_it_reports_already_up_to_date_without_touching_the_binary(): void
     {
         $selfUpdateResult = $this->selfUpdater($this->clientFor('1.0.0', 'IGNORED', hash('sha256', 'IGNORED')))->run('1.0.0', false);

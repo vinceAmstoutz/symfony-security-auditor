@@ -223,6 +223,12 @@ final readonly class StandaloneApplicationFactory
                 $this->standaloneConfigLoader,
                 $this->xdgConfigPathResolver,
                 new ProcessComposerAvailabilityChecker(ProcessComposerAvailabilityChecker::defaultProcessBuilder()),
+                new StandaloneAuditPreflight(
+                    $this->standaloneConfigLoader,
+                    $this->xdgConfigPathResolver,
+                    $this->standaloneContainerFactory,
+                    $this->standaloneConsoleCommandFactory,
+                ),
             ),
         );
     }

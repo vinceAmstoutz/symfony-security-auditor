@@ -471,13 +471,17 @@ model: claude-opus-4-8
 `init` is also scriptable: pass `--provider`, `--model`, and `--env-var` to skip
 the matching prompt. Any option left out falls back to its interactive prompt
 (or, under `--no-interaction`, to its default — `anthropic`, `claude-opus-4-8`,
-and `<PROVIDER>_API_KEY` respectively). When a configuration already exists,
-`init` asks before overwriting it — and declines by default under
-`--no-interaction` — so scripted reconfiguration needs `--force` to replace the
-existing file without asking. The `SSA_INIT` installer flag's no-terminal
-fallback and the GitHub Action run plain `init --no-interaction`, which keeps
-those Anthropic defaults — pass the options yourself to script any other
-provider:
+and `<PROVIDER>_API_KEY` respectively). A blank provider or model, or an
+`--env-var` that is not a valid environment variable name, is rejected with exit
+code `2` before anything is written. The provider bridge is downloaded
+**before** the configuration file is replaced, so a failed download (offline,
+`composer` missing) leaves the previous, working configuration untouched. When a
+configuration already exists, `init` asks before overwriting it — and declines
+by default under `--no-interaction` — so scripted reconfiguration needs
+`--force` to replace the existing file without asking. The `SSA_INIT` installer
+flag's no-terminal fallback and the GitHub Action run plain
+`init --no-interaction`, which keeps those Anthropic defaults — pass the options
+yourself to script any other provider:
 
 ```bash
 symfony-security-auditor init --provider=openai --model=gpt-5.4 --no-interaction
@@ -776,11 +780,11 @@ symfony-security-auditor doctor
 
 It runs three checks and prints one line for each:
 
-| Check           | What it verifies                                                                                                   |
-| --------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Configuration   | `config.yaml` resolves, a `platform:` block is present, and any `%env(...)%` API-key variable it references is set |
-| Provider bridge | the `symfony/ai-*` bridge autoloader is installed under the data directory (`init` downloads it)                   |
-| Composer        | a runnable `composer` is reachable — needed only to run `init` or switch providers, not to audit                   |
+| Check           | What it verifies                                                                                                                                                                                               |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Configuration   | `config.yaml` resolves, a `platform:` block is present, and any `%env(...)%` API-key variable it references is set                                                                                             |
+| Provider bridge | the `symfony/ai-*` bridge autoloader is installed under the data directory (`init` downloads it) **and the audit actually boots with it** — a leftover bridge from a previously configured provider fails here |
+| Composer        | a runnable `composer` is reachable — needed only to run `init` or switch providers, not to audit                                                                                                               |
 
 A missing `composer` is reported as a **warning** (auditing still works); a
 missing/invalid configuration or an uninstalled bridge is a **failure**. The
