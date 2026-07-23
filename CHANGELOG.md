@@ -95,6 +95,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **`init` no longer writes an unbootable configuration when the provider is
+  spelled as a bridge package slug (`open-ai`, `deep-seek`, …).** `init` never
+  validated the provider value: for the seven hyphenated package slugs
+  (`open-ai`, `open-responses`, `deep-seek`, `vertex-ai`, `hugging-face`,
+  `eleven-labs`, `amazee-ai`) the bridge install genuinely succeeded — they are
+  real package names — and `config.yaml` was written with a platform key
+  `symfony/ai` does not recognize, so `init` exited 0 with a success message
+  while every later `audit` aborted at container build. A new
+  `ProviderKeyNormalizer` (`src/Audit/Infrastructure/Bridge/`) now trims,
+  lowercases, and folds package slugs back to their platform config keys
+  (`open-ai` → `openai`) before the configuration is written and the bridge
+  installed.
 - **`self-update` now fails fast on platforms without a published self-update
   path (native Windows), and the update notice stays silent there.** The
   platform check in `GitHubBinaryAssetResolver` only ran on the real-update

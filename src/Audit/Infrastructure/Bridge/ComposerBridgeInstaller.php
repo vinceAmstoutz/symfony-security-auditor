@@ -39,7 +39,7 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
      *
      * @var array<string, string>
      */
-    private const array PACKAGE_SLUG_OVERRIDES = [
+    public const array PACKAGE_SLUG_OVERRIDES = [
         'openai' => 'open-ai',
         'openresponses' => 'open-responses',
         'deepseek' => 'deep-seek',

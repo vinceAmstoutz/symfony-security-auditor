@@ -20,6 +20,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKeyNormalizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactoryInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigWriterInterface;
@@ -41,6 +42,7 @@ final readonly class InitCommand
         private StandaloneConfigWriterInterface $standaloneConfigWriter,
         private BridgeInstallerInterface $bridgeInstaller,
         private Filesystem $filesystem = new Filesystem(),
+        private ProviderKeyNormalizer $providerKeyNormalizer = new ProviderKeyNormalizer(),
     ) {}
 
     /**
@@ -67,6 +69,7 @@ final readonly class InitCommand
         }
 
         $provider ??= $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama)', 'anthropic');
+        $provider = $this->providerKeyNormalizer->normalize($provider);
         $model ??= $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8');
         $envVar ??= $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($provider));
 
