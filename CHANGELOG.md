@@ -49,9 +49,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (or, non-interactively, to its default: `anthropic`, `claude-opus-4-8`, and a
   `<PROVIDER>_API_KEY` variable derived from the resolved provider). This lets a
   single command configure any provider — e.g.
-  `init --provider=openai --model=gpt-5.4 --no-interaction` — which the
-  standalone installer's `SSA_INIT` flow and the GitHub Action use to set up
-  non-interactively. Documented in
+  `init --provider=openai --model=gpt-5.4 --no-interaction`. The standalone
+  installer's `SSA_INIT` no-terminal fallback and the GitHub Action run plain
+  `init --no-interaction` (the Anthropic defaults); pass the options yourself to
+  script a different provider. Documented in
   [`docs/configuration.md`](docs/configuration.md#standalone-configuration).
 - **`init --force` overwrites an existing configuration without asking.**
   Non-interactive reconfiguration was previously impossible: with a
