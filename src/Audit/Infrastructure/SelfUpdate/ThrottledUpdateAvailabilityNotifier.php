@@ -74,7 +74,7 @@ final readonly class ThrottledUpdateAvailabilityNotifier implements UpdateAvaila
         try {
             $latestVersion = $this->selfUpdater->run($currentVersion, true)->latestVersion;
         } catch (SelfUpdateFailedException|UnsupportedSelfUpdatePlatformException) {
-            $latestVersion = $updateCheckState?->latestVersion ?? $currentVersion;
+            $latestVersion = $updateCheckState->latestVersion ?? $currentVersion;
         }
 
         $this->updateCheckStore->write(new UpdateCheckState($this->clock->now(), $latestVersion));
