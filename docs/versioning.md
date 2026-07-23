@@ -133,6 +133,9 @@ following surface is BC-protected:
 - The `doctor` command name and its exit-code contract (`0` when every check
   passes or only warns, `1` when any check fails — see
   [CLI Reference → `doctor`](configuration.md#doctor--preflight-environment-check)).
+- The `SSA_NO_UPDATE_CHECK` environment variable, which disables the interactive
+  "update available" notice (see
+  [CLI Reference → Update notifications](configuration.md#update-notifications)).
 - The configuration path contract. On Linux/macOS the XDG Base Directory spec:
   the config file `$XDG_CONFIG_HOME/symfony-security-auditor/config.yaml`
   (falling back to `~/.config/…`), the cache directory

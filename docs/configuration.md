@@ -28,6 +28,7 @@ bundle registration, bundle-level configuration, platform wiring via
   - [`mcp:serve`](#mcpserve--model-context-protocol-server)
   - [`self-update`](#self-update--updating-the-standalone-binary)
   - [`doctor`](#doctor--preflight-environment-check)
+  - [Update notifications](#update-notifications)
 
 > See also: [Architecture](architecture.md) · [Extending](extending.md) ·
 > [CI](ci.md) · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
@@ -784,3 +785,25 @@ fails, so it drops into a CI preflight step:
 ```bash
 symfony-security-auditor doctor && symfony-security-auditor audit path/to/app
 ```
+
+### Update notifications
+
+When you run the [standalone binary](#standalone-configuration) interactively,
+it prints a one-line notice to **stderr** once a command finishes if a newer
+release is available:
+
+```text
+A new version (1.17.0) is available. Run "symfony-security-auditor self-update" to upgrade.
+```
+
+The check is designed to stay out of the way:
+
+- It runs **only on an interactive terminal**, so piped or CI runs — and
+  machine-readable stdout such as `--format=json` — are never touched.
+- The GitHub release lookup is **throttled to once per 24 hours** (the answer is
+  cached under the XDG cache directory), and any failure (offline, rate-limited)
+  is silent — it never changes a command's exit code.
+- It exists **only in the standalone binary**; the Composer bundle updates
+  through `composer update`.
+
+Set `SSA_NO_UPDATE_CHECK=1` to turn the check off entirely.

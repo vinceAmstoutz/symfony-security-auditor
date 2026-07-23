@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **The standalone binary now tells you when a newer release is available.**
+  After a command finishes on an interactive terminal, the binary prints a
+  one-line notice to stderr pointing at `self-update` when the installed version
+  is behind the latest GitHub release. The GitHub lookup is throttled to once
+  per 24 hours (cached under the XDG cache directory) and is fully best-effort:
+  it runs only on an interactive run (so piped/CI output and `--format=json`
+  stay clean), and any failure (offline, rate-limited) is swallowed and never
+  changes a command's exit code. Set `SSA_NO_UPDATE_CHECK=1` to disable it. The
+  notice exists only in the standalone binary (the Composer bundle updates
+  through `composer update`). Implemented by
+  `ThrottledUpdateAvailabilityNotifier` + `FilesystemUpdateCheckStore`
+  (`src/Audit/Infrastructure/SelfUpdate/`) and wired into the standalone
+  application through a console `TERMINATE` listener
+  (`UpdateAvailabilityConsoleListener`).
 - **One command installs _and_ configures the standalone binary via
   `SSA_INIT`.** `install.sh` now honors an `SSA_INIT` environment variable: with
   `SSA_INIT=1`, after the binary is downloaded and its SHA-256 checksum

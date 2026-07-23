@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Standalone;
 
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -107,6 +108,36 @@ final class StandaloneApplicationFactoryTest extends TestCase
         ])->create();
 
         self::assertTrue($application->has('doctor'));
+    }
+
+    public function test_it_builds_the_application_when_update_checks_are_disabled(): void
+    {
+        $application = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+            'SSA_NO_UPDATE_CHECK' => '1',
+        ])->create();
+
+        self::assertTrue($application->has('audit:run'));
+    }
+
+    /**
+     * @param array<string, string> $environment
+     */
+    #[DataProvider('updateCheckOptOutCases')]
+    public function test_it_reports_whether_update_checks_are_disabled(array $environment, bool $expected): void
+    {
+        self::assertSame($expected, StandaloneApplicationFactory::updateChecksDisabled($environment));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, bool}>
+     */
+    public static function updateCheckOptOutCases(): iterable
+    {
+        yield 'opt-out variable set' => [['SSA_NO_UPDATE_CHECK' => '1'], true];
+        yield 'opt-out variable absent' => [[], false];
+        yield 'opt-out variable empty' => [['SSA_NO_UPDATE_CHECK' => ''], false];
     }
 
     public function test_it_registers_the_audit_command_as_visible(): void
