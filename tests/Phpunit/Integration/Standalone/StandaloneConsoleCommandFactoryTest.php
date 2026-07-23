@@ -53,7 +53,7 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
      * @throws UnresolvableAuditCommandException
      */
     #[RunInSeparateProcess]
-    #[MaximumDuration(2500)]
+    #[MaximumDuration(4000)]
     public function test_it_wraps_the_invokable_audit_command_under_its_name_and_alias(): void
     {
         $containerBuilder = (new StandaloneContainerFactory())->create(

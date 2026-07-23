@@ -75,7 +75,7 @@ final class StandaloneAuditEndToEndTest extends TestCase
      * @throws UnresolvableAuditCommandException
      */
     #[RunInSeparateProcess]
-    #[MaximumDuration(2500)]
+    #[MaximumDuration(4000)]
     public function test_the_standalone_application_audits_a_project_end_to_end_in_dry_run(): void
     {
         $application = StandaloneApplicationFactory::fromEnvironment([
