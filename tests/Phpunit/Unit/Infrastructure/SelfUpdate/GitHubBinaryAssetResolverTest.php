@@ -67,4 +67,15 @@ final class GitHubBinaryAssetResolverTest extends TestCase
         yield 'unsupported bsd operating system' => ['BSD', 'x86_64'];
         yield 'unsupported architecture' => ['Linux', 'riscv64'];
     }
+
+    /**
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
+    #[DataProvider('unsupportedPlatformCases')]
+    public function test_it_reports_an_unsupported_platform_without_an_asset_lookup(string $osFamily, string $machine): void
+    {
+        $this->expectException(UnsupportedSelfUpdatePlatformException::class);
+
+        (new GitHubBinaryAssetResolver($osFamily, $machine))->assertSupportedPlatform();
+    }
 }

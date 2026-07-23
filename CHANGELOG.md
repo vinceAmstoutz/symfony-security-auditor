@@ -84,6 +84,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **`self-update` now fails fast on platforms without a published self-update
+  path (native Windows), and the update notice stays silent there.** The
+  platform check in `GitHubBinaryAssetResolver` only ran on the real-update
+  path, so on Windows `self-update` performed the GitHub lookup first and then
+  either threw `UnsupportedSelfUpdatePlatformException` or — when already on the
+  latest release — misleadingly reported "Already up to date", while the new
+  update notice pointed Windows users at a command that can never succeed there.
+  `SelfUpdater::run()` now asserts platform support before any network call:
+  `self-update` fails immediately with the download-from-releases-page guidance,
+  and the throttled notice check treats the platform as check-failed, so no
+  notice is printed on Windows.
 - **`install.sh` no longer fails silently when the `wget` fallback hits an HTTP
   error.** The `wget` download path in `download()` used `-q`, which suppresses
   wget's error output, so a failed request (e.g. a 404 for a missing release

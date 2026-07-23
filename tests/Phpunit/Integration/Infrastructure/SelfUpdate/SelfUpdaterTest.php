@@ -162,6 +162,26 @@ final class SelfUpdaterTest extends TestCase
      * @throws SelfUpdateFailedException
      * @throws UnsupportedSelfUpdatePlatformException
      */
+    public function test_it_refuses_an_unsupported_platform_without_contacting_github(): void
+    {
+        $fakeReleaseClient = new FakeReleaseClient([]);
+        $locator = self::createStub(RunningBinaryLocatorInterface::class);
+        $locator->method('path')->willReturn($this->binaryPath);
+        $selfUpdater = new SelfUpdater($fakeReleaseClient, new GitHubBinaryAssetResolver('Windows', 'x86_64'), $locator);
+
+        try {
+            $this->expectException(UnsupportedSelfUpdatePlatformException::class);
+
+            $selfUpdater->run('1.0.0', true);
+        } finally {
+            self::assertSame(0, $fakeReleaseClient->requests);
+        }
+    }
+
+    /**
+     * @throws SelfUpdateFailedException
+     * @throws UnsupportedSelfUpdatePlatformException
+     */
     #[DataProvider('unresolvableLatestVersionPayloads')]
     public function test_it_rejects_an_unresolvable_latest_version(string $apiBody): void
     {
