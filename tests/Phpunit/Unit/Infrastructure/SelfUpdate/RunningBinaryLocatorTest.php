@@ -60,7 +60,7 @@ final class RunningBinaryLocatorTest extends TestCase
         $procSelfExe = $this->workingDirectory.'/proc-self-exe';
         symlink($kernelTarget, $procSelfExe);
         $invokedScript = $this->workingDirectory.'/invoked-binary';
-        (new Filesystem())->touch($invokedScript);
+        $this->createExecutableBinary($invokedScript);
 
         self::assertSame($kernelTarget, (new RunningBinaryLocator($procSelfExe, $invokedScript, 'micro'))->path());
     }
