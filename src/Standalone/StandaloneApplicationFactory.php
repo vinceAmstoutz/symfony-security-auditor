@@ -13,10 +13,15 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 
+use Psr\Log\NullLogger;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Command\LazyCommand;
+use Symfony\Component\Console\ConsoleEvents;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
@@ -29,10 +34,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneP
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\FilesystemUpdateCheckStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\GitHubBinaryAssetResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ProcessReleaseClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\RunningBinaryLocator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpdater;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ThrottledUpdateAvailabilityNotifier;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
@@ -53,6 +60,8 @@ final readonly class StandaloneApplicationFactory
 
     private const string PROJECT_CONFIG_FILENAME = '.symfony-security-auditor.yaml';
 
+    private const string UPDATE_CHECK_OPT_OUT_VARIABLE = 'SSA_NO_UPDATE_CHECK';
+
     public function __construct(
         private StandaloneConfigLoader $standaloneConfigLoader,
         private XdgConfigPathResolver $xdgConfigPathResolver,
@@ -61,6 +70,7 @@ final readonly class StandaloneApplicationFactory
         private StandaloneConsoleCommandFactory $standaloneConsoleCommandFactory = new StandaloneConsoleCommandFactory(),
         private string $runningBinaryPath = '',
         private string $pathEnvironment = '',
+        private ?UpdateAvailabilityConsoleListener $updateAvailabilityConsoleListener = null,
     ) {}
 
     /**
@@ -69,6 +79,8 @@ final readonly class StandaloneApplicationFactory
     public static function fromEnvironment(array $environment, ?string $runningBinaryPath = null): self
     {
         $xdgConfigPathResolver = self::resolverFromEnvironment($environment);
+        $resolvedBinaryPath = $runningBinaryPath ?? '';
+        $pathEnvironment = $environment['PATH'] ?? '';
 
         return new self(
             new StandaloneConfigLoader(
@@ -78,9 +90,23 @@ final readonly class StandaloneApplicationFactory
             ),
             $xdgConfigPathResolver,
             new ComposerBridgeInstaller(ComposerBridgeInstaller::defaultProcessBuilder()),
-            runningBinaryPath: $runningBinaryPath ?? '',
-            pathEnvironment: $environment['PATH'] ?? '',
+            runningBinaryPath: $resolvedBinaryPath,
+            pathEnvironment: $pathEnvironment,
+            updateAvailabilityConsoleListener: self::updateAvailabilityConsoleListener(
+                $xdgConfigPathResolver,
+                $resolvedBinaryPath,
+                $pathEnvironment,
+                self::updateChecksDisabled($environment),
+            ),
         );
+    }
+
+    /**
+     * @param array<string, string> $environment
+     */
+    public static function updateChecksDisabled(array $environment): bool
+    {
+        return '' !== ($environment[self::UPDATE_CHECK_OPT_OUT_VARIABLE] ?? '');
     }
 
     /**
@@ -114,6 +140,7 @@ final readonly class StandaloneApplicationFactory
         $application->addCommand($this->selfUpdateCommand());
         $application->addCommand($this->doctorCommand());
         $application->addCommand($this->lazyAuditCommand());
+        $this->registerUpdateAvailabilityNotice($application);
 
         return $application;
     }
@@ -146,13 +173,47 @@ final readonly class StandaloneApplicationFactory
     private function selfUpdateCommand(): SelfUpdateCommand
     {
         return new SelfUpdateCommand(
-            new SelfUpdater(
-                new ProcessReleaseClient(ProcessReleaseClient::defaultProcessBuilder()),
-                new GitHubBinaryAssetResolver(\PHP_OS_FAMILY, php_uname('m')),
-                new RunningBinaryLocator('/proc/self/exe', $this->runningBinaryPath, pathEnvironment: $this->pathEnvironment),
-            ),
+            self::selfUpdater($this->runningBinaryPath, $this->pathEnvironment),
             (new ReportPackage())->version(),
         );
+    }
+
+    private static function selfUpdater(string $runningBinaryPath, string $pathEnvironment): SelfUpdater
+    {
+        return new SelfUpdater(
+            new ProcessReleaseClient(ProcessReleaseClient::defaultProcessBuilder()),
+            new GitHubBinaryAssetResolver(\PHP_OS_FAMILY, php_uname('m')),
+            new RunningBinaryLocator('/proc/self/exe', $runningBinaryPath, pathEnvironment: $pathEnvironment),
+        );
+    }
+
+    private static function updateAvailabilityConsoleListener(
+        XdgConfigPathResolver $xdgConfigPathResolver,
+        string $runningBinaryPath,
+        string $pathEnvironment,
+        bool $disabled,
+    ): UpdateAvailabilityConsoleListener {
+        return new UpdateAvailabilityConsoleListener(
+            new ThrottledUpdateAvailabilityNotifier(
+                self::selfUpdater($runningBinaryPath, $pathEnvironment),
+                new FilesystemUpdateCheckStore($xdgConfigPathResolver, new Filesystem(), new NullLogger()),
+                new NativeClock(),
+            ),
+            (new ReportPackage())->version(),
+            $disabled,
+        );
+    }
+
+    private function registerUpdateAvailabilityNotice(Application $application): void
+    {
+        if (!$this->updateAvailabilityConsoleListener instanceof UpdateAvailabilityConsoleListener) {
+            return;
+        }
+
+        $eventDispatcher = new EventDispatcher();
+        $eventDispatcher->addListener(ConsoleEvents::TERMINATE, $this->updateAvailabilityConsoleListener);
+
+        $application->setDispatcher($eventDispatcher);
     }
 
     private function doctorCommand(): DoctorCommand
