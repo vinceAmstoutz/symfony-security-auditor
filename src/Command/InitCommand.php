@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
@@ -46,8 +47,15 @@ final readonly class InitCommand
      * @throws UnresolvableConfigPathException
      * @throws BridgeInstallationFailedException
      */
-    public function __invoke(SymfonyStyle $symfonyStyle): int
-    {
+    public function __invoke(
+        SymfonyStyle $symfonyStyle,
+        #[Option(description: 'AI provider to configure (any symfony/ai platform — e.g. anthropic, openai, gemini); skips the prompt when set')]
+        ?string $provider = null,
+        #[Option(description: 'Model the auditor should use; skips the prompt when set')]
+        ?string $model = null,
+        #[Option(description: 'Environment variable holding the API key; defaults to <PROVIDER>_API_KEY')]
+        ?string $envVar = null,
+    ): int {
         $configFile = $this->xdgConfigPathResolver->configFile();
 
         if ($this->isOverwriteDeclined($symfonyStyle, $configFile)) {
@@ -56,14 +64,14 @@ final readonly class InitCommand
             return Command::SUCCESS;
         }
 
-        $provider = $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama)', 'anthropic');
-        $model = $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8');
-        $environmentVariable = $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($provider));
+        $provider ??= $this->ask($symfonyStyle, 'Which AI provider do you want to use? (any symfony/ai platform — e.g. anthropic, openai, gemini, mistral, ollama)', 'anthropic');
+        $model ??= $this->ask($symfonyStyle, 'Which model should the auditor use?', 'claude-opus-4-8');
+        $envVar ??= $this->ask($symfonyStyle, 'Which environment variable holds the API key?', $this->defaultApiKeyVariable($provider));
 
-        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $environmentVariable));
+        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar));
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir());
 
-        $symfonyStyle->success(\sprintf('Configuration written to %s. Export %s, then run "audit <path>".', $configFile, $environmentVariable));
+        $symfonyStyle->success(\sprintf('Configuration written to %s. Export %s, then run "audit <path>".', $configFile, $envVar));
 
         return Command::SUCCESS;
     }

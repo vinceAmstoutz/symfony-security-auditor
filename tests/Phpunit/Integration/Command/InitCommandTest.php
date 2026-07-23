@@ -97,6 +97,48 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_it_uses_the_provider_model_and_env_var_options_without_prompting(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => 'MY_CUSTOM_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(MY_CUSTOM_KEY)%']], 'model' => 'gpt-5.4'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_derives_the_api_key_variable_from_the_provider_option_when_env_var_is_omitted(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'openai', '--model' => 'gpt-5.4'],
+            ['interactive' => false],
+        );
+
+        self::assertSame(
+            ['provider' => 'openai', 'platform' => ['openai' => ['api_key' => '%env(OPENAI_API_KEY)%']], 'model' => 'gpt-5.4'],
+            Yaml::parseFile($this->configFile()),
+        );
+    }
+
+    public function test_it_installs_the_bridge_for_the_provider_option(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(
+            ['--provider' => 'openai', '--model' => 'gpt-5.4', '--env-var' => 'MY_CUSTOM_KEY'],
+            ['interactive' => false],
+        );
+
+        self::assertSame([['openai', $this->dataHome.'/symfony-security-auditor']], $this->recordingBridgeInstaller->installations);
+    }
+
     public function test_it_leaves_an_existing_configuration_untouched_when_the_overwrite_is_declined(): void
     {
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
