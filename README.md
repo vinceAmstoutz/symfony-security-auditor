@@ -4,8 +4,6 @@
 [![codecov](https://codecov.io/gh/vinceamstoutz/symfony-security-auditor/branch/main/graph/badge.svg)](https://codecov.io/gh/vinceamstoutz/symfony-security-auditor)
 [![Mutation testing badge](https://img.shields.io/endpoint?style=flat&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2FvinceAmstoutz%2Fsymfony-security-auditor%2Fmain)](https://dashboard.stryker-mutator.io/reports/github.com/vinceAmstoutz/symfony-security-auditor/main)
 [![Total Downloads](https://poser.pugx.org/vinceamstoutz/symfony-security-auditor/downloads)](https://packagist.org/packages/vinceamstoutz/symfony-security-auditor)
-[![PHP 8.3+](https://img.shields.io/badge/PHP-8.3%2B-blue)](composer.json)
-[![Symfony 7.4+](https://img.shields.io/badge/Symfony-7.4%2B-black)](composer.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 AI-powered, multi-agent security auditor for Symfony applications. An
@@ -181,6 +179,10 @@ checksum before replacing the binary**, and swaps it in place — see the
 ## Use it as a Symfony bundle
 
 ### 1. Install — Symfony Flex wires everything
+
+Installing the bundle requires **PHP 8.3+ and Symfony 7.4+** in the host
+application (see [`composer.json`](composer.json)) — the standalone binary has
+no such requirement, since it bundles its own runtime.
 
 ```bash
 composer require --dev vinceamstoutz/symfony-security-auditor
