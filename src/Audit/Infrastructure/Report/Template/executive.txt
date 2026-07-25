@@ -1,0 +1,20 @@
+
+══════════════════════════════════════════════════════════════════════
+  EXECUTIVE SUMMARY — SECURITY AUDIT
+  {{projectPath}}
+══════════════════════════════════════════════════════════════════════
+
+  Audited : {{startedAt}} ({{filesScanned}} files, {{duration}})
+  Audit ID: {{auditId}}
+
+──────────────────────────────────────────────────────────────────────
+  RISK LEVEL: {{riskLevel}}  (Score: {{riskScore}})
+──────────────────────────────────────────────────────────────────────
+
+  {{businessImpact}}
+
+{{body}}
+──────────────────────────────────────────────────────────────────────
+  Findings are validated by a reviewer agent but not human-triaged.
+  Run with --format=console for the full technical detail of each one.
+──────────────────────────────────────────────────────────────────────

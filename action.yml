@@ -16,7 +16,7 @@ inputs:
     required: false
     default: "."
   format:
-    description: "Output format: console, json, sarif, html, markdown, junit, or github."
+    description: "Output format: console, executive, json, sarif, html, markdown, junit, or github."
     required: false
     default: sarif
   output:

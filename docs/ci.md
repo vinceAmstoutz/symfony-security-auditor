@@ -192,11 +192,12 @@ jobs:
 
 Inputs (all optional): `mode` (`bundle`/`standalone`, default `bundle`),
 `project-path` (default `.`), `format`
-(`console`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`, default `sarif`),
-`output` (default `report.sarif`), `baseline`, `generate-baseline`, `since`,
-`fail-on` (`safe`/`low`/`medium`/`high`/`critical`), `extra-args`, `php-version`
-(default `8.3`), `setup-php` (default `true`), `install-dependencies` (default
-`true`, ignored in standalone mode), and `working-directory` (default `.`). Set
+(`console`/`executive`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`,
+default `sarif`), `output` (default `report.sarif`), `baseline`,
+`generate-baseline`, `since`, `fail-on`
+(`safe`/`low`/`medium`/`high`/`critical`), `extra-args`, `php-version` (default
+`8.3`), `setup-php` (default `true`), `install-dependencies` (default `true`,
+ignored in standalone mode), and `working-directory` (default `.`). Set
 `setup-php: false` / `install-dependencies: false` when your job has already
 done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
 
@@ -512,6 +513,9 @@ symfony-security-audit:
 ```bash
 # Console (default — useful for workflow logs)
 php bin/console audit:run /path/to/project
+
+# Executive summary — risk level, business impact and distributions, no finding detail
+php bin/console audit:run /path/to/project --format executive
 
 # JSON — machine-readable, good for custom dashboards
 php bin/console audit:run /path/to/project --format json --output report.json

@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **A new `executive` output format summarizes an audit for stakeholders.**
+  `audit:run --format=executive` renders the risk level and score, a one-line
+  business-impact framing of that level, and three distributions — findings by
+  severity, by vulnerability type, and the five most-affected files — with no
+  per-finding technical detail (description, attack vector, proof and PoC stay
+  in `--format=console`). The distributions come from the new `ExecutiveSummary`
+  domain model (`src/Audit/Domain/Model/`), computed from the report already in
+  memory, so the format costs no extra LLM call. Rendered by
+  `ExecutiveSummaryReportRenderer` (`src/Audit/Infrastructure/Report/`);
+  LLM-sourced file paths are control-character- and bidi-stripped through
+  `TerminalTextSanitizer` exactly as the console report does.
+
 ## [1.17.0] — 2026-07-23 — Preflight
 
 A release about the standalone binary looking after itself. The binary now tells

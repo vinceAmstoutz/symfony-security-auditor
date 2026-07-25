@@ -26,6 +26,7 @@ final class AuditCommandHelp
 
         Output formats (<info>--format</info>, <info>-f</info>):
           <info>console</info>  human-readable summary (default)
+          <info>executive</info> stakeholder summary — risk level, business impact, severity/type/hotspot distributions, no per-finding detail
           <info>json</info>     machine-readable report
           <info>sarif</info>    SARIF 2.1.0 for GitHub Code Scanning / GitLab Security Dashboard
           <info>html</info>     self-contained HTML report for sharing or archiving
