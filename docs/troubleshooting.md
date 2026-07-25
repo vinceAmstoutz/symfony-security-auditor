@@ -253,6 +253,39 @@ Expected behavior on large projects. Mitigations:
 - Enable both caches: `cache.enabled: true` (default) and Anthropic prompt
   caching via `cache_retention` in `ai.yaml` (default `short` already on).
 
+### What happens on a very large project (10 000+ files)?
+
+Nothing special happens — and that is the problem. The pipeline is linear in the
+number of files it keeps, so a 10 000-file repository is not "slow", it is
+proportionally expensive: the scanner walks the tree once, drops everything
+outside `scan.included_paths` and every file over `scan.max_file_size_kb`
+(default `512`), groups what remains into chunks, and spends at least one LLM
+call per chunk per iteration. Triple that for the default
+`audit.max_iterations: 3`, then add one reviewer call per surviving finding.
+
+Measure before you spend: `audit:run --dry-run` reports the retained file count
+and the estimated token/cost total for **your** repository and model without
+making a single audit call. Treat that number as the decision input; wall-clock
+and dollar figures quoted for other projects will not transfer.
+
+To bring a repository of that size into a sane envelope, in the order that helps
+most:
+
+- **Audit a slice, not the monolith.** `--path src/Controller --path src/Form`
+  (repeatable) or a tightened `scan.included_paths` targets the code that
+  actually faces user input. On a monorepo, run one audit per bounded context.
+- **Audit only what changed.** `--since main` (or any git ref) restricts the run
+  to files touched since that ref, which is what you want on a PR — cost then
+  tracks the diff, not the repository.
+- **Use `profile: fast`.** One iteration, lean pre-scan (marker-free files are
+  dropped), code slicing (large files are trimmed to security-relevant lines)
+  and 4× attacker/reviewer concurrency.
+- **Cap the run.** `audit.budget.max_tokens` / `audit.budget.max_cost_usd` abort
+  mid-run and still emit the partial report with exit code `2`, so a
+  misestimated scan cannot run away with your budget.
+- **Keep the cache on.** `cache.enabled: true` (default) means the second and
+  later runs pay only for chunks whose content changed.
+
 ### Cost blew past my budget
 
 - Confirm `scan.included_paths` matches the deployable code surface. The default
