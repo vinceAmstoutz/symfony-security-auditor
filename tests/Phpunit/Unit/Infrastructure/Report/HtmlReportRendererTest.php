@@ -390,4 +390,116 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
 
         self::assertStringContainsString($expectedTable, $output);
     }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_charts_the_severity_distribution(): void
+    {
+        $output = $this->renderer->render($this->makeReport(
+            $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::HIGH),
+        ));
+
+        self::assertStringContainsString(
+            '<section class="charts"><h2>Distribution</h2><h3>By severity</h3><svg',
+            $output,
+        );
+        self::assertStringContainsString('aria-label="Findings by severity"', $output);
+        self::assertStringContainsString('class="bar bar-high"', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_charts_the_type_distribution(): void
+    {
+        $output = $this->renderer->render($this->makeReport(
+            $this->makeValidatedVuln(vulnerabilityType: VulnerabilityType::SQL_INJECTION),
+        ));
+
+        self::assertStringContainsString('aria-label="Findings by vulnerability type"', $output);
+        self::assertStringContainsString('>'.VulnerabilityType::SQL_INJECTION->value.'</text>', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_charts_a_bar_for_every_present_severity(): void
+    {
+        $output = $this->renderer->render($this->makeReport(
+            $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::CRITICAL, filePath: 'src/One.php'),
+            $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::LOW, filePath: 'src/Two.php'),
+        ));
+
+        self::assertStringContainsString('class="bar bar-critical"', $output);
+        self::assertStringContainsString('class="bar bar-low"', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_charts_a_bar_for_every_present_vulnerability_type(): void
+    {
+        $output = $this->renderer->render($this->makeReport(
+            $this->makeValidatedVuln(vulnerabilityType: VulnerabilityType::SQL_INJECTION, filePath: 'src/One.php'),
+            $this->makeValidatedVuln(vulnerabilityType: VulnerabilityType::TWIG_INJECTION, filePath: 'src/Two.php'),
+        ));
+
+        self::assertStringContainsString('>'.VulnerabilityType::SQL_INJECTION->value.'</text>', $output);
+        self::assertStringContainsString('>'.VulnerabilityType::TWIG_INJECTION->value.'</text>', $output);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_omits_the_charts_when_there_is_nothing_to_chart(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+
+        self::assertStringNotContainsString('<svg', $output);
+        self::assertStringNotContainsString('class="charts"', $output);
+        self::assertStringNotContainsString('Distribution', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_charts_load_no_external_asset(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        self::assertStringNotContainsString('<script', $output);
+        self::assertStringNotContainsString('<link', $output);
+        self::assertStringNotContainsString('src=', $output);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_styles_every_severity_bar_of_the_chart(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
+
+        foreach (VulnerabilitySeverity::cases() as $severity) {
+            self::assertStringContainsString('svg.chart rect.bar-'.$severity->value, $output);
+        }
+    }
 }

@@ -15,14 +15,18 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ExecutiveSummary;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class HtmlReportRenderer implements ReportRendererInterface
 {
+    private const string TYPE_BAR_MODIFIER = 'type';
+
     public function __construct(
         private TemplateLoader $templateLoader = new TemplateLoader(),
+        private DistributionBarChart $distributionBarChart = new DistributionBarChart(),
     ) {}
 
     #[Override]
@@ -51,8 +55,51 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
             '{{riskLevelClass}}' => $this->escape(strtolower($riskLevel)),
             '{{riskScore}}' => $auditReport->riskScore(),
             '{{summary}}' => $this->summary($auditReport),
+            '{{charts}}' => $this->charts($auditReport),
             '{{body}}' => $this->body($auditReport),
         ]);
+    }
+
+    private function charts(AuditReport $auditReport): string
+    {
+        if (0 === $auditReport->totalVulnerabilities()) {
+            return '';
+        }
+
+        $executiveSummary = ExecutiveSummary::of($auditReport);
+
+        return \sprintf(
+            '<section class="charts"><h2>Distribution</h2>'
+            .'<h3>By severity</h3>%s<h3>By type</h3>%s</section>',
+            $this->distributionBarChart->render('Findings by severity', $this->severityBars($executiveSummary)),
+            $this->distributionBarChart->render('Findings by vulnerability type', $this->typeBars($executiveSummary)),
+        );
+    }
+
+    /**
+     * @return list<ChartBar>
+     */
+    private function severityBars(ExecutiveSummary $executiveSummary): array
+    {
+        $bars = [];
+        foreach ($executiveSummary->severityCounts as $severity => $count) {
+            $bars[] = new ChartBar(VulnerabilitySeverity::from($severity)->label(), $count, $severity);
+        }
+
+        return $bars;
+    }
+
+    /**
+     * @return list<ChartBar>
+     */
+    private function typeBars(ExecutiveSummary $executiveSummary): array
+    {
+        $bars = [];
+        foreach ($executiveSummary->typeCounts as $type => $count) {
+            $bars[] = new ChartBar($type, $count, self::TYPE_BAR_MODIFIER);
+        }
+
+        return $bars;
     }
 
     private function summary(AuditReport $auditReport): string

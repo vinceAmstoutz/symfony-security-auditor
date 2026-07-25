@@ -41,6 +41,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   pricing was already network-free (read from the `symfony/models-dev` catalog
   in `vendor/`). `docs/faq.md` gains a `tcpdump` recipe for verifying the claim
   rather than trusting it.
+- **The HTML report now charts how findings are distributed.** Every
+  `--format=html` report with at least one finding gains a "Distribution"
+  section holding two inline-SVG horizontal bar charts — findings by severity
+  (color-coded per severity) and by vulnerability type. The charts are drawn by
+  `DistributionBarChart` (`src/Audit/Infrastructure/Report/`) with no external
+  stylesheet, font, image or script, so the report stays a single shareable
+  file, and their colors come from the report's own stylesheet so they follow
+  the reader's light/dark preference. A report with no findings renders no
+  charts.
 
 ## [1.17.0] — 2026-07-23 — Preflight
 
