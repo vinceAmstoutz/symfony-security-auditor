@@ -35,7 +35,9 @@
     },
     "require": {
         "php": ">=8.3",
+        "ext-uri": "*",
         "composer-runtime-api": "^2.0",
+        "league/uri-polyfill": "^7.8",
         "mcp/sdk": "^0.7.0",
         "nikic/php-parser": "^5.3",
         "psr/clock": "^1.0",

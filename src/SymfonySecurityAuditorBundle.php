@@ -52,6 +52,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
@@ -235,7 +236,9 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
             ? RegexSecretScrubber::class
             : NullSecretScrubber::class);
 
-        $servicesConfigurator->alias(AdvisoryDatabaseInterface::class, DeferredAdvisoryDatabase::class);
+        $servicesConfigurator->alias(AdvisoryDatabaseInterface::class, $bundleConfiguration->privacy->offlineOnly
+            ? InMemoryAdvisoryDatabase::class
+            : DeferredAdvisoryDatabase::class);
 
         $servicesConfigurator->alias(ComposerAuditRunnerInterface::class, $bundleConfiguration->cache->enabled
             ? LockfileHashedAdvisoryCache::class

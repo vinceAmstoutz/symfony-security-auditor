@@ -13,6 +13,7 @@ bundle registration, bundle-level configuration, platform wiring via
   - [`scan.*` — file discovery](#scan--file-discovery)
   - [`audit.*` — orchestrator knobs](#audit--orchestrator-knobs)
   - [`cache.*` — caching layers](#cache--caching-layers)
+- [`privacy.*` — data egress](#privacy--data-egress)
   - [Simple mode](#simple-mode--one-model-for-both-roles)
   - [Split mode](#split-mode--separate-models-per-role)
   - [Full example](#full-configuration-example)
@@ -219,6 +220,20 @@ own rates). Models with no published cache rate fall back to the base input
 rate. So the budget tracker and the `estimated_cost_usd` in the report reflect
 the real discounted spend rather than charging every input token at the full
 rate.
+
+### `privacy.*` — data egress
+
+| Key                    | Type   | Default | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------------- | ------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `privacy.offline_only` | `bool` | `false` | Refuse every network call the auditor itself owns. The advisory feed is replaced by an empty in-memory database, so `composer audit` never runs and `lookup_advisory` always answers "no advisories". In **standalone** mode the configured platform endpoints are also checked before the audit boots: every provider must carry at least one endpoint and every endpoint must be loopback, link-local or private-range (Ollama, LM Studio, a LAN inference box), otherwise the run aborts naming the offending provider. In **bundle** mode the platform lives in your own `ai.yaml`, which the auditor cannot inspect, so pointing it at a local platform stays your responsibility. Model pricing needs no network in either mode (it is read from the `symfony/models-dev` catalog in `vendor/`). The standalone update-availability check is separate — set `SSA_NO_UPDATE_CHECK=1` to silence it. See [How do I verify that nothing leaves my machine?](faq.md#how-do-i-verify-that-nothing-leaves-my-machine) |
+
+```yaml
+# config/packages/symfony_security_auditor.yaml
+symfony_security_auditor:
+    model: 'llama3.2'
+    privacy:
+        offline_only: true
+```
 
 ### Simple mode — one model for both roles
 

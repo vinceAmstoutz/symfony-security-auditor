@@ -23,6 +23,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `ExecutiveSummaryReportRenderer` (`src/Audit/Infrastructure/Report/`);
   LLM-sourced file paths are control-character- and bidi-stripped through
   `TerminalTextSanitizer` exactly as the console report does.
+- **New `privacy.offline_only` refuses every network call the auditor owns.**
+  With `privacy.offline_only: true`, the advisory feed is replaced by
+  `InMemoryAdvisoryDatabase`, so `composer audit` is never executed and
+  `lookup_advisory` always answers "no advisories". In standalone mode
+  `OfflineOnlyPlatformGuard` (`src/Audit/Infrastructure/Config/`) additionally
+  checks the configured platforms before the container boots, parsing each
+  endpoint with PHP 8.5's RFC 3986 URI API (`Uri\Rfc3986\Uri`, backported to
+  8.3/8.4 by `league/uri-polyfill`) rather than `parse_url()`: every provider
+  must carry at least one endpoint and every endpoint must be loopback,
+  link-local or private-range, so a hosted provider (an `api_key` and nothing
+  else) or a cloud `base_url` aborts the run with
+  `NonLocalPlatformEndpointException` naming the provider instead of shipping
+  source code off the machine. In bundle mode the platform lives in the
+  application's own `ai.yaml`, which the auditor cannot inspect, so that half
+  stays the operator's responsibility — documented, not silently implied. Model
+  pricing was already network-free (read from the `symfony/models-dev` catalog
+  in `vendor/`). `docs/faq.md` gains a `tcpdump` recipe for verifying the claim
+  rather than trusting it.
 
 ## [1.17.0] — 2026-07-23 — Preflight
 

@@ -62,6 +62,7 @@ Every key under `symfony_security_auditor:` documented in
 - `cache.enabled`, `cache.dir`, `cache.prompt_caching` (the last is **deprecated
   since 1.7** — see [Deprecation policy](#deprecation-policy) — still accepted
   but ignored)
+- `privacy.offline_only`
 
 Default values for these keys are also part of the contract. Changing a default
 is a `MAJOR` change.

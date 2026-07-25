@@ -20,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
@@ -48,6 +49,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws AmbiguousPlatformException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -65,6 +67,48 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws AmbiguousPlatformException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     */
+    public function test_offline_only_refuses_to_boot_against_a_remote_platform(): void
+    {
+        $this->expectException(NonLocalPlatformEndpointException::class);
+        $this->expectExceptionMessage('"anthropic"');
+
+        (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(
+                ['privacy' => ['offline_only' => true]],
+                new StandalonePlatformConfig(['anthropic' => ['api_key' => 'sk-secret']]),
+            ),
+            $this->cacheDir,
+        );
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_offline_only_boots_against_a_local_platform(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(
+                ['privacy' => ['offline_only' => true]],
+                new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]]),
+            ),
+            $this->cacheDir,
+        );
+
+        self::assertInstanceOf(AuditCommand::class, $containerBuilder->get(AuditCommand::class));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -84,6 +128,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws AmbiguousPlatformException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
@@ -107,6 +152,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws AmbiguousPlatformException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
      */
     #[RunInSeparateProcess]
     public function test_it_rejects_a_selector_absent_from_the_platform_block(): void
@@ -123,6 +169,7 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws AmbiguousPlatformException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
      */
     #[RunInSeparateProcess]
     public function test_it_rejects_several_platforms_without_a_selector(): void

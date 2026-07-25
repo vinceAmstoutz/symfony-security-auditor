@@ -252,7 +252,39 @@ symfony_security_auditor:
     model: 'llama3.3'  # or any model from `ollama pull`
 ```
 
-No data leaves your machine.
+No data leaves your machine. Add
+[`privacy.offline_only: true`](configuration.md#privacy--data-egress) to have
+the auditor enforce that rather than rely on it: it drops the advisory feed (no
+`composer audit`) and, in standalone mode, aborts before the audit boots if a
+configured platform endpoint is not loopback or private-range.
+
+### How do I verify that nothing leaves my machine?
+
+Do not take the claim on trust — watch the wire. Set
+[`privacy.offline_only: true`](configuration.md#privacy--data-egress) so the
+auditor refuses its own network calls (and, in standalone mode, refuses to boot
+against a non-local platform endpoint), export `SSA_NO_UPDATE_CHECK=1` to
+silence the standalone release check, then capture traffic while an audit runs:
+
+```bash
+# Terminal 1 — capture everything that is not loopback and not your local LLM
+sudo tcpdump -n -i any 'not host 127.0.0.1 and not port 11434'
+
+# Terminal 2 — run the audit
+SSA_NO_UPDATE_CHECK=1 symfony-security-auditor audit /path/to/project
+```
+
+Expect the capture to stay empty for the whole run. Two notes on reading it:
+
+- `composer install` and your editor make their own connections — run the audit
+  in an otherwise idle shell so anything captured is attributable.
+- With `privacy.offline_only` off, an audit legitimately talks to your LLM
+  provider and (through `composer audit`) to the Packagist advisory feed, so a
+  non-empty capture there is expected, not a leak.
+
+For a stricter guarantee, run the audit in a network namespace or container that
+has no route off the host at all except to the Ollama socket — if the auditor
+still completes, nothing it needs is remote.
 
 ### Does it log my source code anywhere?
 

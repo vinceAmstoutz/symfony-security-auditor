@@ -89,6 +89,35 @@ final class BundleConfigurationTest extends TestCase
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
      */
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
+    public function test_offline_only_is_off_unless_configured(): void
+    {
+        $bundleConfiguration = BundleConfiguration::fromArray($this->treeBuilderOutput());
+
+        self::assertFalse($bundleConfiguration->privacy->offlineOnly);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
+    public function test_from_array_maps_offline_only(): void
+    {
+        $config = $this->treeBuilderOutput();
+        $config['privacy'] = ['offline_only' => true];
+
+        $bundleConfiguration = BundleConfiguration::fromArray($config);
+
+        self::assertTrue($bundleConfiguration->privacy->offlineOnly);
+    }
+
+    /**
+     * @throws InvalidAuditExecutionConfigurationException
+     * @throws InvalidRateLimitConfigurationException
+     */
     public function test_from_array_passes_scan_import_sarif_paths_through(): void
     {
         $config = $this->treeBuilderOutput();

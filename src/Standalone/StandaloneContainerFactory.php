@@ -21,6 +21,8 @@ use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\EventDispatcher\EventDispatcher;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
@@ -40,15 +42,21 @@ final readonly class StandaloneContainerFactory
 
     public function __construct(
         private BundleExtensionLoader $bundleExtensionLoader = new BundleExtensionLoader(),
+        private OfflineOnlyPlatformGuard $offlineOnlyPlatformGuard = new OfflineOnlyPlatformGuard(),
     ) {}
 
     /**
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
+     * @throws NonLocalPlatformEndpointException
      */
     public function create(StandaloneConfig $standaloneConfig, string $cacheDir): ContainerBuilder
     {
+        if ($standaloneConfig->offlineOnly()) {
+            $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal($standaloneConfig->platform);
+        }
+
         $workingDirectory = getcwd();
 
         $containerBuilder = new ContainerBuilder(new ParameterBag([

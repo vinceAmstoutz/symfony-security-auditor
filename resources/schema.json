@@ -387,6 +387,17 @@
               "description": "Deprecated since 1.7 and ignored. Configure prompt caching on the AI platform in ai.yaml instead."
             }
           }
+        },
+        "privacy": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Data-egress controls.",
+          "properties": {
+            "offline_only": {
+              "type": "boolean",
+              "description": "Refuse every network call the auditor owns: the advisory feed becomes an empty in-memory database (composer audit is never run) and, in standalone mode, the audit aborts unless every configured platform endpoint is loopback or private-range. Default: false."
+            }
+          }
         }
       }
     }

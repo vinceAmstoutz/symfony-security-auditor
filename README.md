@@ -360,7 +360,12 @@ The auditor is conservative about what leaves your machine:
 - **You choose where the code goes.** Source is sent only to the provider you
   wire in `ai.yaml`. For zero third-party exposure, run fully offline with
   [Ollama](docs/configuration.md#supported-platforms) — nothing leaves your
-  network.
+  network. Set
+  [`privacy.offline_only: true`](docs/configuration.md#privacy--data-egress) to
+  have that enforced rather than assumed: the advisory feed is dropped (no
+  `composer audit`) and the standalone CLI refuses to boot against a platform
+  endpoint that is not loopback or private-range. `docs/faq.md` carries a
+  `tcpdump` recipe for verifying it yourself.
 - **Reports are sensitive — they list your weak spots.** On public repos, prefer
   SARIF → GitHub Code Scanning (collaborator-only) over downloadable CI
   artifacts. See

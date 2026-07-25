@@ -25,4 +25,11 @@ final readonly class StandaloneConfig
         public array $auditConfig,
         public StandalonePlatformConfig $platform,
     ) {}
+
+    public function offlineOnly(): bool
+    {
+        $privacy = $this->auditConfig['privacy'] ?? null;
+
+        return \is_array($privacy) && true === ($privacy['offline_only'] ?? false);
+    }
 }

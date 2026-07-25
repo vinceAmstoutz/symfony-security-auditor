@@ -27,6 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBri
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
@@ -253,6 +254,7 @@ final readonly class StandaloneApplicationFactory
      * @throws AmbiguousPlatformException
      * @throws UnresolvableAuditCommandException
      * @throws MalformedProjectConfigException
+     * @throws NonLocalPlatformEndpointException
      */
     private function loadAuditCommand(): Command
     {
@@ -267,6 +269,7 @@ final readonly class StandaloneApplicationFactory
      * @throws UnknownPlatformProviderException
      * @throws AmbiguousPlatformException
      * @throws MalformedProjectConfigException
+     * @throws NonLocalPlatformEndpointException
      */
     private function buildContainer(): ContainerBuilder
     {

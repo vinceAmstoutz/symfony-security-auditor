@@ -65,6 +65,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\DeferredAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\InMemoryAdvisoryDatabase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\LockfileHashedAdvisoryCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemAttackerCache;
@@ -237,6 +238,13 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $pathArgument = $definition->getArgument(1);
         self::assertInstanceOf(Reference::class, $pathArgument);
         self::assertSame(AuditedProjectPathHolder::class, (string) $pathArgument);
+    }
+
+    public function test_offline_only_replaces_the_advisory_feed_with_an_empty_local_one(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'privacy' => ['offline_only' => true]]);
+
+        self::assertSame(InMemoryAdvisoryDatabase::class, (string) $containerBuilder->getAlias(AdvisoryDatabaseInterface::class));
     }
 
     public function test_bundle_does_not_register_escalation_services_by_default(): void

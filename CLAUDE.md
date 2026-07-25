@@ -70,7 +70,7 @@ Commit messages are validated separately in CI via
 src/
   Audit/
     Domain/          # Pure PHP — no framework, no I/O
-      Configuration/ # Typed config VOs (BundleConfiguration, AuditProfile, LLMConfiguration, CustomAttackerSkill, …)
+      Configuration/ # Typed config VOs (BundleConfiguration, AuditProfile, LLMConfiguration, PrivacyConfiguration, CustomAttackerSkill, …)
       Model/         # Value objects and enums (Vulnerability [+ `of()` factory + CodeLocation/VulnerabilityClassification/VulnerabilityNarrative], SymfonyMapping [+ `of()` + ProjectFileInventory/AccessControlMap], AuditReport [+ ReportIdentity], ExecutiveSummary (stakeholder view: risk level + severity/type/file distributions), ProjectFile, ProjectFileType, ProjectFileTypeClassifier, CvssEstimate (heuristic CVSS v4.0 per finding), RouteAccessControl, VoterCapability, FormBinding, TokenUsageSnapshot, VulnerabilityHydrationResult, VulnerabilityDropReason, ReviewerFeedback/AcceptedFindingFeedback, …) — public factories use `of()`; the wide `create()` is `@deprecated`
       Exception/     # Domain exceptions (LLMProviderException, GitChangedFilesUnavailableException, InvalidCodeLocationException, InvalidVulnerabilityClassificationException)
       Pipeline/      # PipelineInterface, StageInterface, CoverageRecorderInterface (ports)

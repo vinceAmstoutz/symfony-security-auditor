@@ -20,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 use stdClass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
@@ -51,6 +52,7 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws UnresolvableAuditCommandException
+     * @throws NonLocalPlatformEndpointException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]

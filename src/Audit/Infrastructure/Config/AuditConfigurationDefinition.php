@@ -33,6 +33,7 @@ final readonly class AuditConfigurationDefinition
         $this->defineScanNode($nodeBuilder);
         $this->defineAuditNode($nodeBuilder);
         $this->defineCacheNode($nodeBuilder);
+        $this->definePrivacyNode($nodeBuilder);
     }
 
     private function defineModelNodes(NodeBuilder $nodeBuilder): void
@@ -398,6 +399,21 @@ final readonly class AuditConfigurationDefinition
                                     ->info('Maximum output tokens per minute. `null` (default) disables this dimension. Counted post-hoc from `record()` so the next `acquire()` defers until the window resets when the bucket is full.')
                                 ->end()
                             ->end()
+                        ->end()
+                    ->end()
+                ->end()
+        ;
+    }
+
+    private function definePrivacyNode(NodeBuilder $nodeBuilder): void
+    {
+        $nodeBuilder
+                ->arrayNode('privacy')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->booleanNode('offline_only')
+                            ->defaultFalse()
+                            ->info('Refuse to make any network call the auditor owns. The advisory feed is replaced by an empty in-memory database, so `composer audit` is never run and the `lookup_advisory` tool always answers "no advisories". In standalone mode the configured platform endpoints are also checked before the audit boots: every provider must expose a loopback/private-range endpoint (Ollama, LM Studio, …) or the run aborts. In bundle mode the platform lives in your own `ai.yaml`, which the auditor cannot inspect, so pointing it at a local platform stays your responsibility. Default false.')
                         ->end()
                     ->end()
                 ->end()
