@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.18.0] — 2026-07-26 — Airgap
+
+A release about auditing on your own terms — privately, and legibly. The new
+`privacy.offline_only` mode lets the auditor run fully air-gapped: it refuses
+every network call it owns, and in standalone mode aborts before the container
+boots if any configured platform endpoint would leave the machine. The new
+`executive` format distils a run into a one-screen, stakeholder-facing summary
+with no per-finding detail, and the HTML report now draws its severity and type
+distributions as self-contained inline-SVG charts that follow the reader's
+light/dark theme. A pre-release bug hunt rounds it out — hardening the offline
+guard against IPv4-mapped IPv6 endpoints, stopping the executive summary
+contradicting itself on low-severity reports, and fixing concurrent analysis
+silently dropping files after a batch error.
+
 ### Added
 
 - **A new `executive` output format summarizes an audit for stakeholders.**
@@ -2834,6 +2848,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.18.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.18.0
 [1.17.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.17.0
 [1.16.0]:
