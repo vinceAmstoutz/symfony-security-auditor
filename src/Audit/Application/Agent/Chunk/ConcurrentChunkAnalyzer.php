@@ -214,11 +214,11 @@ final readonly class ConcurrentChunkAnalyzer
             try {
                 $results += $this->dispatchWindow($window, $coverageRecorder);
             } catch (BudgetExceededException $budgetExceededException) {
-                $this->failRemainingWindows($windows, $windowNumber, 'aborted', $coverageRecorder);
+                $this->recordRemainingWindows($windows, $windowNumber, 'aborted', $coverageRecorder);
 
                 throw $budgetExceededException;
             } catch (LLMProviderException $llmProviderException) {
-                $this->failRemainingWindows($windows, $windowNumber, 'errored', $coverageRecorder);
+                $this->recordRemainingWindows($windows, $windowNumber, 'errored', $coverageRecorder);
 
                 throw $llmProviderException;
             } catch (Throwable $throwable) {
@@ -226,7 +226,7 @@ final readonly class ConcurrentChunkAnalyzer
                     'error' => $throwable->getMessage(),
                 ]);
 
-                return $results + $this->failRemainingWindows($windows, $windowNumber, 'errored', $coverageRecorder);
+                $results += $this->failWindow($window, 'errored', $coverageRecorder);
             }
         }
 
@@ -281,27 +281,41 @@ final readonly class ConcurrentChunkAnalyzer
     }
 
     /**
-     * Marks every window from `$fromWindowNumber` onward — the one that just
-     * failed plus any not yet attempted — as failed, without touching windows
-     * that already finalized successfully.
+     * On a fatal budget/provider abort, records every window from
+     * `$fromWindowNumber` onward — the one that just failed plus any not yet
+     * attempted — as failed, without touching windows that already finalized.
+     * Side effects only: the caller rethrows, so no hydration result is
+     * returned or consumed.
      *
      * @param list<array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession, systemPrompt: string, userMessage: string}>> $windows
-     *
-     * @return array<int, VulnerabilityHydrationResult>
      */
-    private function failRemainingWindows(array $windows, int $fromWindowNumber, string $status, CoverageRecorderInterface $coverageRecorder): array
+    private function recordRemainingWindows(array $windows, int $fromWindowNumber, string $status, CoverageRecorderInterface $coverageRecorder): void
     {
-        $results = [];
         foreach ($windows as $windowNumber => $window) {
             if ($windowNumber < $fromWindowNumber) {
                 continue;
             }
 
-            foreach ($window as $index => $entry) {
-                ChunkCoverageRecorder::record($entry['chunk'], $status, $coverageRecorder);
-                $this->recordDrainedFindings($entry['session'], $coverageRecorder);
-                $results[$index] = $this->vulnerabilityFactory->fromList([]);
-            }
+            $this->failWindow($window, $status, $coverageRecorder);
+        }
+    }
+
+    /**
+     * Marks one window's chunks with `$status`, draining any findings the LLM
+     * recorded before the batch aborted. Used both to fail the window that
+     * threw and — for a fatal budget/provider abort — every window after it.
+     *
+     * @param array<int, array{chunk: list<ProjectFile>, contextKey: string, cacheable: bool, session: StructuredVulnerabilityCollectionSession, systemPrompt: string, userMessage: string}> $window
+     *
+     * @return array<int, VulnerabilityHydrationResult>
+     */
+    private function failWindow(array $window, string $status, CoverageRecorderInterface $coverageRecorder): array
+    {
+        $results = [];
+        foreach ($window as $index => $entry) {
+            ChunkCoverageRecorder::record($entry['chunk'], $status, $coverageRecorder);
+            $this->recordDrainedFindings($entry['session'], $coverageRecorder);
+            $results[$index] = $this->vulnerabilityFactory->fromList([]);
         }
 
         return $results;

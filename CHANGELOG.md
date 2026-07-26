@@ -62,6 +62,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Concurrent attacker analysis no longer drops every file after a batch
+  error.** When `completeBatchWithTools()` threw anything other than a budget or
+  provider failure (e.g. `InvalidTokenUsageException` from a hostile
+  provider-response token count), `ConcurrentChunkAnalyzer::dispatchInWindows()`
+  `return`ed from inside its window loop, so every window after the failing one
+  was marked `errored` without ever being sent to the LLM — a single odd runtime
+  error silently dropped all later files from the audit and reported them as
+  covered, a false-negative that only affected concurrent mode (the `fast`
+  profile's `attacker_max_concurrent > 1`); sequential mode already isolated the
+  failure to the one chunk and continued. The generic-error branch now fails
+  only the window that threw and continues with the rest, mirroring the
+  sequential analyzer's per-chunk recovery.
+
 - **Long vulnerability-type names no longer collide with their bar in the HTML
   report's distribution charts.** `DistributionBarChart` reserved 170px for the
   label column, but a type value such as `insecure_direct_object_reference`

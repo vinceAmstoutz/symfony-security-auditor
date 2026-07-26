@@ -19,6 +19,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Validator\Validation;
+use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\AttackerChunkCache;
@@ -143,6 +144,110 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
     }
 
     /**
+     * A generic batch failure must be isolated to its own window: the windows
+     * after it still have to be dispatched, exactly as the sequential analyzer
+     * keeps analysing chunks after one errors. Otherwise a single odd runtime
+     * error silently drops every later file from the audit — a false-negative
+     * SAFE for a security tool.
+     *
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_generic_failure_in_a_middle_window_still_dispatches_the_windows_after_it(): void
+    {
+        $callCount = 0;
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::exactly(3))
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests) use (&$callCount): array {
+                ++$callCount;
+                if (2 === $callCount) {
+                    throw new RuntimeException('middle window tore');
+                }
+
+                foreach ($requests as $request) {
+                    self::registryOf($request)->execute('record_vulnerability', self::recordedFinding('window-'.$callCount));
+                }
+
+                return array_fill(0, \count($requests), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+            });
+
+        $concurrentChunkAnalyzer = $this->makeAnalyzer($llmClient, 2);
+
+        [$vulnerabilities] = $concurrentChunkAnalyzer->analyze(
+            [
+                [$this->makeFile('src/A.php')], [$this->makeFile('src/B.php')],
+                [$this->makeFile('src/C.php')], [$this->makeFile('src/D.php')],
+                [$this->makeFile('src/E.php')], [$this->makeFile('src/F.php')],
+            ],
+            $this->request(),
+            new RecordingCoverageRecorder(),
+            new RiskMarkerIndex([]),
+        );
+
+        self::assertCount(4, $vulnerabilities);
+    }
+
+    /**
+     * A budget abort is fatal: the window that hit the cap and every window
+     * after it are recorded `aborted` (windows already finalized keep their
+     * `analyzed` status) and the exception propagates.
+     *
+     * @throws InvalidProjectFileException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_budget_abort_in_a_later_window_records_the_remaining_windows_as_aborted(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+        $caught = null;
+
+        try {
+            $this->makeAnalyzer($this->clientFailingOnSecondWindowWith(BudgetExceededException::forTokens(150, 100)), 2)->analyze(
+                [[$this->makeFile('src/A.php')], [$this->makeFile('src/B.php')], [$this->makeFile('src/C.php')], [$this->makeFile('src/D.php')]],
+                $this->request(),
+                $recordingCoverageRecorder,
+                new RiskMarkerIndex([]),
+            );
+        } catch (BudgetExceededException $budgetExceededException) {
+            $caught = $budgetExceededException;
+        }
+
+        self::assertInstanceOf(BudgetExceededException::class, $caught);
+        self::assertSame(['aborted' => 2, 'analyzed' => 2], $this->statusCounts($recordingCoverageRecorder));
+    }
+
+    /**
+     * A provider failure is fatal in the same way, recorded as `errored`.
+     *
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_provider_abort_in_a_later_window_records_the_remaining_windows_as_errored(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+        $caught = null;
+
+        try {
+            $this->makeAnalyzer($this->clientFailingOnSecondWindowWith(new LLMProviderException('provider down')), 2)->analyze(
+                [[$this->makeFile('src/A.php')], [$this->makeFile('src/B.php')], [$this->makeFile('src/C.php')], [$this->makeFile('src/D.php')]],
+                $this->request(),
+                $recordingCoverageRecorder,
+                new RiskMarkerIndex([]),
+            );
+        } catch (LLMProviderException $llmProviderException) {
+            $caught = $llmProviderException;
+        }
+
+        self::assertInstanceOf(LLMProviderException::class, $caught);
+        self::assertSame(['analyzed' => 2, 'errored' => 2], $this->statusCounts($recordingCoverageRecorder));
+    }
+
+    /**
      * @throws InvalidProjectFileException
      * @throws BudgetExceededException
      * @throws LLMProviderException
@@ -203,6 +308,44 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
             ['Finalizing an attacker chunk result failed; the chunk is recorded as errored and its siblings in the same window are preserved.', ['error' => 'coverage sink unavailable']],
             $warnings,
         );
+    }
+
+    /**
+     * A client whose first window succeeds (recording a finding per chunk) and
+     * whose second window throws `$failure`, so a later-window abort is
+     * reached with an earlier window already finalized.
+     */
+    private function clientFailingOnSecondWindowWith(Throwable $throwable): ToolBatchCapableLLMClientInterface
+    {
+        $callCount = 0;
+        $llmClient = $this->createMock(ToolBatchCapableLLMClientInterface::class);
+        $llmClient
+            ->expects(self::exactly(2))
+            ->method('completeBatchWithTools')
+            ->willReturnCallback(static function (array $requests) use (&$callCount, $throwable): array {
+                if (2 === ++$callCount) {
+                    throw $throwable;
+                }
+
+                foreach ($requests as $request) {
+                    self::registryOf($request)->execute('record_vulnerability', self::recordedFinding('first-window'));
+                }
+
+                return array_fill(0, \count($requests), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+            });
+
+        return $llmClient;
+    }
+
+    /**
+     * @return array<string, int> coverage status => count, sorted by status
+     */
+    private function statusCounts(RecordingCoverageRecorder $recordingCoverageRecorder): array
+    {
+        $counts = array_count_values(array_column($recordingCoverageRecorder->coverage, 'status'));
+        ksort($counts);
+
+        return $counts;
     }
 
     private function makeAnalyzer(ToolBatchCapableLLMClientInterface $toolBatchCapableLLMClient, int $maxConcurrent, ?AttackerCacheInterface $attackerCache = null, ?LoggerInterface $logger = null): ConcurrentChunkAnalyzer
