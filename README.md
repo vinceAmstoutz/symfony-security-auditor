@@ -286,8 +286,9 @@ bin/console audit:run --dry-run
 
 - **Multi-agent loop** — adversarial Attacker + skeptical Reviewer cut false
   positives across up to 3 iterations, with confirmed findings fed back so later
-  iterations generalize patterns instead of re-finding the same bugs.
-- **39 vulnerability types** covering OWASP-aligned categories: Injection,
+  iterations generalize patterns instead of re-finding the same bugs, and the
+  Reviewer remembering its own rejections across runs.
+- **48 vulnerability types** covering OWASP-aligned categories: Injection,
   Broken Access Control, Logic Flaws, Symfony-specific, Data Exposure,
   Cryptographic — including the modern Symfony 7.x/8.x surface (Authenticators,
   Messenger handlers, Webhooks, Serializer denormalizers, Schedules,
@@ -300,6 +301,7 @@ bin/console audit:run --dry-run
 - **Deterministic pre-scan** — a zero-token risk-marker pass flags concrete
   locations (unserialize, `|raw`, hardcoded secrets, unsafe Doctrine, …) to
   focus the LLM; optional **lean mode** drops marker-free files to cut tokens.
+  Results from other SAST tools can be imported as markers via SARIF.
 - **Diff mode** — `audit:run --since=main` audits only changed files for fast
   pull-request CI.
 - **Cross-file investigation tools** — Attacker (and optionally Reviewer) can
@@ -314,14 +316,16 @@ bin/console audit:run --dry-run
   caching on by default (~90% input-token discount), content-hash caching that
   skips identical chunks, cheap→expensive escalation, and code slicing.
 - **Secret-safe by default** — credential-shaped strings are scrubbed from file
-  content **before** it reaches the LLM (see
+  content **before** it reaches the LLM, and `privacy.offline_only` refuses
+  every network call the auditor owns (see
   [Security by design](#security-by-design)).
 - **Rate-limit aware** — reactive retry with `Retry-After`-aware exponential
   backoff plus an optional proactive token-bucket limiter keep you inside
   provider quotas (see
   [Cost & Performance](docs/cost-and-performance.md#avoiding-rate-limits-429)).
-- **PoC synthesis** — optionally attach a concrete, copy-pasteable reproduction
-  (curl/console/payload) to every high-severity finding.
+- **Actionable findings** — optionally attach a copy-pasteable reproduction
+  (curl/console/payload) and a suggested patch to every high-severity finding;
+  each one also carries a heuristic CVSS v4.0 estimate.
 - **Eight output formats** — `console`, `executive` (stakeholder summary: risk
   level, business impact, severity/type/hotspot distributions, no per-finding
   detail), `json`, `sarif` (GitHub Code Scanning / GitLab Security Dashboard),
@@ -330,17 +334,20 @@ bin/console audit:run --dry-run
   step). Baseline suppression: `--generate-baseline` accepts known findings,
   `--baseline` drops them from the report and exit code so only new findings
   fail CI.
+- **Findings over time** — `audit:diff` compares two JSON reports by finding
+  fingerprint, `audit:trend` tracks counts across a series of them.
 - **CI-ready** — a reusable
   [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor)
   (`uses: vinceamstoutz/symfony-security-auditor@1.17.0`) plus GitLab CI
   templates, with SARIF upload to Code Scanning. See
   [CI Integration](docs/ci.md).
-- **DDD architecture** — strict layering and a sole `LLMClientInterface` seam
-  let you plug in custom providers, agents, stages, advisory feeds, or report
-  formats.
+- **Extensible** — strict DDD layering and a sole `LLMClientInterface` seam let
+  you plug in custom providers, agents, stages, advisory feeds, or report
+  formats; project-specific attacker skills need only configuration, no PHP.
 - **Bundle or standalone** — install as a Symfony bundle, or run it like
   PHPStan/Psalm from a single self-contained binary configured once at the user
-  level to audit any project with zero footprint (see
+  level to audit any project with zero footprint, kept current with
+  `self-update` and preflighted with `doctor` (see
   [Standalone tool](#standalone-tool-binary)).
 
 ## Security by design
