@@ -23,6 +23,7 @@ bundle registration, bundle-level configuration, platform wiring via
 - [Split-Model Setup](#split-model-setup)
 - [Standalone Configuration](#standalone-configuration)
 - [CLI Reference](#cli-reference)
+  - [Output examples](#output-examples)
   - [`audit:diff`](#auditdiff--comparing-two-reports)
   - [`audit:trend`](#audittrend--tracking-findings-across-reports)
   - [`audit:baseline`](#auditbaseline--maintaining-the-accepted-finding-baseline)
@@ -602,6 +603,68 @@ bin/console audit:run --format=html --output=report.html
 bin/console audit:run --generate-baseline=.security-baseline.json
 bin/console audit:run --baseline=.security-baseline.json
 ```
+
+### Output examples
+
+#### `executive`
+
+```text
+══════════════════════════════════════════════════════════════════════
+  EXECUTIVE SUMMARY — SECURITY AUDIT
+  /srv/shop
+══════════════════════════════════════════════════════════════════════
+
+  Audited : 2026-07-26 06:02:59 (148 files, 192.4s)
+  Audit ID: AUDIT-772F0F3E
+
+──────────────────────────────────────────────────────────────────────
+  RISK LEVEL: HIGH  (Score: 46)
+──────────────────────────────────────────────────────────────────────
+
+  Action required this sprint: findings at this level are
+  exploitable by a motivated attacker and put user data or business
+  logic at risk.
+
+  7 validated finding(s) across 5 file(s).
+
+  BY SEVERITY
+  🔴 CRITICAL                                         2
+  🟠 HIGH                                             2
+  🟡 MEDIUM                                           2
+  🟢 LOW                                              1
+
+  BY TYPE
+  broken_access_control                              1
+  insecure_direct_object_reference                   1
+  mass_assignment                                    1
+  messenger_handler_unsafe                           1
+  misconfigured_firewall                             1
+  sql_injection                                      1
+  twig_injection                                     1
+
+  TOP AFFECTED FILES (of 5)
+  src/Controller/Admin/UserController.php            3
+  config/packages/security.yaml                      1
+  src/Messenger/ImportHandler.php                    1
+  src/Repository/ProductRepository.php               1
+  src/Twig/ReviewExtension.php                       1
+
+──────────────────────────────────────────────────────────────────────
+  Findings are validated by a reviewer agent but not human-triaged.
+  Run with --format=console for the full technical detail of each one.
+──────────────────────────────────────────────────────────────────────
+```
+
+#### `html`
+
+A single self-contained file — no external stylesheet, font, image or script —
+carrying the risk badge and run metadata, a Distribution section of two
+inline-SVG bar charts (by severity, by vulnerability type), and one card per
+finding with its location, description, vulnerable code, attack vector, proof of
+concept and remediation. Colors come from the report's own stylesheet, so it
+follows the reader's light/dark preference.
+
+![The HTML report: risk badge, run metadata, distribution charts and one card per finding](../assets/html-report.png?raw=true)
 
 ### Exit codes
 

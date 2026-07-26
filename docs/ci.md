@@ -526,3 +526,6 @@ php bin/console audit:run /path/to/project --format sarif --output report.sarif
 # HTML — self-contained, HTML-escaped report to share or attach as an artifact
 php bin/console audit:run /path/to/project --format html --output report.html
 ```
+
+See what the
+[`executive` summary and the HTML distribution charts look like](configuration.md#output-examples).
