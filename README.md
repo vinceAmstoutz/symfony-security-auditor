@@ -61,7 +61,7 @@ codes). Progress is suppressed for `--format=json/sarif` to stdout and for
 
 The full report renders the same way in console, JSON, SARIF, HTML, and Markdown
 — see [CLI reference](docs/configuration.md#cli-reference) and
-[output formats](docs/ci.md#output-formats-reference).
+[output formats](docs/configuration.md#output-formats-reference).
 
 ## Getting Started
 

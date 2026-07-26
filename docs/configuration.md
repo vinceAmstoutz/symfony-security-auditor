@@ -23,7 +23,7 @@ bundle registration, bundle-level configuration, platform wiring via
 - [Split-Model Setup](#split-model-setup)
 - [Standalone Configuration](#standalone-configuration)
 - [CLI Reference](#cli-reference)
-  - [Output examples](#output-examples)
+  - [Output Formats Reference](#output-formats-reference)
   - [`audit:diff`](#auditdiff--comparing-two-reports)
   - [`audit:trend`](#audittrend--tracking-findings-across-reports)
   - [`audit:baseline`](#auditbaseline--maintaining-the-accepted-finding-baseline)
@@ -604,7 +604,10 @@ bin/console audit:run --generate-baseline=.security-baseline.json
 bin/console audit:run --baseline=.security-baseline.json
 ```
 
-### Output examples
+### Output Formats Reference
+
+What each format produces. For ready-to-paste pipeline snippets, see
+[Output Formats in CI](ci.md#output-formats-in-ci).
 
 #### `executive`
 

@@ -12,7 +12,7 @@ GitHub Code Scanning or the GitLab Security Dashboard.
   - [Reusable GitHub Action](#reusable-github-action)
   - [Sticky PR comment with the audit summary](#sticky-pr-comment-with-the-audit-summary)
 - [GitLab CI](#gitlab-ci)
-- [Output Formats Reference](#output-formats-reference)
+- [Output Formats in CI](#output-formats-in-ci)
 
 > See also: [Configuration](configuration.md) · [FAQ](faq.md) ·
 > [Troubleshooting](troubleshooting.md)
@@ -508,7 +508,7 @@ symfony-security-audit:
     expire_in: 30 days
 ```
 
-## Output Formats Reference
+## Output Formats in CI
 
 ```bash
 # Console (default — useful for workflow logs)
@@ -527,5 +527,5 @@ php bin/console audit:run /path/to/project --format sarif --output report.sarif
 php bin/console audit:run /path/to/project --format html --output report.html
 ```
 
-See what the
-[`executive` summary and the HTML distribution charts look like](configuration.md#output-examples).
+Every format, its options and sample output live in the
+[Output Formats Reference](configuration.md#output-formats-reference).
