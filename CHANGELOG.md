@@ -70,6 +70,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   longest `VulnerabilityType` value with margin and keeps the count label inside
   the 600px viewBox.
 
+### Security
+
+- **`privacy.offline_only` no longer treats an IPv4-mapped IPv6 endpoint as
+  local.** `OfflineOnlyPlatformGuard::isLocal()` classified a host such as
+  `[::ffff:8.8.8.8]` — the IPv4-mapped IPv6 form of the public address `8.8.8.8`
+  — as local, because PHP flags the whole `::ffff:0:0/96` range as reserved and
+  `FILTER_FLAG_NO_RES_RANGE` masked the public embedded address. An
+  `offline_only` run configured with such a `base_url` would have booted and
+  sent source code to a public host instead of aborting. The guard now unwraps a
+  mapped host to its embedded IPv4 before the private/reserved check, so
+  `[::ffff:8.8.8.8]` is refused with `NonLocalPlatformEndpointException` while
+  `[::ffff:127.0.0.1]` stays local. Caught before release — the feature ships
+  first in this version.
+
 ## [1.17.0] — 2026-07-23 — Preflight
 
 A release about the standalone binary looking after itself. The binary now tells

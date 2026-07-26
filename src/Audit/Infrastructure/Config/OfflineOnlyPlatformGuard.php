@@ -99,10 +99,31 @@ final readonly class OfflineOnlyPlatformGuard
             return true;
         }
 
+        $host = $this->embeddedIpv4($host);
+
         if (false === filter_var($host, \FILTER_VALIDATE_IP)) {
             return false;
         }
 
         return false === filter_var($host, \FILTER_VALIDATE_IP, \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE);
+    }
+
+    /**
+     * Unwraps an IPv4-mapped IPv6 host (`::ffff:a.b.c.d`, or its hex form) to
+     * the embedded IPv4 address so the private/reserved check runs against the
+     * real target. Without this, PHP flags the whole `::ffff:0:0/96` range as
+     * reserved and a public endpoint like `[::ffff:8.8.8.8]` is wrongly treated
+     * as local, bypassing the offline-only guard.
+     */
+    private function embeddedIpv4(string $host): string
+    {
+        $packed = inet_pton($host);
+        if (false === $packed || 16 !== \strlen($packed) || !str_starts_with($packed, "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff")) {
+            return $host;
+        }
+
+        $ipv4 = inet_ntop(substr($packed, 12));
+
+        return false === $ipv4 ? $host : $ipv4;
     }
 }

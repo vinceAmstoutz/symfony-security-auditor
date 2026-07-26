@@ -58,6 +58,7 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
         yield 'mdns host' => ['http://workstation.local:11434'];
         yield 'localhost subdomain' => ['http://models.localhost:11434'];
         yield 'uppercase host' => ['http://LOCALHOST:11434'];
+        yield 'ipv4-mapped loopback' => ['http://[::ffff:127.0.0.1]:11434'];
     }
 
     /**
@@ -82,6 +83,8 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
         yield 'public host name' => ['https://my-deployment.openai.azure.com'];
         yield 'public ipv4' => ['https://8.8.8.8:443'];
         yield 'public ipv6' => ['https://[2001:4860:4860::8888]:443'];
+        yield 'ipv4-mapped public ipv6' => ['https://[::ffff:8.8.8.8]:443'];
+        yield 'ipv4-mapped public ipv6 hex form' => ['https://[::ffff:808:808]:443'];
         yield 'scheme without host' => ['file:///etc/passwd'];
     }
 
