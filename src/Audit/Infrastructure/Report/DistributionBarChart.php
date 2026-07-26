@@ -28,9 +28,9 @@ final readonly class DistributionBarChart
 
     private const int BAR_HEIGHT = 14;
 
-    private const int BAR_LEFT_X = 170;
+    private const int BAR_LEFT_X = 250;
 
-    private const int BAR_MAX_WIDTH = 360;
+    private const int BAR_MAX_WIDTH = 290;
 
     private const int BAR_TOP_OFFSET = 5;
 

@@ -51,6 +51,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   the reader's light/dark preference. A report with no findings renders no
   charts.
 
+### Fixed
+
+- **Long vulnerability-type names no longer collide with their bar in the HTML
+  report's distribution charts.** `DistributionBarChart` reserved 170px for the
+  label column, but a type value such as `insecure_direct_object_reference`
+  renders wider than that at the chart's font size, so its tail ran underneath
+  the bar. The label column is now 250px wide and the bars 290px, which fits the
+  longest `VulnerabilityType` value with margin and keeps the count label inside
+  the 600px viewBox.
+
 ## [1.17.0] — 2026-07-23 — Preflight
 
 A release about the standalone binary looking after itself. The binary now tells

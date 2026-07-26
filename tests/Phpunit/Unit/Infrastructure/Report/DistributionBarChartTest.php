@@ -56,7 +56,7 @@ final class DistributionBarChartTest extends TestCase
     {
         $output = $this->distributionBarChart->render('Findings by severity', [new ChartBar('High', 3, 'high')]);
 
-        self::assertStringContainsString('width="360.0"', $output);
+        self::assertStringContainsString('width="290.0"', $output);
     }
 
     public function test_bar_width_is_proportional_to_the_largest_count(): void
@@ -66,7 +66,7 @@ final class DistributionBarChartTest extends TestCase
             new ChartBar('Low', 1, 'low'),
         ]);
 
-        self::assertStringContainsString('width="90.0"', $output);
+        self::assertStringContainsString('width="72.5"', $output);
     }
 
     public function test_each_bar_carries_its_severity_modifier_class(): void
@@ -80,7 +80,7 @@ final class DistributionBarChartTest extends TestCase
     {
         $output = $this->distributionBarChart->render('Findings by severity', [new ChartBar('High', 7, 'high')]);
 
-        self::assertStringContainsString('<text class="bar-count" x="538.0" y="16">7</text>', $output);
+        self::assertStringContainsString('<text class="bar-count" x="548.0" y="16">7</text>', $output);
     }
 
     public function test_chart_height_grows_with_the_number_of_bars(): void
@@ -100,8 +100,8 @@ final class DistributionBarChartTest extends TestCase
             new ChartBar('second', 1, 'type'),
         ]);
 
-        self::assertStringContainsString('x="170" y="5" width="360.0" height="14"', $output);
-        self::assertStringContainsString('x="170" y="29" width="360.0" height="14"', $output);
+        self::assertStringContainsString('x="250" y="5" width="290.0" height="14"', $output);
+        self::assertStringContainsString('x="250" y="29" width="290.0" height="14"', $output);
     }
 
     public function test_rows_are_stacked_one_below_the_other(): void
