@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="symfony-security-auditor" tests="1" failures="1">
+    <testcase classname="broken_access_control" name="Unprotected administrative action (src/Controller/AdminController.php:1)">
+      <failure type="critical" message="Unprotected administrative action">The controller action is reachable without any access-control check.
+
+Severity: critical
+Location: src/Controller/AdminController.php:1-1
+OWASP: OWASP A01:2025 - Broken Access Control
+CWE: CWE-284
+Remediation: Guard the action with #[IsGranted('ROLE_ADMIN')].</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,49 @@
+
+══════════════════════════════════════════════════════════════════════
+  🔍 SYMFONY LLM AUDIT REPORT — AUDIT-XXXXXXXX
+  vinceamstoutz/symfony-security-auditor
+  https://github.com/vinceamstoutz/symfony-security-auditor
+══════════════════════════════════════════════════════════════════════
+
+  Project : PROJECT_PATH
+  Started : TIMESTAMP
+  Duration: DURATIONs
+  Files   : 3 scanned
+  Tokens  : 0 in / 0 out (gpt-4o)
+
+──────────────────────────────────────────────────────────────────────
+  RISK LEVEL: LOW  (Score: 10)
+──────────────────────────────────────────────────────────────────────
+
+  SUMMARY BY SEVERITY
+  🔴 CRITICAL 1
+
+──────────────────────────────────────────────────────────────────────
+  VULNERABILITIES (1 total)
+──────────────────────────────────────────────────────────────────────
+
+  [VULN-0231AA7A] 🔴 CRITICAL
+  Unprotected administrative action
+  OWASP: OWASP A01:2025 - Broken Access Control
+  CWE  : CWE-284
+  File : src/Controller/AdminController.php:1-1
+
+  Description:
+    The controller action is reachable without any access-control
+    check.
+
+  Vulnerable Code:
+    public function delete(): Response
+
+  Attack Vector:
+    Any anonymous visitor can invoke the action directly.
+
+  Proof of Concept:
+    GET /admin/delete returns 200 for an unauthenticated client.
+
+  Remediation:
+    Guard the action with #[IsGranted('ROLE_ADMIN')].
+
+  Confidence: 95%
+
+······································································

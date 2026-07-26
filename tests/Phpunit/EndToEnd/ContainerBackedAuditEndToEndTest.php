@@ -73,6 +73,34 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
     }
 
     /**
+     * Golden-masters every remaining `--format` renderer (console, executive,
+     * html, markdown, junit, github) written via `--output` — the clean
+     * renderer output, free of presenter chrome and streamed progress — so a
+     * change to any output format surfaces as a snapshot diff.
+     */
+    #[DataProvider('textReportFormatCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_default_config_run_matches_the_committed_text_report_snapshot(string $format, string $snapshot): void
+    {
+        self::assertSame(
+            trim((string) file_get_contents(__DIR__.'/__snapshots__/'.$snapshot)),
+            trim($this->normalizeTextReport($this->renderToFile(['model' => 'gpt-4o'], $format))),
+        );
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function textReportFormatCases(): iterable
+    {
+        yield 'console' => ['console', 'default-audit.console.txt'];
+        yield 'executive' => ['executive', 'default-audit.executive.txt'];
+        yield 'html' => ['html', 'default-audit.html'];
+        yield 'markdown' => ['markdown', 'default-audit.markdown.txt'];
+        yield 'junit' => ['junit', 'default-audit.junit.xml'];
+        yield 'github' => ['github', 'default-audit.github.txt'];
+    }
+
+    /**
      * @param array<string, mixed> $config
      */
     #[DataProvider('configMatrixCases')]
@@ -248,15 +276,44 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
 
     private function execute(Kernel $kernel, string $format): string
     {
+        $commandTester = new CommandTester($this->auditCommand($kernel));
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--format' => $format]);
+
+        return $commandTester->getDisplay();
+    }
+
+    /**
+     * Renders through `--output` so the returned string is the renderer's file
+     * output alone — no presenter header or streamed progress to strip.
+     *
+     * @param array<string, mixed> $config
+     */
+    private function renderToFile(array $config, string $format): string
+    {
+        $outputFile = $this->fixtureDir.'/report.out';
+        $commandTester = new CommandTester($this->auditCommand($this->boot($config)));
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--format' => $format, '--output' => $outputFile]);
+
+        return (string) file_get_contents($outputFile);
+    }
+
+    private function auditCommand(Kernel $kernel): AuditCommand
+    {
         $testContainer = $kernel->getContainer()->get('test.service_container');
         self::assertInstanceOf(TestContainer::class, $testContainer);
         $auditCommand = $testContainer->get(AuditCommand::class);
         self::assertInstanceOf(AuditCommand::class, $auditCommand);
 
-        $commandTester = new CommandTester($auditCommand);
-        $commandTester->execute(['project-path' => $this->fixtureDir, '--format' => $format]);
+        return $auditCommand;
+    }
 
-        return $commandTester->getDisplay();
+    private function normalizeTextReport(string $report): string
+    {
+        $normalized = str_replace($this->fixtureDir, 'PROJECT_PATH', $report);
+        $normalized = (string) preg_replace('/AUDIT-[0-9A-F]{8}/', 'AUDIT-XXXXXXXX', $normalized);
+        $normalized = (string) preg_replace('/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/', 'TIMESTAMP', $normalized);
+
+        return (string) preg_replace('/\d+\.\d+s/', 'DURATIONs', $normalized);
     }
 
     /**

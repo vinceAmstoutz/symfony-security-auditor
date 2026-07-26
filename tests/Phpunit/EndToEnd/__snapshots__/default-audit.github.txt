@@ -1,0 +1,1 @@
+::error file=src/Controller/AdminController.php,line=1,title=Unprotected administrative action::The controller action is reachable without any access-control check.%0A%0ARemediation: Guard the action with #[IsGranted('ROLE_ADMIN')].

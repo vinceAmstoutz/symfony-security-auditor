@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content="vinceamstoutz/symfony-security-auditor" />
+    <title>Security Audit Report — PROJECT_PATH</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        line-height: 1.5;
+        margin: 0 auto;
+        max-width: 60rem;
+        padding: 2rem 1rem;
+      }
+      h1 {
+        margin-bottom: 0.25rem;
+      }
+      .risk {
+        display: inline-block;
+        font-weight: 700;
+        padding: 0.15rem 0.6rem;
+        border-radius: 0.4rem;
+        color: #fff;
+      }
+      .risk-critical {
+        background: #7f1d1d;
+      }
+      .risk-high {
+        background: #b91c1c;
+      }
+      .risk-medium {
+        background: #b45309;
+      }
+      .risk-low {
+        background: #2563eb;
+      }
+      .risk-safe {
+        background: #15803d;
+      }
+      dl.meta {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.25rem 1rem;
+      }
+      dl.meta dt {
+        font-weight: 600;
+      }
+      dl.meta dd {
+        margin: 0;
+      }
+      .safe {
+        color: #15803d;
+        font-weight: 600;
+      }
+      section.charts h3 {
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      svg.chart {
+        display: block;
+        max-width: 100%;
+        margin-bottom: 1.25rem;
+      }
+      svg.chart text {
+        fill: currentColor;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        font-size: 12px;
+      }
+      svg.chart text.bar-count {
+        font-weight: 600;
+      }
+      svg.chart rect.bar-critical {
+        fill: #7f1d1d;
+      }
+      svg.chart rect.bar-high {
+        fill: #b91c1c;
+      }
+      svg.chart rect.bar-medium {
+        fill: #b45309;
+      }
+      svg.chart rect.bar-low {
+        fill: #2563eb;
+      }
+      svg.chart rect.bar-info {
+        fill: #6b7280;
+      }
+      svg.chart rect.bar-type {
+        fill: #475569;
+      }
+      article.finding {
+        border: 1px solid #8884;
+        border-left-width: 0.4rem;
+        border-radius: 0.4rem;
+        margin: 1rem 0;
+        padding: 0 1rem 1rem;
+      }
+      article.severity-critical {
+        border-left-color: #7f1d1d;
+      }
+      article.severity-high {
+        border-left-color: #b91c1c;
+      }
+      article.severity-medium {
+        border-left-color: #b45309;
+      }
+      article.severity-low {
+        border-left-color: #2563eb;
+      }
+      article.severity-info {
+        border-left-color: #6b7280;
+      }
+      .badge {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      pre {
+        background: #8881;
+        border-radius: 0.3rem;
+        overflow-x: auto;
+        padding: 0.75rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Security Audit Report</h1>
+    <p>
+      Risk level:
+      <span class="risk risk-low">LOW</span> (score
+      10)
+    </p>
+    <dl class="meta">
+      <dt>Audit ID</dt>
+      <dd>AUDIT-XXXXXXXX</dd>
+      <dt>Project</dt>
+      <dd>PROJECT_PATH</dd>
+      <dt>Started</dt>
+      <dd>TIMESTAMP</dd>
+      <dt>Duration</dt>
+      <dd>DURATIONs</dd>
+      <dt>Files scanned</dt>
+      <dd>3</dd>
+      <dt>Tokens</dt>
+      <dd>0 in / 0 out</dd>
+      <dt>Model</dt>
+      <dd>gpt-4o</dd>
+    </dl>
+     <section class="charts"><h2>Distribution</h2><h3>By severity</h3><svg class="chart" viewBox="0 0 600 24" role="img" aria-label="Findings by severity"><text class="bar-label" x="0" y="16">🔴 CRITICAL</text><rect class="bar bar-critical" x="250" y="5" width="290.0" height="14" rx="2" /><text class="bar-count" x="548.0" y="16">1</text></svg><h3>By type</h3><svg class="chart" viewBox="0 0 600 24" role="img" aria-label="Findings by vulnerability type"><text class="bar-label" x="0" y="16">broken_access_control</text><rect class="bar bar-type" x="250" y="5" width="290.0" height="14" rx="2" /><text class="bar-count" x="548.0" y="16">1</text></svg></section> <h2>Vulnerabilities (1 total)</h2><article class="finding severity-critical">
+  <h3>
+    <span class="badge">🔴 CRITICAL</span>
+    Unprotected administrative action
+  </h3>
+  <dl class="meta">
+    <dt>ID</dt>
+    <dd>VULN-0231AA7A</dd>
+    <dt>Type</dt>
+    <dd>broken_access_control</dd>
+    <dt>OWASP</dt>
+    <dd>OWASP A01:2025 - Broken Access Control</dd>
+    <dt>CWE</dt>
+    <dd>CWE-284</dd>
+    <dt>Location</dt>
+    <dd>src/Controller/AdminController.php:1-1</dd>
+    <dt>Confidence</dt>
+    <dd>95%</dd>
+  </dl>
+  <h4>Description</h4>
+  <p>The controller action is reachable without any access-control check.</p>
+  <h4>Vulnerable code</h4>
+  <pre>public function delete(): Response</pre>
+  <h4>Attack vector</h4>
+  <p>Any anonymous visitor can invoke the action directly.</p>
+  <h4>Proof of concept</h4>
+  <pre>GET /admin/delete returns 200 for an unauthenticated client.</pre>
+  
+  <h4>Remediation</h4>
+  <p>Guard the action with #[IsGranted(&#039;ROLE_ADMIN&#039;)].</p>
+  
+</article>
+    <footer>
+      <p><small>Generated by <a href="https://github.com/vinceamstoutz/symfony-security-auditor">vinceamstoutz/symfony-security-auditor</a>.</small></p>
+    </footer>
+  </body>
+</html>

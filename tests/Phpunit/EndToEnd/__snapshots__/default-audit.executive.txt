@@ -1,0 +1,30 @@
+
+══════════════════════════════════════════════════════════════════════
+  EXECUTIVE SUMMARY — SECURITY AUDIT
+  PROJECT_PATH
+══════════════════════════════════════════════════════════════════════
+
+  Audited : TIMESTAMP (3 files, DURATIONs)
+  Audit ID: AUDIT-XXXXXXXX
+
+──────────────────────────────────────────────────────────────────────
+  RISK LEVEL: LOW  (Score: 10)
+──────────────────────────────────────────────────────────────────────
+
+  Low business exposure: fold the fixes into routine maintenance.
+
+  1 validated finding(s) across 1 file(s).
+
+  BY SEVERITY
+  🔴 CRITICAL                                         1
+
+  BY TYPE
+  broken_access_control                              1
+
+  TOP AFFECTED FILES (of 1)
+  src/Controller/AdminController.php                 1
+
+──────────────────────────────────────────────────────────────────────
+  Findings are validated by a reviewer agent but not human-triaged.
+  Run with --format=console for the full technical detail of each one.
+──────────────────────────────────────────────────────────────────────
