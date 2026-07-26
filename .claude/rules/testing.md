@@ -19,6 +19,65 @@ on private helpers, verifies through external means (e.g. reading a database row
 instead of calling the public getter). Warning sign: renaming a private method
 breaks the suite while behavior is unchanged.
 
+## What 100% MSI Does Not Catch
+
+100% mutation score and 100% line coverage are a **floor, not a ceiling**. They
+prove every line that exists is exercised by an assertion that would fail if the
+line were mutated. They say nothing about three whole classes of defect — which
+is why an external review pass keeps surfacing real medium/high/critical
+findings on a green, 100%-MSI tree:
+
+1. **Missing code.** A missing null-guard, an unhandled response shape, an
+   absent branch — Infection can only mutate lines that exist, so an absence is
+   invisible. Most severe findings in a mature codebase are absences.
+2. **Wrong specifications.** If a test asserts the wrong expected behavior, the
+   mutant still dies and the bug still ships — MSI is self-consistent even when
+   the spec is wrong.
+3. **Composition / wiring defects.** Each unit is correct in isolation; the bug
+   lives in how the compiled container wires them, or in a config combination,
+   or against a real provider's quirks. Unit-level mutants never see it.
+
+Two guards in this suite target these gaps directly — keep them working, do not
+weaken them into shallower checks:
+
+- **Container-backed E2E** (`ContainerBackedAuditEndToEndTest`) boots the real
+  bundle through a kernel and drives `audit:run` from the compiled container,
+  stubbing only the `symfony/ai` platform (at `PlatformInterface`, **not** at
+  `LLMClientInterface`), so `SymfonyAiLLMClient` and its retry / tool-loop /
+  structured-collection collaborators — and the `config/services.php` DI
+  defaults — run end to end. It golden-masters the full JSON and SARIF reports
+  against committed snapshots in `__snapshots__/`, so any unintended behavior or
+  schema drift fails loudly. When a change legitimately alters report output,
+  regenerate the snapshot in the same commit and review the diff. The hand-wired
+  `FullAuditEndToEndTest` stays useful for isolated pipeline shapes, but is
+  **not** a substitute: it validates a graph users never run.
+- **Adversarial-input boundary tests** feed hostile payloads (malformed,
+  truncated, duplicate, wrong-typed) to the parsing/response-shape boundaries —
+  `LLMResponse::parseJson()`, `VulnerabilityFactory`,
+  `TransientFailureClassifier` — because that is where a missing guard becomes a
+  crash or a false SAFE.
+
+## Reproduce-or-Reject: triaging external review findings
+
+AI review scans over-report: they inflate severity and raise plausible-but-wrong
+findings. Do **not** patch a finding on the strength of its description. The
+acceptance test for any reported medium+ finding is a single question:
+
+> Can it be expressed as a failing PHPUnit test — red for the right reason on
+> the current code?
+
+- **Yes → it is real.** That failing test _is_ the regression test; commit it
+  with the fix (red → green). Which suite layer had to grow to express it tells
+  you where the hole was — usually "no E2E ran this config combination."
+- **No → reject it.** A finding no one can turn red is noise; record why and
+  move on. Never add production code, a guard, or a defensive branch for a
+  scenario you cannot make a test reach — that is untested code by definition
+  and it dilutes the signal of the next scan.
+
+This keeps the finding backlog honest and steadily converts each genuine
+discovery into a permanent guard, rather than repeatedly re-running the same
+broad scan to rediscover the same gaps.
+
 ## Anti-Pattern: Horizontal Slices
 
 **Never** write all tests first and then all production code. "Horizontal

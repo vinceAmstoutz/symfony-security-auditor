@@ -1,0 +1,66 @@
+{
+    "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+    "version": "2.1.0",
+    "runs": [
+        {
+            "tool": {
+                "driver": {
+                    "name": "Symfony Security Auditor",
+                    "version": "VERSION",
+                    "informationUri": "https://github.com/vinceamstoutz/symfony-security-auditor",
+                    "rules": [
+                        {
+                            "id": "OWASP A01:2025 - Broken Access Control",
+                            "name": "broken_access_control",
+                            "shortDescription": {
+                                "text": "Broken Access Control"
+                            },
+                            "helpUri": "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/",
+                            "properties": {
+                                "tags": [
+                                    "external/cwe/cwe-284"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
+            "results": [
+                {
+                    "ruleId": "OWASP A01:2025 - Broken Access Control",
+                    "level": "error",
+                    "message": {
+                        "text": "Unprotected administrative action"
+                    },
+                    "partialFingerprints": {
+                        "symfonySecurityAuditor/v1": "SSA-16C53DB2429B"
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uri": "src/Controller/AdminController.php"
+                                },
+                                "region": {
+                                    "startLine": 1,
+                                    "endLine": 1
+                                }
+                            }
+                        }
+                    ],
+                    "properties": {
+                        "security-severity": "9.3",
+                        "cvssV4_0Vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"
+                    }
+                }
+            ],
+            "properties": {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "estimated_cost_usd": 0.0,
+                "primary_model": "gpt-4o"
+            }
+        }
+    ]
+}
