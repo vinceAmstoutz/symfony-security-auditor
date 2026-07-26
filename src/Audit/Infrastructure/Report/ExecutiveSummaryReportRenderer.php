@@ -59,20 +59,29 @@ final readonly class ExecutiveSummaryReportRenderer implements ReportRendererInt
             '{{auditId}}' => $auditReport->auditId(),
             '{{riskLevel}}' => $auditReport->riskLevel(),
             '{{riskScore}}' => $executiveSummary->riskScore,
-            '{{businessImpact}}' => $this->wrapped($this->businessImpact($executiveSummary->riskLevel)),
+            '{{businessImpact}}' => $this->wrapped($this->businessImpact($executiveSummary)),
             '{{body}}' => $this->body($executiveSummary),
         ]);
     }
 
-    private function businessImpact(RiskLevel $riskLevel): string
+    private function businessImpact(ExecutiveSummary $executiveSummary): string
     {
-        return match ($riskLevel) {
+        return match ($executiveSummary->riskLevel) {
             RiskLevel::Critical => 'Immediate action required: findings at this level let an attacker read or alter data they should never reach, or take over a privileged account.',
             RiskLevel::High => 'Action required this sprint: findings at this level are exploitable by a motivated attacker and put user data or business logic at risk.',
             RiskLevel::Medium => 'Plan remediation: no single finding is decisive, but together they weaken defence in depth and shorten the path to a breach.',
             RiskLevel::Low => 'Low business exposure: fold the fixes into routine maintenance.',
-            RiskLevel::Safe => 'No validated findings: this audit identified no business exposure in the scanned surface.',
+            RiskLevel::Safe => $this->safeBusinessImpact($executiveSummary->totalFindings),
         };
+    }
+
+    private function safeBusinessImpact(int $totalFindings): string
+    {
+        if (0 === $totalFindings) {
+            return 'No validated findings: this audit identified no business exposure in the scanned surface.';
+        }
+
+        return 'Negligible business exposure: the validated findings are low-impact — fold the fixes into routine maintenance.';
     }
 
     private function wrapped(string $prose): string

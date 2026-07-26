@@ -72,6 +72,26 @@ final class ExecutiveSummaryReportRendererTest extends AbstractReportRendererTes
     }
 
     /**
+     * A single LOW finding scores 2, below the Safe threshold (< 5), so the
+     * risk level is Safe while the report still carries a validated finding —
+     * the business-impact prose must not claim there were none.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_safe_report_that_still_has_findings_does_not_claim_none_were_found(): void
+    {
+        $output = $this->renderer->render($this->makeReport(
+            $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::LOW),
+        ));
+
+        self::assertStringNotContainsString('No validated findings', $output);
+        self::assertStringContainsString('Negligible business exposure', $output);
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException

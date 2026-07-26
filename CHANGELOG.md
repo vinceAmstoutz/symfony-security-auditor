@@ -70,6 +70,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   longest `VulnerabilityType` value with margin and keeps the count label inside
   the 600px viewBox.
 
+- **The executive summary no longer claims "No validated findings" when it is
+  listing findings.** `ExecutiveSummaryReportRenderer::businessImpact()` mapped
+  `RiskLevel::Safe` to the prose "No validated findings … no business exposure",
+  but Safe is derived as `riskScore < 5`, so a report whose only validated
+  findings are low-impact (a single LOW scores 2, and INFO scores 0) is Safe
+  while `totalVulnerabilities() > 0`. The report then printed that "nothing
+  found" sentence directly above the finding count and severity/type/hotspot
+  breakdown — a self-contradiction. The Safe wording now depends on the finding
+  count: with findings it reads "Negligible business exposure: the validated
+  findings are low-impact …", and only a genuinely empty report keeps the
+  original sentence.
+
 ### Security
 
 - **`privacy.offline_only` no longer treats an IPv4-mapped IPv6 endpoint as
