@@ -104,24 +104,9 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
 
     private function summary(AuditReport $auditReport): string
     {
-        if (0 === $auditReport->totalVulnerabilities()) {
-            return '<p class="safe">No validated vulnerabilities found.</p>';
-        }
-
-        $rows = [];
-        foreach (VulnerabilitySeverity::cases() as $severity) {
-            $count = \count($auditReport->vulnerabilitiesBySeverity($severity));
-            if ($count > 0) {
-                $rows[] = \sprintf(
-                    '<tr class="severity-%s"><th>%s</th><td>%d</td></tr>',
-                    $this->escape($severity->value),
-                    $this->escape($severity->label()),
-                    $count,
-                );
-            }
-        }
-
-        return \sprintf('<table class="summary"><caption>Summary by severity</caption>%s</table>', implode('', $rows));
+        return 0 === $auditReport->totalVulnerabilities()
+            ? '<p class="safe">No validated vulnerabilities found.</p>'
+            : '';
     }
 
     private function body(AuditReport $auditReport): string

@@ -51,6 +51,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   the reader's light/dark preference. A report with no findings renders no
   charts.
 
+### Changed
+
+- **The HTML report no longer repeats the severity counts.** The "Summary by
+  severity" table and the Distribution section's by-severity chart printed the
+  same numbers, one above the other; `HtmlReportRenderer` now emits the chart
+  only (each bar carries its own count as text, so nothing is lost), and the
+  `table.summary` styles are gone from the report template. A report with no
+  findings still shows the "No validated vulnerabilities found." message.
+
 ### Fixed
 
 - **Long vulnerability-type names no longer collide with their bar in the HTML

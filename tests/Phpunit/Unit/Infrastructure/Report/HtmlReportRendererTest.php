@@ -66,6 +66,23 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_states_severity_counts_once_in_the_chart_not_twice(): void
+    {
+        $output = $this->renderer->render($this->makeReport(
+            $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::HIGH),
+        ));
+
+        self::assertStringNotContainsString('<table class="summary"', $output);
+        self::assertStringNotContainsString('Summary by severity', $output);
+        self::assertStringContainsString('aria-label="Findings by severity"', $output);
+    }
+
+    /**
      * @throws InvalidAuditContextException
      */
     public function test_render_shows_safe_message_when_no_vulnerabilities(): void
@@ -121,36 +138,6 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
         self::assertStringContainsString('<h2>Vulnerabilities (1 total)</h2>', $output);
         self::assertStringContainsString('src/Admin/UserController.php', $output);
         self::assertStringContainsString('class="finding severity-high"', $output);
-    }
-
-    /**
-     * @throws InvalidCodeLocationException
-     * @throws InvalidVulnerabilityClassificationException
-     * @throws InvalidAuditContextException
-     * @throws InvalidVulnerabilityNarrativeException
-     */
-    public function test_render_summary_counts_only_present_severities(): void
-    {
-        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::HIGH)));
-
-        self::assertStringContainsString('<tr class="severity-high">', $output);
-        self::assertStringContainsString('<td>1</td></tr>', $output);
-        self::assertStringNotContainsString('<tr class="severity-critical">', $output);
-    }
-
-    /**
-     * @throws InvalidCodeLocationException
-     * @throws InvalidVulnerabilityClassificationException
-     * @throws InvalidAuditContextException
-     * @throws InvalidVulnerabilityNarrativeException
-     */
-    public function test_render_styles_every_summary_row_severity_class(): void
-    {
-        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln()));
-
-        foreach (VulnerabilitySeverity::cases() as $severity) {
-            self::assertStringContainsString('table.summary tr.severity-'.$severity->value, $output);
-        }
     }
 
     /**
@@ -370,25 +357,6 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
 
         self::assertStringContainsString('<dt>CWE</dt>', $output);
         self::assertStringContainsString('<dd>'.VulnerabilityType::SQL_INJECTION->cwe()->label().'</dd>', $output);
-    }
-
-    /**
-     * @throws InvalidCodeLocationException
-     * @throws InvalidVulnerabilityClassificationException
-     * @throws InvalidAuditContextException
-     * @throws InvalidVulnerabilityNarrativeException
-     */
-    public function test_render_summary_table_renders_exactly_one_row_per_present_severity(): void
-    {
-        $output = $this->renderer->render($this->makeReport(
-            $this->makeValidatedVuln(vulnerabilitySeverity: VulnerabilitySeverity::HIGH),
-        ));
-
-        $expectedTable = '<table class="summary"><caption>Summary by severity</caption>'
-            .'<tr class="severity-high"><th>'.VulnerabilitySeverity::HIGH->label().'</th><td>1</td></tr>'
-            .'</table>';
-
-        self::assertStringContainsString($expectedTable, $output);
     }
 
     /**
