@@ -10,6 +10,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Fixed
+
+- **The standalone binaries are published with releases again.** 1.18.0 added
+  `"ext-uri": "*"` to `composer.json` — satisfied on PHP 8.3/8.4 by
+  `league/uri-polyfill`, which declares `provide: {"ext-uri": "*"}` — and
+  `spc dump-extensions`, which collects every `ext-*` requirement in
+  `composer.json`/`composer.lock` and never reads `provide`, emitted `uri` into
+  the list handed to `spc download --for-extensions`. `static-php-cli` 2.8.5 has
+  no `uri` package to build (PHP only gained the extension in 8.5; the release
+  targets 8.3), so all five legs of the binary matrix aborted within a second of
+  starting the build with "`Extension [uri] not exist !`" and the 1.18.0 release
+  carried no binaries at all. `.github/workflows/release.yaml` now drops `uri`
+  alongside the always-compiled core extensions before the list reaches spc; the
+  polyfill shipped inside the PHAR supplies `Uri\Rfc3986\Uri` at runtime,
+  exactly as it already does for the PHP 8.3/8.4 test matrix.
+
 ## [1.18.0] — 2026-07-26 — Airgap
 
 A release about auditing on your own terms — privately, and legibly. The new

@@ -165,9 +165,15 @@ jobs:
           # PHP core extensions (date, …) that `spc download`/`build` reject as
           # non-buildable packages; drop them, then append zlib for the
           # GZ-compressed PHAR wrapper (box.json `compression: GZ`).
+          # `uri` is unbuildable for the mirror-image reason: the root `ext-uri`
+          # requirement is satisfied by league/uri-polyfill's `provide`, which
+          # spc does not read, and the 8.3 target has no uri extension to
+          # compile — so it must be dropped too. Unpinning spc past 2.8.5 makes
+          # this entry redundant, not wrong: `uri` is an internal extension on
+          # spc main.
           raw="$(./spc dump-extensions . --format=text)"
           filtered="$(printf '%s' "$raw" | tr ',' '\n' \
-            | grep -vxE 'core|standard|date|hash|json|pcre|spl|reflection|random|zlib' \
+            | grep -vxE 'core|standard|date|hash|json|pcre|spl|reflection|random|uri|zlib' \
             | paste -sd, -)"
           echo "list=${filtered},zlib" >> "$GITHUB_OUTPUT"
 
