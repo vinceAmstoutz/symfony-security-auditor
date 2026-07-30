@@ -205,7 +205,7 @@ Diagnostic order:
    `ReviewerAgent` to log all incoming candidates, including non-validated ones.
 3. **Raise `audit.max_iterations`** to `5` — the loop stops early when no new
    findings emerge; a stronger pass can surface more.
-4. **Switch to a stronger model** — Claude Opus and GPT-4o consistently
+4. **Switch to a stronger model** — Claude Opus and GPT-5.4 consistently
    outperform small models.
 5. **Check the file actually got scanned** — run with `-vv` to see ingested file
    counts and chunk counts.
@@ -230,13 +230,17 @@ on the model:
 ```yaml
 symfony_security_auditor:
     model:
-        name: 'claude-opus-4-8'
+        name: 'claude-haiku-4-5-20251001'
         options:
             temperature: 0.0
 ```
 
 With `temperature: 0.0` + `cache.enabled: true`, repeated runs on identical code
 become deterministic.
+
+The current Claude generation (Opus 4.7/4.8, Opus 5, Sonnet 5, Fable 5) no
+longer accepts `temperature` and rejects a request that sets it — on those
+models rely on `cache.enabled: true` alone for run-to-run stability.
 
 ## Performance & Cost
 

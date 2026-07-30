@@ -757,14 +757,14 @@ Minimal configuration:
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-8'
+    model: 'claude-opus-5'
 ```
 
 Split-model configuration (larger model for attacking, faster for reviewing):
 
 ```yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-8'
+    attacker_model: 'claude-opus-5'
     reviewer_model: 'claude-haiku-4-5-20251001'
 ```
 

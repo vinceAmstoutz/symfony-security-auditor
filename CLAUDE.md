@@ -161,7 +161,7 @@ Minimal:
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-8'
+    model: 'claude-opus-5'
 ```
 
 One-knob preset (`fast` | `balanced` | `thorough`; explicit keys always win):
@@ -175,7 +175,7 @@ Split-model (larger attacker, faster reviewer):
 
 ```yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-8'
+    attacker_model: 'claude-opus-5'
     reviewer_model: 'claude-haiku-4-5-20251001'
 ```
 

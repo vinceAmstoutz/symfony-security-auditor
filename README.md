@@ -225,7 +225,7 @@ The Flex recipe already created this file — pick your model:
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-8'
+    model: 'claude-opus-5'
 ```
 
 Optionally pick a one-knob preset — `fast`, `balanced` (default), or `thorough`:

@@ -79,7 +79,7 @@ following keys:
 > # $schema: https://raw.githubusercontent.com/vinceamstoutz/symfony-security-auditor/main/resources/schema.json
 >
 > symfony_security_auditor:
->     model: "claude-opus-4-8"
+>     model: "claude-opus-5"
 > ```
 >
 > This gives key completion, type checking, and inline docs as you edit. The
@@ -241,7 +241,7 @@ symfony_security_auditor:
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-8'
+    model: 'claude-opus-5'
 ```
 
 ### Split mode — separate models per role
@@ -249,7 +249,7 @@ symfony_security_auditor:
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-8'   # powerful model for discovery
+    attacker_model: 'claude-opus-5'   # powerful model for discovery
     reviewer_model: 'claude-haiku-4-5-20251001'  # faster model for validation
 ```
 
@@ -258,7 +258,7 @@ symfony_security_auditor:
 ```yaml
 # config/packages/symfony_security_auditor.yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-8'
+    attacker_model: 'claude-opus-5'
     reviewer_model: 'claude-haiku-4-5-20251001'
     scan:
         included_paths:
@@ -390,8 +390,13 @@ supports:
 
 ```yaml
 symfony_security_auditor:
-    model: 'claude-opus-4-8?temperature=0.2'
+    model: 'claude-haiku-4-5-20251001?temperature=0.2'
 ```
+
+> Sampling parameters are model-specific: the current Claude generation (Opus
+> 4.7/4.8, Opus 5, Sonnet 5, Fable 5) no longer accepts `temperature`, `top_p`,
+> or `top_k`, and rejects such a request outright. Steer those models with
+> `effort` or `thinking` instead.
 
 `max_tokens` set this way overrides the bundle's `max_output_tokens` for that
 role. `symfony/ai-bundle`'s own `ai.yaml` platform config additionally accepts
@@ -420,7 +425,7 @@ ai:
 
 ```yaml
 symfony_security_auditor:
-    attacker_model: 'claude-opus-4-8'   # deep reasoning for vuln discovery
+    attacker_model: 'claude-opus-5'   # deep reasoning for vuln discovery
     reviewer_model: 'claude-haiku-4-5-20251001'  # fast + cheap for false-positive filtering
 ```
 
