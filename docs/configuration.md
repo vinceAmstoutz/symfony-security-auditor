@@ -505,7 +505,7 @@ flag's no-terminal fallback and the GitHub Action run plain
 yourself to script any other provider:
 
 ```bash
-symfony-security-auditor init --provider=openai --model=gpt-5.4 --no-interaction
+symfony-security-auditor init --provider=openai --model=gpt-5.6 --no-interaction
 # --env-var omitted → derived as OPENAI_API_KEY
 ```
 
@@ -539,7 +539,7 @@ provider: openai
 platform:
     anthropic: { api_key: '%env(ANTHROPIC_API_KEY)%' }
     openai: { api_key: '%env(OPENAI_API_KEY)%' }
-model: gpt-5.4
+model: gpt-5.6
 ```
 
 ## CLI Reference

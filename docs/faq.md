@@ -143,7 +143,7 @@ No. We recommend the layered approach:
 
 ### How accurate is it?
 
-Accuracy depends on the LLM model. Stronger models (Claude Opus, GPT-5.4, Gemini
+Accuracy depends on the LLM model. Stronger models (Claude Opus, GPT-5.6, Gemini
 3 Pro) produce fewer false positives and catch deeper flaws. The Reviewer agent
 filters Attacker output — only `reviewer_validated` findings appear in the final
 report.
@@ -190,7 +190,7 @@ prompt caching enabled (default):
 | Claude Fable 5 only                 | $6 – $16             |
 | Claude Opus only                    | $3 – $8              |
 | Claude Opus + Haiku (split-model)   | $0.50 – $2           |
-| GPT-5.4 only                        | $3 – $8              |
+| GPT-5.6 only                        | $3 – $8              |
 | DeepSeek / Mistral / Ollama (local) | ~$0 / $0             |
 
 Tips: set `profile: fast` (one attacker iteration, lean pre-scan, code slicing,
@@ -309,7 +309,7 @@ prompt receives the resulting CVE summaries, not your dependency list itself.
 | Highest accuracy  | `attacker_model: claude-opus-5` + `reviewer_model: claude-opus-5`               |
 | Best cost/quality | `attacker_model: claude-opus-5` + `reviewer_model: claude-haiku-4-5-20251001`   |
 | Strong + cheaper  | `attacker_model: claude-sonnet-5` + `reviewer_model: claude-haiku-4-5-20251001` |
-| Cheapest paid     | `model: deepseek-chat` or `mistral-large`                                       |
+| Cheapest paid     | `model: deepseek-chat` or `mistral-large-latest`                                |
 | Offline / free    | `model: llama3.3` via Ollama                                                    |
 | Enterprise        | Azure OpenAI / AWS Bedrock with split-model                                     |
 

@@ -205,7 +205,7 @@ Diagnostic order:
    `ReviewerAgent` to log all incoming candidates, including non-validated ones.
 3. **Raise `audit.max_iterations`** to `5` — the loop stops early when no new
    findings emerge; a stronger pass can surface more.
-4. **Switch to a stronger model** — Claude Opus and GPT-5.4 consistently
+4. **Switch to a stronger model** — Claude Opus and GPT-5.6 consistently
    outperform small models.
 5. **Check the file actually got scanned** — run with `-vv` to see ingested file
    counts and chunk counts.

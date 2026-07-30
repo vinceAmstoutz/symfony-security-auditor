@@ -16,7 +16,7 @@
         },
         "model": {
           "type": "string",
-          "description": "Model id used for both the attacker and reviewer roles, e.g. claude-opus-4-8."
+          "description": "Model id used for both the attacker and reviewer roles, e.g. claude-opus-5."
         },
         "attacker_model": {
           "type": ["string", "null"],
