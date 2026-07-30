@@ -229,10 +229,7 @@ on the model:
 
 ```yaml
 symfony_security_auditor:
-    model:
-        name: 'claude-haiku-4-5-20251001'
-        options:
-            temperature: 0.0
+    model: 'claude-haiku-4-5-20251001?temperature=0.0'
 ```
 
 With `temperature: 0.0` + `cache.enabled: true`, repeated runs on identical code

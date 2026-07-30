@@ -337,12 +337,8 @@ split-model setup above plus per-agent model options (see
 
   ```yaml
   symfony_security_auditor:
-      attacker_model:
-          name: 'claude-opus-5'
-          options:
-              effort: 'high'
-      reviewer_model:
-          name: 'claude-haiku-4-5-20251001'
+      attacker_model: 'claude-opus-5?effort=high'
+      reviewer_model: 'claude-haiku-4-5-20251001'
   ```
 
 - **Reviewer — favour speed.** It validates one finding against context you
@@ -376,22 +372,18 @@ symfony_security_auditor:
     reviewer_max_output_tokens: 2048
 ```
 
-Other params (e.g. `temperature`) flow through the model name:
+Other params (e.g. `temperature`) flow through the model name, using the
+query-string syntax:
 
 ```yaml
-# Query-string
 symfony_security_auditor:
     model: 'claude-haiku-4-5-20251001?temperature=0.1'
-
-# Expanded
-symfony_security_auditor:
-    model:
-        name: 'claude-haiku-4-5-20251001'
-        options:
-            temperature: 0.1
 ```
 
-See [Configuration → Model Options](configuration.md#model-options).
+> `model`, `attacker_model`, and `reviewer_model` are plain strings, so the
+> expanded `{name, options}` mapping that `symfony/ai-bundle`'s own `ai.yaml`
+> accepts for a model is **not** valid here — only the query-string form above
+> works. See [Configuration → Model Options](configuration.md#model-options).
 
 ## Compatibility
 
