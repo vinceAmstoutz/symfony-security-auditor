@@ -79,6 +79,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **CI is green on `1.x` again after `extra.branch-alias` was removed.**
+  Removing it turned every job red — `Lint` on PHPStan, and all nine
+  `Tests + Mutation` legs because Infection runs PHPStan as its static-analysis
+  tool and inherits the same failure. `staabm/phpstan-todo-by`'s
+  `todoBy.sfDeprecation` rule reads the **installed root version** through
+  `Composer\InstalledVersions` and reports every `trigger_deprecation()` whose
+  since-version that root version satisfies; with no alias the root version is
+  the branch name and the three 1.13 deprecations in `SymfonyMapping::create()`,
+  `Vulnerability::create()` and `LLMResponse::create()` were all reported. The
+  alias is restored for both branch keys, and `docs/versioning.md` now records
+  why its value has to stay below the oldest live deprecation so it is not
+  "corrected" into breaking the build again. Removing those three factories is
+  the real fix and belongs to a `MAJOR`.
 - **The standalone binaries are published with releases again.** 1.18.0 added
   `"ext-uri": "*"` to `composer.json` — satisfied on PHP 8.3/8.4 by
   `league/uri-polyfill`, which declares `provide: {"ext-uri": "*"}` — and

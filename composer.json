@@ -115,6 +115,12 @@
         },
         "sort-packages": true
     },
+    "extra": {
+        "branch-alias": {
+            "dev-1.x": "1.0.x-dev",
+            "dev-main": "1.0.x-dev"
+        }
+    },
     "scripts": {
         "auto-scripts": {
             "cache:clear": "symfony-cmd",

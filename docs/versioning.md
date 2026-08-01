@@ -304,6 +304,19 @@ alongside it for static analysis and IDE hints. The only deprecations documented
 in the changelog _without_ a runtime trigger are those with no runtime call site
 to attach one to.
 
+> [!WARNING]
+>
+> `extra.branch-alias` in `composer.json` must stay **below the oldest
+> not-yet-removed deprecation**. `staabm/phpstan-todo-by`'s
+> `todoBy.sfDeprecation` rule resolves the installed root version through
+> `Composer\InstalledVersions` and reports every `trigger_deprecation()` whose
+> since-version that version satisfies. Raising the alias to match the release
+> actually in development, or removing it, therefore turns PHPStan red — and
+> with it every `Tests + Mutation` leg, since Infection runs PHPStan too. It is
+> deliberately not rewritten by `bin/castor release:bump` for this reason. The
+> alias can track reality once the deprecations below it are removed in a
+> `MAJOR`.
+
 ### Currently deprecated
 
 - **`cache.prompt_caching`** (since 1.7) — once set `cache_control: ephemeral`
