@@ -241,6 +241,33 @@ jobs:
             ${{ matrix.asset }}
             ${{ matrix.asset }}.sha256
 
+  installers:
+    name: Attach the installers and config schema
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+
+      - name: Attach the installers and config schema to the release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # zizmor: ignore[superfluous-actions] v3.0.2 -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          overwrite_files: true
+          # Published so the documented URLs can resolve through
+          # `releases/latest/download/` — which always serves the newest
+          # published release — instead of tracking `main`, where an unreleased
+          # change reaches users before the release that carries it.
+          # `resources/schema.json` uploads under its basename, `schema.json`.
+          files: |
+            install.sh
+            install.ps1
+            resources/schema.json
+
   prune:
     name: Prune stale release assets
     runs-on: ubuntu-latest

@@ -13,6 +13,12 @@ SAST tools miss. Provider-agnostic via
 
 ![Symfony Security Auditor](assets/banner.webp?raw=true)
 
+> [!NOTE]
+>
+> `main` holds **exactly the latest release**, so everything documented here is
+> in the version you install. Development happens on
+> [version branches](docs/versioning.md#branches--maintenance).
+
 ## Why this auditor?
 
 Traditional PHP static analysis tools (PHPStan, Psalm) catch type errors. Static

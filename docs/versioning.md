@@ -324,6 +324,50 @@ to attach one to.
   and emit a runtime deprecation when called. Scheduled for removal in the next
   `MAJOR`.
 
+## Branches & maintenance
+
+`main` holds **exactly the latest release** — nothing lands on it except a
+release merge. Development happens on version branches, so the default branch a
+reader lands on always documents a version they can install.
+
+There is one branch per `MAJOR`, plus `main`:
+
+| Branch | Role         | Takes                                             |
+| ------ | ------------ | ------------------------------------------------- |
+| `main` | released     | Release merges only. Always equals the newest tag |
+| `1.x`  | current      | Fixes and features for the next 1.x release       |
+| `2.x`  | next `MAJOR` | Breaking work for a `MAJOR` not yet released      |
+
+A `<N>.x` branch lives for the whole life of that `MAJOR`. It carries fixes and
+features while the `MAJOR` is current, and once the next one ships it keeps the
+same name and becomes that line's maintenance branch — bug fixes only, then
+security fixes only. There are no per-`MINOR` branches: a fix for 1.19 ships as
+1.20 from `1.x` rather than being backported.
+
+Base a change on the branch matching its nature: ordinary work goes to the
+current `<N>.x`, anything breaking goes to the next `MAJOR`'s. Fixes are merged
+forward — `1.x` into `2.x` — so they are never applied twice and the next
+`MAJOR` never regresses behind the current line.
+
+At any release, the `<N>.x` branch is merged into `main` and tagged there.
+
+Because `main` is the default branch, a pull request opens against it by default
+even though almost nothing should land there directly. **Retarget the base** to
+the development branch — `1.x` for ordinary work, `2.x` for breaking work. The
+[Pull request target](../.github/workflows/pr-target.yaml) check enforces that
+the base branch matches the target declared in the pull-request description.
+
+Additions are still marked _Since X.Y_ (see
+[Documenting Additions](../CONTRIBUTING.md#documenting-additions)) so a reader
+can tell which release introduced a key or option.
+
+> [!IMPORTANT]
+>
+> Documentation on `main` describes the latest release, so everything it
+> documents is available in the version you get from Packagist or the installer.
+> Each addition is marked _Since X.Y_ so you can tell when it appeared; if one
+> carries a version later than the one you have installed, upgrade to get it.
+
 ## LLM model identifiers
 
 Model identifiers passed to `model:`, `attacker_model:`, or `reviewer_model:`

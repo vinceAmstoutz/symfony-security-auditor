@@ -16,6 +16,8 @@ the dual-agent loop before you touch code.
 - [Evaluating Detection Quality](#evaluating-detection-quality)
 - [Code Quality](#code-quality)
 - [Writing Tests](#writing-tests)
+- [Which Branch to Target](#which-branch-to-target)
+- [Documenting Additions](#documenting-additions)
 - [Common Tasks](#common-tasks)
 - [Submitting a Pull Request](#submitting-a-pull-request)
 - [Commit Style](#commit-style)
@@ -205,6 +207,47 @@ require a PR-description justification and a linked tracking issue.
 **Domain models** (`src/Audit/Domain/Model/`) are immutable. State changes
 return new instances. See
 [`.claude/rules/domain-models.md`](.claude/rules/domain-models.md).
+
+## Which Branch to Target
+
+`main` holds exactly the latest release, so almost nothing belongs there
+directly. Development happens on version branches:
+
+| Change                                    | Base   |
+| ----------------------------------------- | ------ |
+| Bug fix or new feature for the next minor | `1.x`  |
+| Breaking change, for the next major       | `2.x`  |
+| Release merge                             | `main` |
+
+A pull request opens against `main` by default, so **retarget the base**. Tick
+the same branch under `## Target branch` in the description; the
+`Pull request target` check fails the build when the two disagree. Full
+rationale in [Branches & maintenance](docs/versioning.md#branches--maintenance).
+
+## Documenting Additions
+
+Because `main` tracks the latest release, its documentation matches what users
+can install — but a reader still needs to know which release introduced a key,
+and the config tree rejects an unknown key outright
+(`InvalidConfigurationException` from both the bundle and the standalone binary)
+if they are on an older version.
+
+So when you document a new config key, CLI option or output format, mark it with
+the release that will carry it:
+
+```markdown
+| `audit.new_key` | `bool` | `false` | _Since 1.19._ What it does. |
+```
+
+Use the next unreleased version — the one your `CHANGELOG.md` entry sits under.
+Removals already follow this convention (see `cache.prompt_caching`, marked
+_Deprecated since 1.7_); additions need it for the same reason.
+
+Do not point documentation or examples at a
+`raw.githubusercontent.com/.../main/` URL. User-facing files are published as
+release assets, so reference them through `releases/latest/download/`, which
+always resolves to the newest published release. See
+[Branches & maintenance](docs/versioning.md#branches--maintenance).
 
 ## Common Tasks
 

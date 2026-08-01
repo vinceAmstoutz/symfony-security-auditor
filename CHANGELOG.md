@@ -10,6 +10,73 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **The installers and the config schema are published as release assets.**
+  `README.md` pointed users at
+  `raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh`,
+  and the `# $schema:` modelines in `examples/configs/*.yaml` and
+  `docs/configuration.md` at `main/resources/schema.json` — so every install ran
+  whatever sat on the development branch, and editors autocompleted config keys
+  from it. Because `AuditConfigurationDefinition` does not call
+  `ignoreExtraKeys()`, a key documented before its release makes the audit abort
+  with `InvalidConfigurationException`, and standalone is not spared:
+  `BundleExtensionLoader` loads the same extension the bundle configures.
+  `.github/workflows/release.yaml` gains an `installers` job attaching
+  `install.sh`, `install.ps1` and `resources/schema.json` to each release. The
+  documented URLs still point at `main` for now: `releases/latest/download/`
+  resolves to the newest _published_ release, so it only answers once a release
+  carries these assets. Repointing them is a follow-up, to be done after this
+  job has run — otherwise the documented install command would 404, which is the
+  very breakage this prepares to fix.
+- **A documented branch policy that keeps `main` at the released version.**
+  `docs/versioning.md` defined the BC promise but said nothing about branches,
+  so documentation on the default branch drifted ahead of the newest tag for as
+  long as a release took to prepare — and since `AuditConfigurationDefinition`
+  rejects an unknown key outright, a reader could follow it into
+  `InvalidConfigurationException`. `main` now holds **exactly the latest
+  release**: development happens on `1.x`, breaking work for the next `MAJOR` on
+  `2.x`, and `main` only ever receives a release merge. Everything the default
+  branch documents is therefore installable. `CONTRIBUTING.md` gains the
+  matching branch table and keeps the _Since X.Y_ marking convention so a reader
+  can still tell which release introduced a key.
+- **The pull-request template declares a target, and CI enforces it.** A
+  contributor had no prompt to state a change's impact, and since a pull request
+  opens against the default branch it would land on `main` by default — the one
+  branch that should only receive release merges.
+  `.github/PULL_REQUEST_TEMPLATE.md` gains a `## Target branch` section listing
+  the branches themselves — `1.x`, `2.x`, `main` — rather than SemVer impacts,
+  so there is one question on one axis and no two options that mean the same
+  thing. The new `Pull request target` workflow
+  (`.github/workflows/pr-target.yaml`) fails the build when the template
+  sections are missing, when no box or several are ticked, or when the ticked
+  branch disagrees with the base the pull request was opened against — so a
+  mistargeted branch is caught before review rather than after merge. It matches
+  any `<N>.x` branch, so it needs no edit when a major rolls, and it reads only
+  the event payload, so it needs no checkout, no `uses:` and no permissions.
+
+### Changed
+
+- **CI now runs on version branches.** `.github/workflows/ci.yaml` triggered on
+  pushes to `main` only, so a commit pushed straight to a next-`MAJOR` branch
+  like `2.x` would ship without the test matrix, PHPStan, Deptrac or Infection
+  ever running. The push trigger now also matches `[0-9]+.x`.
+
+### Removed
+
+- **`extra.branch-alias` is gone from `composer.json`.** It declared
+  `{"dev-main": "1.0.x-dev"}` while the project was at 1.18.0 — wrong for
+  eighteen `MINOR` releases, because `bin/castor release:bump` never touched it
+  and nothing else read it. Its only effect was letting a dev version satisfy a
+  numeric constraint such as `^1.19@dev`; requiring a branch directly
+  (`composer require vinceamstoutz/symfony-security-auditor:dev-1.x`) works
+  without it, and nothing depends on this package with a version constraint
+  since it installs as a dev tool. Keeping it would have meant re-pinning it
+  every release to stop it rotting again, for a feature that had already proven
+  unused. `extra` held nothing else, so the whole key is removed. This is not a
+  BC break: `composer.json` metadata is not part of the public API surface in
+  [`docs/versioning.md`](docs/versioning.md).
+
 ### Fixed
 
 - **The standalone binaries are published with releases again.** 1.18.0 added
