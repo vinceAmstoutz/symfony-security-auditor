@@ -79,6 +79,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **CI resolves the root package version deterministically.** Restoring
+  `extra.branch-alias` was not enough: an alias only applies when its key
+  matches the branch Composer manages to infer, and `actions/checkout` produces
+  a depth-1 detached-HEAD checkout with no reachable tags, so the inference —
+  and with it the alias — is unreliable. `todoBy.sfDeprecation` kept reporting
+  the three 1.13 deprecations on `1.x`. `.github/workflows/ci.yaml` now pins
+  `COMPOSER_ROOT_VERSION: 1.0.x-dev` at workflow level, which sets the root
+  version directly and skips inference altogether, and the `Lint` job asserts
+  the resolved version is below the oldest live deprecation before running
+  PHPStan — so a future drift names itself instead of appearing as three
+  unexplained errors.
 - **CI is green on `1.x` again after `extra.branch-alias` was removed.**
   Removing it turned every job red — `Lint` on PHPStan, and all nine
   `Tests + Mutation` legs because Infection runs PHPStan as its static-analysis

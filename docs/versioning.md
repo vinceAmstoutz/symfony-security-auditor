@@ -306,16 +306,25 @@ to attach one to.
 
 > [!WARNING]
 >
-> `extra.branch-alias` in `composer.json` must stay **below the oldest
-> not-yet-removed deprecation**. `staabm/phpstan-todo-by`'s
-> `todoBy.sfDeprecation` rule resolves the installed root version through
-> `Composer\InstalledVersions` and reports every `trigger_deprecation()` whose
-> since-version that version satisfies. Raising the alias to match the release
-> actually in development, or removing it, therefore turns PHPStan red — and
-> with it every `Tests + Mutation` leg, since Infection runs PHPStan too. It is
-> deliberately not rewritten by `bin/castor release:bump` for this reason. The
-> alias can track reality once the deprecations below it are removed in a
-> `MAJOR`.
+> The **resolved root package version** must stay below the oldest
+> not-yet-removed deprecation. `staabm/phpstan-todo-by`'s `todoBy.sfDeprecation`
+> rule reads it through `Composer\InstalledVersions` and reports every
+> `trigger_deprecation()` whose since-version it satisfies, so a root version at
+> or above `1.13` fails PHPStan — and every `Tests + Mutation` leg with it,
+> since Infection runs PHPStan as its static-analysis tool.
+>
+> CI therefore pins `COMPOSER_ROOT_VERSION: 1.0.x-dev` in
+> `.github/workflows/ci.yaml` rather than relying on Composer to guess. The
+> guess depends on the checked-out branch name and on tags being reachable, and
+> holds for neither on a depth-1 detached-HEAD checkout — `extra.branch-alias`
+> alone is not enough, because an alias only applies when its key matches the
+> branch Composer manages to infer. The `Lint` job asserts the resolved version
+> before running PHPStan, so a drift reports itself instead of surfacing as
+> three unexplained deprecation errors.
+>
+> The pin is deliberately not rewritten by `bin/castor release:bump`: raising it
+> to the release actually in development would reintroduce the failure. It can
+> track reality once the deprecations below it are removed in a `MAJOR`.
 
 ### Currently deprecated
 

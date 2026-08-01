@@ -11,6 +11,16 @@ on:
 permissions:
   contents: read
 
+env:
+  # Pin the root package version instead of letting Composer guess it. The guess
+  # depends on the checked-out branch name and on tags being present, neither of
+  # which holds on a depth-1 detached-HEAD checkout, and
+  # staabm/phpstan-todo-by's todoBy.sfDeprecation reports every
+  # trigger_deprecation() whose since-version the root version satisfies — so a
+  # guess above 1.13 fails PHPStan, and Infection with it. Must stay below the
+  # oldest not-yet-removed deprecation; see docs/versioning.md.
+  COMPOSER_ROOT_VERSION: 1.0.x-dev
+
 jobs:
   prettier:
     name: Prettier Check
@@ -81,6 +91,25 @@ jobs:
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Assert the resolved root version stays below the oldest deprecation
+        run: |
+          php -r '
+            require "vendor/autoload.php";
+            $package = "vinceamstoutz/symfony-security-auditor";
+            $oldest = "1.13";
+            $ranges = Composer\InstalledVersions::getVersionRanges($package);
+            $satisfies = Composer\InstalledVersions::satisfies(new Composer\Semver\VersionParser(), $package, ">=" . $oldest);
+            printf("root version ranges: %s\n", $ranges);
+            printf("satisfies >=%s: %s\n", $oldest, $satisfies ? "yes" : "no");
+            if ($satisfies) {
+              fwrite(STDERR, sprintf(
+                "::error::The resolved root version (%s) is at or above %s, so todoBy.sfDeprecation will report every trigger_deprecation() introduced in %s. Set COMPOSER_ROOT_VERSION below it, or remove those deprecations. See docs/versioning.md.\n",
+                $ranges, $oldest, $oldest
+              ));
+              exit(1);
+            }
+          '
 
       - name: Cache Rector result cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
