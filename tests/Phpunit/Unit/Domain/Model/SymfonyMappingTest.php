@@ -38,10 +38,10 @@ final class SymfonyMappingTest extends TestCase
         self::assertEmpty($symfonyMapping->services());
         self::assertEmpty($symfonyMapping->templates());
         self::assertEmpty($symfonyMapping->routeAccessMap());
-        self::assertEmpty($symfonyMapping->firewallRules());
+        self::assertEmpty($symfonyMapping->toApplicationSecurityMap()->perimeterRules());
         self::assertEmpty($symfonyMapping->routeAccessControls());
         self::assertEmpty($symfonyMapping->controllersWithoutAccessCheck());
-        self::assertEmpty($symfonyMapping->voterCapabilities());
+        self::assertEmpty($symfonyMapping->toApplicationSecurityMap()->authorizationRules());
         self::assertEmpty($symfonyMapping->formBindings());
         self::assertSame(0, $symfonyMapping->totalFiles());
     }
@@ -63,7 +63,7 @@ final class SymfonyMappingTest extends TestCase
 
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(voterCapabilities: [$userVoter, $commentVoter]));
 
-        self::assertSame([$userVoter, $commentVoter], $symfonyMapping->voterCapabilities());
+        self::assertSame([$userVoter, $commentVoter], $symfonyMapping->toApplicationSecurityMap()->authorizationRules());
         self::assertSame([$userVoter], $symfonyMapping->votersFor('EDIT', 'User'));
         self::assertSame([$commentVoter], $symfonyMapping->votersFor('VIEW', 'App\\Entity\\Comment'));
         self::assertSame([], $symfonyMapping->votersFor('PUBLISH', 'Post'));
@@ -212,8 +212,8 @@ final class SymfonyMappingTest extends TestCase
 
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['voters' => [$projectFile]]), new AccessControlMap());
 
-        self::assertTrue($symfonyMapping->hasVoterForEntity('User'));
-        self::assertFalse($symfonyMapping->hasVoterForEntity('Post'));
+        self::assertTrue($symfonyMapping->toApplicationSecurityMap()->hasAuthorizationRuleForModel('User'));
+        self::assertFalse($symfonyMapping->toApplicationSecurityMap()->hasAuthorizationRuleForModel('Post'));
     }
 
     /**
@@ -229,8 +229,8 @@ final class SymfonyMappingTest extends TestCase
 
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['voters' => [$projectFile]]), new AccessControlMap());
 
-        self::assertFalse($symfonyMapping->hasVoterForEntity('User'));
-        self::assertTrue($symfonyMapping->hasVoterForEntity('AdminUser'));
+        self::assertFalse($symfonyMapping->toApplicationSecurityMap()->hasAuthorizationRuleForModel('User'));
+        self::assertTrue($symfonyMapping->toApplicationSecurityMap()->hasAuthorizationRuleForModel('AdminUser'));
     }
 
     /**
@@ -246,7 +246,7 @@ final class SymfonyMappingTest extends TestCase
 
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['voters' => [$projectFile]]), new AccessControlMap());
 
-        self::assertFalse($symfonyMapping->hasVoterForEntity('User.'));
+        self::assertFalse($symfonyMapping->toApplicationSecurityMap()->hasAuthorizationRuleForModel('User.'));
     }
 
     /**
@@ -267,7 +267,7 @@ final class SymfonyMappingTest extends TestCase
         );
 
         $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['controllers' => [$projectFile, $insecure]]), new AccessControlMap());
-        $unprotected = $symfonyMapping->controllersWithoutVoters();
+        $unprotected = $symfonyMapping->toApplicationSecurityMap()->entrypointsWithoutAuthorizationRule();
 
         self::assertCount(1, $unprotected);
         self::assertSame('src/Controller/PublicController.php', $unprotected[0]->relativePath());
@@ -295,6 +295,74 @@ final class SymfonyMappingTest extends TestCase
         self::assertStringContainsString('Entities: 1', $summary);
         self::assertStringContainsString('Routes mapped: 1', $summary);
         self::assertStringContainsString('Firewall rules: 1', $summary);
+    }
+
+    /**
+     * @deprecated covers the four Symfony-named accessors deprecated in 1.19 until they are removed in 2.0 — each must keep returning what its neutral counterpart does.
+     */
+    #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
+    public function test_deprecated_voter_capabilities_still_returns_the_authorization_rules(): void
+    {
+        $voterCapability = new VoterCapability(
+            filePath: 'src/Security/UserVoter.php',
+            className: 'App\\Security\\UserVoter',
+            supportedAttributes: ['EDIT'],
+            supportedSubjects: ['App\\Entity\\User'],
+        );
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(voterCapabilities: [$voterCapability]));
+
+        $this->expectUserDeprecationMessageMatches('/SymfonyMapping::voterCapabilities\(\) is deprecated, use ApplicationSecurityMap::authorizationRules\(\) instead\./');
+
+        self::assertSame([$voterCapability], $symfonyMapping->voterCapabilities());
+    }
+
+    /**
+     * @deprecated covers a 1.19 deprecation until 2.0.
+     */
+    #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
+    public function test_deprecated_firewall_rules_still_returns_the_perimeter_rules(): void
+    {
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap(firewallRules: ['^/admin']));
+
+        $this->expectUserDeprecationMessageMatches('/SymfonyMapping::firewallRules\(\) is deprecated, use ApplicationSecurityMap::perimeterRules\(\) instead\./');
+
+        self::assertSame(['^/admin'], $symfonyMapping->firewallRules());
+    }
+
+    /**
+     * @deprecated covers a 1.19 deprecation until 2.0.
+     *
+     * @throws InvalidProjectFileException
+     */
+    #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
+    public function test_deprecated_controllers_without_voters_still_returns_the_unguarded_entrypoints(): void
+    {
+        $projectFile = $this->makeFile('src/Controller/A.php');
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['controllers' => [$projectFile]]), new AccessControlMap());
+
+        $this->expectUserDeprecationMessageMatches('/SymfonyMapping::controllersWithoutVoters\(\) is deprecated, use ApplicationSecurityMap::entrypointsWithoutAuthorizationRule\(\) instead\./');
+
+        self::assertSame([$projectFile], $symfonyMapping->controllersWithoutVoters());
+    }
+
+    /**
+     * @deprecated covers a 1.19 deprecation until 2.0.
+     *
+     * @throws InvalidProjectFileException
+     */
+    #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
+    public function test_deprecated_has_voter_for_entity_still_answers_for_the_model(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Security/UserVoter.php',
+            '/app/src/Security/UserVoter.php',
+            '<?php class UserVoter { public function supports($a, $s): bool { return $s instanceof User; } }',
+        );
+        $symfonyMapping = SymfonyMapping::of(ProjectFileInventory::fromGroups(['voters' => [$projectFile]]), new AccessControlMap());
+
+        $this->expectUserDeprecationMessageMatches('/SymfonyMapping::hasVoterForEntity\(\) is deprecated, use ApplicationSecurityMap::hasAuthorizationRuleForModel\(\) instead\./');
+
+        self::assertTrue($symfonyMapping->hasVoterForEntity('User'));
     }
 
     /**
@@ -335,7 +403,7 @@ final class SymfonyMappingTest extends TestCase
         self::assertSame($services, $symfonyMapping->services());
         self::assertSame($templates, $symfonyMapping->templates());
         self::assertSame(['/admin' => ['ROLE_ADMIN']], $symfonyMapping->routeAccessMap());
-        self::assertSame(['^/admin'], $symfonyMapping->firewallRules());
+        self::assertSame(['^/admin'], $symfonyMapping->toApplicationSecurityMap()->perimeterRules());
 
         self::assertEquals(
             SymfonyMapping::of(

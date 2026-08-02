@@ -18,11 +18,25 @@ final readonly class SymfonyMapping
     private function __construct(
         private ProjectFileInventory $projectFileInventory,
         private AccessControlMap $accessControlMap,
+        private ApplicationSecurityMap $applicationSecurityMap,
     ) {}
 
     public static function of(ProjectFileInventory $projectFileInventory, AccessControlMap $accessControlMap): self
     {
-        return new self($projectFileInventory, $accessControlMap);
+        return new self(
+            $projectFileInventory,
+            $accessControlMap,
+            ApplicationSecurityMap::of($projectFileInventory, $accessControlMap),
+        );
+    }
+
+    /**
+     * The same survey under framework-neutral names. The Symfony-named accessors
+     * below are deprecated in favour of it.
+     */
+    public function toApplicationSecurityMap(): ApplicationSecurityMap
+    {
+        return $this->applicationSecurityMap;
     }
 
     /**
@@ -125,10 +139,16 @@ final readonly class SymfonyMapping
         return $this->accessControlMap->routeAccessMap();
     }
 
-    /** @return list<string> */
+    /**
+     * @return list<string>
+     *
+     * @deprecated since 1.19, use {@see ApplicationSecurityMap::perimeterRules()} via {@see self::toApplicationSecurityMap()} instead.
+     */
     public function firewallRules(): array
     {
-        return $this->accessControlMap->firewallRules();
+        trigger_deprecation('vinceamstoutz/symfony-security-auditor', '1.19', 'SymfonyMapping::firewallRules() is deprecated, use ApplicationSecurityMap::perimeterRules() instead.');
+
+        return $this->applicationSecurityMap->perimeterRules();
     }
 
     /** @return list<RouteAccessControl> */
@@ -143,10 +163,16 @@ final readonly class SymfonyMapping
         return $this->accessControlMap->controllersWithoutAccessCheck();
     }
 
-    /** @return list<VoterCapability> */
+    /**
+     * @return list<VoterCapability>
+     *
+     * @deprecated since 1.19, use {@see ApplicationSecurityMap::authorizationRules()} via {@see self::toApplicationSecurityMap()} instead.
+     */
     public function voterCapabilities(): array
     {
-        return $this->accessControlMap->voterCapabilities();
+        trigger_deprecation('vinceamstoutz/symfony-security-auditor', '1.19', 'SymfonyMapping::voterCapabilities() is deprecated, use ApplicationSecurityMap::authorizationRules() instead.');
+
+        return $this->applicationSecurityMap->authorizationRules();
     }
 
     /** @return list<VoterCapability> */
@@ -172,15 +198,26 @@ final readonly class SymfonyMapping
         return $this->projectFileInventory->totalFiles();
     }
 
+    /**
+     * @deprecated since 1.19, use {@see ApplicationSecurityMap::hasAuthorizationRuleForModel()} via {@see self::toApplicationSecurityMap()} instead.
+     */
     public function hasVoterForEntity(string $entityName): bool
     {
-        return $this->projectFileInventory->hasVoterForEntity($entityName);
+        trigger_deprecation('vinceamstoutz/symfony-security-auditor', '1.19', 'SymfonyMapping::hasVoterForEntity() is deprecated, use ApplicationSecurityMap::hasAuthorizationRuleForModel() instead.');
+
+        return $this->applicationSecurityMap->hasAuthorizationRuleForModel($entityName);
     }
 
-    /** @return list<ProjectFile> */
+    /**
+     * @return list<ProjectFile>
+     *
+     * @deprecated since 1.19, use {@see ApplicationSecurityMap::entrypointsWithoutAuthorizationRule()} via {@see self::toApplicationSecurityMap()} instead.
+     */
     public function controllersWithoutVoters(): array
     {
-        return $this->projectFileInventory->controllersWithoutVoters();
+        trigger_deprecation('vinceamstoutz/symfony-security-auditor', '1.19', 'SymfonyMapping::controllersWithoutVoters() is deprecated, use ApplicationSecurityMap::entrypointsWithoutAuthorizationRule() instead.');
+
+        return $this->applicationSecurityMap->entrypointsWithoutAuthorizationRule();
     }
 
     public function toSummary(): string

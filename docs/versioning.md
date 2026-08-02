@@ -171,6 +171,25 @@ deprecated by the other.
   location in one shot, and the `Release Guard` workflow fails the tag push if
   any pin does not match the tag.
 
+### Domain models
+
+- `SymfonyMapping` stays public and fully working. Four of its accessors are
+  **deprecated since 1.19** in favour of the framework-neutral
+  `ApplicationSecurityMap`, reachable via
+  `SymfonyMapping::toApplicationSecurityMap()`:
+
+  | Deprecated                   | Replacement                             |
+  | ---------------------------- | --------------------------------------- |
+  | `voterCapabilities()`        | `authorizationRules()`                  |
+  | `firewallRules()`            | `perimeterRules()`                      |
+  | `controllersWithoutVoters()` | `entrypointsWithoutAuthorizationRule()` |
+  | `hasVoterForEntity()`        | `hasAuthorizationRuleForModel()`        |
+
+  Every other `SymfonyMapping` accessor, and `AuditContext::mapping()`, is
+  undeprecated and keeps its signature for all of `1.x`. `AuditContext` gains
+  `securityMap()` returning the neutral model. Removing `SymfonyMapping` is a
+  `MAJOR` step.
+
 ### Output schemas
 
 - The **JSON report schema** produced by `--format=json`. Keys present today

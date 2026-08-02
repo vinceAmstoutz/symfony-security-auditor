@@ -193,6 +193,15 @@ final class AuditContext implements CoverageRecorderInterface
         return $this->symfonyMapping;
     }
 
+    /**
+     * The mapping under framework-neutral names — what pipeline stages should
+     * read, so core orchestration never names a Symfony concept.
+     */
+    public function securityMap(): ?ApplicationSecurityMap
+    {
+        return $this->symfonyMapping?->toApplicationSecurityMap();
+    }
+
     /** @return array<string, Vulnerability> */
     public function vulnerabilities(): array
     {

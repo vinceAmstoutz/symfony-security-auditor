@@ -88,7 +88,7 @@ final readonly class MappingStage implements StageInterface
         $auditContext->setMeta('mapping.controllers', \count($projectFileInventory->controllers()));
         $auditContext->setMeta('mapping.entities', \count($projectFileInventory->entities()));
         $auditContext->setMeta('mapping.voters', \count($projectFileInventory->voters()));
-        $auditContext->setMeta('mapping.no_voter_controllers', \count($symfonyMapping->controllersWithoutVoters()));
+        $auditContext->setMeta('mapping.no_voter_controllers', \count($symfonyMapping->toApplicationSecurityMap()->entrypointsWithoutAuthorizationRule()));
         $auditContext->setMeta('mapping.routes', \count($routeAccessControls));
         $auditContext->setMeta('mapping.routes_without_access_check', \count($symfonyMapping->controllersWithoutAccessCheck()));
         $auditContext->setMeta('mapping.voter_capabilities', \count($voterCapabilities));
@@ -96,7 +96,7 @@ final readonly class MappingStage implements StageInterface
 
         $this->logger->info('Mapping complete', [
             'summary' => $symfonyMapping->toSummary(),
-            'unprotected_controllers' => \count($symfonyMapping->controllersWithoutVoters()),
+            'unprotected_controllers' => \count($symfonyMapping->toApplicationSecurityMap()->entrypointsWithoutAuthorizationRule()),
             'routes_without_access_check' => \count($symfonyMapping->controllersWithoutAccessCheck()),
             'voter_capabilities' => \count($voterCapabilities),
             'form_bindings' => \count($formBindings),

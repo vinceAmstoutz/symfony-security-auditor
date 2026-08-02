@@ -69,7 +69,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
 
         $noVoterList = implode("\n", array_map(
             static fn (ProjectFile $projectFile): string => \sprintf('  - %s', self::sanitizePathLine($projectFile->relativePath())),
-            $symfonyMapping->controllersWithoutVoters(),
+            $symfonyMapping->toApplicationSecurityMap()->entrypointsWithoutAuthorizationRule(),
         ));
 
         $firewallRules = SymfonyMappingContextRenderer::renderFirewallRules($symfonyMapping);

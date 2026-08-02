@@ -12,6 +12,34 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **`ApplicationSecurityMap` names the project survey after what each surface
+  _is_.** `SymfonyMapping` is a BC-covered Domain model whose name and most of
+  its 19 accessors hard-code Symfony vocabulary (`voterCapabilities()`,
+  `controllersWithoutVoters()`, `firewallRules()`, `hasVoterForEntity()`), and
+  it leaked into orchestration: `DependencyExpansionStage` guarded on
+  `instanceof SymfonyMapping` and `AuditContext` typed its property against it.
+  The new `Audit\Domain\Model\ApplicationSecurityMap` exposes the same data as
+  `entrypoints()`, `authorizationRules()`,
+  `entrypointsWithoutAuthorizationRule()`, `perimeterRules()`,
+  `hasAuthorizationRuleForModel()` and neutral equivalents of the rest.
+  `SymfonyMapping` now delegates to it and offers `toApplicationSecurityMap()`;
+  `AuditContext` gains `securityMap()` while `mapping()` keeps its signature
+  untouched, so nothing existing breaks. `DependencyExpansionStage` reads the
+  neutral map exclusively and no longer names a Symfony type.
+
+### Deprecated
+
+- **Four `SymfonyMapping` accessors, in favour of `ApplicationSecurityMap`.**
+  `voterCapabilities()` → `authorizationRules()`, `firewallRules()` →
+  `perimeterRules()`, `controllersWithoutVoters()` →
+  `entrypointsWithoutAuthorizationRule()`, `hasVoterForEntity()` →
+  `hasAuthorizationRuleForModel()`. Each still returns exactly what it did and
+  now emits a `trigger_deprecation`, following the `of()`/`create()` precedent
+  set in 1.13. The rest of `SymfonyMapping` — and `AuditContext::mapping()` — is
+  **not** deprecated and works unchanged for all of `1.x`; removing the class is
+  the `MAJOR` step. Every in-tree caller already moved, so the suite runs clean
+  under `failOnDeprecation`.
+
 - **The installers and the config schema are published as release assets.**
   `README.md` pointed users at
   `raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh`,

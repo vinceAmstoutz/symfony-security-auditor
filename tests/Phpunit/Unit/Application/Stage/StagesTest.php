@@ -344,7 +344,7 @@ final class StagesTest extends TestCase
 
         $mapping = $auditContext->mapping();
         self::assertNotNull($mapping);
-        self::assertSame([$capabilityA, $capabilityB], $mapping->voterCapabilities());
+        self::assertSame([$capabilityA, $capabilityB], $mapping->toApplicationSecurityMap()->authorizationRules());
         self::assertSame(2, $auditContext->getMeta('mapping.voter_capabilities'));
     }
 
@@ -371,7 +371,7 @@ final class StagesTest extends TestCase
 
         $mapping = $auditContext->mapping();
         self::assertNotNull($mapping);
-        self::assertSame([], $mapping->voterCapabilities());
+        self::assertSame([], $mapping->toApplicationSecurityMap()->authorizationRules());
     }
 
     /**
@@ -509,7 +509,7 @@ final class StagesTest extends TestCase
 
         $mapping = $auditContext->mapping();
         self::assertNotNull($mapping);
-        self::assertNotEmpty($mapping->firewallRules());
+        self::assertNotEmpty($mapping->toApplicationSecurityMap()->perimeterRules());
     }
 
     /**
@@ -974,7 +974,7 @@ final class StagesTest extends TestCase
 
         $mapping = $auditContext->mapping();
         self::assertNotNull($mapping);
-        $rules = $mapping->firewallRules();
+        $rules = $mapping->toApplicationSecurityMap()->perimeterRules();
         self::assertContains('^/api', $rules);
         self::assertContains('^/admin', $rules);
     }
@@ -1091,7 +1091,7 @@ final class StagesTest extends TestCase
 
         $mapping = $auditContext->mapping();
         self::assertNotNull($mapping);
-        self::assertContains('^/api', $mapping->firewallRules());
+        self::assertContains('^/api', $mapping->toApplicationSecurityMap()->perimeterRules());
     }
 
     /**

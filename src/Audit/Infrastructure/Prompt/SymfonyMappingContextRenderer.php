@@ -43,7 +43,7 @@ final readonly class SymfonyMappingContextRenderer
 
     public static function renderFirewallRules(SymfonyMapping $symfonyMapping): string
     {
-        $firewallRules = $symfonyMapping->firewallRules();
+        $firewallRules = $symfonyMapping->toApplicationSecurityMap()->perimeterRules();
         if ([] === $firewallRules) {
             return '';
         }
@@ -59,7 +59,7 @@ final readonly class SymfonyMappingContextRenderer
 
     public static function renderVoterCoverage(SymfonyMapping $symfonyMapping): string
     {
-        $voterCapabilities = $symfonyMapping->voterCapabilities();
+        $voterCapabilities = $symfonyMapping->toApplicationSecurityMap()->authorizationRules();
         if ([] === $voterCapabilities) {
             return '';
         }

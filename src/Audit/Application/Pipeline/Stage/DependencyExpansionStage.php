@@ -15,11 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
 use Override;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ApplicationSecurityMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 
@@ -58,15 +58,15 @@ final readonly class DependencyExpansionStage implements StageInterface
             return;
         }
 
-        $mapping = $auditContext->mapping();
-        if (!$mapping instanceof SymfonyMapping) {
+        $securityMap = $auditContext->securityMap();
+        if (!$securityMap instanceof ApplicationSecurityMap) {
             return;
         }
 
         $projectFiles = $auditContext->projectFiles();
         $changedPaths = array_flip(array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $projectFiles));
-        $changedVoterAttributes = $this->changedVoterAttributes($changedPaths, $mapping->voterCapabilities());
-        $guardedPaths = $this->guardedControllerPaths($mapping->routeAccessControls(), $changedVoterAttributes);
+        $changedVoterAttributes = $this->changedVoterAttributes($changedPaths, $securityMap->authorizationRules());
+        $guardedPaths = $this->guardedControllerPaths($securityMap->entrypointAccessControls(), $changedVoterAttributes);
 
         $newPaths = array_values(array_filter($guardedPaths, static fn (string $path): bool => !\array_key_exists($path, $changedPaths)));
 
