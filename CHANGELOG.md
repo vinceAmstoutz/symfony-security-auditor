@@ -12,6 +12,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **A report now carries a normalized 0-100 score and an `A`-`F` grade.**
+  `AuditReport::riskScore()` is an unbounded weighted sum, so it grows with
+  every finding and has no ceiling to render against — awkward in a badge, a
+  pull-request comment or a numeric CI gate, all of which need a bounded number.
+  `AuditReport::normalizedScore()` starts at `100` and deducts each finding's
+  `VulnerabilitySeverity::score()` weight, floored at `0`; reusing that one
+  weight table is what keeps the two scales from drifting apart when a severity
+  case changes. `AuditReport::grade()` returns the new
+  `Audit\Domain\Model\SecurityGrade` enum (`A`…`F`), whose boundaries mirror the
+  `riskLevelEnum()` thresholds — `A` is `safe`, `B` is `low`, `C` is `medium`,
+  `D` is `high`, `F` is `critical` — so a report can never read as a healthy
+  grade while its risk level says otherwise. `--format=json` gains the additive
+  root keys `score` and `grade`, and `ExecutiveSummary` carries
+  `normalizedScore` and `grade` beside its existing `riskScore`. `risk_score`
+  and `risk_level` are untouched, so this is purely additive.
 - **The installers and the config schema are published as release assets.**
   `README.md` pointed users at
   `raw.githubusercontent.com/vinceAmstoutz/symfony-security-auditor/main/install.sh`,

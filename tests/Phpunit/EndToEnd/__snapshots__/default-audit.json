@@ -7,6 +7,8 @@
     "files_scanned": 3,
     "risk_score": 10,
     "risk_level": "LOW",
+    "score": 90,
+    "grade": "B",
     "total_vulnerabilities": 1,
     "by_severity": {
         "critical": 1,

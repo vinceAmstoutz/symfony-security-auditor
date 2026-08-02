@@ -239,6 +239,21 @@ final readonly class AuditReport
         );
     }
 
+    /**
+     * The bounded counterpart of {@see riskScore()}: 100 for a clean report,
+     * each finding deducting its severity's `score()` weight, floored at 0.
+     * Reusing that one weight table keeps the two scales from drifting apart.
+     */
+    public function normalizedScore(): int
+    {
+        return max(0, 100 - $this->riskScore());
+    }
+
+    public function grade(): SecurityGrade
+    {
+        return SecurityGrade::fromNormalizedScore($this->normalizedScore());
+    }
+
     public function riskLevel(): string
     {
         return strtoupper($this->riskLevelEnum()->value);
@@ -276,6 +291,8 @@ final readonly class AuditReport
             'files_scanned' => $this->reportIdentity->filesScanned,
             'risk_score' => $this->riskScore(),
             'risk_level' => $this->riskLevel(),
+            'score' => $this->normalizedScore(),
+            'grade' => $this->grade()->value,
             'total_vulnerabilities' => $this->totalVulnerabilities(),
             'by_severity' => $bySeverity,
             'vulnerabilities' => array_map(

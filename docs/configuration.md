@@ -674,6 +674,32 @@ follows the reader's light/dark preference.
 
 ![The HTML report: risk badge, run metadata, distribution charts and one card per finding](../assets/html-report.png?raw=true)
 
+### Normalized score and grade
+
+_Since 1.19._ Alongside `risk_score` — an unbounded weighted sum that grows with
+every finding — a report carries a **normalized score** and a **letter grade**,
+both bounded and both meant to be read at a glance in a badge, a pull-request
+comment or a CI gate.
+
+The normalized score starts at `100` and deducts each finding's severity weight
+(`critical` 10, `high` 7, `medium` 5, `low` 2, `info` 0 — the same table
+`risk_score` sums), floored at `0`. So a clean report scores `100`, and one
+critical finding costs 10 points.
+
+The grade boundaries mirror the `risk_level` thresholds, so the two never
+disagree:
+
+| Grade | Score    | `risk_level` | `risk_score` |
+| ----- | -------- | ------------ | ------------ |
+| `A`   | 96 – 100 | `SAFE`       | 0 – 4        |
+| `B`   | 86 – 95  | `LOW`        | 5 – 14       |
+| `C`   | 71 – 85  | `MEDIUM`     | 15 – 29      |
+| `D`   | 51 – 70  | `HIGH`       | 30 – 49      |
+| `F`   | 0 – 50   | `CRITICAL`   | 50 +         |
+
+`--format=json` exposes them as the additive root keys `score` and `grade`;
+`risk_score` and `risk_level` are unchanged.
+
 ### Exit codes
 
 | Code | Meaning                                                                                                                                                                                                                                                                                                                              |

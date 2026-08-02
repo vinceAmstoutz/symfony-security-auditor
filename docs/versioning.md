@@ -182,7 +182,10 @@ deprecated by the other.
   by baseline suppression — consumed by `audit:diff` to compare two reports.
   Each entry additionally carries a `cvss` object (`version`, `vector`,
   `base_score`) — a heuristic CVSS v4.0 base-metric estimate derived from the
-  finding's type and severity (another additive `MINOR` change).
+  finding's type and severity (another additive `MINOR` change). The report root
+  also carries `score` (a normalized 0-100 health score, since 1.19) and `grade`
+  (its `A`-`F` letter, since 1.19) beside the unchanged `risk_score` and
+  `risk_level` — both additive.
 - The **SARIF 2.1.0 output** produced by `--format=sarif`. The
   `runs[].tool.driver.name`, `informationUri`, and `version` fields are stable.
   The `version` is sourced dynamically from installed Composer metadata, so it
