@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SurfaceArchetype;
 
 final class ProjectFileTest extends TestCase
 {
@@ -34,6 +35,22 @@ final class ProjectFileTest extends TestCase
         );
 
         self::assertSame(ProjectFileType::CONTROLLER, $projectFile->fileType());
+    }
+
+    /**
+     * Lets core logic ask what a file *is* without naming a Symfony concept.
+     *
+     * @throws InvalidProjectFileException
+     */
+    public function test_archetype_returns_the_neutral_shape_of_the_file_type(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/UserController.php',
+            '/app/src/Controller/UserController.php',
+            '<?php',
+        );
+
+        self::assertSame(SurfaceArchetype::HTTP_ENTRYPOINT, $projectFile->archetype());
     }
 
     /**

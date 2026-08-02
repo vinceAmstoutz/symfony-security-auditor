@@ -16,6 +16,13 @@ paths:
 - Vulnerability `id` is deterministic:
   `VULN-{sha1(type+filePath+lineStart)[0..7]}` (no microtime, no title) — do not
   change this scheme.
+- Adding a `ProjectFileType` case requires mapping it in
+  `ProjectFileType::archetype()` — the `match` is exhaustive, so an unmapped
+  case throws at runtime, and `SurfaceArchetypeTest` fails first.
+  `SurfaceArchetype` is the framework-neutral shape core logic switches on; keep
+  `HTTP_ENTRYPOINT` meaning a _route-guarded_ surface, since
+  `isControllerLike()` delegates to it and it decides which files reach the
+  access-control and form-binding maps.
 - Adding a `VulnerabilityType` case requires updating `category()`,
   `owaspReference()`, `owaspReferenceUrl()`, and `cwe()` — nothing else changes.
 - Adding a `VulnerabilitySeverity` case requires updating `score()`, `label()`,
