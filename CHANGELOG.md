@@ -12,6 +12,26 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **`--format=github-comment` and an opt-in `comment-pr` action input post the
+  audit summary to the pull request.** Reviewers had to open the Actions log or
+  download the report artifact to see a result. The new format renders a body
+  sized for a comment rather than a full report: the grade and normalized score
+  as a headline, the run on one line, and the ten most severe findings
+  (`GithubCommentReportRenderer::MAX_ROWS`) as one table row each, with a note
+  naming how many the cap left out so a large report cannot approach GitHub's
+  comment length limit. The body opens with an invisible
+  `<!-- symfony-security-auditor:pr-comment -->` marker, which is how
+  `action.yml`'s new `comment-pr` input (default `false`) finds its own previous
+  comment and `PATCH`es it in place instead of appending one per push; a
+  `comment-url` output names the comment it touched. Like the badge step it runs
+  under `if: always()`, since a run that trips the `fail-on` gate is the one
+  reviewers most need summarized, and it warns and exits 0 — rather than failing
+  the job over a comment — when the format is wrong, no report file exists, or
+  no `GITHUB_TOKEN` was passed. `MarkdownReportRenderer`'s Markdown-injection
+  defenses moved to a shared `MarkdownTextEscaper` so the new renderer inherits
+  them instead of restating them, and it gained `tableCell()` — a `|` or a
+  newline in an LLM-authored finding title would otherwise forge extra table
+  columns or rows.
 - **The GitHub Action can emit a shields.io badge endpoint.** Consumer repos had
   no lightweight visual indicator of audit status — the only way to see a result
   was to open the Actions log or download the report artifact. `action.yml`

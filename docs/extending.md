@@ -484,8 +484,8 @@ instead of `render()`, so that format can mark specific findings as suppressed
 rather than relying on the caller to drop them beforehand.
 
 Trigger them via
-`audit:run --format=console|json|sarif|html|markdown|junit|github` (see
-[`ci.md`](ci.md) for SARIF upload and GitHub annotation workflows).
+`audit:run --format=console|json|sarif|html|markdown|junit|github|github-comment`
+(see [`ci.md`](ci.md) for SARIF upload and GitHub annotation workflows).
 
 ### Adding a new format
 
