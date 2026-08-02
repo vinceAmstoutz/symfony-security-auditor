@@ -134,6 +134,19 @@ final class GithubCommentReportRendererTest extends AbstractReportRendererTestCa
     }
 
     /**
+     * One decimal place, matching every sibling renderer — a comment header is
+     * not the place for sub-100ms precision.
+     *
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_states_the_duration_to_a_single_decimal(): void
+    {
+        $output = $this->renderer->render($this->makeReport());
+
+        self::assertMatchesRegularExpression('/\*\*Duration:\*\* \d+\.\ds/', $output);
+    }
+
+    /**
      * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
@@ -167,6 +180,24 @@ final class GithubCommentReportRendererTest extends AbstractReportRendererTestCa
             \sprintf('Showing the %d most severe of %d findings.', GithubCommentReportRenderer::MAX_ROWS, GithubCommentReportRenderer::MAX_ROWS + 3),
             $output,
         );
+    }
+
+    /**
+     * Without the blank line the note would be parsed as another table row and
+     * render inside the table instead of below it.
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_truncation_note_is_separated_from_the_table_by_a_blank_line(): void
+    {
+        $output = $this->renderer->render($this->makeReport(...$this->manyFindings(
+            GithubCommentReportRenderer::MAX_ROWS + 3,
+        )));
+
+        self::assertStringContainsString("|\n\n_Showing the ", $output);
     }
 
     /**
