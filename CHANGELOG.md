@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **`audit:run --min-score` gates CI on one tunable number.** `--fail-on` gates
+  on severity buckets, so ratcheting a project's bar upward meant reasoning
+  about which bucket to move to and accepting the whole step change that came
+  with it. `--min-score=<0-100>` makes `audit:run` exit `1` when
+  `AuditReport::normalizedScore()` falls below the threshold, so a team can
+  raise the bar one point at a time. It is a second, **independent** gate:
+  `AuditExitCodeResolver::resolve()` fails the run when either the risk level
+  reaches `audit.fail_on` **or** the score falls below `--min-score`, and
+  omitting the option leaves the risk level as the only gate. `action.yml`
+  mirrors it as the `min-score` input. The standalone binary exposes it too,
+  since it shares the same `audit:run` definition.
 - **A report now carries a normalized 0-100 score and an `A`-`F` grade.**
   `AuditReport::riskScore()` is an unbounded weighted sum, so it grows with
   every finding and has no ceiling to render against — awkward in a badge, a

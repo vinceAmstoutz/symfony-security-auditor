@@ -19,5 +19,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 /** @internal not part of the BC promise — see docs/versioning.md */
 interface AuditExitCodeResolverInterface
 {
-    public function resolve(AuditReport $auditReport, RiskLevel $riskLevel): int;
+    /**
+     * @param ?int $minimumScore normalized-score floor; `null` leaves the risk
+     *                           level as the only gate. The audit fails when
+     *                           either gate trips.
+     */
+    public function resolve(AuditReport $auditReport, RiskLevel $riskLevel, ?int $minimumScore = null): int;
 }
