@@ -12,6 +12,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **The GitHub Action can emit a shields.io badge endpoint.** Consumer repos had
+  no lightweight visual indicator of audit status — the only way to see a result
+  was to open the Actions log or download the report artifact. `action.yml`
+  gains an opt-in `update-badge` input (default `false`) and a `badge-path`
+  input (default `.github/security-auditor-badge.json`); when enabled on a
+  `push` event, it writes a
+  [shields.io endpoint](https://shields.io/badges/endpoint-badge) JSON file
+  whose `message` is the report's grade and whose `color` follows it (`A`
+  brightgreen … `F` red). The action **only writes the file** — committing it
+  stays the caller's decision, so the action never pushes to a consumer's
+  repository on their behalf. The badge step runs under `if: always()`, because
+  the audit step exits `1` when it trips the `fail-on` gate and that is
+  precisely the run whose grade must reach the badge; without it the badge would
+  keep showing the last passing grade. `action.yml` also gains a `grade` output
+  beside the existing `highest-severity`, and a `badge-path` output naming the
+  file it wrote.
 - **A report now carries a normalized 0-100 score and an `A`-`F` grade.**
   `AuditReport::riskScore()` is an unbounded weighted sum, so it grows with
   every finding and has no ceiling to render against — awkward in a badge, a
