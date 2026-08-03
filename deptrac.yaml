@@ -10,10 +10,23 @@ deptrac:
       collectors:
         - type: directory
           value: src/Audit/Application/.*
-    - name: Infrastructure
+    - name: SymfonyProfile
       collectors:
         - type: directory
-          value: src/Audit/Infrastructure/.*
+          value: src/Audit/Infrastructure/Prompt/.*
+        - type: classLike
+          value: .*\\Infrastructure\\Scan\\(IsGrantedAttributeParser|PhpParserControllerAccessControlParser|PhpParserFormBindingParser|PhpParserVoterCapabilityParser|RouteAttributeParser|SymfonyYamlSecurityConfigParser)$
+        - type: classLike
+          value: .*\\Infrastructure\\Config\\(AttackerAgentDefinitionFactory|AuditConfigurationDefinition|ContainerParameterRegistrar)$
+    - name: Infrastructure
+      collectors:
+        - type: bool
+          must:
+            - type: directory
+              value: src/Audit/Infrastructure/.*
+          must_not:
+            - type: layer
+              value: SymfonyProfile
     - name: Command
       collectors:
         - type: directory
@@ -33,18 +46,25 @@ deptrac:
     Infrastructure:
       - Domain
       - Application
+    SymfonyProfile:
+      - Domain
+      - Application
+      - Infrastructure
     Command:
       - Application
       - Domain
       - Infrastructure
+      - SymfonyProfile
     Bundle:
       - Application
       - Domain
       - Infrastructure
+      - SymfonyProfile
       - Command
     Standalone:
       - Bundle
       - Application
       - Domain
       - Infrastructure
+      - SymfonyProfile
       - Command
