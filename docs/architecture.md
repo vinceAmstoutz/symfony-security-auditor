@@ -7,6 +7,7 @@ responsibilities, data flow, key design decisions, and extension points.
 ## Table of Contents
 
 - [Layer Overview](#layer-overview)
+  - [The framework-specific boundary](#the-framework-specific-boundary)
 - [Data Flow](#data-flow)
 - [Domain Layer](#domain-layer)
   - [`AuditContext`](#auditcontext--mutable-pipeline-accumulator)
@@ -140,6 +141,32 @@ graph LR
 ```
 
 **Namespace root**: `VinceAmstoutz\SymfonySecurityAuditor\`
+
+### The framework-specific boundary
+
+`deptrac.yaml` splits `Infrastructure` in two. A `SymfonyProfile` layer holds
+everything that only makes sense for a Symfony application:
+
+- `Infrastructure/Prompt/**` — the prompt builders and the `Skill/` blocks,
+  whose wording names controllers, voters, forms, Twig templates and Doctrine
+  repositories.
+- the Symfony source parsers in `Infrastructure/Scan/` — `RouteAttributeParser`,
+  `IsGrantedAttributeParser`, `PhpParserControllerAccessControlParser`,
+  `PhpParserVoterCapabilityParser`, `PhpParserFormBindingParser` and
+  `SymfonyYamlSecurityConfigParser`.
+- the container-building classes in `Infrastructure/Config/` —
+  `AuditConfigurationDefinition`, `AttackerAgentDefinitionFactory` and
+  `ContainerParameterRegistrar`.
+
+The `Infrastructure` layer is then everything under `Infrastructure/` that is
+_not_ in `SymfonyProfile`, and it may not depend on `SymfonyProfile` — `Domain`
+and `Application` already cannot reach `Infrastructure` at all. So the audit
+engine, the LLM client, the caches, the report renderers and the scanners stay
+reusable for a non-Symfony target, while `Command`, the bundle class and the
+standalone entry point are free to wire the Symfony profile up.
+
+Deptrac counts a dependency only when a class is actually used, not when it is
+merely imported, so an unused `use` statement is not a violation.
 
 ## Data Flow
 
