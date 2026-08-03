@@ -39,6 +39,25 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   **not** deprecated and works unchanged for all of `1.x`; removing the class is
   the `MAJOR` step. Every in-tree caller already moved, so the suite runs clean
   under `failOnDeprecation`.
+- **`SurfaceArchetype` gives every scanned file a framework-neutral shape.**
+  `ProjectFileType` is a closed enum of 21 Symfony concepts (`VOTER`,
+  `TWIG_EXTENSION`, `SONATA_ADMIN`, `MESSENGER_HANDLER`, …) and it is
+  load-bearing: 193 references across 42 files in `src/`. A PHP enum cannot be
+  extended, so that taxonomy is the single biggest obstacle to reusing the
+  pipeline for a second framework. The new `Audit\Domain\Model\SurfaceArchetype`
+  describes what a file _does_ — `HTTP_ENTRYPOINT`, `AUTHORIZATION_RULE`,
+  `AUTHENTICATION`, `DOMAIN_MODEL`, `PERSISTENCE_QUERY`, `INPUT_BINDING`,
+  `ASYNC_HANDLER`, `EVENT_HOOK`, `SERIALIZATION`, `TEMPLATE`, `CONFIG`, `OTHER`
+  — and `ProjectFileType::archetype()` maps every case onto exactly one, with
+  `ProjectFile::archetype()` as the accessor. Core logic can now switch on the
+  shape without naming a Symfony concept, while prompts and skill lookup keep
+  the precise type. No case was removed or renamed, so this is purely additive.
+  `ProjectFileType::isControllerLike()` now delegates to `HTTP_ENTRYPOINT`,
+  which is deliberately narrow — a _route-guarded_ action surface. A webhook
+  consumer receives a request but is invoked by the webhook transport rather
+  than a route, so it is an `ASYNC_HANDLER`; widening `HTTP_ENTRYPOINT` would
+  silently change which files reach the access-control and form-binding maps,
+  and a test asserts the two sets stay identical.
 
 - **`--format=github-comment` and an opt-in `comment-pr` action input post the
   audit summary to the pull request.** Reviewers had to open the Actions log or

@@ -321,6 +321,24 @@ selection key off `fileType()` directly. `ProjectFileType` is the single source
 of truth for the file-type vocabulary, referenced by the chunker, the static
 pre-scanner buckets, and the attacker skill-block ordering.
 
+`archetype()` returns the framework-neutral shape of the file — a
+`SurfaceArchetype` case (`HTTP_ENTRYPOINT`, `AUTHORIZATION_RULE`,
+`AUTHENTICATION`, `DOMAIN_MODEL`, `PERSISTENCE_QUERY`, `INPUT_BINDING`,
+`ASYNC_HANDLER`, `EVENT_HOOK`, `SERIALIZATION`, `TEMPLATE`, `CONFIG`, `OTHER`).
+Every `ProjectFileType` case maps onto exactly one, via
+`ProjectFileType::archetype()`. A PHP enum cannot be extended, so the 21-case
+Symfony taxonomy is the biggest obstacle to reusing this pipeline for another
+framework; the archetype is the coarser axis core logic can switch on without
+naming a Symfony concept, and a second framework's taxonomy would map onto the
+same archetypes rather than widening `ProjectFileType`.
+
+`HTTP_ENTRYPOINT` is deliberately narrow — a **route-guarded** action surface,
+which is exactly what `isControllerLike()` means, so that predicate now
+delegates to it. A file whose requests arrive through a transport rather than a
+route (a webhook consumer) is an `ASYNC_HANDLER`, because this archetype decides
+which files reach the access-control and form-binding maps and widening it would
+change that silently. A unit test asserts the two sets stay identical.
+
 ### `SymfonyMapping` — immutable project structure snapshot
 
 Groups `ProjectFile` instances by role and holds `routeAccessMap` and

@@ -38,18 +38,43 @@ enum ProjectFileType: string
     case OTHER = 'other';
 
     /**
+     * The framework-neutral shape of this type, for logic that asks a structural
+     * question rather than a Symfony-specific one. Every case maps to exactly
+     * one archetype; the precise type stays available for prompts and skill
+     * lookup, which do need the Symfony vocabulary.
+     */
+    public function archetype(): SurfaceArchetype
+    {
+        return match ($this) {
+            self::CONTROLLER, self::API_RESOURCE, self::LIVE_COMPONENT, self::EASYADMIN_CRUD => SurfaceArchetype::HTTP_ENTRYPOINT,
+            self::VOTER => SurfaceArchetype::AUTHORIZATION_RULE,
+            self::AUTHENTICATOR, self::LDAP_SERVICE => SurfaceArchetype::AUTHENTICATION,
+            self::ENTITY => SurfaceArchetype::DOMAIN_MODEL,
+            self::REPOSITORY => SurfaceArchetype::PERSISTENCE_QUERY,
+            // A Sonata `AbstractAdmin` self-declares its own routes and
+            // per-action roles too; `INPUT_BINDING` is the closest fit short
+            // of widening `HTTP_ENTRYPOINT`, which `isControllerLike()` locks.
+            self::FORM, self::SONATA_ADMIN => SurfaceArchetype::INPUT_BINDING,
+            self::MESSENGER_HANDLER, self::WEBHOOK_CONSUMER, self::SCHEDULER => SurfaceArchetype::ASYNC_HANDLER,
+            self::EVENT_SUBSCRIBER => SurfaceArchetype::EVENT_HOOK,
+            self::NORMALIZER => SurfaceArchetype::SERIALIZATION,
+            self::TEMPLATE, self::TWIG_EXTENSION => SurfaceArchetype::TEMPLATE,
+            self::CONFIG => SurfaceArchetype::CONFIG,
+            self::PHP, self::OTHER => SurfaceArchetype::OTHER,
+        };
+    }
+
+    /**
      * A `#[AsLiveComponent]`/`#[ApiResource]` class classifies as its own
      * dedicated type (to keep its specialized attacker-skill treatment), but
      * may still declare `#[Route]`/`#[IsGranted]`-guarded actions when it also
      * extends `AbstractController` — the documented pattern for reusing
      * `denyAccessUnlessGranted()`/`addFlash()`. Those actions still need to
-     * reach the access-control/form-binding map.
+     * reach the access-control/form-binding map, which is exactly what
+     * {@see SurfaceArchetype::HTTP_ENTRYPOINT} designates.
      */
     public function isControllerLike(): bool
     {
-        return match ($this) {
-            self::CONTROLLER, self::LIVE_COMPONENT, self::API_RESOURCE, self::EASYADMIN_CRUD => true,
-            default => false,
-        };
+        return SurfaceArchetype::HTTP_ENTRYPOINT === $this->archetype();
     }
 }

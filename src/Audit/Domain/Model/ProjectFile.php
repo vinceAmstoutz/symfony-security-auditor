@@ -88,6 +88,16 @@ final readonly class ProjectFile
         return $this->projectFileType;
     }
 
+    /**
+     * The framework-neutral shape of this file — what core logic switches on so
+     * it need not name a Symfony concept. {@see fileType()} stays the precise
+     * taxonomy for prompts and skill lookup.
+     */
+    public function archetype(): SurfaceArchetype
+    {
+        return $this->projectFileType->archetype();
+    }
+
     public function linesCount(): int
     {
         return $this->linesCount;
