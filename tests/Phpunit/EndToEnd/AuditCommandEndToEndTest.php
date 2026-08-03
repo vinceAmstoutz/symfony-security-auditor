@@ -792,6 +792,38 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_cli_min_score_fails_a_project_the_risk_gate_lets_through(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->highAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--min-score' => '100',
+        ]);
+
+        self::assertSame(Command::FAILURE, $commandTester->getStatusCode());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_cli_min_score_passes_when_the_score_meets_the_threshold(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester($this->highAttackerPayload(), '{"accepted": true}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--min-score' => '1',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_excluded_type_is_dropped_from_report_and_clears_the_exit_code(): void
     {
         $this->createProjectDir();

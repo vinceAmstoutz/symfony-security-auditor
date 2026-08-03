@@ -206,7 +206,7 @@ final class StandaloneApplicationFactoryTest extends TestCase
         $optionNames = array_keys($inputDefinition->getOptions());
 
         self::assertSame([], array_diff(
-            ['format', 'output', 'dry-run', 'no-cache', 'path', 'since', 'baseline', 'generate-baseline', 'fail-on'],
+            ['format', 'output', 'dry-run', 'no-cache', 'path', 'since', 'baseline', 'generate-baseline', 'fail-on', 'min-score'],
             $optionNames,
         ));
     }

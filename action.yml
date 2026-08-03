@@ -39,6 +39,10 @@ inputs:
     description: Minimum aggregate risk level (safe, low, medium, high, critical) that makes the audit exit 1. Leave empty to use the project's audit.fail_on configuration (default critical).
     required: false
     default: ""
+  min-score:
+    description: Minimum normalized score (0-100) below which the audit exits 1. Independent of fail-on — the audit fails when either gate trips. Leave empty to gate on the risk level alone.
+    required: false
+    default: ""
   extra-args:
     description: Additional raw arguments appended verbatim to the audit:run invocation (e.g. "--path=src --no-cache").
     required: false
@@ -62,7 +66,7 @@ inputs:
 
 outputs:
   exit-code:
-    description: The audit command's exit code (0 = passed, 1 = failed the fail-on gate, 2 = budget aborted).
+    description: The audit command's exit code (0 = passed, 1 = failed the fail-on or min-score gate, 2 = budget aborted).
     value: ${{ steps.audit.outputs.exit-code }}
   report-path:
     description: The path the report was written to (mirrors the output input; empty when the report was printed to stdout).
@@ -127,6 +131,7 @@ runs:
         SSA_GENERATE_BASELINE: ${{ inputs.generate-baseline }}
         SSA_SINCE: ${{ inputs.since }}
         SSA_FAIL_ON: ${{ inputs.fail-on }}
+        SSA_MIN_SCORE: ${{ inputs.min-score }}
         SSA_EXTRA_ARGS: ${{ inputs.extra-args }}
       run: |
         set -uo pipefail
@@ -136,6 +141,7 @@ runs:
         if [ -n "$SSA_GENERATE_BASELINE" ]; then args+=("--generate-baseline=$SSA_GENERATE_BASELINE"); fi
         if [ -n "$SSA_SINCE" ]; then args+=("--since=$SSA_SINCE"); fi
         if [ -n "$SSA_FAIL_ON" ]; then args+=("--fail-on=$SSA_FAIL_ON"); fi
+        if [ -n "$SSA_MIN_SCORE" ]; then args+=("--min-score=$SSA_MIN_SCORE"); fi
         # shellcheck disable=SC2206 -- intentional word-splitting of caller-supplied extra args
         if [ -n "$SSA_EXTRA_ARGS" ]; then args+=($SSA_EXTRA_ARGS); fi
 
