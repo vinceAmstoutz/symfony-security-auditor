@@ -195,11 +195,13 @@ Inputs (all optional): `mode` (`bundle`/`standalone`, default `bundle`),
 (`console`/`executive`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`,
 default `sarif`), `output` (default `report.sarif`), `baseline`,
 `generate-baseline`, `since`, `fail-on`
-(`safe`/`low`/`medium`/`high`/`critical`), `extra-args`, `php-version` (default
-`8.3`), `setup-php` (default `true`), `install-dependencies` (default `true`,
-ignored in standalone mode), and `working-directory` (default `.`). Set
-`setup-php: false` / `install-dependencies: false` when your job has already
-done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
+(`safe`/`low`/`medium`/`high`/`critical`), `min-score` (a normalized-score
+floor, 0-100 — independent of `fail-on`, either gate failing fails the audit),
+`extra-args`, `php-version` (default `8.3`), `setup-php` (default `true`),
+`install-dependencies` (default `true`, ignored in standalone mode), and
+`working-directory` (default `.`). Set `setup-php: false` /
+`install-dependencies: false` when your job has already done those steps. Pass
+your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
 
 Outputs: `exit-code`, `report-path`, and — only when `format: json` —
 `findings-count` and `highest-severity` (the report's aggregate `risk_level`).

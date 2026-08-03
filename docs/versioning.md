@@ -86,11 +86,15 @@ is a `MAJOR` change.
   accepted findings).
 - The `--fail-on` option (CI gate threshold; overrides `audit.fail_on`),
   including its accepted values (`safe`, `low`, `medium`, `high`, `critical`).
+- The `--min-score` option (since 1.19) — a second, independent CI gate on the
+  normalized 0-100 score. The audit exits `1` when either gate trips.
 - Exit codes (see [CLI Reference → Exit codes](configuration.md#exit-codes)):
   - `0` — audit completed; aggregate risk level is below the `fail_on` threshold
-    (default `critical`, so `SAFE`/`LOW`/`MEDIUM`/`HIGH` by default).
+    (default `critical`, so `SAFE`/`LOW`/`MEDIUM`/`HIGH` by default) and, when
+    `--min-score` is given, the normalized score is at or above it.
   - `1` — aggregate risk level is at or above the `fail_on` threshold (default
-    `critical`), or the audit itself failed.
+    `critical`), the normalized score is below `--min-score`, or the audit
+    itself failed.
   - `2` — the audit budget could not be honored: either it aborted mid-run
     because the configured token or cost budget was exceeded (partial report
     still emitted), or it never started because an unpriced model makes
@@ -157,11 +161,12 @@ deprecated by the other.
 
 - The composite action defined by `action.yml` at the repository root and its
   input names: `mode`, `project-path`, `format`, `output`, `baseline`,
-  `generate-baseline`, `since`, `fail-on`, `extra-args`, `php-version`,
-  `setup-php`, `install-dependencies`, `working-directory`, and its output
-  names: `exit-code`, `report-path`, `findings-count`, `highest-severity`. New
-  inputs/outputs may be added in a `MINOR`; renaming or removing one is a
-  `MAJOR`. The Marketplace `name` (`Symfony Security Auditor`) is also stable.
+  `generate-baseline`, `since`, `fail-on`, `min-score`, `extra-args`,
+  `php-version`, `setup-php`, `install-dependencies`, `working-directory`, and
+  its output names: `exit-code`, `report-path`, `findings-count`,
+  `highest-severity`. New inputs/outputs may be added in a `MINOR`; renaming or
+  removing one is a `MAJOR`. The Marketplace `name` (`Symfony Security Auditor`)
+  is also stable.
 - **Version pinning.** Consumers pin the action to an exact release tag —
   `uses: vinceamstoutz/symfony-security-auditor@1.18.0` — matching the tag
   format used on Packagist. Bump the pin when upgrading. There is intentionally
