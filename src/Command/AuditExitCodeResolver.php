@@ -21,10 +21,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 final readonly class AuditExitCodeResolver implements AuditExitCodeResolverInterface
 {
     #[Override]
-    public function resolve(AuditReport $auditReport, RiskLevel $riskLevel): int
+    public function resolve(AuditReport $auditReport, RiskLevel $riskLevel, ?int $minimumScore = null): int
     {
-        return $auditReport->riskLevelEnum()->isAtLeast($riskLevel)
-            ? ExitCode::Failure->value
-            : ExitCode::Success->value;
+        $failed = $auditReport->riskLevelEnum()->isAtLeast($riskLevel)
+            || $this->scoreIsBelow($auditReport, $minimumScore);
+
+        return $failed ? ExitCode::Failure->value : ExitCode::Success->value;
+    }
+
+    private function scoreIsBelow(AuditReport $auditReport, ?int $minimumScore): bool
+    {
+        return null !== $minimumScore && $auditReport->normalizedScore() < $minimumScore;
     }
 }
