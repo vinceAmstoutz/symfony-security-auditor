@@ -11,6 +11,7 @@ GitHub Code Scanning or the GitLab Security Dashboard.
 - [GitHub Actions](#github-actions)
   - [Reusable GitHub Action](#reusable-github-action)
   - [Sticky PR comment with the audit summary](#sticky-pr-comment-with-the-audit-summary)
+  - [Live security badge in your README](#live-security-badge-in-your-readme)
 - [GitLab CI](#gitlab-ci)
 - [Output Formats in CI](#output-formats-in-ci)
 
@@ -197,14 +198,16 @@ default `sarif`), `output` (default `report.sarif`), `baseline`,
 `generate-baseline`, `since`, `fail-on`
 (`safe`/`low`/`medium`/`high`/`critical`), `min-score` (a normalized-score
 floor, 0-100 — independent of `fail-on`, either gate failing fails the audit),
-`extra-args`, `php-version` (default `8.3`), `setup-php` (default `true`),
-`install-dependencies` (default `true`, ignored in standalone mode), and
-`working-directory` (default `.`). Set `setup-php: false` /
-`install-dependencies: false` when your job has already done those steps. Pass
-your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
+`update-badge` (default `false`), `badge-path` (default
+`.github/security-auditor-badge.json`), `extra-args`, `php-version` (default
+`8.3`), `setup-php` (default `true`), `install-dependencies` (default `true`,
+ignored in standalone mode), and `working-directory` (default `.`). Set
+`setup-php: false` / `install-dependencies: false` when your job has already
+done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
 
-Outputs: `exit-code`, `report-path`, and — only when `format: json` —
-`findings-count` and `highest-severity` (the report's aggregate `risk_level`).
+Outputs: `exit-code`, `report-path`, `badge-path`, and — only when
+`format: json` — `findings-count`, `highest-severity` (the report's aggregate
+`risk_level`) and `grade` (its `A`-`F` letter).
 
 ```yaml
       - name: Symfony Security Audit
@@ -411,6 +414,51 @@ regardless, while the job itself still fails on the `audit:run` step so
 action to its own comment; give a second sticky-comment step in the same
 workflow (e.g. one posting coverage) a different `header` so the two never
 overwrite each other.
+
+### Live security badge in your README
+
+_Since 1.19._ Set `update-badge: true` and the action writes a
+[shields.io endpoint](https://shields.io/badges/endpoint-badge) JSON file
+carrying the report's [grade](configuration.md#normalized-score-and-grade). The
+action **only writes the file** — committing it stays your workflow's decision,
+so the action never pushes to your repository on your behalf.
+
+It needs a JSON report to read the grade from (`format: json` plus a non-empty
+`output`), and it only runs on `push` events, since a badge should track your
+default branch rather than whichever pull request ran last.
+
+```yaml
+      - name: Symfony Security Audit
+        uses: vinceamstoutz/symfony-security-auditor@1.18.0
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          format: json
+          output: report.json
+          update-badge: true
+
+      - name: Commit the badge
+        if: always()
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add .github/security-auditor-badge.json
+          git diff --quiet --cached || git commit -m 'chore: update the security badge'
+          git push
+```
+
+Both steps use `if: always()` on purpose: the audit exits `1` when it trips the
+`fail-on` (or `--min-score`) gate, and that is exactly the run whose grade you
+want published. The action's own badge step already does this internally.
+
+Then point shields.io at the committed file:
+
+```markdown
+![Security audit](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/<owner>/<repo>/main/.github/security-auditor-badge.json)
+```
+
+The grade maps to a badge color: `A` brightgreen, `B` green, `C` yellow, `D`
+orange, `F` red.
 
 ### JSON report as artifact
 
