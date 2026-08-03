@@ -22,35 +22,30 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
  */
 final readonly class MarkdownTextEscaper
 {
-    /**
-     * LLM-produced narrative text is rendered as raw Markdown; an unescaped
-     * run of backticks OR tildes (CommonMark allows either as a fence marker,
-     * e.g. a ``` or ~~~ fence quoted mid-description) would open a code block
-     * that only closes at the next such run — silently swallowing every
-     * subsequent finding as inert code text once rendered. Backslash-escaping
-     * each backtick/tilde keeps it a literal character instead. CommonMark
-     * also passes raw inline HTML through verbatim, so `<`/`>` are entity-
-     * encoded too — otherwise a payload like `<img onerror=...>` survives
-     * into any downstream Markdown-to-HTML rendering of this report. `#` is
-     * escaped too, since a description/attack-vector/remediation field is
-     * legitimately multi-paragraph (unlike `title`, which is collapsed to one
-     * line by {@see self::heading()}) and an embedded `\n\n## ` would
-     * otherwise forge a fake top-level section heading mid-finding. A raw
-     * backslash already present right before a backtick/tilde must be escaped
-     * *first* — otherwise it combines with the backslash inserted below into
-     * an escaped-backslash-then-live-marker sequence CommonMark still parses
-     * as an open fence. `[`/`]` are escaped too: CommonMark's
-     * `[display text](target)` link syntax needs no fence or heading marker
-     * to work, so an unescaped title could forge a live, clickable link
-     * straight into the rendered report.
-     */
     public static function fences(string $text): string
     {
         $sanitized = TerminalTextSanitizer::stripControlCharacters(mb_scrub($text, 'UTF-8'));
-        $backslashesEscaped = str_replace('\\', '\\\\', $sanitized);
-        $markerEscaped = str_replace(['`', '~', '#', '<', '>', '[', ']'], ['\\`', '\\~', '\\#', '&lt;', '&gt;', '\\[', '\\]'], $backslashesEscaped);
 
-        return self::setextUnderlines($markerEscaped);
+        return self::setextUnderlines(self::escapeStructuralMarkers($sanitized));
+    }
+
+    /**
+     * A backtick/tilde run would open a code fence, `#` a fake heading, and
+     * `[`/`]` a live link — each would swallow or rewrite everything rendered
+     * after it. `<`/`>` are HTML-entity-encoded since CommonMark passes raw
+     * inline HTML through verbatim. A backslash already present is escaped
+     * first, so it can't combine with an escape added below into a sequence
+     * CommonMark still parses as live.
+     */
+    private static function escapeStructuralMarkers(string $text): string
+    {
+        $backslashesEscaped = str_replace('\\', '\\\\', $text);
+
+        return str_replace(
+            ['`', '~', '#', '<', '>', '[', ']'],
+            ['\\`', '\\~', '\\#', '&lt;', '&gt;', '\\[', '\\]'],
+            $backslashesEscaped,
+        );
     }
 
     /**
@@ -65,18 +60,13 @@ final readonly class MarkdownTextEscaper
     }
 
     /**
-     * Backslash escapes do not work inside a CommonMark code span — the
-     * standard way to safely wrap arbitrary text in one is a delimiter longer
-     * than any backtick run the text contains, padded with a leading space if
-     * the text starts with a backtick. `<`/`>` need no manual entity encoding
-     * here: CommonMark renders code-span content as literal text and
-     * HTML-escapes it automatically. A code span cannot contain a blank line
-     * (a blank line is a block-level separator resolved before inline parsing,
-     * so it ends the span no matter how wide the delimiter is), so an
-     * LLM-sourced `filePath` with an embedded `\n\n` would otherwise break out
-     * and render the remainder as live Markdown/HTML — the text is collapsed to
-     * a single line and stripped of control/bidi characters first, the same
-     * defense the sibling console and HTML renderers apply.
+     * A code span can't use backslash escapes, so the delimiter is instead a
+     * backtick run longer than any the text contains, padded with a leading
+     * space if the text starts with a backtick; `<`/`>` need no encoding since
+     * CommonMark renders span content as literal text automatically. A blank
+     * line still ends a span regardless of delimiter width, so the text is
+     * collapsed to a single line first, the same defense the sibling renderers
+     * apply.
      */
     public static function inlineCode(string $text): string
     {
@@ -115,15 +105,12 @@ final readonly class MarkdownTextEscaper
     }
 
     /**
-     * Escaping `#` (see {@see self::fences()}) blocks a forged ATX heading, but
-     * CommonMark also promotes a paragraph line to a heading when the *next*
-     * line is a run of only `=` (H1) or `-` (H2) — a setext underline — with no
-     * `#` involved. A multi-paragraph description/attack-vector/remediation
-     * could therefore still forge a fake section (or, via a `-` run, a `<hr>`
-     * thematic break) mid-finding. Any line consisting solely of `=`/`-` (with
-     * up to three leading spaces, the CommonMark limit) has its run
-     * backslash-escaped so the line is no longer a valid underline yet still
-     * renders as the literal characters.
+     * Escaping `#` blocks a forged ATX heading, but CommonMark also promotes a
+     * paragraph line to a heading when the *next* line is a run of only `=`
+     * (H1) or `-` (H2) — a setext underline, no `#` involved. Any line
+     * consisting solely of `=`/`-` (up to three leading spaces, the CommonMark
+     * limit) has its run backslash-escaped so it renders as literal characters
+     * instead.
      */
     private static function setextUnderlines(string $text): string
     {
