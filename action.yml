@@ -16,7 +16,7 @@ inputs:
     required: false
     default: "."
   format:
-    description: "Output format: console, executive, json, sarif, html, markdown, junit, or github."
+    description: "Output format: console, executive, json, sarif, html, markdown, junit, github, or github-comment."
     required: false
     default: sarif
   output:
@@ -43,6 +43,10 @@ inputs:
     description: Minimum normalized score (0-100) below which the audit exits 1. Independent of fail-on — the audit fails when either gate trips. Leave empty to gate on the risk level alone.
     required: false
     default: ""
+  comment-pr:
+    description: Whether to post the report as a single pull-request comment, editing the previous one in place on every rerun instead of appending. Requires format github-comment plus a non-empty output, a pull_request event, and pull-requests write permission on the calling job's GITHUB_TOKEN (passed as the GITHUB_TOKEN env var).
+    required: false
+    default: "false"
   update-badge:
     description: Whether to write a shields.io endpoint-schema JSON file carrying the report's grade, for a live security badge in your README. Requires format json and a non-empty output. Only runs on push events. The file is written but never committed — that stays your workflow's decision.
     required: false
@@ -91,6 +95,9 @@ outputs:
   badge-path:
     description: The path the shields.io badge endpoint JSON was written to (empty when update-badge is false or no grade was available).
     value: ${{ steps.badge.outputs.badge-path }}
+  comment-url:
+    description: The API URL of the pull-request comment that was posted or updated (empty when comment-pr is false or no comment was posted).
+    value: ${{ steps.comment.outputs.comment-url }}
 
 runs:
   using: composite
@@ -216,3 +223,49 @@ runs:
 
         echo "badge-path=$SSA_BADGE_PATH" >> "$GITHUB_OUTPUT"
         echo "Wrote the shields.io badge endpoint for grade $SSA_GRADE to $SSA_BADGE_PATH."
+
+    # `always()` for the same reason as the badge step: the audit exits 1 on a
+    # tripped gate, and that is exactly the run whose summary reviewers need.
+    - name: Post or update the pull-request comment
+      id: comment
+      if: ${{ always() && inputs.comment-pr == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        SSA_OUTPUT: ${{ inputs.output }}
+        SSA_FORMAT: ${{ inputs.format }}
+        SSA_COMMENTS_URL: ${{ github.event.pull_request.comments_url }}
+      run: |
+        set -euo pipefail
+        if [ "$SSA_FORMAT" != "github-comment" ]; then
+          echo "::warning::comment-pr needs the github-comment format to build a comment body; format is '$SSA_FORMAT'. No comment was posted."
+          exit 0
+        fi
+        if [ -z "$SSA_OUTPUT" ] || [ ! -f "$SSA_OUTPUT" ]; then
+          echo "::warning::comment-pr found no report file at output '$SSA_OUTPUT'. No comment was posted."
+          exit 0
+        fi
+        if [ -z "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
+          echo "::warning::comment-pr needs GITHUB_TOKEN in the calling job's env, and pull-requests write permission on it. No comment was posted."
+          exit 0
+        fi
+
+        # The renderer opens the body with this marker so a rerun edits its own
+        # comment instead of appending another one to the thread.
+        marker='<!-- symfony-security-auditor:pr-comment -->'
+        matches="$RUNNER_TEMP/ssa-comment-matches.txt"
+        gh api --paginate "$SSA_COMMENTS_URL" \
+          --jq ".[] | select(.body | contains(\"$marker\")) | .url" > "$matches"
+        existing="$(head -n 1 "$matches")"
+
+        payload="$RUNNER_TEMP/ssa-comment-payload.json"
+        jq -Rs '{body: .}' < "$SSA_OUTPUT" > "$payload"
+
+        if [ -n "$existing" ]; then
+          url="$(gh api -X PATCH "$existing" --input "$payload" --jq '.url')"
+        else
+          url="$(gh api -X POST "$SSA_COMMENTS_URL" --input "$payload" --jq '.url')"
+        fi
+
+        echo "comment-url=$url" >> "$GITHUB_OUTPUT"
+        echo "Posted the audit summary to $url."

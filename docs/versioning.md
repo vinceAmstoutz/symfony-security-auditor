@@ -81,7 +81,7 @@ is a `MAJOR` change.
 - The `project-path` argument.
 - The `--format` (`-f`) and `--output` (`-o`) options, including the values
   accepted by `--format` (`console`, `executive`, `json`, `sarif`, `html`,
-  `markdown`, `junit`, `github`).
+  `markdown`, `junit`, `github`, `github-comment` — the last added in 1.19).
 - The `--baseline` and `--generate-baseline` options (baseline suppression of
   accepted findings).
 - The `--fail-on` option (CI gate threshold; overrides `audit.fail_on`),
@@ -161,13 +161,13 @@ deprecated by the other.
 
 - The composite action defined by `action.yml` at the repository root and its
   input names: `mode`, `project-path`, `format`, `output`, `baseline`,
-  `generate-baseline`, `since`, `fail-on`, `min-score`, `update-badge`,
-  `badge-path`, `extra-args`, `php-version`, `setup-php`,
+  `generate-baseline`, `since`, `fail-on`, `min-score`, `comment-pr`,
+  `update-badge`, `badge-path`, `extra-args`, `php-version`, `setup-php`,
   `install-dependencies`, `working-directory`, and its output names:
   `exit-code`, `report-path`, `findings-count`, `highest-severity`, `grade`,
-  `badge-path`. New inputs/outputs may be added in a `MINOR`; renaming or
-  removing one is a `MAJOR`. The Marketplace `name` (`Symfony Security Auditor`)
-  is also stable.
+  `badge-path`, `comment-url`. New inputs/outputs may be added in a `MINOR`;
+  renaming or removing one is a `MAJOR`. The Marketplace `name`
+  (`Symfony Security Auditor`) is also stable.
 - **Version pinning.** Consumers pin the action to an exact release tag —
   `uses: vinceamstoutz/symfony-security-auditor@1.18.0` — matching the tag
   format used on Packagist. Bump the pin when upgrading. There is intentionally

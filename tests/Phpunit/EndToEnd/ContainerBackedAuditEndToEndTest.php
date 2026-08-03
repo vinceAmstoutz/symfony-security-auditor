@@ -74,7 +74,7 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
 
     /**
      * Golden-masters every remaining `--format` renderer (console, executive,
-     * html, markdown, junit, github) written via `--output` — the clean
+     * html, markdown, junit, github, github-comment) written via `--output` — the clean
      * renderer output, free of presenter chrome and streamed progress — so a
      * change to any output format surfaces as a snapshot diff.
      */
@@ -98,6 +98,7 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         yield 'markdown' => ['markdown', 'default-audit.markdown.txt'];
         yield 'junit' => ['junit', 'default-audit.junit.xml'];
         yield 'github' => ['github', 'default-audit.github.txt'];
+        yield 'github-comment' => ['github-comment', 'default-audit.github-comment.txt'];
     }
 
     /**

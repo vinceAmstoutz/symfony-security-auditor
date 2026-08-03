@@ -193,21 +193,21 @@ jobs:
 
 Inputs (all optional): `mode` (`bundle`/`standalone`, default `bundle`),
 `project-path` (default `.`), `format`
-(`console`/`executive`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`,
+(`console`/`executive`/`json`/`sarif`/`html`/`markdown`/`junit`/`github`/`github-comment`,
 default `sarif`), `output` (default `report.sarif`), `baseline`,
 `generate-baseline`, `since`, `fail-on`
 (`safe`/`low`/`medium`/`high`/`critical`), `min-score` (a normalized-score
 floor, 0-100 — independent of `fail-on`, either gate failing fails the audit),
-`update-badge` (default `false`), `badge-path` (default
-`.github/security-auditor-badge.json`), `extra-args`, `php-version` (default
-`8.3`), `setup-php` (default `true`), `install-dependencies` (default `true`,
-ignored in standalone mode), and `working-directory` (default `.`). Set
+`comment-pr` (default `false`), `update-badge` (default `false`), `badge-path`
+(default `.github/security-auditor-badge.json`), `extra-args`, `php-version`
+(default `8.3`), `setup-php` (default `true`), `install-dependencies` (default
+`true`, ignored in standalone mode), and `working-directory` (default `.`). Set
 `setup-php: false` / `install-dependencies: false` when your job has already
 done those steps. Pass your provider key via `env:` (e.g. `ANTHROPIC_API_KEY`).
 
-Outputs: `exit-code`, `report-path`, `badge-path`, and — only when
-`format: json` — `findings-count`, `highest-severity` (the report's aggregate
-`risk_level`) and `grade` (its `A`-`F` letter).
+Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, and — only
+when `format: json` — `findings-count`, `highest-severity` (the report's
+aggregate `risk_level`) and `grade` (its `A`-`F` letter).
 
 ```yaml
       - name: Symfony Security Audit
@@ -414,6 +414,44 @@ regardless, while the job itself still fails on the `audit:run` step so
 action to its own comment; give a second sticky-comment step in the same
 workflow (e.g. one posting coverage) a different `header` so the two never
 overwrite each other.
+
+#### Without a third-party action
+
+_Since 1.19._ The action does the same thing itself with `comment-pr: true`,
+paired with `format: github-comment` — a
+[format](configuration.md#github-comment) purpose-built for a comment body:
+grade and score headline, the run on one line, and the ten most severe findings
+as table rows. It opens with an invisible marker, which is how the step finds
+its own previous comment and `PATCH`es it instead of appending a new one.
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write # required to post/update the comment
+
+# …
+
+      - name: Symfony Security Audit
+        uses: vinceamstoutz/symfony-security-auditor@1.18.0
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # required by comment-pr
+        with:
+          format: github-comment
+          output: comment.md
+          comment-pr: true
+          since: origin/${{ github.base_ref }}
+          fail-on: high
+```
+
+`GITHUB_TOKEN` has to be passed explicitly: a composite action cannot read the
+calling workflow's secrets on its own. When it is missing, or the format is not
+`github-comment`, or no report file was produced, the step emits a `::warning::`
+naming the reason and leaves the audit's own exit code untouched rather than
+failing the job over a comment.
+
+The step runs under `if: always()` internally, so a run that trips `--fail-on`
+still posts its summary — that being the run reviewers most need to see.
 
 ### Live security badge in your README
 

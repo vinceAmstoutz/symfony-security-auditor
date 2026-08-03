@@ -146,6 +146,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\Webho
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ExecutiveSummaryReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubCommentReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JunitReportRenderer;
@@ -371,6 +372,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(MarkdownReportRenderer::class);
     $defaultsConfigurator->set(JunitReportRenderer::class);
     $defaultsConfigurator->set(GithubAnnotationsReportRenderer::class);
+    $defaultsConfigurator->set(GithubCommentReportRenderer::class);
     $defaultsConfigurator->set(ExecutiveSummaryReportRenderer::class);
 
     $defaultsConfigurator->set(ReportWriter::class)
