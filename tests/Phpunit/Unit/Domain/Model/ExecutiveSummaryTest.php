@@ -62,6 +62,23 @@ final class ExecutiveSummaryTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_it_carries_the_reports_normalized_score_and_grade(): void
+    {
+        $auditReport = $this->report($this->vulnerability());
+        $executiveSummary = ExecutiveSummary::of($auditReport);
+
+        self::assertSame(
+            [$auditReport->normalizedScore(), $auditReport->grade()],
+            [$executiveSummary->normalizedScore, $executiveSummary->grade],
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_severity_counts_are_ordered_most_severe_first_and_omit_absent_severities(): void
     {
         $executiveSummary = ExecutiveSummary::of($this->report(
