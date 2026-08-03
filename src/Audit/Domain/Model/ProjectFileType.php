@@ -51,8 +51,9 @@ enum ProjectFileType: string
             self::AUTHENTICATOR, self::LDAP_SERVICE => SurfaceArchetype::AUTHENTICATION,
             self::ENTITY => SurfaceArchetype::DOMAIN_MODEL,
             self::REPOSITORY => SurfaceArchetype::PERSISTENCE_QUERY,
-            // A Sonata `AbstractAdmin` declares which request fields may be
-            // written, so its security shape is the form's, not a controller's.
+            // A Sonata `AbstractAdmin` self-declares its own routes and
+            // per-action roles too; `INPUT_BINDING` is the closest fit short
+            // of widening `HTTP_ENTRYPOINT`, which `isControllerLike()` locks.
             self::FORM, self::SONATA_ADMIN => SurfaceArchetype::INPUT_BINDING,
             self::MESSENGER_HANDLER, self::WEBHOOK_CONSUMER, self::SCHEDULER => SurfaceArchetype::ASYNC_HANDLER,
             self::EVENT_SUBSCRIBER => SurfaceArchetype::EVENT_HOOK,
