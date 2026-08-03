@@ -282,7 +282,11 @@ final readonly class AuditCommand
         $reportToRender = OutputFormat::Sarif === $auditCommandInput->format ? $auditReport : $baselineResult->report;
         $this->reportWriter->write($reportToRender, $auditCommandInput->format, $auditCommandInput->output, $symfonyStyle, $baselineResult->acceptedFingerprints);
 
-        $exitCode = $this->auditExitCodeResolver->resolve($baselineResult->report, $auditCommandInput->failOn ?? $this->riskLevel);
+        $exitCode = $this->auditExitCodeResolver->resolve(
+            $baselineResult->report,
+            $auditCommandInput->failOn ?? $this->riskLevel,
+            $auditCommandInput->minScore,
+        );
 
         if (!$auditCommandInput->isMachineReadableToStdout()) {
             $this->auditPresenter->result($symfonyStyle, $baselineResult->report, $exitCode);

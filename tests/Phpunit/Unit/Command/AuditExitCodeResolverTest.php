@@ -97,6 +97,52 @@ final class AuditExitCodeResolverTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    #[DataProvider('minimumScoreCases')]
+    public function test_it_fails_when_the_normalized_score_is_below_the_minimum(int $criticalFindings, int $minimumScore, int $expectedExitCode): void
+    {
+        $auditReport = $this->reportWith($criticalFindings);
+
+        self::assertSame(
+            $expectedExitCode,
+            $this->auditExitCodeResolver->resolve($auditReport, RiskLevel::Critical, $minimumScore),
+        );
+    }
+
+    /**
+     * Each critical finding costs 10 points, so the count maps to a score:
+     * 0 → 100, 1 → 90, 2 → 80, 4 → 60.
+     *
+     * @return iterable<string, array{int, int, int}>
+     */
+    public static function minimumScoreCases(): iterable
+    {
+        yield 'a score below the minimum fails' => [2, 90, Command::FAILURE];
+        yield 'a score exactly at the minimum passes' => [1, 90, Command::SUCCESS];
+        yield 'a score above the minimum passes' => [0, 90, Command::SUCCESS];
+        yield 'a high-risk report the risk gate lets through still fails the score gate' => [4, 70, Command::FAILURE];
+        yield 'a minimum of zero can never fail' => [4, 0, Command::SUCCESS];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_risk_gate_still_fails_on_its_own_when_the_score_gate_passes(): void
+    {
+        self::assertSame(
+            Command::FAILURE,
+            $this->auditExitCodeResolver->resolve($this->reportWith(5), RiskLevel::Critical, 0),
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     private function reportWith(int $criticalFindings): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
