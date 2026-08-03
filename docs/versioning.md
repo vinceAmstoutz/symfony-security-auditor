@@ -161,10 +161,11 @@ deprecated by the other.
 
 - The composite action defined by `action.yml` at the repository root and its
   input names: `mode`, `project-path`, `format`, `output`, `baseline`,
-  `generate-baseline`, `since`, `fail-on`, `min-score`, `extra-args`,
-  `php-version`, `setup-php`, `install-dependencies`, `working-directory`, and
-  its output names: `exit-code`, `report-path`, `findings-count`,
-  `highest-severity`. New inputs/outputs may be added in a `MINOR`; renaming or
+  `generate-baseline`, `since`, `fail-on`, `min-score`, `update-badge`,
+  `badge-path`, `extra-args`, `php-version`, `setup-php`,
+  `install-dependencies`, `working-directory`, and its output names:
+  `exit-code`, `report-path`, `findings-count`, `highest-severity`, `grade`,
+  `badge-path`. New inputs/outputs may be added in a `MINOR`; renaming or
   removing one is a `MAJOR`. The Marketplace `name` (`Symfony Security Auditor`)
   is also stable.
 - **Version pinning.** Consumers pin the action to an exact release tag —

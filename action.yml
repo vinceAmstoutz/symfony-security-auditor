@@ -43,6 +43,14 @@ inputs:
     description: Minimum normalized score (0-100) below which the audit exits 1. Independent of fail-on — the audit fails when either gate trips. Leave empty to gate on the risk level alone.
     required: false
     default: ""
+  update-badge:
+    description: Whether to write a shields.io endpoint-schema JSON file carrying the report's grade, for a live security badge in your README. Requires format json and a non-empty output. Only runs on push events. The file is written but never committed — that stays your workflow's decision.
+    required: false
+    default: "false"
+  badge-path:
+    description: Where to write the shields.io endpoint JSON when update-badge is true.
+    required: false
+    default: .github/security-auditor-badge.json
   extra-args:
     description: Additional raw arguments appended verbatim to the audit:run invocation (e.g. "--path=src --no-cache").
     required: false
@@ -77,6 +85,12 @@ outputs:
   highest-severity:
     description: The report's aggregate risk level (safe, low, medium, high, critical). Only populated when format is json (empty for other formats).
     value: ${{ steps.audit.outputs.highest-severity }}
+  grade:
+    description: The report's A-F security grade. Only populated when format is json (empty for other formats).
+    value: ${{ steps.audit.outputs.grade }}
+  badge-path:
+    description: The path the shields.io badge endpoint JSON was written to (empty when update-badge is false or no grade was available).
+    value: ${{ steps.badge.outputs.badge-path }}
 
 runs:
   using: composite
@@ -160,6 +174,45 @@ runs:
         if [ "$SSA_FORMAT" = "json" ] && [ -n "$SSA_OUTPUT" ] && [ -f "$SSA_OUTPUT" ]; then
           echo "findings-count=$(jq -r '.total_vulnerabilities' "$SSA_OUTPUT")" >> "$GITHUB_OUTPUT"
           echo "highest-severity=$(jq -r '.risk_level' "$SSA_OUTPUT")" >> "$GITHUB_OUTPUT"
+          echo "grade=$(jq -r '.grade' "$SSA_OUTPUT")" >> "$GITHUB_OUTPUT"
         fi
 
         exit "$exit_code"
+
+    # `always()` matters: the audit step ends with `exit "$exit_code"`, so a
+    # tripped fail-on gate fails it and would otherwise skip this step —
+    # leaving the badge showing the last passing grade exactly when it regressed.
+    - name: Emit the shields.io badge endpoint
+      id: badge
+      if: ${{ always() && inputs.update-badge == 'true' && github.event_name == 'push' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        SSA_BADGE_PATH: ${{ inputs.badge-path }}
+        SSA_GRADE: ${{ steps.audit.outputs.grade }}
+      run: |
+        set -euo pipefail
+        if [ -z "$SSA_GRADE" ] || [ "$SSA_GRADE" = "null" ]; then
+          echo "::warning::update-badge found no grade to render, so no badge was written. It needs the audit to have produced a JSON report: set format to json and output to a file path."
+          exit 0
+        fi
+
+        case "$SSA_GRADE" in
+          A) color=brightgreen ;;
+          B) color=green ;;
+          C) color=yellow ;;
+          D) color=orange ;;
+          F) color=red ;;
+          *)
+            echo "::warning::update-badge does not recognize the grade '$SSA_GRADE', so no badge was written."
+            exit 0
+            ;;
+        esac
+
+        mkdir -p "$(dirname "$SSA_BADGE_PATH")"
+        jq -n --arg message "$SSA_GRADE" --arg color "$color" \
+          '{schemaVersion: 1, label: "security audit", message: $message, color: $color}' \
+          > "$SSA_BADGE_PATH"
+
+        echo "badge-path=$SSA_BADGE_PATH" >> "$GITHUB_OUTPUT"
+        echo "Wrote the shields.io badge endpoint for grade $SSA_GRADE to $SSA_BADGE_PATH."
