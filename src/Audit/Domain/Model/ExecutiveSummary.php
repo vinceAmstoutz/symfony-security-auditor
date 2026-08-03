@@ -28,6 +28,8 @@ final readonly class ExecutiveSummary
     private function __construct(
         public RiskLevel $riskLevel,
         public int $riskScore,
+        public int $normalizedScore,
+        public SecurityGrade $grade,
         public int $totalFindings,
         public array $severityCounts,
         public array $typeCounts,
@@ -39,6 +41,8 @@ final readonly class ExecutiveSummary
         return new self(
             $auditReport->riskLevelEnum(),
             $auditReport->riskScore(),
+            $auditReport->normalizedScore(),
+            $auditReport->grade(),
             $auditReport->totalVulnerabilities(),
             self::severityCounts($auditReport),
             self::mostFrequentFirst(self::typeCounts($auditReport)),

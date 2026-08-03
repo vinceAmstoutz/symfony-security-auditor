@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SecurityGrade;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
@@ -258,6 +259,27 @@ final class AuditReportTest extends TestCase
     }
 
     /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_serializes_the_score_and_grade_alongside_the_unchanged_risk_fields(): void
+    {
+        $array = $this->reportWithExactScore(29)->toArray();
+
+        self::assertSame(
+            ['risk_score' => 29, 'risk_level' => 'MEDIUM', 'score' => 71, 'grade' => 'C'],
+            [
+                'risk_score' => $array['risk_score'],
+                'risk_level' => $array['risk_level'],
+                'score' => $array['score'],
+                'grade' => $array['grade'],
+            ],
+        );
+    }
+
+    /**
      * @throws InvalidAuditContextException
      */
     public function test_it_calculates_duration(): void
@@ -337,6 +359,71 @@ final class AuditReportTest extends TestCase
         yield 'low at 5' => [5, RiskLevel::Low];
         yield 'safe at 4' => [4, RiskLevel::Safe];
         yield 'safe at 0' => [0, RiskLevel::Safe];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('normalizedScoreCases')]
+    public function test_normalized_score_deducts_the_aggregate_risk_from_a_hundred(int $score, int $expectedNormalizedScore): void
+    {
+        self::assertSame($expectedNormalizedScore, $this->reportWithExactScore($score)->normalizedScore());
+    }
+
+    /**
+     * @return iterable<string, array{int, int}>
+     */
+    public static function normalizedScoreCases(): iterable
+    {
+        yield 'a clean report scores a hundred' => [0, 100];
+        yield 'a single low finding costs two points' => [2, 98];
+        yield 'the safe ceiling' => [4, 96];
+        yield 'the low ceiling' => [14, 86];
+        yield 'the medium ceiling' => [29, 71];
+        yield 'the high ceiling' => [49, 51];
+        yield 'the critical floor' => [50, 50];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_normalized_score_is_clamped_at_zero_for_an_overwhelming_risk_score(): void
+    {
+        self::assertSame(0, $this->reportWithExactScore(140)->normalizedScore());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('gradeCases')]
+    public function test_grade_agrees_with_the_risk_level_at_every_boundary(int $score, SecurityGrade $securityGrade): void
+    {
+        self::assertSame($securityGrade, $this->reportWithExactScore($score)->grade());
+    }
+
+    /**
+     * @return iterable<string, array{int, SecurityGrade}>
+     */
+    public static function gradeCases(): iterable
+    {
+        yield 'safe is an A' => [0, SecurityGrade::A];
+        yield 'the safe ceiling is an A' => [4, SecurityGrade::A];
+        yield 'the low floor is a B' => [5, SecurityGrade::B];
+        yield 'the low ceiling is a B' => [14, SecurityGrade::B];
+        yield 'the medium floor is a C' => [15, SecurityGrade::C];
+        yield 'the medium ceiling is a C' => [29, SecurityGrade::C];
+        yield 'the high floor is a D' => [30, SecurityGrade::D];
+        yield 'the high ceiling is a D' => [49, SecurityGrade::D];
+        yield 'the critical floor is an F' => [50, SecurityGrade::F];
     }
 
     /**
