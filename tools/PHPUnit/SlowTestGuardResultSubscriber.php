@@ -20,7 +20,7 @@ use PHPUnit\Event\Application\FinishedSubscriber;
 
 /**
  * Fails the run when the detector's collector holds any test that exceeded its
- * maximum duration (the global `maximum-duration` or its own
+ * maximum duration (the guard's headroom-adjusted global bar or its own
  * `#[MaximumDuration]` override). This is the enforcement half of
  * {@see SlowTestGuardExtension}: the report-only detector never fails a run, so
  * a pathological duration — a real `sleep()`, an accidental network call —
