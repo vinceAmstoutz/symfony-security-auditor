@@ -1047,6 +1047,51 @@ final class SymfonyAiLLMClientTest extends TestCase
     }
 
     /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     */
+    public function test_complete_batch_with_tools_reports_tokens_accumulated_across_rounds_when_capping(): void
+    {
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+
+        /** @var list<array{string, array<string, mixed>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('debug');
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+
+        $platform = $this->scriptedPlatformWithTokenUsage(
+            [
+                new MultiPartResult([new ToolCallResult([new ToolCall('1', 'record')])]),
+                new MultiPartResult([new ToolCallResult([new ToolCall('2', 'record')])]),
+            ],
+            [
+                new TokenUsage(promptTokens: 7, completionTokens: 3),
+                new TokenUsage(promptTokens: 11, completionTokens: 5),
+            ],
+        );
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', $logger));
+
+        $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 's', 'user' => 'u', 'tools' => $toolRegistry],
+        ], 4, 2);
+
+        $capContexts = array_values(array_map(
+            static fn (array $entry): array => $entry[1],
+            array_filter($warnings, static fn (array $entry): bool => 'Tool-using loop hit iteration cap' === $entry[0]),
+        ));
+        self::assertSame([['max_iterations' => 2, 'input_tokens' => 18, 'output_tokens' => 8]], $capContexts);
+    }
+
+    /**
      * @throws InvalidRetryConfigurationException
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
