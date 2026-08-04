@@ -78,7 +78,7 @@ final class StandaloneConsoleCommandFactoryTest extends TestCase
 
         $containerBuilder = new ContainerBuilder();
         $containerBuilder->register(AuditCommand::class, stdClass::class)->setPublic(true);
-        $containerBuilder->compile();
+        $containerBuilder->compile(true);
 
         (new StandaloneConsoleCommandFactory())->create($containerBuilder);
     }

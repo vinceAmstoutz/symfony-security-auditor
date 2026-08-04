@@ -205,6 +205,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **Standalone configuration resolves `%env(...)%` placeholders outside the
+  `platform` block.** `StandaloneConfigLoader::load()` splits the raw YAML into
+  a platform block and everything else (`array_diff_key($rawConfig, ...)`), and
+  only the platform block was env-expanded — by
+  `StandalonePlatformConfigResolver::resolveValue()`. The remaining audit
+  configuration reached the container verbatim, where
+  `StandaloneContainerFactory` built its `ContainerBuilder` with a plain
+  `ParameterBag`, which has no env-placeholder machinery at all. A standalone
+  config declaring `model: '%env(SSA_MODEL)%'` therefore aborted with:
+
+  ```text
+  The parameter "symfony_security_auditor.attacker_model" has a dependency on a non-existent parameter "env(SSA_MODEL)".
+  ```
+
+  even though `symfony-security-auditor init` itself writes `%env(...)%` into
+  that same file for the platform API key and so presents it as the idiom for
+  the whole config. `StandaloneContainerFactory` now uses an
+  `EnvPlaceholderParameterBag` and compiles with
+  `ContainerBuilder::compile(true)`, so every `%env(...)%` in a standalone
+  config resolves at compile time. Configs that only used `%env(...)%` for the
+  platform API key are unaffected — that path was already resolved before
+  reaching the container.
+
 - **CI resolves the root package version deterministically.** Restoring
   `extra.branch-alias` was not enough: an alias only applies when its key
   matches the branch Composer manages to infer, and `actions/checkout` produces

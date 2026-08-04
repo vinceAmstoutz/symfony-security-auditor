@@ -172,6 +172,29 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws NonLocalPlatformEndpointException
      */
     #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_it_resolves_environment_variable_placeholders_in_the_audit_configuration(): void
+    {
+        putenv('SSA_TEST_MODEL=claude-opus-5');
+
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(
+                ['model' => '%env(SSA_TEST_MODEL)%'],
+                new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]]),
+            ),
+            $this->cacheDir,
+        );
+
+        self::assertSame('claude-opus-5', $containerBuilder->getParameter('symfony_security_auditor.attacker_model'));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     */
+    #[RunInSeparateProcess]
     public function test_it_rejects_several_platforms_without_a_selector(): void
     {
         $this->expectException(AmbiguousPlatformException::class);

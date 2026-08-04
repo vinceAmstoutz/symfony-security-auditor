@@ -19,7 +19,7 @@ use Symfony\AI\AiBundle\AiBundle;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
+use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBag;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
@@ -59,7 +59,7 @@ final readonly class StandaloneContainerFactory
 
         $workingDirectory = getcwd();
 
-        $containerBuilder = new ContainerBuilder(new ParameterBag([
+        $containerBuilder = new ContainerBuilder(new EnvPlaceholderParameterBag([
             'kernel.cache_dir' => $cacheDir,
             'kernel.build_dir' => $cacheDir,
             'kernel.project_dir' => false !== $workingDirectory ? $workingDirectory : $cacheDir,
@@ -77,7 +77,7 @@ final readonly class StandaloneContainerFactory
         $this->selectActivePlatform($containerBuilder, $standaloneConfig->platform);
 
         $containerBuilder->getDefinition(AuditCommand::class)->setPublic(true);
-        $containerBuilder->compile();
+        $containerBuilder->compile(true);
 
         return $containerBuilder;
     }
