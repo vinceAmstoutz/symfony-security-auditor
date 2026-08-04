@@ -70,11 +70,7 @@ final readonly class ConcurrentReviewAnalyzer
                 continue;
             }
 
-            $pending[] = [
-                'index' => $index,
-                'vulnerability' => $vulnerability,
-                'cacheContext' => $bypassCache ? null : $codeContext,
-            ];
+            $pending[] = new PendingReview($index, $vulnerability, $bypassCache ? null : $codeContext);
             $requests[] = $this->buildRequest($vulnerability, $codeContext);
         }
 
@@ -114,8 +110,8 @@ final readonly class ConcurrentReviewAnalyzer
      * before the next window is attempted, so a failure partway through never
      * discards an earlier window's completed work.
      *
-     * @param list<array{system: string, user: string}>                                        $requests
-     * @param list<array{index: int, vulnerability: Vulnerability, cacheContext: string|null}> $pending
+     * @param list<array{system: string, user: string}> $requests
+     * @param list<PendingReview>                       $pending
      *
      * @return array<int, Vulnerability>
      *
@@ -147,8 +143,8 @@ final readonly class ConcurrentReviewAnalyzer
     }
 
     /**
-     * @param list<array{system: string, user: string}>                                        $requestWindow
-     * @param list<array{index: int, vulnerability: Vulnerability, cacheContext: string|null}> $pendingWindow
+     * @param list<array{system: string, user: string}> $requestWindow
+     * @param list<PendingReview>                       $pendingWindow
      *
      * @return array<int, Vulnerability>
      *
@@ -166,35 +162,32 @@ final readonly class ConcurrentReviewAnalyzer
         }
 
         $reviewed = [];
-        foreach ($pendingWindow as $position => $entry) {
-            $reviewed[$entry['index']] = $this->applyResponseOrRecordError($entry, $responses[$position], $coverageRecorder);
+        foreach ($pendingWindow as $position => $pendingReview) {
+            $reviewed[$pendingReview->index] = $this->applyResponseOrRecordError($pendingReview, $responses[$position], $coverageRecorder);
         }
 
         return $reviewed;
     }
 
-    /**
-     * @param array{index: int, vulnerability: Vulnerability, cacheContext: string|null} $entry
-     */
-    private function applyResponseOrRecordError(array $entry, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder): Vulnerability
+    private function applyResponseOrRecordError(PendingReview $pendingReview, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
         try {
-            return $this->reviewOutcomeRecorder->applyResponse($entry['vulnerability'], $llmResponse, $coverageRecorder, $entry['cacheContext']);
+            return $this->reviewOutcomeRecorder->applyResponse($pendingReview->vulnerability, $llmResponse, $coverageRecorder, $pendingReview->cacheContext);
         } catch (Throwable $throwable) {
-            return $this->reviewOutcomeRecorder->recordReviewError($entry['vulnerability'], $throwable, $coverageRecorder);
+            return $this->reviewOutcomeRecorder->recordReviewError($pendingReview->vulnerability, $throwable, $coverageRecorder);
         }
     }
 
     /**
-     * @param list<array{index: int, vulnerability: Vulnerability, cacheContext: string|null}> $pendingWindow
+     * @param list<PendingReview> $pendingWindow
      *
      * @return array<int, Vulnerability>
      */
     private function recordWindowErrors(array $pendingWindow, Throwable $throwable, CoverageRecorderInterface $coverageRecorder): array
     {
         $reviewed = [];
-        foreach ($pendingWindow as $entry) {
-            $reviewed[$entry['index']] = $this->reviewOutcomeRecorder->recordReviewError($entry['vulnerability'], $throwable, $coverageRecorder);
+        foreach ($pendingWindow as $pendingReview) {
+            $reviewed[$pendingReview->index] = $this->reviewOutcomeRecorder->recordReviewError($pendingReview->vulnerability, $throwable, $coverageRecorder);
         }
 
         return $reviewed;
@@ -205,7 +198,7 @@ final readonly class ConcurrentReviewAnalyzer
      * not yet attempted, as failed — without touching windows that already
      * finalized successfully.
      *
-     * @param list<list<array{index: int, vulnerability: Vulnerability, cacheContext: string|null}>> $pendingWindows
+     * @param list<list<PendingReview>> $pendingWindows
      */
     private function failRemainingWindows(array $pendingWindows, int $fromWindowNumber, string $status, CoverageRecorderInterface $coverageRecorder): void
     {
@@ -214,8 +207,8 @@ final readonly class ConcurrentReviewAnalyzer
                 continue;
             }
 
-            foreach ($window as $entry) {
-                $this->reviewOutcomeRecorder->recordUnreached($entry['vulnerability'], $status, $coverageRecorder);
+            foreach ($window as $pendingReview) {
+                $this->reviewOutcomeRecorder->recordUnreached($pendingReview->vulnerability, $status, $coverageRecorder);
             }
         }
     }
