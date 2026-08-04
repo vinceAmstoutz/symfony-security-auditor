@@ -30,6 +30,9 @@ final class RecordingLLMClient implements LLMClientInterface
     /** @var list<string> */
     public array $capturedUserMessages = [];
 
+    /** @var list<string> */
+    public array $capturedSystemPrompts = [];
+
     public function __construct(
         private readonly string $responseContent = '[]',
     ) {}
@@ -40,6 +43,7 @@ final class RecordingLLMClient implements LLMClientInterface
     #[Override]
     public function complete(string $systemPrompt, string $userMessage): LLMResponse
     {
+        $this->capturedSystemPrompts[] = $systemPrompt;
         $this->capturedUserMessages[] = $userMessage;
 
         return $this->response();
@@ -55,6 +59,7 @@ final class RecordingLLMClient implements LLMClientInterface
         ToolRegistry $toolRegistry,
         int $maxToolIterations,
     ): LLMResponse {
+        $this->capturedSystemPrompts[] = $systemPrompt;
         $this->capturedUserMessages[] = $userMessage;
 
         return $this->response();

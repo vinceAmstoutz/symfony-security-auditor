@@ -25,6 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FrameworkVocabulary;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -413,6 +414,48 @@ final class FixSynthesizerTest extends TestCase
 
         $this->expectException(LLMProviderException::class);
         (new FixSynthesizer($llmClient, new NullLogger()))->synthesize([$vulnerability]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws LLMProviderException
+     */
+    public function test_its_system_prompt_names_the_injected_framework_rather_than_symfony(): void
+    {
+        $recordingLLMClient = new RecordingLLMClient();
+
+        (new FixSynthesizer(
+            $recordingLLMClient,
+            new NullLogger(),
+            VulnerabilitySeverity::HIGH,
+            new FrameworkVocabulary('Laravel', 'Blade', ['an Eloquent binding']),
+        ))->synthesize([$this->makeVulnerability()->withReviewerValidation(true)]);
+
+        self::assertStringContainsString('senior Laravel security engineer', $recordingLLMClient->capturedSystemPrompts[0]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws LLMProviderException
+     */
+    public function test_its_system_prompt_offers_the_injected_idiomatic_fixes_as_the_preferred_remediation(): void
+    {
+        $recordingLLMClient = new RecordingLLMClient();
+
+        (new FixSynthesizer(
+            $recordingLLMClient,
+            new NullLogger(),
+            VulnerabilitySeverity::HIGH,
+            new FrameworkVocabulary('Laravel', 'Blade', ['an Eloquent binding', '`Gate::authorize`']),
+        ))->synthesize([$this->makeVulnerability()->withReviewerValidation(true)]);
+
+        self::assertStringContainsString('(an Eloquent binding, `Gate::authorize`)', $recordingLLMClient->capturedSystemPrompts[0]);
     }
 
     /**

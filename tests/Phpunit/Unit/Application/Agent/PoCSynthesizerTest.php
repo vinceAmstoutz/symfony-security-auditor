@@ -25,6 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FrameworkVocabulary;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -500,6 +501,28 @@ final class PoCSynthesizerTest extends TestCase
 
         $this->expectException(LLMProviderException::class);
         (new PoCSynthesizer($llmClient, new NullLogger()))->synthesize([$vulnerability]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws LLMProviderException
+     */
+    public function test_its_system_prompt_names_the_injected_framework_rather_than_symfony(): void
+    {
+        $recordingLLMClient = new RecordingLLMClient();
+        $poCSynthesizer = new PoCSynthesizer(
+            $recordingLLMClient,
+            new NullLogger(),
+            VulnerabilitySeverity::HIGH,
+            new FrameworkVocabulary('Laravel', 'Blade', ['an Eloquent binding']),
+        );
+
+        $poCSynthesizer->synthesize([$this->makeVulnerability()->withReviewerValidation(true)]);
+
+        self::assertStringContainsString('confirmed Laravel vulnerabilities', $recordingLLMClient->capturedSystemPrompts[0]);
     }
 
     /**

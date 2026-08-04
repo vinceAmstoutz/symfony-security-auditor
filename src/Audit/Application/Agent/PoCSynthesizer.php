@@ -18,6 +18,7 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FrameworkVocabulary;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
@@ -40,6 +41,7 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
         private LLMClientInterface $llmClient,
         private LoggerInterface $logger,
         private VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,
+        private FrameworkVocabulary $frameworkVocabulary = new FrameworkVocabulary(),
     ) {}
 
     /**
@@ -128,9 +130,12 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
 
     private function buildSystemPrompt(): string
     {
-        return <<<'PROMPT'
+        $framework = $this->frameworkVocabulary->name;
+        $templateLanguage = $this->frameworkVocabulary->templateLanguage;
+
+        return <<<PROMPT
             You are a senior offensive security engineer producing reproducible
-            proof-of-concept artifacts for confirmed Symfony vulnerabilities.
+            proof-of-concept artifacts for confirmed {$framework} vulnerabilities.
 
             Given a validated finding, output ONE concrete reproduction artifact
             tailored to the vulnerability type:
@@ -142,8 +147,8 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
               specific argument that triggers the issue.
             - Messenger / async: a `bin/console messenger:consume <transport>`
               line plus the JSON payload that, once dispatched, hits the sink.
-            - Twig SSTI / XSS: the literal payload string that triggers the
-              behaviour, plus the route that renders it.
+            - {$templateLanguage} SSTI / XSS: the literal payload string that
+              triggers the behaviour, plus the route that renders it.
             - Cryptography / weak random: a one-liner showing the predictable
               output (e.g. `php -r 'echo mt_rand(0, 9999);'` enumeration).
             - Authorization / IDOR: two `curl` snippets — one as the rightful

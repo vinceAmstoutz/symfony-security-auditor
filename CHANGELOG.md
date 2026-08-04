@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
+- **`FrameworkVocabulary` lifts the framework wording out of the synthesizer
+  prompt literals.** `PoCSynthesizer` and `FixSynthesizer` are portable in every
+  respect except their prompts, which named Symfony directly: "confirmed Symfony
+  vulnerabilities" and "Twig SSTI / XSS"
+  (`src/Audit/Application/Agent/PoCSynthesizer.php`), "senior Symfony security
+  engineer" and a hard-coded "parameterized Doctrine query, `#[IsGranted]`, …"
+  idiom list (`src/Audit/Application/Agent/FixSynthesizer.php`). That wording
+  was the only thing pinning two otherwise framework-neutral classes to Symfony.
+  The new `Audit\Domain\Model\FrameworkVocabulary` carries the framework's
+  `name`, the name of its `templateLanguage` and the `idiomaticFixes` a patch
+  should prefer over a hand-rolled guard; both synthesizers accept one as an
+  optional fourth constructor argument and interpolate it into their system
+  prompts. The default describes Symfony, so every existing caller — including
+  the container wiring in `config/services.php`, which is unchanged — produces
+  the same prompts it did before. Auditing a non-Symfony PHP application no
+  longer requires forking either class.
+
 - **`ApplicationSecurityMap` names the project survey after what each surface
   _is_.** `SymfonyMapping` is a BC-covered Domain model whose name and most of
   its 19 accessors hard-code Symfony vocabulary (`voterCapabilities()`,

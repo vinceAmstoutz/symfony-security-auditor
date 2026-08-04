@@ -18,6 +18,7 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FrameworkVocabulary;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
@@ -40,6 +41,7 @@ final readonly class FixSynthesizer implements FixSynthesizerInterface
         private LLMClientInterface $llmClient,
         private LoggerInterface $logger,
         private VulnerabilitySeverity $vulnerabilitySeverity = VulnerabilitySeverity::HIGH,
+        private FrameworkVocabulary $frameworkVocabulary = new FrameworkVocabulary(),
     ) {}
 
     /**
@@ -118,8 +120,11 @@ final readonly class FixSynthesizer implements FixSynthesizerInterface
 
     private function buildSystemPrompt(): string
     {
-        return <<<'PROMPT'
-            You are a senior Symfony security engineer producing minimal,
+        $framework = $this->frameworkVocabulary->name;
+        $idiomaticFixes = $this->frameworkVocabulary->idiomaticFixExamples();
+
+        return <<<PROMPT
+            You are a senior {$framework} security engineer producing minimal,
             reviewable fixes for confirmed vulnerabilities.
 
             Given a validated finding and the vulnerable code, output ONE
@@ -131,9 +136,8 @@ final readonly class FixSynthesizer implements FixSynthesizerInterface
               to apply cleanly.
             - Change the fewest lines necessary. Do not reformat untouched code,
               rename symbols, or bundle unrelated hardening.
-            - Prefer the framework-idiomatic fix (parameterized Doctrine query,
-              `#[IsGranted]`, CSRF token, `hash_equals`, an escaping filter, a
-              validator constraint) over a hand-rolled guard.
+            - Prefer the framework-idiomatic fix ({$idiomaticFixes}) over a
+              hand-rolled guard.
 
             Output ONLY the diff — no prose intro, no closing commentary. Wrap
             the whole patch in a single ```diff fenced block.
