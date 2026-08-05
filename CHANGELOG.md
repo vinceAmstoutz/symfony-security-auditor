@@ -203,7 +203,46 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   BC break: `composer.json` metadata is not part of the public API surface in
   [`docs/versioning.md`](docs/versioning.md).
 
+### Security
+
+- **A finding title can no longer ping an arbitrary GitHub account from a posted
+  pull-request comment.** `MarkdownTextEscaper::escapeStructuralMarkers()`
+  enumerated the Markdown-active characters it neutralizes (`` ` ``, `~`, `#`,
+  `<`, `>`, `[`, `]`) but omitted `@`, and GitHub autolinks a bare `@handle` in
+  a comment body into a live profile mention. A finding title is LLM-authored
+  from attacker-influenceable repository content, and `action.yml`'s
+  `comment-pr` step posts the rendered body verbatim with a
+  `pull-requests: write` token — so a crafted target project could notify any
+  GitHub user through the audited repository's own automation. `@` is now
+  HTML-entity-encoded as `&#64;`, the same treatment `<`/`>` already had, so it
+  renders as a literal `@` without triggering the mention.
+
+- **A file path containing `|` can no longer forge a column in the pull-request
+  comment table.** `MarkdownTextEscaper::inlineCode()` wraps text in a backtick
+  run, but GFM splits a table row on unescaped `|` _before_ inline parsing, so a
+  code span does not shield one — and `CodeLocation` accepts any non-blank
+  `filePath`, fed straight from LLM tool-call output with no character
+  allowlist. `GithubCommentReportRenderer` rendered the Location and Type cells
+  through `inlineCode()`, so a path like `src/Foo|Bar.php` corrupted the row a
+  reviewer reads to see validated findings. The new
+  `MarkdownTextEscaper::tableInlineCode()` backslash-escapes `|` and is used for
+  both cells; plain `inlineCode()` is unchanged, since `\|` renders literally in
+  a code span outside a table.
+
 ### Fixed
+
+- **A failing audit no longer blames the `--fail-on` threshold for a
+  `--min-score` failure.** `AuditExitCodeResolver::resolve()` fails a run when
+  the risk gate **or** the independent `--min-score` gate trips, but only the
+  resulting exit code reaches `AuditPresenter::result()`, which unconditionally
+  printed `Audit completed at or above the fail-on threshold. Risk: %s.` So
+  `audit:run --fail-on=critical --min-score=96` against a project with one
+  MEDIUM finding (risk `LOW`, score 95) reported a fail-on breach that had not
+  happened, pointing engineers at a risk-level regression that did not exist.
+  The message now reads
+  `Audit failed a configured gate. Risk: %s. Score: %d/100.` — naming neither
+  gate and surfacing both gated values, matching what `audit:run --help` already
+  documented.
 
 - **Standalone configuration resolves `%env(...)%` placeholders outside the
   `platform` block.** `StandaloneConfigLoader::load()` splits the raw YAML into

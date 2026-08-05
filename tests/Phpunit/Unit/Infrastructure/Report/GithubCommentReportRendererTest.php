@@ -242,6 +242,41 @@ final class GithubCommentReportRendererTest extends AbstractReportRendererTestCa
     }
 
     /**
+     * GFM splits a table row on unescaped `|` before inline parsing, so a code
+     * span does not contain one — a pipe in the LLM-authored file path would
+     * forge a column in the Location cell.
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_pipe_in_a_file_path_cannot_forge_a_table_column(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->makeValidatedVuln(filePath: 'src/Foo|Bar.php')));
+
+        self::assertStringContainsString('`src/Foo\\|Bar.php:1`', $output);
+    }
+
+    /**
+     * GitHub autolinks a bare `@handle` in a comment body into a live profile
+     * mention, notifying that account — driven purely by attacker-influenced
+     * repository content once the rendered body is posted to a pull request.
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_mention_in_a_title_cannot_ping_a_github_account(): void
+    {
+        $output = $this->renderer->render($this->makeReport($this->titled('Ping @octocat about this')));
+
+        self::assertStringContainsString('Ping &#64;octocat about this', $output);
+        self::assertStringNotContainsString('@octocat', $output);
+    }
+
+    /**
      * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
