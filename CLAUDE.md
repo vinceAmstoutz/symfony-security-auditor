@@ -216,6 +216,19 @@ Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`,
 `standalone`, `scan`, `deps`, `ci`, `rate-limit`. Breaking changes: `feat!:`
 with `BREAKING CHANGE:` footer.
 
+## Pull Requests
+
+Fill in [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)
+and keep the top of the PR short:
+
+- **Title: 50 characters or fewer**, same
+  [Conventional Commits](https://www.conventionalcommits.org/) format as a
+  commit subject.
+- **`## Summary`: 500 characters or fewer.** State the user-visible outcome and
+  stop. Per-finding walkthroughs, verification tables and reviewer notes belong
+  in their own sections further down — the summary is the part everyone reads,
+  so it must stay skimmable.
+
 ## CI Pipeline
 
 Seven jobs must all pass before merging: **Prettier Check** (markdown
