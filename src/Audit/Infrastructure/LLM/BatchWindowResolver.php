@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
@@ -52,7 +53,7 @@ final readonly class BatchWindowResolver
     ) {}
 
     /**
-     * @param list<array{system: string, user: string}> $window
+     * @param list<LLMRequest> $window
      *
      * @return list<LLMResponse>
      *
@@ -65,12 +66,12 @@ final readonly class BatchWindowResolver
 
         $platform = $this->platform ?? throw MissingAiPlatformException::create();
         $deferred = [];
-        foreach ($window as $index => $request) {
+        foreach ($window as $index => $llmRequest) {
             $messageBag = new MessageBag(
-                Message::forSystem($request['system']),
-                Message::ofUser($request['user']),
+                Message::forSystem($llmRequest->system),
+                Message::ofUser($llmRequest->user),
             );
-            $estimatedInputTokens = $this->promptTokenEstimator->estimate($request['system'], $request['user']);
+            $estimatedInputTokens = $this->promptTokenEstimator->estimate($llmRequest->system, $llmRequest->user);
             $this->rateLimiter->acquire($estimatedInputTokens);
 
             try {
@@ -81,24 +82,22 @@ final readonly class BatchWindowResolver
         }
 
         $resolved = [];
-        foreach ($window as $index => $request) {
-            $resolved[$index] = $this->resolveOne($deferred[$index], $request);
+        foreach ($window as $index => $llmRequest) {
+            $resolved[$index] = $this->resolveOne($deferred[$index], $llmRequest);
         }
 
         return array_values($resolved);
     }
 
     /**
-     * @param array{system: string, user: string} $request
-     *
      * @throws BudgetExceededException
      */
-    private function resolveOne(?DeferredResult $deferredResult, array $request): LLMResponse
+    private function resolveOne(?DeferredResult $deferredResult, LLMRequest $llmRequest): LLMResponse
     {
         if (!$deferredResult instanceof DeferredResult) {
             $this->rateLimiter->record(0, 0);
 
-            return $this->llmClient->complete($request['system'], $request['user']);
+            return $this->llmClient->complete($llmRequest->system, $llmRequest->user);
         }
 
         $reconciled = false;
@@ -128,7 +127,7 @@ final readonly class BatchWindowResolver
 
             $this->logger->warning('Batch-window response failed to resolve after dispatch; falling back to a fresh complete() call that may duplicate provider billing for the already-dispatched request');
 
-            return $this->llmClient->complete($request['system'], $request['user']);
+            return $this->llmClient->complete($llmRequest->system, $llmRequest->user);
         }
     }
 }

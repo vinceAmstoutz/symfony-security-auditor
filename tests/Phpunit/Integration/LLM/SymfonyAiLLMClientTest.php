@@ -26,7 +26,9 @@ use Symfony\AI\Platform\FinishReason\FinishReason;
 use Symfony\AI\Platform\FinishReason\FinishReasonCase;
 use Symfony\AI\Platform\Message\AssistantMessage;
 use Symfony\AI\Platform\Message\MessageBag;
+use Symfony\AI\Platform\Message\SystemMessage;
 use Symfony\AI\Platform\Message\ToolCallMessage;
+use Symfony\AI\Platform\Message\UserMessage;
 use Symfony\AI\Platform\Model;
 use Symfony\AI\Platform\ModelCatalog\FallbackModelCatalog;
 use Symfony\AI\Platform\ModelCatalog\ModelCatalogInterface;
@@ -1044,6 +1046,50 @@ final class SymfonyAiLLMClientTest extends TestCase
         ));
         self::assertCount(1, $capLogs);
         self::assertSame(2, $capLogs[0][1]['max_iterations']);
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     */
+    public function test_complete_batch_sends_each_prompt_under_its_own_role(): void
+    {
+        $platformInvocationLog = new PlatformInvocationLog();
+        $platform = $this->scriptedPlatform([new TextResult('ok')], $platformInvocationLog);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
+
+        $symfonyAiLLMClient->completeBatch([['system' => 'sys-prompt', 'user' => 'usr-prompt']], 4);
+
+        $messages = $platformInvocationLog->messageSnapshots[0];
+        self::assertInstanceOf(SystemMessage::class, $messages[0]);
+        self::assertSame('sys-prompt', $messages[0]->getContent());
+        self::assertInstanceOf(UserMessage::class, $messages[1]);
+    }
+
+    /**
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     * @throws InvalidToolRegistryException
+     * @throws InvalidTokenUsageException
+     * @throws NonTransientLLMFailureException
+     */
+    public function test_complete_batch_with_tools_sends_each_prompt_under_its_own_role(): void
+    {
+        $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
+        $platformInvocationLog = new PlatformInvocationLog();
+        $platform = $this->scriptedPlatform([new TextResult('ok')], $platformInvocationLog);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(new PlatformBinding($platform, 'm', new NullLogger()));
+
+        $symfonyAiLLMClient->completeBatchWithTools([
+            ['system' => 'sys-prompt', 'user' => 'usr-prompt', 'tools' => $toolRegistry],
+        ], 4, 2);
+
+        $messages = $platformInvocationLog->messageSnapshots[0];
+        self::assertInstanceOf(SystemMessage::class, $messages[0]);
+        self::assertSame('sys-prompt', $messages[0]->getContent());
+        self::assertInstanceOf(UserMessage::class, $messages[1]);
     }
 
     /**

@@ -30,7 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolLLMRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 
@@ -71,7 +71,7 @@ final readonly class ToolConversationWavefront
     ) {}
 
     /**
-     * @param list<array{system: string, user: string, tools: ToolRegistry}> $window
+     * @param list<ToolLLMRequest> $window
      *
      * @return list<LLMResponse>
      *
@@ -94,18 +94,18 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * @param list<array{system: string, user: string, tools: ToolRegistry}> $window
+     * @param list<ToolLLMRequest> $window
      *
      * @return array<int, ConversationState>
      */
     private function initializeConversationStates(array $window): array
     {
         $states = [];
-        foreach ($window as $index => $request) {
+        foreach ($window as $index => $toolLLMRequest) {
             $options = $this->platformOptionsFactory->baseOptions();
-            $options['tools'] = PlatformToolsMapper::map($request['tools']->definitions());
+            $options['tools'] = PlatformToolsMapper::map($toolLLMRequest->tools->definitions());
             $states[$index] = new ConversationState(
-                new MessageBag(Message::forSystem($request['system']), Message::ofUser($request['user'])),
+                new MessageBag(Message::forSystem($toolLLMRequest->system), Message::ofUser($toolLLMRequest->user)),
                 $options,
                 0,
                 0,
@@ -113,7 +113,7 @@ final readonly class ToolConversationWavefront
                 0,
                 false,
                 null,
-                $this->promptTokenEstimator->estimate($request['system'], $request['user']),
+                $this->promptTokenEstimator->estimate($toolLLMRequest->system, $toolLLMRequest->user),
             );
         }
 
@@ -121,8 +121,8 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * @param array<int, ConversationState>                                  $states
-     * @param list<array{system: string, user: string, tools: ToolRegistry}> $window
+     * @param array<int, ConversationState> $states
+     * @param list<ToolLLMRequest>          $window
      *
      * @return array<int, ConversationState>
      *
@@ -196,36 +196,32 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * @param array{system: string, user: string, tools: ToolRegistry} $request
-     *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
      */
-    private function advanceConversation(ConversationState $conversationState, ?DeferredResult $deferredResult, array $request, int $maxToolIterations): ConversationState
+    private function advanceConversation(ConversationState $conversationState, ?DeferredResult $deferredResult, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): ConversationState
     {
         if (!$deferredResult instanceof DeferredResult) {
             $this->rateLimiter->record(0, 0);
 
-            return $this->retryOrAbortConversation($conversationState, $request, $maxToolIterations);
+            return $this->retryOrAbortConversation($conversationState, $toolLLMRequest, $maxToolIterations);
         }
 
         try {
-            return $this->processDeferredResult($conversationState, $deferredResult, $request);
+            return $this->processDeferredResult($conversationState, $deferredResult, $toolLLMRequest);
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (Throwable) {
-            return $this->retryOrAbortConversation($conversationState, $request, $maxToolIterations);
+            return $this->retryOrAbortConversation($conversationState, $toolLLMRequest, $maxToolIterations);
         }
     }
 
     /**
-     * @param array{system: string, user: string, tools: ToolRegistry} $request
-     *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      */
-    private function processDeferredResult(ConversationState $conversationState, DeferredResult $deferredResult, array $request): ConversationState
+    private function processDeferredResult(ConversationState $conversationState, DeferredResult $deferredResult, ToolLLMRequest $toolLLMRequest): ConversationState
     {
         try {
             $platformResult = $deferredResult->getResult();
@@ -251,7 +247,7 @@ final readonly class ToolConversationWavefront
         $toolCalls = $this->platformResultExtractor->extractToolCalls($platformResult);
 
         if ([] !== $toolCalls) {
-            return $this->runToolCalls($conversationState, $toolCalls, $request);
+            return $this->runToolCalls($conversationState, $toolCalls, $toolLLMRequest);
         }
 
         return $conversationState->withResponse(LLMResponse::of(
@@ -273,13 +269,11 @@ final readonly class ToolConversationWavefront
      * is rethrown rather than finalized, since a restart can't happen and
      * masking the failure would produce a false-negative SAFE result.
      *
-     * @param array{system: string, user: string, tools: ToolRegistry} $request
-     *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
      */
-    private function retryOrAbortConversation(ConversationState $conversationState, array $request, int $maxToolIterations): ConversationState
+    private function retryOrAbortConversation(ConversationState $conversationState, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): ConversationState
     {
         try {
             $deferredResult = $this->retryingPlatformInvoker->invoke($conversationState->bag, $conversationState->options, $conversationState->estimatedInputTokens);
@@ -288,31 +282,30 @@ final readonly class ToolConversationWavefront
                 throw $nonTransientLLMFailureException;
             }
 
-            return $this->abortConversation($conversationState, $request, $maxToolIterations);
+            return $this->abortConversation($conversationState, $toolLLMRequest, $maxToolIterations);
         } catch (Throwable) {
-            return $this->abortConversation($conversationState, $request, $maxToolIterations);
+            return $this->abortConversation($conversationState, $toolLLMRequest, $maxToolIterations);
         }
 
         try {
-            return $this->processDeferredResult($conversationState, $deferredResult, $request);
+            return $this->processDeferredResult($conversationState, $deferredResult, $toolLLMRequest);
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (Throwable) {
-            return $this->abortConversation($conversationState, $request, $maxToolIterations);
+            return $this->abortConversation($conversationState, $toolLLMRequest, $maxToolIterations);
         }
     }
 
     /**
-     * @param list<ToolCall>                                           $toolCalls
-     * @param array{system: string, user: string, tools: ToolRegistry} $request
+     * @param list<ToolCall> $toolCalls
      */
-    private function runToolCalls(ConversationState $conversationState, array $toolCalls, array $request): ConversationState
+    private function runToolCalls(ConversationState $conversationState, array $toolCalls, ToolLLMRequest $toolLLMRequest): ConversationState
     {
         $conversationState->bag->add(new AssistantMessage(...$toolCalls));
 
         $toolResults = [];
         foreach ($toolCalls as $toolCall) {
-            $result = $request['tools']->execute($toolCall->getName(), $toolCall->getArguments());
+            $result = $toolLLMRequest->tools->execute($toolCall->getName(), $toolCall->getArguments());
             $conversationState->bag->add(new ToolCallMessage($toolCall, new Text($result)));
             $toolResults[] = $result;
         }
@@ -321,14 +314,12 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * @param array{system: string, user: string, tools: ToolRegistry} $request
-     *
      * @throws InvalidTokenUsageException
      */
-    private function abortConversation(ConversationState $conversationState, array $request, int $maxToolIterations): ConversationState
+    private function abortConversation(ConversationState $conversationState, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): ConversationState
     {
         if (!$conversationState->toolsRan) {
-            return $conversationState->withResponse($this->llmClient->completeWithTools($request['system'], $request['user'], $request['tools'], $maxToolIterations));
+            return $conversationState->withResponse($this->llmClient->completeWithTools($toolLLMRequest->system, $toolLLMRequest->user, $toolLLMRequest->tools, $maxToolIterations));
         }
 
         $this->logger->warning('Concurrent tool-using conversation failed after tool execution; keeping recorded tool results', [
