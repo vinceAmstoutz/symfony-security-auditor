@@ -175,6 +175,31 @@ final class AuditPresenterTest extends TestCase
     }
 
     /**
+     * `AuditExitCodeResolver` fails a run when the risk gate OR the independent
+     * `--min-score` gate trips, and only the exit code reaches the presenter —
+     * so it must not attribute the failure to one specific gate. A LOW-risk
+     * report failing under `--fail-on=critical --min-score=96` is a
+     * score-only failure the old wording described as a fail-on breach.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_result_for_failure_exit_does_not_blame_a_gate_it_cannot_identify(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->result($symfonyStyle, $this->makeLowRiskReport(), Command::FAILURE);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringNotContainsString('at or above the fail-on threshold', $flattened);
+        self::assertStringContainsString('Risk: LOW', $flattened);
+        self::assertStringContainsString('Score: 95/100', $flattened);
+    }
+
+    /**
      * @throws InvalidAuditContextException
      */
     public function test_result_for_success_exit_emits_success_message(): void
@@ -583,6 +608,30 @@ final class AuditPresenterTest extends TestCase
                 )->withReviewerValidation(true),
             );
         }
+
+        return AuditReport::fromContext($auditContext);
+    }
+
+    /**
+     * One MEDIUM finding scores 5, so risk is LOW and the normalized score is
+     * 95 — the shape a `--min-score=96` run fails on while the risk gate passes.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function makeLowRiskReport(): AuditReport
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->addVulnerability(
+            Vulnerability::of(
+                new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::MEDIUM, 'Medium vuln', 0.9),
+                new CodeLocation('src/File.php', 1, 5),
+                new VulnerabilityNarrative('desc', 'inject', "' OR 1", 'fix'),
+                '$q',
+            )->withReviewerValidation(true),
+        );
 
         return AuditReport::fromContext($auditContext);
     }

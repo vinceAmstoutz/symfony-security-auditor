@@ -111,8 +111,8 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
             '| %s | %s | %s | %s |',
             $vulnerability->severity()->label(),
             MarkdownTextEscaper::tableCell($vulnerability->title()),
-            MarkdownTextEscaper::inlineCode(\sprintf('%s:%d', $vulnerability->filePath(), $vulnerability->lineStart())),
-            MarkdownTextEscaper::inlineCode($vulnerability->type()->value),
+            MarkdownTextEscaper::tableInlineCode(\sprintf('%s:%d', $vulnerability->filePath(), $vulnerability->lineStart())),
+            MarkdownTextEscaper::tableInlineCode($vulnerability->type()->value),
         );
     }
 

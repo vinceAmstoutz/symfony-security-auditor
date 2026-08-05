@@ -206,10 +206,10 @@ function runCodeQualityTools(bool $fixMode = false): void
     run('sh tests/Shell/install_script_test.sh');
 
     io()->section('PHPUnit');
-    run('docker compose exec php vendor/bin/phpunit --coverage-clover=build/coverage/clover.xml');
+    run('docker compose exec php vendor/bin/phpunit --coverage-clover=build/coverage/clover.xml --coverage-xml=build/coverage/coverage-xml --log-junit=build/coverage/junit.xml');
 
     io()->section('Infection');
-    run('docker compose exec php php -d memory_limit=2G bin/infection');
+    run('docker compose exec php php -d memory_limit=2G bin/infection --configuration=infection.json5 --threads=max --coverage=build/coverage --skip-initial-tests --min-msi=100 --min-covered-msi=100');
 
     io()->success($fixMode ? 'Fixing complete.' : 'Linting complete.');
 }

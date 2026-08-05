@@ -33,17 +33,19 @@ final readonly class MarkdownTextEscaper
      * A backtick/tilde run would open a code fence, `#` a fake heading, and
      * `[`/`]` a live link — each would swallow or rewrite everything rendered
      * after it. `<`/`>` are HTML-entity-encoded since CommonMark passes raw
-     * inline HTML through verbatim. A backslash already present is escaped
-     * first, so it can't combine with an escape added below into a sequence
-     * CommonMark still parses as live.
+     * inline HTML through verbatim. `@` is encoded the same way because GitHub
+     * autolinks a bare `@handle` into a live profile mention, notifying that
+     * account when a report is posted as a pull-request comment. A backslash
+     * already present is escaped first, so it can't combine with an escape
+     * added below into a sequence CommonMark still parses as live.
      */
     private static function escapeStructuralMarkers(string $text): string
     {
         $backslashesEscaped = str_replace('\\', '\\\\', $text);
 
         return str_replace(
-            ['`', '~', '#', '<', '>', '[', ']'],
-            ['\\`', '\\~', '\\#', '&lt;', '&gt;', '\\[', '\\]'],
+            ['`', '~', '#', '<', '>', '[', ']', '@'],
+            ['\\`', '\\~', '\\#', '&lt;', '&gt;', '\\[', '\\]', '&#64;'],
             $backslashesEscaped,
         );
     }
@@ -102,6 +104,17 @@ final readonly class MarkdownTextEscaper
     public static function tableCell(string $text): string
     {
         return str_replace('|', '\\|', self::heading($text));
+    }
+
+    /**
+     * GFM splits a table row on unescaped `|` before inline parsing, so a code
+     * span does not shield one — {@see self::inlineCode()} alone still lets a
+     * pipe in the text forge a column. The escape is applied only here because
+     * a code span outside a table renders `\|` literally.
+     */
+    public static function tableInlineCode(string $text): string
+    {
+        return str_replace('|', '\\|', self::inlineCode($text));
     }
 
     /**

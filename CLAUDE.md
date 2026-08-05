@@ -49,7 +49,7 @@ bin/castor up
 | Lint + auto-fix         | `bin/castor lint:fix`                                                       |
 | Markdown check only     | `bin/castor lint:docs` (fast pre-push check)                                |
 | Run PHP tests           | `docker compose exec php vendor/bin/phpunit`                                |
-| Run mutation tests      | `docker compose exec php bin/infection`                                     |
+| Run mutation tests      | `bin/castor lint` (its Infection step mirrors CI's flags — see below)       |
 | Score detection quality | `bin/castor eval` (audits a ground-truth fixture, reports precision/recall) |
 | Symfony console         | `docker compose exec php bin/console <command>`                             |
 
@@ -59,6 +59,17 @@ bin/castor up
 scan) → Install script tests (`tests/Shell/install_script_test.sh`) → PHPUnit →
 Infection. `bin/castor lint:fix` auto-fixes steps 1–3 (Prettier, Markdown lint,
 Composer Normalize); the remaining steps are check-only.
+
+Run Infection **through `bin/castor lint`**, never as a bare `bin/infection`.
+The task's PHPUnit step emits the
+`--coverage-clover`/`--coverage-xml`/`--log-junit` set that its Infection step
+then reuses via
+`--coverage=build/coverage --skip-initial-tests --min-msi=100 --min-covered-msi=100`,
+matching `.github/workflows/ci.yaml`; invoking `bin/infection` with ad-hoc flags
+has twice reported a green 100% MSI on a commit CI then rejected. Note that a
+single green run is still not proof of CI parity: Infection rewrites
+`phpunit.dist.xml` to force `executionOrder="defects,random"` while disabling
+result caching, so test order is effectively random per invocation — see #275.
 
 Commit messages are validated separately in CI via
 [commitlint](https://commitlint.js.org/) (`commitlint.config.js`) — see
@@ -204,6 +215,19 @@ Format: `<type>[optional scope]: <description>` —
 Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`,
 `standalone`, `scan`, `deps`, `ci`, `rate-limit`. Breaking changes: `feat!:`
 with `BREAKING CHANGE:` footer.
+
+## Pull Requests
+
+Fill in [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)
+and keep the top of the PR short:
+
+- **Title: 50 characters or fewer**, same
+  [Conventional Commits](https://www.conventionalcommits.org/) format as a
+  commit subject.
+- **`## Summary`: 500 characters or fewer.** State the user-visible outcome and
+  stop. Per-finding walkthroughs, verification tables and reviewer notes belong
+  in their own sections further down — the summary is the part everyone reads,
+  so it must stay skimmable.
 
 ## CI Pipeline
 
