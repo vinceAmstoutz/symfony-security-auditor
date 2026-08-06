@@ -106,6 +106,21 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
     }
 
     /**
+     * The audited project is untrusted, and composer runs inside it. Composer
+     * dispatches that project's `pre-command-run` script and activates the
+     * plugins in its `vendor/` unless told not to — either one is arbitrary
+     * command execution on the audit host, which for the shipped GitHub Action
+     * is a runner holding a write-scoped token.
+     */
+    public function test_default_process_builder_refuses_the_audited_projects_scripts_and_plugins(): void
+    {
+        $commandLine = (SymfonyProcessComposerAuditRunner::defaultProcessBuilder())('/some/path')->getCommandLine();
+
+        self::assertStringContainsString("'--no-scripts'", $commandLine);
+        self::assertStringContainsString("'--no-plugins'", $commandLine);
+    }
+
+    /**
      * @throws AdvisorySourceUnavailableException
      */
     public function test_it_throws_when_stdout_is_only_whitespace(): void
