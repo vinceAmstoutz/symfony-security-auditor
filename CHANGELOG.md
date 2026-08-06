@@ -278,6 +278,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `Configuration` check. Project files that carry audit settings — chunking
   strategy, `fail_on`, excluded paths — are unaffected.
 
+- **The audited project can no longer execute code on the audit host.**
+  `SymfonyProcessComposerAuditRunner::defaultProcessBuilder()` ran
+  `composer audit --format=json --locked --no-interaction` with the audited
+  project as the working directory, without `--no-scripts` or `--no-plugins`.
+  Composer dispatches the project's `pre-command-run` script and activates the
+  plugins in its `vendor/` for that command, so a repository carrying a
+  `composer.json` such as `"scripts": {"pre-command-run": "php -r \"…\""}`
+  obtained arbitrary command execution as the auditing user — reached on the
+  documented happy path, since `audit.tools_enabled` defaults to `true` and the
+  attacker agent's `lookup_advisory` tool triggers the advisory database.
+  Reproduced end to end: the hostile script ran and wrote its marker file, and
+  the `AdvisorySourceUnavailableException` the runner then raised was no
+  mitigation because the code had already executed. Both flags are now passed;
+  neither changes what `audit --locked` reports, since the advisory check reads
+  `composer.lock`. Users auditing an untrusted project with a release before
+  this fix should assume the project's Composer scripts ran.
+
 ### Fixed
 
 - **A failing audit no longer blames the `--fail-on` threshold for a
