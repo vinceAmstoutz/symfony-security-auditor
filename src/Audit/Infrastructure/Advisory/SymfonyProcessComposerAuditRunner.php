@@ -28,6 +28,13 @@ use function Symfony\Component\String\u;
  * exit code is non-zero whenever advisories are found, so we only treat a failure
  * as fatal when stdout is empty (the JSON is the contract).
  *
+ * `--no-scripts` and `--no-plugins` are mandatory, not tidiness: composer runs
+ * inside the audited project, which is untrusted, and would otherwise dispatch
+ * that project's `pre-command-run` script and activate the plugins in its
+ * `vendor/`. Either is arbitrary command execution on the audit host. Neither
+ * flag changes what `audit --locked` reports, since the advisory check reads
+ * `composer.lock`.
+ *
  * @internal not part of the BC promise — see docs/versioning.md
  */
 final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditRunnerInterface
@@ -48,7 +55,7 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
     public static function defaultProcessBuilder(): Closure
     {
         return static fn (string $path): Process => new Process(
-            ['composer', 'audit', '--format=json', '--locked', '--no-interaction'],
+            ['composer', 'audit', '--format=json', '--locked', '--no-interaction', '--no-scripts', '--no-plugins'],
             $path,
         );
     }
