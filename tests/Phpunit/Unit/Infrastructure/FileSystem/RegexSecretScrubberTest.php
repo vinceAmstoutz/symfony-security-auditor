@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\FileSys
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 
@@ -221,6 +222,7 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'api_token' => ['api_token'];
         yield 'api-token' => ['api-token'];
         yield 'credentials' => ['credentials'];
+        yield 'passphrase' => ['passphrase'];
     }
 
     public function test_it_redacts_an_encrypted_pem_private_key(): void
@@ -324,6 +326,13 @@ final class RegexSecretScrubberTest extends TestCase
         self::assertSame("\$config = [\n    'password' =>\n'***REDACTED:multiline_assignment***',\n];", $output);
     }
 
+    public function test_a_wrapped_value_under_a_credential_key_with_trailing_segments_is_still_redacted(): void
+    {
+        $output = $this->regexSecretScrubber->scrub("\$config = [\n    'client_secret_value' =>\n        'SuperSecretValue1234',\n];");
+
+        self::assertSame("\$config = [\n    'client_secret_value' =>\n'***REDACTED:multiline_assignment***',\n];", $output);
+    }
+
     public function test_a_multiline_secret_spanning_two_newlines_reproduces_every_newline_it_spanned(): void
     {
         $output = $this->regexSecretScrubber->scrub("password\n: \n'SuperSecretValue1234'");
@@ -405,6 +414,24 @@ final class RegexSecretScrubberTest extends TestCase
         yield 'token_as_prefix_segment' => ['TOKEN_STORE', 'leakme123456'];
         yield 'key_as_middle_segment' => ['JWT_PRIVATE_KEY_PATH', '/var/secrets/jwt.pem'];
         yield 'key_as_suffix_segment_with_prefix' => ['AWS_ACCESS_KEY_ID', 'AKIAABCDEFGHEXAMPLE'];
+        yield 'passphrase_as_suffix_segment' => ['SSH_PASSPHRASE', 'hunter2000'];
+    }
+
+    #[DataProvider('inlineCredentialKeyWithTrailingSegmentCases')]
+    public function test_inline_assignment_redacts_a_credential_key_followed_by_further_segments(string $key): void
+    {
+        $output = $this->regexSecretScrubber->scrub(\sprintf("%s: 'zzz999aaa111'", $key));
+
+        self::assertSame(\sprintf("%s: '***REDACTED:inline_assignment***'", $key), $output);
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function inlineCredentialKeyWithTrailingSegmentCases(): iterable
+    {
+        yield 'aws_secret_access_key' => ['aws_secret_access_key'];
+        yield 'secret_key_base' => ['secret_key_base'];
+        yield 'client_secret_value' => ['client_secret_value'];
+        yield 'private_key_path' => ['private_key_path'];
     }
 
     #[DataProvider('nonCredentialKeyContainingCredentialSubstringCases')]
@@ -454,25 +481,49 @@ final class RegexSecretScrubberTest extends TestCase
     /**
      * @throws SecretScrubberConfigurationException
      */
-    public function test_runtime_pcre_failure_continues_to_remaining_patterns(): void
+    public function test_a_pattern_that_cannot_be_evaluated_withholds_the_content_instead_of_shipping_it_part_scanned(): void
     {
-        $regexSecretScrubber = new RegexSecretScrubber(additionalPatterns: [
-            '/^(a+)+$/',
-            '/SECONDARY-\d+/',
-        ]);
+        $regexSecretScrubber = new RegexSecretScrubber(additionalPatterns: ['/^(a+)+$/']);
 
+        $output = $this->underATightBacktrackLimit(static fn (): string => $regexSecretScrubber->scrub(str_repeat('a', 30)."b\nSECONDARY-123"));
+
+        self::assertSame("***REDACTED:unscannable***\n", $output);
+    }
+
+    /**
+     * @throws SecretScrubberConfigurationException
+     */
+    public function test_it_reports_the_pattern_it_could_not_evaluate(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                'Withheld file content: a secret-scrubbing pattern could not be evaluated',
+                self::callback(static fn (array $context): bool => 'custom_0' === ($context['pattern'] ?? null) && \is_string($context['error'] ?? null) && '' !== $context['error']),
+            );
+
+        $regexSecretScrubber = new RegexSecretScrubber(['/^(a+)+$/'], $logger);
+
+        self::assertSame(
+            '***REDACTED:unscannable***',
+            $this->underATightBacktrackLimit(static fn (): string => $regexSecretScrubber->scrub(str_repeat('a', 30).'b')),
+        );
+    }
+
+    /**
+     * @param callable(): string $scrub
+     */
+    private function underATightBacktrackLimit(callable $scrub): string
+    {
         $previousLimit = \ini_get('pcre.backtrack_limit');
         ini_set('pcre.backtrack_limit', '50');
 
         try {
-            $payload = str_repeat('a', 30).'b found: SECONDARY-123';
-            $output = $regexSecretScrubber->scrub($payload);
+            return $scrub();
         } finally {
             ini_set('pcre.backtrack_limit', false === $previousLimit ? '1000000' : $previousLimit);
         }
-
-        self::assertStringNotContainsString('SECONDARY-123', $output);
-        self::assertStringContainsString('***REDACTED:custom_1***', $output);
     }
 
     public function test_an_unterminated_quoted_value_full_of_backslashes_does_not_defeat_redaction_of_an_earlier_secret_in_the_same_file(): void

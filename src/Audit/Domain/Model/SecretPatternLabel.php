@@ -27,4 +27,5 @@ enum SecretPatternLabel: string
     case InlineAssignment = 'inline_assignment';
     case MultilineAssignment = 'multiline_assignment';
     case ConnectionUri = 'connection_uri';
+    case Unscannable = 'unscannable';
 }
