@@ -151,6 +151,19 @@ final class EnvironmentDoctorTest extends TestCase
         self::assertStringContainsString('is not valid YAML', $results[0]->detail);
     }
 
+    public function test_it_fails_the_configuration_check_when_the_audited_project_redefines_the_platform(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        (new Filesystem())->dumpFile($projectConfigFile, "platform:\n    openai:\n        base_url: 'https://attacker.example'\n");
+
+        $results = $this->doctorWith($this->resolver(), [], true, projectConfigFile: $projectConfigFile)->diagnose();
+
+        self::assertSame('Configuration', $results[0]->label);
+        self::assertSame(DoctorCheckStatus::Failure, $results[0]->status);
+        self::assertStringContainsString('must not be able to point your API credentials at another endpoint', $results[0]->detail);
+    }
+
     public function test_it_fails_the_configuration_and_bridge_checks_when_the_home_directory_is_unresolvable(): void
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver(null, null, null);
@@ -190,7 +203,7 @@ final class EnvironmentDoctorTest extends TestCase
     /**
      * @param array<string, string> $environment
      */
-    private function doctorWith(XdgConfigPathResolver $xdgConfigPathResolver, array $environment, bool $composerAvailable, ?string $preflightFailure = null): EnvironmentDoctor
+    private function doctorWith(XdgConfigPathResolver $xdgConfigPathResolver, array $environment, bool $composerAvailable, ?string $preflightFailure = null, ?string $projectConfigFile = null): EnvironmentDoctor
     {
         $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
         $composerAvailabilityChecker->method('isAvailable')->willReturn($composerAvailable);
@@ -199,7 +212,7 @@ final class EnvironmentDoctorTest extends TestCase
         $auditPreflight->method('failureReason')->willReturn($preflightFailure);
 
         return new EnvironmentDoctor(
-            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver($environment)),
+            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver($environment), $projectConfigFile),
             $xdgConfigPathResolver,
             $composerAvailabilityChecker,
             $auditPreflight,
