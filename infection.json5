@@ -23,6 +23,7 @@
         }
     },
     "testFramework":"phpunit",
+    "testFrameworkOptions": "--no-extensions",
     "staticAnalysisTool":"phpstan",
     "staticAnalysisToolOptions": "--memory-limit=500M",
     "minMsi": 100,
