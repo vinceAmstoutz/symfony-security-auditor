@@ -279,7 +279,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     // `SecretScrubberInterface` alias is set in SymfonySecurityAuditorBundle::loadExtension()
     // based on `scan.secret_scrubbing.enabled`.
     $defaultsConfigurator->set(RegexSecretScrubber::class)
-        ->args([param('symfony_security_auditor.scan.secret_scrubbing.additional_patterns')]);
+        ->args([
+            param('symfony_security_auditor.scan.secret_scrubbing.additional_patterns'),
+            service('logger'),
+        ]);
 
     $defaultsConfigurator->set(ProjectFileScanner::class)
         ->args([
