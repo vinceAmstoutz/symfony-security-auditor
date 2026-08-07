@@ -295,6 +295,42 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `composer.lock`. Users auditing an untrusted project with a release before
   this fix should assume the project's Composer scripts ran.
 
+- **Secret scrubbing no longer ships content it could not finish scanning.**
+  `RegexSecretScrubber::scrub()`
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) applies each
+  pattern in turn, and when `preg_replace()`/`preg_replace_callback()` returned
+  `null` — the PCRE engine refusing to evaluate a pattern — it did `continue`,
+  moving on to the next pattern with the content unchanged. Nothing downstream
+  could distinguish that part-scanned content from a clean scan, so a file
+  crafted to exhaust `pcre.backtrack_limit` (or a `/u` `additional_patterns`
+  entry meeting invalid UTF-8) sent whatever the failed pattern would have
+  caught straight to the LLM provider. Enabling `scan.secret_scrubbing` is a
+  promise that no credential reaches the model, so the scrubber now fails
+  closed: the file's content is replaced with `***REDACTED:unscannable***`,
+  padded to preserve the original line count so reported line numbers stay
+  correct, and a warning naming the pattern and the `preg_last_error_msg()` is
+  logged. `RegexSecretScrubber` takes an optional `LoggerInterface` second
+  constructor argument, defaulting to `NullLogger`, and is wired to `logger` in
+  `config/services.php`.
+
+- **`aws_secret_access_key: '…'` is redacted, matching what
+  `AWS_SECRET_ACCESS_KEY=…` already did.** The `env_assignment` pattern
+  tolerates segments after the credential word (`(?:_[A-Z0-9]+)*`), which is why
+  the suite already asserted `JWT_PRIVATE_KEY_PATH=…` is redacted, but the
+  `inline_assignment` and `multiline_assignment` patterns required the
+  credential word to be the **last** segment before the separator. The exact
+  same key leaked in YAML, PHP-array and JSON form while being redacted in
+  dotenv form — `aws_secret_access_key`, `secret_key_base`,
+  `client_secret_value` and `private_key_path` all passed through untouched.
+  Both inline patterns now carry the same `(?:[_-][a-z0-9]+)*` tolerance.
+
+- **`PASSPHRASE` / `passphrase` is recognized as a credential word.** Neither
+  the `env_assignment` keyword alternation
+  (`TOKEN|SECRET|PASSWORD|PASSWD|KEY|DSN`) nor the inline one listed it, so
+  `SSH_PASSPHRASE=…` and `passphrase: '…'` — the usual way an SSH or PGP key's
+  passphrase appears in a committed config — were sent verbatim. Added to all
+  three patterns.
+
 ### Fixed
 
 - **A failing audit no longer blames the `--fail-on` threshold for a

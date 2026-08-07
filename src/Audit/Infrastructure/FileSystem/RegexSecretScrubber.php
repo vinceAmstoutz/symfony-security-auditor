@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 
 use Override;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SecretPatternLabel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
@@ -47,9 +49,9 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
         SecretPatternLabel::Jwt->value => '/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/',
         SecretPatternLabel::PemPrivateKey->value => '/-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----/',
         SecretPatternLabel::ConnectionUri->value => '~\b([a-z][a-z0-9+.\-]*://)[^:@/\s]*:[^/\s]+@~i',
-        SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY|DSN)(?:_[A-Z0-9]+)*)\s*=[ \t]*(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\2)[^\n])*+\2|\S+)/m',
-        SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|passwd|pwd|secret|credentials|api[_-]?key|api[_-]?token|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key)["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:[ \t]+[A-Za-z0-9]+)*))/i',
-        SecretPatternLabel::MultilineAssignment->value => '/(["\']?(?:password|passwd|pwd|secret|credentials|api[_-]?key|api[_-]?token|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key)["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi',
+        SecretPatternLabel::EnvAssignment->value => '/((?:^|\s)(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD|PASSWD|PASSPHRASE|KEY|DSN)(?:_[A-Z0-9]+)*)\s*=[ \t]*(?!\s*\n)(?:(["\'])(?:\\\\.|(?!\2)[^\n])*+\2|\S+)/m',
+        SecretPatternLabel::InlineAssignment->value => '/(["\']?(?:password|passwd|pwd|passphrase|secret|credentials|api[_-]?key|api[_-]?token|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key)(?:[_-][a-z0-9]+)*["\']?\s*(?:=>|[:=])[ \t]*)(?!\*\*\*REDACTED:)(?:(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2|([^"\'\s]\S{3,}(?:[ \t]+[A-Za-z0-9]+)*))/i',
+        SecretPatternLabel::MultilineAssignment->value => '/(["\']?(?:password|passwd|pwd|passphrase|secret|credentials|api[_-]?key|api[_-]?token|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key)(?:[_-][a-z0-9]+)*["\']?\s*(?:=>|[:=]))[ \t]*\r?\n[ \t]*(["\'])((?:\\\\.|(?!\2)[^\n]){4,}+)\2/mi',
     ];
 
     /**
@@ -64,8 +66,10 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      *
      * @throws SecretScrubberConfigurationException
      */
-    public function __construct(array $additionalPatterns = [])
-    {
+    public function __construct(
+        array $additionalPatterns = [],
+        private LoggerInterface $logger = new NullLogger(),
+    ) {
         $patterns = self::DEFAULT_PATTERNS;
         foreach ($additionalPatterns as $index => $pattern) {
             $error = $this->validatePattern($pattern);
@@ -91,13 +95,30 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
             };
 
             if (null === $result) {
-                continue;
+                return $this->withheldContent($label, $content);
             }
 
             $content = $result;
         }
 
         return $content;
+    }
+
+    /**
+     * A pattern the PCRE engine refuses to evaluate — a file crafted to exhaust
+     * `pcre.backtrack_limit`, a `/u` custom pattern meeting invalid UTF-8 — leaves
+     * the content only part-scanned, and nothing downstream can tell that apart
+     * from a clean scan. Enabling secret scrubbing is a promise that no credential
+     * reaches the LLM, so the content is withheld rather than sent unverified.
+     */
+    private function withheldContent(string $label, string $content): string
+    {
+        $this->logger->warning('Withheld file content: a secret-scrubbing pattern could not be evaluated', [
+            'pattern' => $label,
+            'error' => preg_last_error_msg(),
+        ]);
+
+        return $this->placeholderPreservingLineCount(SecretPatternLabel::Unscannable, $content);
     }
 
     private function replacementFor(string $label): string
@@ -149,7 +170,12 @@ final readonly class RegexSecretScrubber implements SecretScrubberInterface
      */
     private function redactPreservingLineCount(array $match): string
     {
-        return \sprintf('***REDACTED:%s***%s', SecretPatternLabel::PemPrivateKey->value, str_repeat("\n", substr_count($match[0], "\n")));
+        return $this->placeholderPreservingLineCount(SecretPatternLabel::PemPrivateKey, $match[0]);
+    }
+
+    private function placeholderPreservingLineCount(SecretPatternLabel $secretPatternLabel, string $replaced): string
+    {
+        return \sprintf('***REDACTED:%s***%s', $secretPatternLabel->value, str_repeat("\n", substr_count($replaced, "\n")));
     }
 
     /**
