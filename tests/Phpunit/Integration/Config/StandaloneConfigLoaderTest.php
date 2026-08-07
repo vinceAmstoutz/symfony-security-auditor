@@ -129,6 +129,25 @@ final class StandaloneConfigLoaderTest extends TestCase
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
      */
+    public function test_every_key_a_project_config_declares_reaches_the_audit_settings(): void
+    {
+        $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        $this->filesystem->dumpFile($projectConfigFile, "model: project-model\nfail_on: high\n");
+
+        self::assertSame(
+            ['model' => 'project-model', 'fail_on' => 'high'],
+            $this->loader($projectConfigFile)->load()->auditConfig,
+        );
+    }
+
+    /**
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnresolvableConfigPathException
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     */
     public function test_user_config_keys_survive_when_a_project_config_omits_them(): void
     {
         $this->writeConfig("platform:\n  anthropic:\n    api_key: sk-user\nmodel: user-model\n");
