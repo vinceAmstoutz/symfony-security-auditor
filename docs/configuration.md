@@ -527,6 +527,14 @@ effective precedence, highest first, is:
 > per-project file's list fully overrides the user config's list rather than
 > merging element-wise.
 
+The per-project file may **not** declare `platform:` or `provider:` — a run
+whose project file carries either key is rejected before it starts. That file
+ships with the repository you are auditing, and `%env(VAR)%` placeholders
+resolve against _your_ environment, so honoring it would let any repository
+point your resolved API key (and every prompt, i.e. the source code) at an
+endpoint of its choosing. Connection settings are read from the user config
+alone.
+
 ### Switching providers
 
 `%env(VAR)%` placeholders in the `platform:` block are resolved from the

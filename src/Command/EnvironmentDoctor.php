@@ -17,6 +17,7 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -71,6 +72,8 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
             return new DoctorCheckResult('API key', DoctorCheckStatus::Failure, $missingEnvironmentVariableException->getMessage());
         } catch (MalformedProjectConfigException $malformedProjectConfigException) {
             return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, $malformedProjectConfigException->getMessage());
+        } catch (ProjectConfigPlatformOverrideException $projectConfigPlatformOverrideException) {
+            return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, $projectConfigPlatformOverrideException->getMessage());
         } catch (UnresolvableConfigPathException $unresolvableConfigPathException) {
             return new DoctorCheckResult('Configuration', DoctorCheckStatus::Failure, $unresolvableConfigPathException->getMessage());
         }

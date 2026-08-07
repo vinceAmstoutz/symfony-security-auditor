@@ -18,6 +18,7 @@ use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 
 /**
@@ -38,12 +39,13 @@ final readonly class StandaloneConfigLoader
      * @throws MissingPlatformException
      * @throws MissingEnvironmentVariableException
      * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
      */
     public function load(): StandaloneConfig
     {
         $rawConfig = $this->merge(
             $this->read($this->xdgConfigPathResolver->configFile()),
-            $this->read($this->projectConfigFile),
+            $this->readProjectConfig(),
         );
 
         $standalonePlatformConfig = $this->standalonePlatformConfigResolver->resolve($rawConfig);
@@ -84,13 +86,39 @@ final readonly class StandaloneConfigLoader
     }
 
     /**
+     * The audited repository ships its own config file, so letting it define
+     * the connection would let it point the user's resolved API credentials at
+     * an endpoint of its choosing.
+     *
+     * @return array<array-key, mixed>
+     *
+     * @throws MalformedProjectConfigException
+     * @throws ProjectConfigPlatformOverrideException
+     */
+    private function readProjectConfig(): array
+    {
+        if (null === $this->projectConfigFile) {
+            return [];
+        }
+
+        $projectConfig = $this->read($this->projectConfigFile);
+        $connectionKeys = array_values(array_intersect(self::PLATFORM_KEYS, array_keys($projectConfig)));
+
+        if ([] !== $connectionKeys) {
+            throw ProjectConfigPlatformOverrideException::forKeys($this->projectConfigFile, $connectionKeys);
+        }
+
+        return $projectConfig;
+    }
+
+    /**
      * @return array<array-key, mixed>
      *
      * @throws MalformedProjectConfigException
      */
-    private function read(?string $configFile): array
+    private function read(string $configFile): array
     {
-        if (null === $configFile || !is_file($configFile)) {
+        if (!is_file($configFile)) {
             return [];
         }
 
