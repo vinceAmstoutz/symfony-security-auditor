@@ -13,6 +13,7 @@ permissions: {}
 jobs:
   target:
     name: Base branch matches the declared target
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check the description follows the template and the base matches
