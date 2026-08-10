@@ -83,7 +83,7 @@ final readonly class ReviewerPromptSections implements ReviewerPromptSectionsInt
         Valid `corrected_type` values (same enum the attacker uses):
         sql_injection, command_injection, ldap_injection, xpath_injection, twig_injection, header_injection,
         broken_access_control, missing_voter, voter_bypass, role_escalation, insecure_direct_object_reference,
-        missing_csrf_protection, business_logic_flaw, race_condition, insecure_workflow, price_manipulation,
+        missing_csrf_protection, json_hijacking, business_logic_flaw, race_condition, insecure_workflow, price_manipulation,
         state_machine_bypass, mass_assignment, insecure_deserialization, unsafe_parameter_binding,
         exposed_internal_service, misconfigured_firewall, insecure_redirect, sensitive_data_exposure,
         log_injection, path_traversal, ssrf, xxe, open_redirect, weak_cryptography, insecure_random,
