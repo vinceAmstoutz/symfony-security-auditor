@@ -44,6 +44,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   untouched, so nothing existing breaks. `DependencyExpansionStage` reads the
   neutral map exclusively and no longer names a Symfony type.
 
+- **The attacker now detects XSSI "JSON Hijacking" on GET endpoints.** Per the
+  [Symfony `JsonResponse` documentation](https://symfony.com/doc/current/components/http_foundation.html#creating-a-json-response),
+  a `GET` action that returns a bare top-level indexed JSON array (e.g.
+  `[{...}, {...}]`) instead of an object (`{"data": [...]}`) is exploitable via
+  a cross-origin `<script src="...">` include, since only `GET` requests can be
+  triggered that way. `ControllerAttackerSkill`
+  (`src/Audit/Infrastructure/Prompt/Skill/`) now hunts for this pattern and
+  explicitly does not flag it on routes whose `methods:` exclude `GET`. New
+  `VulnerabilityType::JSON_HIJACKING` case (`src/Audit/Domain/Model/`), mapped
+  to CWE-352 and OWASP A01:2025 (Broken Access Control) alongside the existing
+  CSRF and SSRF variants.
+
 ### Deprecated
 
 - **Four `SymfonyMapping` accessors, in favour of `ApplicationSecurityMap`.**

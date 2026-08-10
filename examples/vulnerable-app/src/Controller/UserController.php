@@ -57,4 +57,16 @@ final class UserController extends AbstractController
 
         return new JsonResponse($user->toArray(), 201);
     }
+
+    // VULN: XSSI "JSON Hijacking" — a GET action returning a bare top-level
+    // indexed array. A cross-origin <script src="/users"> include can read
+    // the array literal. Wrapping it in an object (e.g. {"users": [...]})
+    // closes the hole.
+    #[Route('/users', name: 'user_list', methods: ['GET'])]
+    public function listAction(EntityManagerInterface $entityManager): JsonResponse
+    {
+        $users = $entityManager->getRepository(User::class)->findAll();
+
+        return new JsonResponse(array_map(static fn (User $user): array => $user->toArray(), $users));
+    }
 }

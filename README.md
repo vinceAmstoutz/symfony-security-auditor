@@ -294,7 +294,7 @@ bin/console audit:run --dry-run
   positives across up to 3 iterations, with confirmed findings fed back so later
   iterations generalize patterns instead of re-finding the same bugs, and the
   Reviewer remembering its own rejections across runs.
-- **48 vulnerability types** covering OWASP-aligned categories: Injection,
+- **49 vulnerability types** covering OWASP-aligned categories: Injection,
   Broken Access Control, Logic Flaws, Symfony-specific, Data Exposure,
   Cryptographic — including the modern Symfony 7.x/8.x surface (Authenticators,
   Messenger handlers, Webhooks, Serializer denormalizers, Schedules,

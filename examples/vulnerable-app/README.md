@@ -15,6 +15,7 @@ Run the auditor against it and observe the report.
 | ---------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------- |
 | `src/Controller/UserController.php::deleteAction()`  | Missing `#[IsGranted]` / no `denyAccessUnlessGranted()` on a `DELETE` route. | A01 — Broken Access Control |
 | `src/Controller/UserController.php::showAction()`    | Direct object reference (`$id` from URL → `find()`) with no ownership check. | A01 — Broken Access Control |
+| `src/Controller/UserController.php::listAction()`    | Bare indexed-array `JsonResponse` on a `GET` route (XSSI "JSON Hijacking").  | A01 — Broken Access Control |
 | `src/Controller/SearchController.php::queryAction()` | Raw `$request->get('q')` concatenated into a DQL/SQL string.                 | A03 — Injection             |
 | `src/Entity/User.php::fromRequest()`                 | Mass-assigning every request field, including `isAdmin`, into the entity.    | A04 — Insecure Design       |
 
@@ -31,7 +32,7 @@ Expected outcome:
 
 - Exit code **1** (risk level `CRITICAL` once the controller findings are
   validated).
-- Report lists ≈ 4 findings, one per row of the table above. Severity and
+- Report lists ≈ 5 findings, one per row of the table above. Severity and
   wording vary by model.
 
 To try a different provider, edit

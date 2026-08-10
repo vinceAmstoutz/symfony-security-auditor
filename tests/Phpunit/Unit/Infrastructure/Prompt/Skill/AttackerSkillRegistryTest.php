@@ -335,4 +335,19 @@ final class AttackerSkillRegistryTest extends TestCase
 
         self::assertStringContainsString('setPermission(', $block);
     }
+
+    public function test_controller_skill_flags_bare_array_json_responses_on_get_routes_as_json_hijacking(): void
+    {
+        $block = (new ControllerAttackerSkill())->block();
+
+        self::assertStringContainsString('XSSI', $block);
+        self::assertStringContainsString('Report as `json_hijacking`.', $block);
+    }
+
+    public function test_controller_skill_does_not_flag_json_hijacking_on_routes_that_exclude_get(): void
+    {
+        $block = (new ControllerAttackerSkill())->block();
+
+        self::assertStringContainsString('a non-GET route cannot be hijacked this way.', $block);
+    }
 }

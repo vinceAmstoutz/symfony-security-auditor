@@ -9,6 +9,10 @@
       "file": "src/Controller/UserController.php",
       "type": "broken_access_control"
     },
-    { "file": "src/Entity/User.php", "type": "mass_assignment" }
+    { "file": "src/Entity/User.php", "type": "mass_assignment" },
+    {
+      "file": "src/Controller/UserController.php",
+      "type": "json_hijacking"
+    }
   ]
 }
