@@ -61,6 +61,21 @@ final class LLMResponseTest extends TestCase
     }
 
     /**
+     * `BudgetTracker::recordCall()` sums `totalTokens()` across every call to
+     * enforce `audit.budget.max_tokens`; a provider serves a cache-read or
+     * cache-creation token at a different price than a fresh one, but it is
+     * still a token the request consumed and the cap is meant to bound.
+     *
+     * @throws InvalidTokenUsageException
+     */
+    public function test_total_tokens_includes_cache_read_and_creation_tokens(): void
+    {
+        $llmResponse = LLMResponse::of('Hello world', 'claude-opus', 'end_turn', TokenUsageSnapshot::of(100, 50, 30, 12));
+
+        self::assertSame(192, $llmResponse->totalTokens());
+    }
+
+    /**
      * @throws InvalidTokenUsageException
      */
     public function test_it_detects_empty_content(): void

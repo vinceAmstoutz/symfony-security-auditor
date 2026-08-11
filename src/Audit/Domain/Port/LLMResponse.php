@@ -102,7 +102,7 @@ final readonly class LLMResponse
 
     public function totalTokens(): int
     {
-        return $this->inputTokens + $this->outputTokens;
+        return $this->inputTokens + $this->outputTokens + $this->cacheReadTokens + $this->cacheCreationTokens;
     }
 
     /**

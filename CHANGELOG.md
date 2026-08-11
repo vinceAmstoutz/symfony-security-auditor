@@ -333,6 +333,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **`audit.budget.max_tokens` did not bound a run's real token spend once
+  provider prompt caching was involved.** `LLMResponse::totalTokens()`
+  (`src/Audit/Domain/Port/LLMResponse.php`) returned only
+  `inputTokens + outputTokens`, and `BudgetTracker::recordCall()`
+  (`src/Audit/Application/Budget/BudgetTracker.php`) sums exactly that value to
+  compare against the configured cap — so a call's `cacheReadTokens` and
+  `cacheCreationTokens` were consumed, billed (`CostCalculator::costForCall()`
+  already prices all four counters correctly), and never counted toward the cap
+  that is supposed to abort the run. A caching-heavy audit — the default, since
+  `cache.enabled` is on — could run well past a configured
+  `audit.budget.max_tokens` without ever tripping `BudgetExceededException`.
+  `totalTokens()` now sums all four counters. Fixing a run's token accounting
+  means `audit.budget.max_tokens` now trips earlier than it used to appear to,
+  which is the guard working correctly for the first time, not a change to what
+  the option promises.
+
 - **A persisted attacker chunk cache entry could outlive the mapping it was
   computed under.** `ChunkContextFactory::create()` derives a chunk's cache key
   from file content plus a `contextKey` hashed from the marker/rejected/previous
