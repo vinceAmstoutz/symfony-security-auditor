@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkContextKeyDeriver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
@@ -46,6 +47,7 @@ final class ChunkContextFactoryTest extends TestCase
             self::createStub(AttackerPromptBuilderInterface::class),
             new NullCodeSlicer(),
             new AttackerContextPromptRenderer(),
+            new ChunkContextKeyDeriver(),
         );
 
         $projectFile = ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}');
@@ -77,6 +79,7 @@ final class ChunkContextFactoryTest extends TestCase
             self::createStub(AttackerPromptBuilderInterface::class),
             new NullCodeSlicer(),
             new AttackerContextPromptRenderer(),
+            new ChunkContextKeyDeriver(),
         );
 
         $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}')];
@@ -159,6 +162,7 @@ final class ChunkContextFactoryTest extends TestCase
             self::createStub(AttackerPromptBuilderInterface::class),
             new NullCodeSlicer(),
             new AttackerContextPromptRenderer(),
+            new ChunkContextKeyDeriver(),
         );
 
         $chunk = [ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}')];
@@ -190,6 +194,7 @@ final class ChunkContextFactoryTest extends TestCase
             self::createStub(AttackerPromptBuilderInterface::class),
             new NullCodeSlicer(),
             new AttackerContextPromptRenderer(),
+            new ChunkContextKeyDeriver(),
         );
 
         $projectFile = ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', '<?php class A {}');
@@ -214,6 +219,7 @@ final class ChunkContextFactoryTest extends TestCase
             new AttackerPromptBuilder(),
             $codeSlicer,
             new AttackerContextPromptRenderer(),
+            new ChunkContextKeyDeriver(),
         );
 
         $projectFile = ProjectFile::create('src/Repository/UserRepository.php', '/app/src/Repository/UserRepository.php', "<?php\n\$a = 1;\n\$b = 2;\nDANGER_LINE_HERE\n\$d = 4;");
@@ -239,6 +245,7 @@ final class ChunkContextFactoryTest extends TestCase
             new AttackerPromptBuilder(),
             $codeSlicer,
             new AttackerContextPromptRenderer(),
+            new ChunkContextKeyDeriver(),
         );
 
         $projectFile = ProjectFile::create('src/Controller/A.php', '/app/src/Controller/A.php', "<?php\nORIGINAL_ONLY_TOKEN\n// more");
