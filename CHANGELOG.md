@@ -333,6 +333,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A finding whose LLM tool call omitted `line_start` could silently overwrite
+  an unrelated finding.** `Vulnerability`'s id is deterministic —
+  `VULN-{sha1(type+filePath+lineStart)[0..7]}` — and `line_start` was absent
+  from `record_vulnerability`'s `required` list
+  (`src/Audit/Infrastructure/Tool/RecordVulnerabilityTool.php`), so the provider
+  accepted a tool call that omitted it.
+  `VulnerabilityFactory::buildVulnerability()` then defaulted the missing value
+  to `1`, and `AuditContext::addVulnerability()` keys its findings map by id —
+  so two distinct findings of the same type in the same file collided onto one
+  id the moment either omitted `line_start`, and only the last one written to
+  the map survived. `line_start` is now required, so the provider validates
+  every tool call against it before invocation and the omission is structurally
+  impossible, matching how `confidence` and `title` were already required for
+  the same reason. `line_end` stays optional — it legitimately defaults to
+  `line_start` for a single-line finding and plays no part in the id.
+
 - **An audit that examined no files no longer reports a clean bill of health.**
   A run whose scan found nothing — a mistyped `project-path`, a
   `scan.included_paths` entry matching no directory, an over-broad
