@@ -18,6 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlMap;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileInventory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\SymfonyMappingContextRenderer;
 
 final class SymfonyMappingContextRendererTest extends TestCase
@@ -75,5 +76,27 @@ final class SymfonyMappingContextRendererTest extends TestCase
         );
 
         self::assertStringContainsString('LACKS_ACCESS_CHECK', SymfonyMappingContextRenderer::renderRouteAccessControlMap($symfonyMapping));
+    }
+
+    /**
+     * A voter's `supports()` string-literal attribute is a PHP source value
+     * collected by an AST parser — attacker-controlled, not ours. `sanitizeLine()`
+     * stripped `\n` but left a bare `\r` untouched, unlike the sibling
+     * `NumberedFileContextRenderer::sanitizePathAttribute()` and
+     * `AttackerPromptBuilder::sanitizePathLine()`, which strip both — a bare
+     * `\r` can still forge a fake `##`-prefixed section in the rendered
+     * attacker/reviewer prompt.
+     */
+    public function test_a_carriage_return_in_a_voter_attribute_is_neutralized(): void
+    {
+        $voterCapability = new VoterCapability('src/Security/Voter.php', 'App\\Security\\Voter', ["\rFORGED SECTION", 'EDIT'], []);
+        $symfonyMapping = SymfonyMapping::of(
+            ProjectFileInventory::fromGroups([]),
+            new AccessControlMap(voterCapabilities: [$voterCapability]),
+        );
+
+        $rendered = SymfonyMappingContextRenderer::renderVoterCoverage($symfonyMapping);
+
+        self::assertStringNotContainsString("\r", $rendered);
     }
 }

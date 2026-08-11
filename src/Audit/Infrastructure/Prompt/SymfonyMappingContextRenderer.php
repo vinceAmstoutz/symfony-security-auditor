@@ -363,12 +363,12 @@ final readonly class SymfonyMappingContextRenderer
      * Every value rendered here — a file path, a class name, or a raw
      * `#[IsGranted("...")]` attribute-argument string literal collected by
      * the AST parsers — comes from the audited (untrusted) project, not from
-     * us. A raw embedded newline would let a crafted value forge a fake
-     * `##`-prefixed section (e.g. the literal `## Source Code` heading
+     * us. A raw embedded `\n` or bare `\r` would let a crafted value forge a
+     * fake `##`-prefixed section (e.g. the literal `## Source Code` heading
      * further down the attacker prompt) as unguarded top-level prompt text.
      */
     private static function sanitizeLine(string $value): string
     {
-        return str_replace("\n", ' ', $value);
+        return str_replace(["\r", "\n"], ' ', $value);
     }
 }

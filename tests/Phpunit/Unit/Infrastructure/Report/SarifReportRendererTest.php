@@ -443,6 +443,33 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
+     * `TerminalTextSanitizer::stripControlCharacters()` runs a `/u`-mode
+     * regex, which aborts (returns `null`) on an invalid subject byte —
+     * `HtmlReportRenderer::escape()` guards against exactly this by scrubbing
+     * with `mb_scrub()` first. A single stray byte anywhere in the title,
+     * alongside a genuine bidi override, must not let that override survive
+     * unstripped into the SARIF `message.text` a consumer decodes back.
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_render_strips_a_bidirectional_override_even_alongside_an_invalid_utf8_byte(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, "Weak\xFFSafe\u{202E}txt.exe", 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative('desc', 'vec', 'proof', 'fix'),
+            'code',
+        )->withReviewerValidation(true);
+
+        $decoded = $this->decodeSarif($this->makeReport($vulnerability));
+
+        self::assertStringNotContainsString("\u{202E}", $decoded['runs'][0]['results'][0]['message']['text']);
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException

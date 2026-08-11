@@ -95,7 +95,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
         $result = [
             'ruleId' => $vulnerability->type()->owaspReference(),
             'level' => $this->sarifLevel($vulnerability->severity()),
-            'message' => ['text' => $this->escapeEmbeddedLinkSyntax(TerminalTextSanitizer::stripControlCharacters($vulnerability->title()))],
+            'message' => ['text' => $this->escapeEmbeddedLinkSyntax(TerminalTextSanitizer::stripControlCharacters(mb_scrub($vulnerability->title(), 'UTF-8')))],
             'partialFingerprints' => ['symfonySecurityAuditor/v1' => $vulnerability->fingerprint()],
             'locations' => [
                 [

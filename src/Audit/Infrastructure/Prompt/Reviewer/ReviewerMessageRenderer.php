@@ -170,26 +170,26 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
     /**
      * The attacker LLM supplies `file_path` as a free-form tool argument,
      * indirectly influenced by whatever text lives in the audited source it
-     * just analyzed. A crafted value containing `"` or a newline could
+     * just analyzed. A crafted value containing `"` or a `\n`/bare `\r` could
      * otherwise close the `<file path="...">` tag early or forge fake
      * standalone instruction paragraphs in the plain `File: ...` line.
      */
     private function sanitizeFilePath(string $filePath): string
     {
-        return str_replace(["\n", '"'], [' ', "'"], $filePath);
+        return str_replace(["\r", "\n", '"'], [' ', ' ', "'"], $filePath);
     }
 
     /**
      * `title` lands in the bare, single-line `Title: ...` slot with no
      * surrounding fence or heading to contain it — unlike the fenced/heading
-     * -guarded narrative fields `escapeFences()` protects. A raw newline here
-     * would forge a fake standalone instruction paragraph as unguarded
-     * top-level prompt text, the same class of injection
+     * -guarded narrative fields `escapeFences()` protects. A raw `\n` or bare
+     * `\r` here would forge a fake standalone instruction paragraph as
+     * unguarded top-level prompt text, the same class of injection
      * `sanitizeFilePath()` already guards `File: ...` against.
      */
     private function stripEmbeddedNewline(string $text): string
     {
-        return str_replace("\n", ' ', $text);
+        return str_replace(["\r", "\n"], ' ', $text);
     }
 
     /**
