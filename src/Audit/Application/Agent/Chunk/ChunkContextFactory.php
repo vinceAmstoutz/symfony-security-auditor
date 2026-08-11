@@ -16,9 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAnalysisRequest;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContextPromptRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 
@@ -133,13 +136,10 @@ final readonly class ChunkContextFactory
         $signatures = [
             ...$applicationSecurityMap->perimeterRules(),
             ...$this->routeAccessMapSignatures($symfonyMapping->routeAccessMap()),
-            ...array_map(serialize(...), $symfonyMapping->routeAccessControls()),
-            ...array_map(serialize(...), $applicationSecurityMap->authorizationRules()),
-            ...array_map(serialize(...), $symfonyMapping->formBindings()),
-            ...array_map(
-                static fn (ProjectFile $projectFile): string => $projectFile->relativePath(),
-                $applicationSecurityMap->entrypointsWithoutAuthorizationRule(),
-            ),
+            ...$this->routeAccessControlSignatures($symfonyMapping->routeAccessControls()),
+            ...$this->voterCapabilitySignatures($applicationSecurityMap->authorizationRules()),
+            ...$this->formBindingSignatures($symfonyMapping->formBindings()),
+            ...$this->entrypointsWithoutAuthorizationRulePaths($applicationSecurityMap->entrypointsWithoutAuthorizationRule()),
         ];
 
         if ([] === $signatures) {
@@ -164,6 +164,46 @@ final readonly class ChunkContextFactory
         }
 
         return $signatures;
+    }
+
+    /**
+     * @param list<RouteAccessControl> $routeAccessControls
+     *
+     * @return list<string>
+     */
+    private function routeAccessControlSignatures(array $routeAccessControls): array
+    {
+        return array_map(serialize(...), $routeAccessControls);
+    }
+
+    /**
+     * @param list<VoterCapability> $voterCapabilities
+     *
+     * @return list<string>
+     */
+    private function voterCapabilitySignatures(array $voterCapabilities): array
+    {
+        return array_map(serialize(...), $voterCapabilities);
+    }
+
+    /**
+     * @param list<FormBinding> $formBindings
+     *
+     * @return list<string>
+     */
+    private function formBindingSignatures(array $formBindings): array
+    {
+        return array_map(serialize(...), $formBindings);
+    }
+
+    /**
+     * @param list<ProjectFile> $entrypointsWithoutAuthorizationRule
+     *
+     * @return list<string>
+     */
+    private function entrypointsWithoutAuthorizationRulePaths(array $entrypointsWithoutAuthorizationRule): array
+    {
+        return array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $entrypointsWithoutAuthorizationRule);
     }
 
     private function isCacheable(AttackerAnalysisRequest $attackerAnalysisRequest, string $contextKey, bool $cacheIsContextAware): bool
