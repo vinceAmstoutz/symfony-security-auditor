@@ -3675,7 +3675,7 @@ final class AttackerAgentTest extends TestCase
         $attackerContextPromptRenderer = new AttackerContextPromptRenderer();
         $expectedKey = hash(
             'sha256',
-            hash('sha256', '').hash('sha256', $attackerContextPromptRenderer->renderRejectedFindings([$rejectedFinding])).hash('sha256', $attackerContextPromptRenderer->renderPreviousFindings([$vulnerability])),
+            hash('sha256', '').hash('sha256', $attackerContextPromptRenderer->renderRejectedFindings([$rejectedFinding])).hash('sha256', $attackerContextPromptRenderer->renderPreviousFindings([$vulnerability])).hash('sha256', ''),
         );
         self::assertSame([$expectedKey], $contextKeys);
     }

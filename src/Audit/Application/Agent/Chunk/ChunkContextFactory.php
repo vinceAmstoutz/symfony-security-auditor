@@ -18,6 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerContext
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RiskMarkerIndex;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 
@@ -47,7 +48,8 @@ final readonly class ChunkContextFactory
 
         $rejectedPreamble = $this->renderRejectedPreamble($attackerAnalysisRequest);
         $previousPreamble = $this->renderPreviousPreamble($attackerAnalysisRequest);
-        $contextKey = $this->deriveContextKey($markerPreamble, $rejectedPreamble, $previousPreamble);
+        $mappingFingerprint = $this->mappingFingerprint($attackerAnalysisRequest->symfonyMapping);
+        $contextKey = $this->deriveContextKey($markerPreamble, $rejectedPreamble, $previousPreamble, $mappingFingerprint);
         $cacheable = $this->isCacheable($attackerAnalysisRequest, $contextKey, $cacheIsContextAware);
 
         $slicedChunk = $this->sliceChunk($chunk, $riskMarkerIndex);
@@ -101,14 +103,67 @@ final readonly class ChunkContextFactory
      * whenever the risk markers it was built from change — e.g. a custom
      * `StaticPreScannerInterface` implementation (a documented extension
      * point) starts flagging a file differently on an unchanged content hash.
+     * The mapping fingerprint serves the same purpose for the access-control
+     * data {@see self::mappingFingerprint()} folds in.
      */
-    private function deriveContextKey(string $markerPreamble, string $rejectedPreamble, string $previousPreamble): string
+    private function deriveContextKey(string $markerPreamble, string $rejectedPreamble, string $previousPreamble, string $mappingFingerprint): string
     {
-        if ('' === $markerPreamble && '' === $rejectedPreamble && '' === $previousPreamble) {
+        if ('' === $markerPreamble && '' === $rejectedPreamble && '' === $previousPreamble && '' === $mappingFingerprint) {
             return '';
         }
 
-        return hash('sha256', hash('sha256', $markerPreamble).hash('sha256', $rejectedPreamble).hash('sha256', $previousPreamble));
+        return hash('sha256', hash('sha256', $markerPreamble).hash('sha256', $rejectedPreamble).hash('sha256', $previousPreamble).hash('sha256', $mappingFingerprint));
+    }
+
+    /**
+     * `AttackerPromptBuilder::buildUserMessage()` renders the firewall,
+     * route-access-control, voter-coverage and form-binding sections straight
+     * from the mapping, but the chunk cache is keyed only by file content and
+     * this class's context key — so, unfingerprinted, a `security.yaml` edit
+     * or a voter added elsewhere in the project would replay a verdict
+     * computed under the old mapping for a file whose own content never
+     * changed. Each list is sorted before hashing since project scanning
+     * makes no ordering guarantee, so two scans of the same unchanged
+     * codebase still agree.
+     */
+    private function mappingFingerprint(SymfonyMapping $symfonyMapping): string
+    {
+        $applicationSecurityMap = $symfonyMapping->toApplicationSecurityMap();
+
+        $signatures = [
+            ...$applicationSecurityMap->perimeterRules(),
+            ...$this->routeAccessMapSignatures($symfonyMapping->routeAccessMap()),
+            ...array_map(serialize(...), $symfonyMapping->routeAccessControls()),
+            ...array_map(serialize(...), $applicationSecurityMap->authorizationRules()),
+            ...array_map(serialize(...), $symfonyMapping->formBindings()),
+            ...array_map(
+                static fn (ProjectFile $projectFile): string => $projectFile->relativePath(),
+                $applicationSecurityMap->entrypointsWithoutAuthorizationRule(),
+            ),
+        ];
+
+        if ([] === $signatures) {
+            return '';
+        }
+
+        sort($signatures);
+
+        return hash('sha256', implode("\n", $signatures));
+    }
+
+    /**
+     * @param array<string, list<string>> $routeAccessMap
+     *
+     * @return list<string>
+     */
+    private function routeAccessMapSignatures(array $routeAccessMap): array
+    {
+        $signatures = [];
+        foreach ($routeAccessMap as $pattern => $roles) {
+            $signatures[] = \sprintf('%s=%s', $pattern, implode(',', $roles));
+        }
+
+        return $signatures;
     }
 
     private function isCacheable(AttackerAnalysisRequest $attackerAnalysisRequest, string $contextKey, bool $cacheIsContextAware): bool

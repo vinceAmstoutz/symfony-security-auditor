@@ -333,6 +333,28 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A persisted attacker chunk cache entry could outlive the mapping it was
+  computed under.** `ChunkContextFactory::create()` derives a chunk's cache key
+  from file content plus a `contextKey` hashed from the marker/rejected/previous
+  preambles, but `AttackerPromptBuilder::buildUserMessage()` also folds the
+  `SymfonyMapping` — firewall rules, the route access-control map, voter
+  coverage, form bindings, controllers without a voter — straight into the
+  prompt, and none of that ever reached the key
+  (`src/Audit/Application/Agent/Chunk/ChunkContextFactory.php`). A
+  `security.yaml` edit or a voter added elsewhere in the project could leave a
+  specific file's own content untouched while changing whether the attacker
+  would flag it — and `FilesystemAttackerCache` would keep serving the verdict
+  computed under the old mapping indefinitely. `deriveContextKey()` now folds in
+  a fingerprint of that same access-control data, sorted before hashing so two
+  scans of an unchanged codebase still agree despite `Finder` making no ordering
+  guarantee, and stays the empty string when the mapping carries none of it — so
+  a mapping-less test double or a project with no routes at all keeps today's
+  full cacheability. A custom, non-context-aware `AttackerCacheInterface`
+  implementation will now see chunks skipped (per the existing, documented
+  fallback) far more often than before, since a real Symfony project's mapping
+  is rarely empty — the alternative was letting such a cache keep serving stale
+  verdicts, which is the exact bug this closes.
+
 - **A finding whose LLM tool call omitted `line_start` could silently overwrite
   an unrelated finding.** `Vulnerability`'s id is deterministic —
   `VULN-{sha1(type+filePath+lineStart)[0..7]}` — and `line_start` was absent

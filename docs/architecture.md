@@ -492,16 +492,21 @@ optional lean-mode filtering, chunking, strategy selection, and the
 start/complete logging — delegating the per-chunk work to `Chunk\` collaborators
 it builds at construction time: `ChunkContextFactory` assembles each chunk's
 prompts (markers + cross-iteration preambles, code slicing) and derives the
-cache key/cacheability into a `ChunkContext`; `AttackerChunkCache` adapts
-`AttackerCacheInterface` (context-aware key when supported) and turns a hit into
-a hydrated result; `SequentialChunkAnalyzer` and `ConcurrentChunkAnalyzer` are
-the two analysis strategies, and both build their structured-collection round (a
-fresh collector wired into a single-tool `record_vulnerability` registry)
-through the shared `StructuredVulnerabilityCollectionSession::begin()`;
-`ChunkCoverageRecorder` records per-file coverage. The chunk-priority ordering
-above is defined once on `FileChunker` over `ProjectFileType` cases. Risk
-markers are indexed by `RiskMarkerIndex`, and the deterministic-marker /
-prior-findings prompt preambles are rendered by `AttackerContextPromptRenderer`.
+cache key/cacheability into a `ChunkContext` — the key folds in a fingerprint of
+the mapping's access-control data (firewall rules, route access-control map,
+voter capabilities, form bindings, controllers without a voter) alongside the
+marker/rejected/previous preambles, so a `security.yaml` edit or a voter added
+elsewhere invalidates a chunk's cached verdict even though the chunk's own file
+content never changed; `AttackerChunkCache` adapts `AttackerCacheInterface`
+(context-aware key when supported) and turns a hit into a hydrated result;
+`SequentialChunkAnalyzer` and `ConcurrentChunkAnalyzer` are the two analysis
+strategies, and both build their structured-collection round (a fresh collector
+wired into a single-tool `record_vulnerability` registry) through the shared
+`StructuredVulnerabilityCollectionSession::begin()`; `ChunkCoverageRecorder`
+records per-file coverage. The chunk-priority ordering above is defined once on
+`FileChunker` over `ProjectFileType` cases. Risk markers are indexed by
+`RiskMarkerIndex`, and the deterministic-marker / prior-findings prompt
+preambles are rendered by `AttackerContextPromptRenderer`.
 
 Chunks the files (default `feature` strategy; `type` for the legacy
 priority-window). For each chunk: builds prompts via `AttackerPromptBuilder`,
@@ -526,11 +531,12 @@ analyses cache-miss chunks concurrently through
 registry with its own `VulnerabilityCollector`); cache hits short-circuit first
 and chunk order, coverage, caching, and drop accounting are identical to the
 sequential path. Chunks carrying cross-iteration context (prior validated
-findings, reviewer-rejected findings) are keyed by chunk + a SHA-256 of the
-rendered context preambles through the opt-in
+findings, reviewer-rejected findings) or a non-empty mapping fingerprint (see
+above) are keyed by chunk + a SHA-256 of that context through the opt-in
 `ContextAwareAttackerCacheInterface`, so iterations 2+ are cacheable too; a
 cache that does not implement the context-aware port is simply skipped for those
-chunks.
+chunks — in practice almost every chunk of a real Symfony project, since its
+mapping is rarely empty.
 
 ### `ReviewerAgent`
 
