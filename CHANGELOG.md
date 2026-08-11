@@ -333,6 +333,38 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **A crafted file path could still forge a fake prompt section using a carriage
+  return instead of a newline.** `AttackerPromptBuilder::sanitizePathLine()` and
+  `NumberedFileContextRenderer::sanitizePathAttribute()`
+  (`src/Audit/Infrastructure/Prompt/`) stripped `\n` from a scanned file's path
+  before embedding it in the attacker prompt, but left `\r` untouched — half of
+  the same defense `AttackerContextPromptRenderer::sanitizeLine()` already
+  applies to risk-marker and prior-finding text. Both now strip `\r` alongside
+  `\n`.
+
+- **A purely-numeric `file_path` crashed the executive summary report.**
+  `ExecutiveSummary::fileCounts()`
+  (`src/Audit/Domain/Model/ExecutiveSummary.php`) keys its hotspot distribution
+  by the LLM-controlled `file_path`, and a canonical-integer string (e.g.
+  `"42"`) becomes an `int` array key under PHP's own array-key rules.
+  `ExecutiveSummaryReportRenderer::countLines()`
+  (`src/Audit/Infrastructure/Report/`) passed that key straight into
+  `sanitize(string $text)`, so `audit:run --format executive` aborted with a
+  `TypeError` the moment any validated finding's file path looked like a number.
+  The label is now cast to `string` before sanitizing.
+
+- **A Unicode bidirectional override in a finding's title survived into the
+  SARIF and JUnit reports.** Neither `SarifReportRenderer::resultFor()` nor
+  `JunitReportRenderer::stripIllegalXmlCharacters()`
+  (`src/Audit/Infrastructure/Report/`) stripped bidi control characters — a bidi
+  override is valid JSON text and valid XML text, so it survived round-tripping
+  into `message.text` (SARIF) and the testcase name/failure text (JUnit)
+  unchanged, letting a crafted finding visually reorder how its own title reads
+  in GitHub Code Scanning or a JUnit-consuming CI viewer. Both renderers now run
+  the affected fields through the same
+  `TerminalTextSanitizer::stripControlCharacters()` the console and Markdown
+  renderers already use.
+
 - **`audit.budget.max_tokens` did not bound a run's real token spend once
   provider prompt caching was involved.** `LLMResponse::totalTokens()`
   (`src/Audit/Domain/Port/LLMResponse.php`) returned only

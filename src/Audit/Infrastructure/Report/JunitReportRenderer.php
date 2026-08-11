@@ -103,9 +103,13 @@ final readonly class JunitReportRenderer implements ReportRendererInterface
      * escaping them — a finding whose LLM-produced text carries one silently
      * corrupts the document for any consumer that re-parses it. A value that
      * is not valid UTF-8 at all cannot be repaired and is dropped wholesale.
+     * A Unicode bidirectional override is valid XML text and survives this
+     * filter untouched, so it is stripped first via the shared
+     * `TerminalTextSanitizer`, the same defense the console/Markdown/SARIF
+     * renderers apply to LLM-sourced text.
      */
     private function stripIllegalXmlCharacters(string $value): string
     {
-        return preg_replace(self::ILLEGAL_XML_CHARACTERS, '', $value) ?? '';
+        return preg_replace(self::ILLEGAL_XML_CHARACTERS, '', TerminalTextSanitizer::stripControlCharacters($value)) ?? '';
     }
 }

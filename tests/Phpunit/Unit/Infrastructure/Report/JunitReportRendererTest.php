@@ -137,6 +137,37 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
+     * A Unicode bidirectional override is valid XML text — the illegal-XML-char
+     * filter never touches it — so it reaches any JUnit-consuming CI viewer
+     * unchanged, enabling a Trojan-Source-style visual reorder of the
+     * displayed finding title/description/remediation.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_strips_a_bidirectional_override_from_title_description_and_remediation(): void
+    {
+        $vulnerability = Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, "Safe\u{202E}Title", 0.9),
+            new CodeLocation('src/Foo.php', 1, 5),
+            new VulnerabilityNarrative("Safe\u{202E}Desc", 'vector', 'proof', "Safe\u{202E}Fix"),
+            '$q',
+        )->withReviewerValidation(true);
+
+        $domDocument = $this->decodeJunit($this->makeReport($vulnerability));
+
+        $testcase = $domDocument->getElementsByTagName('testcase')->item(0);
+        self::assertNotNull($testcase);
+        self::assertStringNotContainsString("\u{202E}", $testcase->getAttribute('name'));
+
+        $failure = $domDocument->getElementsByTagName('failure')->item(0);
+        self::assertNotNull($failure);
+        self::assertStringNotContainsString("\u{202E}", $failure->textContent);
+    }
+
+    /**
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException

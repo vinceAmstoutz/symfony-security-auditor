@@ -112,7 +112,7 @@ final readonly class AttackerPromptBuilder implements AttackerPromptBuilderInter
      */
     private static function sanitizePathLine(string $path): string
     {
-        return str_replace("\n", ' ', $path);
+        return str_replace(["\r", "\n"], ' ', $path);
     }
 
     private function basePrompt(): string

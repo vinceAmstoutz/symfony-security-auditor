@@ -49,7 +49,7 @@ final readonly class NumberedFileContextRenderer
      */
     private static function sanitizePathAttribute(string $path): string
     {
-        return str_replace(["\n", '"'], [' ', "'"], $path);
+        return str_replace(["\r", "\n", '"'], [' ', ' ', "'"], $path);
     }
 
     private static function numberLines(string $content): string

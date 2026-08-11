@@ -121,13 +121,13 @@ final readonly class ExecutiveSummaryReportRenderer implements ReportRendererInt
     }
 
     /**
-     * @param array<string, int> $counts
+     * @param array<int|string, int> $counts
      */
     private function countLines(array $counts): string
     {
         $lines = [];
         foreach ($counts as $label => $count) {
-            $lines[] = \sprintf('  %s %3d', mb_str_pad($this->sanitize($label), self::LABEL_COLUMN_WIDTH), $count);
+            $lines[] = \sprintf('  %s %3d', mb_str_pad($this->sanitize((string) $label), self::LABEL_COLUMN_WIDTH), $count);
         }
 
         return implode("\n", $lines);

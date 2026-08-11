@@ -82,4 +82,17 @@ final class NumberedFileContextRendererTest extends TestCase
 
         self::assertStringStartsWith('<file path="src/Foo.php FORGED INJECTED LINE" type=', $rendered);
     }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_a_relative_path_containing_a_carriage_return_stays_on_the_opening_tag_line(): void
+    {
+        $maliciousRelativePath = "src/Foo.php\rFORGED INJECTED LINE";
+        $projectFile = ProjectFile::create($maliciousRelativePath, '/app/x', '<?php');
+
+        $rendered = NumberedFileContextRenderer::render([$projectFile]);
+
+        self::assertStringStartsWith('<file path="src/Foo.php FORGED INJECTED LINE" type=', $rendered);
+    }
 }

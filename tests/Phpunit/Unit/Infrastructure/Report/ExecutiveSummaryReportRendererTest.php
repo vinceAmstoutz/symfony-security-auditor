@@ -304,4 +304,23 @@ final class ExecutiveSummaryReportRendererTest extends AbstractReportRendererTes
 
         self::assertStringContainsString('RISK LEVEL: SAFE  (Score: 0)', $output);
     }
+
+    /**
+     * A purely-numeric `file_path` (fully LLM-controlled) canonicalizes to an
+     * int array key in `ExecutiveSummary::fileCounts()`, so the hotspot
+     * distribution must not assume its labels are always strings.
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_purely_numeric_file_path_does_not_crash_the_hotspot_distribution(): void
+    {
+        $output = $this->renderer->render($this->makeReport(
+            $this->makeValidatedVuln(filePath: '42'),
+        ));
+
+        self::assertStringContainsString('42', $output);
+    }
 }
