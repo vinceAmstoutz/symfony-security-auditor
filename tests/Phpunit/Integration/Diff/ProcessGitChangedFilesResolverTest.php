@@ -305,6 +305,30 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     }
 
     /**
+     * The audited project is untrusted — its own `.git/config` is attacker
+     * data. `core.fsmonitor` lets a repo declare an arbitrary command that git
+     * runs on any working-tree comparison, including the plain `git diff
+     * --name-only HEAD` this resolver issues for uncommitted changes. Left
+     * unneutralized, auditing a malicious clone with `--since` executes that
+     * command as the auditor's own process.
+     *
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_does_not_execute_the_audited_repos_fsmonitor_hook(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // initial', 'init');
+
+        $marker = $this->tmpDir.'-fsmonitor-pwned';
+        $this->runGit(['git', 'config', 'core.fsmonitor', \sprintf('sh -c "touch %s"', $marker)]);
+        $this->writeFile('src/Foo.php', '<?php // uncommitted edit');
+
+        (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'HEAD');
+
+        self::assertFileDoesNotExist($marker);
+    }
+
+    /**
      * @throws GitChangedFilesUnavailableException
      */
     public function test_it_wraps_a_git_diff_timeout_instead_of_leaking_a_raw_process_exception(): void
@@ -335,6 +359,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     protected function tearDown(): void
     {
         $this->filesystem->remove($this->tmpDir);
+        $this->filesystem->remove($this->tmpDir.'-fsmonitor-pwned');
     }
 
     private function initRepo(): void

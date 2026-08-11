@@ -126,14 +126,18 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
     }
 
     /**
+     * `-z` NUL-terminates each path instead of newline-terminating it, and disables
+     * git's C-style quoting of non-ASCII bytes AND of literal quotes/backslashes/
+     * control characters alike — `core.quotepath=off` alone only covers the former.
+     * `core.fsmonitor=` neutralizes the audited (untrusted) repo's own local config:
+     * otherwise a hostile `core.fsmonitor` hook set in its `.git/config` runs as an
+     * arbitrary command on this working-tree comparison.
+     *
      * @param list<string> $argv
      */
     private function buildDefaultGitDiffProcess(array $argv, string $projectPath): Process
     {
-        // -z NUL-terminates each path instead of newline-terminating it, and disables
-        // git's C-style quoting of non-ASCII bytes AND of literal quotes/backslashes/
-        // control characters alike — core.quotepath=off alone only covers the former.
-        return new Process(['git', '-c', 'core.quotepath=off', ...$argv, '-z'], $projectPath);
+        return new Process(['git', '-c', 'core.quotepath=off', '-c', 'core.fsmonitor=', ...$argv, '-z'], $projectPath);
     }
 
     /**

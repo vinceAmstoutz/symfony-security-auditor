@@ -21,6 +21,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\AuditTool;
@@ -69,7 +70,7 @@ final class McpServeCommandTest extends TestCase
     private function command(): McpServeCommand
     {
         $mcpServerFactory = new McpServerFactory(
-            new AuditTool(new RunAuditUseCase(self::createStub(PipelineInterface::class), new NullLogger()), new JsonReportRenderer()),
+            new AuditTool(new RunAuditUseCase(self::createStub(PipelineInterface::class), new NullLogger()), new JsonReportRenderer(), new AuditedProjectPathHolder('/default/project/dir')),
             new ReportPackage(),
         );
 

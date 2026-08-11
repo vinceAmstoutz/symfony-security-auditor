@@ -251,11 +251,14 @@ runs:
         fi
 
         # The renderer opens the body with this marker so a rerun edits its own
-        # comment instead of appending another one to the thread.
+        # comment instead of appending another one to the thread. The marker is
+        # public, so the author is checked too — otherwise anyone able to
+        # comment on the PR could post it first and hijack this job's write
+        # access to edit their own comment on every rerun.
         marker='<!-- symfony-security-auditor:pr-comment -->'
         matches="$RUNNER_TEMP/ssa-comment-matches.txt"
         gh api --paginate "$SSA_COMMENTS_URL" \
-          --jq ".[] | select(.body | contains(\"$marker\")) | .url" > "$matches"
+          --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$marker\"))) | .url" > "$matches"
         existing="$(head -n 1 "$matches")"
 
         payload="$RUNNER_TEMP/ssa-comment-payload.json"

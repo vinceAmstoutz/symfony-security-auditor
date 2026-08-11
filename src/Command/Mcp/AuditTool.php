@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 
 /** @internal not part of the BC promise — the MCP tool *name* (`audit`) is public, but the PHP class itself is for internal use only. */
@@ -27,6 +28,7 @@ final readonly class AuditTool
     public function __construct(
         private RunAuditUseCase $runAuditUseCase,
         private ReportRendererInterface $reportRenderer,
+        private AuditedProjectPathHolder $auditedProjectPathHolder,
     ) {}
 
     /**
@@ -38,6 +40,8 @@ final readonly class AuditTool
      */
     public function audit(string $path): string
     {
+        $this->auditedProjectPathHolder->set($path);
+
         return $this->reportRenderer->render($this->runAuditUseCase->execute($path));
     }
 }

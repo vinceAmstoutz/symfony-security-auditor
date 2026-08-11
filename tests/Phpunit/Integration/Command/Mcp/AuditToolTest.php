@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCont
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\AuditTool;
@@ -54,7 +55,7 @@ final class AuditToolTest extends TestCase
      */
     public function test_it_audits_the_given_path_and_returns_the_rendered_json_report(): void
     {
-        $auditTool = new AuditTool($this->runAuditUseCase(), new JsonReportRenderer());
+        $auditTool = new AuditTool($this->runAuditUseCase(), new JsonReportRenderer(), $this->auditedProjectPathHolder());
 
         $report = json_decode($auditTool->audit($this->projectPath), true, flags: \JSON_THROW_ON_ERROR);
 
@@ -74,13 +75,43 @@ final class AuditToolTest extends TestCase
         $renderer = self::createStub(ReportRendererInterface::class);
         $renderer->method('render')->willReturn('RENDERED-REPORT');
 
-        $auditTool = new AuditTool($this->runAuditUseCase(), $renderer);
+        $auditTool = new AuditTool($this->runAuditUseCase(), $renderer, $this->auditedProjectPathHolder());
 
         self::assertSame('RENDERED-REPORT', $auditTool->audit($this->projectPath));
+    }
+
+    /**
+     * `ComposerAuditAdvisoryDatabase`, `SarifImportingPreScanner` and
+     * `FilesystemTriageMemoryStore` all resolve the audited project through
+     * `AuditedProjectPathHolder::path()`, which falls back to the bundle's own
+     * `kernel.project_dir` when never `set()`. `AuditCommand` sets it from the
+     * resolved CLI argument before running; the MCP entrypoint must do the
+     * same for its own `path` argument, or those collaborators silently
+     * resolve against the wrong project when the tool is invoked over MCP.
+     *
+     * @throws AuditAbortedByBudgetException
+     * @throws AuditAbortedByProviderException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     * @throws InvalidTokenUsageException
+     */
+    public function test_it_sets_the_audited_project_path_holder_before_running_the_use_case(): void
+    {
+        $auditedProjectPathHolder = $this->auditedProjectPathHolder();
+        $auditTool = new AuditTool($this->runAuditUseCase(), new JsonReportRenderer(), $auditedProjectPathHolder);
+
+        $auditTool->audit($this->projectPath);
+
+        self::assertSame($this->projectPath, $auditedProjectPathHolder->path());
     }
 
     private function runAuditUseCase(): RunAuditUseCase
     {
         return new RunAuditUseCase(self::createStub(PipelineInterface::class), new NullLogger());
+    }
+
+    private function auditedProjectPathHolder(): AuditedProjectPathHolder
+    {
+        return new AuditedProjectPathHolder('/default/project/dir');
     }
 }

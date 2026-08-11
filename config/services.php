@@ -727,6 +727,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->args([
             service(RunAuditUseCase::class),
             service(JsonReportRenderer::class),
+            service(AuditedProjectPathHolder::class),
         ]);
 
     $defaultsConfigurator->set(McpServerFactory::class)
