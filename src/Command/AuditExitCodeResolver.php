@@ -17,13 +17,22 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/**
+ * A run whose scan discovered no file at all reports SAFE, 100/100 and grade A,
+ * because there was nothing to find — so a mistyped project path or a
+ * `scan.included_paths` entry that matches nothing would pass any gate. That is
+ * not a verdict, so it fails regardless of the thresholds. A `--since` run whose
+ * diff left nothing changed still passes: there the scan did find files.
+ *
+ * @internal not part of the BC promise — see docs/versioning.md
+ */
 final readonly class AuditExitCodeResolver implements AuditExitCodeResolverInterface
 {
     #[Override]
     public function resolve(AuditReport $auditReport, RiskLevel $riskLevel, ?int $minimumScore = null): int
     {
-        $failed = $auditReport->riskLevelEnum()->isAtLeast($riskLevel)
+        $failed = 0 === $auditReport->filesDiscovered()
+            || $auditReport->riskLevelEnum()->isAtLeast($riskLevel)
             || $this->scoreIsBelow($auditReport, $minimumScore);
 
         return $failed ? ExitCode::Failure->value : ExitCode::Success->value;

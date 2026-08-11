@@ -19,11 +19,13 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -57,6 +59,7 @@ final class AuditExitCodeResolverTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidProjectFileException
      */
     #[DataProvider('thresholdCases')]
     public function test_it_fails_only_when_risk_level_meets_the_threshold(int $criticalFindings, RiskLevel $riskLevel, int $expectedExitCode): void
@@ -96,6 +99,7 @@ final class AuditExitCodeResolverTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidProjectFileException
      */
     #[DataProvider('minimumScoreCases')]
     public function test_it_fails_when_the_normalized_score_is_below_the_minimum(int $criticalFindings, int $minimumScore, int $expectedExitCode): void
@@ -128,6 +132,7 @@ final class AuditExitCodeResolverTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
+     * @throws InvalidProjectFileException
      */
     public function test_the_risk_gate_still_fails_on_its_own_when_the_score_gate_passes(): void
     {
@@ -138,14 +143,41 @@ final class AuditExitCodeResolverTest extends TestCase
     }
 
     /**
-     * @throws InvalidCodeLocationException
-     * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidAuditContextException
+     */
+    public function test_it_fails_a_run_that_found_no_files_to_audit(): void
+    {
+        $auditReport = AuditReport::fromContext(AuditContext::forProject($this->tmpDir));
+
+        self::assertSame(Command::FAILURE, $this->auditExitCodeResolver->resolve($auditReport, RiskLevel::Critical));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_it_passes_a_diff_run_whose_reference_left_no_changed_file_to_audit(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setMappingFiles([ProjectFile::create('src/Untouched.php', $this->tmpDir.'/src/Untouched.php', '<?php')]);
+        $auditContext->setProjectFiles([]);
+
+        $auditReport = AuditReport::fromContext($auditContext);
+
+        self::assertSame(Command::SUCCESS, $this->auditExitCodeResolver->resolve($auditReport, RiskLevel::Critical));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityNarrativeException
      */
     private function reportWith(int $criticalFindings): AuditReport
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
+        $auditContext->setProjectFiles([ProjectFile::create('src/Audited.php', $this->tmpDir.'/src/Audited.php', '<?php')]);
         for ($i = 1; $i <= $criticalFindings; ++$i) {
             $auditContext->addVulnerability(
                 Vulnerability::of(

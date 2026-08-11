@@ -27,6 +27,7 @@ final class ReportIdentityTest extends TestCase
             new DateTimeImmutable('2020-03-10 08:15:20.250000'),
             new DateTimeImmutable('2020-03-12 12:20:26.750000'),
             3,
+            3,
         );
 
         self::assertSame(187_506.5, $reportIdentity->durationSeconds());
@@ -39,6 +40,7 @@ final class ReportIdentityTest extends TestCase
             '/project',
             new DateTimeImmutable('2020-03-10 08:15:20.250000'),
             new DateTimeImmutable('2020-03-10 08:15:20.500000'),
+            0,
             0,
         );
 

@@ -333,6 +333,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Fixed
 
+- **An audit that examined no files no longer reports a clean bill of health.**
+  A run whose scan found nothing — a mistyped `project-path`, a
+  `scan.included_paths` entry matching no directory, an over-broad
+  `excluded_paths` — produced a report with zero findings, and every downstream
+  signal read that as success: `riskLevel` SAFE, `normalizedScore()` 100, grade
+  A, and `AuditExitCodeResolver::resolve()` returning `0` even under
+  `--fail-on=low --min-score=90`. A CI gate configured exactly as the docs
+  recommend went green having audited nothing. `ReportIdentity` now also carries
+  `filesDiscovered` — what the scan found, before a `--since` diff narrows it —
+  exposed as `AuditReport::filesDiscovered()`, and the resolver fails a run
+  whose value is `0` regardless of the thresholds. A `--since` run whose diff
+  left nothing changed still exits `0`, because there the scan did find files;
+  the two cases were previously indistinguishable, since `filesScanned` is the
+  post-diff count.
+
 - **A failing audit no longer blames the `--fail-on` threshold for a
   `--min-score` failure.** `AuditExitCodeResolver::resolve()` fails a run when
   the risk gate **or** the independent `--min-score` gate trips, but only the

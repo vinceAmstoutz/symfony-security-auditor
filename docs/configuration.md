@@ -743,8 +743,15 @@ disagree:
 | Code | Meaning                                                                                                                                                                                                                                                                                                                              |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `0`  | Audit completed; aggregate risk level is below the `fail_on` threshold (default `critical` → SAFE, LOW, MEDIUM, or HIGH) and, when `--min-score` is given, the normalized score is at or above it                                                                                                                                    |
-| `1`  | Aggregate risk level is at or above the `fail_on` threshold (default `critical`), the normalized score is below `--min-score`, the audit itself failed, or the path was invalid                                                                                                                                                      |
+| `1`  | Aggregate risk level is at or above the `fail_on` threshold (default `critical`), the normalized score is below `--min-score`, **the scan discovered no file to audit**, the audit itself failed, or the path was invalid                                                                                                            |
 | `2`  | The audit budget could not be honored: either it aborted mid-run because the configured token or cost budget was exceeded (partial report still emitted), or it never started because an unpriced model makes `audit.budget.max_cost_usd` unenforceable and the run was declined or non-interactive (no report emitted in that case) |
+
+A run whose scan discovered **no file at all** exits `1` rather than reporting
+SAFE with a perfect score. Nothing was examined, so there is no verdict to pass
+— this catches a mistyped `project-path`, a `scan.included_paths` entry matching
+nothing, or an over-broad `excluded_paths`, instead of letting the gate go
+green. A `--since` run whose diff left nothing changed still exits `0`: there
+the scan did find files, and none of them changed.
 
 ### `audit:diff` — comparing two reports
 

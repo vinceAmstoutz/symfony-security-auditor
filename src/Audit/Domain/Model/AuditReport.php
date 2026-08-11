@@ -62,6 +62,7 @@ final readonly class AuditReport
                 $auditContext->startedAt(),
                 new DateTimeImmutable(),
                 \count($auditContext->projectFiles()),
+                \count($auditContext->mappingFiles()),
             ),
             $auditContext->coverage(),
             $auditCost,
@@ -106,6 +107,15 @@ final readonly class AuditReport
     public function filesScanned(): int
     {
         return $this->reportIdentity->filesScanned;
+    }
+
+    /**
+     * How many files the scan found, before a `--since` diff narrowed them.
+     * Zero means nothing was examined, so the report carries no verdict.
+     */
+    public function filesDiscovered(): int
+    {
+        return $this->reportIdentity->filesDiscovered;
     }
 
     public function cost(): AuditCost
