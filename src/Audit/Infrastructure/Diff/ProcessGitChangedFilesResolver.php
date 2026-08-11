@@ -27,28 +27,43 @@ use function Symfony\Component\String\u;
 /**
  * @internal not part of the BC promise — see docs/versioning.md
  *
- * Resolves the set of changed files via two git invocations:
+ * Resolves the set of changed files via three git invocations:
  *
  *   1. `git diff --relative --name-only --diff-filter=ACMR <ref>...HEAD`
  *      — committed changes that diverge from the ref's merge base. The triple
  *      dot semantics handle topic branches diverged from the ref correctly:
  *      only changes ON the branch are returned, not changes the ref accrued
- *      since branch point.
+ *      since branch point. Pure tree-to-tree comparison — never touches the
+ *      working tree, so it cannot invoke a `.gitattributes` content filter.
  *
- *   2. `git diff --relative --name-only --diff-filter=ACMR HEAD`
- *      — uncommitted changes against HEAD: staged changes (including files
- *      already `git add`ed) plus unstaged edits to already-tracked files.
- *      `git diff` never reports genuinely untracked files (ones never staged
- *      at all) — those are invisible to this resolver. Merged into the result
- *      so a local dev running `audit:run --since=main` sees their staged and
- *      already-tracked in-flight work too.
+ *   2. `git diff-index --relative --name-only --diff-filter=ACMR --cached HEAD`
+ *      — staged changes against HEAD (including files already `git add`ed):
+ *      index vs tree, both already-hashed objects, so no working-tree content
+ *      filter runs either.
+ *
+ *   3. `git diff-files --relative --name-only --diff-filter=ACMR`
+ *      — unstaged edits to already-tracked files: working tree vs index.
+ *      Deliberately the plumbing form rather than `git diff HEAD` — the
+ *      porcelain form normalizes a working-tree file through its
+ *      `.gitattributes` `filter=<name>` `clean` command before comparing it,
+ *      and both the attribute assignment and the `filter.<name>.clean`
+ *      command live in the audited (untrusted) repo's own `.gitattributes`/
+ *      `.git/config`, making it as exploitable as the `core.fsmonitor` hook
+ *      neutralized below. `diff-files` reports the same "did this tracked
+ *      file change" answer without ever invoking a content filter.
+ *
+ *      Together, invocations 2 and 3 never report genuinely untracked files
+ *      (ones never staged at all) — those are invisible to this resolver.
+ *      Merged into the result so a local dev running `audit:run --since=main`
+ *      sees their staged and already-tracked in-flight work too.
  *
  * `--relative` rewrites paths relative to `$projectPath` instead of the git
  * root, and excludes changes outside it — required so the result lines up
  * with `ProjectFile::relativePath()` when the audited project is a
  * subdirectory of a larger repository (a monorepo layout).
  *
- * Both lists are merged, deduplicated, and returned in deterministic order.
+ * All three lists are merged, deduplicated, and returned in deterministic
+ * order.
  */
 final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesResolverInterface
 {
@@ -78,9 +93,10 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
         }
 
         $committed = $this->runGit($projectPath, ['diff', '--relative', '--name-only', '--diff-filter=ACMR', \sprintf('%s...HEAD', $ref)]);
-        $uncommitted = $this->runGit($projectPath, ['diff', '--relative', '--name-only', '--diff-filter=ACMR', 'HEAD']);
+        $staged = $this->runGit($projectPath, ['diff-index', '--relative', '--name-only', '--diff-filter=ACMR', '--cached', 'HEAD']);
+        $unstaged = $this->runGit($projectPath, ['diff-files', '--relative', '--name-only', '--diff-filter=ACMR']);
 
-        return $this->mergeAndNormalize([...$committed, ...$uncommitted]);
+        return $this->mergeAndNormalize([...$committed, ...$staged, ...$unstaged]);
     }
 
     /**

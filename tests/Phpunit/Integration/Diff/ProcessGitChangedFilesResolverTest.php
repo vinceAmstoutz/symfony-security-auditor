@@ -329,6 +329,37 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     }
 
     /**
+     * `core.fsmonitor=` (added above) only closes one config-driven command
+     * hook. A `.gitattributes` `filter=` assignment plus a matching
+     * `filter.<name>.clean` command in the same untrusted `.git/config`
+     * reaches an arbitrary command too — git runs the clean filter to
+     * normalize a working-tree file before comparing it against the index,
+     * which `git diff HEAD` (the plain worktree-vs-HEAD comparison this
+     * resolver used for uncommitted changes) triggers for any file whose
+     * stat info looks changed. `git diff-index --cached` (index vs HEAD) and
+     * `git diff-files` (worktree vs index) together cover the same ground
+     * without ever invoking a content filter.
+     *
+     * @throws GitChangedFilesUnavailableException
+     */
+    public function test_it_does_not_execute_the_audited_repos_clean_filter(): void
+    {
+        $this->initRepo();
+        $this->commit('src/Foo.php', '<?php // initial', 'init');
+
+        $marker = $this->tmpDir.'-clean-filter-pwned';
+        $this->writeFile('.gitattributes', '*.php filter=dangerous');
+        $this->stage('.gitattributes');
+        $this->runGit(['git', 'commit', '-m', 'add gitattributes']);
+        $this->runGit(['git', 'config', 'filter.dangerous.clean', \sprintf('sh -c "touch %s"', $marker)]);
+        $this->writeFile('src/Foo.php', '<?php // uncommitted edit');
+
+        (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir, 'HEAD');
+
+        self::assertFileDoesNotExist($marker);
+    }
+
+    /**
      * @throws GitChangedFilesUnavailableException
      */
     public function test_it_wraps_a_git_diff_timeout_instead_of_leaking_a_raw_process_exception(): void
@@ -360,6 +391,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     {
         $this->filesystem->remove($this->tmpDir);
         $this->filesystem->remove($this->tmpDir.'-fsmonitor-pwned');
+        $this->filesystem->remove($this->tmpDir.'-clean-filter-pwned');
     }
 
     private function initRepo(): void
