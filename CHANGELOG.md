@@ -53,8 +53,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   (`src/Audit/Infrastructure/Prompt/Skill/`) now hunts for this pattern and
   explicitly does not flag it on routes whose `methods:` exclude `GET`. New
   `VulnerabilityType::JSON_HIJACKING` case (`src/Audit/Domain/Model/`), mapped
-  to CWE-352 and OWASP A01:2025 (Broken Access Control) alongside the existing
-  CSRF and SSRF variants. `AttackerPromptBuilder` and `ReviewerPromptSections`
+  to CWE-200 (it leaks data cross-origin rather than forging a state-changing
+  request, so CWE-352's request-forgery framing doesn't fit) and OWASP A01:2025
+  (Broken Access Control) alongside the existing CSRF and SSRF variants.
+  `AttackerPromptBuilder` and `ReviewerPromptSections`
   (`src/Audit/Infrastructure/Prompt/`) list `json_hijacking` among the valid
   `type`/`corrected_type` values so both agents can name it.
 
