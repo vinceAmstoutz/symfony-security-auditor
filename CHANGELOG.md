@@ -360,7 +360,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `security.yaml` edit or a voter added elsewhere in the project could leave a
   specific file's own content untouched while changing whether the attacker
   would flag it — and `FilesystemAttackerCache` would keep serving the verdict
-  computed under the old mapping indefinitely. `deriveContextKey()` now folds in
+  computed under the old mapping indefinitely.
+  `ChunkContextKeyDeriver::derive()`
+  (`src/Audit/Application/Agent/Chunk/ChunkContextKeyDeriver.php`) now folds in
   a fingerprint of that same access-control data, sorted before hashing so two
   scans of an unchanged codebase still agree despite `Finder` making no ordering
   guarantee, and stays the empty string when the mapping carries none of it — so
