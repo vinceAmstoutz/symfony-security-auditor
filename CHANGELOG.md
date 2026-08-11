@@ -503,6 +503,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   edit their comment on every subsequent rerun instead of posting its own. The
   `jq` selector now also requires `.user.login == "github-actions[bot]"`.
 
+- **A negative token count from the LLM provider could permanently defeat the
+  configured rate limit for the rest of its window.** The only place that
+  rejected a negative token count was `TokenUsageRecorder::record()`, reached
+  through `PlatformResultExtractor::extractTokens()`'s optional
+  `$tokenUsageRecorder` collaborator
+  (`src/Audit/Infrastructure/LLM/PlatformResultExtractor.php`) — but
+  `PlatformAccountingConfig` defaults that collaborator to `null`, a legitimate,
+  supported configuration. Built without one, `extractTokens()` returned an
+  unvalidated negative value straight to `RateLimiterInterface::record()`
+  (`src/Audit/Infrastructure/LLM/RateLimit/TokenBucketRateLimiter.php`), whose
+  mutable window counters have no lower bound of their own — a single malformed
+  or compromised provider response could drive the counter deeply negative,
+  silently suppressing the input-tokens-per-minute limit for the rest of that
+  window regardless of how much real traffic followed. `extractTokens()` now
+  validates all four token counts itself, unconditionally, before any caller
+  ever sees them.
+
 - **`audit.budget.max_tokens` did not bound a run's real token spend once
   provider prompt caching was involved.** `LLMResponse::totalTokens()`
   (`src/Audit/Domain/Port/LLMResponse.php`) returned only

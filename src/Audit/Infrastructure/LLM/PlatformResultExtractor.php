@@ -57,9 +57,41 @@ final readonly class PlatformResultExtractor
         $outputTokens = $tokenUsage->getCompletionTokens() ?? 0;
         $cacheReadTokens = $tokenUsage->getCacheReadTokens() ?? 0;
         $cacheCreationTokens = $tokenUsage->getCacheCreationTokens() ?? 0;
+        $this->assertNonNegative($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
         $this->tokenUsageRecorder?->record($inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens);
 
         return [$inputTokens, $outputTokens, $cacheReadTokens, $cacheCreationTokens];
+    }
+
+    /**
+     * A negative count here is a compromised or malfunctioning provider
+     * response — every caller relies on rejecting it before it ever reaches
+     * `RateLimiterInterface::record()`, whose mutable window counters have no
+     * lower bound of their own and would stay corrupted for the rest of the
+     * rate-limit window. `$tokenUsageRecorder` is optional
+     * ({@see PlatformAccountingConfig}
+     * defaults it to `null`), so this guard cannot live behind it — it must
+     * run unconditionally.
+     *
+     * @throws NegativeTokenCountException
+     */
+    private function assertNonNegative(int $inputTokens, int $outputTokens, int $cacheReadTokens, int $cacheCreationTokens): void
+    {
+        if ($inputTokens < 0) {
+            throw NegativeTokenCountException::forInputTokens($inputTokens);
+        }
+
+        if ($outputTokens < 0) {
+            throw NegativeTokenCountException::forOutputTokens($outputTokens);
+        }
+
+        if ($cacheReadTokens < 0) {
+            throw NegativeTokenCountException::forCacheReadTokens($cacheReadTokens);
+        }
+
+        if ($cacheCreationTokens < 0) {
+            throw NegativeTokenCountException::forCacheCreationTokens($cacheCreationTokens);
+        }
     }
 
     public function extractStopReason(DeferredResult $deferredResult): ?string
