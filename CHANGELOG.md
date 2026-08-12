@@ -477,6 +477,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   alongside the always-compiled core extensions before the list reaches spc; the
   polyfill shipped inside the PHAR supplies `Uri\Rfc3986\Uri` at runtime,
   exactly as it already does for the PHP 8.3/8.4 test matrix.
+- **`Vulnerability::generateId()` could collide two distinct findings.**
+  `src/Audit/Domain/Model/Vulnerability.php` hashed
+  `$vulnerabilityType->value.$filePath.$lineStart` with no delimiter between
+  the fields, so a digit could shift across the `filePath`/`lineStart`
+  boundary and still hash identically — e.g. `filePath: 'src/Foo1'` with
+  `lineStart: 23` and `filePath: 'src/Foo'` with `lineStart: 123` both
+  concatenate to `sql_injectionsrc/Foo123` and produced the same `VULN-…` id.
+  `generateId()` now hashes each field individually before joining them
+  (`sha1(sha1(type).sha1(filePath).sha1(lineStart))`), mirroring
+  `ChunkContextKeyDeriver::derive()` — each hash is a fixed 40-hex-char string,
+  so no join-boundary shift can collide. This is a `PATCH`, not a `MAJOR`:
+  `id()` is a per-run, human-display-only value (shown in the console/HTML
+  reports and used only as an in-memory dedup key within a single run) — it is
+  absent from the JSON and SARIF schemas, and baseline suppression persists
+  across runs via the separate, already-delimited `fingerprint()`
+  (`'%s|%s|%s'`), which this change does not touch.
 
 ## [1.18.0] — 2026-07-26 — Airgap
 

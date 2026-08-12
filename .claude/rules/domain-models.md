@@ -14,8 +14,12 @@ paths:
 - `AuditReport` is created exactly once via `AuditReport::fromContext()` after
   the pipeline finishes. It captures only `validatedVulnerabilities()`.
 - Vulnerability `id` is deterministic:
-  `VULN-{sha1(type+filePath+lineStart)[0..7]}` (no microtime, no title) — do not
-  change this scheme.
+  `VULN-{sha1(sha1(type)+sha1(filePath)+sha1(lineStart))[0..7]}` (no microtime,
+  no title). Each field is hashed individually before joining — mirroring
+  `ChunkContextKeyDeriver::derive()` — so a digit shifting across the
+  `filePath`/`lineStart` boundary (e.g. `src/Foo1`+`23` vs `src/Foo`+`123`)
+  can't collide. Do not change this scheme without preserving that
+  per-field-hash-then-join property.
 - Adding a `ProjectFileType` case requires mapping it in
   `ProjectFileType::archetype()` — the `match` is exhaustive, so an unmapped
   case throws at runtime, and `SurfaceArchetypeTest` fails first.

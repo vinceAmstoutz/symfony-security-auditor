@@ -22,7 +22,7 @@
   VULNERABILITIES (1 total)
 ──────────────────────────────────────────────────────────────────────
 
-  [VULN-0231AA7A] 🔴 CRITICAL
+  [VULN-61563E0B] 🔴 CRITICAL
   Unprotected administrative action
   OWASP: OWASP A01:2025 - Broken Access Control
   CWE  : CWE-284

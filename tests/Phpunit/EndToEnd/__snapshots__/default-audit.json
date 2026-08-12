@@ -19,7 +19,7 @@
     },
     "vulnerabilities": [
         {
-            "id": "VULN-0231AA7A",
+            "id": "VULN-61563E0B",
             "fingerprint": "SSA-16C53DB2429B",
             "type": "broken_access_control",
             "category": "Broken Access Control",
