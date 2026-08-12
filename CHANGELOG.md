@@ -269,6 +269,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   and call order for every existing case — a 12,000-method chain now resolves in
   well under a second.
 
+- **A single crafted PHP file could crash the entire audit process.**
+  `RegexCodeSlicer::stripBlockComments()`
+  (`src/Audit/Infrastructure/Scan/RegexCodeSlicer.php`) recursed once per
+  `/*`/`*/` pair found on a line, with no depth limit, and runs on every line of
+  every PHP file at or above `minLinesBeforeSlicing` (80 lines) up to the
+  scanner's 512 KiB per-file cap. A malicious target repo containing a file with
+  one line like `str_repeat('/**/', 20000)` — an 80 KB line, well under that cap
+  — blew the native C call stack and segfaulted the PHP process (reproduced
+  directly: `Segmentation fault (core dumped)`, exit code 139), killing
+  `audit:run` before it reported on the rest of the repository. No `try`/`catch`
+  in the pipeline can intercept a native stack overflow. `stripBlockComments()`
+  now strips same-line block comments iteratively instead of recursing, with
+  identical output for every existing case.
+
 - **A finding title can no longer ping an arbitrary GitHub account from a posted
   pull-request comment.** `MarkdownTextEscaper::escapeStructuralMarkers()`
   enumerated the Markdown-active characters it neutralizes (`` ` ``, `~`, `#`,
