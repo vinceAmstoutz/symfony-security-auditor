@@ -36,24 +36,51 @@ jobs:
           # description can never be read as a target.
           block="$(printf '%s\n' "$PR_BODY" | awk '/^##[[:space:]]*Target branch/ { inside = 1; next } /^##[[:space:]]/ { inside = 0 } inside')"
           ticked="$(printf '%s\n' "$block" | sed -n 's/^[[:space:]]*-[[:space:]]*\[[xX]\][[:space:]]*`\([^`]*\)`.*/\1/p')"
-          count="$(printf '%s' "$ticked" | grep -c . || true)"
 
-          if [ "$count" -ne 1 ]; then
-            fail "Tick exactly one branch under '## Target branch' (found ${count}), and open the pull request against it."
+          stacked=0
+          targets=""
+          while IFS= read -r item; do
+            [ -z "$item" ] && continue
+            if [ "$item" = 'stacked' ]; then
+              stacked=1
+            else
+              targets="${targets}${item}
+          "
+            fi
+          done <<TICKED
+          $ticked
+          TICKED
+
+          target_count="$(printf '%s' "$targets" | grep -c . || true)"
+          if [ "$target_count" -ne 1 ]; then
+            fail "Tick exactly one release branch under '## Target branch' (found ${target_count})."
           fi
+          target="$(printf '%s' "$targets" | grep . | head -n1)"
 
-          case "$ticked" in
-            main)
-              [ "$BASE_REF" = 'main' ] \
-                || fail "'main' takes release merges only, but this pull request is based on '${BASE_REF}'."
-              ;;
-            *.x)
-              [ "$BASE_REF" = "$ticked" ] \
-                || fail "You ticked '${ticked}' but opened this pull request against '${BASE_REF}'. Retarget the base to '${ticked}', or tick the branch you actually want."
-              ;;
-            *)
-              fail "'${ticked}' is not one of the targets in .github/PULL_REQUEST_TEMPLATE.md."
-              ;;
+          case "$target" in
+            main|*.x) ;;
+            *) fail "'${target}' is not one of the targets in .github/PULL_REQUEST_TEMPLATE.md." ;;
           esac
 
-          echo "Ticked '${ticked}', based on '${BASE_REF}' — consistent."
+          if [ "$stacked" -eq 1 ]; then
+            case "$BASE_REF" in
+              main|*.x)
+                fail "You ticked 'stacked', which means the base should be another PR's feature branch — but this pull request is based on '${BASE_REF}'."
+                ;;
+              *)
+                echo "Ticked 'stacked' + '${target}' — based on feature branch '${BASE_REF}'; retarget to '${target}' once that PR merges."
+                ;;
+            esac
+          else
+            case "$target" in
+              main)
+                [ "$BASE_REF" = 'main' ] \
+                  || fail "'main' takes release merges only, but this pull request is based on '${BASE_REF}'."
+                ;;
+              *.x)
+                [ "$BASE_REF" = "$target" ] \
+                  || fail "You ticked '${target}' but opened this pull request against '${BASE_REF}'. Retarget the base to '${target}', or tick the branch you actually want."
+                ;;
+            esac
+            echo "Ticked '${target}', based on '${BASE_REF}' — consistent."
+          fi

@@ -14,13 +14,20 @@
 
 ## Target branch
 
-Tick one and open the pull request against it — CI fails if they disagree. The
-default base `main` is almost never right
-([why](docs/versioning.md#branches--maintenance)).
+Tick the release branch this is ultimately headed for, and open the pull request
+against it — CI fails if they disagree. The default base `main` is almost never
+right ([why](docs/versioning.md#branches--maintenance)).
 
 - [ ] `1.x` — anything for the next minor release: bug fixes and new features
 - [ ] `2.x` — breaking changes, for the next major release
 - [ ] `main` — release merges only, nothing else
+
+If this PR is stacked on another open PR — its actual base is that PR's branch,
+not a release branch yet — also tick this, in addition to the release branch
+above:
+
+- [ ] `stacked` — based on another open PR; retarget to the release branch
+      ticked above once that PR merges
 
 ## Checklist
 
