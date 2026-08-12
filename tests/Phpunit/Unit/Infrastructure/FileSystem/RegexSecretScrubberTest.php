@@ -39,6 +39,8 @@ final class RegexSecretScrubberTest extends TestCase
 
     private const string JWT = 'eyJ';
 
+    private const string OPENAI_SK = 'sk-proj';
+
     private RegexSecretScrubber $regexSecretScrubber;
 
     #[DataProvider('credentialPatternCases')]
@@ -117,6 +119,29 @@ final class RegexSecretScrubberTest extends TestCase
             'REDIS_URL=redis://:s3cr3tValue@localhost:6379',
             '***REDACTED:connection_uri***',
         ];
+        yield 'bearer_token_header' => [
+            'Bearer '.str_repeat('a1B2', 8),
+            '***REDACTED:bearer_token***',
+        ];
+        yield 'openai_api_key' => [
+            self::OPENAI_SK.'-'.str_repeat('a1B2', 10),
+            '***REDACTED:openai_api_key***',
+        ];
+        yield 'slack_incoming_webhook_url' => [
+            'https://hooks.slack.com/services/T00000000/B00000000/'.str_repeat('X', 24),
+            '***REDACTED:slack_webhook_url***',
+        ];
+    }
+
+    public function test_an_azure_storage_account_key_is_redacted(): void
+    {
+        $accountKey = str_repeat('Eby8vdM02xNOcqFctNzYpk', 3).'==';
+        $connectionString = \sprintf('DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;AccountKey=%s;EndpointSuffix=core.windows.net', $accountKey);
+
+        $output = $this->regexSecretScrubber->scrub($connectionString);
+
+        self::assertStringNotContainsString($accountKey, $output);
+        self::assertStringContainsString('***REDACTED:inline_assignment***', $output);
     }
 
     #[DataProvider('symfonyPlaceholderCases')]

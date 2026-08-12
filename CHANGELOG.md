@@ -393,6 +393,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   passphrase appears in a committed config — were sent verbatim. Added to all
   three patterns.
 
+- **Azure Storage connection strings, `Authorization: Bearer` headers, and
+  OpenAI-style `sk-`/`sk-proj-` keys, and Slack incoming webhook URLs are now
+  redacted.** `RegexSecretScrubber::DEFAULT_PATTERNS`
+  (`src/Audit/Infrastructure/FileSystem/RegexSecretScrubber.php`) had no pattern
+  for any of these four common credential shapes: an `AccountKey=<base64>`
+  connection-string segment matches neither `env_assignment`'s all-caps keyword
+  rule nor `inline_assignment`'s fixed keyword list (mixed-case, no separator
+  before `Key`); a bare `Bearer <token>` header/curl argument and a bare
+  `sk-`/`sk-proj-` key with no enclosing `key=`/`token=` assignment matched
+  nothing; and a Slack incoming webhook URL is itself the credential, while only
+  OAuth-style `xox*` tokens were covered. All four would have reached the LLM
+  provider and any generated report verbatim. Added `account[_-]?key` to the
+  `inline_assignment`/ `multiline_assignment` keyword alternations, and three
+  new patterns/labels: `bearer_token`, `openai_api_key`, `slack_webhook_url`.
+
 ### Fixed
 
 - **A crafted file path could still forge a fake prompt section using a carriage
