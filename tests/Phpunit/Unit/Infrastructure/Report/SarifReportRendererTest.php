@@ -365,11 +365,10 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
      */
     public function test_render_produces_valid_unescaped_slashes_json(): void
     {
-        $decoded = $this->decodeSarif($this->makeReport());
-        $schema = $decoded['$schema'];
+        $raw = $this->renderer->render($this->makeReport());
 
-        self::assertStringContainsString('/', $schema);
-        self::assertStringNotContainsString('\/', $schema);
+        self::assertStringContainsString('https://json.schemastore.org', $raw);
+        self::assertStringNotContainsString('\/', $raw);
     }
 
     /**
