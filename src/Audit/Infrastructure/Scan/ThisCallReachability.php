@@ -40,46 +40,74 @@ final readonly class ThisCallReachability
     ) {}
 
     /**
+     * Walks the call graph depth-first with an explicit stack, visiting each
+     * method's helper calls in the order they appear (pushed in reverse, so
+     * the first call encountered is the next one popped) and appending each
+     * statement once to a single shared result — replacing an earlier
+     * recursive version that copied a growing `$visited` set and
+     * return-and-concatenated a growing result array at every recursion
+     * level. That was quadratic in the length of a
+     * `$this->b1()->b2()->…` helper chain: an ordinary-looking file with a
+     * few thousand such methods took minutes, and enough of them exhausted
+     * PHP's memory limit outright, instead of resolving in a fraction of a
+     * second.
+     *
      * @param array<string, ClassMethod> $methodsByName
      *
      * @return array<Node>
      */
     public function reachableBody(ClassMethod $classMethod, array $methodsByName): array
     {
-        return $this->reachableBodyVisiting($classMethod, $methodsByName, []);
+        $visited = [];
+        $result = [];
+        $stack = [$classMethod];
+
+        while ([] !== $stack) {
+            $current = array_pop($stack);
+            $name = $current->name->toString();
+            if (\array_key_exists($name, $visited)) {
+                continue;
+            }
+
+            $visited[$name] = $current;
+
+            $ownBody = $current->stmts ?? [];
+            foreach ($ownBody as $statement) {
+                $result[] = $statement;
+            }
+
+            $helperMethods = $this->helperMethodsCalledBy($ownBody, $methodsByName);
+            for ($i = \count($helperMethods) - 1; $i >= 0; --$i) {
+                $stack[] = $helperMethods[$i];
+            }
+        }
+
+        return $result;
     }
 
     /**
+     * @param array<Node>                $ownBody
      * @param array<string, ClassMethod> $methodsByName
-     * @param array<string, true>        $visited
      *
-     * @return array<Node>
+     * @return list<ClassMethod>
      */
-    private function reachableBodyVisiting(ClassMethod $classMethod, array $methodsByName, array $visited): array
+    private function helperMethodsCalledBy(array $ownBody, array $methodsByName): array
     {
-        $name = $classMethod->name->toString();
-        if (\array_key_exists($name, $visited)) {
-            return [];
-        }
-
-        $visited[$name] = true;
-
-        $ownBody = $classMethod->stmts ?? [];
-
-        $helperBody = [];
         $methodCalls = [
             ...$this->nodeFinder->findInstanceOf($ownBody, MethodCall::class),
             ...$this->nodeFinder->findInstanceOf($ownBody, NullsafeMethodCall::class),
             ...$this->nodeFinder->findInstanceOf($ownBody, StaticCall::class),
         ];
+
+        $helperMethods = [];
         foreach ($methodCalls as $methodCall) {
             $calledName = $this->calledMethodName($methodCall);
             if (null !== $calledName && \array_key_exists($calledName, $methodsByName)) {
-                $helperBody = [...$helperBody, ...$this->reachableBodyVisiting($methodsByName[$calledName], $methodsByName, $visited)];
+                $helperMethods[] = $methodsByName[$calledName];
             }
         }
 
-        return [...$ownBody, ...$helperBody];
+        return $helperMethods;
     }
 
     private function calledMethodName(MethodCall|NullsafeMethodCall|StaticCall $call): ?string

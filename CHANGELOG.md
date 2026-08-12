@@ -255,6 +255,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   now hashed individually before being joined, so no delimiter-free
   concatenation can shift a byte across a field boundary.
 
+- **A file with a long `$this->helper()` call chain could stall or exhaust
+  memory during mapping.** `ThisCallReachability::reachableBody()`
+  (`src/Audit/Infrastructure/Scan/ThisCallReachability.php`) recursed once per
+  helper call, copying a growing `visited` set and return-and-concatenating a
+  growing result array at every level — quadratic in the length of a
+  `$this->b1()->b2()->…` chain. A target-repo class with a few thousand such
+  methods (well under the 512 KiB per-file scan cap) took minutes instead of a
+  fraction of a second, and a longer chain exhausted PHP's memory limit outright
+  (reproduced directly: an 8,000-method chain fatal-errored on
+  `Allowed memory size … exhausted`). Rewritten as an explicit-stack depth-first
+  walk with a single shared `visited` set and result list, with identical output
+  and call order for every existing case — a 12,000-method chain now resolves in
+  well under a second.
+
 - **A finding title can no longer ping an arbitrary GitHub account from a posted
   pull-request comment.** `MarkdownTextEscaper::escapeStructuralMarkers()`
   enumerated the Markdown-active characters it neutralizes (`` ` ``, `~`, `#`,

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
+use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PhpParser\Node;
 use PhpParser\Node\Scalar\String_;
@@ -227,6 +228,34 @@ final class ThisCallReachabilityTest extends TestCase
         self::assertSame(['one', 'two'], $this->stringLiteralsIn($body));
     }
 
+    public function test_it_continues_past_an_already_visited_helper_to_process_the_remaining_call_sites(): void
+    {
+        $class = $this->parseClass(<<<'PHP'
+            <?php
+            final class Example {
+                public function action(): void {
+                    $this->helperA();
+                    $this->helperB();
+                    $this->helperC();
+                }
+                private function helperA(): void {
+                    echo 'a';
+                    $this->helperB();
+                }
+                private function helperB(): void {
+                    echo 'b';
+                }
+                private function helperC(): void {
+                    echo 'c';
+                }
+            }
+            PHP);
+
+        $body = $this->thisCallReachability->reachableBody($this->methodNamed($class, 'action'), $this->methodsByName($class));
+
+        self::assertSame(['a', 'b', 'c'], $this->stringLiteralsIn($body));
+    }
+
     public function test_it_ignores_a_method_call_on_a_variable_other_than_this(): void
     {
         $class = $this->parseClass(<<<'PHP'
@@ -263,6 +292,28 @@ final class ThisCallReachabilityTest extends TestCase
         $body = $this->thisCallReachability->reachableBody($this->methodNamed($class, 'action'), $this->methodsByName($class));
 
         self::assertSame([], $this->stringLiteralsIn($body));
+    }
+
+    #[MaximumDuration(4000)]
+    public function test_a_long_chain_of_helper_calls_resolves_in_near_linear_time(): void
+    {
+        $chainLength = 8000;
+        $methods = "public function action(): void { \$this->helper1(); }\n";
+        for ($i = 1; $i < $chainLength; ++$i) {
+            $next = $i + 1;
+            $methods .= "private function helper{$i}(): void { echo 'x'; \$this->helper{$next}(); }\n";
+        }
+
+        $methods .= "private function helper{$chainLength}(): void { echo 'end'; }\n";
+
+        $class = $this->parseClass("<?php\nfinal class Example {\n{$methods}}\n");
+
+        $start = microtime(true);
+        $body = $this->thisCallReachability->reachableBody($this->methodNamed($class, 'action'), $this->methodsByName($class));
+        $elapsed = microtime(true) - $start;
+
+        self::assertCount($chainLength, $this->stringLiteralsIn($body));
+        self::assertLessThan(3.0, $elapsed);
     }
 
     private function parseClass(string $source): Class_
