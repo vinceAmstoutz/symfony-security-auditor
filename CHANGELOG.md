@@ -236,6 +236,25 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   now carries a pinned SHA-256 (`matrix.spc_sha256`), verified immediately after
   download and before either extraction or execution.
 
+- **A crafted `title` or `filePath` could forge the baseline/CI-gate identity of
+  a real, unrelated finding.** `Vulnerability::fingerprintOf()`
+  (`src/Audit/Domain/Model/Vulnerability.php`) joined `type`, `filePath`, and
+  `title` with a bare `|` before hashing, so a `filePath` ending in `|Bar` and a
+  `title` of `Unsafe SQL query` produced the exact same input string — and
+  therefore the exact same `SSA-…` fingerprint — as a `filePath` of `src/Foo`
+  paired with the title `Bar|Unsafe SQL query`. Both `filePath` and `title` are
+  attacker-influenceable (a PR author picks their own filenames; findings'
+  titles are visible in prior JSON/SARIF reports and PR comments). Because this
+  fingerprint is the sole suppression key for `Baseline`, and
+  `AuditExitCodeResolver`'s `--fail-on`/`--min-score` CI gate is computed
+  **after** baseline suppression, one innocuous-looking baseline entry could be
+  engineered to also suppress a real, unrelated HIGH/CRITICAL finding sharing
+  the colliding fingerprint — a false SAFE at the CI-gating layer. `audit:diff`
+  and `audit:trend` inherited the same weakness through `fingerprint`-keyed
+  matching. Fixed the same way as `generateId()`'s equivalent bug: each field is
+  now hashed individually before being joined, so no delimiter-free
+  concatenation can shift a byte across a field boundary.
+
 - **A finding title can no longer ping an arbitrary GitHub account from a posted
   pull-request comment.** `MarkdownTextEscaper::escapeStructuralMarkers()`
   enumerated the Markdown-active characters it neutralizes (`` ` ``, `~`, `#`,

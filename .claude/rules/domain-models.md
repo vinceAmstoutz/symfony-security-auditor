@@ -20,6 +20,12 @@ paths:
   `filePath`/`lineStart` boundary (e.g. `src/Foo1`+`23` vs `src/Foo`+`123`)
   can't collide. Do not change this scheme without preserving that
   per-field-hash-then-join property.
+- Vulnerability `fingerprint`/`attackerFingerprint` (baseline/diff/trend
+  identity) is `SSA-{sha1(sha1(type).sha1(filePath).sha1(title))[0..11]}` — each
+  field is hashed individually before joining so a delimiter shift across a
+  field boundary (e.g. `title` starting with the same bytes that end `filePath`)
+  cannot collide two different findings onto the same fingerprint. Do not revert
+  to hashing a delimiter-joined string of the raw fields.
 - Adding a `ProjectFileType` case requires mapping it in
   `ProjectFileType::archetype()` — the `match` is exhaustive, so an unmapped
   case throws at runtime, and `SurfaceArchetypeTest` fails first.

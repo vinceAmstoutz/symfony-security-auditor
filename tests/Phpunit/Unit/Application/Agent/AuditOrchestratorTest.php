@@ -2309,9 +2309,6 @@ final class AuditOrchestratorTest extends TestCase
 
     private function fingerprintFor(string $title, string $filePath = 'src/Controller/FooController.php'): string
     {
-        return \sprintf(
-            'SSA-%s',
-            strtoupper(substr(sha1(\sprintf('sql_injection|%s|%s', $filePath, $title)), 0, 12)),
-        );
+        return Vulnerability::fingerprintOf('sql_injection', $filePath, $title);
     }
 }
