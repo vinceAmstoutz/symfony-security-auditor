@@ -481,6 +481,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   path is now checked against the canonicalized project root and skipped with a
   warning if it escapes, mirroring the existing symlink-escape guard.
 
+- **A project config can no longer point the SARIF importer at a file of its
+  choosing.** `scan.import_sarif` accepts absolute paths by design (SARIF
+  reports commonly live outside the audited repository, e.g. in a CI artifacts
+  directory), so sandboxing its path resolution the way `included_paths` was
+  fixed above would have broken that legitimate use. Instead,
+  `StandaloneConfigLoader::readProjectConfig()`
+  (`src/Audit/Infrastructure/Config/StandaloneConfigLoader.php`) now rejects a
+  per-project `.symfony-security-auditor.yaml` that declares `scan.import_sarif`
+  at all, the same way it already rejects `platform`/`provider` — the new
+  `ProjectConfigScanOverrideException`. Configure SARIF imports in the trusted
+  user config instead.
+
 ### Fixed
 
 - **A crafted file path could still forge a fake prompt section using a carriage

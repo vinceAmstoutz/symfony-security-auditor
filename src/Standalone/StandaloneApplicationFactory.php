@@ -29,6 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
@@ -257,6 +258,7 @@ final readonly class StandaloneApplicationFactory
      * @throws MalformedProjectConfigException
      * @throws NonLocalPlatformEndpointException
      * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
      */
     private function loadAuditCommand(): Command
     {
@@ -273,6 +275,7 @@ final readonly class StandaloneApplicationFactory
      * @throws MalformedProjectConfigException
      * @throws NonLocalPlatformEndpointException
      * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
      */
     private function buildContainer(): ContainerBuilder
     {

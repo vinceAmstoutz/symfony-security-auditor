@@ -164,6 +164,19 @@ final class EnvironmentDoctorTest extends TestCase
         self::assertStringContainsString('must not be able to point your API credentials at another endpoint', $results[0]->detail);
     }
 
+    public function test_it_fails_the_configuration_check_when_the_audited_project_declares_a_sarif_import_path(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\n");
+        $projectConfigFile = $this->configHome.'/project/.symfony-security-auditor.yaml';
+        (new Filesystem())->dumpFile($projectConfigFile, "scan:\n    import_sarif:\n        - /etc/passwd\n");
+
+        $results = $this->doctorWith($this->resolver(), [], true, projectConfigFile: $projectConfigFile)->diagnose();
+
+        self::assertSame('Configuration', $results[0]->label);
+        self::assertSame(DoctorCheckStatus::Failure, $results[0]->status);
+        self::assertStringContainsString('must not be able to point the scanner at paths of its choosing', $results[0]->detail);
+    }
+
     public function test_it_fails_the_configuration_and_bridge_checks_when_the_home_directory_is_unresolvable(): void
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver(null, null, null);

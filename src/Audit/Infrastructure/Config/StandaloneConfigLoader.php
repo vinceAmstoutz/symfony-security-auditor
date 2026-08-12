@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigPlatformOverrideException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigScanOverrideException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 
 /**
@@ -27,6 +28,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 final readonly class StandaloneConfigLoader
 {
     private const array PLATFORM_KEYS = ['platform', 'provider'];
+
+    private const array SCAN_SURFACE_KEYS = ['import_sarif'];
 
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
@@ -40,6 +43,7 @@ final readonly class StandaloneConfigLoader
      * @throws MissingEnvironmentVariableException
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
      */
     public function load(): StandaloneConfig
     {
@@ -94,6 +98,7 @@ final readonly class StandaloneConfigLoader
      *
      * @throws MalformedProjectConfigException
      * @throws ProjectConfigPlatformOverrideException
+     * @throws ProjectConfigScanOverrideException
      */
     private function readProjectConfig(): array
     {
@@ -108,7 +113,35 @@ final readonly class StandaloneConfigLoader
             throw ProjectConfigPlatformOverrideException::forKeys($this->projectConfigFile, $connectionKeys);
         }
 
+        $this->guardAgainstScanSurfaceOverride($this->projectConfigFile, $projectConfig);
+
         return $projectConfig;
+    }
+
+    /**
+     * `scan.import_sarif` reads whatever file it names — an absolute path or
+     * one escaping the project root included — and folds its contents into
+     * the LLM prompt. Letting the audited repository declare it would let the
+     * repository point the scanner at paths of its own choosing, the same
+     * threat model already applied to `platform`/`provider`.
+     *
+     * @param array<array-key, mixed> $projectConfig
+     *
+     * @throws ProjectConfigScanOverrideException
+     */
+    private function guardAgainstScanSurfaceOverride(string $projectConfigFile, array $projectConfig): void
+    {
+        $scanConfig = $projectConfig['scan'] ?? null;
+        if (!\is_array($scanConfig)) {
+            return;
+        }
+
+        $scanKeys = array_values(array_intersect(self::SCAN_SURFACE_KEYS, array_keys($scanConfig)));
+        if ([] === $scanKeys) {
+            return;
+        }
+
+        throw ProjectConfigScanOverrideException::forKeys($projectConfigFile, array_map(static fn (string $key): string => \sprintf('scan.%s', $key), $scanKeys));
     }
 
     /**
