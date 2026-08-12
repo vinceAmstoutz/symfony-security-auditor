@@ -4,13 +4,23 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description:
+          "Version to tag and release (X.Y.Z) — replays a release the push
+          trigger missed, e.g. because this workflow did not exist yet on main"
+        required: true
+        type: string
 
 permissions: {}
 
 jobs:
   detect:
     name: Detect a release commit
-    if: "${{ startsWith(github.event.head_commit.message, 'chore: release ') }}"
+    if:
+      "${{ github.event_name == 'workflow_dispatch' ||
+      startsWith(github.event.head_commit.message, 'chore: release ') }}"
     runs-on: ubuntu-latest
     permissions: {}
     outputs:
@@ -23,12 +33,17 @@ jobs:
           # script: a push to main is trusted, but this still avoids the
           # habit of splicing ${{ }} expressions into shell code.
           MESSAGE: ${{ github.event.head_commit.message }}
+          MANUAL_VERSION: ${{ github.event.inputs.version }}
         run: |
           set -euo pipefail
 
-          version="$(printf '%s\n' "$MESSAGE" | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+          if [ -n "$MANUAL_VERSION" ]; then
+            version="$MANUAL_VERSION"
+          else
+            version="$(printf '%s\n' "$MESSAGE" | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+          fi
           if [ -z "$version" ]; then
-            echo "::error::Could not parse a X.Y.Z version out of the commit message. Expected \"chore: release X.Y.Z\"."
+            echo "::error::Could not determine a X.Y.Z version. Expected a workflow_dispatch \"version\" input or a \"chore: release X.Y.Z\" commit message."
             exit 1
           fi
 
@@ -44,6 +59,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: main
           fetch-depth: 0
           persist-credentials: true
 

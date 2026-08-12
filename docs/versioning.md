@@ -408,7 +408,11 @@ generates a `What's Changed` summary from the merged pull requests since the
 previous tag, and drafts the GitHub Release — publish it when ready, which
 triggers the binary-build workflow. Cherry-pick the same release commit back
 onto `<N>.x` so its changelog doesn't keep listing the shipped fixes as
-`Unreleased`.
+`Unreleased`. Its `push` trigger only fires going forward, so it cannot cover a
+release commit that already landed on `main` before the workflow existed (or
+before the workflow's `if:` could match it); for that case, dispatch it manually
+with the `version` `workflow_dispatch` input — it always tags and diffs against
+`main`'s history regardless of which ref the dispatch itself runs from.
 
 Because `main` is the default branch, a pull request opens against it by default
 even though almost nothing should land there directly. **Retarget the base** to
