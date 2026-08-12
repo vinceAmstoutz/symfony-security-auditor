@@ -66,21 +66,26 @@ jobs:
           - runner: ubuntu-latest
             asset: symfony-security-auditor-linux-x86_64
             spc: spc-linux-x86_64
+            spc_sha256: '523ba4279c54c7a377156c0dd3a36adf92ee64b01e9a7f5e9e2ec084b8e458e5'
           - runner: ubuntu-24.04-arm
             asset: symfony-security-auditor-linux-aarch64
             spc: spc-linux-aarch64
+            spc_sha256: '675a3840dcdc4ed041fe20eaa54310ce019a9984c1c03951df9ec66df5795213'
           - runner: macos-15-intel
             asset: symfony-security-auditor-macos-x86_64
             spc: spc-macos-x86_64
+            spc_sha256: 'e8b798048f62ca4960764196543b60ae703f7174aa418824cf542aeec1d2cd6a'
           - runner: macos-14
             asset: symfony-security-auditor-macos-arm64
             spc: spc-macos-aarch64
+            spc_sha256: 'acf2f25d56d0cbf8e65aa82e5054fef555f7be7c5c38046c6e0819f266d83225'
           # Pinned to windows-2022: spc 2.8.5 locates Visual Studio through a
           # hardcoded list of VS 2019/2022 paths, and windows-latest ships
           # VS 2026 (no VS 2022) since GitHub's June 2026 image migration.
           - runner: windows-2022
             asset: symfony-security-auditor-windows-x86_64.exe
             spc: spc-windows-x64.exe
+            spc_sha256: '425b54ab857e21409c1fd9b818899ffebabd1e2817ef0a0ed5ae8a3d9f5b463b'
     defaults:
       run:
         shell: bash
@@ -91,14 +96,25 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
           persist-credentials: false
 
-      - name: Setup static-php-cli (pinned stable release)
+      - name: Setup static-php-cli (pinned stable release, checksum-verified)
         run: |
+          verify_sha256() {
+            if command -v sha256sum >/dev/null 2>&1; then
+              echo "$1  $2" | sha256sum -c -
+            else
+              echo "$1  $2" | shasum -a 256 -c -
+            fi
+          }
+
           case "${{ matrix.spc }}" in
             *.exe)
               curl -fsSL --retry 3 -o spc.exe "https://github.com/crazywhalecc/static-php-cli/releases/download/${SPC_VERSION}/${{ matrix.spc }}"
+              verify_sha256 "${{ matrix.spc_sha256 }}" spc.exe
               ;;
             *)
-              curl -fsSL --retry 3 "https://github.com/crazywhalecc/static-php-cli/releases/download/${SPC_VERSION}/${{ matrix.spc }}.tar.gz" | tar -xz
+              curl -fsSL --retry 3 -o spc.tar.gz "https://github.com/crazywhalecc/static-php-cli/releases/download/${SPC_VERSION}/${{ matrix.spc }}.tar.gz"
+              verify_sha256 "${{ matrix.spc_sha256 }}" spc.tar.gz
+              tar -xzf spc.tar.gz
               chmod +x spc
               ;;
           esac

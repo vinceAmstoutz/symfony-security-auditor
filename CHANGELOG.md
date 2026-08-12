@@ -221,6 +221,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Security
 
+- **The release pipeline's `static-php-cli` (`spc`) download is now
+  checksum-verified.** `release.yaml`'s `binary` job pinned `spc` only to a
+  mutable version _tag_ (`SPC_VERSION: '2.8.5'`) and executed it
+  (`./spc doctor`, `./spc build`, …) with no integrity check, unlike every other
+  third-party download in the same job — the `autopoint`/`re2c` `.deb` fallback
+  two steps later is already SHA-256-verified before `dpkg -i`, and every
+  `uses:` in the repo is commit-SHA pinned. A GitHub release asset attached to
+  an existing tag can be replaced without the tag changing, so a compromised
+  upstream release would be downloaded and executed by the very job that
+  produces the officially published binaries — and the checksum this job later
+  publishes alongside them is generated _after_ `spc` has already run, so it
+  would happily match a backdoored artifact. Each matrix platform's `spc` asset
+  now carries a pinned SHA-256 (`matrix.spc_sha256`), verified immediately after
+  download and before either extraction or execution.
+
 - **A finding title can no longer ping an arbitrary GitHub account from a posted
   pull-request comment.** `MarkdownTextEscaper::escapeStructuralMarkers()`
   enumerated the Markdown-active characters it neutralizes (`` ` ``, `~`, `#`,
