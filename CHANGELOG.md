@@ -10,6 +10,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.19.0] — 2026-08-12 — Bulwark
+
+A pre-release security hardening round. A fresh audit of the auditor's own trust
+boundaries found and closed nine gaps: secret-scrubbing now catches Azure
+Storage connection strings, `Authorization: Bearer` headers, OpenAI-style keys,
+and Slack incoming webhook URLs; five cache/dedup-key constructions that hashed
+a joined string instead of hashing each field first could collide two genuinely
+different inputs onto the same key, replaying a stale verdict or silently
+dropping a finding; and the audited project's own config could read an arbitrary
+file on the host via `scan.included_paths`, point the SARIF importer anywhere
+via `scan.import_sarif`, or stall the audit with an unvalidated
+catastrophic-backtracking `scan.custom_risk_patterns` regex. Alongside the
+security fixes, `RegexCodeSlicer` was decomposed into five focused collaborators
+behind a `LineRetentionDeciderInterface` decorator, replacing an inline
+three-way boolean OR with no behavior change.
+
 ### Added
 
 - **`FrameworkVocabulary` lifts the framework wording out of the synthesizer
@@ -3649,6 +3665,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.19.0]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.19.0
 [1.18.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.18.0
 [1.17.0]:
