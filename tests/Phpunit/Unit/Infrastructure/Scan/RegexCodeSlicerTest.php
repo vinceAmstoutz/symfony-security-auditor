@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -795,6 +796,23 @@ final class RegexCodeSlicerTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_a_line_with_two_block_comments_keeps_the_segment_before_the_first_one_paren_tracked(): void
+    {
+        $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
+            ."        \$_GET(/* c1 */ x /* c2 */ y\n"
+            ."        \$keep = 'KEEP_MARKER';\n"
+            ."        );\n"
+            .str_repeat("        \$x = 1;\n", 20);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertStringContainsString('KEEP_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_code_before_a_same_line_block_comment_is_paren_tracked(): void
     {
         $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)
@@ -842,6 +860,22 @@ final class RegexCodeSlicerTest extends TestCase
         $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
 
         self::assertStringNotContainsString('INERT_MARKER', $sliced);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    #[RunInSeparateProcess]
+    public function test_a_line_with_thousands_of_adjacent_block_comments_does_not_crash_the_process(): void
+    {
+        $lines = array_fill(0, 90, '        $x = 1;');
+        $lines[50] = str_repeat('/**/', 20_000);
+        $content = "<?php\n".implode("\n", $lines);
+        $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
+
+        $sliced = (new RegexCodeSlicer(10))->slice($projectFile);
+
+        self::assertSame(substr_count($content, "\n"), substr_count($sliced, "\n"));
     }
 
     /**

@@ -425,24 +425,31 @@ final readonly class RegexCodeSlicer implements CodeSlicerInterface
      */
     private function stripBlockComments(string $line, bool $insideBlockComment): array
     {
-        if ($insideBlockComment) {
-            $closeOffset = strpos($line, '*/');
-            if (false === $closeOffset) {
-                return ['line' => '', 'inside_block_comment' => true];
+        $kept = '';
+        $remaining = $line;
+
+        while (true) {
+            if ($insideBlockComment) {
+                $closeOffset = strpos($remaining, '*/');
+                if (false === $closeOffset) {
+                    return ['line' => $kept, 'inside_block_comment' => true];
+                }
+
+                $remaining = substr($remaining, $closeOffset + 2);
+                $insideBlockComment = false;
+
+                continue;
             }
 
-            return $this->stripBlockComments(substr($line, $closeOffset + 2), false);
+            $openOffset = strpos($this->maskStringLiterals($remaining), '/*');
+            if (false === $openOffset) {
+                return ['line' => $kept.$remaining, 'inside_block_comment' => false];
+            }
+
+            $kept .= substr($remaining, 0, $openOffset);
+            $remaining = substr($remaining, $openOffset + 2);
+            $insideBlockComment = true;
         }
-
-        $openOffset = strpos($this->maskStringLiterals($line), '/*');
-        if (false === $openOffset) {
-            return ['line' => $line, 'inside_block_comment' => false];
-        }
-
-        $before = substr($line, 0, $openOffset);
-        $after = $this->stripBlockComments(substr($line, $openOffset + 2), true);
-
-        return ['line' => $before.$after['line'], 'inside_block_comment' => $after['inside_block_comment']];
     }
 
     /**
