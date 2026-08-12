@@ -615,6 +615,46 @@ final class ProjectFileScannerTest extends TestCase
         }
     }
 
+    public function test_an_included_path_that_traverses_outside_the_project_root_is_skipped_and_logged(): void
+    {
+        mkdir($this->tmpDir.'/src', 0o777, true);
+        file_put_contents($this->tmpDir.'/src/Real.php', '<?php class Real {}');
+        mkdir($this->tmpDir.'/config', 0o777, true);
+        file_put_contents($this->tmpDir.'/config/security.yaml', 'security: {}');
+
+        $outsideDir = sys_get_temp_dir().'/scanner_int_outside_dir_'.uniqid('', true);
+        mkdir($outsideDir, 0o777, true);
+        file_put_contents($outsideDir.'/Secret.php', '<?php $secretApiKey = \'AKIAIOSFODNN7EXAMPLE\';');
+
+        /** @var list<array{string, array<string, string>}> $warnings */
+        $warnings = [];
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            static function (string $msg, array $ctx = []) use (&$warnings): void {
+                $warnings[] = [$msg, $ctx];
+            },
+        );
+        $logger->method('info');
+
+        $traversalPath = '../'.basename($outsideDir);
+        $projectFileScanner = new ProjectFileScanner($logger, ['src', $traversalPath, 'config']);
+
+        try {
+            $files = $projectFileScanner->scan($this->tmpDir);
+
+            $paths = array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $files);
+            self::assertSame(['src/Real.php', 'config/security.yaml'], $paths);
+
+            self::assertCount(1, $warnings);
+            self::assertSame('Skipped included path outside the project root', $warnings[0][0]);
+            $path = $warnings[0][1]['path'];
+            self::assertIsString($path);
+            self::assertStringEndsWith($traversalPath, $path);
+        } finally {
+            $this->rmdirRecursive($outsideDir);
+        }
+    }
+
     #[Override]
     protected function setUp(): void
     {

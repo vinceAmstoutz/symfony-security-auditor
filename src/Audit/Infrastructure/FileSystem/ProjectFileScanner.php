@@ -193,12 +193,19 @@ final readonly class ProjectFileScanner implements ProjectFileScannerInterface
      */
     private function resolveIncludedPaths(string $projectPath): array
     {
+        $canonicalProjectPath = Path::canonicalize($projectPath);
         $directories = [];
         $explicitFiles = [];
         foreach ($this->includedPaths as $includedPath) {
             $resolved = $projectPath.\DIRECTORY_SEPARATOR.$includedPath;
             if (is_link($resolved)) {
                 $this->logger->warning('Skipped symlinked included path', ['path' => $resolved]);
+
+                continue;
+            }
+
+            if (!Path::isBasePath($canonicalProjectPath, Path::canonicalize($resolved))) {
+                $this->logger->warning('Skipped included path outside the project root', ['path' => $resolved]);
 
                 continue;
             }

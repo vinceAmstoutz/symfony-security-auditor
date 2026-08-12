@@ -466,6 +466,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   memory store, `line`) individually before joining, matching
   `ChunkContextKeyDeriver::derive()`.
 
+- **An audited repository's own `scan.included_paths` entry could read and
+  exfiltrate an arbitrary file on the audit host.**
+  `ProjectFileScanner::resolveIncludedPaths()`
+  (`src/Audit/Infrastructure/FileSystem/ProjectFileScanner.php`) resolved each
+  configured path with plain string concatenation
+  (`$projectPath.DIRECTORY_SEPARATOR.$includedPath`), with no check that the
+  result stayed inside the project root. A `scan.included_paths` entry such as
+  `../outside/secret.php` — settable from `config/packages/` in bundle mode, or
+  a target repository's own project config in standalone mode — resolved to a
+  path outside the audited project, and its full contents were then sent to the
+  LLM provider like any other scanned file (past best-effort secret scrubbing,
+  which only redacts known credential shapes, not arbitrary content). A resolved
+  path is now checked against the canonicalized project root and skipped with a
+  warning if it escapes, mirroring the existing symlink-escape guard.
+
 ### Fixed
 
 - **A crafted file path could still forge a fake prompt section using a carriage
