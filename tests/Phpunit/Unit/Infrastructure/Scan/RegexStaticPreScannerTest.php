@@ -16,16 +16,21 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Scan;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 
 final class RegexStaticPreScannerTest extends TestCase
 {
     private RegexStaticPreScanner $regexStaticPreScanner;
 
+    /**
+     * @throws InvalidCustomRiskPatternException
+     */
     #[Override]
     protected function setUp(): void
     {
@@ -1679,6 +1684,7 @@ final class RegexStaticPreScannerTest extends TestCase
     }
 
     /**
+     * @throws InvalidCustomRiskPatternException
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
@@ -1705,6 +1711,7 @@ final class RegexStaticPreScannerTest extends TestCase
     }
 
     /**
+     * @throws InvalidCustomRiskPatternException
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
@@ -1729,6 +1736,7 @@ final class RegexStaticPreScannerTest extends TestCase
     }
 
     /**
+     * @throws InvalidCustomRiskPatternException
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
@@ -1752,6 +1760,7 @@ final class RegexStaticPreScannerTest extends TestCase
     }
 
     /**
+     * @throws InvalidCustomRiskPatternException
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
@@ -1779,6 +1788,7 @@ final class RegexStaticPreScannerTest extends TestCase
     }
 
     /**
+     * @throws InvalidCustomRiskPatternException
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
@@ -1802,6 +1812,7 @@ final class RegexStaticPreScannerTest extends TestCase
     }
 
     /**
+     * @throws InvalidCustomRiskPatternException
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
@@ -1825,6 +1836,7 @@ final class RegexStaticPreScannerTest extends TestCase
     }
 
     /**
+     * @throws InvalidCustomRiskPatternException
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
@@ -1857,5 +1869,122 @@ final class RegexStaticPreScannerTest extends TestCase
         yield 'curly_braces' => ['{BEGIN_BLOCK.*?END_BLOCK}s'];
         yield 'square_brackets' => ['[BEGIN_BLOCK.*?END_BLOCK]s'];
         yield 'angle_brackets' => ['<BEGIN_BLOCK.*?END_BLOCK>s'];
+    }
+
+    /**
+     * @throws InvalidCustomRiskPatternException
+     */
+    public function test_an_invalid_custom_risk_pattern_throws_at_construction(): void
+    {
+        $this->expectException(InvalidCustomRiskPatternException::class);
+        $this->expectExceptionMessage('Invalid custom risk pattern "broken" (bucket "php")');
+
+        new RegexStaticPreScanner([
+            'php' => [
+                'broken' => ['regex' => '/[unterminated/', 'description' => 'test'],
+            ],
+        ]);
+    }
+
+    /**
+     * @throws InvalidCustomRiskPatternException
+     */
+    public function test_an_empty_custom_risk_pattern_throws_at_construction(): void
+    {
+        $this->expectException(InvalidCustomRiskPatternException::class);
+        $this->expectExceptionMessage('empty pattern');
+
+        new RegexStaticPreScanner([
+            'php' => [
+                'empty' => ['regex' => '', 'description' => 'test'],
+            ],
+        ]);
+    }
+
+    public function test_invalid_custom_pattern_validation_suppresses_the_internal_pcre_warning(): void
+    {
+        error_clear_last();
+
+        try {
+            new RegexStaticPreScanner([
+                'php' => [
+                    'broken' => ['regex' => '/[unterminated/', 'description' => 'test'],
+                ],
+            ]);
+            self::fail('expected InvalidCustomRiskPatternException');
+        } catch (InvalidCustomRiskPatternException) {
+            self::assertNull(error_get_last());
+        }
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws InvalidCustomRiskPatternException
+     */
+    public function test_a_custom_pattern_that_exhausts_the_backtrack_limit_does_not_crash_the_scan(): void
+    {
+        $logger = self::createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                self::stringContains('Risk-pattern evaluation failed'),
+                self::callback(static fn (array $context): bool => '/^(a+)+$/' === ($context['pattern'] ?? null) && \is_string($context['error'] ?? null) && '' !== $context['error']),
+            );
+
+        $regexStaticPreScanner = new RegexStaticPreScanner([
+            'php' => [
+                'catastrophic' => ['regex' => '/^(a+)+$/', 'description' => 'test'],
+            ],
+        ], $logger);
+        $projectFile = ProjectFile::create('src/Service/S.php', '/app/src/Service/S.php', "<?php\n".str_repeat('a', 30)."b\naaaa");
+
+        $markers = $this->underATightBacktrackLimit(static fn (): array => $regexStaticPreScanner->scan([$projectFile]));
+
+        self::assertSame([], $markers);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws InvalidCustomRiskPatternException
+     */
+    public function test_a_dot_all_custom_pattern_that_exhausts_the_backtrack_limit_does_not_crash_the_scan(): void
+    {
+        $logger = self::createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                self::stringContains('Risk-pattern evaluation failed'),
+                self::callback(static fn (array $context): bool => '/^(a+)+$/ms' === ($context['pattern'] ?? null) && \is_string($context['error'] ?? null) && '' !== $context['error']),
+            );
+
+        $regexStaticPreScanner = new RegexStaticPreScanner([
+            'php' => [
+                'catastrophic' => ['regex' => '/^(a+)+$/ms', 'description' => 'test'],
+            ],
+        ], $logger);
+        $projectFile = ProjectFile::create('src/Service/S.php', '/app/src/Service/S.php', "aaaa\n".str_repeat('a', 30).'b');
+
+        $markers = $this->underATightBacktrackLimit(static fn (): array => $regexStaticPreScanner->scan([$projectFile]));
+
+        self::assertSame([], $markers);
+    }
+
+    /**
+     * @param callable(): list<RiskMarker> $scan
+     *
+     * @return list<RiskMarker>
+     */
+    private function underATightBacktrackLimit(callable $scan): array
+    {
+        $previousLimit = \ini_get('pcre.backtrack_limit');
+        ini_set('pcre.backtrack_limit', '50');
+
+        try {
+            return $scan();
+        } finally {
+            ini_set('pcre.backtrack_limit', false === $previousLimit ? '1000000' : $previousLimit);
+        }
     }
 }

@@ -595,7 +595,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(NullStaticPreScanner::class);
     $defaultsConfigurator->set(RegexStaticPreScanner::class)
-        ->args([param('symfony_security_auditor.scan.custom_risk_patterns')]);
+        ->args([param('symfony_security_auditor.scan.custom_risk_patterns'), service('logger')]);
 
     $defaultsConfigurator->set(NullCodeSlicer::class);
     $defaultsConfigurator->set(RegexCodeSlicer::class)

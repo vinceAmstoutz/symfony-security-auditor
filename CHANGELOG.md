@@ -493,6 +493,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `ProjectConfigScanOverrideException`. Configure SARIF imports in the trusted
   user config instead.
 
+- **A `scan.custom_risk_patterns` entry with a catastrophic-backtracking regex
+  had no safeguard, unlike the sibling `secret_scrubbing.additional_patterns`
+  path.** `RegexStaticPreScanner` stored `customPatterns` with no validation
+  and, on a `preg_match()`/`preg_match_all()` failure (e.g.
+  `pcre.backtrack_limit` exhausted), silently treated it the same as "no match"
+  — reproduced directly: a classic `(a+)+$` pattern against a ~30-character
+  attacker-controlled line exhausts the default backtrack limit in a couple of
+  milliseconds, and since the pattern re-runs per line of every matching file, a
+  repository-supplied pattern plus repository-supplied content scales that into
+  a meaningful CPU-exhaustion DoS against the audit run itself. Each custom
+  pattern is now validated at construction — an empty or syntactically invalid
+  pattern throws the new `InvalidCustomRiskPatternException` — and a runtime
+  evaluation failure now logs a warning and stops evaluating that pattern for
+  the rest of the file, instead of silently repeating a failing, CPU-costly call
+  once per remaining line.
+
 ### Fixed
 
 - **A crafted file path could still forge a fake prompt section using a carriage

@@ -14,11 +14,14 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
 use Override;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarkerException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
 
 /**
  * @internal not part of the BC promise — see docs/versioning.md
@@ -45,10 +48,41 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
 
     /**
      * @param array<string, array<string, array{regex: string, description: string}>> $customPatterns extra patterns merged into the static dictionary keyed by file-type bucket
+     *
+     * @throws InvalidCustomRiskPatternException
      */
     public function __construct(
         private array $customPatterns = [],
-    ) {}
+        private LoggerInterface $logger = new NullLogger(),
+    ) {
+        foreach ($this->customPatterns as $bucket => $patterns) {
+            foreach ($patterns as $label => $entry) {
+                $error = $this->validatePattern($entry['regex']);
+                if (null !== $error) {
+                    throw InvalidCustomRiskPatternException::forPattern($bucket, $label, $entry['regex'], $error);
+                }
+            }
+        }
+    }
+
+    private function validatePattern(string $pattern): ?string
+    {
+        if ('' === $pattern) {
+            return 'empty pattern';
+        }
+
+        $error = null;
+        set_error_handler(static function (int $severity, string $message) use (&$error): bool {
+            $error = $message;
+
+            return true;
+        });
+
+        $isValidPattern = false !== preg_match($pattern, '');
+        restore_error_handler();
+
+        return $isValidPattern ? null : ($error ?? preg_last_error_msg());
+    }
 
     /**
      * @var array<string, array<string, array{regex: string, description: string}>>
@@ -498,12 +532,34 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         $matches = [];
 
         foreach ($lines as $index => $line) {
-            if (1 === preg_match($regex, $line)) {
+            $result = preg_match($regex, $line);
+            if (false === $result) {
+                $this->logEvaluationFailure($regex);
+
+                break;
+            }
+
+            if (1 === $result) {
                 $matches[] = $index + 1;
             }
         }
 
         return $matches;
+    }
+
+    /**
+     * A pattern the PCRE engine refuses to evaluate on one line will refuse on
+     * every remaining line too — e.g. `pcre.backtrack_limit` exhausted by a
+     * catastrophic-backtracking pattern — so evaluation stops for this pattern
+     * rather than repeating a failing (and CPU-costly) call once per remaining
+     * line.
+     */
+    private function logEvaluationFailure(string $regex): void
+    {
+        $this->logger->warning('Risk-pattern evaluation failed, skipping the remainder of this file for this pattern', [
+            'pattern' => $regex,
+            'error' => preg_last_error_msg(),
+        ]);
     }
 
     /**
@@ -529,7 +585,12 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      */
     private function matchAcrossLines(string $content, string $regex): array
     {
-        preg_match_all($regex, $content, $matches, \PREG_OFFSET_CAPTURE);
+        $result = preg_match_all($regex, $content, $matches, \PREG_OFFSET_CAPTURE);
+        if (false === $result) {
+            $this->logEvaluationFailure($regex);
+
+            return [];
+        }
 
         $lines = [];
         foreach ($matches[0] as [$matchedText, $startOffset]) {

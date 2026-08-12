@@ -23,6 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRiskMarke
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\MalformedSarifFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\SarifFileNotReadableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
@@ -53,6 +54,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_sarif_result_becomes_a_marker_at_its_file_line_and_rule(): void
     {
@@ -74,6 +76,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_result_with_a_code_flow_gets_the_taint_path_appended_to_its_description(): void
     {
@@ -103,6 +106,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_leading_taint_path_step_outside_the_scan_surface_becomes_an_ellipsis(): void
     {
@@ -128,6 +132,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_an_internal_taint_path_step_outside_the_scan_surface_becomes_an_ellipsis(): void
     {
@@ -156,6 +161,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_trailing_taint_path_step_outside_the_scan_surface_becomes_an_ellipsis(): void
     {
@@ -181,6 +187,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_taint_path_step_with_a_non_positive_start_line_clamps_to_line_one(): void
     {
@@ -209,6 +216,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_taint_path_step_without_a_start_line_defaults_to_line_one(): void
     {
@@ -237,6 +245,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_taint_path_step_without_a_location_uri_becomes_an_ellipsis(): void
     {
@@ -262,6 +271,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_imported_markers_are_merged_after_the_inner_scanner_markers(): void
     {
@@ -286,6 +296,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_result_pointing_outside_the_scan_surface_is_dropped(): void
     {
@@ -301,6 +312,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     #[DataProvider('equivalentUriSpellings')]
     public function test_equivalent_uri_spellings_match_the_scanned_file(string $uri): void
@@ -329,6 +341,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_missing_or_non_positive_start_line_clamps_to_line_one(): void
     {
@@ -345,6 +358,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_the_message_falls_back_to_the_rule_id_and_the_rule_to_a_generic_label(): void
     {
@@ -366,6 +380,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_result_without_a_location_uri_is_skipped(): void
     {
@@ -379,6 +394,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_run_without_a_tool_name_labels_markers_with_a_generic_tool(): void
     {
@@ -395,6 +411,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_every_result_of_a_run_becomes_its_own_marker(): void
     {
@@ -416,6 +433,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_markers_from_every_configured_sarif_file_are_imported(): void
     {
@@ -435,6 +453,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_relative_sarif_path_resolves_against_the_audited_project_root(): void
     {
@@ -456,6 +475,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_missing_sarif_file_aborts_with_a_clear_error(): void
     {
@@ -470,6 +490,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_an_invalid_json_sarif_file_aborts_with_a_clear_error(): void
     {
@@ -487,6 +508,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     #[DataProvider('runsMissingDocuments')]
     public function test_a_json_document_without_a_runs_array_aborts_with_a_clear_error(string $json): void
@@ -513,6 +535,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_non_object_runs_and_results_entries_are_skipped(): void
     {
@@ -529,6 +552,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_run_whose_results_key_is_not_an_array_yields_no_markers(): void
     {
@@ -542,6 +566,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_whitespace_only_message_falls_back_to_the_rule_id(): void
     {
@@ -562,6 +587,7 @@ final class SarifImportingPreScannerTest extends TestCase
      * @throws InvalidRiskMarkerException
      * @throws SarifFileNotReadableException
      * @throws MalformedSarifFileException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_an_unreadable_sarif_file_aborts_with_a_clear_error(): void
     {
@@ -585,6 +611,8 @@ final class SarifImportingPreScannerTest extends TestCase
 
     /**
      * @param list<string> $sarifPaths
+     *
+     * @throws InvalidCustomRiskPatternException
      */
     private function scanner(array $sarifPaths, ?RegexStaticPreScanner $regexStaticPreScanner = null): SarifImportingPreScanner
     {

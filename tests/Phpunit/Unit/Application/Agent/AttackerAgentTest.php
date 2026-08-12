@@ -76,6 +76,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityTool;
@@ -313,6 +314,7 @@ final class AttackerAgentTest extends TestCase
      * @throws LLMProviderException
      * @throws InvalidProjectFileException
      * @throws InvalidToolRegistryException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_line_flagged_by_the_static_pre_scanner_survives_code_slicing(): void
     {
@@ -354,6 +356,7 @@ final class AttackerAgentTest extends TestCase
      * @throws LLMProviderException
      * @throws InvalidProjectFileException
      * @throws InvalidToolRegistryException
+     * @throws InvalidCustomRiskPatternException
      */
     public function test_a_multi_line_risk_marker_restores_its_actually_dangerous_line_not_the_matchs_opening_line(): void
     {
