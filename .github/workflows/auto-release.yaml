@@ -1,0 +1,104 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+jobs:
+  detect:
+    name: Detect a release commit
+    if: "${{ startsWith(github.event.head_commit.message, 'chore: release ') }}"
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - name: Parse the version from the commit message
+        id: parse
+        env:
+          # Passed through the environment rather than interpolated into the
+          # script: a push to main is trusted, but this still avoids the
+          # habit of splicing ${{ }} expressions into shell code.
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+
+          version="$(printf '%s\n' "$MESSAGE" | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+          if [ -z "$version" ]; then
+            echo "::error::Could not parse a X.Y.Z version out of the commit message. Expected \"chore: release X.Y.Z\"."
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  tag-and-draft-release:
+    name: Tag the release and draft its GitHub Release
+    needs: detect
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Build the What's Changed release notes
+        id: notes
+        env:
+          VERSION: ${{ needs.detect.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          previous_tag="$(git tag --list --sort=-version:refname '[0-9]*.[0-9]*.[0-9]*' | grep -vxF "$VERSION" | head -n1 || true)"
+          if [ -z "$previous_tag" ]; then
+            echo "::error::Could not find a previous release tag to diff against."
+            exit 1
+          fi
+
+          {
+            echo "## What's Changed"
+            echo
+          } > release-notes.md
+
+          git log --reverse --format='%H %s' "${previous_tag}..HEAD" | while IFS=' ' read -r sha rest; do
+            pr_number="$(printf '%s\n' "$rest" | grep -oE '\(#[0-9]+\)$' | tr -d '(#)' || true)"
+            [ -z "$pr_number" ] && continue
+
+            description="$(printf '%s\n' "$rest" | sed -E 's/[[:space:]]*\(#[0-9]+\)$//')"
+
+            author_login="$(gh pr view "$pr_number" --repo "$REPO" --json author --jq '.author.login' 2>/dev/null || true)"
+            [ -z "$author_login" ] && author_login="vinceAmstoutz"
+
+            printf -- '- %s by @%s in https://github.com/%s/pull/%s\n' "$description" "$author_login" "$REPO" "$pr_number" >> release-notes.md
+          done
+
+          {
+            echo
+            printf '**Full Changelog**: https://github.com/%s/compare/%s...%s\n' "$REPO" "$previous_tag" "$VERSION"
+          } >> release-notes.md
+
+      - name: Create and push the tag
+        env:
+          VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+
+      - name: Draft the GitHub Release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # zizmor: ignore[superfluous-actions] v3.0.2 -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
+        with:
+          tag_name: ${{ needs.detect.outputs.version }}
+          name: ${{ needs.detect.outputs.version }}
+          body_path: release-notes.md
+          draft: true

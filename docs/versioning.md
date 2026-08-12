@@ -399,7 +399,16 @@ current `<N>.x`, anything breaking goes to the next `MAJOR`'s. Fixes are merged
 forward — `1.x` into `2.x` — so they are never applied twice and the next
 `MAJOR` never regresses behind the current line.
 
-At any release, the `<N>.x` branch is merged into `main` and tagged there.
+At any release, the `<N>.x` branch is merged into `main` and tagged there: open
+a `chore: release X.Y.Z` pull request from `<N>.x` — promoting the changelog and
+bumping every version pin via `bin/castor release:bump X.Y.Z` — against `main`.
+Once that commit lands, the
+[Auto Release](../.github/workflows/auto-release.yaml) workflow tags it `X.Y.Z`,
+generates a `What's Changed` summary from the merged pull requests since the
+previous tag, and drafts the GitHub Release — publish it when ready, which
+triggers the binary-build workflow. Cherry-pick the same release commit back
+onto `<N>.x` so its changelog doesn't keep listing the shipped fixes as
+`Unreleased`.
 
 Because `main` is the default branch, a pull request opens against it by default
 even though almost nothing should land there directly. **Retarget the base** to
