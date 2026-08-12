@@ -81,6 +81,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeSleep
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FixedTokenEstimator;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\InvocationOptionsCapture;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\PlatformInvocationLog;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedTokenUsagePlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingConverter;
 
 final class SymfonyAiLLMClientTest extends TestCase
@@ -786,6 +787,46 @@ final class SymfonyAiLLMClientTest extends TestCase
     }
 
     /**
+     * The negative-token guard above only fires through
+     * `TokenUsageRecorder::record()`, reached via
+     * `PlatformResultExtractor::extractTokens()`'s optional, nullable
+     * `$tokenUsageRecorder` collaborator. `PlatformAccountingConfig` defaults
+     * that collaborator to `null` — a legitimate, supported configuration —
+     * so building the client without one (as this test does) must not let a
+     * provider-reported negative token count reach the rate limiter
+     * unvalidated: `extractTokens()` itself must reject it before any caller
+     * ever sees the value.
+     *
+     * @throws MissingAiPlatformException
+     * @throws BudgetExceededException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_releases_the_rate_limiter_reservation_when_token_extraction_fails_without_a_token_usage_recorder(): void
+    {
+        $fakeRateLimiter = new FakeRateLimiter();
+        $platform = $this->scriptedPlatformWithTokenUsage(new TextResult('a'), new TokenUsage(promptTokens: -1, completionTokens: 0));
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'm', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(rateLimiter: $fakeRateLimiter),
+        );
+
+        $threw = false;
+        try {
+            $symfonyAiLLMClient->complete('s', 'u');
+        } catch (NegativeTokenCountException) {
+            $threw = true;
+        }
+
+        self::assertTrue($threw);
+        self::assertCount(1, $fakeRateLimiter->acquired);
+        self::assertSame([[0, 0]], $fakeRateLimiter->recorded);
+    }
+
+    /**
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
      * @throws TransientLLMFailureException
@@ -893,10 +934,15 @@ final class SymfonyAiLLMClientTest extends TestCase
     }
 
     /**
+     * A dispatch whose token extraction fails must release its own
+     * reservation as `[0, 0]` — not the poisoned value that failed to
+     * extract — and the fallback `complete()` call's own reservation must
+     * still be recorded correctly and independently alongside it.
+     *
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
      */
-    public function test_complete_batch_does_not_release_an_already_reconciled_reservation_when_a_later_step_fails(): void
+    public function test_complete_batch_releases_a_clean_reservation_when_extraction_fails_then_records_the_fallbacks_reservation_independently(): void
     {
         $fakeRateLimiter = new FakeRateLimiter();
         $platform = $this->scriptedPlatformWithTokenUsage(
@@ -912,7 +958,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $responses = $symfonyAiLLMClient->completeBatch([['system' => 's', 'user' => 'u']], 4);
 
         self::assertSame('recovered', $responses[0]->content());
-        self::assertSame([[-1, 0], [5, 2]], $fakeRateLimiter->recorded);
+        self::assertSame([[0, 0], [5, 2]], $fakeRateLimiter->recorded);
     }
 
     /**
@@ -1276,13 +1322,18 @@ final class SymfonyAiLLMClientTest extends TestCase
     }
 
     /**
+     * A dispatch whose token extraction fails must release its own
+     * reservation as `[0, 0]` — not the poisoned value that failed to
+     * extract — and the fallback conversation's own reservation must still
+     * be recorded correctly and independently alongside it.
+     *
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
      * @throws InvalidToolRegistryException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
      */
-    public function test_complete_batch_with_tools_does_not_release_an_already_reconciled_reservation_when_a_later_step_fails(): void
+    public function test_complete_batch_with_tools_releases_a_clean_reservation_when_extraction_fails_then_records_the_fallbacks_reservation_independently(): void
     {
         $fakeRateLimiter = new FakeRateLimiter();
         $toolRegistry = new ToolRegistry([$this->makeTool('record', 'd')], new NullLogger());
@@ -1301,7 +1352,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         ], 4, 3);
 
         self::assertSame('recovered', $responses[0]->content());
-        self::assertSame([[-1, 0], [5, 2]], $fakeRateLimiter->recorded);
+        self::assertSame([[0, 0], [5, 2]], $fakeRateLimiter->recorded);
     }
 
     /**
@@ -2852,43 +2903,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $resultList = $results instanceof ResultInterface ? [$results] : $results;
         $tokenUsageList = $tokenUsages instanceof TokenUsage ? [$tokenUsages] : $tokenUsages;
 
-        return new class($resultList, $tokenUsageList) implements PlatformInterface {
-            /**
-             * @param list<ResultInterface> $results
-             * @param list<TokenUsage>      $tokenUsages
-             */
-            public function __construct(
-                private array $results,
-                private array $tokenUsages,
-            ) {}
-
-            #[Override]
-            public function invoke(Model|string $model, array|string|object $input, array $options = []): DeferredResult
-            {
-                $result = array_shift($this->results);
-                if (!$result instanceof ResultInterface) {
-                    throw new RuntimeException('scriptedPlatformWithTokenUsage invoked more times than scripted — invokeWithRetry never returned (a mutation removed a loop-exit branch).');
-                }
-
-                $tokenUsage = array_shift($this->tokenUsages);
-                $deferredResult = new DeferredResult(
-                    new PlainConverter($result),
-                    new InMemoryRawResult(['text' => ''], [], (object) []),
-                    $options,
-                );
-                if ($tokenUsage instanceof TokenUsage) {
-                    $deferredResult->getMetadata()->add('token_usage', $tokenUsage);
-                }
-
-                return $deferredResult;
-            }
-
-            #[Override]
-            public function getModelCatalog(): ModelCatalogInterface
-            {
-                return new FallbackModelCatalog();
-            }
-        };
+        return new ScriptedTokenUsagePlatform($resultList, $tokenUsageList);
     }
 
     /**
