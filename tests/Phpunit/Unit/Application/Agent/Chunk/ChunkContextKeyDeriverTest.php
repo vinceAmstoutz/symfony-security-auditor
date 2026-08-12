@@ -25,7 +25,7 @@ final class ChunkContextKeyDeriverTest extends TestCase
     {
         $chunkContextKeyDeriver = new ChunkContextKeyDeriver();
 
-        $unshifted = SymfonyMapping::of(
+        $symfonyMapping = SymfonyMapping::of(
             ProjectFileInventory::fromGroups([]),
             new AccessControlMap(firewallRules: ['ab', 'c']),
         );
@@ -35,7 +35,7 @@ final class ChunkContextKeyDeriverTest extends TestCase
         );
 
         self::assertNotSame(
-            $chunkContextKeyDeriver->derive('', '', '', $unshifted),
+            $chunkContextKeyDeriver->derive('', '', '', $symfonyMapping),
             $chunkContextKeyDeriver->derive('', '', '', $shifted),
         );
     }
