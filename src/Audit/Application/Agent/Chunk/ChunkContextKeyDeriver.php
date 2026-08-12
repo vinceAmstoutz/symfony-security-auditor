@@ -66,6 +66,14 @@ final readonly class ChunkContextKeyDeriver
      * changed. Each list is sorted before hashing since project scanning
      * makes no ordering guarantee, so two scans of the same unchanged
      * codebase still agree.
+     *
+     * Each signature is hashed individually before joining, for the same
+     * reason as {@see self::derive()}: a firewall rule or serialized
+     * route/voter/form signature can itself contain a newline (e.g. a
+     * `security.yaml` access-control path parsed from a double-quoted YAML
+     * string), so joining raw signatures with "\n" before a single hash
+     * could let one signature spanning two entries collide with two
+     * genuinely different, shorter entries.
      */
     private function mappingFingerprint(SymfonyMapping $symfonyMapping): string
     {
@@ -86,7 +94,7 @@ final readonly class ChunkContextKeyDeriver
 
         sort($signatures);
 
-        return hash('sha256', implode("\n", $signatures));
+        return hash('sha256', implode('', array_map(static fn (string $signature): string => hash('sha256', $signature), $signatures)));
     }
 
     /**

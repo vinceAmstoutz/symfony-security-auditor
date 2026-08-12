@@ -408,6 +408,33 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   `inline_assignment`/ `multiline_assignment` keyword alternations, and three
   new patterns/labels: `bearer_token`, `openai_api_key`, `slack_webhook_url`.
 
+- **A `security.yaml` access-control path or a serialized route/voter/form
+  signature spanning two entries could replay a stale attacker verdict.**
+  `ChunkContextKeyDeriver::mappingFingerprint()`
+  (`src/Audit/Application/Agent/Chunk/ChunkContextKeyDeriver.php`) joined its
+  sorted signature list with `implode("\n", $signatures)` before a single
+  `hash()` call — the same naive-concatenation anti-pattern
+  `Vulnerability::fingerprintOf()`/`generateId()` were already fixed to avoid,
+  just not applied here. A firewall rule, route-access-control, voter, or form
+  signature containing a literal newline (parsed from a double-quoted YAML
+  string) could make two materially different security configurations
+  fingerprint identically, so the `AttackerChunkCache` replayed a "no
+  vulnerability" verdict computed under a different, stale security posture for
+  a file whose own content never changed — a false negative. Each signature is
+  now hashed individually before joining, mirroring `derive()`'s own scheme in
+  the same class.
+
+- **A reviewer-feedback reason containing another entry's exact line could
+  replay a stale accept/reject verdict.** `ReviewerFeedback::digest()`
+  (`src/Audit/Domain/Model/ReviewerFeedback.php`) had the identical
+  naive-concatenation weakness: it joined per-entry `\0`-separated lines with
+  `implode("\n", $lines)` before a single `hash()` call. Since an entry's
+  `title`/`file`/`reason` (LLM- or filesystem-path-sourced) can embed another
+  entry's whole line, two genuinely different feedback sets could digest
+  identically, letting `FilesystemReviewerCache` silently fail to invalidate a
+  verdict after a maintainer's reason change. Each line is now hashed
+  individually before joining, mirroring `ChunkContextKeyDeriver::derive()`.
+
 ### Fixed
 
 - **A crafted file path could still forge a fake prompt section using a carriage

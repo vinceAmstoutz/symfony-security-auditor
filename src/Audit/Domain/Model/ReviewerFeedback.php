@@ -46,6 +46,12 @@ final readonly class ReviewerFeedback
      * so that re-ordering the same set (e.g. the triage-memory store re-writing
      * its file in a different order between runs) does not spuriously
      * invalidate cached reviewer verdicts.
+     *
+     * Each entry's line is hashed individually before joining — mirroring
+     * `ChunkContextKeyDeriver::derive()` — so a `reason` embedding a literal
+     * newline (LLM- or file-path-sourced text, never newline-sanitized)
+     * cannot reproduce another entry's own `\0`-joined line and collide two
+     * different feedback sets onto the same digest.
      */
     public function digest(): string
     {
@@ -65,6 +71,6 @@ final readonly class ReviewerFeedback
         );
         sort($lines);
 
-        return hash('sha256', implode("\n", $lines));
+        return hash('sha256', implode('', array_map(static fn (string $line): string => hash('sha256', $line), $lines)));
     }
 }

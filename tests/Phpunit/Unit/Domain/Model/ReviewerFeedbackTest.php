@@ -62,6 +62,19 @@ final class ReviewerFeedbackTest extends TestCase
         );
     }
 
+    public function test_the_digest_does_not_collide_when_one_reason_embeds_another_entrys_whole_line(): void
+    {
+        $separateEntries = new ReviewerFeedback([
+            new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', 'X'),
+            new AcceptedFindingFeedback('sql_injection', 'src/B.php', 'TitleB', 'Y'),
+        ]);
+        $singleEntryEmbeddingTheOthersBoundary = new ReviewerFeedback([
+            new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', "Xsql_injection\0src/B.php\0TitleB\0Y"),
+        ]);
+
+        self::assertNotSame($separateEntries->digest(), $singleEntryEmbeddingTheOthersBoundary->digest());
+    }
+
     private function feedback(string $reason): ReviewerFeedback
     {
         return new ReviewerFeedback([new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', $reason)]);
