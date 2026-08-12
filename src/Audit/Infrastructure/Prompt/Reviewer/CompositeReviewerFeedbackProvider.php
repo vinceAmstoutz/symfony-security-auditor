@@ -67,6 +67,12 @@ final class CompositeReviewerFeedbackProvider implements ReviewerFeedbackProvide
      * occupies a single reviewer-prompt slot instead of two — the baseline
      * reason wins, since primary is spread first.
      *
+     * `file`/`title` are LLM- or file-path-sourced and never NUL-sanitized, so
+     * each field is hashed individually before joining the key — mirroring
+     * `ChunkContextKeyDeriver::derive()` — so a NUL byte cannot shift a value
+     * across the `file`/`title` boundary and collide two distinct findings
+     * onto the same dedup key, silently dropping one's guidance.
+     *
      * @param list<AcceptedFindingFeedback> $entries
      *
      * @return list<AcceptedFindingFeedback>
@@ -75,7 +81,12 @@ final class CompositeReviewerFeedbackProvider implements ReviewerFeedbackProvide
     {
         $unique = [];
         foreach ($entries as $entry) {
-            $unique[\sprintf("%s\0%s\0%s", $entry->type, $entry->file, $entry->title)] ??= $entry;
+            $key = hash('sha256', implode('', [
+                hash('sha256', $entry->type),
+                hash('sha256', $entry->file),
+                hash('sha256', $entry->title),
+            ]));
+            $unique[$key] ??= $entry;
         }
 
         return array_values($unique);

@@ -75,6 +75,26 @@ final class ReviewerFeedbackTest extends TestCase
         self::assertNotSame($separateEntries->digest(), $singleEntryEmbeddingTheOthersBoundary->digest());
     }
 
+    public function test_the_digest_changes_when_the_type_changes(): void
+    {
+        $sqlInjection = new ReviewerFeedback([new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', 'accepted risk')]);
+        $xss = new ReviewerFeedback([new AcceptedFindingFeedback('xss', 'src/A.php', 'Title', 'accepted risk')]);
+
+        self::assertNotSame($sqlInjection->digest(), $xss->digest());
+    }
+
+    public function test_the_digest_does_not_collide_when_a_nul_byte_shifts_a_value_across_the_file_and_title_boundary(): void
+    {
+        $fileEndsWithNulTitle = new ReviewerFeedback([
+            new AcceptedFindingFeedback('sql_injection', "src/A.php\0EvilTitle", 'reason-x', 'r'),
+        ]);
+        $titleStartsAfterTheSameNul = new ReviewerFeedback([
+            new AcceptedFindingFeedback('sql_injection', 'src/A.php', "EvilTitle\0reason-x", 'r'),
+        ]);
+
+        self::assertNotSame($fileEndsWithNulTitle->digest(), $titleStartsAfterTheSameNul->digest());
+    }
+
     private function feedback(string $reason): ReviewerFeedback
     {
         return new ReviewerFeedback([new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', $reason)]);

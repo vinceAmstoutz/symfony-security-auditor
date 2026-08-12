@@ -120,6 +120,35 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
     /**
      * @throws InvalidCacheConfigurationException
      */
+    public function test_two_findings_sharing_a_file_title_and_line_but_differing_in_type_do_not_collide(): void
+    {
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', 'Title', 10, 'sql injection reason');
+        $this->filesystemTriageMemoryStore->record('xss', 'src/A.php', 'Title', 10, 'xss reason');
+
+        $reasons = array_map(
+            static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->reason,
+            $this->filesystemTriageMemoryStore->feedback()->entries,
+        );
+
+        self::assertEqualsCanonicalizing(['sql injection reason', 'xss reason'], $reasons);
+    }
+
+    public function test_two_findings_whose_file_and_title_share_a_nul_boundary_do_not_collide(): void
+    {
+        $this->filesystemTriageMemoryStore->record('sql_injection', "src/A.php\0Evil", 'Title', 10, 'first finding');
+        $this->filesystemTriageMemoryStore->record('sql_injection', 'src/A.php', "Evil\0Title", 10, 'second finding');
+
+        $reasons = array_map(
+            static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => $acceptedFindingFeedback->reason,
+            $this->filesystemTriageMemoryStore->feedback()->entries,
+        );
+
+        self::assertEqualsCanonicalizing(['first finding', 'second finding'], $reasons);
+    }
+
+    /**
+     * @throws InvalidCacheConfigurationException
+     */
     public function test_a_persisted_entry_without_a_line_is_keyed_as_line_zero(): void
     {
         $this->filesystem()->dumpFile($this->memoryPath, json_encode([

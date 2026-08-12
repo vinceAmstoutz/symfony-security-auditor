@@ -64,6 +64,38 @@ final class CompositeReviewerFeedbackProviderTest extends TestCase
         self::assertEquals([$baselineA, $baselineB, $triageC], $compositeReviewerFeedbackProvider->feedback()->entries);
     }
 
+    public function test_feedback_does_not_deduplicate_findings_that_share_a_file_and_title_but_differ_in_type(): void
+    {
+        $sqlInjection = new AcceptedFindingFeedback('sql_injection', 'src/A.php', 'Title', 'sql injection reason');
+        $xss = new AcceptedFindingFeedback('xss', 'src/A.php', 'Title', 'xss reason');
+
+        $reviewerFeedbackHolder = new ReviewerFeedbackHolder();
+        $reviewerFeedbackHolder->set(new ReviewerFeedback([$sqlInjection]));
+
+        $triageMemoryProvider = self::createStub(ReviewerFeedbackProviderInterface::class);
+        $triageMemoryProvider->method('feedback')->willReturn(new ReviewerFeedback([$xss]));
+
+        $compositeReviewerFeedbackProvider = new CompositeReviewerFeedbackProvider($reviewerFeedbackHolder, $triageMemoryProvider);
+
+        self::assertEquals([$sqlInjection, $xss], $compositeReviewerFeedbackProvider->feedback()->entries);
+    }
+
+    public function test_feedback_does_not_deduplicate_distinct_findings_whose_file_and_title_share_a_nul_boundary(): void
+    {
+        $baselineEntry = new AcceptedFindingFeedback('sql_injection', "src/A.php\0Evil", 'Title', 'baseline reason');
+        $triageMemoryEntry = new AcceptedFindingFeedback('sql_injection', 'src/A.php', "Evil\0Title", 'triage-memory reason');
+
+        $reviewerFeedbackHolder = new ReviewerFeedbackHolder();
+        $reviewerFeedbackHolder->set(new ReviewerFeedback([$baselineEntry]));
+
+        $triageMemoryProvider = self::createStub(ReviewerFeedbackProviderInterface::class);
+        $triageMemoryProvider->method('feedback')->willReturn(new ReviewerFeedback([$triageMemoryEntry]));
+
+        $compositeReviewerFeedbackProvider = new CompositeReviewerFeedbackProvider($reviewerFeedbackHolder, $triageMemoryProvider);
+
+        self::assertEquals([$baselineEntry, $triageMemoryEntry], $compositeReviewerFeedbackProvider->feedback()->entries);
+    }
+
     public function test_feedback_is_snapshotted_on_first_read_and_ignores_later_secondary_writes(): void
     {
         $reviewerFeedbackHolder = new ReviewerFeedbackHolder();

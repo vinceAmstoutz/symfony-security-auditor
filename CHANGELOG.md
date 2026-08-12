@@ -435,6 +435,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
   verdict after a maintainer's reason change. Each line is now hashed
   individually before joining, mirroring `ChunkContextKeyDeriver::derive()`.
 
+- **A NUL byte in a `file` or `title` could still shift a value across a field
+  boundary within a single entry, in three places the previous fix round
+  missed.** `ReviewerFeedback::digest()` hashed each entry's whole
+  `type\0file\0title\0reason` line, but not each field before joining it into
+  that line — so `file="A\0B", title="C"` and `file="A", title="B\0C"` produced
+  the byte-identical line, and therefore the same digest, despite being
+  genuinely different feedback. The same idiom, with the same gap, existed in
+  `CompositeReviewerFeedbackProvider::deduplicated()`
+  (`src/Audit/Infrastructure/Prompt/Reviewer/`) — used to merge baseline and
+  triage-memory feedback, where a collision silently drops one finding's
+  guidance — and in `FilesystemTriageMemoryStore::keyOf()`
+  (`src/Audit/Infrastructure/Cache/`) — used to dedupe persisted rejections,
+  where a collision silently drops a reviewer's rejection reason for a genuinely
+  distinct finding. All three now hash `type`, `file`, `title` (and, for the
+  memory store, `line`) individually before joining, matching
+  `ChunkContextKeyDeriver::derive()`.
+
 ### Fixed
 
 - **A crafted file path could still forge a fake prompt section using a carriage

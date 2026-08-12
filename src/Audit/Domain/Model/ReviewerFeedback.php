@@ -47,11 +47,16 @@ final readonly class ReviewerFeedback
      * its file in a different order between runs) does not spuriously
      * invalidate cached reviewer verdicts.
      *
-     * Each entry's line is hashed individually before joining — mirroring
-     * `ChunkContextKeyDeriver::derive()` — so a `reason` embedding a literal
-     * newline (LLM- or file-path-sourced text, never newline-sanitized)
-     * cannot reproduce another entry's own `\0`-joined line and collide two
-     * different feedback sets onto the same digest.
+     * Each entry's `type`/`file`/`title`/`reason` is hashed individually before
+     * being joined into that entry's line, and each line is hashed again
+     * before joining the whole set — mirroring `ChunkContextKeyDeriver::derive()`
+     * at both levels. `file`/`title` are LLM- or file-path-sourced and never
+     * NUL-sanitized, so without the field-level hash a NUL byte could shift a
+     * value across the `\0` join and make two entries with different
+     * `file`/`title` splits produce the exact same line string (e.g.
+     * `file="A\0B", title="C"` vs `file="A", title="B\0C"`); the line-level
+     * hash alone cannot catch that, since the lines themselves would already
+     * be identical.
      */
     public function digest(): string
     {
@@ -60,17 +65,16 @@ final readonly class ReviewerFeedback
         }
 
         $lines = array_map(
-            static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => \sprintf(
-                "%s\0%s\0%s\0%s",
-                $acceptedFindingFeedback->type,
-                $acceptedFindingFeedback->file,
-                $acceptedFindingFeedback->title,
-                $acceptedFindingFeedback->reason,
-            ),
+            static fn (AcceptedFindingFeedback $acceptedFindingFeedback): string => hash('sha256', implode('', [
+                hash('sha256', $acceptedFindingFeedback->type),
+                hash('sha256', $acceptedFindingFeedback->file),
+                hash('sha256', $acceptedFindingFeedback->title),
+                hash('sha256', $acceptedFindingFeedback->reason),
+            ])),
             $this->entries,
         );
         sort($lines);
 
-        return hash('sha256', implode('', array_map(static fn (string $line): string => hash('sha256', $line), $lines)));
+        return hash('sha256', implode('', $lines));
     }
 }

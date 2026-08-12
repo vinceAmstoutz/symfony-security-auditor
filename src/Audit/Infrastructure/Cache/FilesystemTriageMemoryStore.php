@@ -194,17 +194,22 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
      * type/file/title (a generic title reused at different locations) do not
      * collide — the second rejection would otherwise overwrite the first.
      *
+     * `file`/`title` are LLM-sourced and never NUL-sanitized, so each field is
+     * hashed individually before joining — mirroring
+     * `ChunkContextKeyDeriver::derive()` — so a NUL byte cannot shift a value
+     * across the `file`/`title` boundary and collide two distinct findings
+     * onto the same key.
+     *
      * @param array<array-key, mixed> $entry
      */
     private function keyOf(array $entry): string
     {
-        return \sprintf(
-            "%s\0%s\0%s\0%d",
-            $this->stringField($entry, 'type'),
-            $this->stringField($entry, 'file'),
-            $this->stringField($entry, 'title'),
-            $this->intField($entry, 'line'),
-        );
+        return hash('sha256', implode('', [
+            hash('sha256', $this->stringField($entry, 'type')),
+            hash('sha256', $this->stringField($entry, 'file')),
+            hash('sha256', $this->stringField($entry, 'title')),
+            hash('sha256', (string) $this->intField($entry, 'line')),
+        ]));
     }
 
     private function cappedReason(string $reason): string
