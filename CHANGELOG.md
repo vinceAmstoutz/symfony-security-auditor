@@ -199,6 +199,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Changed
 
+- **`RegexCodeSlicer` (`src/Audit/Infrastructure/Scan/`) split from one 465-line
+  class into eight single-responsibility collaborators.** `StringLiteralMasker`
+  neutralizes string-literal content; `SecurityRelevantLineClassifier` decides
+  structural/security-token retention; `BlockCommentStripper` and
+  `ParenContinuationTracker` track block-comment and paren-continuation state
+  across lines; `HeredocLineTracker` retains a heredoc/nowdoc body verbatim.
+  Retention itself is now a `LineRetentionDeciderInterface`, with
+  `ContinuationForcedLineRetentionDecider` decorating
+  `SecurityRelevantLineClassifier` so a line that continues an open construct is
+  retained regardless of the base classifier's verdict — replacing an inline
+  three-way boolean OR in `slice()`. `RegexCodeSlicer` itself is now a 93-line
+  orchestrator. Purely internal (`@internal`, not part of the BC promise);
+  identical output for every existing case.
+
 - **CI now runs on version branches.** `.github/workflows/ci.yaml` triggered on
   pushes to `main` only, so a commit pushed straight to a next-`MAJOR` branch
   like `2.x` would ship without the test matrix, PHPStan, Deptrac or Infection
