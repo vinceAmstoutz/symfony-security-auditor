@@ -31,24 +31,27 @@ Each key a profile sets is documented in
 ## Speed & cost levers
 
 - **Split-model** — pairing a powerful attacker with a cheap reviewer
-  (`attacker_model` + `reviewer_model`) is the single biggest cost lever, often
-  ~20× cheaper than one large model for both roles. See
+  (`attacker_model` + `reviewer_model`) is the single biggest cost lever: the
+  Reviewer phase alone often runs ~20× cheaper than on the attacker's model. See
   [Split-Model Setup](configuration.md#split-model-setup).
 - **Concurrency** — `audit.attacker_max_concurrent` and
   `audit.reviewer_max_concurrent` resolve several LLM calls at once on platforms
   with an async transport; `4`–`8` (within your rate limits) cuts each phase's
   wall-clock roughly proportionally. Cache hits short-circuit, so only the
   misses are dispatched.
-- **Caching** — content-hash caching skips identical chunks across runs, and
-  Anthropic prompt caching (`cache_retention` in `ai.yaml`) gives a ~90%
-  input-token discount on cache hits. Both are on by default; see
+- **Caching** — content-hash caching skips identical attacker chunks and
+  reviewer verdicts across runs, and Anthropic prompt caching (`cache_retention`
+  in `ai.yaml`) gives a ~90% input-token discount on cache hits. Both are on by
+  default; see
   [Configuration → `cache.*`](configuration.md#cache--caching-layers).
 - **Lean pre-scan & code slicing** — `audit.static_prescan.lean_mode` drops
   marker-free files and `audit.code_slicing.enabled` trims large files to
   security-relevant lines; both cut tokens and are on under the `fast` profile.
 - **Budget guards** — cap a run with `audit.budget.max_tokens` /
   `audit.budget.max_cost_usd`, and preview spend with `audit:run --dry-run`
-  before committing to a full run.
+  before committing to a full run. The preview's token counts are a heuristic
+  projection from file size, not the real per-call usage a completed run
+  reports.
 
 ## Avoiding rate limits (`429`)
 
