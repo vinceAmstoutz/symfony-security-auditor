@@ -12,8 +12,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [1.19.0] — 2026-08-12 — Bulwark
 
-A release about seeing a result without leaving GitHub. `--format=github-comment`
-posts a run's summary straight to the pull request, an opt-in badge input
+A release about seeing a result without leaving GitHub. The attacker now also
+flags XSSI "JSON Hijacking": a `GET` endpoint returning a bare top-level JSON
+array instead of an object, exploitable via a cross-origin `<script src>`
+include. `--format=github-comment` posts a run's summary straight to the pull
+request, an opt-in badge input
 reports a project's grade on shields.io, and every report now carries a
 normalized 0-100 score and `A`-`F` grade beside the existing risk level, with
 `--min-score` to gate CI on it directly. Alongside that: an audited project
