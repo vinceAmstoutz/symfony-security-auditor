@@ -200,16 +200,5 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Dispatched unconditionally, draft or not: softprops/action-gh-release
-          # finds a release by tag regardless of its draft state, so building
-          # here means the binaries are already attached by the time a human
-          # publishes the draft -- otherwise releases/latest/download/<asset>
-          # 404s for however long the matrix takes to finish after publish.
-          # release.yaml also still listens for `release: published`, as a
-          # safety net for a release created outside this workflow -- but an
-          # event produced by the default GITHUB_TOKEN (the draft step above)
-          # never cascades into another workflow run (GitHub's anti-recursion
-          # guard), so it would not have fired for this release anyway.
-          # Dispatch it explicitly instead; an API-triggered workflow_dispatch
-          # is not subject to that restriction.
+          # GITHUB_TOKEN-authored events don't cascade into other workflows (GitHub's anti-recursion guard), so dispatch explicitly rather than rely on release:published.
           gh workflow run release.yaml --repo "$REPO" --field tag="$VERSION"
