@@ -63,6 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -158,3 +159,20 @@ jobs:
           name: ${{ steps.release-name.outputs.name }}
           body_path: release-notes.md
           draft: ${{ steps.publish-state.outputs.draft }}
+
+      - name: Trigger the binary build for a release this workflow published
+        if: steps.publish-state.outputs.draft == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # release.yaml listens for `release: published`, but an event
+          # produced by the default GITHUB_TOKEN never cascades into another
+          # workflow run (GitHub's anti-recursion guard) -- only a human
+          # publishing through the UI triggers it that way. Dispatch it
+          # explicitly instead; an API-triggered workflow_dispatch is not
+          # subject to that restriction.
+          gh workflow run release.yaml --repo "$REPO" --field tag="$VERSION"
