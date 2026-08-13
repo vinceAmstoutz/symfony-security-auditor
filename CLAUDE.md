@@ -213,8 +213,8 @@ Format: `<type>[optional scope]: <description>` —
 | `perf`     | Performance improvement |
 
 Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`,
-`standalone`, `scan`, `deps`, `ci`, `rate-limit`. Breaking changes: `feat!:`
-with `BREAKING CHANGE:` footer.
+`standalone`, `scan`, `deps`, `ci`, `rate-limit`, `release`. Breaking changes:
+`feat!:` with `BREAKING CHANGE:` footer.
 
 ## Pull Requests
 

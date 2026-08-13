@@ -49,6 +49,7 @@ export default {
                 'prompt',
                 'scan',
                 'rate-limit',
+                'release',
             ],
         ],
         'scope-empty': [0],
