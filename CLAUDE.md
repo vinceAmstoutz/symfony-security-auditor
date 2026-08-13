@@ -229,6 +229,13 @@ and keep the top of the PR short:
   in their own sections further down — the summary is the part everyone reads,
   so it must stay skimmable.
 
+**Always squash-merge, never rebase-merge or create-a-merge-commit.** Every PR
+becomes exactly one commit on its base branch. Rebase-merging replays each of
+the PR's commits individually — with a fresh SHA apiece, even when nothing about
+them changed — which is how PR #305 quietly turned a one-commit release into ~40
+replayed commits landing on `main` and broke `Commit Lint` (see
+[Branches & maintenance](docs/versioning.md#branches--maintenance)).
+
 ## CI Pipeline
 
 Seven jobs must all pass before merging: **Prettier Check** (markdown

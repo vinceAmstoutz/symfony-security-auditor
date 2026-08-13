@@ -402,13 +402,14 @@ forward — `1.x` into `2.x` — so they are never applied twice and the next
 At any release, the `<N>.x` branch is merged into `main` and tagged there: open
 a `chore: release X.Y.Z` pull request from `<N>.x` — promoting the changelog and
 bumping every version pin via `bin/castor release:bump X.Y.Z` — against `main`.
-**Squash-merge this PR, never rebase-merge it.** A rebase-merge replays every
-commit `<N>.x` has accumulated since it last diverged from `main` as brand-new
-commits (GitHub gives each a fresh SHA even when the parent chain already
-matched), which (a) makes `main` and `<N>.x` diverge on commit identity despite
-having the same content, requiring a manual reconciliation cherry-pick, and (b)
-re-runs CI's `Commit Lint` job — which lints the full commit range on every push
-to `main` — over that entire replayed history, so one old commit whose scope has
+Squash-merge it like every PR (see [Pull Requests](../CLAUDE.md#pull-requests))
+— it matters more than usual here. Rebase-merging this particular PR replays
+every commit `<N>.x` has accumulated since it last diverged from `main` as
+brand-new commits (a fresh SHA apiece, even though nothing about them changed),
+which (a) makes `main` and `<N>.x` diverge on commit identity despite having the
+same content, requiring a manual reconciliation cherry-pick, and (b) re-runs
+CI's `Commit Lint` job — which lints the full commit range on every push to
+`main` — over that entire replayed history, so one old commit whose scope has
 since fallen out of `commitlint.config.mjs`'s `scope-enum` turns the release
 push red for a commit nobody can amend. A squash-merge lands exactly one new
 commit (the release commit itself), so neither problem occurs. Once that commit
