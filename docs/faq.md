@@ -27,7 +27,7 @@ It feeds your Symfony project through a three-stage AI pipeline:
 1. **Ingestion** — scans `.php`, `.twig`, `.yaml`, `.yml`, `.xml` files
    recursively.
 2. **Mapping** — classifies files as Controllers, Entities, Voters, Forms,
-   Repositories, Templates, Config, Services; builds a route/firewall map.
+   Repositories, Templates, Config; builds a route/firewall map.
 3. **Audit** — an adversarial Attacker agent hunts for vulnerabilities; a
    skeptical Reviewer agent validates each finding. Up to 3 iterations, stops
    earlier when no new findings emerge.
@@ -37,7 +37,7 @@ for GitHub Code Scanning / GitLab Security Dashboard.
 
 ### What kinds of vulnerabilities does it catch?
 
-32 types across six categories (OWASP-aligned):
+49 types across six categories (OWASP-aligned):
 
 - **Injection** — SQL, command, LDAP, XPath, Twig, header.
 - **Broken Access Control** — missing Voter, Voter bypass, role escalation,
@@ -67,10 +67,13 @@ output and a per-run LLM cost.
 
 ### Is it ready for production use?
 
-The bundle is actively developed. Output is validated by a Reviewer agent before
-being included in the final report. We recommend running it as a **scheduled
-nightly CI job** alongside existing tools (PHPStan / Psalm / Dependabot), not as
-a blocking PR gate. See [CI Integration](ci.md).
+The auditor is actively developed. Output is validated by a Reviewer agent
+before being included in the final report. A **scheduled nightly CI job**
+alongside existing tools (PHPStan / Psalm / Dependabot) is the lowest-friction
+default, but gating pull requests directly is also supported: scope the run to
+changed files with `--since`, then gate on `--fail-on` / `--min-score`, with
+baseline suppression (`--baseline`/`--generate-baseline`) so previously-accepted
+findings don't fail CI. See [CI Integration](ci.md).
 
 ## Comparisons
 
@@ -172,11 +175,14 @@ That's a harder problem — LLMs miss things. Options:
 
 ### Is the output deterministic?
 
-**No.** LLM output is nondeterministic by default. Set `temperature: 0.0` (or
-low like `0.1`) in your model options to reduce variation, but identical input
-may still produce different findings across runs. The cache
-(`cache.enabled: true`) makes a _repeated_ run on identical code deterministic —
-chunks with the same content hash are short-circuited.
+**No.** LLM output is nondeterministic by default. On models that accept it, set
+`temperature: 0.0` (or low like `0.1`) in your model options to reduce variation
+— the current Claude generation (Opus 5, Sonnet 5, Fable 5) rejects
+`temperature` outright and is steered via `effort`/`thinking` instead (see Model
+Selection below) — but identical input may still produce different findings
+across runs. The cache (`cache.enabled: true`) makes a _repeated_ run on
+identical code deterministic — chunks with the same content hash are
+short-circuited.
 
 ## Cost & Performance
 
@@ -208,16 +214,19 @@ the risk of cross-talk between findings in the prompt.
 
 ### Why is the cache so important?
 
-The Attacker chunks files in groups of 10 and computes a content hash. Identical
-chunks (same files, same content) skip the LLM entirely — `cache.enabled: true`
-(the default) gives ~80% cost reduction on repeated CI runs of unchanged code.
+By default, the Attacker groups files by feature
+(`audit.chunking.strategy: feature`) — a controller together with its related
+entity/repository/form/voter/templates, capped at 10 files per chunk — and
+computes a content hash per chunk. Identical chunks (same files, same content)
+skip the LLM entirely — `cache.enabled: true` (the default) gives ~80% cost
+reduction on repeated CI runs of unchanged code.
 
 Provider-side **prompt caching** stacks on top of that for a ~90%
 **input-token** discount on prompts that share a long system message. It is
-configured on the `symfony/ai` platform, not in this bundle: set
+configured on the `symfony/ai` platform, not by the auditor itself: set
 `cache_retention` (`short`/`long`) on the `anthropic` platform in `ai.yaml`
 (default `short` already enables it); OpenAI and Gemini cache automatically. The
-old `cache.prompt_caching` bundle flag is deprecated since 1.7 and ignored.
+old `cache.prompt_caching` flag is deprecated since 1.7 and ignored.
 
 ## Privacy & Data Handling
 
@@ -354,14 +363,14 @@ class of issue this tool exists to find.
 
 > Which option keys are accepted (`effort`, `thinking`, …) depends on the
 > provider and model behind `symfony/ai`. Unknown options are passed straight
-> through to the provider, so check your provider's documentation; this bundle
+> through to the provider, so check your provider's documentation; the auditor
 > does not validate them.
 
 ### Can I tune model parameters (temperature, max_tokens)?
 
-Yes. For `max_tokens`, use the dedicated bundle key — it defaults to `4096` and
-avoids `symfony/ai`'s built-in ~1000-token cap. This key currently only takes
-effect for Claude/Anthropic-dialect models — see
+Yes. For `max_tokens`, use the dedicated `max_output_tokens` key — it defaults
+to `4096` and avoids `symfony/ai`'s built-in ~1000-token cap. This key currently
+only takes effect for Claude/Anthropic-dialect models — see
 [Configuration → Top-level](configuration.md#top-level):
 
 ```yaml
@@ -454,14 +463,19 @@ symfony_security_auditor:
 
 ### How do I run it in CI?
 
-Schedule it nightly — the multi-agent loop takes minutes, so blocking PRs hurts
-productivity. See [CI Integration](ci.md) for ready-to-copy GitHub Actions and
-GitLab CI templates with SARIF upload.
+Nightly scheduling is simplest — the multi-agent loop can take minutes, so a
+full audit on every push adds latency. See [CI Integration](ci.md) for
+ready-to-copy GitHub Actions and GitLab CI templates, including scheduled SARIF
+upload and a `--since`-scoped, `--fail-on`-gated pattern for teams that want the
+audit to block pull requests directly.
 
 ### Can I run it on every PR?
 
-You **can** (with `audit.max_iterations: 1` + split-model to keep latency low)
-but the cost-vs-value usually favors nightly scheduled runs.
+You **can** — this is now a well-supported pattern. Scope the run to changed
+files with `--since` (fast, and the cache stays warm) and gate on `--fail-on` /
+`--min-score`, with `--baseline` to keep already-accepted findings from failing
+the check. A full (non-`--since`) audit on every PR is still costlier and slower
+than a nightly run — reserve that for the scheduled job.
 
 ### How do I get findings into GitHub Code Scanning?
 
@@ -492,9 +506,9 @@ notification-only (Slack/email), and storage in a private repo via PAT.
 
 ### Can I add custom vulnerability types?
 
-Yes. Add a case to `Audit/Domain/Model/VulnerabilityType`, extend `category()`
-and `owaspReference()`, then update `AttackerPromptBuilder` to mention the new
-type. See
+Yes. Add a case to `Audit/Domain/Model/VulnerabilityType`, extend `category()`,
+`owaspReference()`, `owaspReferenceUrl()`, and `cwe()`, then update
+`AttackerPromptBuilder` to mention the new type. See
 [Contributing → Common Tasks](../CONTRIBUTING.md#add-a-new-vulnerability-type).
 
 ### Can I add custom pipeline stages?
@@ -516,6 +530,7 @@ alias in `config/services.yaml`. See
 
 ### Can I add a new output format?
 
-Yes. Add a case to `Command/OutputFormat`, a `render<Name>()` method to
-`ReportRenderer`, and a `match` arm in `ReportWriter::write()`. See
-[Extending → Custom Report Output](extending.md#4-custom-report-output).
+Yes. Add a case to `Command/OutputFormat`, then a `<Name>ReportRenderer` class
+implementing `ReportRendererInterface` and register it in `config/services.php`
+— autoconfiguration wires it into `ReportWriter`, no `match` arm to edit. See
+[Extending → Custom Report Output](extending.md#3-custom-report-output).
