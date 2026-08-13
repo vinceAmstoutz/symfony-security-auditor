@@ -67,6 +67,18 @@ jobs:
       - name: Run commitlint
         uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed # v6.2.1
 
+      - name: Lint the PR title (becomes the squash-merge commit message)
+        if: github.event_name == 'pull_request'
+        env:
+          # Passed through the environment rather than interpolated into the
+          # script: a PR title is attacker-controlled on a fork PR, so
+          # splicing it into a ${{ }} expression inside shell code would be a
+          # template-injection command-execution vector.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$PR_TITLE" | npx --yes --package @commitlint/cli@21.2.1 --package @commitlint/config-conventional@21.2.0 -- commitlint --config commitlint.config.mjs
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
