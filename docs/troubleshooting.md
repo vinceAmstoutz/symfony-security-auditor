@@ -7,8 +7,8 @@ so we can document it.
 
 ## Table of Contents
 
-- [Installation & Setup](#installation--setup)
 - [Standalone Binary Issues](#standalone-binary-issues)
+- [Installation & Setup](#installation--setup)
 - [Running the Audit](#running-the-audit)
 - [LLM & Provider Errors](#llm--provider-errors)
 - [Empty / Surprising Reports](#empty--surprising-reports)
@@ -21,49 +21,6 @@ so we can document it.
 
 > See also: [FAQ](faq.md) · [Configuration](configuration.md) ·
 > [CI Integration](ci.md)
-
-## Installation & Setup
-
-### `Class "Symfony\AI\AiBundle\AiBundle" not found`
-
-`symfony/ai-bundle` isn't installed, or Composer's autoloader hasn't picked it
-up yet. This is a Composer/autoload issue, not a `config/bundles.php` ordering
-problem — `AiBundle` and `SymfonySecurityAuditorBundle` can be registered in
-either order.
-
-```bash
-composer require symfony/ai-anthropic-platform  # or any other bridge
-```
-
-```php
-// config/bundles.php — either order works
-Symfony\AI\AiBundle\AiBundle::class => ['all' => true],
-VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['dev' => true, 'test' => true],
-```
-
-### `No AI platform is configured`
-
-`audit:run` aborts with this message when no
-`Symfony\AI\Platform\PlatformInterface` service exists in the container. The
-`symfony/ai-bundle` recipe ships `config/packages/ai.yaml` with **every platform
-commented out** — uncomment one (e.g. `anthropic`) and set its API key. See
-[Configuration → Platform Configuration](configuration.md#platform-configuration).
-
-### `The service "security_auditor.attacker_client" has a dependency on a non-existent service "Symfony\AI\Platform\PlatformInterface"`
-
-Same root cause as above, surfaced at container compile time (`cache:clear`,
-`cache:warmup`) by versions **≤ 1.7.0**. Upgrade to `1.7.1` or later — the
-container then compiles without a platform and the actionable error above is
-raised only when an audit actually runs.
-
-### `Argument #1 ... must be of type Symfony\AI\Platform\PlatformInterface, NULL given`
-
-Same root cause as above — another **≤ 1.7.0** symptom. Since `1.7.1`,
-`PlatformBinding`'s platform property (and every collaborator built from it) is
-typed `?PlatformInterface`, so a missing platform can no longer reach a
-constructor as a hard type error. Upgrade to `1.7.1` or later, or verify
-`ai.yaml` has a `platform:` block and the corresponding `symfony/ai-*-platform`
-package is installed.
 
 ## Standalone Binary Issues
 
@@ -205,6 +162,49 @@ directory before it writes the config file. `BridgeInstallationFailedException`:
 These surface directly from `init` itself — `doctor`'s "Provider bridge" check
 only inspects the _result_ of a previous `init` run, so a failed installation
 never shows up there.
+
+## Installation & Setup
+
+### `Class "Symfony\AI\AiBundle\AiBundle" not found`
+
+`symfony/ai-bundle` isn't installed, or Composer's autoloader hasn't picked it
+up yet. This is a Composer/autoload issue, not a `config/bundles.php` ordering
+problem — `AiBundle` and `SymfonySecurityAuditorBundle` can be registered in
+either order.
+
+```bash
+composer require symfony/ai-anthropic-platform  # or any other bridge
+```
+
+```php
+// config/bundles.php — either order works
+Symfony\AI\AiBundle\AiBundle::class => ['all' => true],
+VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['dev' => true, 'test' => true],
+```
+
+### `No AI platform is configured`
+
+`audit:run` aborts with this message when no
+`Symfony\AI\Platform\PlatformInterface` service exists in the container. The
+`symfony/ai-bundle` recipe ships `config/packages/ai.yaml` with **every platform
+commented out** — uncomment one (e.g. `anthropic`) and set its API key. See
+[Configuration → Platform Configuration](configuration.md#platform-configuration).
+
+### `The service "security_auditor.attacker_client" has a dependency on a non-existent service "Symfony\AI\Platform\PlatformInterface"`
+
+Same root cause as above, surfaced at container compile time (`cache:clear`,
+`cache:warmup`) by versions **≤ 1.7.0**. Upgrade to `1.7.1` or later — the
+container then compiles without a platform and the actionable error above is
+raised only when an audit actually runs.
+
+### `Argument #1 ... must be of type Symfony\AI\Platform\PlatformInterface, NULL given`
+
+Same root cause as above — another **≤ 1.7.0** symptom. Since `1.7.1`,
+`PlatformBinding`'s platform property (and every collaborator built from it) is
+typed `?PlatformInterface`, so a missing platform can no longer reach a
+constructor as a hard type error. Upgrade to `1.7.1` or later, or verify
+`ai.yaml` has a `platform:` block and the corresponding `symfony/ai-*-platform`
+package is installed.
 
 ## Running the Audit
 
