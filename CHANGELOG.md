@@ -12,19 +12,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [1.19.0] — 2026-08-12 — Bulwark
 
-A pre-release security hardening round. A fresh audit of the auditor's own trust
-boundaries found and closed nine gaps: secret-scrubbing now catches Azure
-Storage connection strings, `Authorization: Bearer` headers, OpenAI-style keys,
-and Slack incoming webhook URLs; five cache/dedup-key constructions that hashed
-a joined string instead of hashing each field first could collide two genuinely
-different inputs onto the same key, replaying a stale verdict or silently
-dropping a finding; and the audited project's own config could read an arbitrary
-file on the host via `scan.included_paths`, point the SARIF importer anywhere
-via `scan.import_sarif`, or stall the audit with an unvalidated
-catastrophic-backtracking `scan.custom_risk_patterns` regex. Alongside the
-security fixes, `RegexCodeSlicer` was decomposed into five focused collaborators
-behind a `LineRetentionDeciderInterface` decorator, replacing an inline
-three-way boolean OR with no behavior change.
+A release about seeing a result without leaving GitHub. `--format=github-comment`
+posts a run's summary straight to the pull request, an opt-in badge input
+reports a project's grade on shields.io, and every report now carries a
+normalized 0-100 score and `A`-`F` grade beside the existing risk level, with
+`--min-score` to gate CI on it directly. Alongside that: an audited project
+could execute code on the host via its own Composer scripts, or redirect the
+standalone binary's LLM connection — and the operator's API key — to an
+attacker's endpoint; both are now closed. Secret-scrubbing also catches several
+previously-missed credential shapes (Azure Storage keys,
+`Authorization: Bearer` headers, OpenAI-style keys, Slack webhooks), and a
+handful of cache/dedup-key hashing bugs that could replay a stale verdict or
+silently drop a finding are fixed.
 
 ### Added
 
