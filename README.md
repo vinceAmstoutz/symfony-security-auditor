@@ -344,7 +344,7 @@ bin/console audit:run --dry-run
   fingerprint, `audit:trend` tracks counts across a series of them.
 - **CI-ready** — a reusable
   [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor)
-  (`uses: vinceamstoutz/symfony-security-auditor@1.19.0`) plus GitLab CI
+  (`uses: vinceamstoutz/symfony-security-auditor@1.19.1`) plus GitLab CI
   templates, with SARIF upload to Code Scanning. See
   [CI Integration](docs/ci.md).
 - **Extensible** — strict DDD layering and a sole `LLMClientInterface` seam let
