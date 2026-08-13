@@ -18,7 +18,7 @@ flowchart LR
         PHP["Setup PHP 8.3\ncomposer install"]:::step
         AUDIT["audit:run\n--format sarif"]:::step
         UPLOAD["upload-sarif\n→ Code Scanning"]:::step
-        ARTIFACT["Upload artifact\n.sarif · .json · 90 days"]:::step
+        ARTIFACT["Upload artifact\n.sarif · .json · 30 days"]:::step
         PHP --> AUDIT --> UPLOAD --> ARTIFACT
     end
 
@@ -48,9 +48,12 @@ flowchart LR
     subgraph PIPE["  Pipeline  "]
         ING["Ingest\nPHP · Twig · YAML · XML\n(--since git diff filter)"]:::stage
         MAP["Map\nRoutes · Firewalls · Roles"]:::stage
+        DEP["Dependency Expansion\n(--since, opt-in)"]:::stage
         AUD["Audit"]:::stage
         POC["PoC Synthesis\n(opt-in)"]:::stage
-        ING --> MAP --> AUD --> POC
+        FIX["Fix Synthesis\n(opt-in)"]:::stage
+        ING --> MAP --> DEP --> AUD
+        POC --> FIX
     end
 
     subgraph LOOP["  Dual-Agent Loop — max 3 iterations  "]
@@ -59,14 +62,15 @@ flowchart LR
         REV["Reviewer Agent\nper-finding · LLM call\nvalidate + score (opt. concurrent)"]:::agent
         PRE --> ATK
         ATK -- "confidence ≥ 0.6" --> REV
-        REV -. "iterate: feed back confirmed findings" .-> ATK
+        REV -. "iterate: feed back validated + rejected findings" .-> ATK
     end
 
     RPT(["AuditReport\nrisk level · JSON · SARIF · console"]):::report
 
     CLI --> PIPE
     AUD --> PRE
-    REV -- "validated findings" --> RPT
+    REV -- "validated findings" --> POC
+    FIX --> RPT
 ```
 
 ## Attacker vs Reviewer — Dual-Agent Loop
@@ -85,15 +89,15 @@ sequenceDiagram
         O->>A: analyze(files, mapping)
         loop chunk of 10 files
             A->>L1: system prompt + source code
-            L1-->>A: JSON vulnerabilities[]
+            L1-->>A: record_vulnerability() calls
         end
-        A->>A: filter confidence ≥ 0.6
-        A-->>O: candidate findings
+        A-->>O: raw findings
+        O->>O: filter confidence ≥ 0.6
 
         O->>R: review(findings, files)
         loop per vulnerability
             R->>L2: system prompt + finding
-            L2-->>R: accepted · adjusted_severity
+            L2-->>R: record_review() calls
         end
         R-->>O: validated findings
 
@@ -102,7 +106,7 @@ sequenceDiagram
     end
 
     O->>C: write metadata
-    note over C: iterations · total_findings · risk_score
+    note over C: iterations · total_findings · validated · risk_score
 ```
 
 ## Multi-Provider LLM Support
