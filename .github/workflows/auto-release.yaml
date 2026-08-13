@@ -57,6 +57,38 @@ jobs:
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: Checkout code
+        if: github.event_name == 'push'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the release commit is a genuine merge of 1.x
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+
+          # A push-triggered release commit is always meant to be the `chore:
+          # release X.Y.Z` merge of `<N>.x` into `main` — a regular merge
+          # commit with two parents (main's previous tip, then `<N>.x`'s tip).
+          # Squash- or rebase-merging that PR instead replays `<N>.x`'s
+          # commits under fresh SHAs, permanently duplicating them across both
+          # branches — exactly what happened in #305. Catch it here rather
+          # than let it land silently.
+          parents=($(git rev-list --parents -n1 HEAD))
+          if [ "${#parents[@]}" -ne 3 ]; then
+            echo "::error::This release commit has $(( ${#parents[@]} - 1 )) parent(s), expected 2 (a regular merge commit). Squash- or rebase-merging the release PR duplicates <N>.x's commits under new SHAs instead of sharing history with main — see docs/versioning.md#branches--maintenance. Re-open and merge it with a regular merge commit."
+            exit 1
+          fi
+
+          second_parent="${parents[2]}"
+          git fetch origin 1.x --quiet
+          if ! git merge-base --is-ancestor "$second_parent" origin/1.x; then
+            echo "::error::This release commit's second parent ($second_parent) is not part of 1.x's history, so it doesn't look like a genuine 1.x-into-main merge — see docs/versioning.md#branches--maintenance."
+            exit 1
+          fi
+
   tag-and-draft-release:
     name: Tag the release and draft its GitHub Release
     needs: detect
