@@ -236,14 +236,14 @@ on its base branch. Rebase-merging replays each of the PR's commits individually
 **Exception: the `chore: release X.Y.Z` PR that merges `<N>.x` into `main`.**
 Use a regular merge (a merge commit) there instead, never squash and never
 rebase. `main` is supposed to end up with the exact same commit SHAs as `<N>.x`
-— that's how every release before this one actually happened (e.g. 1.18.0's PR
-#226). Squashing collapses `<N>.x`'s commits into one new SHA that doesn't exist
-on `<N>.x`, so the two branches permanently diverge in commit identity and need
-a cherry-pick-back reconciliation after every single release. Rebase-merging is
-worse: it replays every commit `<N>.x` has accumulated since it last diverged
-from `main` with a fresh SHA apiece — which is how PR #305 quietly turned a
-one-commit release into ~40 replayed commits landing on `main` and broke
-`Commit Lint` (see
+— that's how every release before this one actually happened (PR #226, for
+1.18.0). Squashing collapses `<N>.x`'s commits into one new SHA that doesn't
+exist on `<N>.x`, so the two branches permanently diverge in commit identity and
+need a cherry-pick-back reconciliation after every single release.
+Rebase-merging is worse: it replays every commit `<N>.x` has accumulated since
+it last diverged from `main` with a fresh SHA apiece — which is how PR #305
+quietly turned a one-commit release into ~40 replayed commits landing on `main`
+and broke `Commit Lint` (see
 [Branches & maintenance](docs/versioning.md#branches--maintenance)).
 
 ## CI Pipeline
