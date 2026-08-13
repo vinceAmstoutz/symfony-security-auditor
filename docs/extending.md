@@ -7,10 +7,9 @@ All extension points are PHP interfaces. Wire your implementations via
 
 - [1. Custom LLM Client](#1-custom-llm-client)
 - [2. Custom Pipeline Stage](#2-custom-pipeline-stage)
-- [3. Custom Agent (Attacker or Reviewer)](#3-custom-agent-attacker-or-reviewer)
-- [4. Custom Report Output](#4-custom-report-output)
-- [5. Other Pluggable Ports](#5-other-pluggable-ports)
-- [6. Schema-Enforced Collection (`audit.structured_collection`)](#6-schema-enforced-collection-auditstructured_collection)
+- [3. Custom Report Output](#3-custom-report-output)
+- [4. Other Pluggable Ports](#4-other-pluggable-ports)
+- [5. Schema-Enforced Collection (`audit.structured_collection`)](#5-schema-enforced-collection-auditstructured_collection)
 
 > See also: [Architecture](architecture.md) · [Configuration](configuration.md)
 > · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
@@ -132,25 +131,28 @@ and override those two arguments:
 
 ```yaml
 # config/services.yaml
-App\Llm\AcmeLlmClient:
-    arguments:
-        $apiKey: '%env(ACME_API_KEY)%'
+services:
+    App\Llm\AcmeLlmClient:
+        arguments:
+            $apiKey: '%env(ACME_API_KEY)%'
 
-security_auditor.attacker_client:
-    alias: App\Llm\AcmeLlmClient
-    public: true
+    security_auditor.attacker_client:
+        alias: App\Llm\AcmeLlmClient
+        public: true
 
-security_auditor.reviewer_client:
-    alias: App\Llm\AcmeLlmClient
-    public: true
+    security_auditor.reviewer_client:
+        alias: App\Llm\AcmeLlmClient
+        public: true
 ```
 
 To replace the client for every consumer that type-hints `LLMClientInterface`
 directly:
 
 ```yaml
-VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface:
-    alias: App\Llm\AcmeLlmClient
+# config/services.yaml
+services:
+    VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface:
+        alias: App\Llm\AcmeLlmClient
 ```
 
 ## 2. Custom Pipeline Stage
@@ -250,175 +252,7 @@ services:
             - { name: symfony_security_auditor.pipeline_stage, priority: -100 }
 ```
 
-## 3. Custom Agent (Attacker or Reviewer)
-
-### AttackerAgentInterface
-
-**Interface**:
-`VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface`
-
-```php
-interface AttackerAgentInterface
-{
-    /** @param ProjectFile[] $files */
-    public function analyze(array $files, SymfonyMapping $mapping): array; // Vulnerability[]
-}
-```
-
-The attacker receives all ingested `ProjectFile` objects and the Symfony
-route/controller mapping, then returns raw `Vulnerability` instances. Use
-`VulnerabilityFactory` to convert LLM JSON arrays into validated domain objects
-— invalid or incomplete shapes are silently dropped.
-
-```php
-// src/Agent/RuleBasedAttackerAgent.php
-namespace App\Agent;
-
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFactory;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-
-final class RuleBasedAttackerAgent implements AttackerAgentInterface
-{
-    public function __construct(
-        private readonly LLMClientInterface $llmClient,
-        private readonly VulnerabilityFactory $factory,
-    ) {}
-
-    public function analyze(array $files, SymfonyMapping $mapping): array
-    {
-        $combined = implode("\n\n", array_map(
-            static fn(ProjectFile $f): string => "// {$f->relativePath()}\n{$f->content()}",
-            $files,
-        ));
-
-        $response = $this->llmClient->complete(
-            systemPrompt: $this->systemPrompt(),
-            userMessage: $combined,
-        );
-
-        if ($response->isEmpty()) {
-            return [];
-        }
-
-        return $this->factory->fromList($response->parseJson())->vulnerabilities();
-    }
-
-    private function systemPrompt(): string
-    {
-        return <<<PROMPT
-            You are a security auditor. Return a JSON array of vulnerability objects.
-            Each object must have: type, severity, title, description, file_path,
-            line_start, line_end, vulnerable_code, attack_vector, proof, remediation, confidence.
-            Valid type values: sql_injection, command_injection, broken_access_control, ...
-            Valid severity values: critical, high, medium, low, info.
-            Confidence is a float between 0.0 and 1.0.
-            PROMPT;
-    }
-}
-```
-
-Wire:
-
-```yaml
-# config/services.yaml
-App\Agent\RuleBasedAttackerAgent: ~
-
-VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgentInterface:
-    alias: App\Agent\RuleBasedAttackerAgent
-```
-
-### ReviewerAgentInterface
-
-**Interface**:
-`VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface`
-
-```php
-interface ReviewerAgentInterface
-{
-    /** @param Vulnerability[] $vulnerabilities  @param ProjectFile[] $projectFiles */
-    public function review(array $vulnerabilities, array $projectFiles): array; // Vulnerability[]
-}
-```
-
-The reviewer receives findings from the attacker plus the full file list for
-cross-referencing. Return the same or modified `Vulnerability` objects. Use
-`$vulnerability->withReviewerValidation(true)` to mark a finding as confirmed —
-only validated findings appear in the final `AuditReport`. Use
-`$vulnerability->withElevatedSeverity(VulnerabilitySeverity::CRITICAL)` to
-adjust severity before returning.
-
-```php
-// src/Agent/StrictReviewerAgent.php
-namespace App\Agent;
-
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
-
-final class StrictReviewerAgent implements ReviewerAgentInterface
-{
-    public function review(array $vulnerabilities, array $projectFiles): array
-    {
-        $reviewed = [];
-
-        foreach ($vulnerabilities as $vuln) {
-            // Only validate findings with confidence >= 0.7.
-            if ($vuln->confidence() < 0.7) {
-                $reviewed[] = $vuln->withReviewerValidation(false);
-                continue;
-            }
-
-            $validated = $vuln->withReviewerValidation(true);
-
-            // Escalate any unreviewed HIGH to CRITICAL when confidence is perfect.
-            if ($vuln->severity() === VulnerabilitySeverity::HIGH && $vuln->confidence() === 1.0) {
-                $validated = $validated->withElevatedSeverity(VulnerabilitySeverity::CRITICAL);
-            }
-
-            $reviewed[] = $validated;
-        }
-
-        return $reviewed;
-    }
-}
-```
-
-Wire:
-
-```yaml
-VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgentInterface:
-    alias: App\Agent\StrictReviewerAgent
-```
-
-### VulnerabilityFactory
-
-`VulnerabilityFactory` is a service (autowired). Inject it wherever you need to
-convert raw LLM arrays into domain objects.
-
-```php
-// $rawList is the decoded JSON array from the LLM.
-$result = $this->factory->fromList($rawList); // VulnerabilityHydrationResult
-
-$vulnerabilities = $result->vulnerabilities(); // list<Vulnerability>
-$result->totalDropped();                       // int — entries the factory dropped
-$result->droppedBy(VulnerabilityDropReason::HYDRATION_FAILED); // per-reason count
-```
-
-`fromList()` calls `fromArray()` per item and drops any entry that fails
-validation (unknown `type`/`severity` enum value, empty `title`,
-`line_end < line_start`, `confidence` outside `[0.0, 1.0]`). Each drop is logged
-at `warning` level with a structured `reason` code
-(`VulnerabilityDropReason::NON_ARRAY_ENTRY` for non-array entries,
-`VulnerabilityDropReason::HYDRATION_FAILED` for invalid shapes) and aggregated
-in the returned `VulnerabilityHydrationResult` so callers can surface drop
-counts in their reports or metrics.
-
-## 4. Custom Report Output
+## 3. Custom Report Output
 
 `AuditReport` is produced by `AuditReport::fromContext(AuditContext $context)`
 at the end of the pipeline. It contains only reviewer-validated vulnerabilities.
@@ -452,10 +286,13 @@ $report->toArray(): array<string, mixed>             // fully serializable; incl
 
 Every format is its own class implementing `ReportRendererInterface`
 (`format(): string` + `render(AuditReport): string`). One class per format keeps
-each renderer small and independently testable. The bundle ships seven:
+each renderer small and independently testable. The bundle ships nine:
 
 - `ConsoleReportRenderer` (`console`) — human-readable terminal output
   (templates in `Report/Template/*.txt`).
+- `ExecutiveSummaryReportRenderer` (`executive`) — stakeholder-facing view: risk
+  level and severity/type/hotspot distributions, without the per-finding
+  technical detail the `console` format carries.
 - `JsonReportRenderer` (`json`) — pretty-printed `AuditReport::toArray()`.
 - `SarifReportRenderer` (`sarif`) — SARIF 2.1.0, consumable by GitHub Code
   Scanning and GitLab Security Dashboard. The only renderer implementing
@@ -471,6 +308,10 @@ each renderer small and independently testable. The bundle ships seven:
 - `GithubAnnotationsReportRenderer` (`github`) — one GitHub Actions
   `::error`/`::warning`/`::notice` workflow-command annotation per finding, for
   inline findings on a pull request's Files Changed view.
+- `GithubCommentReportRenderer` (`github-comment`) — the grade, normalized
+  score, and most severe findings (capped at 10 rows) as a pull-request comment
+  body, with a hidden marker so a workflow can find and update its own previous
+  comment instead of piling up new ones.
 
 Each renderer is tagged `symfony_security_auditor.report_renderer` (via the
 `ReportRendererInterface` `instanceof` autoconfiguration in
@@ -484,7 +325,7 @@ instead of `render()`, so that format can mark specific findings as suppressed
 rather than relying on the caller to drop them beforehand.
 
 Trigger them via
-`audit:run --format=console|json|sarif|html|markdown|junit|github|github-comment`
+`audit:run --format=console|executive|json|sarif|html|markdown|junit|github|github-comment`
 (see [`ci.md`](ci.md) for SARIF upload and GitHub annotation workflows).
 
 ### Adding a new format
@@ -501,7 +342,7 @@ inject it directly into any consumer (custom command, controller, event
 listener) and serialize it however fits your output target without going through
 a renderer.
 
-## 5. Other Pluggable Ports
+## 4. Other Pluggable Ports
 
 Beyond the seams above, these Domain ports can each be implemented and aliased
 in `config/services.yaml` to override the bundled behaviour (see
@@ -532,11 +373,12 @@ in `config/services.yaml` to override the bundled behaviour (see
   it for redaction the bundled patterns cannot express — e.g. calling out to a
   dedicated secret-detection engine. Extra PCRE patterns alone do not need a
   class: use `scan.secret_scrubbing.additional_patterns`.
-- `AdvisoryDatabaseInterface` — `lookup(string $package, string $version)`
-  backing the attacker's `lookup_advisory` tool (default:
-  `ComposerAuditAdvisoryDatabase` running `composer audit`;
-  `InMemoryAdvisoryDatabase` is the offline fallback). Implement it to query an
-  internal vulnerability feed or a commercial advisory service.
+- `AdvisoryDatabaseInterface` —
+  `lookup(string $packageName, string $installedVersion): array` backing the
+  attacker's `lookup_advisory` tool (default: `ComposerAuditAdvisoryDatabase`
+  running `composer audit`; `InMemoryAdvisoryDatabase` is the offline fallback).
+  Implement it to query an internal vulnerability feed or a commercial advisory
+  service.
 - `PricingProviderInterface` — per-model USD prices for cost estimation
   (default: `ModelsDevPricingProvider` reading the `symfony/models-dev`
   catalog). Also implement `CacheAwarePricingProviderInterface` if your source
@@ -579,7 +421,7 @@ in `config/services.yaml` to override the bundled behaviour (see
   `audit.triage_memory: true`). Implement it to source feedback from elsewhere —
   a shared team knowledge base, a ticketing system's "won't fix" list.
 - `TriageMemoryRecorderInterface` —
-  `record(string $type, string $file, string $title, string $reason): void`
+  `record(string $type, string $file, string $title, int $line, string $reason)`
   called whenever the reviewer rejects a finding with a non-empty
   `reviewer_notes` explanation (default: `NullTriageMemoryRecorder`, or
   `FilesystemTriageMemoryStore` when `audit.triage_memory: true`). Implement it
@@ -587,7 +429,7 @@ in `config/services.yaml` to override the bundled behaviour (see
   cache reachable by every CI runner, for example — so the cross-run memory
   survives across ephemeral containers.
 
-## 6. Schema-Enforced Collection (`audit.structured_collection`)
+## 5. Schema-Enforced Collection (`audit.structured_collection`)
 
 By default (`audit.structured_collection: true`), the attacker is given a
 `record_vulnerability` tool with a strict JSON-Schema input and the prompt
