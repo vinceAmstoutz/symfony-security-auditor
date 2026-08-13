@@ -12,6 +12,14 @@ on:
           trigger missed, e.g. because this workflow did not exist yet on main"
         required: true
         type: string
+      publish:
+        description:
+          "Publish the release immediately instead of leaving it as a draft.
+          Rarely needed — normally review the drafted release notes and publish
+          manually in the GitHub UI."
+        required: false
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -130,10 +138,23 @@ jobs:
             echo "name=$VERSION" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Resolve whether to publish immediately
+        id: publish-state
+        env:
+          PUBLISH: ${{ github.event.inputs.publish }}
+        run: |
+          set -euo pipefail
+
+          if [ "$PUBLISH" = "true" ]; then
+            echo "draft=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "draft=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Draft the GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # zizmor: ignore[superfluous-actions] v3.0.2 -- not a security issue per zizmor's own docs; migrating to `gh release` is a separate follow-up
         with:
           tag_name: ${{ needs.detect.outputs.version }}
           name: ${{ steps.release-name.outputs.name }}
           body_path: release-notes.md
-          draft: true
+          draft: ${{ steps.publish-state.outputs.draft }}
