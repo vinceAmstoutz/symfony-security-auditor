@@ -10,6 +10,34 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+## [1.19.1] — 2026-08-13 — Lineage
+
+A release about the release process itself. A past release (PR #305) merged
+`1.x` into `main` with a rebase instead of a regular merge commit, silently
+duplicating 41 commits under new SHAs and letting `auto-release.yaml` evolve
+differently on each branch afterward. This release reconciles the two branches
+properly and adds the CI check that would have caught the original mistake.
+
+### Fixed
+
+- **A rebase-merged release once duplicated `1.x`'s commits onto `main` under
+  new SHAs, and the divergence kept growing unnoticed.** `docs/versioning.md`
+  already names the cause: PR #305 rebase-merged a release instead of using a
+  regular merge commit, replaying `1.x`'s commits onto `main` with fresh hashes.
+  Comparing every commit since by content (`git patch-id`) confirms it: 41
+  commits on `1.x` and `main` are byte-identical changes under different SHAs.
+  Afterward, `.github/workflows/auto-release.yaml` was edited separately on each
+  branch rather than ported across — `main`'s copy fell behind `1.x`'s by a
+  manual-replay `workflow_dispatch` trigger, an optional `publish` input, and
+  the binary-build dispatch step, while `CLAUDE.md`, `docs/versioning.md`, and
+  `commitlint.config.mjs`'s `release` commit scope documenting the regular-merge
+  rule itself never reached `main` at all. This release merges `1.x` into `main`
+  with a proper merge commit, so both branches share the same history from here
+  on, and `auto-release.yaml`'s `detect` job now verifies any push-triggered
+  release commit is a genuine two-parent merge whose second parent is an
+  ancestor of `1.x` — failing the workflow loudly instead of silently accepting
+  a squash- or rebase-merge.
+
 ## [1.19.0] — 2026-08-12 — Bulwark
 
 A release about seeing a result without leaving GitHub. The attacker now also
@@ -3666,6 +3694,8 @@ CI test matrix: PHP 8.3 / 8.4 / 8.5 × Symfony 7.4 / 8.0 / 8.1.
 - Register bundle in `dev` and `test` environments only (per
   `config/bundles.php` guidance in the README).
 
+[1.19.1]:
+  https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.19.1
 [1.19.0]:
   https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/1.19.0
 [1.18.0]:
