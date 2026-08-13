@@ -229,11 +229,21 @@ and keep the top of the PR short:
   in their own sections further down — the summary is the part everyone reads,
   so it must stay skimmable.
 
-**Always squash-merge, never rebase-merge or create-a-merge-commit.** Every PR
-becomes exactly one commit on its base branch. Rebase-merging replays each of
-the PR's commits individually — with a fresh SHA apiece, even when nothing about
-them changed — which is how PR #305 quietly turned a one-commit release into ~40
-replayed commits landing on `main` and broke `Commit Lint` (see
+**Always squash-merge, never rebase-merge.** Every PR becomes exactly one commit
+on its base branch. Rebase-merging replays each of the PR's commits individually
+— with a fresh SHA apiece, even when nothing about them changed.
+
+**Exception: the `chore: release X.Y.Z` PR that merges `<N>.x` into `main`.**
+Use a regular merge (a merge commit) there instead, never squash and never
+rebase. `main` is supposed to end up with the exact same commit SHAs as `<N>.x`
+— that's how every release before this one actually happened (e.g. 1.18.0's PR
+#226). Squashing collapses `<N>.x`'s commits into one new SHA that doesn't exist
+on `<N>.x`, so the two branches permanently diverge in commit identity and need
+a cherry-pick-back reconciliation after every single release. Rebase-merging is
+worse: it replays every commit `<N>.x` has accumulated since it last diverged
+from `main` with a fresh SHA apiece — which is how PR #305 quietly turned a
+one-commit release into ~40 replayed commits landing on `main` and broke
+`Commit Lint` (see
 [Branches & maintenance](docs/versioning.md#branches--maintenance)).
 
 ## CI Pipeline
