@@ -62,8 +62,8 @@ While the pipeline runs, the audit narrates itself live — an attack-surface
 overview, each finding streamed (color-coded by severity in a terminal) the
 moment the Attacker flags it, per-chunk timing, and a reviewer tally. In CI or
 any non-TTY output it degrades to clean, append-only lines (no bar, no ANSI
-codes). Progress is suppressed for `--format=json/sarif` to stdout and for
-`--dry-run`.
+codes). Progress is suppressed for any non-`console` `--format` to stdout and
+for `--dry-run`.
 
 The full report renders the same way in console, JSON, SARIF, HTML, and Markdown
 — see [CLI reference](docs/configuration.md#cli-reference) and
@@ -332,21 +332,23 @@ bin/console audit:run --dry-run
 - **Actionable findings** — optionally attach a copy-pasteable reproduction
   (curl/console/payload) and a suggested patch to every high-severity finding;
   each one also carries a heuristic CVSS v4.0 estimate.
-- **Eight output formats** — `console`, `executive` (stakeholder summary: risk
+- **Nine output formats** — `console`, `executive` (stakeholder summary: risk
   level, business impact, severity/type/hotspot distributions, no per-finding
   detail), `json`, `sarif` (GitHub Code Scanning / GitLab Security Dashboard),
   `html` (self-contained, shareable), `markdown` (PR-friendly), `junit` (CI
-  test-report panels), and `github` (inline PR annotations, no SARIF upload
-  step). Baseline suppression: `--generate-baseline` accepts known findings,
-  `--baseline` drops them from the report and exit code so only new findings
-  fail CI.
+  test-report panels), `github` (inline PR annotations, no SARIF upload step),
+  and `github-comment` (PR comment headlined by the grade and score,
+  self-updating on rerun). Baseline suppression: `--generate-baseline` accepts
+  known findings, `--baseline` drops them from the report and exit code so only
+  new findings fail CI; `--min-score` gates on the normalized score
+  independently of `--fail-on`.
 - **Findings over time** — `audit:diff` compares two JSON reports by finding
   fingerprint, `audit:trend` tracks counts across a series of them.
 - **CI-ready** — a reusable
   [GitHub Action](https://github.com/marketplace/actions/symfony-security-auditor)
   (`uses: vinceamstoutz/symfony-security-auditor@1.19.1`) plus GitLab CI
-  templates, with SARIF upload to Code Scanning. See
-  [CI Integration](docs/ci.md).
+  templates, with SARIF upload to Code Scanning and an optional shields.io badge
+  tracking the report's letter grade. See [CI Integration](docs/ci.md).
 - **Extensible** — strict DDD layering and a sole `LLMClientInterface` seam let
   you plug in custom providers, agents, stages, advisory feeds, or report
   formats; project-specific attacker skills need only configuration, no PHP.
@@ -393,20 +395,20 @@ then override individual keys as needed.
 
 ## Supported Platforms
 
-| Platform             | Bridge package                       | Key env var            |
-| -------------------- | ------------------------------------ | ---------------------- |
-| Anthropic (Claude)   | `symfony/ai-anthropic-platform`      | `ANTHROPIC_API_KEY`    |
-| OpenAI               | `symfony/ai-open-ai-platform`        | `OPENAI_API_KEY`       |
-| OpenAI Responses API | `symfony/ai-open-responses-platform` | `OPENAI_API_KEY`       |
-| Azure OpenAI         | `symfony/ai-azure-platform`          | `AZURE_OPENAI_API_KEY` |
-| Google Gemini        | `symfony/ai-gemini-platform`         | `GEMINI_API_KEY`       |
-| Google Vertex AI     | `symfony/ai-vertex-ai-platform`      | GCP credentials        |
-| AWS Bedrock          | `symfony/ai-bedrock-platform`        | AWS credentials        |
-| DeepSeek             | `symfony/ai-deep-seek-platform`      | `DEEPSEEK_API_KEY`     |
-| Mistral              | `symfony/ai-mistral-platform`        | `MISTRAL_API_KEY`      |
-| Meta (Llama)         | `symfony/ai-meta-platform`           | `META_API_KEY`         |
-| MiniMax              | `symfony/ai-mini-max-platform`       | `MINIMAX_API_KEY`      |
-| Ollama (local)       | `symfony/ai-ollama-platform`         | _(none)_               |
+| Platform             | Bridge package                       | Key env var(s)                                 |
+| -------------------- | ------------------------------------ | ---------------------------------------------- |
+| Anthropic (Claude)   | `symfony/ai-anthropic-platform`      | `ANTHROPIC_API_KEY`                            |
+| OpenAI               | `symfony/ai-open-ai-platform`        | `OPENAI_API_KEY`                               |
+| OpenAI Responses API | `symfony/ai-open-responses-platform` | `OPENAI_API_KEY`                               |
+| Azure OpenAI         | `symfony/ai-azure-platform`          | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_BASEURL` |
+| Google Gemini        | `symfony/ai-gemini-platform`         | `GEMINI_API_KEY`                               |
+| Google Vertex AI     | `symfony/ai-vertex-ai-platform`      | GCP credentials                                |
+| AWS Bedrock          | `symfony/ai-bedrock-platform`        | AWS credentials                                |
+| DeepSeek             | `symfony/ai-deep-seek-platform`      | `DEEPSEEK_API_KEY`                             |
+| Mistral              | `symfony/ai-mistral-platform`        | `MISTRAL_API_KEY`                              |
+| Meta (Llama)         | `symfony/ai-meta-platform`           | `META_API_KEY`                                 |
+| MiniMax              | `symfony/ai-mini-max-platform`       | `MINIMAX_API_KEY`                              |
+| Ollama (local)       | `symfony/ai-ollama-platform`         | _(none)_                                       |
 
 Swapping providers requires only a `config/packages/ai.yaml` change — no PHP
 edits.
