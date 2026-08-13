@@ -8,6 +8,7 @@ so we can document it.
 ## Table of Contents
 
 - [Installation & Setup](#installation--setup)
+- [Standalone Binary Issues](#standalone-binary-issues)
 - [Running the Audit](#running-the-audit)
 - [LLM & Provider Errors](#llm--provider-errors)
 - [Empty / Surprising Reports](#empty--surprising-reports)
@@ -48,7 +49,7 @@ VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['de
 commented out** — uncomment one (e.g. `anthropic`) and set its API key. See
 [Configuration → Platform Configuration](configuration.md#platform-configuration).
 
-### `The service "VinceAmstoutz\..." has a dependency on a non-existent service "Symfony\AI\Platform\PlatformInterface"`
+### `The service "security_auditor.attacker_client" has a dependency on a non-existent service "Symfony\AI\Platform\PlatformInterface"`
 
 Same root cause as above, surfaced at container compile time (`cache:clear`,
 `cache:warmup`) by versions **≤ 1.7.0**. Upgrade to `1.7.1` or later — the
@@ -57,8 +58,153 @@ raised only when an audit actually runs.
 
 ### `Argument #1 ... must be of type Symfony\AI\Platform\PlatformInterface, NULL given`
 
-Same root cause as above. Verify `ai.yaml` has a `platform:` block and the
-corresponding `symfony/ai-*-platform` package is installed.
+Same root cause as above — another **≤ 1.7.0** symptom. Since `1.7.1`,
+`PlatformBinding`'s platform property (and every collaborator built from it) is
+typed `?PlatformInterface`, so a missing platform can no longer reach a
+constructor as a hard type error. Upgrade to `1.7.1` or later, or verify
+`ai.yaml` has a `platform:` block and the corresponding `symfony/ai-*-platform`
+package is installed.
+
+## Standalone Binary Issues
+
+Entries in this section apply only to the standalone binary (`init`,
+`self-update`, `doctor`) — not to the Symfony bundle, which has no equivalent
+commands.
+
+### `doctor` reports a Configuration or API key failure
+
+`doctor`'s "Configuration" and "API key" lines surface
+`StandaloneConfigLoader::load()` failures directly:
+
+- **`No provider is configured — run "init".`** — no `platform:` block in
+  `config.yaml`; run `init`.
+- **`The environment variable "<VAR>", referenced by your config, is not set.`**
+  (reported under the `API key` label) — export the `%env(VAR)%` variable your
+  `platform:` block references.
+- **`Config file "<path>" is not valid YAML: <detail>`** — fix the malformed
+  `config.yaml` or `.symfony-security-auditor.yaml` at `<path>`.
+- **Cannot resolve the user configuration directory** — set `$HOME`, or set
+  `SYMFONY_SECURITY_AUDITOR_HOME` to a writable directory:
+
+  ```text
+  Cannot resolve the user configuration directory: neither the relevant XDG
+  base-directory variable nor $HOME is set.
+  ```
+
+Running `audit`/`init` directly without `doctor` first hits the same underlying
+failures.
+
+### `doctor` reports the provider bridge as not installed or unbootable
+
+Two distinct "Provider bridge" failures:
+
+- **`Not installed — run "init" to download it.`** —
+  `<data-dir>/vendor/autoload.php` does not exist yet.
+- **`Installed, but the audit cannot start with it: <reason>`** — the autoloader
+  exists, but `doctor` also builds the container to confirm it actually boots,
+  not just that the file is present. A bridge left over from a previously
+  configured provider passes the file check but fails here, since the container
+  needs the _currently_ configured provider's classes, not whichever bridge
+  happens to be installed. Re-run `init` for the current provider (`--force`
+  skips the overwrite prompt) to install the matching bridge.
+
+### `.symfony-security-auditor.yaml` cannot override `platform`, `provider`, or `scan.import_sarif`
+
+Fixed as a security issue in `1.19.0`. A per-project
+`.symfony-security-auditor.yaml` ships with the audited repository, so letting
+it contribute these keys allowed a malicious or compromised repository to
+redirect your resolved API key — and every prompt, i.e. the source code — to an
+endpoint of its choosing via `platform:`/`provider:`, or to point the SARIF
+importer at an arbitrary file via `scan.import_sarif`. Both are now rejected
+outright before the audit starts:
+
+- Declaring `platform` and/or `provider` aborts with
+  `ProjectConfigPlatformOverrideException`:
+
+  ```text
+  The project config "<path>" declares "platform", but LLM connection
+  settings are read from your user config only — a repository you audit
+  must not be able to point your API credentials at another endpoint.
+  Configure the platform in your user config instead.
+  ```
+
+- Declaring `scan.import_sarif` aborts with `ProjectConfigScanOverrideException`
+  carrying the equivalent message for that key.
+
+`doctor` reports the same message under a failed `Configuration` check.
+Per-project overrides of audit settings (chunking strategy, `fail_on`, excluded
+paths, …) are unaffected — move only `platform`/`provider`/`scan.import_sarif`
+to your user `config.yaml`.
+
+### `self-update` fails
+
+`self-update` exists only in the standalone binary. Failures:
+
+- **Any platform other than Linux or macOS** —
+  `UnsupportedSelfUpdatePlatformException`. There is no Windows `self-update`;
+  reinstall with `install.ps1` or download the new release asset directly:
+
+  ```text
+  Self-update does not support the "Windows" / "<machine>" platform;
+  download the binary for your platform from the releases page instead.
+  ```
+
+- **Cannot reach GitHub** — `SelfUpdateFailedException`:
+  `Failed to download "<url>".` (curl itself failed — offline, DNS, TLS) or
+  `Could not determine the latest released version from "<url>".` (GitHub
+  answered but without a usable `tag_name` — an API outage or rate limit).
+- **Checksum mismatch** — the downloaded file is deleted and nothing is
+  replaced; retry, or download the asset manually and verify its `.sha256`
+  yourself:
+
+  ```text
+  Checksum verification failed for "<asset>"; the download was not trusted
+  and has been discarded.
+  ```
+
+- **Binary not writable**:
+
+  ```text
+  The binary at "<path>" is not writable; re-run the update with the
+  necessary permissions (e.g. sudo) or reinstall with the install script.
+  ```
+
+- **Replacement failed mid-swap** —
+  `Failed to replace the binary at "<path>": <reason>.`
+
+### `init` fails to install the provider bridge
+
+`init` always runs `composer require symfony/ai-<slug>-platform` under the data
+directory before it writes the config file. `BridgeInstallationFailedException`:
+
+- **No `composer` binary reachable**:
+
+  ```text
+  Could not run composer to install the "<package>" provider bridge; is
+  composer on the PATH?
+  ```
+
+- **`composer require` ran but exited non-zero** (no network, or the package
+  does not exist for a misspelled `--provider`):
+
+  ```text
+  Installing the "<package>" provider bridge failed: <composer's error output>
+  ```
+
+- **`Could not initialize a composer project in "<dir>": <reason>`** — the data
+  directory has no `composer.json` yet and one could not be written there
+  (permissions).
+- **The data directory or its `composer.json` is a symlink** — `init` refuses to
+  write through it:
+
+  ```text
+  Refusing to initialize a composer project in "<dir>": the target or its
+  manifest path is a symlink.
+  ```
+
+These surface directly from `init` itself — `doctor`'s "Provider bridge" check
+only inspects the _result_ of a previous `init` run, so a failed installation
+never shows up there.
 
 ## Running the Audit
 
@@ -77,7 +223,7 @@ To enable in `prod`, change `config/bundles.php`:
 VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle::class => ['all' => true],
 ```
 
-### `[ERROR] Path "/x" is not a valid directory`
+### `[ERROR] Project path "/x" is not a valid directory`
 
 The `project-path` argument must point to a directory that exists. Use an
 absolute path, or omit the argument to default to the current working directory.
@@ -97,9 +243,14 @@ resolved to nothing.
 Exit code `1` is also used for:
 
 - Invalid `project-path` argument.
+- The scan discovered no file to audit at all — a mistyped path, a
+  `scan.included_paths` entry matching nothing, or an over-narrow `--path` —
+  fails rather than reporting a hollow SAFE result. A `--since` run that finds
+  no _changed_ files still exits `0`.
+- The normalized score fell below `--min-score`, if set.
 - Unhandled exception during pipeline execution (check stderr).
-- Validator errors on the input (e.g. `--format` not one of
-  `console|json|sarif`).
+- Validator errors on the input (e.g. `--format` set to a value it does not
+  support — see [Configuration → Options](configuration.md#options)).
 
 Re-run with `-v` or `-vv` to see the underlying error.
 
@@ -121,7 +272,10 @@ docker compose exec -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" php bin/console au
 
 ### `Rate limit exceeded` / `429`
 
-Reduce concurrent load:
+Configure `audit.rate_limit.requests_per_minute` / `input_tokens_per_minute` /
+`output_tokens_per_minute` to your provider tier's limits so the auditor
+throttles proactively instead of hitting a `429`. Otherwise, reduce concurrent
+load:
 
 - Lower `audit.max_iterations` (default `3`) to `1`.
 - Raise `reviewer_batch_size` from `1` to `5` (fewer reviewer calls).
@@ -157,10 +311,13 @@ If it happens for **every** chunk, the model is unsuitable. Switch model.
 
 ### `Tool-using loop ended with empty content response` warnings
 
-Logged at `warning` level when the attacker's tool loop ends with an empty final
-content block. Look at the `output_tokens` field: if it sits near a multiple of
-~1000 (e.g. `1971`, `2000`), the model is being truncated by `symfony/ai`'s
-default `max_tokens = 1000` that ships with the Anthropic bridge. Set
+Logged at `warning` level when the empty response is the very first LLM call in
+the loop (no tool round happened yet); once at least one tool round has run, a
+later empty response logs the same message at `debug` instead — grep by message
+text rather than filtering on `warning` alone if the loop used tools first. Look
+at the `output_tokens` field: if it sits near a multiple of ~1000 (e.g. `1971`,
+`2000`), the model is being truncated by `symfony/ai`'s default
+`max_tokens = 1000` that ships with the Anthropic bridge. Set
 `max_output_tokens` in the bundle config (default `4096` since this fix) — or
 `attacker_max_output_tokens` / `reviewer_max_output_tokens` for per-agent
 tuning:
@@ -219,8 +376,9 @@ Diagnostic order:
 - Raise `audit.min_confidence` from `0.6` to `0.8`.
 - Switch Reviewer to a **stronger** model (counterintuitive — Reviewer needs
   accuracy, not speed).
-- Inspect the LLM's `reviewer_notes` (logged at `info` level) — the Reviewer
-  often explains why it accepted weak findings.
+- Inspect the LLM's `reviewer_notes` (logged at `debug` level in the
+  `Vulnerability reviewed` entry) — the Reviewer often explains why it accepted
+  weak findings.
 
 ### Same code, different findings on each run
 
@@ -334,6 +492,13 @@ USD figure is unavailable. Run `composer update symfony/models-dev` to pull a
 fresher catalog, or alias your own `PricingProviderInterface` implementation to
 supply prices (see [Extending](extending.md)).
 
+**Standalone binary:** `composer update` does not apply — there is no
+user-facing `vendor/` or `composer.json`; the catalog is baked into the binary
+at release-build time from whatever `symfony/models-dev` version that release's
+CI resolved. The only way to get a newer catalog is `self-update` to a newer
+release, and even that only carries whatever was current when that release was
+built — there is no way to refresh the catalog independently of a release yet.
+
 ## Cache Issues
 
 ### Cache seems stale — old findings persist after fixing code
@@ -373,30 +538,38 @@ symfony_security_auditor:
         enabled: false
 ```
 
-`AttackerCacheInterface` is aliased to `NullAttackerCache` — every chunk hits
-the LLM.
+`AttackerCacheInterface` is aliased to `NullAttackerCache` (and
+`ReviewerCacheInterface` to `NullReviewerCache`) — every chunk, and every
+reviewer verdict, hits the LLM.
 
 ## Advisory (`composer audit`) Issues
 
 ### `lookup_advisory` always returns empty results
 
-Causes (each logs a `warning` via `LoggerInterface`):
+Causes (each logs a `warning` via `LoggerInterface`, except the deliberate
+`offline_only` case below):
 
 - **`composer` not in `PATH`** — install Composer 2.4+ on the audit host.
 - **`composer.lock` missing** — run `composer install` first; advisory data
   comes from the lockfile.
 - **Malformed JSON output** — corrupted `composer.lock`. Regenerate it.
 - **Process error** — network failure to Packagist. Retry.
+- **`privacy.offline_only: true`** — the advisory feed is intentionally replaced
+  by an empty in-memory database, so `composer audit` never runs; no warning is
+  logged since this is configured behavior, not a failure.
 
 When `lookup_advisory` returns empty, the audit continues without CVE data — no
 audit failure.
 
 ### `composer audit` is slow
 
-It runs **once** per audit and the result is cached for the lifetime of the
-request. If it's the bottleneck, you can pre-warm it before the audit or
-override `AdvisoryDatabaseInterface` with `InMemoryAdvisoryDatabase` containing
-a baked snapshot.
+Within a run it executes **once** and the result is cached for the lifetime of
+the request. Across runs, with `cache.enabled: true` (default),
+`LockfileHashedAdvisoryCache` also persists the JSON payload to disk for 24h,
+keyed by a SHA-256 hash of `composer.lock` — an unchanged lockfile skips
+`composer audit` entirely on the next run. If it's still the bottleneck, you can
+pre-warm it before the audit or override `AdvisoryDatabaseInterface` with
+`InMemoryAdvisoryDatabase` containing a baked snapshot.
 
 ### Override the advisory source
 
@@ -435,9 +608,21 @@ See [Advisory (`composer audit`) Issues](#advisory-composer-audit-issues) above.
 
 ### `read_file` / `grep` returns nothing for files I know exist
 
-The tools are scoped to the project path passed to `audit:run`. Symlinks outside
-that path are not followed. Use absolute paths only when the file is under the
-project root.
+Both tools only search the files `ProjectFileScanner` already loaded into memory
+during ingestion — neither touches the filesystem live. Causes:
+
+- The file falls outside `scan.included_paths`, is excluded by
+  `scan.respect_gitignore`, or exceeds `scan.max_file_size_kb`.
+- The file, or one of its `scan.included_paths` ancestors, is a symlink.
+  `ProjectFileScanner` skips symlinks unconditionally regardless of where they
+  point (logged as `Skipped symlinked file` / `Skipped symlinked included path`)
+  — a symlink pointing back inside the project is skipped too, not just one
+  pointing outside it.
+- `read_file`'s `relative_path` argument must match
+  `ProjectFile::relativePath()` exactly (e.g.
+  `src/Controller/UserController.php`). It has no absolute-path fallback — an
+  absolute path never matches and returns
+  `Error: file "..." is not part of the audited project.`
 
 ## CI Failures
 
@@ -485,9 +670,9 @@ tracking issue and a justification in the PR description.
 
 ### Infection MSI is below 100%
 
-A mutation survived your tests. Read the Infection log (`var/infection.log`) to
-see which mutator and which line. Add a test that distinguishes the mutated
-behavior. Suppression annotations are forbidden.
+A mutation survived your tests. Read the Infection log
+(`infection/infection.log`) to see which mutator and which line. Add a test that
+distinguishes the mutated behavior. Suppression annotations are forbidden.
 
 ### PHP CS Fixer / Rector wants to change code I deliberately wrote that way
 
@@ -499,5 +684,6 @@ document the reason in the PR.
 
 - Different PHP version — CI matrix runs 8.3, 8.4, 8.5; pin locally with Docker.
 - Filesystem case sensitivity — Linux CI is case-sensitive; macOS is not.
-- Random test order — Infection runs with random order; reproduce locally with
-  `--order=random --random-order-seed=<seed>`.
+- Random test order — Infection rewrites `phpunit.dist.xml` to force
+  `executionOrder="defects,random"` for its own runs; reproduce locally with
+  `--order-by=defects,random --random-order-seed=<seed>`.
