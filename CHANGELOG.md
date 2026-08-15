@@ -14,10 +14,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 - **`init`'s success message now prints a copy-pasteable `export` line instead
   of naming the variable in prose.** `InitCommand::__invoke()`
-  (`src/Command/InitCommand.php`) used to say `Export ANTHROPIC_API_KEY, then
-  run "audit <path>".`, leaving the user to know their shell's export syntax
-  and retype the variable name. It now prints `Run: export
-  ANTHROPIC_API_KEY=, then "audit <path>".`, a line that can be pasted as-is.
+  (`src/Command/InitCommand.php`) used to say
+  `Export ANTHROPIC_API_KEY, then run "audit <path>".`, leaving the user to know
+  their shell's export syntax and retype the variable name. It now prints
+  `Run: export ANTHROPIC_API_KEY=, then "audit <path>".`, a line that can be
+  pasted as-is.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 
