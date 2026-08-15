@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase;
 
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
@@ -23,6 +24,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
@@ -34,7 +37,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterfa
  * stays free regardless of project size.
  *
  * Estimation strategy: every scanned file contributes its content to a
- * synthetic "attacker prompt" (input). Output tokens are projected at
+ * synthetic "attacker prompt" (input). The attacker system prompt's skill
+ * blocks are sent once per chunk — chunked the same way `FileChunker` chunks
+ * a real run — and added on top. Output tokens are projected at
  * `outputRatio * input` because audit prompts are heavily input-skewed.
  * Multiplied by `max_iterations` to account for the attacker/reviewer loop.
  */
@@ -56,12 +61,15 @@ final readonly class EstimateAuditCostUseCase
         private TokenEstimatorInterface $tokenEstimator,
         private CostCalculator $costCalculator,
         private LoggerInterface $logger,
+        private FileChunker $fileChunker,
+        private AttackerSkillPromptRendererInterface $attackerSkillPromptRenderer,
         private string $primaryModel = '',
         private int $maxIterations = 3,
         private float $outputRatio = self::DEFAULT_OUTPUT_RATIO,
         private string $reviewerModel = '',
         private float $reviewerInputRatio = self::DEFAULT_REVIEWER_INPUT_RATIO,
         private ?GitChangedFilesResolverInterface $gitChangedFilesResolver = null,
+        private bool $emitAllSkills = true,
     ) {}
 
     /**
@@ -93,6 +101,9 @@ final readonly class EstimateAuditCostUseCase
         foreach ($files as $file) {
             $attackerPerRoundInput += $this->tokenEstimator->estimateTokens($file->content(), $this->primaryModel);
         }
+
+        $chunkCount = \count($this->fileChunker->chunk($files));
+        $attackerPerRoundInput += $this->skillPromptTokens($files) * $chunkCount;
 
         $attackerInputTokens = $attackerPerRoundInput * $this->maxIterations;
         $attackerOutputTokens = (int) ceil($attackerInputTokens * $this->outputRatio);
@@ -134,6 +145,21 @@ final readonly class EstimateAuditCostUseCase
         ]);
 
         return AuditReport::fromContext($auditContext, $auditCost);
+    }
+
+    /**
+     * @param list<ProjectFile> $files
+     */
+    private function skillPromptTokens(array $files): int
+    {
+        $presentTypes = array_map(
+            static fn (ProjectFile $projectFile): ProjectFileType => $projectFile->fileType(),
+            $files,
+        );
+
+        $skillPrompt = $this->attackerSkillPromptRenderer->render($presentTypes, $this->emitAllSkills);
+
+        return '' === $skillPrompt ? 0 : $this->tokenEstimator->estimateTokens($skillPrompt, $this->primaryModel);
     }
 
     /**

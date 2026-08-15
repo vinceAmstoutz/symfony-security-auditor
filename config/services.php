@@ -54,6 +54,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\FormBindingParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
@@ -327,6 +328,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(WebhookConsumerAttackerSkill::class);
     $defaultsConfigurator->set(AttackerSkillRegistry::class)
         ->args([tagged_iterator('symfony_security_auditor.attacker_skill')]);
+    $defaultsConfigurator->alias(AttackerSkillPromptRendererInterface::class, AttackerSkillRegistry::class);
 
     $defaultsConfigurator->set(AttackerPromptBuilder::class)
         ->args([
@@ -648,12 +650,15 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(TokenEstimatorInterface::class),
             service(CostCalculator::class),
             service('logger'),
+            service(FileChunker::class),
+            service(AttackerSkillPromptRendererInterface::class),
             param('symfony_security_auditor.attacker_model'),
             param('symfony_security_auditor.audit.max_iterations'),
             EstimateAuditCostUseCase::DEFAULT_OUTPUT_RATIO,
             param('symfony_security_auditor.reviewer_model'),
             EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO,
             service(GitChangedFilesResolverInterface::class),
+            param('symfony_security_auditor.audit.stable_system_prompt'),
         ]);
 
     $defaultsConfigurator->set(ListScannedFilesUseCase::class)

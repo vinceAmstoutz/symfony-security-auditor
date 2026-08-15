@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **`--dry-run` now counts the attacker's skill-prompt overhead**, closing a
+  gap where the estimate undercounted real spend by a fixed amount repeated
+  on every chunk and every iteration. `audit.stable_system_prompt` (default
+  `true`) makes the attacker send every built-in skill block — currently 25 of
+  them, ~66KB of prompt — on every chunk regardless of relevance, and none of
+  that reached the estimate. `EstimateAuditCostUseCase::execute()` now chunks
+  the scanned files the same way a real run does (via `FileChunker`), renders
+  the skill prompt for the resolved `stable_system_prompt` setting through
+  the new `AttackerSkillPromptRendererInterface` port (implemented by
+  `AttackerSkillRegistry`), estimates its tokens once, and adds
+  `skillPromptTokens * chunkCount` to the attacker's per-round input before
+  scaling by `max_iterations`.
+
 ## [1.19.1] — 2026-08-13 — Lineage
 
 A release about the release process itself. A past release (PR #305) merged
