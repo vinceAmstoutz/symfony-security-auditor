@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Report;
 
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
@@ -123,6 +124,17 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
         $output = $this->renderer->render($this->makeReportWithCost(AuditCost::zero('')));
 
         self::assertStringContainsString('unknown model', $output);
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_shows_the_cost_labeled_as_published_rates(): void
+    {
+        $output = $this->renderer->render($this->makeReportWithCost(AuditCost::of(100, 50, 0.0123, 'claude-opus-4-7')));
+
+        self::assertStringContainsString('$0.0123 (published rates)', $output);
     }
 
     /**
