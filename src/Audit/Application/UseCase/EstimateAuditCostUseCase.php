@@ -39,7 +39,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterfa
  * Estimation strategy: every scanned file contributes its content to a
  * synthetic "attacker prompt" (input). The attacker system prompt's skill
  * blocks are sent once per chunk — chunked the same way `FileChunker` chunks
- * a real run — and added on top. Output tokens are projected at
+ * a real run — and added on top. When `audit.tools_enabled` is on, the
+ * attacker may take several tool-call rounds per chunk, each resending the
+ * growing conversation plus the tool schemas — `toolRoundTripRatio` inflates
+ * the per-round input to account for that. Output tokens are projected at
  * `outputRatio * input` because audit prompts are heavily input-skewed.
  * Multiplied by `max_iterations` to account for the attacker/reviewer loop.
  *
@@ -63,6 +66,14 @@ final readonly class EstimateAuditCostUseCase
      */
     public const float DEFAULT_REVIEWER_INPUT_RATIO = 0.20;
 
+    /**
+     * Conservative estimate of the extra attacker input consumed by
+     * tool-call round-trips (the re-sent conversation plus tool schemas on
+     * every round) when `audit.tools_enabled` is on. Calibrated against
+     * reference audits at ~50% on top of the base per-round input.
+     */
+    public const float DEFAULT_TOOL_ROUND_TRIP_RATIO = 0.50;
+
     public function __construct(
         private ProjectFileScannerInterface $projectFileScanner,
         private TokenEstimatorInterface $tokenEstimator,
@@ -77,6 +88,8 @@ final readonly class EstimateAuditCostUseCase
         private float $reviewerInputRatio = self::DEFAULT_REVIEWER_INPUT_RATIO,
         private ?GitChangedFilesResolverInterface $gitChangedFilesResolver = null,
         private bool $emitAllSkills = true,
+        private bool $toolsEnabled = true,
+        private float $toolRoundTripRatio = self::DEFAULT_TOOL_ROUND_TRIP_RATIO,
     ) {}
 
     /**
@@ -110,6 +123,10 @@ final readonly class EstimateAuditCostUseCase
         }
 
         $attackerPerRoundInput = $fileContentPerRoundInput + $this->skillPromptTokensAcrossChunks($files);
+
+        if ($this->toolsEnabled) {
+            $attackerPerRoundInput = (int) ceil($attackerPerRoundInput * (1 + $this->toolRoundTripRatio));
+        }
 
         $attackerInputTokens = $attackerPerRoundInput * $this->maxIterations;
         $attackerOutputTokens = (int) ceil($attackerInputTokens * $this->outputRatio);
