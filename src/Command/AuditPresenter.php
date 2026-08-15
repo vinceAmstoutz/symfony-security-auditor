@@ -140,7 +140,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         }
 
         $symfonyStyle->note('Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.');
-        $symfonyStyle->success('Dry run complete.');
+        $symfonyStyle->writeln('  ✅ Dry run complete.');
     }
 
     #[Override]
@@ -159,7 +159,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             $symfonyStyle->listing(array_map($this->sanitizePathForListing(...), $relativePaths));
         }
 
-        $symfonyStyle->success(\sprintf('%d file(s) in scope.', \count($projectFiles)));
+        $symfonyStyle->writeln(\sprintf('  ✅ %d file(s) in scope.', \count($projectFiles)));
     }
 
     #[Override]

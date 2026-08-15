@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Changed
+
+- **`--show-scanned` and `--dry-run` no longer close with a heavy `[OK]` block
+  for an intermediate confirmation.** `AuditPresenter::scannedFiles()` and
+  `AuditPresenter::dryRunResult()` (`src/Command/AuditPresenter.php`) used
+  `SymfonyStyle::success()` for the files-in-scope count and the
+  dry-run-complete message, so `--show-scanned --dry-run` printed two `[OK]`
+  boxes and a `[NOTE]` block within a few lines. Both now print a single light
+  `✅` line, matching the style the console report already uses for its own
+  success line — the boxed block is reserved for a command's true final
+  pass/fail outcome (`AuditPresenter::result()`).
+
 ## [1.19.1] — 2026-08-13 — Lineage
 
 A release about the release process itself. A past release (PR #305) merged
