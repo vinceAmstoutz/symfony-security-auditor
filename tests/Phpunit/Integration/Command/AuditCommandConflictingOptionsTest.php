@@ -120,6 +120,22 @@ final class AuditCommandConflictingOptionsTest extends TestCase
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_dry_run_does_not_warn_about_synthesis_cost_by_default(): void
+    {
+        $commandTester = $this->makeCommandTester();
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringNotContainsString('synthesis', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     private function makeCommandTester(): CommandTester
     {
         $vulnerability = Vulnerability::of(

@@ -700,6 +700,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             inline_service(RiskLevel::class)
                 ->factory([RiskLevel::class, 'from'])
                 ->args([param('symfony_security_auditor.audit.fail_on')]),
+            param('symfony_security_auditor.audit.poc_synthesis.enabled'),
+            param('symfony_security_auditor.audit.fix_synthesis.enabled'),
         ])
         ->tag('console.command');
 

@@ -528,6 +528,54 @@ final class AuditPresenterTest extends TestCase
         self::assertSame(1, substr_count($bufferedOutput->fetch(), 'made-up-model'));
     }
 
+    public function test_synthesis_cost_warning_names_poc_synthesis_when_enabled(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->synthesisCostWarnings($symfonyStyle, pocSynthesisEnabled: true, fixSynthesisEnabled: false);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('PoC synthesis', $display);
+        self::assertStringContainsString('audit.poc_synthesis.enabled', $display);
+        self::assertStringNotContainsString('Fix synthesis', $display);
+    }
+
+    public function test_synthesis_cost_warning_names_fix_synthesis_when_enabled(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->synthesisCostWarnings($symfonyStyle, pocSynthesisEnabled: false, fixSynthesisEnabled: true);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('Fix synthesis', $display);
+        self::assertStringContainsString('audit.fix_synthesis.enabled', $display);
+        self::assertStringNotContainsString('PoC synthesis', $display);
+    }
+
+    public function test_synthesis_cost_warning_names_both_stages_when_both_enabled(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->synthesisCostWarnings($symfonyStyle, pocSynthesisEnabled: true, fixSynthesisEnabled: true);
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('PoC synthesis', $display);
+        self::assertStringContainsString('Fix synthesis', $display);
+    }
+
+    public function test_synthesis_cost_warning_is_silent_when_neither_stage_is_enabled(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->synthesisCostWarnings($symfonyStyle, pocSynthesisEnabled: false, fixSynthesisEnabled: false);
+
+        self::assertSame('', $bufferedOutput->fetch());
+    }
+
     /**
      * @throws InvalidAuditCostException
      * @throws InvalidAuditContextException

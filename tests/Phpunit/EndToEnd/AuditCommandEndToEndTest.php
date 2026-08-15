@@ -943,7 +943,7 @@ final class AuditCommandEndToEndTest extends TestCase
     }
 
     /**
-     * @param array{secretScrubbingEnabled?: bool, configuredBaseline?: string|null, riskLevel?: RiskLevel, excludedTypes?: list<string>, includedTypes?: list<string>, maxCostUsd?: float|null} $overrides
+     * @param array{secretScrubbingEnabled?: bool, configuredBaseline?: string|null, riskLevel?: RiskLevel, excludedTypes?: list<string>, includedTypes?: list<string>, maxCostUsd?: float|null, pocSynthesisEnabled?: bool, fixSynthesisEnabled?: bool} $overrides
      */
     private function makeCommandTesterWithLLM(LLMClientInterface $attackerLLM, LLMClientInterface $reviewerLLM, array $overrides = []): CommandTester
     {
@@ -953,6 +953,8 @@ final class AuditCommandEndToEndTest extends TestCase
         $excludedTypes = $overrides['excludedTypes'] ?? [];
         $includedTypes = $overrides['includedTypes'] ?? [];
         $maxCostUsd = $overrides['maxCostUsd'] ?? null;
+        $pocSynthesisEnabled = $overrides['pocSynthesisEnabled'] ?? false;
+        $fixSynthesisEnabled = $overrides['fixSynthesisEnabled'] ?? false;
 
         $progressReporterHolder = new ProgressReporterHolder(new NullLogger());
         $auditOrchestrator = new AuditOrchestrator(
@@ -1021,6 +1023,8 @@ final class AuditCommandEndToEndTest extends TestCase
             secretScrubbingEnabled: $secretScrubbingEnabled,
             findingTypeFilter: new FindingTypeFilter($includedTypes, $excludedTypes),
             riskLevel: $riskLevel,
+            pocSynthesisEnabled: $pocSynthesisEnabled,
+            fixSynthesisEnabled: $fixSynthesisEnabled,
         );
 
         return new CommandTester($auditCommand);
@@ -1093,6 +1097,54 @@ final class AuditCommandEndToEndTest extends TestCase
         ]);
 
         self::assertStringContainsString('No published pricing', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_dry_run_warns_that_poc_synthesis_cost_is_not_included(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}', ['pocSynthesisEnabled' => true]);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringContainsString('PoC synthesis', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_dry_run_warns_that_fix_synthesis_cost_is_not_included(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}', ['fixSynthesisEnabled' => true]);
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringContainsString('Fix synthesis', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_dry_run_does_not_warn_about_synthesis_cost_when_neither_stage_is_enabled(): void
+    {
+        $this->createProjectDir();
+
+        $commandTester = $this->makeCommandTester('[]', '{}');
+        $commandTester->execute([
+            'project-path' => $this->fixtureDir,
+            '--dry-run' => true,
+        ]);
+
+        self::assertStringNotContainsString('synthesis', $commandTester->getDisplay());
     }
 
     /**

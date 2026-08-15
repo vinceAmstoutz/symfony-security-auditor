@@ -30,6 +30,8 @@ interface AuditPresenterInterface
 
     public function unsupportedModelWarnings(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void;
 
+    public function synthesisCostWarnings(SymfonyStyle $symfonyStyle, bool $pocSynthesisEnabled, bool $fixSynthesisEnabled): void;
+
     public function runningSection(SymfonyStyle $symfonyStyle): void;
 
     public function longRunNotice(SymfonyStyle $symfonyStyle): void;
