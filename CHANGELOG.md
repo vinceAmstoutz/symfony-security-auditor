@@ -12,17 +12,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ### Added
 
-- **The console, Markdown, and HTML reports now show the audit's real cost,
-  not just token counts.** `RunAuditUseCase::buildCost()` already assembled
-  an `AuditCost` from the LLM provider's own per-call token usage, but
+- **The console, Markdown, and HTML reports now show the audit's real cost, not
+  just token counts.** `RunAuditUseCase::buildCost()` already assembled an
+  `AuditCost` from the LLM provider's own per-call token usage, but
   `ConsoleReportRenderer`, `MarkdownReportRenderer`, and `HtmlReportRenderer`
   (`src/Audit/Infrastructure/Report/`) only ever rendered
   `inputTokens()`/`outputTokens()`/`primaryModel()` — `estimatedCostUsd()` was
   computed but never shown outside `--format=json`/`--format=sarif` or
-  `--dry-run`. All three renderers now show a `Cost` line labeled
-  "published rates" — the token counts are the provider's exact figures, but
-  the USD conversion comes from `symfony/models-dev`'s published pricing
-  snapshot, which can drift from a negotiated rate or an unpriced model.
+  `--dry-run`. All three renderers now show a `Cost` line labeled "published
+  rates" — the token counts are the provider's exact figures, but the USD
+  conversion comes from `symfony/models-dev`'s published pricing snapshot, which
+  can drift from a negotiated rate or an unpriced model.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 
