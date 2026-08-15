@@ -18,6 +18,7 @@ use Override;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Formatter\OutputFormatterInterface;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
@@ -117,6 +118,41 @@ final class AuditPresenterTest extends TestCase
 
         $display = $bufferedOutput->fetch();
         self::assertStringContainsString('/var/www/<fg=grey>oops</>', $display);
+    }
+
+    public function test_header_falls_back_to_the_plain_title_when_not_decorated(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->header($symfonyStyle, '/path/to/project');
+
+        $display = $bufferedOutput->fetch();
+        self::assertStringContainsString('Symfony LLM Security Auditor', $display);
+        self::assertStringNotContainsString('◉', $display);
+    }
+
+    public function test_header_shows_a_branded_banner_when_decorated(): void
+    {
+        $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->header($symfonyStyle, '/path/to/project');
+
+        $display = $bufferedOutput->fetch();
+        $formatter = $bufferedOutput->getFormatter();
+        self::assertStringContainsString($this->formatted($formatter, '<fg=#e71c55>◉</>'), $display);
+        self::assertStringContainsString($this->formatted($formatter, '<fg=#242d5c;options=bold>Symfony LLM Security Auditor</>'), $display);
+        self::assertStringContainsString($this->formatted($formatter, \sprintf('<fg=#e71c55>%s</>', str_repeat('─', 70))), $display);
+        self::assertSame(1, substr_count($display, 'Symfony LLM Security Auditor'), 'the plain title() fallback must not also run once the banner has printed');
+    }
+
+    private function formatted(OutputFormatterInterface $outputFormatterInterface, string $tag): string
+    {
+        $formatted = $outputFormatterInterface->format($tag);
+        self::assertNotNull($formatted);
+
+        return $formatted;
     }
 
     /**

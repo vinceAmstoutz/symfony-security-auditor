@@ -28,15 +28,44 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTex
 /** @internal not part of the BC promise — see docs/versioning.md */
 final readonly class AuditPresenter implements AuditPresenterInterface
 {
+    private const string WORDMARK = 'Symfony LLM Security Auditor';
+
+    /** Sampled from the circular bug glyph in `assets/banner.webp`. */
+    private const string BANNER_PINK = '#e71c55';
+
+    /** Sampled from the wordmark in `assets/banner.webp`. */
+    private const string BANNER_NAVY = '#242d5c';
+
     public function __construct(private PricingProviderInterface $pricingProvider) {}
 
     #[Override]
     public function header(SymfonyStyle $symfonyStyle, string $projectPath): void
     {
-        $symfonyStyle->title('Symfony LLM Security Auditor');
+        $this->wordmark($symfonyStyle);
+
         $symfonyStyle->text([
             \sprintf('Project: <info>%s</info>', OutputFormatter::escape($projectPath)),
             'Pipeline: Ingestion → Mapping → Audit (Attacker ⚔ Reviewer)',
+            '',
+        ]);
+    }
+
+    private function wordmark(SymfonyStyle $symfonyStyle): void
+    {
+        if ($symfonyStyle->isDecorated()) {
+            $this->identityBanner($symfonyStyle);
+
+            return;
+        }
+
+        $symfonyStyle->title(self::WORDMARK);
+    }
+
+    private function identityBanner(SymfonyStyle $symfonyStyle): void
+    {
+        $symfonyStyle->writeln([
+            \sprintf('<fg=%s>◉</> <fg=%s;options=bold>%s</>', self::BANNER_PINK, self::BANNER_NAVY, self::WORDMARK),
+            \sprintf('<fg=%s>%s</>', self::BANNER_PINK, str_repeat('─', 70)),
             '',
         ]);
     }

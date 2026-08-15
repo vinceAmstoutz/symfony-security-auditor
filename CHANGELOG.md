@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **The CLI now shows a branded identity banner instead of a plain
+  underlined header.** `AuditPresenter::header()`
+  (`src/Command/AuditPresenter.php`) used to print
+  `$symfonyStyle->title('Symfony LLM Security Auditor')` — a plain line with
+  no visual identity. On a decorated (color-capable) terminal it now prints a
+  small banner combining a circular glyph with the wordmark, colored with the
+  pink/navy palette sampled from `assets/banner.webp` (`#e71c55`/`#242d5c`).
+  Non-decorated output (CI, redirected output, `NO_COLOR`) keeps the original
+  plain title line.
+
 ## [1.19.1] — 2026-08-13 — Lineage
 
 A release about the release process itself. A past release (PR #305) merged
