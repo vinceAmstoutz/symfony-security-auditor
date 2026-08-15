@@ -14,15 +14,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 - **`--dry-run` now warns when PoC or fix synthesis is enabled**, since neither
   stage's cost was ever included in the estimate. `PoCSynthesizer` and
-  `FixSynthesizer` each make their own LLM call per qualifying finding — a
-  cost that can't be known before the attacker has actually run and found
-  something — so `EstimateAuditCostUseCase`'s cost breakdown has no line item
-  for either. `AuditPresenter::synthesisCostWarnings()` prints a stderr
-  warning naming the enabled stage(s) (`audit.poc_synthesis.enabled` /
+  `FixSynthesizer` each make their own LLM call per qualifying finding — a cost
+  that can't be known before the attacker has actually run and found something —
+  so `EstimateAuditCostUseCase`'s cost breakdown has no line item for either.
+  `AuditPresenter::synthesisCostWarnings()` prints a stderr warning naming the
+  enabled stage(s) (`audit.poc_synthesis.enabled` /
   `audit.fix_synthesis.enabled`) whenever `--dry-run` runs with one on,
   mirroring the existing unpriced-model warning precedent. The `thorough`
-  profile turns PoC synthesis on by default, making it the case most likely
-  to hit this gap.
+  profile turns PoC synthesis on by default, making it the case most likely to
+  hit this gap.
 
 ## [1.19.1] — 2026-08-13 — Lineage
 
