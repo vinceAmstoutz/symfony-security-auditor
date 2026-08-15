@@ -22,6 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\P
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 
 use function Symfony\Component\String\b;
 
@@ -41,11 +42,14 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
 {
     private const string BRIDGE_AUTOLOAD_RELATIVE_PATH = 'vendor/autoload.php';
 
+    private const string MODELS_DEV_PACKAGE = 'symfony/models-dev';
+
     public function __construct(
         private StandaloneConfigLoader $standaloneConfigLoader,
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private ComposerAvailabilityCheckerInterface $composerAvailabilityChecker,
         private AuditPreflightInterface $auditPreflight,
+        private string $pricingCatalogPackage = self::MODELS_DEV_PACKAGE,
     ) {}
 
     /**
@@ -60,6 +64,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
             $doctorCheckResult,
             $this->bridgeCheck(DoctorCheckStatus::Ok === $doctorCheckResult->status),
             $this->composerCheck(),
+            $this->pricingCatalogCheck(),
         ];
     }
 
@@ -126,5 +131,14 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         return $this->composerAvailabilityChecker->isAvailable()
             ? new DoctorCheckResult('Composer', DoctorCheckStatus::Ok, 'Available.')
             : new DoctorCheckResult('Composer', DoctorCheckStatus::Warning, 'Not found — needed only to run "init" or switch providers, not to audit.');
+    }
+
+    private function pricingCatalogCheck(): DoctorCheckResult
+    {
+        $version = (new ReportPackage($this->pricingCatalogPackage))->version();
+
+        return ReportPackage::UNKNOWN_VERSION === $version
+            ? new DoctorCheckResult('Pricing catalog', DoctorCheckStatus::Warning, \sprintf('%s not found — cost figures will show $0.00.', $this->pricingCatalogPackage))
+            : new DoctorCheckResult('Pricing catalog', DoctorCheckStatus::Ok, \sprintf('%s %s.', $this->pricingCatalogPackage, $version));
     }
 }

@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Added
+
+- **`doctor` and `--version` now surface which `symfony/models-dev` pricing
+  snapshot is bundled.** A standalone install's cost figures (`--dry-run`,
+  the report's `Cost` line) come from whatever `symfony/models-dev` catalog
+  was newest on Packagist when that release's binary was built, with no way
+  to see which snapshot that is. `EnvironmentDoctor::diagnose()`
+  (`src/Command/EnvironmentDoctor.php`) gains a "Pricing catalog" check
+  reporting the installed version (`Composer\InstalledVersions`), and the
+  standalone binary's `--version` output now appends it too, via a new
+  `StandaloneApplication` (`src/Standalone/StandaloneApplication.php`)
+  overriding `getLongVersion()` — the bare `Symfony\Component\Console\Application`
+  used by `StandaloneApplicationFactory` had no other extension point for this.
+
 ## [1.19.1] — 2026-08-13 — Lineage
 
 A release about the release process itself. A past release (PR #305) merged

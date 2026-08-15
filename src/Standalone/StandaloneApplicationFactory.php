@@ -61,6 +61,8 @@ final readonly class StandaloneApplicationFactory
 {
     private const string APPLICATION_NAME = 'symfony-security-auditor';
 
+    private const string MODELS_DEV_PACKAGE = 'symfony/models-dev';
+
     private const string PROJECT_CONFIG_FILENAME = '.symfony-security-auditor.yaml';
 
     private const string UPDATE_CHECK_OPT_OUT_VARIABLE = 'SSA_NO_UPDATE_CHECK';
@@ -138,7 +140,7 @@ final readonly class StandaloneApplicationFactory
 
     public function create(): Application
     {
-        $application = new Application(self::APPLICATION_NAME, (new ReportPackage())->version());
+        $application = new StandaloneApplication(self::APPLICATION_NAME, (new ReportPackage())->version(), (new ReportPackage(self::MODELS_DEV_PACKAGE))->version());
         $application->addCommand($this->initCommand());
         $application->addCommand($this->selfUpdateCommand());
         $application->addCommand($this->doctorCommand());

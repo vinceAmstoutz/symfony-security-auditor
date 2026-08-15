@@ -61,7 +61,45 @@ final class EnvironmentDoctorTest extends TestCase
             new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and the API-key variable is set.'),
             new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed and the audit boots with it.'),
             new DoctorCheckResult('Composer', DoctorCheckStatus::Ok, 'Available.'),
-        ], $results);
+        ], \array_slice($results, 0, 3));
+    }
+
+    public function test_it_reports_the_bundled_pricing_catalog_version(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\nmodel: 'gpt-4'\n");
+        $this->installBridge();
+
+        $results = $this->doctorWith($this->resolver(), [], true)->diagnose();
+
+        self::assertSame('Pricing catalog', $results[3]->label);
+        self::assertSame(DoctorCheckStatus::Ok, $results[3]->status);
+        self::assertMatchesRegularExpression('/^symfony\/models-dev v?[0-9]+(\.[0-9]+)*\.$/', $results[3]->detail);
+    }
+
+    public function test_it_warns_when_the_pricing_catalog_package_is_not_installed(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: 'sk-test'\nmodel: 'gpt-4'\n");
+        $this->installBridge();
+
+        $xdgConfigPathResolver = $this->resolver();
+        $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
+        $composerAvailabilityChecker->method('isAvailable')->willReturn(true);
+        $auditPreflight = self::createStub(AuditPreflightInterface::class);
+
+        $environmentDoctor = new EnvironmentDoctor(
+            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
+            $xdgConfigPathResolver,
+            $composerAvailabilityChecker,
+            $auditPreflight,
+            'vinceamstoutz/definitely-not-installed',
+        );
+
+        $results = $environmentDoctor->diagnose();
+
+        self::assertEquals(
+            new DoctorCheckResult('Pricing catalog', DoctorCheckStatus::Warning, 'vinceamstoutz/definitely-not-installed not found — cost figures will show $0.00.'),
+            $results[3],
+        );
     }
 
     public function test_it_fails_the_bridge_check_when_the_installed_bridge_cannot_boot_the_audit(): void

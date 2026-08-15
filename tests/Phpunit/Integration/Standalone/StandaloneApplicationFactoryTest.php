@@ -80,6 +80,19 @@ final class StandaloneApplicationFactoryTest extends TestCase
         self::assertSame((new ReportPackage())->version(), $application->getVersion());
     }
 
+    public function test_it_includes_the_bundled_models_dev_version_in_the_long_version(): void
+    {
+        $application = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => sys_get_temp_dir().'/ssa-absent-'.bin2hex(random_bytes(6)),
+            'XDG_CACHE_HOME' => $this->cacheHome,
+        ])->create();
+
+        self::assertStringContainsString(
+            \sprintf('symfony/models-dev %s', (new ReportPackage('symfony/models-dev'))->version()),
+            $application->getLongVersion(),
+        );
+    }
+
     public function test_it_registers_the_init_command(): void
     {
         $application = StandaloneApplicationFactory::fromEnvironment([
