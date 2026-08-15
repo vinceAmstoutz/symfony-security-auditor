@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org). See
 
 ## [Unreleased]
 
+### Changed
+
+- **`--show-scanned`'s generic `php` bucket no longer reads as "every PHP
+  file."** `AuditPresenter::scannedFiles()`
+  (`src/Command/AuditPresenter.php`) printed the fallback `ProjectFileType::PHP`
+  bucket — the catch-all for `.php` files matching no specific archetype — as
+  a plain `php (N)` sibling of `entity`/`voter`/`event_subscriber`/etc., with
+  nothing marking it as the leftover bucket it is. It's now labeled
+  `php · uncategorized` and, along with `other`, always renders last, after
+  every specific archetype. Presentation only — `ProjectFileType::PHP`'s
+  backed value (`'php'`, used by `included_types`/`excluded_types` config) is
+  unchanged.
+
 ## [1.19.1] — 2026-08-13 — Lineage
 
 A release about the release process itself. A past release (PR #305) merged

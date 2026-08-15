@@ -22,6 +22,7 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
@@ -155,7 +156,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $symfonyStyle->section(\sprintf('Scanned files (%d)', \count($projectFiles)));
 
         foreach ($this->relativePathsByType($projectFiles) as $type => $relativePaths) {
-            $symfonyStyle->writeln(\sprintf(' <info>%s</info> (%d)', $type, \count($relativePaths)));
+            $symfonyStyle->writeln(\sprintf(' <info>%s</info> (%d)', $this->bucketLabel($type), \count($relativePaths)));
             $symfonyStyle->listing(array_map($this->sanitizePathForListing(...), $relativePaths));
         }
 
@@ -196,7 +197,36 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             $byType[$projectFile->type()][] = $projectFile->relativePath();
         }
 
-        return $byType;
+        return $this->withUncategorizedBucketsLast($byType);
+    }
+
+    /**
+     * `ProjectFileType::PHP`/`::OTHER` are the fallback buckets a file lands
+     * in only when nothing more specific matched, so — unlike `controller`,
+     * `voter`, etc. — they read as "every PHP file" if they appear as just
+     * another sibling in scan order. Moving them after every specific
+     * archetype marks them as the leftovers they are.
+     *
+     * @param array<string, list<string>> $byType
+     *
+     * @return array<string, list<string>>
+     */
+    private function withUncategorizedBucketsLast(array $byType): array
+    {
+        $trailing = [];
+        foreach ([ProjectFileType::PHP->value, ProjectFileType::OTHER->value] as $trailingType) {
+            if (\array_key_exists($trailingType, $byType)) {
+                $trailing[$trailingType] = $byType[$trailingType];
+                unset($byType[$trailingType]);
+            }
+        }
+
+        return $byType + $trailing;
+    }
+
+    private function bucketLabel(string $type): string
+    {
+        return ProjectFileType::PHP->value === $type ? 'php · uncategorized' : $type;
     }
 
     #[Override]

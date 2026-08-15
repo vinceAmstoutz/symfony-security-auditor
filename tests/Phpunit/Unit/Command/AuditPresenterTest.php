@@ -402,6 +402,48 @@ final class AuditPresenterTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_scanned_files_labels_the_generic_php_bucket_as_uncategorized(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/Utility/Helper.php', '/p/src/Utility/Helper.php', '<?php class Helper {}'),
+        ]);
+
+        $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
+        self::assertStringContainsString('php · uncategorized (1)', $flattened);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_scanned_files_renders_the_uncategorized_php_and_other_buckets_last(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
+
+        $this->auditPresenter->scannedFiles($symfonyStyle, [
+            ProjectFile::create('src/Utility/Helper.php', '/p/src/Utility/Helper.php', '<?php class Helper {}'),
+            ProjectFile::create('README.md', '/p/README.md', '# readme'),
+            ProjectFile::create('src/Controller/HomeController.php', '/p/src/Controller/HomeController.php', '<?php class HomeController {}'),
+        ]);
+
+        $flattened = $bufferedOutput->fetch();
+        $controllerPosition = mb_strpos($flattened, 'controller (1)');
+        $phpPosition = mb_strpos($flattened, 'php · uncategorized (1)');
+        $otherPosition = mb_strpos($flattened, 'other (1)');
+
+        self::assertIsInt($controllerPosition);
+        self::assertIsInt($phpPosition);
+        self::assertIsInt($otherPosition);
+        self::assertLessThan($phpPosition, $controllerPosition);
+        self::assertLessThan($otherPosition, $phpPosition);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_scanned_files_does_not_render_a_crafted_file_path_as_console_markup(): void
     {
         $bufferedOutput = new BufferedOutput(BufferedOutput::VERBOSITY_NORMAL, true);
